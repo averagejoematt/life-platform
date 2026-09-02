@@ -31,7 +31,11 @@ per-LAMBDA, so per-feature dollars exist only where feature <-> lambda is 1:1
 ``monthly_budget_usd=None`` and are gated only by the ADR-063 ceiling — the gap
 is visible in the row, not hidden. Budgeted rows covered $41.28 of the $84.87
 August stamped spend; with ``unknown`` ($33.21) the close check grades ~88% of
-stamped dollars.
+stamped dollars. **The true ungraded remainder is $10.38** (August stamped
+$84.87 minus $74.49 graded), not the "~$1.2/mo residual" the founding PR (#3427)
+stated — that figure counted only SHARED-claimed rows and missed the $9.22 that
+sits in named-lambda dimensions with NO ledger row at all (#3447; see the
+unclaimed-dimension check below, which is what closes that gap going forward).
 
 THE BUDGET RULE IS DERIVED, NOT CHOSEN: ``round(max($1.00, 1.15 x founding
 August actual), 2)``. 1.15 is R2's MoM growth clause (calibrated so the Jul->Aug
@@ -40,13 +44,40 @@ the $1.00 floor keeps sub-dollar features from flapping the close while still
 capping any of them at <0.5% of the $215 ceiling. ``validate()`` recomputes the
 rule, so a budget can't drift from its stated derivation.
 
+FOUR GUARDS WERE FOUNDING-MONTH SNAPSHOTS, NOT INVARIANTS (#3447, the Session S
+calculation-proof pass) — each is now closed, at the plane named:
+  (a) unclaimed dimensions were invisible — a named LambdaFunction dimension
+      with real spend, claimed by NO row (EXCLUSIVE or SHARED) and not
+      ``unknown`` either, passed the close silently ($9.22/10.9% of August's
+      stamped dollars, 8 dimensions incl. ai-expert-analyzer $4.45,
+      coach-quality-gate $2.66, remediation-agent $1.96). ``evaluate_close()``
+      now sums every dimension no row claims and reds above a floor.
+  (b) the down-only ``unknown`` ratchet checked only the FOUNDING pin, so
+      ratchet-to-$5-then-reraise-to-$20 (still <= founding $33.19) was a
+      quiet one-file edit. The contract test now pins the CURRENT committed
+      value too (equality, not <=), so ANY move off it — up or down, anywhere
+      in the range — requires touching the test file as well.
+  (c) absence graded as a quiet pass — ``spend.get(k, 0.0)`` reads $0.00 for a
+      dead or renamed emitter forever. A founding->=$1 EXCLUSIVE row reading
+      $0.00 now fails as a probable absent/renamed emitter, not a clean bill.
+  (d) the secrets population in the R1 cost-surface plane counts
+      ``tests/test_secret_references.KNOWN_SECRETS`` — a CODE-REFERENCE
+      registry (lambdas/+mcp/ scan) — and calls it the billable estate; the
+      live Secrets Manager estate already disagrees (28 registry vs 26 live,
+      and ``life-platform/github-billing`` is live+billed but referenced only
+      from ``deploy/``, outside the scan). ``scripts/monthly_close.py`` now
+      prints a read-only registry-vs-estate reconciliation line at close.
+
 ENFORCEMENT PLANES (no new alarm, cron, or runtime — #3374's constraint):
-  * pre-merge  — the contract test (set equality, down-only unknown, rule
-                 conformance, mutation controls);
+  * pre-merge  — the contract test (set equality, down-only unknown incl. the
+                 current-value pin, rule conformance, mutation controls);
   * at close   — ``scripts/monthly_close.py`` step [5/5] evaluates this ledger
-                 against its own attribution run and exits 1 on any overage;
-                 standalone form: ``python3 scripts/ai_budget_ledger.py --month
-                 2026-09`` (read-only CloudWatch, via the instrument).
+                 (unclaimed dimensions, per-budget overage, absent-emitter
+                 flags, the down-only ratchet) against its own attribution run
+                 and exits 1 on any failure, plus a separate secrets
+                 registry-vs-estate line; standalone form:
+                 ``python3 scripts/ai_budget_ledger.py --month 2026-09``
+                 (read-only CloudWatch, via the instrument).
 
 Usage
 -----
@@ -85,6 +116,19 @@ GROWTH_FACTOR = 1.15
 BUDGET_FLOOR_USD = 1.00
 
 FOUNDING_WINDOW = "2026-08"  # ai_spend_attribution --month 2026-08, run 2026-09-01
+
+# #3447 leg (a): a named LambdaFunction dimension with real spend, claimed by NO
+# row's attribution_keys and not `unknown` either, is invisible to every check
+# above — reusing the $1 floor keeps a handful of cents from flapping the close
+# while still catching the founding $9.22/8-dimension escape (each of those
+# dimensions individually clears $1).
+UNCLAIMED_DIMENSION_FLOOR_USD = BUDGET_FLOOR_USD
+
+# #3447 leg (c): a row whose founding month cleared this floor is a KNOWN-ACTIVE
+# emitter — reading exactly $0.00 later is not a clean bill, it is indistinguishable
+# from the emitter being dead or renamed (the class the same finding's leg (a) sees
+# from the other side: the renamed lambda's dollars land as an unclaimed dimension).
+ABSENT_EMITTER_FOUNDING_FLOOR_USD = BUDGET_FLOOR_USD
 
 
 def _row(*, owner, attribution, attribution_keys=(), founding_usd=None, monthly_budget_usd=None, note):
@@ -276,6 +320,17 @@ def budget_guard_features() -> frozenset:
     raise ValueError(f"_FEATURE_CUTOFF not found (or empty) in {BUDGET_GUARD_PATH} — the R3 derivation rotted")
 
 
+def claimed_attribution_keys() -> frozenset:
+    """Every ``LambdaFunction`` dimension value ANY row claims (EXCLUSIVE or
+    SHARED — both name which dimension values carry their spend, even where
+    SHARED means the per-feature split isn't separable). A live spend dimension
+    outside this set and outside ``unknown`` is claimed by nothing (#3447 leg a)."""
+    keys: set[str] = set()
+    for row in LEDGER.values():
+        keys.update(row["attribution_keys"])
+    return frozenset(keys)
+
+
 def expected_budget(founding_usd: float) -> float:
     """The stated budget rule — recomputed, so a stamped budget can't drift from it."""
     return round(max(BUDGET_FLOOR_USD, GROWTH_FACTOR * founding_usd), 2)
@@ -337,7 +392,16 @@ def evaluate_close(attribution: dict) -> list[str]:
     Grades every budgeted (EXCLUSIVE) row's summed spend against its budget, and
     the ``unknown`` bucket against the down-only ratchet. Absence is failure,
     never success: an empty measurement or a missing ``unknown`` datapoint is
-    indistinguishable from a broken query and reds the close."""
+    indistinguishable from a broken query and reds the close.
+
+    #3447 adds two more close-time invariants the founding ledger didn't have:
+      (a) a named dimension with real spend, claimed by no row and not
+          ``unknown``, is invisible to every check above — sum it and red
+          above ``UNCLAIMED_DIMENSION_FLOOR_USD``;
+      (c) a founding->=$1 EXCLUSIVE row reading exactly $0.00 is graded as a
+          probable dead or renamed emitter, not a clean bill (``unknown`` is
+          exempt — a $0.00 unknown means attribution reached 100%, the
+          ratchet's own success state, not an absence)."""
     failures: list[str] = []
     rows = attribution.get("features") or []
     spend = {r["feature"]: float(r.get("cost_usd") or 0.0) for r in rows}
@@ -360,6 +424,37 @@ def evaluate_close(attribution: dict) -> list[str]:
                 f"{name}: ${actual:.2f} over {over} ${budget:.2f} "
                 f"(keys {', '.join(row['attribution_keys'])}) — name the driver or raise the budget deliberately"
             )
+
+    # (c) absent/renamed-emitter flag: a founding->=$1 EXCLUSIVE row reading
+    # exactly $0.00 this window is graded as a probable dead or renamed emitter.
+    for name, row in sorted(LEDGER.items()):
+        if name == UNKNOWN_KEY or row["attribution"] != EXCLUSIVE:
+            continue
+        founding = row["founding_usd"]
+        if founding is None or founding < ABSENT_EMITTER_FOUNDING_FLOOR_USD:
+            continue
+        actual = sum(spend.get(k, 0.0) for k in row["attribution_keys"])
+        if actual <= 0.0:
+            failures.append(
+                f"{name}: founding ${founding:.2f} but $0.00 this window across keys "
+                f"{', '.join(row['attribution_keys'])} — flagged as an absent or renamed emitter, not a pass "
+                f"(#3447 leg c; a renamed lambda's dollars would surface as an unclaimed dimension below)"
+            )
+
+    # (a) unclaimed named dimensions: real spend under a LambdaFunction value no
+    # row claims and that isn't `unknown` either — invisible to every check above.
+    claimed = claimed_attribution_keys()
+    unclaimed = {k: v for k, v in spend.items() if k != UNKNOWN_KEY and k not in claimed and v > 0}
+    unclaimed_total = sum(unclaimed.values())
+    if unclaimed and (
+        unclaimed_total > UNCLAIMED_DIMENSION_FLOOR_USD or any(v > UNCLAIMED_DIMENSION_FLOOR_USD for v in unclaimed.values())
+    ):
+        named = ", ".join(f"{k} (${v:.2f})" for k, v in sorted(unclaimed.items(), key=lambda kv: -kv[1]))
+        failures.append(
+            f"unclaimed named dimension(s) outside every ledger row and outside `unknown`, total "
+            f"${unclaimed_total:.2f}: {named} — declare a ledger row for each or fold it into an existing "
+            f"row's attribution_keys (#3447 leg a)"
+        )
     return failures
 
 

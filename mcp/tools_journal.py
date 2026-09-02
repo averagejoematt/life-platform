@@ -232,6 +232,11 @@ def tool_get_flourishing_trend(args):
     from health.flourishing import SIGNALS, ema_series, provenance_line
 
     days = max(7, min(365, int(args.get("days") or 90)))
+    # default span=14: chosen against the observed median inter-entry gap
+    # (~9d) in real journal density, not a calendar-day target — the EMA
+    # below is observation-indexed (see ema_span_semantics in the payload),
+    # so a span a bit past the typical gap keeps at least one prior entry
+    # meaningfully weighted without collapsing to the single latest row.
     span = max(3, min(60, int(args.get("ema_span") or 14)))
     start = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     resp = table.query(
@@ -257,6 +262,12 @@ def tool_get_flourishing_trend(args):
     return {
         "window_days": days,
         "ema_span": span,
+        "ema_span_semantics": (
+            "observation-indexed, not calendar-indexed: the span counts contributing "
+            "ROWS (see days_with_rows), and gaps between journal entries are carried "
+            "across rather than decayed by elapsed time — a sparse history keeps old "
+            "readings influential far longer than the span number implies."
+        ),
         "days_with_rows": len(rows),
         "signals": trends,
         "channels_present": channels_present,

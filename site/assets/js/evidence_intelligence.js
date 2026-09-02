@@ -374,7 +374,15 @@ function _calStatFigs(s, scope) {
     fig(s.n, nLabel, null, "calibration_score_pairs"),
     s.brier != null && fig(fmt(s.brier), "Brier", null, "brier_score"),
     s.brier_skill != null && fig(fmt(s.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
-    s.accuracy_pct != null && fig(fmt(s.accuracy_pct) + "%", "hit rate", null, "calibration_score_pairs"),
+    // #3450, ADR-105: a bare hit rate off a small n reads as more precise than it
+    // is — the 95% Wilson interval rides along as the figure's delta line.
+    s.accuracy_pct != null &&
+      fig(
+        fmt(s.accuracy_pct) + "%",
+        "hit rate",
+        s.accuracy_ci95 ? `95% CI ${fmt(s.accuracy_ci95[0])}–${fmt(s.accuracy_ci95[1])}%` : null,
+        "calibration_score_pairs",
+      ),
     // #1370 honest badge: calibrated (reliability) ≠ skilled (beats base rate). A
     // skill ≤ 0 surface reads the dignified state with its n, never "Well Calibrated".
     s.calibration === "not_yet_skillful"
@@ -462,7 +470,10 @@ export function renderCalibration(d) {
       const calCell = c.calibration && c.calibration !== "insufficient_data"
         ? esc(ttl(String(c.calibration).replace(/_/g, " ")))
         : (cl.calibration && cl.calibration !== "insufficient_data" ? `career ${esc(ttl(String(cl.calibration).replace(/_/g, " ")))}` : "—");
-      return `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}</td><td class="num">${seasonN}</td><td class="num">${careerN}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range">${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${calCell}</td></tr>`;
+      // #3450: the CI rides as a title tooltip in this dense per-coach table — the
+      // platform-wide figure above carries the same interval inline, uncollapsed.
+      const accTitle = c.accuracy_ci95 ? ` title="95% CI ${fmt(c.accuracy_ci95[0])}–${fmt(c.accuracy_ci95[1])}%"` : "";
+      return `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}</td><td class="num">${seasonN}</td><td class="num">${careerN}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range"${accTitle}>${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${calCell}</td></tr>`;
     })
     .join("");
   const board = sec(

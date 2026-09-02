@@ -17,7 +17,6 @@ v1.0.0 — 2026-03-31
 import json
 import logging
 import os
-import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -56,6 +55,7 @@ def _get_api_key():
     return _api_key_cache
 
 
+from common import digest_utils  # #3442: the shared day-row predicate (DAY_SK_RE)
 from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
@@ -101,7 +101,10 @@ def _query_source(source, start_date, end_date):
     return _decimal_to_float(resp.get("Items", []))
 
 
-_DAY_SK_RE = re.compile(r"^DATE#\d{4}-\d{2}-\d{2}$")
+# #3442: converged onto the shared predicate — this module's 2026-W26 incident
+# (docstring below) was the class's prior art, fixed here first and refound at 8
+# other sites by the 2026-09-02 calculation-proof pass.
+_DAY_SK_RE = digest_utils.DAY_SK_RE
 
 
 def _query_day_records(source, start_date, end_date):

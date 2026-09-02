@@ -125,7 +125,13 @@ function renderScorecard(s, parsed) {
     statBlock("resolved calls", String(s.n), `${s.confirmed} came true · ${s.refuted} did not`) +
     statBlock("Brier score", num(s.brier, 4), "0 perfect · 0.25 = always saying 50%") +
     statBlock("skill vs base rate", skillTxt, skillSub) +
-    statBlock("hit rate", s.accuracy_pct === null ? "—" : `${num(s.accuracy_pct, 1)}%`, "the flattering number — read it last") +
+    statBlock(
+      "hit rate",
+      s.accuracy_pct === null ? "—" : `${num(s.accuracy_pct, 1)}%`,
+      s.accuracy_ci95
+        ? `95% CI ${num(s.accuracy_ci95[0], 1)}–${num(s.accuracy_ci95[1], 1)}% — read it last`
+        : "the flattering number — read it last",
+    ) +
     `</div>`;
 
   const verdictKey = s.calibration;
