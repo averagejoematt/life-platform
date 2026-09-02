@@ -29,6 +29,7 @@ import hashlib
 import inspect
 
 from ai import conversation_enrichment
+from coach.coach_prediction_evaluator import _get_ewma_trend  # #3448: the directional-band stamp's fingerprinted source
 from common import stats_core
 
 from experiment import bsts_lite, calibration_core
@@ -416,6 +417,27 @@ REGISTRY = {
         "conflate them (#1370).",
         "96a2d825721f",
         used_by="/api/calibration, /api/coach_team's per-coach calibration line.",
+    ),
+    "directional_trend_verdict": _entry(
+        "directional_trend_verdict",
+        "Directional trend verdict (up / down / flat)",
+        _get_ewma_trend,
+        "Calibration",
+        "slope = (EWMA_now - EWMA_prior_lag7) / |EWMA_prior_lag7| over the metric's trailing "
+        "30d series (decay 0.87); slope > +0.02 \u2192 up, < -0.02 \u2192 down, else flat",
+        "Trailing 30 days of the predicted metric, minimum 9 observations (else no verdict, " "not a flat one).",
+        "The \u00b12% band is a FIXED editorial choice, not derived from each metric's own "
+        "trailing variance \u2014 a documented exception to the ADR-105 'thresholds from "
+        "personal variance' rule, dated 2026-09-02 (#3448). Its reach is the dominant live "
+        "scoring path: every machine spec re-routed to directional evaluation by the #813 "
+        "rescue (1,207/1,207 live specs at stamping) is judged against this one band, so a "
+        "high-variance metric can clear it on noise and a low-variance metric's real signal "
+        "can be absorbed as flat. Re-derive trigger: once a per-metric trailing-variance "
+        "baseline exists over a clean cycle window (the September 2026 n\u226530 read is the "
+        "first candidate), the band is derived from it as its own measured change.",
+        "e50ceb7ceac3",
+        min_n=9,
+        used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),
     "calibration_verdict": _entry(
         "calibration_verdict",
