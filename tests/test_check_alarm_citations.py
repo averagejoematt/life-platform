@@ -144,7 +144,9 @@ def test_main_exits_nonzero_on_uncited_and_zero_with_decoded(monkeypatch, capsys
     monkeypatch.setattr(cac, "load_citations", lambda: {})
     # Freeze uncited_long_reds' `now` via a wrapper so the synthetic alarm reads as old
     # regardless of wall-clock — reuse the pure function directly with the fixed now.
-    monkeypatch.setattr(cac, "uncited_long_reds", lambda alarms, citations, now=None, threshold_hours=72: [("uncited-alarm", 100.0)])
+    monkeypatch.setattr(
+        cac, "uncited_long_reds", lambda alarms, citations, now=None, threshold_hours=72, audience=None: [("uncited-alarm", 100.0)]
+    )
 
     monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
     assert cac.main() == 1
@@ -864,3 +866,190 @@ def test_mutation_the_old_extractor_reds_these():
     old = lambda text: re.findall(r"#(\d+)", text)  # noqa: E731 — the exact pre-#3412 line
     assert old("withings' newest DDB record is DATE#2026-08-24") == ["2026"]  # the bug, reproduced
     assert cac.issue_refs("withings' newest DDB record is DATE#2026-08-24") == []  # the fix
+
+
+# ── #3423: reader-audience alarms escalate on FIRST red, not the 72h bar ───────
+#
+# ai-canary-overall (the public-AI quality canary) went ALARM 2026-08-31 09:22 PT
+# — 16:22 UTC, the #3413 `/api/board_ask` 504 P1 — and sat lit ~31h across launch
+# day with zero escalation, because it was under this gate's 72h bar and nothing
+# flagged it as needing a citation sooner. "Immediate detection, ~31h escalation.
+# The canary worked; nothing read it." (docs/INCIDENT_LOG.md 2026-09-01 Session Q
+# row). The replay below reconstructs the episode's SHAPE (fired timestamp, alarm
+# name) 38 minutes in — long before the incident's real ~31h escalation gap, and
+# far under the old 72h bar — to prove the new policy would have caught it almost
+# immediately instead.
+
+_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC = "2026-08-31T16:22:00+00:00"  # 2026-08-31 09:22 PT (PDT, UTC-7)
+
+
+def test_replay_ai_canary_overall_episode_does_not_escalate_under_the_old_72h_bar():
+    """RED under the pre-#3423 logic: the exact gap the incident measured. Calling
+    uncited_long_reds with no `audience` argument reproduces that logic byte-for-byte
+    (audience=None restores the original flat threshold_hours behavior) — this is
+    the must-fail case the #3423 acceptance box asks for, not a hypothetical."""
+    fired = datetime.fromisoformat(_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC)
+    now = fired + timedelta(minutes=38)
+    alarms = [_alarm("ai-canary-overall", 38 / 60.0, now)]
+    out = cac.uncited_long_reds(alarms, citations={}, now=now)  # no audience -> old behavior
+    assert out == [], "the pre-#3423 72h-only logic must NOT catch this 38-minute-old red — that silence IS the incident"
+
+
+def test_replay_ai_canary_overall_episode_escalates_at_first_red_under_the_new_policy():
+    """GREEN under the #3423 policy: the same 38-minutes-old episode, this time with
+    ai-canary-overall's real reader-audience tag, escalates immediately."""
+    fired = datetime.fromisoformat(_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC)
+    now = fired + timedelta(minutes=38)
+    alarms = [_alarm("ai-canary-overall", 38 / 60.0, now)]
+    audience = {"ai-canary-overall": "reader"}
+    out = cac.uncited_long_reds(alarms, citations={}, now=now, audience=audience)
+    assert len(out) == 1 and out[0][0] == "ai-canary-overall"
+
+
+def test_replay_against_the_real_shipped_registry_end_to_end():
+    """Not a synthetic audience map — the actual committed
+    scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS registry, read through
+    the real `load_alarm_audience()` off the committed model/platform_model.json.
+    Proves the wiring, not just the mechanism."""
+    fired = datetime.fromisoformat(_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC)
+    now = fired + timedelta(minutes=38)
+    alarms = [_alarm("ai-canary-overall", 38 / 60.0, now)]
+    audience = cac.load_alarm_audience()
+    assert audience.get("ai-canary-overall") == "reader", "ai-canary-overall must be tagged reader-audience in the shipped model"
+    out = cac.uncited_long_reds(alarms, citations={}, now=now, audience=audience)
+    assert len(out) == 1 and out[0][0] == "ai-canary-overall"
+
+
+def test_load_alarm_audience_reads_the_real_committed_model():
+    audience = cac.load_alarm_audience()
+    assert audience, "load_alarm_audience() returned nothing against the real committed model"
+    assert all(v == "reader" for v in audience.values())
+
+
+def test_load_alarm_audience_missing_file_degrades_to_empty(tmp_path):
+    missing = tmp_path / "does_not_exist.json"
+    assert cac.load_alarm_audience(missing) == {}
+
+
+def test_load_alarm_audience_malformed_json_degrades_to_empty(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not valid json", encoding="utf-8")
+    assert cac.load_alarm_audience(bad) == {}
+
+
+def test_load_alarm_audience_non_dict_alarms_plane_degrades_to_empty(tmp_path):
+    weird = tmp_path / "weird.json"
+    weird.write_text(json.dumps({"alarms": ["not", "a", "dict"]}), encoding="utf-8")
+    assert cac.load_alarm_audience(weird) == {}
+
+
+def test_load_alarm_audience_ignores_non_reader_audience_values(tmp_path):
+    custom = tmp_path / "custom.json"
+    custom.write_text(
+        json.dumps({"alarms": {"a": {"audience": "reader"}, "b": {"audience": "internal"}, "c": {}}}),
+        encoding="utf-8",
+    )
+    assert cac.load_alarm_audience(custom) == {"a": "reader"}
+
+
+# ── regression proof: non-reader alarms keep the 72h bar, #2912 flap unchanged ─
+
+
+def test_a_non_reader_alarm_still_needs_72h_even_with_a_reader_map_present():
+    """Regression proof (#3423 acceptance box 4): a non-reader-audience alarm's bar
+    is untouched even when the SAME call carries a reader-audience map for a
+    different alarm — the conditional only ever lowers the bar for the alarm it
+    names, never globally."""
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    alarms = [
+        _alarm("ai-canary-overall", 38 / 60.0, now),  # reader, fresh -> escalates
+        _alarm("cost-metric-drift-sustained", 10, now),  # non-reader, 10h -> stays under 72h
+    ]
+    audience = {"ai-canary-overall": "reader"}
+    out = cac.uncited_long_reds(alarms, citations={}, now=now, audience=audience)
+    names = sorted(n for n, _ in out)
+    assert names == ["ai-canary-overall"], "a non-reader alarm must not be swept up by a reader map for a different alarm"
+
+
+def test_a_non_reader_alarm_at_71_hours_is_still_not_flagged_with_audience_present():
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    alarms = [_alarm("cost-metric-drift-sustained", 71, now)]
+    audience = {"ai-canary-overall": "reader"}  # present, but names a DIFFERENT alarm
+    assert cac.uncited_long_reds(alarms, citations={}, now=now, audience=audience) == []
+
+
+def test_issueless_ancient_reds_is_untouched_by_the_audience_facet():
+    """#3423 is explicitly scoped to the 72h citation bar only — the 14-day
+    mandatory-issue tenure has no audience parameter at all and must not change
+    shape for a reader-audience alarm."""
+    import inspect
+
+    sig = inspect.signature(cac.issueless_ancient_reds)
+    assert "audience" not in sig.parameters
+
+
+def test_flapped_uncited_is_untouched_by_the_audience_facet():
+    """#3423 acceptance box 4: 'the #2912 fired-and-cleared lookback unchanged' —
+    flapped_uncited carries no audience parameter and its window constant is
+    unmoved."""
+    import inspect
+
+    sig = inspect.signature(cac.flapped_uncited)
+    assert "audience" not in sig.parameters
+    assert cac.FLAP_WINDOW_HOURS == cac.ALARM_AGE_CITATION_HOURS == 72
+
+
+def test_dead_citations_is_untouched_by_the_audience_facet():
+    import inspect
+
+    sig = inspect.signature(cac.dead_citations)
+    assert "audience" not in sig.parameters
+
+
+def test_audience_none_reproduces_pre_3423_behavior_exactly():
+    """The default (audience=None/omitted) must be byte-identical to the old flat
+    72h logic — every pre-#3423 caller/test keeps working unchanged."""
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    alarms = [_alarm("mystery-alarm", 100, now)]
+    assert cac.uncited_long_reds(alarms, citations={}, now=now) == cac.uncited_long_reds(alarms, citations={}, now=now, audience=None)
+    assert cac.uncited_long_reds(alarms, citations={}, now=now, audience={}) == [("mystery-alarm", 100.0)]
+
+
+# ── render()/main() wiring for the reader-audience annotation ──────────────────
+
+
+def test_render_annotates_a_reader_audience_uncited_entry():
+    code, message = cac.render([("ai-canary-overall", 0.63)], unreachable_error=None, audience={"ai-canary-overall": "reader"})
+    assert code == 1
+    assert "reader-audience" in message and "#3423" in message
+
+
+def test_render_does_not_annotate_a_non_reader_entry():
+    code, message = cac.render([("cost-metric-drift-sustained", 96.0)], unreachable_error=None, audience={"ai-canary-overall": "reader"})
+    assert code == 1
+    assert "[reader-audience" not in message
+
+
+def test_render_clean_board_mentions_the_first_red_policy():
+    code, message = cac.render([], unreachable_error=None)
+    assert code == 0
+    assert "#3423" in message
+
+
+def test_main_wires_audience_into_uncited_long_reds(monkeypatch, capsys):
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    seen_audience = {}
+
+    def _fake_uncited(alarms, citations, now=None, threshold_hours=72, audience=None):
+        seen_audience.update(audience or {})
+        return [("ai-canary-overall", 0.63)]
+
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([_alarm("ai-canary-overall", 38 / 60.0, now)], None))
+    monkeypatch.setattr(cac, "load_citations", lambda: {})
+    monkeypatch.setattr(cac, "load_alarm_audience", lambda: {"ai-canary-overall": "reader"})
+    monkeypatch.setattr(cac, "uncited_long_reds", _fake_uncited)
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 1
+    out = capsys.readouterr().out
+    assert "ai-canary-overall" in out
+    assert seen_audience == {"ai-canary-overall": "reader"}, "main() must pass load_alarm_audience()'s result into uncited_long_reds"

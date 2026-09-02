@@ -42,6 +42,7 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "averagejoematt/life-platform")
 SENDER = RECIPIENT = "awsdev@mattsusername.com"
 LOG_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(ROOT, "model", "platform_model.json")
 
 _ssm = boto3.client("ssm", region_name=REGION)
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -322,6 +323,33 @@ def write_skeleton_report(report_path, signals):
 
 ALARM_AGE_ESCALATION_HOURS = 72
 
+# #3423: a reader-audience alarm escalates into this same needs_human email on FIRST
+# red, not after ALARM_AGE_ESCALATION_HOURS — `ai-canary-overall` sat lit ~31h across
+# launch day (the #3413 board-504 P1) with zero escalation because it was under this
+# same 72h bar. Curated in scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS,
+# read here (independently of scripts/check_alarm_citations.py's own reader, same
+# "each script reads model/platform_model.json for itself" shape the two 72h
+# constants already use) via `model/platform_model.json`'s alarms plane — structural,
+# never a name-pattern match on the alarm itself. 0 means any positive age escalates.
+READER_AUDIENCE_ESCALATION_HOURS = 0
+
+
+def _reader_audience_alarms():
+    """{alarm_name: "reader"} from model/platform_model.json's alarms plane (#3423).
+    Fail-soft to `{}` on any read/parse problem — the honest, safe direction: every
+    alarm then keeps the unchanged 72h bar rather than a broken read silently
+    widening escalation."""
+    try:
+        with open(MODEL_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[warn] reader-audience model read: {e}")
+        return {}
+    alarms_plane = data.get("alarms") if isinstance(data, dict) else None
+    if not isinstance(alarms_plane, dict):
+        return {}
+    return {name: rec.get("audience") for name, rec in alarms_plane.items() if isinstance(rec, dict) and rec.get("audience") == "reader"}
+
 
 def _alarm_age_hours(alarm, now):
     """Hours the alarm has been in its current (ALARM) state, from the
@@ -346,29 +374,44 @@ def _fmt_age(hours):
     return f"{hours:.0f}h"
 
 
-def aged_alarm_escalations(signals, now=None):
+def aged_alarm_escalations(signals, now=None, audience=None):
     """Return `(alarm_name, needs_human_item)` tuples for every alarm that has been
-    in ALARM longer than ALARM_AGE_ESCALATION_HOURS and is not already acked. Pure
-    and deterministic (no LLM, no I/O) so it always fires even when the agent's turn
-    budget burns out mid-triage. An already-acked alarm (annotate_acked ran a prior
-    conclusion forward) is skipped — that IS the acknowledgement — and it re-escalates
-    only once the ack expires and the alarm is still stuck."""
+    in ALARM longer than its effective escalation window and is not already acked.
+    Pure and deterministic (no LLM, no I/O beyond the offline model read) so it
+    always fires even when the agent's turn budget burns out mid-triage. An
+    already-acked alarm (annotate_acked ran a prior conclusion forward) is skipped
+    — that IS the acknowledgement — and it re-escalates only once the ack expires
+    and the alarm is still stuck.
+
+    #3423: `audience` (optional {alarm_name: "reader"}, defaults to
+    `_reader_audience_alarms()` when omitted) gives a reader-audience alarm an
+    effective threshold of READER_AUDIENCE_ESCALATION_HOURS (0 — first red) instead
+    of ALARM_AGE_ESCALATION_HOURS (72h). Every other alarm is unchanged."""
     now_dt = now or datetime.now(timezone.utc)
+    audience = _reader_audience_alarms() if audience is None else audience
     out = []
     for a in signals.get("alarms", []) or []:
         if a.get("acked"):
             continue
         age = _alarm_age_hours(a, now_dt)
-        if age is None or age <= ALARM_AGE_ESCALATION_HOURS:
-            continue
         name = a.get("name", "?")
+        is_reader = audience.get(name) == "reader"
+        threshold = READER_AUDIENCE_ESCALATION_HOURS if is_reader else ALARM_AGE_ESCALATION_HOURS
+        if age is None or age <= threshold:
+            continue
+        reader_note = (
+            " This is a READER-AUDIENCE alarm (#3423) — it escalates on first red, not the usual 72h bar, "
+            "because its blast radius reaches a real reader of averagejoematt.com."
+            if is_reader
+            else ""
+        )
         out.append(
             (
                 name,
                 {
                     "issue": f"Alarm '{name}' has been in ALARM for {_fmt_age(age)} "
-                    f"(> {ALARM_AGE_ESCALATION_HOURS}h aging threshold) — an aged, unresolved sensor whose only "
-                    "consumer is the daily alert digest (#1204).",
+                    f"(> {threshold}h aging threshold) — an aged, unresolved sensor whose only "
+                    f"consumer is the daily alert digest (#1204).{reader_note}",
                     "action": f"Investigate and resolve '{name}', or ack it if the state is expected. "
                     "This aging escalation repeats each run until the alarm clears or is acknowledged.",
                 },
