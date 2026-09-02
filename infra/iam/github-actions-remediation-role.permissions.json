@@ -107,8 +107,18 @@
     {
       "Sid": "S3BucketPolicyRead",
       "Effect": "Allow",
-      "Action": "s3:GetBucketPolicy",
+      "Action": [
+        "s3:GetBucketPolicy",
+        "s3:GetBucketLifecycleConfiguration",
+        "s3:GetReplicationConfiguration"
+      ],
       "Resource": "arn:aws:s3:::matthew-life-platform"
+    },
+    {
+      "Sid": "EventBridgeRulesRead",
+      "Effect": "Allow",
+      "Action": "events:ListRules",
+      "Resource": "*"
     },
     {
       "Sid": "S3List",
@@ -117,7 +127,10 @@
       "Resource": "arn:aws:s3:::matthew-life-platform",
       "Condition": {
         "StringLike": {
-          "s3:prefix": "remediation-log/*"
+          "s3:prefix": [
+            "remediation-log/*",
+            "drift-log/*"
+          ]
         }
       }
     },
