@@ -184,6 +184,12 @@ def _build_numbers(stats):
     delta = vitals.get("weight_delta_7d")
     delta_window = vitals.get("weight_delta_window_days")
     sleep = vitals.get("sleep_hours_30d_avg")
+    # #3451: the writer computes this over whatever the last 30 calendar days
+    # actually held (never genesis-clamped — window_registry.py's EXEMPT ruling)
+    # and now ships n beside it. Rendered the same way the #1917 weight row
+    # above states its real window, instead of a bare "30d" that could be
+    # covering a Whoop outage's handful of nights.
+    sleep_n = vitals.get("sleep_hours_30d_n")
     recovery = vitals.get("recovery_pct")
     level = char.get("level", "?")
     tier = char.get("tier", "")
@@ -196,8 +202,9 @@ def _build_numbers(stats):
             f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Weight</td><td style="color:#c9d1d9;font-weight:600;">{weight} lbs{delta_str}</td></tr>'
         )
     if sleep:
+        window_str = f" ({sleep_n}n · 30d)" if sleep_n else ""
         rows.append(
-            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Avg Sleep</td><td style="color:#c9d1d9;font-weight:600;">{sleep:.1f} hrs</td></tr>'
+            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Avg Sleep</td><td style="color:#c9d1d9;font-weight:600;">{sleep:.1f} hrs{window_str}</td></tr>'
         )
     if recovery:
         rows.append(

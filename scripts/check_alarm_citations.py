@@ -63,6 +63,25 @@ FLAP VISIBILITY (#2912)
   (old ALARM -> new not-ALARM) but no citation entry. A transition count is the
   honest signal; current-state duration is not (ADR-104).
 
+READER-AUDIENCE ALARMS ESCALATE ON FIRST RED, NOT 72H (#3423)
+  `ai-canary-overall` — the public AI quality canary — went ALARM 2026-08-31 09:22
+  PT (the #3413 `/api/board_ask` 504 P1) and sat lit ~31h across launch day with
+  zero escalation, because it was under this gate's 72h bar so no wrap's citation
+  check ever named it. "Immediate detection, ~31h escalation. The canary worked;
+  nothing read it." (docs/INCIDENT_LOG.md). `uncited_long_reds` now takes an
+  `audience` map ({alarm_name: "reader"}, `load_alarm_audience()` reading
+  `model/platform_model.json`'s alarms plane, curated in
+  `scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS`): a reader-audience
+  alarm's citation-required bar is READER_AUDIENCE_ESCALATION_HOURS (0 — any
+  positive age counts) instead of the 72h `ALARM_AGE_CITATION_HOURS`. Everything
+  else — the 14-day mandatory-issue tenure, the #2912 fired-and-cleared flap
+  window, the #2996 dead-citation check — is UNCHANGED for every alarm, reader or
+  not; this is routing/windowing on the one 72h citation bar, nothing else. The
+  escalation channel is this gate's existing exit-1/`--decoded` contract (the
+  `/wrap` e10 step) PLUS the mirrored bar in `remediation/agent.py`'s
+  `aged_alarm_escalations` (the actual scheduled Mon/Wed/Fri needs-human email —
+  see that module's #1204 section) — no new alarm, no new notification surface.
+
 DEGRADE HONESTLY
   If CloudWatch can't be reached (no creds, offline, throttled) this prints a clear
   UNVERIFIED notice and exits 0 — a gate that can't measure anything must not claim
@@ -85,6 +104,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CITATIONS_PATH = ROOT / "docs" / "alarm_citations.json"
+MODEL_PATH = ROOT / "model" / "platform_model.json"
 REGION = "us-west-2"
 
 # Matches remediation/agent.py's ALARM_AGE_ESCALATION_HOURS (#1204) — the same 72h
@@ -116,6 +136,15 @@ FLAP_WINDOW_HOURS = ALARM_AGE_CITATION_HOURS
 _HISTORY_MAX_PAGES = 20
 
 _ISSUE_REF = r"#\d+"
+
+# #3423: a reader-audience alarm escalates on FIRST red, not the 72h citation bar —
+# `ai-canary-overall` sat lit ~31h across launch day (the #3413 board-504 P1) because
+# it was under this same threshold and nothing flagged it sooner. The facet is keyed
+# off `model/platform_model.json`'s alarms plane (scripts/platform_model_alarms.py::
+# READER_AUDIENCE_ALARMS — a curated, blast-radius-documented registry, structural,
+# never a name-pattern match), never off a hand list inside this script. 0 means any
+# positive age at all counts — the alarm doesn't get one free wrap under the bar.
+READER_AUDIENCE_ESCALATION_HOURS = 0
 
 
 def _parse_ts(ts):
@@ -155,18 +184,49 @@ def load_citations(path=CITATIONS_PATH):
     return data if isinstance(data, dict) else {}
 
 
-def uncited_long_reds(alarms, citations, now=None, threshold_hours=ALARM_AGE_CITATION_HOURS):
-    """(alarm_name, age_hours) for every ALARM-state alarm older than
-    threshold_hours with no entry in `citations`. Pure and deterministic — no I/O —
-    so it's exercised directly by the regression test with synthetic input,
-    independent of live AWS/registry state (per the #1959 negative-test requirement).
+def load_alarm_audience(path=MODEL_PATH):
+    """{alarm_name: "reader"} for every alarm the model's alarms plane tags
+    `audience: "reader"` (scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS,
+    #3423). Missing/malformed model file degrades to `{}` — the honest and safe
+    direction: every alarm then reads as non-reader-audience and keeps the
+    unchanged 72h bar, rather than a broken read silently widening escalation.
+    Structural, not name-pattern matched: this reads the curated facet the model
+    carries, it does not guess from an alarm's name."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    alarms_plane = data.get("alarms")
+    if not isinstance(alarms_plane, dict):
+        return {}
+    return {name: rec.get("audience") for name, rec in alarms_plane.items() if isinstance(rec, dict) and rec.get("audience") == "reader"}
+
+
+def uncited_long_reds(alarms, citations, now=None, threshold_hours=ALARM_AGE_CITATION_HOURS, audience=None):
+    """(alarm_name, age_hours) for every ALARM-state alarm older than its
+    effective threshold with no entry in `citations`. Pure and deterministic —
+    no I/O — so it's exercised directly by the regression test with synthetic
+    input, independent of live AWS/registry state (per the #1959 negative-test
+    requirement).
+
+    #3423: `audience` is an optional {alarm_name: "reader"} map (see
+    load_alarm_audience). A reader-audience alarm's effective threshold is
+    READER_AUDIENCE_ESCALATION_HOURS (0 — first red) instead of threshold_hours;
+    everything else is unchanged. `audience=None`/`{}` reproduces the pre-#3423
+    behavior exactly — every alarm uses the flat threshold_hours bar.
     """
     now = now or datetime.now(timezone.utc)
+    audience = audience or {}
     out = []
     for a in alarms:
         name = a.get("name") or "?"
         age = alarm_age_hours(a, now)
-        if age is None or age <= threshold_hours:
+        effective_threshold = READER_AUDIENCE_ESCALATION_HOURS if audience.get(name) == "reader" else threshold_hours
+        if age is None or age <= effective_threshold:
             continue
         entry = citations.get(name)
         if not entry or not str(entry.get("citation", "")).strip():
@@ -249,18 +309,60 @@ def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS
     return out
 
 
+# ── #3412: an issue reference is not a DynamoDB sort key ─────────────────────
+#
+# `re.findall(r"#(\d+)", citation)` cannot tell the two apart, and this repo
+# writes keys as `PREFIX#value` constantly. A citation that quoted the evidence
+# it was citing —
+#
+#     withings' newest DDB record is DATE#2026-08-24
+#
+# — parsed as a reference to issue #2026, which resolves to a real, CLOSED
+# issue, so the #2996 check reddened naming an owner that does not exist. Hit
+# live twice (2026-09-01, sessions P and Q); both times the "fix" was to stop
+# quoting the key, which punishes the most evidence-bound citation an operator
+# can write and rewards a vaguer one.
+#
+# The rule keys off the sort-key GRAMMAR, never a blocklist of strings or a
+# phrase match on the surrounding sentence: every phrase-matched member of the
+# #2959/#3003/#3199 suppressor family has failed in the field.
+#
+#   * digits immediately followed by `-DD-DD` are a calendar date, not an issue;
+#   * a `#` immediately preceded by an ALL-CAPS token of 3+ characters is a key
+#     prefix (DATE, SOURCE, USER, COACH, PROFILE, TOTALS, LIFETIME, WORKOUT, …).
+#
+# The 3-character floor is what keeps `PR#3075` — a form this file's own header
+# comment uses — parsing as a genuine reference.
+_KEY_TOKEN_BEFORE_HASH = re.compile(r"[A-Z][A-Z0-9_]{2,}$")
+_DATE_TAIL = re.compile(r"^-\d{2}-\d{2}")
+
+
+def issue_refs(text):
+    """Issue numbers (as strings) genuinely referenced by a citation string.
+
+    ONE definition, used by every caller — the two `re.findall` sites this
+    replaced had to be fixed in lockstep and silently disagreed if they were not.
+    """
+    out = []
+    for m in re.finditer(r"#(\d+)", str(text or "")):
+        if _DATE_TAIL.match(text[m.end() :]):
+            continue  # DATE#2026-08-24 — a calendar date
+        if _KEY_TOKEN_BEFORE_HASH.search(text[: m.start()]):
+            continue  # SOURCE#hevy, TOTALS#current — a sort key
+        out.append(m.group(1))
+    return out
+
+
 def cited_issue_refs(alarms, citations):
     """The issue numbers cited by alarms that are CURRENTLY lit, as strings.
 
     Scoped to `alarms` (which is the ALARM-state read) rather than the whole
     registry: a stale entry on a recovered alarm is a pruning chore, not a red.
     """
-    import re
-
     refs = set()
     for a in alarms:
         entry = citations.get(a.get("name") or "?") or {}
-        refs.update(re.findall(r"#(\d+)", str(entry.get("citation", ""))))
+        refs.update(issue_refs(entry.get("citation", "")))
     return sorted(refs)
 
 
@@ -284,13 +386,11 @@ def dead_citations(alarms, citations, issue_states):
     Pure and deterministic — `issue_states` is injected, so the regression test
     drives it with synthetic input exactly like the sibling checks.
     """
-    import re
-
     out = []
     for a in alarms:
         name = a.get("name") or "?"
         entry = citations.get(name) or {}
-        for num in re.findall(r"#(\d+)", str(entry.get("citation", ""))):
+        for num in issue_refs(entry.get("citation", "")):
             state = issue_states.get(num)
             if state is not None and str(state).upper() != "OPEN":
                 out.append((name, f"#{num}"))
@@ -440,8 +540,14 @@ def fetch_alarm_history(window_hours=FLAP_WINDOW_HOURS):
     return items, None
 
 
-def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=None, dead=(), issue_error=None):
-    """(exit_code, message) for a computed result. Pure — unit-tested offline."""
+def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=None, dead=(), issue_error=None, audience=None):
+    """(exit_code, message) for a computed result. Pure — unit-tested offline.
+
+    #3423: `audience` (optional {alarm_name: "reader"}) only ANNOTATES which
+    uncited entries were flagged under the first-red bar rather than the 72h
+    one — it does not change which entries `uncited` holds (uncited_long_reds
+    already applied the conditional threshold upstream)."""
+    audience = audience or {}
     if unreachable_error is not None:
         return 0, (
             f"⚠️  check_alarm_citations: CloudWatch unreachable ({unreachable_error}) — "
@@ -450,8 +556,9 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
         )
     if not uncited and not ancient and not flapped and not dead:
         message = (
-            "✅ every alarm in ALARM state >72h cites an incident row or issue, and every one "
-            f"red >{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
+            "✅ every alarm in ALARM state >72h cites an incident row or issue (reader-audience alarms "
+            "cite on FIRST red instead, #3423), and every one red "
+            f">{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
             f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912). "
             "Every lit alarm's cited `#N` is OPEN (#2996)."
         )
@@ -470,9 +577,13 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
         return 0, message
     lines = []
     if uncited:
-        lines.append(f"❌ {len(uncited)} alarm(s) in ALARM >72h with no citation in {CITATIONS_PATH.relative_to(ROOT)}:")
+        lines.append(
+            f"❌ {len(uncited)} alarm(s) past their citation-required bar (>72h, or FIRST RED for "
+            f"reader-audience alarms per #3423) with no citation in {CITATIONS_PATH.relative_to(ROOT)}:"
+        )
         for name, age in sorted(uncited):
-            lines.append(f"   - {name}  (red {age / 24:.1f}d / {age:.0f}h)")
+            tag = "  [reader-audience: first-red bar, #3423]" if audience.get(name) == "reader" else ""
+            lines.append(f"   - {name}{tag}  (red {age / 24:.1f}d / {age:.0f}h)")
         lines.append(
             '   Add an entry to docs/alarm_citations.json — {"<AlarmName>": {"citation": "#N", '
             '"note": "..."}} — or write the shortfall explicitly into the handover '
@@ -528,7 +639,8 @@ def main():
     decoded = "--decoded" in sys.argv
     alarms, err = fetch_alarms()
     citations = load_citations()
-    uncited = [] if err else uncited_long_reds(alarms, citations)
+    audience = load_alarm_audience()  # #3423 — offline model read, independent of the AWS reads
+    uncited = [] if err else uncited_long_reds(alarms, citations, audience=audience)
     ancient = [] if err else issueless_ancient_reds(alarms, citations)
     if err:
         history, history_err, flapped = [], None, []  # whole board already UNVERIFIED
@@ -538,7 +650,9 @@ def main():
         flapped = [] if history_err else flapped_uncited(history, citations)
         issue_states, issue_err = fetch_issue_states(cited_issue_refs(alarms, citations))
         dead = [] if issue_err else dead_citations(alarms, citations, issue_states)
-    code, message = render(uncited, err, ancient=ancient, flapped=flapped, history_error=history_err, dead=dead, issue_error=issue_err)
+    code, message = render(
+        uncited, err, ancient=ancient, flapped=flapped, history_error=history_err, dead=dead, issue_error=issue_err, audience=audience
+    )
     print(message)
     if code == 0:
         return 0

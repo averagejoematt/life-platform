@@ -77,15 +77,35 @@ def check_rate_limit(
     pk = f"RATE#{endpoint}#{ip_hash}"
     sk = f"HOUR#{bucket_start}"
 
+    cost = max(1, int(cost))
+    # #3419: a request that cannot fit must not CONSUME. The old unconditional
+    # ADD meant a doomed fan-out (the 7-persona board click: 1+6=7 vs limit 5)
+    # was rejected AND still charged the whole window, locking the reader's
+    # working smaller panel out for the rest of the hour. Two guards:
+    #   1. cost > limit is structurally impossible in ANY window state — reject
+    #      before any write (a fresh window's attribute_not_exists would
+    #      otherwise let the charge through and instantly exhaust it).
+    #   2. The ADD is conditional on prior count + cost <= limit, so an
+    #      over-limit request is a rejection verdict, never a charge.
+    if cost > limit:
+        return False, 0, max(0, bucket_end - now)
+
     try:
         resp = table.update_item(
             Key={"pk": pk, "sk": sk},
             UpdateExpression="ADD #c :inc SET #t = if_not_exists(#t, :ttl)",
+            ConditionExpression="attribute_not_exists(#c) OR #c <= :headroom",
             ExpressionAttributeNames={"#c": "count", "#t": "ttl"},
-            ExpressionAttributeValues={":inc": max(1, int(cost)), ":ttl": ttl},
+            ExpressionAttributeValues={":inc": cost, ":ttl": ttl, ":headroom": limit - cost},
             ReturnValues="UPDATED_NEW",
         )
     except Exception as e:
+        # A conditional failure is the limiter WORKING (over limit, nothing
+        # charged) — a verdict, never a DDB error, so it must not reach the
+        # fail-open path and turn into an allow.
+        err_code = str((getattr(e, "response", None) or {}).get("Error", {}).get("Code", ""))
+        if err_code == "ConditionalCheckFailedException":
+            return False, 0, max(0, bucket_end - now)
         _logger.warning(
             "rate_limit_ddb_error endpoint=%s err=%s — failing %s",
             endpoint,

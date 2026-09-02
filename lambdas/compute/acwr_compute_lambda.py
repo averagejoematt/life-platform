@@ -104,7 +104,10 @@ table = dynamodb.Table(TABLE_NAME)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import (
+    d2f as _d2f,  # shared bundled helpers (#970)
+    filter_day_rows,  # #3442: day rows only — never a #WORKOUT# fragment
+)
 
 
 def _fetch_range(source: str, start: str, end: str) -> list:
@@ -355,6 +358,10 @@ def _lambda_handler_impl(event, context):
     fetch_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
 
     whoop_items = _fetch_range("whoop", fetch_start, target_date)
+    # #3442: drop DATE#<d>#WORKOUT#<uuid> sub-records — one workout's strain was
+    # last-write-winning over the day row on 24/85 window days (08-31: acwr 0.945
+    # published vs 1.040 from true day rows).
+    whoop_items = filter_day_rows(whoop_items)
     logger.info(
         "Fetched %d Whoop records (%s to %s)",
         len(whoop_items),

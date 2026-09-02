@@ -21,7 +21,7 @@ surface, and it must never raise into the coach pipeline.
 
 from typing import Any, Optional
 
-from ai.quality_gate_contract import grounding_from_brief
+from ai.quality_gate_contract import grounding_from_brief, report_findings
 
 
 def retain_coach_brief_flag(
@@ -37,28 +37,14 @@ def retain_coach_brief_flag(
     try:
         from experiment import eval_retention
 
-        findings = []
-        for v in report.get("anti_pattern_violations") or []:
-            phrase = v.get("phrase") if isinstance(v, dict) else v
-            if phrase:
-                findings.append({"type": "anti_pattern", "detail": phrase})
-        for v in report.get("decision_class_violations") or []:
-            if isinstance(v, dict):
-                findings.append({"type": "decision_class", "detail": v.get("excerpt", "")})
-        for flag in report.get("cross_coach_similarity_flags") or []:
-            if isinstance(flag, dict):
-                findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
-        for v in report.get("cycle_boundary_violations") or []:  # #1973
-            if isinstance(v, dict):
-                findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
         # #3202: the ONE class that held two reader-facing coaches dark every cycle was the
         # one this retention dropped — the record carried the draft text and not the reason,
         # so root-causing the 2026-08-26 holds meant rebuilding the drafts out of DDB and
         # re-running the grounder offline. With the findings, the allow-list and the facts
-        # retained, the next diagnosis of a hold is a query.
-        _raw_gr = report.get("number_grounding")
-        _gr: dict = _raw_gr if isinstance(_raw_gr, dict) else {}
-        findings += [{"type": f.get("type"), "detail": f.get("detail", "")} for f in (_gr.get("findings") or []) if isinstance(f, dict)]
+        # retained, the next diagnosis of a hold is a query. The report -> findings mapping
+        # itself moved to `quality_gate_contract.report_findings` (#3414) so the async
+        # board channel retains the SAME record shape — one mapping, two surfaces.
+        findings = report_findings(report)
         allowed, facts = grounding_from_brief(generation_brief)
         eval_retention.retain(
             "coach_brief",
