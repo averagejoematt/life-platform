@@ -577,7 +577,7 @@ REGISTRY = {
         "can be absorbed as flat. Re-derive trigger: once a per-metric trailing-variance "
         "baseline exists over a clean cycle window (the September 2026 n\u226530 read is the "
         "first candidate), the band is derived from it as its own measured change.",
-        "e50ceb7ceac3",
+        "a424d9ff0014",
         min_n=9,
         used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),
