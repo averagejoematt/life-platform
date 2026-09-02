@@ -117,8 +117,23 @@
     {
       "Sid": "EventBridgeRulesRead",
       "Effect": "Allow",
-      "Action": "events:ListRules",
+      "Action": [
+        "events:ListRules",
+        "events:ListTargetsByRule"
+      ],
       "Resource": "*"
+    },
+    {
+      "Sid": "RawReplicaDestinationRead",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketVersioning",
+      "Resource": "arn:aws:s3:::matthew-life-platform-raw-backup"
+    },
+    {
+      "Sid": "RawReplicaObjectRead",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::matthew-life-platform-raw-backup/*"
     },
     {
       "Sid": "S3List",
