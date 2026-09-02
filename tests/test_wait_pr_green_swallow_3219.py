@@ -130,6 +130,61 @@ def _make_env(check_sequence, classifier_payload="", sha=FULL_SHA):
     return env, stub_dir
 
 
+# ── #3455: a scripted fake clock, decoupled from real wall-clock scheduling ──
+#
+# THE INCIDENT. Main run 33605871465 (2026-09-02) red-mained the docs-only
+# #3454 merge: `test_indeterminate_is_named_and_is_not_a_swallow` simulates a
+# 1s watcher budget, but `deploy/wait_pr_green.sh`'s poll loop used to read
+# elapsed time via two real `date +%s` calls a loop-iteration apart. `date +%s`
+# has 1-SECOND granularity, so under a loaded runner (the same job logged 2012s
+# against its own 1950s duration budget that night) the fork+exec overhead of
+# the SECOND call alone can straddle a whole-second boundary against the
+# FIRST — making `elapsed >= timeout` true on the very first loop iteration,
+# before the zero-check diagnosis these tests assert on ever runs. A bigger
+# timeout constant only makes that race rarer, never closes it (the #3206
+# time-dependent-gate-outside-its-window family) — so the script now reads
+# elapsed time through an overridable `WAIT_PR_GREEN_TIME_CMD` (see
+# `deploy/wait_pr_green.sh`'s `TIME_CMD`), and this stub scripts the EXACT
+# sequence of values it returns, one per call, repeating the last forever.
+# That decouples the assertion from real process-scheduling jitter entirely —
+# it no longer matters how long the real `gh`/`jq`/classifier subprocess calls
+# actually take.
+_TIME_STUB = r"""#!/usr/bin/env bash
+STUB_DIR="__STUB_DIR__"
+n=0
+[ -f "${STUB_DIR}/clock_count" ] && n="$(cat "${STUB_DIR}/clock_count")"
+echo $((n + 1)) > "${STUB_DIR}/clock_count"
+# #3455 proof hook: on request, stall for real between two adjacent clock
+# reads — the exact gap that raced in the incident — to prove the SCRIPTED
+# value (not real elapsed wall-clock time) is what the caller sees.
+if [ -n "${WAIT_PR_GREEN_TEST_STALL_S:-}" ] && [ "$((n + 1))" -eq "${WAIT_PR_GREEN_TEST_STALL_AT_CALL:-2}" ]; then
+  sleep "${WAIT_PR_GREEN_TEST_STALL_S}"
+fi
+f="${STUB_DIR}/clock_seq"
+total=$(wc -l < "${f}")
+if [ "${n}" -ge "${total}" ]; then
+  idx="${total}"
+else
+  idx=$((n + 1))
+fi
+sed -n "${idx}p" "${f}"
+"""
+
+
+def _with_fake_clock(env, stub_dir, seq):
+    """Wires the #3455 fake clock into `env`: the script's `${TIME_CMD}` calls
+    will return exactly `seq[0], seq[1], ..., seq[-1], seq[-1], ...` regardless
+    of real elapsed wall-clock time between calls. Mutates and returns `env`."""
+    with open(os.path.join(stub_dir, "clock_seq"), "w") as f:
+        f.write("\n".join(str(v) for v in seq) + "\n")
+    clock = os.path.join(stub_dir, "fakeclock")
+    with open(clock, "w") as f:
+        f.write(_TIME_STUB.replace("__STUB_DIR__", stub_dir))
+    os.chmod(clock, os.stat(clock).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    env["WAIT_PR_GREEN_TIME_CMD"] = clock
+    return env
+
+
 def _run(env, *extra, interval="1", timeout="1"):
     """Runs the REAL script with the real poll loop, at second-scale budgets.
 
@@ -234,9 +289,20 @@ def test_diagnosis_never_runs_once_any_check_has_attached():
 # ── The other zero-run states are named, not lumped in ───────────────────────
 
 
+# #3455: these four tests all depend on the zero-check diagnosis firing before
+# the loop's own `elapsed >= timeout` check can race it (see the fake-clock
+# header above) — each wires a scripted clock: call 1 (`start`) and call 2
+# (the first loop `now`) both read 0, so the diagnosis's own `elapsed >= grace`
+# (grace 0) fires deterministically on the first poll; call 3 reads 100, so the
+# loop then exits via TIMEOUT on the very next iteration without depending on
+# any real sleep. `interval="0"` avoids a real wait between iterations.
+_CLOCK_DIAGNOSE_THEN_TIMEOUT = [0, 0, 100]
+
+
 def test_path_filter_skip_is_named_and_polling_continues():
-    env, _ = _make_env([[]], PATH_SKIP)
-    r = _run(env, "--zero-check-grace", "0")
+    env, stub_dir = _make_env([[]], PATH_SKIP)
+    env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)
+    r = _run(env, "--zero-check-grace", "0", interval="0")
     out = r.stdout
     assert "DIAGNOSIS path-filter-skip" in out, out
     assert "SWALLOWED-PUSH" not in out
@@ -244,15 +310,25 @@ def test_path_filter_skip_is_named_and_polling_continues():
 
 
 def test_bot_push_no_dispatch_is_named_and_is_not_a_swallow():
-    env, _ = _make_env([[]], BOT_PUSH)
-    r = _run(env, "--zero-check-grace", "0")
+    env, stub_dir = _make_env([[]], BOT_PUSH)
+    env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)
+    r = _run(env, "--zero-check-grace", "0", interval="0")
     assert "DIAGNOSIS bot-push-no-dispatch" in r.stdout, r.stdout
     assert r.returncode != 5
 
 
 def test_indeterminate_is_named_and_is_not_a_swallow():
-    env, _ = _make_env([[]], INDETERMINATE)
-    r = _run(env, "--zero-check-grace", "0")
+    """#3455: main run 33605871465 (2026-09-02) red-mained the docs-only #3454
+    merge here — a loaded runner let two adjacent real `date +%s` calls
+    straddle a whole-second boundary, timing this test's 1s simulated budget
+    out before "DIAGNOSIS indeterminate" was ever printed, while the exact
+    same code passed locally (1.63s) and on every PR-lane run that night. The
+    fake clock below makes the poll loop's own `elapsed` math independent of
+    real process-scheduling jitter, closing the race structurally rather than
+    widening the timeout (which would only make the same flake rarer)."""
+    env, stub_dir = _make_env([[]], INDETERMINATE)
+    env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)
+    r = _run(env, "--zero-check-grace", "0", interval="0")
     assert "DIAGNOSIS indeterminate" in r.stdout, r.stdout
     assert r.returncode != 5
 
@@ -261,10 +337,48 @@ def test_unparseable_classifier_output_never_manufactures_a_swallow():
     """An execution failure must degrade to the pre-#3219 behaviour (keep waiting),
     never to a confirmed swallow — the #2753/#3212 rule that a broken instrument
     is not a verdict."""
-    env, _ = _make_env([[]], "not json at all")
-    r = _run(env, "--zero-check-grace", "0")
+    env, stub_dir = _make_env([[]], "not json at all")
+    env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)
+    r = _run(env, "--zero-check-grace", "0", interval="0")
     assert "diagnosis unavailable" in r.stdout, r.stdout
     assert r.returncode != 5
+
+
+# ── #3455 proof: the race is closed, not just avoided by luck ────────────────
+
+
+def test_diagnosis_survives_a_real_scheduling_stall_between_the_two_clock_reads():
+    """Reproduces the EXACT gap that raced in main run 33605871465 (2026-09-02):
+    a real delay between the `start` read and the loop's first `now` read. The
+    #3455 fix makes what those reads RETURN a scripted constant, not a
+    measurement of how much wall-clock time actually passed — so injecting a
+    real 2-5s stall there (`WAIT_PR_GREEN_TEST_STALL_S`, `_TIME_STUB` above)
+    must not change the outcome. Pre-fix (real `date +%s`), this exact gap is
+    what let a loaded runner's fork+exec overhead alone push `elapsed` past a
+    1s budget before the diagnosis this test asserts on ever ran."""
+    for stall_s in ("2", "3.5", "5"):
+        env, stub_dir = _make_env([[]], INDETERMINATE)
+        env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)
+        env["WAIT_PR_GREEN_TEST_STALL_S"] = stall_s
+        r = _run(env, "--zero-check-grace", "0", interval="0")
+        assert "DIAGNOSIS indeterminate" in r.stdout, f"stall={stall_s}s: {r.stdout}"
+        assert r.returncode != 5, f"stall={stall_s}s: {r.stdout}"
+
+
+def test_diagnosis_is_deterministic_across_20_runs_under_a_scheduling_stall():
+    """The acceptance bar (#3455): 20/20 passes under an injected scheduling
+    delay. Uses a smaller per-run stall than the test above so the 20 reps stay
+    cheap in CI (the suite is already near its own duration budget, per this
+    incident's own trigger) — the fix's mechanism (a scripted, not measured,
+    clock) is insensitive to the stall's MAGNITUDE, so a short stall proves the
+    same structural closure as a long one."""
+    for i in range(20):
+        env, stub_dir = _make_env([[]], INDETERMINATE)
+        env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)
+        env["WAIT_PR_GREEN_TEST_STALL_S"] = "0.1"
+        r = _run(env, "--zero-check-grace", "0", interval="0")
+        assert "DIAGNOSIS indeterminate" in r.stdout, f"run {i}: {r.stdout}"
+        assert r.returncode != 5, f"run {i}: {r.stdout}"
 
 
 # ── The progress line: the two states must not render identically ────────────
