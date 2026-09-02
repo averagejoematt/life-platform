@@ -24,6 +24,7 @@ module imports nothing back from the host (no cycle).
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 
 def _prepare(ai, personas: list, question: str, facts: str) -> tuple[list, dict]:
@@ -65,7 +66,7 @@ def _generate(ai, pid: str, user_msg: str, _sys_txt: str) -> dict:
     grounding gate ONLY (no other boto3 use; see the module docstring).
     Returns everything the main thread needs to run the side effects
     afterward; `findings` is non-None iff the grounding gate fired."""
-    out = {"pid": pid, "txt": "", "grounded": True, "draft": None, "findings": None, "usages": [], "error": None}
+    out: dict[str, Any] = {"pid": pid, "txt": "", "grounded": True, "draft": None, "findings": None, "usages": [], "error": None}
     try:
         req_body = json.dumps(
             {

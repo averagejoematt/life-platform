@@ -516,6 +516,14 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
+    # #3419: the board's per-persona generation (and its fail-closed ADR-104 gate,
+    # one corrective rewrite max) moved to the extracted panel sibling's worker —
+    # same gate core (board_grounding_findings, called through the host module),
+    # same arms as the prompt-module entry above.
+    "lambdas/web/site_api_board_panel.py::_generate": _entry(
+        ("numbers", "dates", "freshness"),
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
+    ),
     "lambdas/web/site_api_ai_lambda.py::_handle_ask": _entry(
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
