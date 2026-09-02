@@ -510,7 +510,9 @@ def handle_calibration(event, *, _g):
                     "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
                     "Calibrated. Voided bets: a reset voids — never grades — every still-open pre-registered "
                     "bet; each is recorded in the ledger and counted in `voided` so the graded denominator "
-                    "is honest. They are excluded from Brier because they never resolved."
+                    "is honest. They are excluded from Brier because they never resolved. Every hit rate here "
+                    "carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` — a hit rate off a small "
+                    "n reads as more precise than it is."
                 ),
                 "as_of": datetime.now(PT).strftime("%Y-%m-%d"),
             },

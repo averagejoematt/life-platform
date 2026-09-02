@@ -47,6 +47,12 @@ class CapturingTable:
         self.items.append(dict(Item))
         return {}
 
+    def get_item(self, Key=None, **_kw):  # noqa: N803
+        # #3443: store_computed_metrics reads the existing record before its
+        # from-scratch re-put (the co-owned acwr_* carry). An empty read is the
+        # ordinary first-write-of-the-day shape.
+        return {}
+
     def by_sk(self, sk):
         for item in self.items:
             if item.get("sk") == sk:

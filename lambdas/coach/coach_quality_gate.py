@@ -46,9 +46,12 @@ Checks:
 
 Returns a quality report with pass/fail, score, and detailed findings.
 
-DynamoDB patterns: reads only (no writes)
+DynamoDB patterns: reads, plus ONE opt-in write class (#3414)
   PK=COACH#{coach_id}  SK=VOICE#state
   PK=COACH#{coach_id}  SK=OUTPUT#*  (recent outputs for cross-coach comparison)
+  PK=EVALRET#{surface} SK=TS#*      (write — ONLY when the event carries the
+                                     #3414 `emit_verdict` opt-in AND the verdict
+                                     failed; `experiment.eval_retention`)
 
 S3: config/coaches/{coach_id}.json (voice spec)
 
@@ -59,6 +62,14 @@ v1.2.0 — 2026-08-29 (#3083, ADR-108 amendment): fail-closed fallback — when 
          gate's own LLM call fails, `_build_fallback_report` reports
          `passed: False` with an honest `reason`, so the blocking caller holds
          the unjudged draft (regenerate-or-hold) instead of green-lighting it.
+v1.3.0 — 2026-09-01 (#3414): callee-side verdict capture for ASYNC callers —
+         an event carrying the `emit_verdict` opt-in (a fire-and-forget Event
+         invoke cannot receive the return value) gets its verdict emitted to
+         CloudWatch + retained here as it completes. OBSERVE-ONLY: nothing
+         about scoring, `passed`, or any synchronous caller's wire changes,
+         and there is no regenerate-or-hold on this channel by design (the
+         board reader already has the text; ADR-108's enforcement scope
+         stays daily-brief-only per the #3413 amendment).
 """
 
 import json
@@ -71,7 +82,7 @@ import boto3
 
 # #2573: the deterministic grounding context's key names — defined once, in the wire
 # contract, so the caller that attaches them and the gate that reads them cannot drift.
-from ai.quality_gate_contract import AUTHORITATIVE_FACTS_KEY, GROUNDING_ALLOWLIST_KEY
+from ai.quality_gate_contract import AUTHORITATIVE_FACTS_KEY, EMIT_VERDICT_KEY, GROUNDING_ALLOWLIST_KEY, report_findings
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 # Structured logger
@@ -162,6 +173,82 @@ def _emit_failure_metric():
         )
     except Exception as e:
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
+
+
+def _emit_async_verdict(surface, coach_id, report, output_text):
+    """#3414 — capture a completed verdict CALLEE-side for a fire-and-forget caller.
+
+    The board's #968 synchronous wrapper produced 0 verdicts in 7 days of live
+    traffic (the client cap sat below this Lambda's own p50) and was removed by
+    #3413 — leaving the board's voice-fidelity failure rate UNKNOWN. An async
+    caller opts in via the `emit_verdict` event field and the verdict lands
+    here, where the gate always runs to completion:
+
+      • `BoardQualityGateVerdict` (Surface)            — the denominator: proof
+        the channel is alive on every completed evaluation
+      • `BoardQualityGateVerdict` (Surface, Outcome)   — passed | failed |
+        unjudged; failure rate = failed / (passed + failed)
+      • `BoardQualityGateFired`   (CoachID)            — failed only; the #968
+        metric name+dimension, finally with datapoints
+      • eval retention                                 — failed only, disposition
+        "observed": HONEST about the absence of regeneration — the reader was
+        already served `output_text`, nothing was corrected or held
+
+    An `_fallback: True` report is "unjudged", never "failed": the judge did not
+    run, and counting an unjudged draft as a voice-fidelity failure would inflate
+    the very rate this channel exists to measure (ADR-104 honest absence).
+
+    Fail-soft everywhere: this is telemetry riding a scorer — it must never
+    change the report, and its own failure costs a log line.
+    """
+    outcome = "unjudged" if report.get("_fallback") else ("passed" if report.get("passed") else "failed")
+    surface = str(surface)[:64]
+    try:
+        metric_data = [
+            {
+                "MetricName": "BoardQualityGateVerdict",
+                "Dimensions": [{"Name": "Surface", "Value": surface}],
+                "Value": 1,
+                "Unit": "Count",
+            },
+            {
+                "MetricName": "BoardQualityGateVerdict",
+                "Dimensions": [{"Name": "Surface", "Value": surface}, {"Name": "Outcome", "Value": outcome}],
+                "Value": 1,
+                "Unit": "Count",
+            },
+        ]
+        if outcome == "failed":
+            metric_data.append(
+                {
+                    "MetricName": "BoardQualityGateFired",
+                    "Dimensions": [{"Name": "CoachID", "Value": coach_id}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            )
+        _cw.put_metric_data(Namespace=_CW_NAMESPACE, MetricData=metric_data)
+    except Exception as e:
+        logger.warning("[%s] async verdict metric emit failed (non-fatal): %s", surface, e)
+    if outcome != "failed":
+        return
+    try:
+        from experiment import eval_retention
+
+        # Only FLAGGED events are retained (eval_retention's own contract) —
+        # clean passes already live in the surface's own record (the board's
+        # INTERACTION# write-back). draft == final on purpose: no regeneration
+        # happened, and the disposition says so.
+        eval_retention.retain(
+            surface,
+            "observed",
+            draft=output_text,
+            final=output_text,
+            findings=report_findings(report),
+            extra={"coach_id": coach_id, "score": report.get("score"), "channel": "async_event", "regenerated": False},
+        )
+    except Exception as e:  # noqa: BLE001 — retention is never load-bearing
+        logger.warning("[%s] async verdict retention failed (non-fatal): %s", surface, e)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -940,6 +1027,12 @@ def lambda_handler(event, context):
             # with no findings to name.
             _grounding_findings_summary(grounding),
         )
+
+        # #3414: an async (Event) caller cannot receive the return value below —
+        # when the event opted in, the verdict is captured HERE, on completion.
+        # After the COMPLETE log line, before the return; observe-only, fail-soft.
+        if event.get(EMIT_VERDICT_KEY):
+            _emit_async_verdict(event[EMIT_VERDICT_KEY], coach_id, report, output_text)
 
         return {
             "statusCode": 200,

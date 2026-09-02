@@ -1,18 +1,24 @@
 {
   "alarms": {
     "ai-canary-blind": {
+      "audience": "reader",
+      "audience_ruling": "same LifePlatform/AICanary probe family as ai-canary-overall \u2014 fires when the probe itself cannot reach the reader-facing /api/ask, /api/board_ask endpoints (distinguishes 'the watcher is broken' from 'the answers are bad', but both states mean the reader-facing AI surface is unwatched).",
       "kind": "metric",
       "routing": "digest",
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
     },
     "ai-canary-heartbeat": {
+      "audience": "reader",
+      "audience_ruling": "dead-man's-switch on the same public-AI canary \u2014 a missed heartbeat means the reader-facing AI watch has gone dark, silently, exactly the failure mode #3413 hid inside.",
       "kind": "metric",
       "routing": "digest",
       "stack": "monitoring_stack",
       "via": "factory:_heartbeat_alarm"
     },
     "ai-canary-overall": {
+      "audience": "reader",
+      "audience_ruling": "the public-AI quality canary (ai_quality_canary_lambda.py: 'standing eyes on the public AI') invokes site-api-ai directly with probes against /api/ask and /api/board_ask \u2014 the exact alarm that sat lit ~31h through the #3413 board-504 incident this facet exists to fix.",
       "kind": "metric",
       "routing": "digest",
       "stack": "monitoring_stack",
@@ -601,48 +607,64 @@
       "via": "declaration"
     },
     "site-api-ai-errors": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 errors on the reader-facing AI endpoints (/api/ask, /api/board_ask).",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-ai-throttles": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 throttling a reader hits directly on the AI endpoints.",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-content-filter-fallback": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 the reader-facing AI content-filter fallback path.",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-errors": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack (CLAUDE.md: 'public serving path \u2014 site-api + site-api-ai, #793') \u2014 general error rate serving averagejoematt.com readers.",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-handled-5xx": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 5xx served directly to a reader's browser/API client.",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-invocation-spike": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 an invocation spike on the reader-facing API (capacity/DoS blast radius reaches readers).",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-p95-latency-high": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 p95 latency a reader directly experiences loading the site.",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-throttles": {
+      "audience": "reader",
+      "audience_ruling": "serve_stack \u2014 throttling a reader hits directly on the public API.",
       "kind": "metric",
       "routing": "digest",
       "stack": "serve_stack",
@@ -813,6 +835,13 @@
       "producer": "common.send_ledger::record_sent"
     }
   ],
+  "cost_surface": {
+    "ai_features": 18,
+    "alarms": 119,
+    "emf_namespaces": 31,
+    "schedules": 88,
+    "secrets": 28
+  },
   "edges": [
     {
       "direction": "read",
@@ -6852,6 +6881,7 @@
     "authorities": {
       "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
       "contracts": "tests/pair_contract_registry.py (AST) \u2014 PairContract(...) declarations for the #2847 enrolled pairs, unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR",
+      "cost_surface": "#3374 R1 \u2014 the five cost-bearing population counts: alarms + schedules from this model's own planes; emf_namespaces from deploy/emf_namespace_ledger.LEDGER (AST), secrets from tests/test_secret_references.KNOWN_SECRETS (AST), ai_features from lambdas/ai/budget_guard._FEATURE_CUTOFF (AST). Exact-pinned against the hand-owned model/cost_surface_baseline.json by tests/test_platform_model_drift.py",
       "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets",
@@ -6886,9 +6916,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 320,
+        "sites_dynamic": 319,
         "sites_resolved": 825,
-        "sites_total": 1145
+        "sites_total": 1144
       },
       "schedule_resolution": {
         "dynamic": 0,

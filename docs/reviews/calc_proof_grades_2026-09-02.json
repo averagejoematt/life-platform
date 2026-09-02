@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-02",
+  "run_id": "calc-proof-2026-09-02-session-s",
+  "method": "formula-family calculation-proof pass on the /review spine (accuracy lens variant, Session S plan Phase 3): 7 fresh-context Fable graders (source vs spec vs live recomputation, hand arithmetic required) + 4 adversarial finding-verifier batches; axis-a deterministic pass alongside. Does NOT claim the accuracy-full calendar slot.",
+  "headline": "Every formula recomputes byte-exact; the defects live in the pipes between correct formulas — 23/23 verified findings CONFIRMED (0 refuted), led by two P1s: the 8-member whoop #WORKOUT# sub-record class and ACWR's nightly destruction by the evening re-put.",
+  "verification": {"findings_raw": 23, "confirmed": 23, "refuted": 0, "historical_fp_base_rate": "~44-50%", "note": "recompute-first grader briefs front-loaded verification; the verifier pass added the 8-member class census, 2 severity corrections (P1->P2 window truncation, P2->P3 n_eff), 3 citation fixes, 1 scope correction"},
+  "lenses": {
+    "sleep-math": {"verdict": "PROVEN", "grade": "A-", "note": "raw-S3->DDB->served exact on 4 nights + nap specimen; 30d avg exact n=30; two P3 disclosure gaps (#3451)"},
+    "flourishing-ema": {"verdict": "PROVEN", "grade": "A-", "note": "20-row series bit-exact all 6 signals; absence never a value; MCP description mislabel (#3452)"},
+    "budget-ledger-cost-surface": {"verdict": "PROVEN", "grade": "A-", "note": "founding numbers to the cent; $0.02 dogfood red reproduced live; guards are founding snapshots not invariants (#3447)"},
+    "calibration-brier": {"verdict": "PROVEN", "grade": "B+", "note": "21.6% = 8/37 exact over 2,806 rows; #2219 beats_null class sound; no interval anywhere, Wilson 95% [11.4,37.2] (#3450); fixed 2% null unstamped (#3448)"},
+    "character-engine": {"verdict": "PROVEN", "grade": "B+", "note": "five verdict-critical mechanisms unchanged since frozen 07-11 audit; 5 stats to 4 decimals; Day-1 partial locked in by existence-only guard (#3446)"},
+    "readiness-acwr": {"verdict": "DIVERGENT", "grade": "C+", "note": "readiness exact (personal band n=164); ACWR destroyed nightly since 08-24 (#3443) + workout-strain clobber (#3442 member)"},
+    "stats-core-fdr": {"verdict": "DIVERGENT", "grade": "C+", "note": "core math A, byte-exact only by replicating two defects: workout clobber (#3442) + phase-filter truncation running '90-day' as 14 (#3444); Evidence Bar serving defects (#3445); time-affluence never scored (#3444 context)"}
+  },
+  "axis_a": {"cross_page_disagreements": 0, "ddb_ground_truth_divergences": 0, "sentinel_leaks": "2 false positives (honest prose flagged; instrument finding #3453)"},
+  "filed": {"label": "review:calc-proof-2026-09", "issues": [3442, 3443, 3444, 3445, 3446, 3447, 3448, 3449, 3450, 3451, 3452, 3453], "extends_comments": [3390]},
+  "rubric_anchors_note": "first run of this variant; per-family anchors recorded in each grader's banked result and the scorecard — reuse verbatim on the next run",
+  "already_a": ["ADR-104 absence discipline everywhere probed", "#2219 beats_null class", "personal-variance HRV band n=164", "budget mutation tests non-vacuous", "get_acwr_status ADR-105 serving (honestly withholding over the outage it found)"]
+}

@@ -28,9 +28,18 @@ What it runs (the ritual's queries, in order)
      any window reaching earlier reads a PARTIAL stamp (the August close covered only
      a ~7-day stamped window) — the ci+dev SHARE of the stamped window is the fact to
      record, never the stamped dollars as the month's AI spend.
-  Plus the dial states (SSM budget-tier / qa-level / remediation-mode) and the
-  run-twice stability check on scripts/ai_spend_attribution.py (its first invocation
-  returned partial data on 2026-08-31 — nondeterminism observed n=1, #3375).
+  5. The per-feature AI budget ledger (#3374 R3, scripts/ai_budget_ledger.py) — every
+     budgeted feature's spend vs. its ledger budget, and the `unknown` bucket vs. its
+     down-only ratchet, graded on the stability check's own attribution run. An
+     overage is a close FAILURE (exit 1), not a note.
+  Plus the dial states (SSM budget-tier / qa-level / remediation-mode), a secrets
+  registry-vs-live-estate reconciliation (#3447 leg d — tests/test_secret_references
+  .KNOWN_SECRETS is a CODE-REFERENCE registry, not the billable Secrets Manager
+  estate; the two have already drifted, 28 registry vs 26 live as of 2026-09-02, and
+  a live-but-unreferenced secret like life-platform/github-billing is billed and
+  structurally invisible to the registry), and the run-twice stability check on
+  scripts/ai_spend_attribution.py (its first invocation returned partial data on
+  2026-08-31 — nondeterminism observed n=1, #3375).
 
 Exit code (read it UNPIPED — `... | tail` reads the pipe's exit, the
 reference_a_ci_gate_that_cannot_fail class): 0 = every query answered and the
@@ -45,6 +54,7 @@ Usage
 """
 
 import argparse
+import ast
 import json
 import os
 import statistics
@@ -76,9 +86,9 @@ DIALS = (
 _PROBLEMS: list[str] = []
 
 
-def _problem(msg: str) -> None:
+def _problem(msg: str, label: str = "UNAVAILABLE") -> None:
     _PROBLEMS.append(msg)
-    print(f"  !! UNAVAILABLE — {msg}")
+    print(f"  !! {label} — {msg}")
 
 
 def _month_window(month_arg: str | None) -> tuple[date, date, str]:
@@ -213,6 +223,39 @@ def _dials(ssm) -> dict[str, str]:
     return out
 
 
+# ── Secrets reconciliation (#3447 leg d) ──────────────────────────────────────
+_SECRET_REFS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "test_secret_references.py")
+
+
+def _known_secrets_registry() -> set[str]:
+    """``KNOWN_SECRETS`` lifted by AST — never a hand-restated copy (the same
+    #3374 R1 discipline the cost-surface plane's count already uses). This is
+    the CODE-REFERENCE registry (grep scope: lambdas/ + mcp/ source), not the
+    live billable Secrets Manager estate — that is exactly the gap this
+    reconciliation exists to surface, not to paper over."""
+    tree = ast.parse(open(_SECRET_REFS_PATH, encoding="utf-8").read(), filename=_SECRET_REFS_PATH)
+    for node in ast.walk(tree):
+        targets = [t.id for t in node.targets if isinstance(t, ast.Name)] if isinstance(node, ast.Assign) else []
+        if "KNOWN_SECRETS" in targets and isinstance(getattr(node, "value", None), ast.Set):
+            names = {e.value for e in node.value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+            if names:
+                return names
+    raise ValueError(f"KNOWN_SECRETS not found (or empty) in {_SECRET_REFS_PATH} — the #3447 secrets reconciliation rotted")
+
+
+def _secrets_reconciliation() -> tuple[set[str], set[str]]:
+    """(registry, live estate) — read-only ``secretsmanager:ListSecrets``. Raises
+    up to the caller on an AWS failure; the caller records it as a problem, same
+    as every other query here (absence must never read as a clean reconciliation)."""
+    registry = _known_secrets_registry()
+    sm = boto3.client("secretsmanager", region_name=REGION)
+    estate: set[str] = set()
+    paginator = sm.get_paginator("list_secrets")
+    for page in paginator.paginate():
+        estate.update(s["Name"] for s in page.get("SecretList", []))
+    return registry, estate
+
+
 # ── Run-twice stability check on ai_spend_attribution.py ─────────────────────
 def _attribution_run(month: str) -> dict | None:
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_spend_attribution.py")
@@ -270,7 +313,7 @@ def main(argv=None) -> int:
     print(f"\nMonthly close assembler — {label}  (print-only: this script writes NOTHING)\n")
 
     # 1. CE actual
-    print("[1/4] CE actual by service (unblended)")
+    print("[1/5] CE actual by service (unblended)")
     actuals = _ce_actuals(ce, start, end)
     top = sorted(actuals["services"].items(), key=lambda kv: -kv[1])[:8]
     for svc, amt in top:
@@ -290,13 +333,13 @@ def main(argv=None) -> int:
         print(f"  Bedrock daily: {spike_note}")
 
     # 2. Days at tier ≥1
-    print("\n[2/4] Days at tier >=1 (LifePlatform/Budget::BudgetTier daily max)")
+    print("\n[2/5] Days at tier >=1 (LifePlatform/Budget::BudgetTier daily max)")
     tier_days = _days_at_tier(cw, start, end)
     if tier_days is not None:
         print(f"  {tier_days} / {days_in_month} days")
 
     # 3. Cost per reader-week
-    print("\n[3/4] Cost per reader-week (LifePlatform/Traffic::UniqueVisitors7d)")
+    print("\n[3/5] Cost per reader-week (LifePlatform/Traffic::UniqueVisitors7d)")
     readers = _reader_week(cw, start, end)
     reader_week = None
     if readers and total:
@@ -308,7 +351,7 @@ def main(argv=None) -> int:
         )
 
     # 4. CallerClass split
-    print("\n[4/4] CallerClass split (LifePlatform/AI::EstimatedCostUSD, #2892)")
+    print("\n[4/5] CallerClass split (LifePlatform/AI::EstimatedCostUSD, #2892)")
     by_class = _caller_class(cw, start, end)
     stamped = sum(by_class.values())
     episodic = sum(by_class[c] for c in EPISODIC_CLASS_NAMES)
@@ -332,6 +375,27 @@ def main(argv=None) -> int:
     for name, value in _dials(ssm).items():
         print(f"  {name:<38} {value}")
 
+    # Secrets reconciliation (#3447 leg d)
+    print("\nSecrets reconciliation (tests/test_secret_references.KNOWN_SECRETS vs live Secrets Manager estate, #3447)")
+    try:
+        registry, estate = _secrets_reconciliation()
+    except Exception as e:
+        _problem(f"secrets reconciliation failed: {e}")
+    else:
+        registry_only = sorted(registry - estate)
+        estate_only = sorted(estate - registry)
+        print(f"  registry {len(registry)} vs live estate {len(estate)}")
+        if registry_only:
+            print(
+                f"  registry-only (declared, not currently live — verify each is a deliberately-disarmed/deferred feature): {', '.join(registry_only)}"
+            )
+        if estate_only:
+            _problem(
+                f"live secret(s) billed with NO registry row — invisible to the R1 cost-surface secrets count: {', '.join(estate_only)}"
+            )
+        if not registry_only and not estate_only:
+            print("  registry and live estate agree exactly")
+
     # Run-twice stability
     attribution, diffs = (None, [])
     if args.skip_attribution:
@@ -346,6 +410,32 @@ def main(argv=None) -> int:
         elif attribution is not None:
             n = len(attribution["features"])
             print(f"  stable: two runs agree on {n} features (top: " + ", ".join(f["feature"] for f in attribution["features"][:3]) + ")")
+
+    # 5. The per-feature AI budget ledger (#3374 R3) — graded on the SAME
+    # attribution run the stability check just validated; a budgeted feature over
+    # its ledger budget, or `unknown` over the down-only ratchet, FAILS the close.
+    print("\n[5/5] AI budget ledger (#3374 R3, scripts/ai_budget_ledger.py)")
+    import ai_budget_ledger  # sibling module — scripts/ is this file's own directory
+
+    ledger_structural = ai_budget_ledger.validate()
+    for f in ledger_structural:
+        _problem(f"ai_budget_ledger structural: {f}", label="FAIL")
+    if args.skip_attribution:
+        month_arg = start.strftime("%Y-%m")
+        print(f"  SKIPPED with --skip-attribution — run by hand: python3 scripts/ai_budget_ledger.py --month {month_arg}")
+    elif attribution is None or diffs:
+        # the run-twice leg already recorded its own problem/divergence → exit 1
+        print("  not evaluated: no stable attribution run to grade against (see the check above)")
+    else:
+        ledger_failures = ai_budget_ledger.evaluate_close(attribution)
+        for f in ledger_failures:
+            _problem(f"ai_budget_ledger: {f}", label="FAIL")
+        if not ledger_failures and not ledger_structural:
+            budgeted = sum(1 for r in ai_budget_ledger.LEDGER.values() if r["monthly_budget_usd"] is not None)
+            print(
+                f"  ok: {budgeted} budgeted features within budget; unknown within the down-only ratchet "
+                f"(${ai_budget_ledger.LEDGER[ai_budget_ledger.UNKNOWN_KEY]['monthly_budget_usd']})"
+            )
 
     # The candidate row
     fmt = lambda v, spec=".2f": format(v, spec) if v is not None else "??"  # noqa: E731
@@ -365,7 +455,8 @@ def main(argv=None) -> int:
 
     if _PROBLEMS or diffs:
         print(
-            f"\nEXIT 1 — {len(_PROBLEMS)} unavailable quer{'y' if len(_PROBLEMS) == 1 else 'ies'}, {len(diffs)} divergence(s) (listed above)."
+            f"\nEXIT 1 — {len(_PROBLEMS)} problem{'' if len(_PROBLEMS) == 1 else 's'} "
+            f"(unavailable queries / ledger failures), {len(diffs)} divergence(s) (listed above)."
         )
         return 1
     return 0

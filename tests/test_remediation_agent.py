@@ -449,6 +449,102 @@ def test_aged_alarm_unparseable_timestamp_never_false_fires():
     assert agent.aged_alarm_escalations({"alarms": [{"name": "x", "updated": "not-a-date"}]}, now=now) == []
 
 
+# ── #3423: reader-audience alarms escalate into this same needs_human email on
+# FIRST red, not ALARM_AGE_ESCALATION_HOURS (72h) ──────────────────────────────
+#
+# ai-canary-overall went ALARM 2026-08-31 09:22 PT (16:22 UTC — the #3413
+# `/api/board_ask` 504 P1) and sat lit ~31h with zero escalation into this same
+# curated email, because it was under the 72h aging threshold. The replay below
+# reconstructs the episode 38 minutes in.
+
+_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC = "2026-08-31T16:22:00+00:00"  # 2026-08-31 09:22 PT (PDT, UTC-7)
+
+
+def test_replay_ai_canary_overall_does_not_escalate_under_the_old_72h_bar():
+    """RED under the pre-#3423 logic: passing an explicit EMPTY audience map
+    reproduces the flat 72h-only behavior byte-for-byte — the exact gap the
+    incident measured."""
+    from datetime import datetime, timedelta
+
+    fired = datetime.fromisoformat(_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC)
+    now = fired + timedelta(minutes=38)
+    signals = {"alarms": [{"name": "ai-canary-overall", "updated": fired.isoformat()}]}
+    out = agent.aged_alarm_escalations(signals, now=now, audience={})
+    assert out == [], "the pre-#3423 72h-only logic must NOT catch this 38-minute-old red — that silence IS the incident"
+
+
+def test_replay_ai_canary_overall_escalates_at_first_red_under_the_new_policy():
+    """GREEN under the #3423 policy: the same episode, tagged reader-audience,
+    escalates into the curated needs_human email immediately."""
+    from datetime import datetime, timedelta
+
+    fired = datetime.fromisoformat(_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC)
+    now = fired + timedelta(minutes=38)
+    signals = {"alarms": [{"name": "ai-canary-overall", "updated": fired.isoformat()}]}
+    out = dict(agent.aged_alarm_escalations(signals, now=now, audience={"ai-canary-overall": "reader"}))
+    assert "ai-canary-overall" in out
+    assert "READER-AUDIENCE" in out["ai-canary-overall"]["issue"]
+    assert (
+        "38" in out["ai-canary-overall"]["issue"] or "1h" in out["ai-canary-overall"]["issue"] or "0h" in out["ai-canary-overall"]["issue"]
+    )
+
+
+def test_replay_against_the_real_shipped_registry_end_to_end():
+    """Not a synthetic map — the default `audience=None` loads the real committed
+    scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS registry off the
+    committed model/platform_model.json. Proves the wiring, not just the
+    mechanism."""
+    from datetime import datetime, timedelta
+
+    fired = datetime.fromisoformat(_INCIDENT_AI_CANARY_OVERALL_FIRED_UTC)
+    now = fired + timedelta(minutes=38)
+    signals = {"alarms": [{"name": "ai-canary-overall", "updated": fired.isoformat()}]}
+    out = dict(agent.aged_alarm_escalations(signals, now=now))  # audience omitted -> real registry
+    assert "ai-canary-overall" in out
+
+
+def test_a_non_reader_alarm_still_needs_72h_even_with_a_reader_map_present():
+    """Regression proof: a non-reader-audience alarm's threshold is untouched even
+    when the SAME call carries a reader-audience map naming a different alarm."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    signals = {
+        "alarms": [
+            {"name": "ai-canary-overall", "updated": (now - timedelta(minutes=38)).isoformat()},
+            {"name": "grading-stalled", "updated": (now - timedelta(hours=10)).isoformat()},
+        ]
+    }
+    out = dict(agent.aged_alarm_escalations(signals, now=now, audience={"ai-canary-overall": "reader"}))
+    assert set(out) == {"ai-canary-overall"}, "a non-reader alarm must not be swept up by a reader map for a different alarm"
+
+
+def test_reader_audience_alarms_helper_reads_the_real_committed_model():
+    audience = agent._reader_audience_alarms()
+    assert audience.get("ai-canary-overall") == "reader"
+
+
+def test_reader_audience_alarms_helper_degrades_on_missing_file(monkeypatch):
+    monkeypatch.setattr(agent, "MODEL_PATH", "/does/not/exist/platform_model.json")
+    assert agent._reader_audience_alarms() == {}
+
+
+def test_reader_audience_alarms_helper_degrades_on_malformed_json(monkeypatch, tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not valid json", encoding="utf-8")
+    monkeypatch.setattr(agent, "MODEL_PATH", str(bad))
+    assert agent._reader_audience_alarms() == {}
+
+
+def test_ack_and_ratchet_escalations_carry_no_audience_parameter():
+    """#3423 is explicitly scoped to aged_alarm_escalations — the ack-ratchet and
+    stale-secret escalations are untouched."""
+    import inspect
+
+    assert "audience" not in inspect.signature(agent.ack_ratchet_escalations).parameters
+    assert "audience" not in inspect.signature(agent.stale_secret_escalations).parameters
+
+
 def test_main_surfaces_aged_alarm_into_needs_human(monkeypatch, tmp_path):
     # End-to-end non-vacuous proof: the agent transcript classifies grading-stalled
     # as STALE (never naming it in needs_human) yet the deterministic backstop lands

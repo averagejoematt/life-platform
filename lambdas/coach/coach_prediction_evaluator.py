@@ -104,8 +104,10 @@ EVALUABLE_STATUSES = {"pending", "confirming"}
 # EWMA decay factor for directional trend evaluation
 EWMA_DECAY = 0.87
 
-# Directional evaluation: minimum slope magnitude to count as a real signal
-# (avoids calling noise a confirmed direction)
+# Directional evaluation: minimum slope to count as real signal — a DOCUMENTED ADR-105
+# EXCEPTION (2026-09-02, #3448): fixed editorial band, the de-facto null for the #813
+# rescue path. Stamp, reach + re-derive trigger: registry entry `directional_trend_verdict`
+# + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
 # #2221 — the EWMA observation floor + the provisional-grade rules, reasoned out there.

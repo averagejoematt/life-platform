@@ -802,6 +802,28 @@ def is_coach_surface_audience(finding):
 # #3258 residue, unchanged and unhidden. What #3337 removes is the other half:
 # a note that proves a real impossibility and happens to close with "internally
 # consistent" is no longer silently dropped.
+#
+# ── #3399 (2026-09-01): the field arrived POPULATED AND WRONG ─────────────────
+# The first live measurement of the #3337 channel (run 33451827346, 35 findings):
+# `basis: "withdrawn"` was emitted ZERO times, and the run's one genuine
+# withdrawal — a /method/voicefidelity/ note ending "Withdrawing this finding."
+# — arrived as `basis: "impossibility"` at `high` and GATED. Channel 2 was also
+# blind (that literal matches none of the six phrases); extending the list would
+# be the family's fifth field failure and was refused. THE FIX lives in the
+# response contract, not here: the old schema emitted `basis` BEFORE the note,
+# so an autoregressive judge had committed the label before its note's own
+# re-check could reach it. #3399 moves `basis` to the END of each finding (see
+# reader_truth_qa._PROMPT_FOOTER's comment block) — a POST-NOTE withdrawal
+# marker; channel 1 below is unchanged and remains the decider, and a first-pass
+# mislabel is enforced at the #2741/#3102 confirm passes, whose re-judge under
+# the same post-note contract is dropped here so the high demotes visibly.
+# WHAT SURVIVES OF `_WITHDRAWAL_RE`, ruled for the record (#3399 acceptance):
+# the six phrases remain EXACTLY a logged tiebreak — they may confirm a drop the
+# structural predicates already allowed, they can never decide alone, and every
+# firing prints via `_tiebreak`. Regression + controls (the wire finding, the
+# 35-finding replay census, a contract guard that reds if `basis` moves back
+# ahead of the note or "withdrawn" leaves the enum):
+# tests/test_reader_truth_withdrawn_basis_3399.py.
 
 
 def is_self_refuted(finding, start_date=None, today=None):

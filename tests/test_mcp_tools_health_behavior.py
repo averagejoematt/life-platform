@@ -498,6 +498,39 @@ def test_readiness_surfaces_the_precomputed_cross_check_when_one_exists(monkeypa
     assert out["_precomputed_cross_check"]["readiness_score"] == 70.2
 
 
+def test_readiness_cross_check_note_states_the_stored_models_real_weights(monkeypatch):
+    """#3452 F3: the `_precomputed_cross_check` note is a served description of
+    the OTHER model (daily-metrics-compute's compute_readiness), so it must
+    match that model's real weights rather than the note-author's guess. It
+    used to say "sleep 30%" while the code weighted sleep 0.25, and it claimed
+    the four weights summed to 100% when they actually sum to 0.95 (no Body
+    Battery leg). This derives the true weights straight from
+    compute_readiness's own breakdown output rather than restating a second
+    hardcoded copy, so a future rebalance that forgets the note trips this."""
+    import daily_metrics_compute_lambda as dmc
+
+    _, _, breakdown = dmc.compute_readiness(
+        {
+            "whoop_today": {"recovery_score": 80},
+            "whoop": None,
+            "sleep": {"sleep_score": 70},
+            "hrv": {"hrv_7d": 55, "hrv_30d": 50},
+            "tsb": 4,
+        }
+    )
+    live_weights = {c["key"]: c["weight"] for c in breakdown}
+    assert live_weights == {"recovery": 0.40, "sleep": 0.25, "hrv_trend": 0.20, "tsb": 0.10}
+    assert sum(live_weights.values()) == pytest.approx(0.95)
+
+    rows = _readiness_rows()
+    rows[1] = cmetrics(TODAY, hrv_7d=44, hrv_30d=40, tsb=4, readiness_score=70.2, readiness_colour="GREEN")
+    install(monkeypatch, rows)
+    note = th.tool_get_readiness_score({})["_precomputed_cross_check"]["note"]
+    assert "sleep 25%" in note and "sleep 30%" not in note
+    assert "recovery 40%" in note and "HRV trend 20%" in note and "TSB 10%" in note
+    assert "95%" in note  # honestly states the true sum, not a fabricated 100%
+
+
 def test_readiness_paginates_the_whoop_partition_without_dropping_rows(monkeypatch):
     """``query_source``'s ``while True`` pagination, driven by a BOUNDED fake that
     really returns LastEvaluatedKey. With page_size 1 the 8-date window is walked

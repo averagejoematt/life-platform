@@ -8,12 +8,27 @@ formula, the window it runs over, its known limitations, and what surfaces it fe
 
 Anti-drift by construction (the pattern of sync_doc_metadata.py's tool-count
 auto-discovery, #389): each entry names the actual function it documents, and
-`_fingerprint()` hashes that function's live source. The entry also carries the hash
-recorded the last time its prose was verified accurate. `verify_fingerprints()` (run in
-tests/test_methods_registry.py) diffs the two — if a function's implementation changes
-without a human re-reading and re-committing its registry entry, the test goes red.
-The registry can go stale by omission (nobody added an entry for a new stat) but it
-cannot silently drift out of sync with a documented one.
+`_fingerprint()` hashes that function's CLOSURE — its own source, its bound default
+argument values, and every helper function / module-level constant it reads by name in
+its OWN defining module, recursively (#3449). The entry also carries the hash recorded
+the last time its prose was verified accurate. `verify_fingerprints()` (run in
+tests/test_methods_registry.py) diffs the two — if a function's implementation, a
+helper it calls, or a constant it reads changes without a human re-reading and
+re-committing its registry entry, the test goes red. The registry can go stale by
+omission (nobody added an entry for a new stat) but it cannot silently drift out of
+sync with a documented one.
+
+Closure-aware, not call-graph-complete (#3449): the fingerprint chases bare-name
+references within the fingerprinted function's OWN module (a helper called directly,
+e.g. `_block_resample(...)`, or a module constant read directly, e.g. `_Z_CRIT`), plus
+its own `__defaults__`/`__kwdefaults__` (the only place a value like
+`seed=DEFAULT_SEED` actually shows up post-binding — the literal text `DEFAULT_SEED`
+in the signature never changes even when the constant does). It does NOT chase
+module-qualified cross-module calls (`stats_core.brier_score(...)` inside
+calibration_core.py) — those targets are, in every case in this registry, themselves
+separately registered entries that trip independently when their own source changes,
+so the residual gap is calling an UNREGISTERED private helper in another module, which
+does not occur among the functions below as of #3449.
 
 This is a pure, read-only module — no I/O, no AI, matching the "zero AI cost" /
 "deterministic before narrative" posture of every other stats_core/calibration_core
@@ -27,24 +42,93 @@ its entry without this module knowing anything about that UI.
 
 import hashlib
 import inspect
+import types
 
 from ai import conversation_enrichment
+from coach.coach_prediction_evaluator import _get_ewma_trend  # #3448: the directional-band stamp's fingerprinted source
 from common import stats_core
 
 from experiment import bsts_lite, calibration_core
 
 
-def _fingerprint(fn):
-    """Short source-hash for a function — the drift tripwire (see module docstring).
+def _referenced_names(code):
+    """All bare names a code object loads from its enclosing scope, including
+    names referenced only inside NESTED code objects (a lambda or comprehension
+    gets its own code object with its own `co_names`, e.g. the
+    `lambda a, b: pearson_r(a, b, ...)` default statistic in
+    `moving_block_bootstrap_ci`) — a shallow `fn.__code__.co_names` read alone
+    misses those.
+    """
+    names = set(code.co_names)
+    for const in code.co_consts:
+        if isinstance(const, types.CodeType):
+            names |= _referenced_names(const)
+    return names
 
-    Returns None (never raises) when source isn't available, e.g. a built-in —
-    none of the functions registered below hit that path.
+
+def _closure_sources(fn, visited=None):
+    """Deterministic list of source-like strings for everything `fn` can reach
+    in its OWN defining module (see the module docstring for the exact scope).
+
+    Three ingredients, all proven necessary by the #3449 blind spot:
+      1. `fn`'s own source text (the original, pre-#3449 fingerprint input).
+      2. `fn`'s bound `__defaults__`/`__kwdefaults__` — a default like
+         `seed=DEFAULT_SEED` is evaluated ONCE at def time; the literal text
+         `DEFAULT_SEED` in the signature never changes when the constant does,
+         only the bound value in `__defaults__` does.
+      3. Every helper function called by bare name (recursively) and every
+         module-level constant read by bare name, resolved via `fn.__globals__`
+         (which IS the defining module's globals dict) against the names
+         `_referenced_names` finds in `fn`'s bytecode.
+    `visited` guards mutual/self recursion by (module, qualname).
+    """
+    if visited is None:
+        visited = set()
+    key = (getattr(fn, "__module__", None), getattr(fn, "__qualname__", None))
+    if key in visited:
+        return []
+    visited.add(key)
+
+    parts = []
+    try:
+        parts.append(inspect.getsource(fn))
+    except (OSError, TypeError):
+        pass
+    parts.append(repr(getattr(fn, "__defaults__", None)))
+    parts.append(repr(getattr(fn, "__kwdefaults__", None)))
+
+    module_globals = getattr(fn, "__globals__", None)
+    code = getattr(fn, "__code__", None)
+    if module_globals is not None and code is not None:
+        for name in sorted(_referenced_names(code)):
+            if name not in module_globals:
+                continue
+            value = module_globals[name]
+            if inspect.isfunction(value) and value.__module__ == fn.__module__:
+                parts.extend(_closure_sources(value, visited))
+            elif not inspect.ismodule(value) and not inspect.isclass(value) and not inspect.isfunction(value):
+                # A module-level constant this function reads by name (e.g.
+                # `_Z_CRIT`, checked with `confidence not in _Z_CRIT`).
+                parts.append(f"{name}={value!r}")
+    return parts
+
+
+def _fingerprint(fn):
+    """Closure-aware source hash — the drift tripwire (see module docstring).
+
+    Returns None (never raises) when `fn`'s OWN source isn't available, e.g. a
+    built-in — none of the functions registered below hit that path. A helper
+    further down the closure lacking source (rare — e.g. a C-implemented
+    dependency) still contributes its repr'd value/defaults rather than
+    vanishing silently.
     """
     try:
-        src = inspect.getsource(fn)
+        inspect.getsource(fn)
     except (OSError, TypeError):
         return None
-    return hashlib.sha256(src.encode("utf-8")).hexdigest()[:12]
+    parts = _closure_sources(fn)
+    joined = "\x1e".join(parts)  # ASCII record separator: never appears in source
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
 
 
 def _entry(id_, name, fn, category, formula, window, limitations, recorded_fingerprint, min_n=None, used_by=None):
@@ -124,7 +208,7 @@ REGISTRY = {
         "only — a real non-linear relationship can score near zero. Not corrected for "
         "day-to-day autocorrelation on its own (see effective_sample_size) — a raw r without "
         "the effective-n-based p-value/CI overstates confidence on daily physiological series.",
-        "cc43b664c7de",
+        "317f3c35ee72",
         min_n=3,
         used_by=(
             "The correlation engine (/method/intelligence/), tools_training zone-2 and "
@@ -142,7 +226,7 @@ REGISTRY = {
         "Returns 0.0 (no detectable memory) below n=3 or zero variance, which makes the "
         "downstream effective-n correction a no-op rather than an error. A helper, not a "
         "reported statistic on its own — it feeds effective_sample_size.",
-        "1523ef8b9895",
+        "1a46a46d39ca",
     ),
     "effective_sample_size": _entry(
         "effective_sample_size",
@@ -156,7 +240,7 @@ REGISTRY = {
         "First-order (Bartlett/AR(1)) only — does not model higher-order or seasonal "
         "autocorrelation. The core answer to the ADR-105 rule that daily physiological series "
         "(recovery, HRV, weight) are not i.i.d. and raw n overstates the evidence.",
-        "cc8455887d33",
+        "9ff962e2c609",
         used_by="Every correlation surface: correlation_report (mcp/helpers.py), tools_training, the weekly correlation compute.",
     ),
     "pearson_p_value": _entry(
@@ -171,7 +255,7 @@ REGISTRY = {
         "None when |r| ≥ 1 or n ≤ 2. Accurate to ~3 decimals for df > 10, conservative "
         "(slightly wider) below — a stated intentional trade-off, not an unhandled edge case. "
         "Always compute on n_eff for daily series, never raw n (ADR-105).",
-        "dad41124dc37",
+        "132e2e353de4",
         used_by="correlation_report (the ONE correlation-reporting helper, replacing 6 duplicate copies), tools_training.",
     ),
     "fisher_ci": _entry(
@@ -183,8 +267,32 @@ REGISTRY = {
         "Same n as the r it's bounding — pass effective_sample_size's n_eff for " "autocorrelated daily series.",
         "None when |r| ≥ 1 or n ≤ 3. Supports exactly four confidence levels (0.80, 0.90, "
         "0.95, 0.99) — anything else raises ValueError rather than silently approximating.",
-        "dd89a9450ce8",
+        "5d18f372e25e",
         used_by="correlation_report, tools_training correlation reads.",
+    ),
+    "correlation_evidence": _entry(
+        "correlation_evidence",
+        "Correlation evidence score (Evidence Bar)",
+        stats_core.correlation_evidence,
+        "Correlation",
+        "score = 0.5·s_n + 0.3·s_ci + 0.2·s_fdr, s_n = min(1, log1p(n_eff-2)/log1p(88)) "
+        "(0 at n_eff≤2, ~0.67 at n_eff=21, 1.0 at n_eff≥90), s_ci = max(0, 1 - width of "
+        "the 95% Fisher CI on r), s_fdr = 1 if fdr_significant is True else 0",
+        "The same (r, n, n_eff, fdr_significant) a caller already computed for one " "correlation claim — no lookback of its own.",
+        "Tolerant of None/garbage inputs (returns the honest low/zero shape rather than "
+        "raising) since it sits on a public serving path. `level` (high/medium/low) "
+        "mirrors charts.js's client-side n thresholds (≥21/≥8) so the served level and "
+        "every existing confidence treatment read the same grammar. `ci95`/`ci_width` "
+        "are None (never a fabricated band) when no CI is computable; `fdr_significant` "
+        "is None (never coerced to False) when the batch was never checked. #1372's ONE "
+        "deterministic source for the public Evidence Bar — no authored strength grades "
+        "anywhere, every component computed.",
+        "d9c3f64f01a0",
+        used_by=(
+            "The Evidence Bar on /api/vitals correlations (site_api_discovery.py) and the "
+            "correlation ledger surface (site_api_ledger.py) — every published correlation "
+            "claim's per-claim evidence readout."
+        ),
     ),
     "moving_block_bootstrap_ci": _entry(
         "moving_block_bootstrap_ci",
@@ -200,7 +308,7 @@ REGISTRY = {
         "or the call returns None (e.g. degenerate resamples with zero variance). Default "
         "statistic is Pearson r (paired) or the mean (single series); a custom stat may be "
         "passed in. Only 4 confidence levels supported (see fisher_ci).",
-        "e5bc510cc54f",
+        "364a826647e5",
         min_n=5,
         used_by="weight_trend.py (the weight-rate confidence interval on /api/journey, #535).",
     ),
@@ -217,7 +325,7 @@ REGISTRY = {
         "Both series need n ≥ 5 or the call returns None. Independent block-resampling means "
         "it does not account for any correlation between the baseline and window periods "
         "themselves (e.g. a slow seasonal drift spanning both).",
-        "2ebc196523b9",
+        "38bbf01a47f3",
         min_n=5,
         used_by="experiment_design.py (evaluate_design) — the n-of-1 pre-registered experiment analysis (#539).",
     ),
@@ -232,7 +340,7 @@ REGISTRY = {
         "bar).",
         "None when either group has n < 2 or pooled SD is 0. A standardized magnitude, not a "
         "significance test — always report alongside the bootstrap CI, never alone.",
-        "ef546176a048",
+        "6e8b79c3da55",
         used_by="experiment_design.py (evaluate_design).",
     ),
     "start_point_randomization_test": _entry(
@@ -255,7 +363,7 @@ REGISTRY = {
         "thin arm (< 5 points after gaps) are excluded and reported in n_excluded; a pure "
         "pre-existing linear trend scores p ≈ 1 by construction — the coincident-trend "
         "confound the design exists to defeat.",
-        "ce658c9d7d25",
+        "dfce6c20abd5",
         min_n=2,
         used_by=(
             "experiment_design.randomization_test — the end_experiment close-path analysis for "
@@ -285,7 +393,7 @@ REGISTRY = {
         "(correctly) withholds the ghost. The effect CI uses the full forecast-error covariance "
         "(shared level error correlates post days); the interval widens with distance from start "
         "by construction — the model's honesty about extrapolation, drawn as-is on the card.",
-        "bcde99d1a787",
+        "e21e6e635149",
         min_n=14,
         used_by=(
             "experiment_design.counterfactual_analysis — the end_experiment close path for designs "
@@ -305,7 +413,7 @@ REGISTRY = {
         "Needs ≥ 4 clean points or returns None. The grid search always picks the same α for "
         "the same data (ties go to the smaller α) — deterministic, no randomness, per ADR-105's "
         "'deterministic computation before any LLM verdict' rule.",
-        "d1462361a90e",
+        "be7249b58368",
         used_by="ewma_forecast (below); indirectly, the forecast engine.",
     ),
     "ewma_forecast": _entry(
@@ -322,7 +430,7 @@ REGISTRY = {
         "Needs ≥ min_n clean points (default 10) and ≥ 3 residuals or returns None. An "
         "EXPECTATION extrapolated from the series' own recent pattern — never a causal claim. "
         "Supports only the 4 fisher_ci confidence levels.",
-        "4b50c3a63abf",
+        "454a81e5791d",
         min_n=10,
         used_by="forecast_engine_lambda.py — daily expectations graded into the calibration ledger.",
     ),
@@ -340,8 +448,43 @@ REGISTRY = {
         "mathematical component of the chronic load, so they move together by construction "
         "(Lolli et al. 2019) — a directional signal, not a precise injury predictor. The "
         "Gabbett zone thresholds it is compared against are population-derived (ADR-105 r4).",
-        "d184d690c287",
+        "c74d381d2ed0",
         used_by="acwr_compute_lambda.py (EWMA-ACWR, #543); mcp/helpers.compute_ewa.",
+    ),
+    "detect_changepoints": _entry(
+        "detect_changepoints",
+        "Changepoint detection (abrupt level shift)",
+        stats_core.detect_changepoints,
+        "Changepoint detection",
+        "Binary segmentation: recursively finds the strongest single-changepoint split "
+        "(CUSUM-style max-statistic scan, _single_changepoint) in each sub-segment, up "
+        "to max_changepoints (default 3); each accepted break must clear a "
+        "Bonferroni-corrected confidence gate (default 0.99) AND a |Cohen's d| ≥ "
+        "min_effect (default 1.0) magnitude gate",
+        "Caller-supplied chronological series (None/non-numeric dropped, order kept); "
+        "the one registered consumer runs it over a 60-day lookback "
+        "(CHANGEPOINT_WINDOW_DAYS) and only surfaces breaks dated within the trailing "
+        "28 days (CHANGEPOINT_RECENT_DAYS) as actionable.",
+        "Needs ≥ 2·min_segment (default 7) clean points on both sides of a candidate "
+        "split or returns status 'insufficient_data' with an empty changepoint list — "
+        "no shift is ever claimed that can't be tested. Finds abrupt LEVEL shifts only, "
+        "not gradual drift (see the platform's separate slow-drift window comparison) "
+        "or seasonal breaks. Binary segmentation is greedy (strongest break first), not "
+        "exhaustive, so a real but smaller simultaneous break can be missed. "
+        "SCOPE NOTE (#542, the deliberately weaker exemplar of this hygiene pass, "
+        "#3449): as of this entry the only registered consumer is the daily-insight "
+        "compute's priority-3/4 injection into the DAILY EMAIL BRIEF, a private "
+        "single-recipient surface — not the public website. This entry documents it "
+        "anyway because the registry's contract is 'every stat the platform publishes', "
+        "and a personal daily brief is a publication surface even though it is not "
+        "public; re-scope this note if a public consumer is added.",
+        "f35e0e72f845",
+        min_n=14,
+        used_by=(
+            "daily_insight_compute_lambda.py's _compute_changepoints (IC-31, #542) — HRV / "
+            "Resting HR / Weight level-shift detection injected into the daily brief's "
+            "priority queue. No public website consumer as of #3449."
+        ),
     ),
     "bh_fdr": _entry(
         "bh_fdr",
@@ -356,7 +499,7 @@ REGISTRY = {
         "Controls the FALSE DISCOVERY rate, not the false-positive rate of any single test — "
         "with dozens of simultaneous correlation pairs, some individually-significant p-values will "
         "still be flagged non-significant after correction, by design.",
-        "6fbd08d7dfe7",
+        "2e5c4e316de7",
         used_by="correlation_report (per-tool FDR across every correlation in a batch).",
     ),
     "brier_score": _entry(
@@ -371,7 +514,7 @@ REGISTRY = {
         "0.0 is perfect, 0.25 is the always-say-50% baseline, 1.0 is confidently-wrong-every-"
         "time. None when there are no valid (probability in [0,1], outcome in {0,1}) pairs — "
         "an unresolved or too-new coach shows no score rather than a misleading 0.",
-        "549af3654060",
+        "6a38b3284b68",
         used_by="The calibration scoreboard (/method/calibration/), /api/calibration, /api/coach_team, the coach track-record MCP tool.",
     ),
     "brier_skill_score": _entry(
@@ -385,7 +528,7 @@ REGISTRY = {
         "against a degenerate base rate). 1.0 is perfect, 0.0 means no better than always "
         "guessing the observed base rate, negative means worse than that baseline — the "
         "honest 'does stated confidence beat just guessing the average?' number.",
-        "53f6f9353525",
+        "0588098f2bb8",
         used_by="The calibration scoreboard.",
     ),
     "reliability_bins": _entry(
@@ -398,7 +541,7 @@ REGISTRY = {
         "Empty list when there are no valid pairs. Bins with very few points can show a noisy "
         "observed rate — the bin's n is always reported alongside so a 1-of-1 bin isn't read "
         "as strong evidence.",
-        "ff2ff67a8f4a",
+        "257a92e7d9fc",
         used_by="The calibration scoreboard's reliability curve.",
     ),
     "calibration_score_pairs": _entry(
@@ -413,9 +556,33 @@ REGISTRY = {
         "rather than a guess dressed as a number. Also reports `skilled` (Brier skill > 0?) — "
         "calibrated (reliability: stated confidence tracks observed rates) and skilled (beats "
         "the base rate) are different claims, and the summary carries both so no surface can "
-        "conflate them (#1370).",
-        "96a2d825721f",
+        "conflate them (#1370). Reports `accuracy_ci95` — the 95% Wilson interval on the same "
+        "confirmed/n, same percentage-point units as accuracy_pct — whenever n > 0 (#3450, "
+        "ADR-105): a bare accuracy_pct off a small n reads as more precise than it is (21.6% "
+        "vs. 'somewhere between 11% and 37%' are different decisions at n=37).",
+        "f1d7ff696095",
         used_by="/api/calibration, /api/coach_team's per-coach calibration line.",
+    ),
+    "directional_trend_verdict": _entry(
+        "directional_trend_verdict",
+        "Directional trend verdict (up / down / flat)",
+        _get_ewma_trend,
+        "Calibration",
+        "slope = (EWMA_now - EWMA_prior_lag7) / |EWMA_prior_lag7| over the metric's trailing "
+        "30d series (decay 0.87); slope > +0.02 \u2192 up, < -0.02 \u2192 down, else flat",
+        "Trailing 30 days of the predicted metric, minimum 9 observations (else no verdict, " "not a flat one).",
+        "The \u00b12% band is a FIXED editorial choice, not derived from each metric's own "
+        "trailing variance \u2014 a documented exception to the ADR-105 'thresholds from "
+        "personal variance' rule, dated 2026-09-02 (#3448). Its reach is the dominant live "
+        "scoring path: every machine spec re-routed to directional evaluation by the #813 "
+        "rescue (1,207/1,207 live specs at stamping) is judged against this one band, so a "
+        "high-variance metric can clear it on noise and a low-variance metric's real signal "
+        "can be absorbed as flat. Re-derive trigger: once a per-metric trailing-variance "
+        "baseline exists over a clean cycle window (the September 2026 n\u226530 read is the "
+        "first candidate), the band is derived from it as its own measured change.",
+        "a424d9ff0014",
+        min_n=9,
+        used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),
     "calibration_verdict": _entry(
         "calibration_verdict",
@@ -435,7 +602,7 @@ REGISTRY = {
         "always guessing the base rate) reads 'not_yet_skillful' — reliability alone never earns "
         "the flattering verdict (ADR-104/105, #1370). An undefined skill (degenerate base rate) "
         "is treated as unknown, not as unskilled.",
-        "96a2d825721f",
+        "f1d7ff696095",
         min_n=5,
     ),
     "credibility_label": _entry(
@@ -452,7 +619,7 @@ REGISTRY = {
         "derived. A negative Brier skill (worse than the base rate) can never render the "
         "reliable/authoritative rungs, however good the raw Brier looks against an extreme "
         "base rate — it reads not-yet-skillful (#1370).",
-        "96a2d825721f",
+        "f1d7ff696095",
         used_by="Coach cards that need a single at-a-glance credibility word.",
     ),
     "conversational_enrichment_scope": _entry(
@@ -476,7 +643,7 @@ REGISTRY = {
         "Enrichment pauses at budget tier 1 (internal band, ADR-125); paused windows are visible as unenriched "
         "records, never fabricated. The #1708 prescription_reaction channel inherits this scope unchanged: it "
         "calibrates the DETERMINISTIC Horizons reaction ledger (counts only, no model verdict) and moves no scoring.",
-        "16d92a931f58",
+        "706b7e77a7fa",
         min_n=None,
         used_by=(
             "journal_analyzer_lambda HYPO_CANDIDATE# aggregation (channel provenance on every quote) → the weekly "

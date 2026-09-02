@@ -911,6 +911,16 @@ _EMAILS_DAY_ANCHOR_RULINGS: dict[str, int] = {
     # TTL epoch. An expiry is not a day selection and no reader compares it to a
     # Pacific day; a 7h shift on a 90-day investigative TTL is immaterial.
     "lambdas/emails/anomaly_detector_lambda.py": 1,
+    # #3430: `_compute_staleness_observation_deadline` parses the Pacific `DATE#` the
+    # brief is reading and anchors it in UTC to build ONE thing — the UTC instant of
+    # daily-metrics-compute's own `cron(40 16 * * ? *)`. UTC is the frame that names
+    # this: EventBridge crons on this platform are fixed UTC by standing rule, and the
+    # only comparison made is against `datetime.now(timezone.utc)`, so both sides are
+    # one frame. The Pacific→UTC day mapping is exact here rather than merely close:
+    # 16:40Z is 08:40/09:40 PT, the same calendar date in both frames at every offset,
+    # so "the cron on the day after date D" cannot land on the wrong day. Not a day
+    # SELECTION — nothing reads a record by this value; it is a deadline instant.
+    "lambdas/emails/daily_brief_lambda.py": 1,
 }
 
 
