@@ -88,9 +88,12 @@ def _daily_rows(pk: str, field: str, days: list[date], value=lambda i: 100.0 + i
 
 def test_query_range_default_still_hides_pilot_rows():
     """Regression pin: omitting include_pilot must keep the pre-#2150 behaviour
-    every existing caller (weekly_digest, wednesday_chronicle, hypothesis_engine,
-    challenge_generator, partner_email, weekly_plate, nutrition_review,
-    weekly_correlation_compute, chronicle_data) relies on."""
+    every existing caller relying on the bare default (weekly_digest,
+    wednesday_chronicle, partner_email, weekly_plate, nutrition_review,
+    chronicle_data) still gets. hypothesis_engine and weekly_correlation_compute
+    now derive include_pilot per source instead (#3444 — see
+    tests/test_phase_filter_third_wave_3444.py); challenge_generator does too
+    (#2221, predates this file)."""
     rows = _daily_rows("USER#matthew#SOURCE#whoop", "hrv", _ALL_DAYS)
     table = PhaseAwareFakeTable(rows)
     out = digest_utils.query_range(table, "whoop", _WINDOW_START, _WINDOW_END)

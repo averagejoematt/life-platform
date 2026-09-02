@@ -78,7 +78,7 @@ from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input cen
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -212,9 +212,12 @@ def query_range(source, start_date, end_date):
     copy did not paginate, silently truncating results at DynamoDB's 1MB page.
     Fail-soft ([] on error) preserved: hypothesis checks degrade to no-data
     rather than failing the whole run.
+    #3444/#2109: cross-phase per source now (source_reads_cross_phase) — was unconditionally filtered.
     """
     try:
-        return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
+        return digest_utils.query_range_list(
+            table, source, start_date, end_date, user_id=USER_ID, include_pilot=source_reads_cross_phase(source)
+        )
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
         return []

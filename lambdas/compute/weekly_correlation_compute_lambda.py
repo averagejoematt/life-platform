@@ -51,6 +51,7 @@ from common import (
 )
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
+from experiment.phase_filter import source_reads_cross_phase  # #3444/#2109: per-source cross-phase decision
 from health import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
 
 from compute.correlation_gloss import n_gate_gloss  # split out at the #1665 size ceiling (#1996)
@@ -98,12 +99,15 @@ def _to_dec(val):
 def fetch_range(source, start_date, end_date):
     """Paginated DDB query for source records in date range, as a list.
 
-    Shared paginated, phase-scoped implementation (digest_utils, #970).
-    Fail-soft ([] on error) preserved: a single source's failure degrades to
-    no-data for that source rather than failing the whole compute run.
+    Shared paginated implementation (digest_utils, #970). Fail-soft ([] on error)
+    preserved: a single source's failure degrades to no-data for that source
+    rather than failing the whole compute run.
+    #3444/#2109: cross-phase per source now (source_reads_cross_phase) — was unconditionally filtered.
     """
     try:
-        return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
+        return digest_utils.query_range_list(
+            table, source, start_date, end_date, user_id=USER_ID, include_pilot=source_reads_cross_phase(source)
+        )
     except Exception as e:
         logger.warning("fetch_range(%s, %s→%s) failed: %s", source, start_date, end_date, e)
         return []
