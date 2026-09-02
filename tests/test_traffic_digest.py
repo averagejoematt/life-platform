@@ -3,6 +3,7 @@
 import gzip
 import io
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -11,11 +12,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "ope
 
 import traffic_digest_lambda as td  # noqa: E402
 
-HEADER = "#Version: 1.0\n#Fields: date time c-ip cs-method cs(Host) cs-uri-stem sc-status cs(Referer) cs(User-Agent)\n"
+HEADER = "#Version: 1.0\n#Fields: date time c-ip cs-method cs(Host) cs-uri-stem sc-status cs(Referer) cs(User-Agent) cs-uri-query\n"
 
 
-def _row(date, ip, method, uri, status, ref, ua):
-    return "\t".join([date, "12:00:00", ip, method, "averagejoematt.com", uri, status, ref, ua])
+def _row(date, ip, method, uri, status, ref, ua, query="-"):
+    return "\t".join([date, "12:00:00", ip, method, "averagejoematt.com", uri, status, ref, ua, query])
 
 
 SAMPLE = HEADER + "\n".join(
@@ -67,11 +68,93 @@ def test_empty_logs_safe():
         "returning_pct": 0,
         "top_pages": [],
         "top_referrers": [],
+        # #3376: every door reports, zeros included — a 0 is a valid reading
+        "door_views": {d: 0 for d in td.DOORS},
+        "syndicated_referrals": 0,
         # travel watch (#741): a watched page with zero views is still reported
         "watched_pages": [
             {"page": "/journal/essays/org-chart-of-one/", "views": 0, "referrers": [], "direct_or_internal": 0},
         ],
     }
+
+
+# ── Per-door page views + syndicated referrals (#3376) ───────────────────────
+# The audience-evidence series the docs/PROPORTIONALITY.md retire-triggers
+# read. The Door dimension is the CLOSED six-door set (a code literal); the
+# utm_source attribution keeps only a boolean — the query string itself is
+# visitor-controlled input and is dropped at parse time, like raw IPs.
+
+DOOR_SAMPLE = HEADER + "\n".join(
+    [
+        _row("2026-08-31", "1.1.1.1", "GET", "/coaching/", "200", "-", "Mozilla/5.0 (Mac)", "utm_source=bluesky&utm_medium=social"),
+        _row("2026-08-31", "2.2.2.2", "GET", "/journal/essays/org-chart-of-one/", "200", "-", "Mozilla/5.0 (Mac)"),  # → story (#1566)
+        _row("2026-08-31", "3.3.3.3", "GET", "/story/build/", "200", "-", "Mozilla/5.0 (Mac)", "xutm_source=notutm"),  # → story, NOT utm
+        _row("2026-08-31", "4.4.4.4", "GET", "/mind/", "200", "-", "Mozilla/5.0 (Mac)"),  # → data (a Data-door section, SITE_MAP)
+        _row("2026-08-31", "5.5.5.5", "GET", "/protocols/index.html", "200", "-", "Mozilla/5.0 (Mac)"),  # normalizes → protocols
+        _row("2026-08-31", "6.6.6.6", "GET", "/method/how/", "200", "-", "Mozilla/5.0 (Mac)"),  # footer-tier: no door by design
+        _row("2026-08-31", "7.7.7.7", "GET", "/subscribe/", "200", "-", "Mozilla/5.0 (Mac)"),  # utility: no door
+    ]
+)
+
+
+def test_door_classification():
+    assert td._door("/") == "home"
+    assert td._door("/index.html") == "home"
+    assert td._door("/cockpit/") == "cockpit"
+    assert td._door("/data/sleep/") == "data"
+    assert td._door("/mind/") == "data"
+    assert td._door("/coaching/") == "coaching"
+    assert td._door("/protocols") == "protocols"
+    assert td._door("/story/build/") == "story"
+    assert td._door("/journal/essays/x/") == "story"
+    assert td._door("/method/") is None  # footer-tier "under the hood" — not a 7th door
+    assert td._door("/gear/") is None
+    assert td._door("/subscribe/") is None
+
+
+def test_aggregate_door_views_and_syndicated_referrals():
+    agg = td.aggregate(td.parse_cf_log(DOOR_SAMPLE))
+    assert agg["door_views"] == {"home": 0, "cockpit": 0, "data": 1, "coaching": 1, "protocols": 1, "story": 2}
+    # exactly one hit carried a real utm_source param; `xutm_source` must not count
+    assert agg["syndicated_referrals"] == 1
+    # site-wide views still include the no-door pages — a door series measures a door, not the site
+    assert agg["page_views"] == 7
+
+
+def test_query_string_never_retained():
+    """Privacy posture (#3376): only the utm BOOLEAN survives parsing — the raw
+    query string (arbitrary visitor input) is dropped, same posture as raw IPs."""
+    blob = repr(td.parse_cf_log(DOOR_SAMPLE))
+    assert "bluesky" not in blob
+    assert "utm_medium" not in blob
+
+
+def test_doors_block_in_email_html():
+    agg = td.aggregate(td.parse_cf_log(DOOR_SAMPLE))
+    html = td.build_html(agg, "Aug 24", "Aug 31")
+    assert "The six doors" in html
+    for door in td.DOORS:
+        assert door in html
+
+
+def test_door_set_matches_the_v5_ia():
+    """Guard the SET: the metric dimension vocabulary is home + the five
+    doors-nav doors (scripts/v4_chrome.DOORS). A door added or renamed there
+    must move the dimension in the same diff, or its series reads 0 forever."""
+    chrome = os.path.join(os.path.dirname(__file__), "..", "scripts", "v4_chrome.py")
+    with open(chrome, encoding="utf-8") as f:
+        src = f.read()
+    block = src.split("DOORS = [", 1)[1].split("]", 1)[0]
+    nav_doors = set(re.findall(r'\("/([a-z]+)/"', block))
+    assert nav_doors, "could not read the doors nav from scripts/v4_chrome.py — the guard lost its subject"
+    assert set(td.DOORS) == nav_doors | {"home"}
+
+
+def test_every_door_prefix_resolves_to_a_real_site_path():
+    """A prefix pointing at a moved/renamed directory would read 0 forever."""
+    site = os.path.join(os.path.dirname(__file__), "..", "site")
+    for prefix in td._DOOR_BY_PREFIX:
+        assert os.path.isdir(os.path.join(site, prefix.strip("/"))), f"door prefix {prefix} has no site/ directory"
 
 
 # ── Travel watch (#741): per-page referrer attribution for watched artifacts ──
@@ -187,7 +270,16 @@ class _FakeBoto3:
 def _metric_value(cw, metric_name):
     for call in cw.calls:
         for m in call["MetricData"]:
-            if m["MetricName"] == metric_name:
+            if m["MetricName"] == metric_name and not m.get("Dimensions"):
+                return m["Value"]
+    return None
+
+
+def _door_metric_value(cw, door):
+    """The PageViews7d datapoint carrying the Door dimension (#3376)."""
+    for call in cw.calls:
+        for m in call["MetricData"]:
+            if m["MetricName"] == "PageViews7d" and m.get("Dimensions") == [{"Name": "Door", "Value": door}]:
                 return m["Value"]
     return None
 
@@ -201,6 +293,14 @@ def test_lambda_handler_emits_unique_visitors_metric(monkeypatch):
     assert resp["statusCode"] == 200
     assert _metric_value(cw, "UniqueVisitors7d") == 2  # matches test_aggregate_counts_and_returners
     assert _metric_value(cw, "PageViews7d") == 4
+    # #3376: the per-door series ride the same put — zeros included, all 6 doors
+    assert _door_metric_value(cw, "home") == 2
+    assert _door_metric_value(cw, "cockpit") == 1
+    assert _door_metric_value(cw, "data") == 1
+    assert _door_metric_value(cw, "coaching") == 0  # a 0-view door still emits
+    assert _door_metric_value(cw, "protocols") == 0
+    assert _door_metric_value(cw, "story") == 0
+    assert _metric_value(cw, "SyndicatedReferrals7d") == 0  # no utm-tagged hits in SAMPLE
 
 
 def test_lambda_handler_emits_zero_on_genuinely_quiet_week(monkeypatch):
@@ -215,6 +315,10 @@ def test_lambda_handler_emits_zero_on_genuinely_quiet_week(monkeypatch):
     assert resp["statusCode"] == 200
     assert _metric_value(cw, "UniqueVisitors7d") == 0
     assert _metric_value(cw, "PageViews7d") == 0
+    # #3376: same contract per door — a quiet week is six fresh zeros, not absence
+    for door in td.DOORS:
+        assert _door_metric_value(cw, door) == 0
+    assert _metric_value(cw, "SyndicatedReferrals7d") == 0
 
 
 # ── Subscriber funnel (#1954): the digest joins the subscriber partition ──────

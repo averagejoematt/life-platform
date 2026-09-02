@@ -5000,6 +5000,26 @@ Three changes, all registry data — **no code**:
 
 **Consequence.** The checklist is ~30 minutes of discipline per new signal. The alternative was measured, not imagined: an unclassified age metric in the database before anyone decided it should be, and a 15-value segmental payload one naive map entry away from storing one arbitrary limb as the whole truth.
 
+### ADR-154 Amendment (2026-09-01, #3417): the playbook applied to the BodyScan composition signal — the body-comp delta stays deleted, and the lean-mass floor is owner-monitored
+
+**Driver:** Day-1 verification finding #3417 (owner-confirmed device behavior) — the "weight-only scale" premise expired 2026-08-16, the day the parent ADR's own BodyScan spike (#2782) fired.
+
+**Context.** #486/B-3 (2026-07-04) deleted the Withings 14-day body-comp delta computation (`lean_mass_delta_14d`/`fat_mass_delta_14d`) and the character engine's `body_fat_trajectory` component on the stated premise that *the scale is weight-only* — at the time 0/1198 withings records carried any composition field, and the delta had early-returned on every record since 2021. That premise was true when written and stopped being true on **2026-08-16**: the device has two modes (owner-confirmed 2026-09-01) — a plain stand-on weigh writes weight only, and a full scan with the **handles held** writes ~30 impedance-derived composition fields (the #2782 BodyScan set, including segmental mass). Measured live 2026-09-01: `DATE#2026-08-16` (fat_ratio 36.763%, muscle 87.60 kg) and `DATE#2026-08-24` (fat_ratio 37.688%, muscle 87.72 kg) are real full scans — **n=2**; every earlier record is weight-only. Ingestion needs no change (`requested_meastypes()` already asks for everything in `MEAS_TYPES`). Separately, `config/user_goals.json` declares `lean_mass_floor_lbs: 155` a **hard stop** ("if DEXA shows lean mass below this, the deficit must be reduced regardless of weight target") — a rail nothing on the pipeline evaluates.
+
+**Decision (three parts).**
+
+1. **The premise is retired, and the signal's absence semantics are fixed at the source-of-truth docs** (ADR-104, NEW_SIGNAL_PLAYBOOK step 4): scale composition is a **behavioral/sparse** signal — it exists only on full-scan days, which happen only when the owner holds the handles. Absence of composition on a weigh-day means *a basic weigh happened*, never a device or pipeline failure. Every live comment claiming the scale is weight-only is corrected to say exactly this (`withings_lambda.py` ×2, `character_engine.py`, `docs/SCHEMA.md` — which also documented the two delta fields that were in fact never written).
+
+2. **The 14-day body-comp delta is NOT restored.** Three grounds, each sufficient today:
+   - A fixed calendar window over a sparse behavioral signal is the exact ADR-104 dishonesty class — a "14-day" delta would silently compare two arbitrary scans whatever their real spacing, presenting a behavior-gated pair as a cadence.
+   - **n=2** is below any floor for a trend claim (ADR-105: uncertainty and n on every statistical claim). There is no personal variance to size a threshold from.
+   - The floor is defined on **DEXA lean mass** (155 lbs; current DEXA lean 169 lbs), while the scale's impedance reads `muscle_mass` ≈ 193 lbs and `fat_free_mass` ≈ 203 lbs on the same body. Cross-instrument substitution without a recorded calibration decision would let an impedance number adjudicate a DEXA-defined hard stop.
+   **Revisit trigger:** once ≥6 full scans spanning ≥6 weeks exist, a *scan-to-scan* delta (dates and n carried in the output, never a calendar-window one) may be proposed — proven against the real full-scan records per #3417's acceptance, as its own story, extending this amendment.
+
+3. **The lean-mass floor is explicitly recorded as OWNER-MONITORED — no automated instrument.** The honest state, now written into the goals file itself (`config/user_goals.json` body_composition note): the floor fires via periodic DEXA scans read by the owner and coaches (DEXA rechecks are already scheduled at the month-4 and month-12 milestones); scale composition is advisory context only and does not trip the floor. Practical owner guidance, recorded where the rail lives: **hold the handles** — composition lands only on full-scan days.
+
+**Consequence.** The hard stop no longer rests on a code comment that quietly became false: it is either backed by a DEXA reading a human looks at, or honestly absent — never a green light from an instrument that does not exist. The cost honestly carried: between DEXA scans the floor has no automated tripwire, and full-scan composition accrues unused by any engine until the revisit trigger is met. Corrections were NOT retro-edited into dated artifacts (the 2026-06 RCA and 2026-07 data-source review keep their then-true claims, with a dated correction note on the RCA's root-cause line); this amendment supersedes them.
+
 ## ADR-155: Self-publication of selected Tier-2 fields by owner consent — publication is a stamp, never an omission
 
 **Date:** 2026-08-23 · **Status:** Accepted · **Driver:** external acquisition diligence 2026-08-23 (DIL-008/DIL-011, story #3045, epic #3042) · **Gate:** `gate:owner` — this is Matthew's consent call, recorded
