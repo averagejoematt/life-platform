@@ -44,9 +44,9 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 397** — feedback 22 · reference 220 · security 1 · project 151 · user 1 · index 2
+**Files in the memory index snapshot: 399** — feedback 22 · reference 222 · security 1 · project 151 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 243** — homed-here 58 · already-homed 164 · superseded 7 · narrative 12 · off-repo 2
+**Rule-class files (feedback + reference + security): 245** — homed-here 58 · already-homed 166 · superseded 7 · narrative 12 · off-repo 2
 
 **Program/session files (project): 151** — already-homed 14 · superseded 1 · narrative 133 · off-repo 2 · index 1
 
@@ -241,6 +241,7 @@ project_voice_studio_2026_07_19.md
 project_whoop_reauth.md
 project_wiki_program_2026_07_10.md
 project_wrong_day_and_wrong_gauge_2026_08_18.md
+reference_a_cancelled_ci_rollup_hides_real_failures.md
 reference_a_check_after_truncation_launders_the_defect.md
 reference_a_check_that_measures_nothing_returns_clean.md
 reference_a_ci_gate_that_cannot_fail.md
@@ -320,6 +321,7 @@ reference_deploy_coach_intelligence_excludes_the_worker.md
 reference_deploy_from_main_not_worktree_branch.md
 reference_deploy_gate_approval_and_recovery.md
 reference_deploy_timestamp_is_not_the_commit.md
+reference_describe_alarms_hides_composites.md
 reference_discovery_bias_loose_but_gate_the_verb.md
 reference_doc_index_strict_ci_only.md
 reference_doc_sync_literal_treadmill.md
@@ -508,6 +510,8 @@ user_who_is_matthew.md
 | `reference_a_transform_can_be_correct_and_unreachable.md` | reference | `.claude/skills/new-machinery/SKILL.md` § traps (set equality both directions) + `.claude/skills/land/SKILL.md` §4 | homed-here |
 | `reference_a_ci_warning_that_no_action_can_clear.md` | reference | `docs/CONVENTIONS.md` §4 (CI gate ordering / warning-channel hygiene) — the rule is "a warning no action can clear must be structurally suppressed, not acknowledged away"; the live instance is #3476 | already-homed |
 | `reference_reset_pipeline_exits_0_over_ci_doc_gates.md` | reference | `CLAUDE.md` (Experiment Restart Pipeline) + the #3477 acceptance — the rule is "a green restart_pipeline.py is not a finished reset; run CI's twelve doc gates before pushing" | already-homed |
+| `reference_a_cancelled_ci_rollup_hides_real_failures.md` | reference | `docs/CONVENTIONS.md` §4 (CI gate ordering) — the rule is "a `cancelled` rollup is not a timeout; enumerate the failed STEPS before concluding" | already-homed |
+| `reference_describe_alarms_hides_composites.md` | reference | `deploy/restart_verify.py` (the #2116 leg, now passing AlarmTypes) + `tests/test_composite_alarm_lookup_3390.py` — the rule is pinned as an executable guard | already-homed |
 | `reference_a_vacuous_negative_control.md` | reference | `.claude/skills/prove-it/SKILL.md` Q1 + `.claude/agents/finding-verifier.md` 7 | already-homed |
 | `reference_a_client_cap_below_the_callee_p50.md` | reference | `lambdas/web/board_quality_gate.py` docstring (the measurement + derivation command) + `docs/DECISIONS.md` ADR-108 amendment 2026-09-01 | already-homed |
 | `reference_a_verified_stamp_is_a_human_claim.md` | reference | `docs/OPERATING_DISCIPLINE.md` §4.2 + `.claude/agents/finding-verifier.md` (standing cautions) | already-homed |

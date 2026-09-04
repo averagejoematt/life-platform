@@ -1,4 +1,4 @@
-# Handover — 2026-09-03 (Opus 5): Session U — the Friday re-anchor, and what a green pipeline didn't tell us
+# Handover — 2026-09-03/04 (Opus 5): Session U — the Friday re-anchor, then the drain past midnight
 
 **Session:** Claude Opus 5, driven by one owner instruction — *"do another full platform
 experiment reset so it all starts on friday september 4th"* — then, after it landed,
@@ -10,17 +10,17 @@ Not the Session U that was planned. The approved 09-08 plan (Architect ritual + 
 time-anchored batch, `~/.claude/plans/lovely-snacking-panda.md`) is **untouched and still
 valid** — this session was an owner-initiated re-anchor that arrived five days early.
 
-**Main:** green (4b8660bc)
-**Build beat:** none — the reset is a platform-state change, not a shipped feature; the two backlog fixes are internal alarm plumbing with no reader-visible surface
+**Main:** green (eb777b5b) — it went red twice tonight, both mine, both from running targeted tests instead of the full suite: 5 checks after #3473 (fixed b73b41f58) and 4 ratchets after #3477 (fixed eb777b5b5, CI/CD success). Tip 87ec9d667 (the Day-1 static rebake) has its run in flight; v4 site gate, Cron freshness and CodeQL already green on it. Every red surfaced under a CI/CD `cancelled` rollup — three times in one night
+**Build beat:** none — the reset is a platform-state change and the rest is internal gate plumbing; the one reader-visible change (the Day-1 static rebake) is the reset flipping its own copy, not new work
 **Docs:** SCHEMA.md (genesis literal), engines/CHARACTER.md (re-verified), MCP_TOOL_CATALOG.md, ARCHITECTURE.md + INFRASTRUCTURE.md + MONITORING.md (alarm count), DEPENDENCY_GRAPH.md + model/platform_model.json, PROPORTIONALITY.md, alarm_citations.json
 **Decisions:** none needed — the threshold re-derivation and the extraction both follow existing ADRs (ADR-105 for the derivation, the #2604/#2610/#2977 extraction precedent); neither is a new governance posture
 **Incidents:** none — main was red ~22 min (03:50Z v4-site-gate fail → 04:12Z green on the fix commit), under the >1h bar; no auto-rollback fired, no data gap, no budget event. The five gate reds are recorded as #3477 instead, because they recur by construction rather than being an event
 **Stash/hooks:** clean
-**Closures:** #3473, #3474 commented · DoD: scanned 2, hits 2 — both were `no-outcome-verdict` before the (e8) comments existed; both now carry the ADR-099 `**Shipped:**`/`**Outcome:**` pair, re-scan clean
-**Backlog:** Now 1 actionable in the opus lane; **NO REMEDY IN THE CORPUS** — `backlog_next.py --refill-now --lane opus` found zero startable promotions and correctly refused the 11 startable stories outside the lane (promoting one turns the count green while adding nothing this session could start). Floor NOT lowered. Later sweep — no stale issues (31 open all satisfy the contract). Filed #3476, #3477
+**Closures:** #3473, #3474, #3477, #3476 commented · DoD: scanned 4, hits 0 — every closure carries the ADR-099 `**Shipped:**`/`**Outcome:**` pair
+**Backlog:** filed #3478 from the Day-1 runlist. Now 1 actionable in the opus lane; **NO REMEDY IN THE CORPUS** — `backlog_next.py --refill-now --lane opus` found zero startable promotions and correctly refused the 11 startable stories outside the lane (promoting one turns the count green while adding nothing this session could start). Floor NOT lowered. Later sweep — no stale issues (31 open all satisfy the contract). Filed #3476, #3477
 **Alarms:** 1 flap cited — `ai-tokens-platform-daily-total` fired-and-cleared in the 72h window (#2912 detector); dated self-clearing entry added, prune on/after 2026-09-07. That flap *is* the defect #3474 closed
-**CI warnings:** 1 — the `LifePlatformMonitoring` dashboard-`Tags` warning. **Not a pending deploy: it is unshippable.** Filed #3476
-**Ledger:** compute-pipeline liveness heartbeat (#3473) row added
+**CI warnings:** none — the `LifePlatformMonitoring` dashboard-`Tags` warning is GONE. #3476 shipped and `check_ci_warnings.py` now exits 0 with no `--decoded`, which is the one acceptance box I said could not be confirmed tonight
+**Ledger:** compute-pipeline liveness heartbeat (#3473) + reset doc-gate sweep (#3477) rows added
 
 ---
 
@@ -63,7 +63,7 @@ commit produced **five** gate reds. Three of them recur on *every* reset:
 | red | cause |
 |---|---|
 | `tests/js/genesis_pt_2941.test.mjs` ×6 (v4 site gate) | genesis-anchored boundary instants; its own first assertion is the drift detector, and the file says "regenerate them with the sweep, don't loosen" |
-| `docs/SCHEMA.md:2852` (`check_doc_facts`) + `test_wiki_checkers.py` ×3 | stale genesis literal; `restart_docs_update.py` reported the file "unchanged" |
+| `docs/SCHEMA.md:2852` (`check_doc_facts`) + `test_wiki_checkers.py` ×3 | stale genesis literal. **My first explanation was wrong** — see Part 3: `sync_doc_metadata` ran and *refused* the rewrite, because #2986's freshness hold classified a semantic date fact as a cosmetic re-stamp |
 | `docs/engines/CHARACTER.md` (`check_doc_index --strict`) | the reset rewrites `config/character_sheet.json`, invalidating the doc's `Verified` stamp **every time** |
 | `docs/MCP_TOOL_CATALOG.md` | the pipeline's catalog write disagrees with the canonical generator |
 
@@ -167,15 +167,104 @@ shorter and honest.
   leaving it stale reds 3 tests.
 - The reconcile bot raced me **twice**, both times making the identical fix. Rebase; the
   duplicate commit drops out as already-applied.
+- **A CI/CD `cancelled` rollup hid real failures THREE times tonight.** Never read it as a
+  timeout or a concurrency cancel without opening the steps.
+- **`agent_commit.sh` reverts `platform_counts.py` and refuses it outright.** On main the
+  driver regenerates and folds it in with `--amend --no-verify`; do it AFTER agent_commit
+  runs, or the revert eats it.
+- **Backticks in a commit message passed as a shell argument** get command-substituted by
+  zsh. Write the message to a file and pass `"$(cat file)"`.
+- **`npx cdk diff | grep` can come back empty when the diff is non-empty** (buffering);
+  redirect to a file and grep the file, or you will "prove" a drift is gone when it isn't.
+- **A monitor's `until grep -q 'passed'`** matched black's "All checks passed!" and fired
+  ~13 minutes early. Wait on a token only the target emits (`REAL_EXIT`).
+
+## Part 3 — After the first wrap: "fix them then" (the post-midnight run)
+
+The wrap at `3ff0b5480` was not the end. The owner asked for #3477, #3476 and (at
+genesis) #3390. What follows is the honest record, including two self-inflicted reds.
+
+### I broke main. Twice, the same way.
+After #3473 I ran targeted tests and not the full suite; five checks caught it
+(`b73b41f5`). After #3477 I did **exactly the same thing** and four ratchets caught it
+(`eb777b5b5`). Both times the failure surfaced under a CI/CD **`cancelled`** rollup —
+which on this repo has now hidden real failures **three times in one night**. A
+`cancelled` CI/CD here is not a timeout; open the steps.
+
+The second breakage is the more interesting one: the two module-size failures were caused
+by **comments I wrote explaining the fix**, not the fix. The ratchet was right — the
+narrative already lived in the test docstrings — and the cure it demands (shrink, never
+raise) produced better code than what I first wrote.
+
+### #3477 — CLOSED, and the filed mechanism was wrong
+I blamed `restart_docs_update.py`. In fact `sync_doc_metadata --apply` ran as designed and
+reported "Applied 1 change(s)" — it *refused* this one rewrite. #2986's "no manufactured
+freshness" hold defers anything that `differs_only_by_date_stamp`, and
+`(currently 2026-09-01)` → `(currently 2026-09-04)` differs only by a date. **The one rule
+whose job is converging the genesis literal was structurally unable to fire.** CLAUDE.md's
+twin escaped by accident: it carries the cycle number, so masking leaves `cycle 15` vs
+`cycle 16` visible.
+
+The distinction already existed (`doc_restamp_guard.stamped_rules()`); it just wasn't
+consulted where the decision is made. Exactly two rules are in the semantic-date class,
+both genesis anchors — and #2986/#2649's own 167 tests still pass.
+
+Plus `deploy/restart_verify_gates.py`: the pipeline now runs CI's twelve doc gates
+**derived from `docs-ci.yml`**, never restated, as its final sub-script. It caught a stale
+`test_count` on its first run — one the tests written for #3477 had themselves moved.
+
+### #3476 — CLOSED without crossing a security boundary
+The obvious fix is a `TOLERATED_NON_IAM` entry. **That set is a ratchet that may only
+shrink**, and its own design says a widening must reach the owner via the ADR-065 baseline
+block, because tolerating a delta lets additive IAM ship beside it. So the fix changes
+**one advisory line and no verdict**, keyed on `(resource type, property)` rather than
+message text. Mutation-proven both ways, including the positive control.
+
+Verified after the fact: `check_ci_warnings.py` now exits 0 **with no `--decoded`** — the
+acceptance box I had recorded as unconfirmable tonight.
+
+### #3390 — worked to its limit, deliberately NOT closed
+**The genesis flip worked unattended**: at PT midnight `/api/journey` went `day_n` 0 → 1,
+`pre_start` true → false, `started_date: 2026-09-04`; `/api/predict_week` lit for 2026-W36.
+
+`restart_verify` finished **23 pass / 2 fail**, both owner-only: no Day-1 weigh-in yet
+(supersede reflex still owed) and cycle 16 still unsealed. Cleared during the run: the
+character sheet (forced compute wrote `DATE#2026-09-04`, `replay_verified=True`) and the
+baked static proof (`87ec9d667` — without it every meta card and noscript block still
+advertised "the experiment begins Friday, September 4" after it had begun).
+`restart_integration_check --expect-cycle 16`: **30 pass / 2 fail**, both known —
+three cited alarms, and `notion` stale 607h on a source whose registry says
+`behavioral: True, monitored: False`, i.e. a gate that reds on honest human behaviour.
+
+En route it turned out **this issue's own verifier had a check that had never once run**:
+the #2116 composite leg called `describe_alarms` without `AlarmTypes` (metric alarms only),
+so two deployed composites read as "not deployed" — and that verdict took the tolerant
+branch, silently skipping the four assertions beneath it. Fixed in `a5fce037b`; both now
+execute and pass.
+
+### Filed from the runlist
+**#3478** — `/api/journey` serves `last_weighin_date: 2026-09-04` and `weighin_count: 1`
+when no weigh-in happened. Mechanism verified, not guessed: the reset re-phased the 09-03
+row to `pilot`, `_latest_item` hides pilot by default, the series empties, and the
+genesis-baseline fallback supplies the genesis date *as a measurement date*. The
+`pre_start` branch already nulls exactly this ghost (#948); Day 1 has no equivalent guard.
+
+### The through-line, extended
+Six instruments this session were unable to fail, or failed to mean what they said:
+`restart_pipeline` (one gate vs twelve), the `_DETECTORS` ledger, the unshippable CI
+warning, `restart_verify`'s composite leg, its "raw alarm missing" message on a **passing**
+check — and my own first wire-guard for #3477, which passed over the exact defect it was
+written to catch until I mutated it.
 
 ## Residual / next picks
 
 - **#3390** — Day-1 runlist for cycle 16, run ON or AFTER 2026-09-04 (post-genesis by
   construction; `restart_verify.py`, the two reconcilers in order, the supersede reflex).
-- **#3477** — the reset pipeline exits 0 over the doc gates CI runs; three reds recur every
-  reset. Filed this session.
-- **#3476** — the `LifePlatformMonitoring` dashboard-`Tags` CI warning is unshippable and
-  fires on every green run. Filed this session.
+- **#3478** — `/api/journey` reports a weigh-in that never happened on Day 1 of a cycle
+  (ADR-104). Filed from the Day-1 runlist; self-heals on the first weigh-in.
+- **#3390** — still open by design: the Day-1 weigh-in + supersede reflex, the attended
+  prereg publish + stamp, and the cloud routine's own public-surface verdict. Its runlist
+  is otherwise executed and recorded on the issue.
 - **#3403** — CI duration budget; blocked until ~09-08 by its own acceptance (needs a week
   of post-#3378 data).
 - **#2978** — deploy-race umbrella, `blocked:date` (~09-08).
@@ -191,6 +280,10 @@ shorter and honest.
 - `not-work — expired by design, owner declined`: the **genesis-eve prereg lock email**
   was not sent ("no need to publish email"). It refuses after PT midnight by design;
   recording the skip rather than backdating it.
+- `not-work — owner judgement`: **the `notion` staleness FAIL** in
+  `restart_integration_check` — that source is `behavioral: True, monitored: False`, so its
+  staleness is the datum, yet a flat 336h threshold reds the behavioural check. File it or
+  waive it; I did not want to manufacture an issue out of journaling habits.
 - `not-work — standing observable`: **`compute-pipeline-stale-heartbeat` has not yet
   produced a first verdict** (`INSUFFICIENT_DATA — Unchecked: Initial alarm creation`).
   The emitter is confirmed healthy (1 datapoint/day, 10 consecutive days) so OK is a
