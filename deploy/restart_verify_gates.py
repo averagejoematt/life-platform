@@ -18,10 +18,11 @@ THE DERIVATION GUARD (charter primitive, and the reason this is not a hand-typed
   the original one-gate tail survive. `docs_ci_gate_commands()` raises rather than
   returning a short list, so "found nothing" can never read as "nothing to run".
 
-  The genesis-fixture check is the one deliberate ADDITION beyond Docs CI: the
-  genesis-anchored JS instants live in the v4 site gate, not Docs CI, and they are broken
-  BY the reset every single time (`tests/js/genesis_pt_2941.test.mjs`'s own first
-  assertion is the drift detector, and the file says regenerate them, don't loosen).
+  The JS suite is the one deliberate ADDITION beyond Docs CI: the genesis-anchored
+  instants live in the v4 site gate, not Docs CI, and they are broken BY the reset every
+  single time (`tests/js/genesis_pt_2941.test.mjs`'s own first assertion is the drift
+  detector, and the file says regenerate them, don't loosen). It runs that gate's whole
+  `node --test`, not a chosen file — see JS_SUITE_CMD for why a subset was not enough.
 
 POSTURE
   Read-only and side-effect free — every command is a `--check`/verify form. It reports
@@ -50,9 +51,17 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "docs-ci.yml"
 # doc checkers this mirrors, and running them here would be a different contract.
 _RUN_LINE = re.compile(r"^\s*run:\s*(python3\s+\S+.*?)\s*$")
 
-# The reset breaks these every cycle; they are not in Docs CI, so they are named here.
-# Kept to genesis-anchored fixtures only — this is not a second home for the test suite.
-GENESIS_FIXTURE_TESTS = ["tests/js/genesis_pt_2941.test.mjs"]
+# The JS suite is NOT in Docs CI — it is the v4 site gate's `node --test` step — and the
+# reset breaks it every cycle through the genesis-anchored instants. Run the WHOLE suite,
+# exactly as that workflow does.
+#
+# #3479: this was scoped to `genesis_pt_2941.test.mjs` alone, on the reasoning that only the
+# genesis fixtures are reset-sensitive. That reasoning was wrong in a way worth recording:
+# on the 2026-09-05 re-anchor the sweep passed, and the v4 site gate then redded on
+# `coach_asof.test.mjs` — a hardcoded stamp that had silently aged out of an 8-day cadence
+# window. Not reset-caused at all, but squarely inside what the reset commit was about to be
+# blamed for. A sweep that runs a SUBSET of a gate cannot promise anything about that gate.
+JS_SUITE_CMD = ["node", "--test"]
 
 
 def docs_ci_gate_commands() -> list[list[str]]:
@@ -80,7 +89,7 @@ def _run(cmd: list[str]) -> tuple[int, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--skip-js", action="store_true", help="skip the genesis-fixture JS check (node unavailable)")
+    ap.add_argument("--skip-js", action="store_true", help="skip the JS suite (node unavailable)")
     args = ap.parse_args()
 
     try:
@@ -100,13 +109,13 @@ def main() -> int:
 
     if not args.skip_js:
         if shutil.which("node") is None:
-            print("  ⚠ node unavailable — genesis-fixture check SKIPPED (loudly, not silently)")
+            print("  ⚠ node unavailable — the JS suite was SKIPPED (loudly, not silently)")
         else:
-            for t in GENESIS_FIXTURE_TESTS:
-                rc, out = _run(["node", "--test", t])
-                print(f"  {'✓' if rc == 0 else '✗'} {rc:<3} node --test {t}")
-                if rc != 0:
-                    failures.append((f"node --test {t}", out[-1200:]))
+            rc, out = _run(JS_SUITE_CMD)
+            label = " ".join(JS_SUITE_CMD)
+            print(f"  {'✓' if rc == 0 else '✗'} {rc:<3} {label}  (the v4 site gate's step)")
+            if rc != 0:
+                failures.append((label, out[-1800:]))
 
     if failures:
         print(f"\n❌ {len(failures)} gate(s) will red on the commit of these reset artifacts:")

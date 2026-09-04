@@ -163,15 +163,30 @@ test("weeklyAsOf: no/invalid date renders nothing — never a fabricated stamp",
    cycle"), and while regeneration is paused that sentence keeps asserting a
    frozen day as today's. The calendar date alone cannot reconcile it. */
 
+// These two cases need a stamp INSIDE the weekly cadence window (WEEKLY_STALE_HOURS =
+// 8 days), so the date must be DERIVED FROM NOW. Both used a hardcoded
+// "2026-08-27T14:02:46.793290+00:00", which sat comfortably inside the window when it was
+// written and silently aged out of it: on 2026-09-04 — exactly 8 days later — the
+// "— next refresh pending" suffix appeared and the strict-equality case redded main on a
+// commit that had touched none of this. The regex case survived only because it lacked a
+// `$` anchor, which is luck, not coverage. A fixture that measures the wall clock must be
+// derived from the wall clock (the golden-tests-wallclock class).
+const FRESH_ISO = new Date(Date.now() - 2 * 3600e3).toISOString();
+const FRESH_STAMP = `as of ${new Date(FRESH_ISO).toLocaleDateString("en-US", {
+  timeZone: "America/Los_Angeles",
+  month: "short",
+  day: "numeric",
+})}`;
+
 test("weeklyAsOf: the day number joins the calendar date (#3252)", () => {
-  assert.match(weeklyAsOf("2026-08-27T14:02:46.793290+00:00", 11), /^as of Aug 27 · Day 11/);
+  assert.equal(weeklyAsOf(FRESH_ISO, 11), `${FRESH_STAMP} · Day 11`);
 });
 
 test("weeklyAsOf: an unknown day renders the date ALONE, never Day 0 or a guess", () => {
   // The must-fail direction is a fabricated anchor: a wrong day number is strictly
   // worse than none, so every non-positive-integer collapses to no day at all.
   for (const bad of [undefined, null, 0, -3, "11", 11.5, NaN, true]) {
-    assert.equal(weeklyAsOf("2026-08-27T14:02:46.793290+00:00", bad), "as of Aug 27",
+    assert.equal(weeklyAsOf(FRESH_ISO, bad), FRESH_STAMP,
       `day ${JSON.stringify(bad)} must render no day label`);
   }
 });

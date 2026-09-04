@@ -69,11 +69,13 @@ def test_a_missing_workflow_raises_rather_than_passing(tmp_path, monkeypatch):
         rvg.docs_ci_gate_commands()
 
 
-def test_the_genesis_fixture_check_names_a_file_that_exists():
-    """The reset breaks these every cycle; a stale path here would silently stop checking."""
-    assert rvg.GENESIS_FIXTURE_TESTS, "the genesis-fixture list is empty — the reset's own breakage is unwatched"
-    for rel in rvg.GENESIS_FIXTURE_TESTS:
-        assert os.path.isfile(os.path.join(_REPO, rel)), f"{rel} does not exist — re-point the sweep"
+def test_the_js_leg_runs_the_whole_suite_not_a_subset():
+    """#3479: it ran ONE file, so the v4 site gate redded on a different JS test the sweep
+    never executed. A sweep that runs a SUBSET of a gate can promise nothing about it."""
+    assert rvg.JS_SUITE_CMD == ["node", "--test"], (
+        f"the JS leg is {rvg.JS_SUITE_CMD!r} — it must be the v4 site gate's own bare "
+        "`node --test`, which discovers the whole suite; naming individual files re-opens #3479"
+    )
 
 
 def test_the_pipeline_runs_the_sweep_last():
