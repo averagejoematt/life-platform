@@ -22,3 +22,4 @@ that ties them together (genesis, cycle, baseline, pipeline report).
 | 12 | 2026-08-03 | 321.6 | docs/restart/_pipeline_report.txt @ 2026-08-03 |
 | 13 | 2026-08-10 | 321.6 | docs/restart/_pipeline_report.txt @ 2026-08-09 |
 | 14 | 2026-08-17 | 321.01 | docs/restart/_pipeline_report.txt @ 2026-08-17 |
+| 16 | 2026-09-04 | 324.64 | docs/restart/_pipeline_report.txt @ 2026-09-04 |

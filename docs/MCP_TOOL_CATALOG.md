@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-08-31
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-04
 
-**Version:** v8.6.0 | **Last updated:** 2026-08-31 | **Total tools:** 76
+**Version:** v8.6.0 | **Last updated:** 2026-09-04 | **Total tools:** 76
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -284,3 +284,19 @@ filter; the `get_daily_snapshot` dispatcher applies the same filter via
 `mcp.core._apply_phase_filter`. To access pre-genesis data, pass
 `include_pilot=True` (most tools accept this keyword via the args dict). See
 `lambdas/phase_filter.py::with_phase_filter()`.
+
+
+### Phase-filter behavior (ADR-058)
+
+The following tools default to `phase=experiment`-only results and hide
+phase=pilot records:
+
+- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
+  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
+  `mcp.core.query_source` which applies the filter.
+- `get_latest`, `get_daily_summary` — apply the filter directly.
+- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
+
+To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
+keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
+for the underlying mechanism.
