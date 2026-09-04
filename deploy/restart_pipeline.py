@@ -732,14 +732,7 @@ def build_sub_scripts(
         # exactly the "one command, zero manual steps" gap the cycle-7 reset surfaced). Dry-run:
         # run_step strips --apply → no-flag check, which exits 0 even with stale literals.
         ("sync_doc_metadata", ["python3", "deploy/sync_doc_metadata.py", "--apply"]),
-        # #3477: run the gates CI will run on the commit of these artifacts. Until this
-        # step existed the pipeline ran ONE doc gate (the line above) while Docs CI ran
-        # twelve, so a reset could — and on the 2026-09-03 cycle-16 re-anchor did — exit 0
-        # having produced a commit that reds main by construction. The gate list is DERIVED
-        # from .github/workflows/docs-ci.yml, never restated, so a thirteenth CI gate is
-        # covered the day it lands. Read-only (--check forms only); it must run LAST, after
-        # sync_doc_metadata has had its chance to converge the literals it owns.
-        ("restart_verify_gates", ["python3", "deploy/restart_verify_gates.py"]),
+        ("restart_verify_gates", ["python3", "deploy/restart_verify_gates.py"]),  # #3477: CI's gates, LAST
     ]
     sub_scripts.insert(3, ("restart_leadin_pages", ["python3", "deploy/restart_leadin_pages.py", "--apply"]))
     sub_scripts.insert(3, ("restart_media_reset", ["python3", "deploy/restart_media_reset.py", "--apply"]))
