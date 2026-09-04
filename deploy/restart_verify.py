@@ -497,8 +497,16 @@ def main():
         from lambdas.common.token_alarm_window import TOKEN_ALARM_GENESIS_WINDOW as _TAW
 
         cw_tok = boto3.client("cloudwatch", region_name=REGION)
+        # AlarmTypes IS REQUIRED (#3390, 2026-09-04). `describe_alarms` returns ONLY metric
+        # alarms when AlarmTypes is omitted — asking for names that happen to be composites
+        # yields an empty CompositeAlarms list, indistinguishable from "not deployed".
+        # Measured: without AlarmTypes -> 0 composites; with it -> 2, both OK. So this check
+        # reported "not deployed yet" from the moment #2116 actually deployed, and because
+        # that verdict takes the tolerant branch it silently SKIPPED the four assertions
+        # below it — the absence-read-as-success class, in the post-reset verifier itself.
         composite = cw_tok.describe_alarms(
-            AlarmNames=["ai-tokens-platform-daily-total-urgent", "ai-tokens-platform-daily-total-genesis-window"]
+            AlarmNames=["ai-tokens-platform-daily-total-urgent", "ai-tokens-platform-daily-total-genesis-window"],
+            AlarmTypes=["CompositeAlarm"],
         ).get("CompositeAlarms", [])
         by_name = {a["AlarmName"]: a for a in composite}
         urgent = by_name.get("ai-tokens-platform-daily-total-urgent")
@@ -514,13 +522,17 @@ def main():
         else:
             raw = cw_tok.describe_alarms(AlarmNames=["ai-tokens-platform-daily-total"]).get("MetricAlarms", [])
             raw_actions = raw[0].get("AlarmActions", []) if raw else None
+            # #3390: the detail branched on `if raw_actions`, so the PASSING state (an
+            # empty action list — exactly what #2116 wants) rendered as "raw alarm
+            # missing: [...]". Branch on the alarm's presence, not on the truthiness of
+            # the thing whose emptiness is the success condition.
             check(
                 "Raw ai-tokens-platform-daily-total alarm carries no SNS action of its own (#2116)",
                 raw_actions == [],
                 (
-                    f"AlarmActions={raw_actions} — only the two composites should route anywhere"
-                    if raw_actions
-                    else f"raw alarm missing: {raw}"
+                    "raw alarm not found — cannot confirm its routing"
+                    if not raw
+                    else f"AlarmActions={raw_actions} — only the two composites should route anywhere"
                 ),
             )
 
