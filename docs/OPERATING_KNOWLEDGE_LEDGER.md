@@ -503,6 +503,8 @@ user_who_is_matthew.md
 | `reference_a_rollback_whose_scope_cannot_reach_its_trigger.md` | reference | `docs/CONVENTIONS.md` §4b (what the site auto-rollback can and cannot reach) + `docs/OPERATING_DISCIPLINE.md` §5.6 | homed-here |
 | `reference_a_sweep_one_import_away.md` | reference | `docs/CONVENTIONS.md` §4a1 (#2924) + `tests/premerge_derivation.py` | already-homed |
 | `reference_a_transform_can_be_correct_and_unreachable.md` | reference | `.claude/skills/new-machinery/SKILL.md` § traps (set equality both directions) + `.claude/skills/land/SKILL.md` §4 | homed-here |
+| `reference_a_ci_warning_that_no_action_can_clear.md` | reference | `docs/CONVENTIONS.md` §4 (CI gate ordering / warning-channel hygiene) — the rule is "a warning no action can clear must be structurally suppressed, not acknowledged away"; the live instance is #3476 | already-homed |
+| `reference_reset_pipeline_exits_0_over_ci_doc_gates.md` | reference | `CLAUDE.md` (Experiment Restart Pipeline) + the #3477 acceptance — the rule is "a green restart_pipeline.py is not a finished reset; run CI's twelve doc gates before pushing" | already-homed |
 | `reference_a_vacuous_negative_control.md` | reference | `.claude/skills/prove-it/SKILL.md` Q1 + `.claude/agents/finding-verifier.md` 7 | already-homed |
 | `reference_a_client_cap_below_the_callee_p50.md` | reference | `lambdas/web/board_quality_gate.py` docstring (the measurement + derivation command) + `docs/DECISIONS.md` ADR-108 amendment 2026-09-01 | already-homed |
 | `reference_a_verified_stamp_is_a_human_claim.md` | reference | `docs/OPERATING_DISCIPLINE.md` §4.2 + `.claude/agents/finding-verifier.md` (standing cautions) | already-homed |
@@ -721,6 +723,7 @@ carries an operating rule.
 | `project_agrade_d2_drain_2026_08_24.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_o_launch_2026_08_31.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_p_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_session_u_2026_09_03.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_agrade_program_2026_08_23.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_alarm_board_2026_08_15.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_arch781_layer_retirement.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
