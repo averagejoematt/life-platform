@@ -196,7 +196,36 @@ class StackVerdict:
     findings: list[Finding] = field(default_factory=list)
     admitted: list[Admitted] = field(default_factory=list)
     pending_non_iam: list[str] = field(default_factory=list)  # advisory when no IAM change; blocking with one
+    pending_inert: list[str] = field(default_factory=list)  # #3476: subset CloudFormation cannot act on
     unevaluable: str | None = None
+
+
+# ── #3476: deltas no `cdk deploy` can ever ship ────────────────────────────────
+# The advisory below tells the operator "an owner cdk deploy is pending". For these
+# (resource type, property) pairs that sentence is FALSE and un-actionable: the delta
+# survives a successful deploy, so the warning fires on every green main run forever and
+# trains the reader to acknowledge the whole channel away — the exact normalisation #1966
+# built the /wrap (e11) gate to prevent.
+#
+# MEASURED, not assumed (2026-09-03, #3476). Two owner deploys of LifePlatformMonitoring
+# that night reported UPDATE_COMPLETE on both dashboards; afterwards `get-template
+# --template-stage Original` still carried the Tags, `list-tags-for-resource` still showed
+# them live, and `cdk diff` still reported the removal as pending. `AWS::CloudWatch::Dashboard`
+# has no `Tags` property in the CloudFormation resource spec, so the stored template keeps a
+# literal the resource handler will not act on.
+#
+# SCOPE — read this before adding a row. This set NARROWS ONE ADVISORY LINE AND NOTHING
+# ELSE. It is deliberately NOT `TOLERATED_NON_IAM`: that set is a security ratchet which may
+# only shrink and whose widening must appear where the OWNER reads (the ADR-065 baseline
+# block), because tolerating a delta lets additive IAM ship beside it. Membership here
+# changes no verdict — `pending_non_iam` still carries every entry, so a stack whose IAM
+# moved is still OWNER-REQUIRED and still names this delta in the finding. A row belongs
+# here only with live evidence that a successful deploy does NOT clear the delta.
+STRUCTURALLY_UNSHIPPABLE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("AWS::CloudWatch::Dashboard", "Tags"),
+    }
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -656,6 +685,11 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
                 if problem != _NOT_LISTED:
                     entry += f" — {problem}"
                 v.pending_non_iam.append(entry)
+                # #3476: decided on (type, property) HERE, where both are still values.
+                # Matching the rendered string later would be a phrase match, and every
+                # phrase-matched suppressor in this repo has failed in the field.
+                if (typ, p) in STRUCTURALLY_UNSHIPPABLE:
+                    v.pending_inert.append(entry)
         for k in changed_attrs:
             if k == "Metadata" and _tolerance_problem(typ, lid, None, new.get(k), ctx) is None:
                 continue
@@ -805,10 +839,19 @@ def render(verdicts: list[StackVerdict]) -> list[str]:
             out.append(f"        actions   {', '.join(a.actions)}")
             out.append(f"        resources {', '.join(a.resources)}")
         if v.verdict == NO_CHANGE and v.pending_non_iam:
-            out.append(
-                f"    ::warning title=Pending owner cdk deploy ({v.stack})::{v.stack} has non-IAM CDK changes CI does not ship: "
-                + "; ".join(v.pending_non_iam[:12])
-            )
+            # #3476: name only what a deploy could actually ship. An inert delta is
+            # reported as a note, never as a ::warning:: — the (e11) wrap gate treats a
+            # warning as something a session must fix or explicitly decide, and neither
+            # is possible for a delta CloudFormation will not act on.
+            inert = set(v.pending_inert)
+            shippable = [e for e in v.pending_non_iam if e not in inert]
+            if shippable:
+                out.append(
+                    f"    ::warning title=Pending owner cdk deploy ({v.stack})::{v.stack} has non-IAM CDK changes CI does not ship: "
+                    + "; ".join(shippable[:12])
+                )
+            if inert:
+                out.append("    ℹ inert delta(s), unshippable by construction (#3476): " + "; ".join(sorted(inert)[:12]))
     if any(v.verdict == OWNER for v in verdicts):
         out.append("")
         out.append("  OWNER-REQUIRED → " + OWNER_PATH)
