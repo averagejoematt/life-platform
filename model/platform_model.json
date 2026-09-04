@@ -110,21 +110,27 @@
     },
     "compute-outputs-heartbeat": {
       "kind": "metric",
-      "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_heartbeat_alarm"
+      "routing": "unresolved",
+      "stack": "monitoring_compute_alarms",
+      "via": "alarm_discovery-only (untraced)"
     },
     "compute-outputs-missing": {
       "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
+      "stack": "monitoring_compute_alarms",
+      "via": "factory:_problem_alarm"
     },
     "compute-pipeline-stale": {
       "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
+      "stack": "monitoring_compute_alarms",
+      "via": "factory:_problem_alarm"
+    },
+    "compute-pipeline-stale-heartbeat": {
+      "kind": "metric",
+      "routing": "unresolved",
+      "stack": "monitoring_compute_alarms",
+      "via": "alarm_discovery-only (untraced)"
     },
     "cost-governor-heartbeat": {
       "kind": "metric",
@@ -837,7 +843,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 119,
+    "alarms": 120,
     "emf_namespaces": 31,
     "schedules": 88,
     "secrets": 28
@@ -6889,11 +6895,12 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 119,
+      "alarms": 120,
       "alarms_by_routing": {
-        "digest": 88,
+        "digest": 87,
         "digest+paging": 2,
         "paging": 2,
+        "unresolved": 2,
         "urgent": 25,
         "via-composite": 2
       },

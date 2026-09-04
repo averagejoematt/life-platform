@@ -263,7 +263,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 88 · digest+paging 2 · paging 2 · urgent 25 · via-composite 2 — of 119 alarms (2 composite)
+Routing: digest 87 · digest+paging 2 · paging 2 · unresolved 2 · urgent 25 · via-composite 2 — of 120 alarms (2 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -282,9 +282,10 @@ Routing: digest 88 · digest+paging 2 · paging 2 · urgent 25 · via-composite 
 | `chronicle-delivery-heartbeat` | email_stack | metric | urgent | declaration |  |
 | `coherence-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `coherence-overall` | monitoring_stack | metric | digest | factory:_alarm |  |
-| `compute-outputs-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
-| `compute-outputs-missing` | monitoring_stack | metric | digest | factory:_alarm |  |
-| `compute-pipeline-stale` | monitoring_stack | metric | digest | factory:_alarm |  |
+| `compute-outputs-heartbeat` | monitoring_compute_alarms | metric | unresolved | alarm_discovery-only (untraced) |  |
+| `compute-outputs-missing` | monitoring_compute_alarms | metric | digest | factory:_problem_alarm |  |
+| `compute-pipeline-stale` | monitoring_compute_alarms | metric | digest | factory:_problem_alarm |  |
+| `compute-pipeline-stale-heartbeat` | monitoring_compute_alarms | metric | unresolved | alarm_discovery-only (untraced) |  |
 | `cost-governor-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `cost-metric-drift-sustained` | operational_stack | metric | digest | declaration |  |
 | `daily-brief-duration-high` | monitoring_stack | metric | digest | factory:_alarm |  |
@@ -478,7 +479,7 @@ Field-level rulings (only non-default fields are declared):
 
 - Edge sites: 1144 total · 825 resolved · 319 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 119 literal-named declarations across three idioms, 2 composite; routing digest 88 · digest+paging 2 · paging 2 · urgent 25 · via-composite 2 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 120 literal-named declarations across three idioms, 2 composite; routing digest 87 · digest+paging 2 · paging 2 · unresolved 2 · urgent 25 · via-composite 2 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 13 owner-only + 2 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 88 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -495,7 +496,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 18 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 119 | this model's alarms plane (CDK AST) |
+| alarms | 120 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 88 | this model's schedules plane (CDK AST) |
 | secrets | 28 | `tests/test_secret_references.py::KNOWN_SECRETS` |
