@@ -15,7 +15,7 @@ Covers:
 
   AI token budget alarms (13):
     ai-tokens-<lambda>-daily  AnthropicOutputTokens Sum, 86400s
-    Per-Lambda threshold: 1818 (most); 30000 (daily-brief); 150000 (platform total)
+    Per-Lambda threshold: 1818 (most); 30000 (daily-brief); 250000 (platform total)
 
   DynamoDB item-size warning (1):
     life-platform-ddb-item-size-warning  LifePlatform/DynamoDB ItemSizeBytes Max >= 307200, 300s
@@ -781,16 +781,16 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
-        # Platform-level total (no dims)
-        # 2026-06-24: bumped threshold 33333 → 150000. The platform's autonomous
-        # AI baseline crept to ~59k output tokens/day (Jun 22/23/24 all ~58-59k:
-        # daily brief + 8 coach narratives + the panelcast revision loop + compute),
-        # so 33333 sat far *below* normal operation and fired into the alarm digest
-        # every single day — pure noise, not a cost signal (the $75 budget guard +
-        # the ai-daily-spend-high $ alarm are the real cost protection, both intact).
-        # Legitimate content-heavy days (weekly podcast/chronicle generation) peak
-        # ~121k. 150000 clears those peaks and alerts only on a genuine ~2.5x runaway.
-        # Future: swap to a CloudWatch anomaly-detection band (per ai-daily-spend-high).
+        # Platform-level total (no dims). 2026-09-04 (#3474): 150000 → 250000, re-derived (ADR-105). Set in 2026-06
+        # against a ~59k/day baseline peaking ~121k, 150000 had become the platform's
+        # 75th PERCENTILE and fired on the ordinary working day. n=31 daily Sums to
+        # 2026-09-02: median 87,046 · Q3 145,161 · max 492,314, every breach on a
+        # working session — so the question is "anomalous for THIS distribution", and
+        # two robust estimators bracket it: Tukey Q3+1.5·IQR = 260,014, median+3·MAD·
+        # 1.4826 = 221,743. Fire rate 25.8% [13.7%, 43.2%] → 9.7% [3.3%, 24.9%] n=31,
+        # i.e. 7.7 → 2.9 per 30d. NOT a budget guard: 250k/day of output is ~$112/mo
+        # at sonnet's $15/1M against a $215 ceiling — sustained burn is cost_governor's
+        # tiering; this is the single-day outlier detector beside it.
         #
         # #1961 -> #2116 (this block closes #1961's residual gap, flagged in
         # PR #2114): a genesis's predictable post-reset full-cycle rebuild spike
@@ -831,7 +831,7 @@ class MonitoringStack(Stack):
             alarm_name="ai-tokens-platform-daily-total",
             metric=ai_tokens_platform_metric,
             evaluation_periods=1,
-            threshold=150000,
+            threshold=250000,
             comparison_operator=GTE,
             treat_missing_data=NB,
         )

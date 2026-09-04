@@ -401,7 +401,7 @@ def test_dedupe_proposes_only_where_a_dimensionless_guard_matches():
 
 
 def test_dedupe_refuses_a_guard_with_a_different_threshold():
-    """The live `ai-tokens-*` pair: same metric, 150k platform-wide vs 30k for one Lambda.
+    """The live `ai-tokens-*` pair: same metric, 250k platform-wide vs 30k for one Lambda.
 
     A set guard that fires five times later is not the same coverage. Proposing
     it would be exactly the trade ADR-116 forbids, dressed up as consolidation.
@@ -409,7 +409,7 @@ def test_dedupe_refuses_a_guard_with_a_different_threshold():
     common = dict(ns="LifePlatform/AI", stat="Sum", op="GreaterThanOrEqualToThreshold")
     result = census.alarm_dedupe_candidates(
         [
-            _alarm("ai-tokens-platform-daily-total", "AnthropicOutputTokens", threshold=150000.0, **common),
+            _alarm("ai-tokens-platform-daily-total", "AnthropicOutputTokens", threshold=250000.0, **common),
             _alarm(
                 "ai-tokens-daily-brief-daily", "AnthropicOutputTokens", dims={"LambdaFunction": "daily-brief"}, threshold=30000.0, **common
             ),

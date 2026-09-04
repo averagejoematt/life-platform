@@ -61,7 +61,7 @@ def test_raw_alarm_carries_no_sns_action_of_its_own():
 def test_raw_alarm_threshold_and_metric_unchanged():
     assert 'alarm_name="ai-tokens-platform-daily-total"' in _BLOCK
     assert 'metric_name="AnthropicOutputTokens"' in _BLOCK
-    assert "threshold=150000" in _BLOCK
+    assert "threshold=250000" in _BLOCK
 
 
 def test_window_gauge_alarm_matches_cost_governor_cadence():
