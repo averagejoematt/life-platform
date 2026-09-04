@@ -70,6 +70,7 @@ from aws_cdk import (
 
 from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.monitoring_budget_alarms import add_budget_alarms  # #2824: budget-unreadable, same seam
+from stacks.monitoring_compute_alarms import add_compute_alarms  # #3473: compute-pipeline liveness pairs
 from stacks.monitoring_dashboards import add_dashboards  # #2610: the dashboards live in a sibling
 from stacks.monitoring_prediction_alarms import add_prediction_alarms  # #727/#3046: the science alarms, same seam
 from stacks.monitoring_silence_alarms import add_silence_alarms  # #2977: the fail-soft token alarms, same seam
@@ -1182,60 +1183,18 @@ class MonitoringStack(Stack):
         )
         paging_pipeline_dead.add_alarm_action(cw_actions.SnsAction(paging))
 
-        # ══════════════════════════════════════════════════════════════
-        # #411 / ADR-116: two UNIQUE silent-failure signals adopted into IaC.
-        # Both existed only as hand-created (CLI-era) orphan alarms — the CloudWatch
-        # cost audit (docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §3b) codifies them here
-        # under IaC-owned names so they are managed + reviewable. The manual originals
-        # (life-platform-compute-pipeline-stale, health-auto-export-no-invocations-24h)
-        # are deleted by deploy/cloudwatch_retire_orphans.sh; new names avoid any
-        # CloudFormation collision at deploy time.
-        # ══════════════════════════════════════════════════════════════
-        # Compute-pipeline staleness: daily_brief emits ComputePipelineStaleness=1
-        # (Source=computed_metrics) when the pre-computed compute artifacts it reads
-        # are stale. The freshness digest watches INGESTION sources; nothing else
-        # watches the COMPUTE pipeline going stale behind the brief. Digest.
-        _alarm(
-            "ComputePipelineStale",
-            "compute-pipeline-stale",
-            "LifePlatform",
-            "ComputePipelineStaleness",
-            86400,
-            "Maximum",
-            1,
-            GTE,
-            dims={"Source": "computed_metrics"},
-            to_digest=True,
-        )
+        # #3473: the compute-pipeline liveness PAIRS (problem alarm + absence
+        # heartbeat) live in the cohesive sibling stacks/monitoring_compute_alarms.py.
+        add_compute_alarms(self, digest)
 
-        # #1455: compute-output completeness. pipeline-health-check's 16:58 UTC
-        # {check_compute_outputs} run has emitted
-        # LifePlatform/Pipeline::ComputeOutputsMissing on every run since Phase 3.2
-        # — but nothing alarmed it, so a compute cron that silently died
-        # (character-sheet / daily-metrics / daily-insight / adaptive-mode) was only
-        # visible if the brief happened to complain about the one partition IT reads.
-        # Problem alarm + absence heartbeat (the REL-01 pattern): ≥1 missing compute
-        # output = digest alert the same morning; gauge absent 2 straight days = the
-        # detector leg itself went dark. Digest — the brief still sends (with stale
-        # data flagged), so this is a same-day fix item, not a page.
-        _alarm(
-            "ComputeOutputsMissing",
-            "compute-outputs-missing",
-            "LifePlatform/Pipeline",
-            "ComputeOutputsMissing",
-            86400,
-            "Maximum",
-            1,
-            GTE,
-            to_digest=True,
-        )
-        _heartbeat_alarm(
-            "ComputeOutputsHeartbeat",
-            "compute-outputs-heartbeat",
-            "LifePlatform/Pipeline",
-            "ComputeOutputsMissing",
-        )
-
+        # ══════════════════════════════════════════════════════════════
+        # #411 / ADR-116: a UNIQUE silent-failure signal adopted into IaC from a
+        # hand-created (CLI-era) orphan alarm (health-auto-export-no-invocations-24h),
+        # per the CloudWatch cost audit (docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §3b).
+        # The manual original is deleted by deploy/cloudwatch_retire_orphans.sh; the new
+        # name avoids a CloudFormation collision at deploy time. Its compute-pipeline
+        # counterpart moved to monitoring_compute_alarms.py with #3473.
+        # ══════════════════════════════════════════════════════════════
         # HAE webhook liveness: the Health Auto Export webhook (CGM/water/BP/State of
         # Mind) is near-real-time and streams continuously, so <1 invocation in 24h =
         # a dead webhook. treat_missing=BREACHING (absence IS the failure) — the
