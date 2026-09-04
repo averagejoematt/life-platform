@@ -1,4 +1,4 @@
-# Handover — 2026-09-03/04 (Opus 5): Session U — the Friday re-anchor, then the drain past midnight
+# Handover — 2026-09-03/04 (Opus 5): Session U — the re-anchor (Friday, then corrected to Saturday), the drain, and the sweep proving itself
 
 **Session:** Claude Opus 5, driven by one owner instruction — *"do another full platform
 experiment reset so it all starts on friday september 4th"* — then, after it landed,
@@ -256,9 +256,50 @@ warning, `restart_verify`'s composite leg, its "raw alarm missing" message on a 
 check — and my own first wire-guard for #3477, which passed over the exact defect it was
 written to catch until I mutated it.
 
+## Part 4 — the owner typo, and the sweep earning its keep the same night
+
+At 01:2x PT the owner said the reset should have been **Saturday 2026-09-05**, not Friday.
+Cycle 16 was ~1h old with **no weigh-in, no brief and no published prereg** — nothing of
+record.
+
+**Re-anchored IN PLACE rather than closing a phantom cycle** (owner picked this):
+`--genesis 2026-09-05 --no-close-cycle`, plus a hand-corrected `CYCLE_GENESES[16]`
+(2026-09-04 → 2026-09-05, with a comment saying why it is a correction and not an append).
+SSM stays 16. The deciding factor was the seal gate: cycle 16's prereg was frozen but never
+published, so **closing it would have required a permanent grandfather record** in
+`prereg_seal_gate.py` — the right record for cycle 13, which genuinely ran and missed its
+seal, and the wrong one for a typo caught in 90 minutes. The correction is still recorded
+three ways: the CYCLE_GENESES comment, the RESET_LOG line, and the archived Friday freeze
+(`genesis_preregistration_2026-09-04_cycle16.json`).
+
+### The #3477 sweep proved itself on its first live reset — twice
+It **ABORTED the pipeline** rather than letting it exit 0, both times:
+
+1. `generate_mcp_tool_catalog --check` + the genesis-anchored JS fixtures.
+2. After regenerating both: the **catalog again**.
+
+The second abort root-caused a defect that had been silently recurring on EVERY reset:
+`restart_docs_update.py` appended a `### Phase-filter behavior (ADR-058)` section to
+`docs/MCP_TOOL_CATALOG.md` — a file `scripts/generate_mcp_tool_catalog.py` regenerates
+WHOLE, and which already emits its own `##` version of that exact section ("behavioral doc,
+stable across regenerations"). Two writers, one file, a staler duplicate: the generator
+wiped the append, the append re-added itself, and `--check` redded whichever way the last
+write went. **The #1287 owned-manifest clobber, third specimen.** The duplicate writer is
+gone; the generator is the single owner.
+
+Scoreboard for #3477's three "recurs every reset" items, measured rather than argued:
+`SCHEMA.md` genesis literal **fixed at source** (converged automatically, gate passed);
+JS fixtures **caught pre-commit**; MCP catalog **caught pre-commit and root-caused**.
+
+### Verified live after the re-anchor
+`day_n: 0 · pre_start: true · started_date: 2026-09-05 · days_until_start: 1`, character
+`pre_start: true`, constants `2026-09-05`, SSM cycle **16** (unchanged), prereg re-frozen
+for Saturday (8 coaches, 2 hypotheses). Gates: rendered **96/96**, semantic **8/8**, truth
+**8 surfaces clean**, and the doc-gate sweep green.
+
 ## Residual / next picks
 
-- **#3390** — Day-1 runlist for cycle 16, run ON or AFTER 2026-09-04 (post-genesis by
+- **#3390** — Day-1 runlist for cycle 16, now run ON or AFTER **2026-09-05** (post-genesis by
   construction; `restart_verify.py`, the two reconcilers in order, the supersede reflex).
 - **#3478** — `/api/journey` reports a weigh-in that never happened on Day 1 of a cycle
   (ADR-104). Filed from the Day-1 runlist; self-heals on the first weigh-in.

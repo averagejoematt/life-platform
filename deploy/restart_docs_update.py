@@ -11,7 +11,6 @@ Touches:
   4. docs/ARCHITECTURE.md        — appends "Experiment Phase Filtering" subsection
   5. docs/RUNBOOK.md             — appends "Restart Pipeline" runbook entry
   6. docs/BACKLOG.md             — appends restart follow-up items
-  7. docs/MCP_TOOL_CATALOG.md    — appends phase-filter notes on date-range tools
 
 Date-agnostic. Idempotent: each section checks for an ADR-058 marker before
 inserting. Re-running with a new genesis updates the in-place content rather
@@ -204,24 +203,17 @@ BACKLOG_APPEND = f"""
 """
 
 
-MCP_MARKER = "### Phase-filter behavior (ADR-058)"
-
-MCP_APPEND = f"""
-{MCP_MARKER}
-
-The following tools default to `phase=experiment`-only results and hide
-phase=pilot records:
-
-- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
-  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
-  `mcp.core.query_source` which applies the filter.
-- `get_latest`, `get_daily_summary` — apply the filter directly.
-- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
-
-To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
-keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
-for the underlying mechanism.
-"""
+# #3477 (2026-09-04): docs/MCP_TOOL_CATALOG.md is NOT ours. `scripts/generate_mcp_tool_catalog.py`
+# regenerates that file whole from `mcp/registry.py`, and it ALREADY emits a
+# "## Phase-filter behavior (ADR-058)" epilogue of its own ("behavioral doc, stable across
+# regenerations"). This module used to append a SECOND, staler copy under a `###` marker, so
+# the two writers overwrote each other on every reset: the generator wiped the append, the
+# append re-added itself, and `generate_mcp_tool_catalog.py --check` redded whichever way the
+# last write went. That is the #1287 owned-manifest clobber, third specimen — a file another
+# step OWNS is never ours to append to. Caught by the #3477 doc-gate sweep on its first live
+# reset, which is precisely what that sweep exists for.
+#
+# If the phase-filter prose needs to change, change it in the GENERATOR.
 
 
 SECTIONS = [
@@ -231,7 +223,6 @@ SECTIONS = [
     ("docs/ARCHITECTURE.md", ARCH_MARKER, ARCH_APPEND, "append"),
     ("docs/RUNBOOK.md", RUNBOOK_MARKER, RUNBOOK_APPEND, "append"),
     ("docs/BACKLOG.md", BACKLOG_MARKER, BACKLOG_APPEND, "append"),
-    ("docs/MCP_TOOL_CATALOG.md", MCP_MARKER, MCP_APPEND, "append"),
 ]
 
 

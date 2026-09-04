@@ -10,8 +10,8 @@ via `cdk deploy --all` or `bash deploy/deploy_fleet.sh`.
 
 from datetime import date
 
-EXPERIMENT_START_DATE = "2026-09-04"
-EXPERIMENT_START_DOW = "Friday"
+EXPERIMENT_START_DATE = "2026-09-05"
+EXPERIMENT_START_DOW = "Saturday"
 EXPERIMENT_TZ = "America/Los_Angeles"
 
 EXPERIMENT_PHASE_CURRENT = "experiment"

@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-08-26 (v8.6.0 — 76 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
+**Last updated:** 2026-09-04 (v8.6.0 — 76 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2849,7 +2849,7 @@ Every DDB item under `USER#matthew#SOURCE#*` carries an optional `phase` attribu
 
 | Value         | Meaning                                                          |
 |---------------|------------------------------------------------------------------|
-| `experiment`  | Record dated on or after EXPERIMENT_START_DATE (currently 2026-09-04). |
+| `experiment`  | Record dated on or after EXPERIMENT_START_DATE (currently 2026-09-05). |
 | `pilot`       | Record dated before EXPERIMENT_START_DATE.                       |
 | (unset)       | Cross-phase identity record: profile, config, subscribers, genome, field_notes, baseline_snapshot, re_entry. |
 

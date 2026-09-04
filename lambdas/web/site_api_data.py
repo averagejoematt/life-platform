@@ -116,7 +116,12 @@ CYCLE_GENESES = {
     13: "2026-08-10",  # appended by restart_pipeline --close-cycle
     14: "2026-08-17",  # appended by restart_pipeline --close-cycle
     15: "2026-09-01",  # appended by restart_pipeline --close-cycle
-    16: "2026-09-04",  # appended by restart_pipeline --close-cycle
+    # CORRECTED IN PLACE 2026-09-04, not appended: the cycle-16 re-anchor was mis-dated to
+    # Friday and caught ~1h in, before any weigh-in, brief or published prereg. Re-anchored
+    # to the intended Saturday with --no-close-cycle, so cycle 16 keeps its number and no
+    # 1-day phantom cycle enters this registry (which prereg_seal_gate.py iterates — a
+    # closed-unsealed cycle 16 would have needed a permanent grandfather record).
+    16: "2026-09-05",
 }
 
 # #1066: container cache for the training-phase registry (read by the routine handler
