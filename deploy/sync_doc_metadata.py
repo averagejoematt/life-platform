@@ -1116,7 +1116,22 @@ def process_doc(rel_path: str, dry_run: bool) -> list[str]:
                 new_text = replacement[:80]
                 # A date-ONLY difference is never drift (#2649) and never an entitlement to
                 # re-stamp (#2986) — defer it; `resolve()` below decides if the run earned it.
-                if _restamp.differs_only_by_date_stamp(old_match.group(0), replacement):
+                #
+                # #3477: ONLY for a rule that actually stamps freshness. The hold used to
+                # apply to every rule, which silently swallowed the SEMANTIC date facts —
+                # a genesis anchor is a claim ABOUT THE EXPERIMENT, not a "last updated"
+                # stamp, and `(currently 2026-09-01)` → `(currently 2026-09-04)` differs
+                # only by a date, so it was held and never written. Measured on the
+                # cycle-16 reset: `sync_doc_metadata --apply` ran as the pipeline's last
+                # step, reported "Applied 1 change(s)", and left docs/SCHEMA.md:2852
+                # claiming the outgoing genesis — which then redded check_doc_facts and
+                # three test_wiki_checkers cases on the reset commit. CLAUDE.md's twin
+                # rule escaped only by accident: it carries the cycle number too, so
+                # masking leaves `cycle 15` vs `cycle 16` visible and the change survived.
+                # The predicate is the module's own (`stamped_rules` = template carries
+                # STAMP_PLACEHOLDER), applied where the decision is actually made.
+                is_freshness_stamp = _restamp.STAMP_PLACEHOLDER in replacement_template
+                if is_freshness_stamp and _restamp.differs_only_by_date_stamp(old_match.group(0), replacement):
                     held.append((pattern, replacement))
                     continue
                 changes.append(f"  ~ {old_text!r}\n    → {new_text!r}")

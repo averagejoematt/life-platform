@@ -130,9 +130,14 @@ def test_build_sub_scripts_sequence():
         "restart_site_copy_sync",
         "restart_docs_update",
         "sync_doc_metadata",
+        "restart_verify_gates",
     ]
     # The doc-literal sync must run AFTER restart_docs_update (docs first, then literal reconcile).
     assert names.index("sync_doc_metadata") > names.index("restart_docs_update")
+    # #3477: the CI doc-gate sweep must run LAST — it judges the tree every earlier step
+    # has finished writing, and in particular must see sync_doc_metadata's convergence.
+    assert names[-1] == "restart_verify_gates", "the doc-gate sweep must be the final sub-script"
+    assert names.index("restart_verify_gates") > names.index("sync_doc_metadata")
 
 
 # ── clear_predict_week_subject: the #1198 reset step ─────────────────────────
