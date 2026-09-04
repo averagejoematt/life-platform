@@ -20,7 +20,7 @@ valid** — this session was an owner-initiated re-anchor that arrived five days
 **Backlog:** filed #3478 from the Day-1 runlist. Now 1 actionable in the opus lane; **NO REMEDY IN THE CORPUS** — `backlog_next.py --refill-now --lane opus` found zero startable promotions and correctly refused the 11 startable stories outside the lane (promoting one turns the count green while adding nothing this session could start). Floor NOT lowered. Later sweep — no stale issues (31 open all satisfy the contract). Filed #3476, #3477
 **Alarms:** 1 flap cited — `ai-tokens-platform-daily-total` fired-and-cleared in the 72h window (#2912 detector); dated self-clearing entry added, prune on/after 2026-09-07. That flap *is* the defect #3474 closed
 **CI warnings:** none — the `LifePlatformMonitoring` dashboard-`Tags` warning is GONE. #3476 shipped and `check_ci_warnings.py` now exits 0 with no `--decoded`, which is the one acceptance box I said could not be confirmed tonight
-**Ledger:** compute-pipeline liveness heartbeat (#3473) + reset doc-gate sweep (#3477) rows added
+**Ledger:** compute-pipeline liveness heartbeat (#3473) + reset doc-gate sweep (#3477) rows added; the #3477 row then AMENDED for #3479 (its JS leg went from one file to the v4 gate's whole `node --test`)
 
 ---
 
