@@ -43,6 +43,36 @@ from web.site_api_common import (
     logger,
 )
 
+# #948/#3478 — the weight, its as-of anchor and the weigh-in COUNT travel together.
+# Nulling any subset of these serves an unattributable ghost: a weight with no
+# measurement date, or a count of measurements with no dates behind it. Two callers
+# need the same suppression (the pre-start countdown and the Day-1 synthetic
+# baseline), so the set lives here once rather than being restated per branch.
+_WEIGHT_ABSENT_FIELDS = (
+    "current_weight_lbs",
+    "lost_lbs",
+    "remaining_lbs",
+    "progress_pct",
+    "weekly_rate_lbs",
+    "weekly_rate_ci_low",
+    "weekly_rate_ci_high",
+    "projection_confidence",
+    "rate_provisional",
+    "weighin_span_days",
+    "projected_goal_date",
+    "projected_goal_date_earliest",
+    "projected_goal_date_latest",
+    "days_to_goal",
+    "last_weighin_date",
+)
+
+
+def _null_weight_block(journey: dict) -> None:
+    """Report the absence of a weigh-in as an absence (ADR-104), as ONE set."""
+    journey["weighin_count"] = 0
+    for _k in _WEIGHT_ABSENT_FIELDS:
+        journey[_k] = None
+
 
 def journey(*, _g) -> dict:
     """
@@ -65,6 +95,11 @@ def journey(*, _g) -> dict:
         [(w["sk"].replace("DATE#", ""), float(w["weight_lbs"])) for w in withings_all if w.get("weight_lbs")], key=lambda x: x[0]
     )
 
+    # #3478: the genesis baseline below is a CONSTANT, not a reading. Downstream it is
+    # indistinguishable from a weigh-in (it fills last_weighin_date and counts toward
+    # weighin_count), so the branch that mints it flags itself here.
+    weighin_synthetic = False
+
     if not weight_series:
         # G-4: Fall back to last known weight — never return 503 for missing recent data.
         withings_latest = _latest_item("withings")
@@ -75,6 +110,7 @@ def journey(*, _g) -> dict:
             weight_series = [
                 (EXPERIMENT_START, EXPERIMENT_BASELINE_WEIGHT_LBS)
             ]  # ADR-058: genesis baseline; only used when no Withings data exists
+            weighin_synthetic = True
 
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
@@ -86,9 +122,15 @@ def journey(*, _g) -> dict:
     try:
         _ah_start = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
         _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
-        if _lw["as_of"] and _lw["as_of"] > last_weighin_date:
+        # #3478: against a SYNTHETIC anchor the `>` test is wrong twice over — the
+        # anchor is the genesis date, so a real Day-1 weigh-in dated ON genesis
+        # compares equal and loses to a constant. Any in-cycle reading supersedes it.
+        if _lw["as_of"] and (_lw["as_of"] >= EXPERIMENT_START if weighin_synthetic else _lw["as_of"] > last_weighin_date):
             current_weight = _lw["weight_lbs"]
             last_weighin_date = _lw["as_of"]
+            if weighin_synthetic:
+                weight_series = [(_lw["as_of"], _lw["weight_lbs"])]
+                weighin_synthetic = False
     except Exception:
         pass
     # #1225 display policy: the reader sees weights rounded to ONE decimal, and every
@@ -154,6 +196,17 @@ def journey(*, _g) -> dict:
         "height_inches": _p.get("height_inches"),
     }
 
+    # #3478 — DAY 1, before the first weigh-in lands. The window above starts AT
+    # genesis (one day wide, empty) and the G-4 fallback cannot see the pre-genesis
+    # row (the reset re-phases it to `pilot`, hidden by ADR-058), so the synthetic
+    # baseline is served as though it were measured: last_weighin_date == the genesis
+    # date, weighin_count == 1. That is the same ghost #948 removed from the
+    # countdown one day earlier, and ADR-104 gives it the same answer — an absence is
+    # reported as absent. Self-heals the moment a real weigh-in lands, which is why
+    # it survived every prior cycle: it is reachable exactly once, always unattended.
+    if weighin_synthetic:
+        _null_weight_block(journey)
+
     # PRE-START (#931): a staged FUTURE genesis means there is no baseline yet —
     # Day 1's weigh-in creates it. The countdown fields go ON and every delta /
     # progress / projection claim comes OFF (ADR-104: "down X lbs" against a
@@ -163,28 +216,11 @@ def journey(*, _g) -> dict:
     journey["pre_start"] = bool(_pre)
     if _pre:
         journey.update(_pre)
-        for _k in (
-            # #948: the weight + its as-of anchor travel TOGETHER (the in-code
-            # contract above) — keeping a stale prior-cycle weigh-in while nulling
-            # last_weighin_date served an unattributable ghost weight during the
-            # countdown, and contradicted /api/vitals (which nulls weight_lbs).
-            "current_weight_lbs",
-            "lost_lbs",
-            "remaining_lbs",
-            "progress_pct",
-            "weekly_rate_lbs",
-            "weekly_rate_ci_low",
-            "weekly_rate_ci_high",
-            "projection_confidence",
-            "rate_provisional",
-            "weighin_span_days",
-            "projected_goal_date",
-            "projected_goal_date_earliest",
-            "projected_goal_date_latest",
-            "days_to_goal",
-            "last_weighin_date",
-        ):
-            journey[_k] = None
+        # #948: the weight + its as-of anchor travel TOGETHER — keeping a stale
+        # prior-cycle weigh-in while nulling last_weighin_date served an
+        # unattributable ghost weight during the countdown, and contradicted
+        # /api/vitals (which nulls weight_lbs).
+        _null_weight_block(journey)
 
     return _ok({"journey": journey}, cache_seconds=3600)
 
