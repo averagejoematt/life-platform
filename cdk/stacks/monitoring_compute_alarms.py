@@ -63,7 +63,7 @@ LT = cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD
 NB = cloudwatch.TreatMissingData.NOT_BREACHING
 
 
-def _problem_alarm(scope, digest, alarm_id, alarm_name, namespace, metric_name, dims=None):
+def _compute_problem_alarm(scope, digest, alarm_id, alarm_name, namespace, metric_name, dims=None):
     """The "≥1 problem today" half. Mirrors monitoring_stack's `_alarm(...,
     to_digest=True)` exactly: 86400s Maximum >= 1, NOT_BREACHING, digest topic.
     NB is deliberate — absence here is the heartbeat's question, not this alarm's."""
@@ -87,12 +87,15 @@ def _problem_alarm(scope, digest, alarm_id, alarm_name, namespace, metric_name, 
     return a
 
 
-def _heartbeat_alarm(scope, digest, alarm_id, alarm_name, namespace, metric_name, dims=None, days=2):
+def _compute_heartbeat_alarm(scope, digest, alarm_id, alarm_name, namespace, metric_name, dims=None, days=2):
     """The absence half (REL-01). Byte-for-byte the config of monitoring_stack's helper
     of the same name: SampleCount < 1 over `days` consecutive full days, BREACHING.
-    Named identically on purpose — tests/test_silent_failure_heartbeats.py asserts by
-    AST that every heartbeat is created through a `_heartbeat_alarm` call, so a
-    hand-rolled alarm that could silently be NOT_BREACHING cannot pass as one."""
+    The name is UNIQUE across cdk/stacks/*.py by contract: the #3314 routing tracer
+    resolves a helper by BARE NAME, so reusing `_heartbeat_alarm` here silently made
+    BOTH compute heartbeats unroutable (caught by test_stack_helper_names_are_unique).
+    It is registered in tests/test_silent_failure_heartbeats.py::_HEARTBEAT_FACTORIES,
+    which shape-asserts every registered factory is BREACHING and accepts any of them
+    as declaring a heartbeat — so a hand-rolled alarm still cannot pass as one."""
     a = cloudwatch.Alarm(
         scope,
         alarm_id,
@@ -126,7 +129,7 @@ def add_compute_alarms(scope, digest) -> None:
     # pre-computed artifacts it reads are stale. The freshness digest watches INGESTION
     # sources; nothing else watches the COMPUTE pipeline going stale behind the brief.
     # ══════════════════════════════════════════════════════════════
-    _problem_alarm(
+    _compute_problem_alarm(
         scope,
         digest,
         "ComputePipelineStale",
@@ -139,7 +142,7 @@ def add_compute_alarms(scope, digest) -> None:
     # heartbeat on the undimensioned metric would be satisfied by ANY source's emission
     # and so could not see computed_metrics going dark, which is the only thing it is
     # here to watch (guard the set you actually mean).
-    _heartbeat_alarm(
+    _compute_heartbeat_alarm(
         scope,
         digest,
         "ComputePipelineStaleHeartbeat",
@@ -157,7 +160,7 @@ def add_compute_alarms(scope, digest) -> None:
     # ≥1 missing compute output = digest alert the same morning; gauge absent 2 straight
     # days = the detector leg itself went dark. Digest — the brief still sends (with stale
     # data flagged), so this is a same-day fix item, not a page.
-    _problem_alarm(
+    _compute_problem_alarm(
         scope,
         digest,
         "ComputeOutputsMissing",
@@ -165,7 +168,7 @@ def add_compute_alarms(scope, digest) -> None:
         "LifePlatform/Pipeline",
         "ComputeOutputsMissing",
     )
-    _heartbeat_alarm(
+    _compute_heartbeat_alarm(
         scope,
         digest,
         "ComputeOutputsHeartbeat",

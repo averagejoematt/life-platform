@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 394** — feedback 22 · reference 218 · security 1 · project 150 · user 1 · index 2
+**Files in the memory index snapshot: 397** — feedback 22 · reference 220 · security 1 · project 151 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 241** — homed-here 58 · already-homed 162 · superseded 7 · narrative 12 · off-repo 2
+**Rule-class files (feedback + reference + security): 243** — homed-here 58 · already-homed 164 · superseded 7 · narrative 12 · off-repo 2
 
-**Program/session files (project): 150** — already-homed 14 · superseded 1 · narrative 132 · off-repo 2 · index 1
+**Program/session files (project): 151** — already-homed 14 · superseded 1 · narrative 133 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -217,6 +217,7 @@ project_session_q_2026_09_01.md
 project_session_r_2026_09_01.md
 project_session_s_2026_09_02.md
 project_session_t_2026_09_02.md
+project_session_u_2026_09_03.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -243,7 +244,9 @@ project_wrong_day_and_wrong_gauge_2026_08_18.md
 reference_a_check_after_truncation_launders_the_defect.md
 reference_a_check_that_measures_nothing_returns_clean.md
 reference_a_ci_gate_that_cannot_fail.md
+reference_a_ci_warning_that_no_action_can_clear.md
 reference_a_citation_string_is_not_an_owner.md
+reference_a_client_cap_below_the_callee_p50.md
 reference_a_correct_rule_with_a_narrow_denominator.md
 reference_a_dependency_missing_makes_a_gate_dark.md
 reference_a_derived_artifact_needs_its_lane.md
@@ -251,7 +254,6 @@ reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
-reference_a_client_cap_below_the_callee_p50.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
 reference_a_sweep_one_import_away.md
@@ -259,7 +261,6 @@ reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
 reference_absence_read_as_success.md
-reference_co_owned_record_reput_erases_merged_fields.md
 reference_absent_check_invisible_to_fail_filter.md
 reference_accuracy_gate_signed_metrics.md
 reference_adr099_score_inverts_priority.md
@@ -301,6 +302,7 @@ reference_cloudfront_404_cache_smoke.md
 reference_cloudfront_forwards_client_xff_unchanged.md
 reference_cloudwatch_alarm_week_cap.md
 reference_cloudwatch_query_form_errors_read_as_defects.md
+reference_co_owned_record_reput_erases_merged_fields.md
 reference_collect_only_lane_hides_infunction_imports.md
 reference_concurrent_prs_union_breach_size_gate.md
 reference_conflict_resolution_ate_a_return.md
@@ -343,6 +345,7 @@ reference_gate_prose_is_a_parsed_interface.md
 reference_gate_registration_before_deploy.md
 reference_gated_run_is_a_deploy_group_lease.md
 reference_genesis_week_present_none.md
+reference_gh_hosts_yml_write_race.md
 reference_gh_merge_takes_branch_not_integration_tree.md
 reference_gh_merge_worktree_branch_switch.md
 reference_gh_pr_checks_empty_is_not_green.md
@@ -350,7 +353,6 @@ reference_git_add_a_sweeps_concurrent_agent_edits.md
 reference_git_checkout_path_destroys_your_own_edit.md
 reference_git_stash_shared_across_worktrees.md
 reference_github_env_protection_private_flip.md
-reference_gh_hosts_yml_write_race.md
 reference_github_event_swallow_recovery.md
 reference_github_token_push_never_dispatches.md
 reference_gitleaks_push_only.md
@@ -418,6 +420,7 @@ reference_reject_a_gated_run_pinned_to_a_stale_sha.md
 reference_removing_a_confound_reveals_the_second_defect.md
 reference_reordering_sync_steps_changes_what_each_step_owns.md
 reference_rerun_reuses_the_original_merge_commit.md
+reference_reset_pipeline_exits_0_over_ci_doc_gates.md
 reference_reset_pipeline_owned_manifest_clobber.md
 reference_rollback_partial_fires_mixed_fleet.md
 reference_ruff_full_dir_set.md
