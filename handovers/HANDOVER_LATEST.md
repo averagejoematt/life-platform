@@ -297,12 +297,36 @@ JS fixtures **caught pre-commit**; MCP catalog **caught pre-commit and root-caus
 for Saturday (8 coaches, 2 hypotheses). Gates: rendered **96/96**, semantic **8/8**, truth
 **8 surfaces clean**, and the doc-gate sweep green.
 
+### Two more the re-anchor surfaced, AFTER the handover was first written
+
+**The engine-doc gate cannot be caught pre-commit.** `check_doc_index --strict` reds on
+`docs/engines/CHARACTER.md` the moment `config/character_sheet.json` is COMMITTED — it
+compares commit dates, so it is structurally invisible to the #3477 sweep, which runs
+against the working tree. It duly redded right after the re-anchor commit. Re-derived (2
+lines changed: `start_date` → 2026-09-05, `_meta.last_updated`; the weight did NOT move,
+only the date it anchors to) and the limitation is now recorded in the stamp itself so the
+next reset does not rediscover it.
+
+**#3479 — a fixture that redded main on a DATE, and the sweep running a subset of its
+gate.** `tests/js/coach_asof.test.mjs` pinned a hardcoded `2026-08-27` stamp and asserted
+the FRESH rendering; `weeklyAsOf` appends "— next refresh pending" past 8 days, so on
+2026-09-04, *exactly* 8 days later, it redded the v4 site gate on a commit that touched
+none of it. The sibling assertion one test above used the same stamp and survived only
+because its regex lacked a `$` anchor — **one case failed loudly and one passed wrongly
+off identical input, and the difference was an anchor character.**
+
+And the sweep did not catch it because its JS leg ran ONE file while the v4 site gate runs
+the whole `node --test`. That is #3477's own principle turned on #3477: **a check that
+executes a subset of another check can promise nothing about it.** Fixtures now derive from
+`Date.now()`; the sweep runs bare `node --test`; a guard pins it.
+
 ## Residual / next picks
 
 - **#3390** — Day-1 runlist for cycle 16, now run ON or AFTER **2026-09-05** (post-genesis by
   construction; `restart_verify.py`, the two reconcilers in order, the supersede reflex).
 - **#3478** — `/api/journey` reports a weigh-in that never happened on Day 1 of a cycle
-  (ADR-104). Filed from the Day-1 runlist; self-heals on the first weigh-in.
+  (ADR-104). Filed from the Day-1 runlist; self-heals on the first weigh-in. Confirmed
+  scoped to POST-genesis Day 1: the pre-start branch correctly nulls both fields today.
 - **#3390** — still open by design: the Day-1 weigh-in + supersede reflex, the attended
   prereg publish + stamp, and the cloud routine's own public-surface verdict. Its runlist
   is otherwise executed and recorded on the issue.
