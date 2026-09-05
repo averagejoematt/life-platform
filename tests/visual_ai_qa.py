@@ -432,15 +432,68 @@ def _image_blocks(path):
     return blocks
 
 
+# #3540 — the UNEVALUATED contract, this module's half. Until 2026-09-05 both
+# the no-JSON and the JSONDecodeError paths below returned
+# `{"severity": "ok", "renders_ok": True, ...}` and `assess_results` counted the
+# page in `evaluated` — so a judge that answered with prose, with nothing, or
+# with a reply cut off at max_tokens (`TruncatedResponses{visual-ai-qa}` Sum = 5
+# over 2026-08-21→09-05, live) certified the page as rendering fine. #2973 made
+# the EXCEPTION path a named FAIL; this is the same class one level in, on the
+# PARSE path.
+#
+# The field name and the three kinds are deliberately the SAME vocabulary
+# `operational/reader_truth_qa` uses, but they are declared here rather than
+# imported: this module reaches `lambdas/` only lazily (after `_import_bedrock()`
+# puts it on sys.path) and its own tests run with `operational` stubbed as a
+# bare namespace, so an import-time dependency would be a new failure mode in a
+# module whose whole point is not having one. The two parsers stay separate for
+# the same reason plus a real one — the verdict SCHEMAS differ (findings[]/basis/
+# rulings there, issues[]/renders_ok/charts_populated/template_gloss here), and
+# only the 3-line "find a JSON object or say why not" step is common.
+_UNEVALUATED_FIELD = "unevaluated"
+_KIND_NO_VERDICT = "no_verdict"
+_KIND_UNPARSEABLE = "unparseable"
+_KIND_TRUNCATED = "truncated"
+_UNEVALUATED_SUMMARY = {
+    _KIND_NO_VERDICT: "(no structured verdict)",
+    _KIND_UNPARSEABLE: "(unparseable verdict)",
+    _KIND_TRUNCATED: "(verdict truncated at max_tokens)",
+}
+
+
+def _unevaluated_verdict(kind, text):
+    """The verdict for a reply that carried no readable judgement (#3540).
+
+    `severity` is "unknown" — not "ok" and not "high": it is not a severity any
+    caller can gate or clear on, so a future branch that forgets the
+    `unevaluated` field falls out of both the FAIL and the PASS arms rather than
+    quietly joining one. `renders_ok` is False for the same reason: no one looked.
+    """
+    return {
+        "severity": "unknown",
+        "renders_ok": False,
+        "summary": _UNEVALUATED_SUMMARY[kind],
+        _UNEVALUATED_FIELD: kind,
+        "raw": (text or "")[:200],
+    }
+
+
 def _parse_verdict(text):
-    """Pull the JSON verdict out of Claude's reply, tolerating stray prose/fences."""
-    m = re.search(r"\{.*\}", text, re.DOTALL)
+    """Pull the JSON verdict out of Claude's reply, tolerating stray prose/fences.
+
+    A reply with no JSON object, or one json.loads rejects, comes back as an
+    explicit UNEVALUATED verdict (#3540) — never as a clean "renders_ok" pass.
+    """
+    m = re.search(r"\{.*\}", text or "", re.DOTALL)
     if not m:
-        return {"severity": "ok", "renders_ok": True, "summary": "(no structured verdict)", "raw": text[:200]}
+        return _unevaluated_verdict(_KIND_NO_VERDICT, text)
     try:
         v = json.loads(m.group(0))
     except json.JSONDecodeError:
-        return {"severity": "ok", "renders_ok": True, "summary": "(unparseable verdict)", "raw": text[:200]}
+        return _unevaluated_verdict(_KIND_UNPARSEABLE, text)
+    # No isinstance(v, dict) guard on purpose: the regex only yields a span that
+    # starts "{" and ends "}", so json.loads returns a dict or raises. A guard
+    # that cannot fire is exactly the class this issue is about.
     # #1466: the template-gloss lens is advisory BY CONSTRUCTION — if the model
     # (mis)files it inside issues[], strip it before severity ever computes, so the
     # lens can never flip a page to FAIL (prompt rules alone can't guarantee
@@ -498,6 +551,13 @@ def _assess_page(bedrock, name, path, shots):
     with _attributed(bedrock, "visual-ai-qa"):
         resp = bedrock.invoke(body, model_name=_VISION_MODEL)
     text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
+    # #3540: `stop_reason` outranks the parse result. A reply cut off at
+    # max_tokens is a partial judgement even in the rare case its prefix closes
+    # into valid JSON — the page was not fully assessed, so it is UNEVALUATED
+    # rather than "whatever the prefix happened to say". #2893 already meters
+    # this class at the bedrock chokepoint as a WARN; here it decides a gate.
+    if isinstance(resp, dict) and (resp.get("stop_reason") or "") == "max_tokens":
+        return _unevaluated_verdict(_KIND_TRUNCATED, text)
     return _parse_verdict(text)
 
 
@@ -596,6 +656,26 @@ def assess_results(results):
             r["status"] = "FAIL"
             unevaluated.append(r["page"])
             print(f"  ❌ {r['page']}: AI-vision could NOT evaluate this page — {msg}")
+            continue
+
+        # #3540: the judge answered with nothing readable. THE RULING FOR THIS
+        # CALLER IS FAIL — this pass gates the deploy pipeline on a `high`
+        # verdict, so "the judge did not answer" is a failure to evaluate, not a
+        # pass; the page joins #2973's existing UNEVALUATED bucket (out of
+        # `evaluated`, into the gating count, named in the summary line, red exit
+        # code) rather than being counted as looked-at. Note this is NOT the
+        # budget-pause path: a deliberate tier-3 pause is caught upfront and
+        # mid-run above and returns "skipped_by_budget", which stays a sanctioned
+        # skip and is never reddened by this branch.
+        unread = verdict.get(_UNEVALUATED_FIELD)
+        if unread:
+            msg = f"the judge returned no readable verdict ({unread}) — this page was NOT assessed"
+            r["ai_unevaluated"] = msg
+            r["ai_verdict"] = verdict  # kept for triage: carries `raw`, the first 200 chars of the reply
+            r.setdefault("issues", []).append(f"AI-vision UNEVALUATED (#3540): {msg}")
+            r["status"] = "FAIL"
+            unevaluated.append(r["page"])
+            print(f"  ❌ {r['page']}: AI-vision returned NO readable verdict ({unread}) — UNEVALUATED, not a pass")
             continue
 
         evaluated += 1
@@ -794,8 +874,55 @@ def assess_reader_truth(results, today_iso=None):
 
     truth_invoke = _attributed_invoke(bedrock, "reader-truth-qa")
     findings, errors = reader_truth_qa.assess_prose(surfaces, truth_invoke, today_iso=today_iso)
+
+    # ── #3540: batches the judge did not answer ──────────────────────────────
+    # THE RULING FOR THIS CALLER IS FAIL. This pass gates the deploy pipeline
+    # (a NEW high FAILs the page, the job's exit code reverts the site), so a
+    # batch whose verdict was unreadable — no JSON, unparseable JSON, or a reply
+    # cut off at max_tokens — is a failure to EVALUATE those surfaces, not
+    # evidence they are clean. Before this, `assess_prose` returned nothing at
+    # all for that batch and the surfaces in it printed like any other clean
+    # page. The nightly qa-smoke sibling rules WARN instead (see
+    # operational/qa_check_reader_truth: CONTENT_TRUTH, may not revert a deploy).
+    #
+    # A TRANSPORT error keeps its existing fail-soft ⚠ — it has always been in
+    # `errors` and has always been printed, so it is already visible, and its
+    # posture was adjudicated separately (#1440's Bedrock-outage rule). Widening
+    # that to gating is its own decision, not a side effect of this fix. It IS
+    # now counted in the coverage line below, which it was not before.
+    # `reader_truth_qa` is read through getattr with THIS module's own constants as
+    # the fallback: test_truth_baseline_audit's TestWire exercises assess_reader_truth
+    # with `operational` stubbed as a bare namespace, and the fallback keeps the guard
+    # LIVE under that stub instead of quietly inert (an absent attribute must not read
+    # as "nothing was unevaluated").
+    uneval_kinds = tuple(getattr(reader_truth_qa, "UNEVALUATED_KINDS", (_KIND_NO_VERDICT, _KIND_UNPARSEABLE, _KIND_TRUNCATED)))
+    unread = []
     for err in errors:
-        print(f"  ⚠ Reader-truth batch error (fail-soft): {err}")
+        if getattr(err, "kind", "transport") in uneval_kinds:
+            unread.append(err)
+            print(f"  ❌ Reader-truth batch UNEVALUATED (#3540, gating): {err}")
+        else:
+            print(f"  ⚠ Reader-truth batch error (fail-soft): {err}")
+    unread_pages = []
+    for err in unread:
+        for path in getattr(err, "paths", ()):
+            r = by_path.get(path)
+            if r is None:
+                continue
+            r["truth_unevaluated"] = str(err)
+            r.setdefault("issues", []).append(
+                f"Reader-truth UNEVALUATED (#3540): the judge returned no readable verdict "
+                f"({getattr(err, 'kind', 'unknown')}) for this surface's batch"
+            )
+            r["status"] = "FAIL"
+            unread_pages.append(r["page"])
+    n_batches = -(-len(surfaces) // max(1, getattr(reader_truth_qa, "DEFAULT_BATCH_SIZE", 5)))
+    line = f"  Reader-truth: {n_batches - len(errors)}/{n_batches} batch(es) judged over {len(surfaces)} surface(s)"
+    if unread:
+        line += f"; {len(unread)} UNEVALUATED → FAIL ({', '.join(unread_pages[:6]) or 'no matching page rows'})"
+    if len(errors) - len(unread):
+        line += f"; {len(errors) - len(unread)} transport error(s) (fail-soft)"
+    print(line)
 
     # The debt ledger (#2956): a high finding on a baselined (page, category)
     # is standing, triaged debt — surfaced every run with its issue ref, never
@@ -865,11 +992,14 @@ def assess_reader_truth(results, today_iso=None):
             + "; ".join(f"{p} ({', '.join(c)})" for p, c in sorted(shrink.items()))
         )
 
-    if not findings:
+    if not findings and not unread:
+        # #3540: "clean" is a claim about surfaces that were JUDGED. With an
+        # unevaluated batch in the run it is not available at any count of
+        # findings — the coverage line above is the honest statement instead.
         phase = reader_truth_qa.phase_context(today_iso)
         day = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
         print(f"  ✅ Reader-truth: {len(surfaces)} surfaces clean at {day}")
-    return {"status": "ok", "findings": len(findings)}
+    return {"status": "ok", "findings": len(findings), "unevaluated": len(unread), "batches": n_batches}
 
 
 if __name__ == "__main__":
