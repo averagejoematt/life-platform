@@ -676,6 +676,15 @@ def _write_step_summary(path, passed, failed, warns, results, reader_truth_statu
         lines.append(
             f"❌ **UNEVALUATED (#2973)** — the AI oracle never saw **{r['page']}** (`{r['path']}`): {str(r['ai_unevaluated'])[:160]}\n"
         )
+    # #3540: the same treatment for the reader-truth judge. Its unevaluated rows
+    # are FAILs (counted in `failed` above, red exit code), and they get their own
+    # named callout for the same reason #2973's do — the one surface reviewers
+    # actually read must never let "we could not judge this" pass as a result.
+    for r in [x for x in results if x.get("truth_unevaluated")]:
+        lines.append(
+            f"❌ **UNEVALUATED (#3540)** — the reader-truth judge returned no readable verdict for "
+            f"**{r['page']}** (`{r['path']}`): {str(r['truth_unevaluated'])[:160]}\n"
+        )
     # #1440/#1428: a budget-tier pause must render as its own line in the CI
     # summary — never silently absent, never indistinguishable from a clean run.
     if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
@@ -1647,6 +1656,14 @@ def run_sweep(
     for r in results:
         if r.get("ai_unevaluated"):
             print(f"  ❌ UNEVALUATED — the AI oracle never saw {r['page']} ({r['path']}): {str(r['ai_unevaluated'])[:120]}")
+        # #3540: the reader-truth judge's own unevaluated bucket. These rows are
+        # already FAIL (so they are inside `failed` and red the exit code); the
+        # line exists so the reason reads as "not judged", never as "judged and
+        # found wrong" — two different facts about a deploy.
+        if r.get("truth_unevaluated"):
+            print(
+                f"  ❌ UNEVALUATED — the reader-truth judge never answered for {r['page']} ({r['path']}): {str(r['truth_unevaluated'])[:120]}"
+            )
     # #1440/#1428: a budget-tier pause of an AI QA pass must read as its own
     # explicit state, never blend into "passed" — this is the one line a human
     # or a CI summary skim is guaranteed to see regardless of page-level warnings.
