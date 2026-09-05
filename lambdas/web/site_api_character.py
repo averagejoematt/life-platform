@@ -145,6 +145,12 @@ def character(date: str | None = None, *, _g) -> dict:
         "consistency": "🎯",
     }
 
+    # #3522: the reason copy for the zeroed sheet's held pillars. chWhy() prefers
+    # `not_instrumented_note` over its generic "no data source feeds this pillar"
+    # line, so the reader is told the true reason (no sheet yet) rather than a
+    # wrong one (no sensor).
+    _NO_SHEET_NOTE = "No sheet yet — this pillar has no measured day behind it. Scoring begins with the first full day of the experiment."
+
     def _zeroed_pre_experiment(as_of: str) -> dict:
         # The zeroed "experiment hasn't started" state. Used both when the experiment
         # hasn't begun AND — critically — when the phase filter (ADR-058) hides every
@@ -167,7 +173,31 @@ def character(date: str | None = None, *, _g) -> dict:
                     "pre_experiment": True,
                 },
                 "pillars": [
-                    {"name": p, "emoji": PILLAR_EMOJI.get(p, ""), "level": 1, "raw_score": 0, "tier": "Foundation", "xp_delta": 0}
+                    {
+                        "name": p,
+                        "emoji": PILLAR_EMOJI.get(p, ""),
+                        "level": 1,
+                        "raw_score": 0,
+                        "tier": "Foundation",
+                        "xp_delta": 0,
+                        # #3522 (ADR-104): the seven zeros above are NOT measurements —
+                        # no sheet exists yet, so nothing has been scored. Without these
+                        # flags the reader surfaces render them as data: seven "0/100 ·
+                        # 0 xp" rows, an all-zero radar polygon, and a "bottlenecks right
+                        # now" ranking of a 7-way tie at zero. The flags are the SAME
+                        # honest-absence vocabulary the engine emits on a real dark day
+                        # (#747 not_instrumented / ADR-134 coverage_hold), so every
+                        # renderer's existing held branch engages with no new placeholder:
+                        # zero components carried any value, which is exactly what
+                        # `not_instrumented` means (character_engine.py:1070-1078).
+                        "data_coverage": 0.0,
+                        "coverage_hold": True,
+                        "not_instrumented": True,
+                        "not_instrumented_note": _NO_SHEET_NOTE,
+                        "absent_behaviors": [],
+                        "xp_debt": 0.0,
+                        "score_delta": None,
+                    }
                     for p in PILLAR_ORDER
                 ],
                 **(_pre or {"pre_start": False}),

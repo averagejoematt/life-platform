@@ -968,6 +968,16 @@ export function pillarRingCpts(pillars, { size = 360, rimR = 0.46, labels = null
 export function radarChart(axes, { size = 320 } = {}) {
   const ax = (axes || []).filter((a) => a && a.label != null);
   if (ax.length < 3) return "";
+  // #3522 (ADR-104): an axis the engine flagged `not_instrumented` has NO measurement
+  // behind it — the engine's own 50.0 is "a mathematical placeholder, never a real
+  // reading; callers must not present it as one" (character_engine.py:1073-1077), and a
+  // zeroed pre-sheet payload is the same absence sitting at 0. pillarRing (#747) and
+  // pillarRingCpts already honour the flag; this axis renderer did not, so the seven
+  // unmeasured pillars of a fresh cycle drew a full all-zero polygon that read as a
+  // measurement. A held axis keeps its spoke and label — it is drawn as absent, not
+  // dropped — but never a vertex, a dot, or a number.
+  const held = (a) => !!a.not_instrumented;
+  const measured = ax.filter((a) => !held(a));
   const C = size / 2, R = size * 0.36, N = ax.length;
   const pt = (i, r) => {
     const a = (i / N) * 2 * Math.PI - Math.PI / 2;
@@ -983,21 +993,38 @@ export function radarChart(axes, { size = 320 } = {}) {
     spokes += `<line class="radar-grid" x1="${C}" y1="${C}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
     const [lx, ly] = pt(i, R + size * 0.075);
     labels += `<text class="radar-lbl" x="${lx.toFixed(1)}" y="${(ly + 3).toFixed(1)}" text-anchor="middle">${escAttr(a.label)}</text>`;
+    if (held(a)) return;  // #3522: no vertex, no dot — an unmeasured axis draws nothing
     const v = Math.max(0, Math.min(Number(a.value) || 0, 100));
     const [dx, dy] = pt(i, (R * v) / 100);
     const color = a.key ? `var(--pillar-${escAttr(String(a.key).toLowerCase())}, var(--ember))` : "var(--ember)";
     dots += `<circle class="radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.5" fill="${color}"/>`;
   });
-  const poly = ax.map((a, i) => pt(i, (R * Math.max(0, Math.min(Number(a.value) || 0, 100))) / 100).map((n) => n.toFixed(1)).join(",")).join(" ");
+  // #3522: the polygon spans only the MEASURED axes. Below three of them there is no
+  // shape to draw at all (two points are a line, one is a dot) — a fresh cycle with
+  // nothing measured yet renders the empty grid, which is the honest picture.
+  const poly = measured.length >= 3
+    ? ax.map((a, i) => (held(a) ? null : pt(i, (R * Math.max(0, Math.min(Number(a.value) || 0, 100))) / 100).map((n) => n.toFixed(1)).join(","))).filter(Boolean).join(" ")
+    : "";
   // Interactive readout (#583): one focus point per vertex (where the radar-dot sits) →
   // 2-D nearest (data-cpts-hit="xy"); label carries the axis + its 0–100 value.
   const cpts = ax.map((a, i) => {
+    // #3522: a held axis keeps a hover target so the readout can SAY it is unmeasured —
+    // parked out at the label ring, never inside the plot where it would read as a value
+    // (mirrors pillarRingCpts:904, which already refuses to quote the placeholder score).
+    if (held(a)) {
+      const [hx, hy] = pt(i, R + size * 0.075);
+      return { x: +(hx / size).toFixed(4), y: +(hy / size).toFixed(4), l: `${a.label}: not yet instrumented` };
+    }
     const v = Math.max(0, Math.min(Number(a.value) || 0, 100));
     const [dx, dy] = pt(i, (R * v) / 100);
     return { x: +(dx / size).toFixed(4), y: +(dy / size).toFixed(4), l: `${a.label}: ${Math.round(v)}` };
   });
-  return `<figure class="chart radar-chart"><svg viewBox="0 0 ${size} ${size}" role="img" aria-label="Pillar radar: ${escAttr(ax.map((a) => `${a.label} ${Math.round(a.value || 0)}`).join(", "))}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-hit="xy">` +
+  const heldN = ax.length - measured.length;
+  const cap = heldN
+    ? `<figcaption class="chart-cap label">${heldN} of ${ax.length} not yet measured — no point is plotted for ${heldN === 1 ? "it" : "them"}.</figcaption>`
+    : "";
+  return `<figure class="chart radar-chart"><svg viewBox="0 0 ${size} ${size}" role="img" aria-label="Pillar radar: ${escAttr(ax.map((a) => (held(a) ? `${a.label} not yet instrumented` : `${a.label} ${Math.round(a.value || 0)}`)).join(", "))}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-hit="xy">` +
     grid + spokes +
-    `<polygon class="radar-poly" points="${poly}"/>` +
-    dots + labels + `</svg></figure>`;
+    (poly ? `<polygon class="radar-poly" points="${poly}"/>` : "") +
+    dots + labels + `</svg>${cap}</figure>`;
 }

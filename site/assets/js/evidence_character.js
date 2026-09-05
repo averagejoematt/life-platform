@@ -134,6 +134,42 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
 /* ADR-104: each pillar carries its own honest "why" — engine-computed provenance
    (coverage holds, behaviors that didn't happen, what's dragging), never narrated. */
 
+/* #3522 (ADR-104) — "a zero that was never measured is not a zero; it is an absence."
+   ONE predicate for every character surface. True when the pillar carries no
+   measurement at all: either the engine's own `not_instrumented` (#747 — zero
+   weighted components had any value), or a coverage hold at literally 0% data,
+   which is the same state arriving from the zeroed pre-sheet payload
+   (site_api_character._zeroed_pre_experiment). A held pillar renders the existing
+   absence vocabulary — the "—" glyph and the `n/a` badge — never `0/100`, never a
+   bar, never a rank. Exported so tests/js can pin it and so no surface re-derives
+   its own version of the rule. */
+export function chUnmeasured(p) {
+  if (!p) return false;
+  if (p.not_instrumented) return true;
+  return !!p.coverage_hold && p.data_coverage != null && Number(p.data_coverage) === 0;
+}
+
+/* #3522 — "The bottlenecks right now: X and Y" is a RANKING, and a ranking needs
+   measured scores to rank. On a fresh cycle all seven pillars sat at an unmeasured 0,
+   so the sort returned a 7-way tie and the copy named whichever two happened to sort
+   first — a fabricated finding, printed as a finding, directly under the page's own
+   "a missing sensor reading doesn't [score zero]" sentence. Two conditions gate it
+   now, both deterministic (ADR-105): at least two pillars with a real measurement
+   behind them, and a real spread between the weakest and the strongest. Pure and
+   exported so the rule itself is testable, not just its rendered output. */
+export function chBottlenecks(pillars) {
+  const ranked = (pillars || []).filter((p) => !chUnmeasured(p)).slice().sort((a, b) => (Number(a.raw_score) || 0) - (Number(b.raw_score) || 0));
+  if (ranked.length < 2) return [];
+  if ((Number(ranked[0].raw_score) || 0) === (Number(ranked[ranked.length - 1].raw_score) || 0)) return [];
+  return ranked.slice(0, 2);
+}
+
+/* The honest replacement copy — says WHICH of the two conditions is missing. */
+export function chBottleneckNote(pillars) {
+  const measured = (pillars || []).filter((p) => !chUnmeasured(p)).length;
+  return `No bottleneck yet — ${measured < 2 ? "the pillars have no measured days behind them" : "every measured pillar is sitting at the same score"}, so there is nothing to rank. The weakest-pillar route appears once the scores separate.`;
+}
+
 export function chWhy(p) {
   const drv = p.drivers || {};
   const names = (a) => (a || []).map((n) => ttl(n)).join(", ");
@@ -141,7 +177,7 @@ export function chWhy(p) {
   // not-instrumented pillar is also, incidentally, coverage_hold (0% coverage
   // is below any leveling threshold). "Not yet instrumented" is the honest
   // reason; "levels frozen" would undersell it as a temporary data gap.
-  if (p.not_instrumented) {
+  if (chUnmeasured(p)) {
     return p.not_instrumented_note || "Not yet instrumented — no data source feeds this pillar yet.";
   }
   if (p.coverage_hold) {
@@ -170,7 +206,7 @@ export function chStatHtml(pillars, hist) {
     // #747: a pillar with zero real inputs renders a labeled state instead of
     // the placeholder neutral score — data-driven off the engine's own flag,
     // so this clears itself automatically the day a component gets real data.
-    const notInstrumented = !!p.not_instrumented;
+    const notInstrumented = chUnmeasured(p);  // #3522 — held-at-zero is the same absence
     // #913: the atrophy chip — same badge grammar as `held`, muted ember, so a
     // decaying pillar is visibly different from a frozen or healthy one.
     const atrophy = !notInstrumented && p.neglect_decay && p.neglect_decay.applied
@@ -201,7 +237,10 @@ export function chStatHtml(pillars, hist) {
       ${spark ? `<span class="ch-rspark">${spark}</span>` : ""}
     </div>${why ? `<p class="ch-rwhy">${esc(why)}</p>` : ""}`;
   }).join("");
-  const radar = radarChart(pillars.map((p) => ({ key: p.name, label: CH_ABBR[p.name] || p.name, value: p.raw_score })));
+  // #3522: the flag travels to the radar too — it used to be dropped here, so the
+  // one surface that could not see an absence drew it as a vertex at 0 (or at the
+  // engine's placeholder 50).
+  const radar = radarChart(pillars.map((p) => ({ key: p.name, label: CH_ABBR[p.name] || p.name, value: p.raw_score, not_instrumented: chUnmeasured(p) })));
   return sec("The seven pillars", `<div class="ch-statgrid"><div class="ch-rows">${rows}</div>${radar}</div>
     <p class="rd-why">Each pillar scores 0–100 nightly from its own real data (wearables, the food log, habits, labs), then an EMA smooths it and a streak gate decides level moves — one great day can't swing a level, and a level-up also needs the day itself to have been lived at that level. Behaviors that didn't happen score zero; a missing sensor reading doesn't. XP is the daily currency: strong days earn it, weak days bleed it.</p>`);
 }
@@ -330,7 +369,8 @@ export async function renderCharacter(d) {
     const xpNow = Math.max(0, Number(ch.xp_total) || 0) % perLvl;
     const gates = (lv.tier_streak_overrides || {})[tier] || { up: lv.level_up_streak_days, down: lv.level_down_streak_days };
     const tick = (n, cls) => `<span class="ch-ticks">${Array.from({ length: Math.max(0, Math.min(Number(n) || 0, 21)) }, () => `<i class="${cls}"></i>`).join("")}<b class="label">${esc(String(n))} days</b></span>`;
-    const bottlenecks = pillars.slice().sort((a, b) => (a.raw_score || 0) - (b.raw_score || 0)).slice(0, 2);
+    const bottlenecks = chBottlenecks(pillars);
+    const bottleneckHeld = !bottlenecks.length ? `<p class="rd-prose">${chBottleneckNote(pillars)}</p>` : "";
     const nextlvl = sec("What it takes — the next level", `
       <div class="ch-xpbar" role="img" aria-label="XP buffer: ${fmt(xpNow)} of ${perLvl}, shield at ${bufThr}">
         <i style="width:${Math.min(100, (xpNow / perLvl) * 100).toFixed(1)}%"></i>
@@ -342,14 +382,16 @@ export async function renderCharacter(d) {
         <div class="ch-gate"><span class="label">level down</span>${tick(gates.down, "dn")}</div>
       </div>
       <p class="rd-why">In ${esc(tier)}, a level-up takes <strong>${esc(String(gates.up))} sustained days</strong> above the line — but a level-down takes ${esc(String(gates.down))}. The asymmetry is deliberate: an "up" is earned, a "down" needs real decline, and a single day can never swing either.</p>
-      ${bottlenecks.length ? `<p class="rd-prose">The bottlenecks right now: ${bottlenecks.map((p) => `<strong>${esc(ttl(p.name))}</strong> (${fmt(p.raw_score)}/100 — a level here moves the character +${((weights[p.name] || 1 / 7) / wTotal).toFixed(2)} weighted)`).join(" and ")}. The fastest route to the next character level runs through the weakest pillar, not the strongest.</p>` : ""}`);
+      ${bottleneckHeld}${bottlenecks.length ? `<p class="rd-prose">The bottlenecks right now: ${bottlenecks.map((p) => `<strong>${esc(ttl(p.name))}</strong> (${fmt(p.raw_score)}/100 — a level here moves the character +${((weights[p.name] || 1 / 7) / wTotal).toFixed(2)} weighted)`).join(" and ")}. The fastest route to the next character level runs through the weakest pillar, not the strongest.</p>` : ""}`);
 
     /* 7 · The XP economy — the bands ladder, today's pillars placed on it. */
     const bands = (cfg.xp_bands || []).slice().sort((a, b) => (b.min_raw_score || 0) - (a.min_raw_score || 0));
     const bandRows = bands.map((b, i) => {
       const lo = Number(b.min_raw_score) || 0;
       const hi = i === 0 ? 100 : Number(bands[i - 1].min_raw_score);
-      const here = pillars.filter((p) => (p.raw_score || 0) >= lo && (p.raw_score || 0) < (i === 0 ? 101 : hi));
+      // #3522: an unmeasured pillar has no score to place — dropping it in the bottom
+      // band is the same 0-as-measurement claim the rows just stopped making.
+      const here = pillars.filter((p) => !chUnmeasured(p) && (p.raw_score || 0) >= lo && (p.raw_score || 0) < (i === 0 ? 101 : hi));
       return `<div class="ch-band${here.length ? " has-p" : ""}">
         <span class="ch-band-r label">${lo}–${i === 0 ? 100 : hi - 1}</span>
         <span class="ch-band-xp num ${Number(b.xp) > 0 ? "ch-dup" : Number(b.xp) < 0 ? "ch-ddn" : "ch-d0"}">${Number(b.xp) > 0 ? "+" : ""}${esc(String(b.xp))} xp/day</span>

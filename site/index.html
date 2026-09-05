@@ -122,7 +122,11 @@
           </svg>
           <!-- the hub: the page's ONE glow — the live day counter (binds dayNum, ticks daily) -->
           <div class="dial-center">
-            <span class="label">day</span>
+            <!-- #3524: the eyebrow is BOUND, not static. It shipped hard-coded as "day",
+                 so on launch eve the hub read DAY / 1 / DAY TO GO — the same three glyphs
+                 that mean Day 1 the following morning. story.js rewrites it in every
+                 branch (pre-start: "until day 1"; running: "day"). -->
+            <span class="label" data-bind="dayEyebrow">day</span>
             <span class="dc-num num" data-bind="dayNum" data-countup>··</span>
             <span class="label dc-sub" data-bind="dayCap">measured in public</span>
           </div>
@@ -288,9 +292,14 @@
     <section class="beat beat-numbers">
       <p class="beat-kicker label">where it started · where it is</p>
       <div class="numbers" data-bind="numbers">
+        <!-- #3524: ONE pre-JS shimmer glyph across all three figures. They shipped as
+             "··" / "···" / "··%", and because story.js only wrote `current` when a
+             weigh-in existed, the odd one out survived the render — a stat row reading
+             "— / ··· / —", which looks like a widget that failed to load rather than a
+             record that hasn't started. story.js now writes all three in every branch. -->
         <div class="figure"><span class="num big" data-bind="lost" data-countup>··</span><span class="figure-cap label">lbs down</span></div>
-        <div class="figure"><span class="num" data-bind="current">···</span><span class="figure-cap label">lbs today</span></div>
-        <div class="figure"><span class="num" data-bind="progress">··%</span><span class="figure-cap label">to goal</span></div>
+        <div class="figure"><span class="num" data-bind="current">··</span><span class="figure-cap label">lbs today</span></div>
+        <div class="figure"><span class="num" data-bind="progress">··</span><span class="figure-cap label">to goal</span></div>
       </div>
       <p class="beat-note" data-bind="projected"></p>
       <div data-bind="weightchart"></div>
