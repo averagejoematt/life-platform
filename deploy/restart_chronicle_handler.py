@@ -8,6 +8,13 @@ Per spec §7 + Matthew's D decision:
   - This script handles the S3 + frontend side:
       1. Move all chronicle HTML under blog/ to blog/archive/pilot/<key>
          (tombstone-overwrite original since IAM blocks DeleteObject)
+      1b. Journal permalinks (/journal/posts/week-NN/) — archive a pristine copy
+         under a CYCLE-KEYED prefix and inject an editor's-note archive banner in
+         place, so a prior cycle's article stays readable at its permalink and
+         reconciles its superseded numbers instead of asserting them as current
+         (#3512, deploy/journal_archive_notice.py). Deliberately NOT step 1's
+         copy-then-tombstone: that wrote raw JSON over a public URL, and its
+         constant archive prefix collided per-slug so it archived nothing.
       2. Rewrite chronicle index page(s) to show empty Day-1 state
       3. Re-date the PRELAUNCH_CALENDAR arc (chronicle entries untombstoned +
          re-dated to genesis − days_before; podcast entries reported here and
@@ -35,8 +42,13 @@ from botocore.exceptions import ClientError
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+# deploy/ itself, so the sibling import below resolves when this module is imported
+# rather than run as a script (curate_prelaunch_leadins, restart_media_reset do both).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lambdas.common.constants import EXPERIMENT_START_DATE
+import journal_archive_notice  # noqa: E402 — sibling deploy module (#3512), imported by leaf name like restart_media_reset does
+
+from lambdas.common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 
 REGION = "us-west-2"
 S3_BUCKET = "matthew-life-platform"
@@ -134,12 +146,18 @@ CHRONICLE_PREFIXES = [
     ("blog/", "blog/archive/pilot/", "blog/index.html"),
     ("dashboard/chronicle/posts/", "dashboard/chronicle/archive/pilot/posts/", "dashboard/chronicle/index.html"),
     ("site/chronicle/", "site/chronicle/archive/pilot/", "site/chronicle/index.html"),
-    # v4 article pages (wednesday_chronicle_lambda writes generated/journal/posts/
-    # week-NN/index.html, served at /journal/posts/week-NN/). Missed by the cycle-4
-    # reset — old week pages kept rendering at their public URLs even though the
-    # posts.json feed was tombstoned. No hub index lives under this prefix (the
-    # chronicle hub is site/story/chronicle/), so index_key is None.
-    ("generated/journal/posts/", "generated/journal/archive/pilot/posts/", None),
+    # NB the v4 article pages (generated/journal/posts/week-NN/index.html, served at
+    # /journal/posts/week-NN/) were a member of this list until #3512 and now have
+    # their OWN step — see step [1b] in main(). Two reasons they could not stay here:
+    # (a) this list's archive prefixes carry no cycle segment, so a reused week-NN
+    # slug collided with the 2026-07-10 cycle-4 archival — `archive_one` reported
+    # "already archived" and did nothing for every reset since July
+    # (`html_files_archived=0` in the 2026-09-04 report), leaving cycle 14/15
+    # articles live at their permalinks quoting superseded baselines; and (b) the
+    # tombstone-overwrite below writes raw JSON over a PUBLIC permalink, which is why
+    # week-00/06/minus-1 still serve `{"tombstone": true, ...}` at HTTP 200 today. A
+    # published article gets an editor's-note archive banner instead — the
+    # frozen-artifact reconciliation `weight_truth_qa` actually checks for.
 ]
 
 # ── Pre-launch content calendar (Matthew's rule, 2026-07-11) ─────────────────
@@ -513,20 +531,40 @@ def main():
             if did:
                 archived_count += 1
                 print(f"    {('would archive' if not args.apply else 'archived')}: {src} → {dest}")
-                # #1805: a freshly-tombstoned journal week-NN permalink must 301 at
-                # the edge — otherwise it serves its raw JSON tombstone marker at
-                # HTTP 200 (live orphans: #1803/#1804/#1805/#1806's #1805 case,
-                # week-04/05/06). Only the journal week-NN prefix has a public
-                # permalink shape worth redirecting.
-                if prefix == "generated/journal/posts/":
-                    m = re.search(r"week-(\d+)/index\.html$", src)
-                    if m:
-                        seq = int(m.group(1))
-                        added = register_permalink_redirect(f"/journal/posts/week-{seq:02d}/", "/story/journal/", args.apply)
-                        if added:
-                            print(f"      + redirects.map: /journal/posts/week-{seq:02d}/ → /story/journal/")
             else:
                 skipped_count += 1
+
+    # ── 1b. Journal permalinks: cycle-keyed archive + editor's-note banner (#3512) ──
+    #
+    # Deliberately NOT the copy-then-tombstone above. These are PUBLIC permalinks
+    # that readers reach from email, RSS caches and search long after the manifest
+    # stops listing them, and their prose quotes the closing cycle's baseline. The
+    # sanctioned reconciliation for a frozen artifact is an editor's note, not a
+    # rewrite and not a 301 that blackholes the prose (#3284's incident). The
+    # pristine copy goes to an archive prefix that CARRIES THE CYCLE, which is the
+    # dest-key collision fix: `archive/pilot/posts/week-NN/` was constant, so every
+    # reused slug collided with the 2026-07-10 archival and nothing archived.
+    #
+    # keep_slugs is EMPTY here on purpose: at this point in the reset every live week
+    # page belongs to the cycle that is closing (restart_leadin_pages.py re-renders
+    # the slugs the NEW cycle reuses immediately after this script). That is what
+    # makes the banner land by construction on every future reset rather than being a
+    # one-time repair.
+    print("\n[1b/3] Journal permalinks — cycle archive + archive notice (#3512):")
+    journal_stats = journal_archive_notice.sweep_journal_permalinks(
+        s3,
+        cycle=current_cycle,
+        genesis=EXPERIMENT_START_DATE,
+        baseline_lbs=float(EXPERIMENT_BASELINE_WEIGHT_LBS),
+        keep_slugs=frozenset(),
+        apply=args.apply,
+        now_iso=now_iso,
+    )
+    print(
+        f"  scanned={journal_stats['scanned']} archived={journal_stats['archived']} "
+        f"annotated={journal_stats['annotated']} already_current={journal_stats['already_current']} "
+        f"not_html={journal_stats['not_html']} no_anchor={journal_stats['no_anchor']}"
+    )
 
     # ── 2. Rewrite each index (prefixes with index_key=None have no hub page) ──
     print("\n[2/3] Rewriting chronicle index pages:")
@@ -583,6 +621,15 @@ def main():
         f"html_files_total       = {total_html}\n"
         f"html_files_archived    = {archived_count}\n"
         f"html_files_already_archived = {skipped_count}\n"
+        # #3512: the journal permalinks report SEPARATELY. Folding them into the
+        # counters above is how `html_files_archived=0` read as "nothing to do" for
+        # two months while three cycle-14/15 articles sat live at their permalinks.
+        f"journal_pages_scanned  = {journal_stats['scanned']}\n"
+        f"journal_pages_archived = {journal_stats['archived']}\n"
+        f"journal_notices_written = {journal_stats['annotated']}\n"
+        f"journal_notices_current = {journal_stats['already_current']}\n"
+        f"journal_pages_no_prose = {journal_stats['not_html']}\n"
+        f"journal_pages_no_anchor = {journal_stats['no_anchor']}\n"
         f"index_pages_rewritten  = {len(index_keys)}\n"
         f"chronicles_resurrected = {resurrected}\n"
     )
