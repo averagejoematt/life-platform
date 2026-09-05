@@ -87,10 +87,11 @@ def test_every_route_branch_lives_inside_the_single_dispatch_function():
     straight out and go unmeasured, which is exactly #2876's defect.
 
     `/api/healthz` is the one sanctioned, pre-existing exception: it is
-    handled before dispatch (no auth needed for a health check) and calls
-    `_emit_route_log(200)` itself, explicitly, right there — that's why it
-    was the ONE early-returning route the original issue found already
-    measured.
+    handled outside `_dispatch_route` and calls `_emit_route_log(200)` itself,
+    explicitly, right there — that's why it was the ONE early-returning route
+    the original issue found already measured. (#3561 moved it BELOW the SEC-04
+    origin gate; "outside the dispatch function" never meant "outside the gate",
+    though for eight months it happened to.)
     """
     start, end = _function_line_span("_dispatch_route")
     offenders = [ln for ln in _all_path_literal_branch_lines() if not (start <= ln <= end)]

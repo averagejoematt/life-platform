@@ -870,10 +870,14 @@ def _rate_limit_identity(event: dict) -> str:
 
 
 def _handle_ask(event: dict) -> dict:
-    """POST /api/ask — AI Q&A with health data context."""
-    _paused = _ai_paused_response()
-    if _paused:
-        return _paused
+    """POST /api/ask — AI Q&A with health data context.
+
+    #3560 ordering (the contract in `_req.hazard_gate`'s docstring, now true):
+    parse → hazard gate → budget pause → privacy filter → rate limit. Parsing the
+    body and classifying the question are pure, offline and $0, so a reader
+    describing an emergency reaches the resource copy whether or not they are out
+    of hourly questions and whether or not the month's AI budget is spent.
+    """
     source_ip = _rate_limit_identity(event)
     try:
         _body, _err = _req.json_object_body(event.get("body"))
@@ -882,6 +886,14 @@ def _handle_ask(event: dict) -> dict:
         question = _req.text_field(_body, "question")
         if len(question) < 5:
             return _error(400, "Question too short")
+
+        hazard_hit = _req.hazard_gate(question, "ask", "answer", CORS_HEADERS, extra={"remaining": 999})
+        if hazard_hit:
+            return hazard_hit
+
+        _paused = _ai_paused_response()
+        if _paused:
+            return _paused
 
         # Follow-up memory (2026-06-13): up to 3 prior Q/A pairs from the same
         # browser session become real conversation turns, so "what about REM?"
@@ -902,10 +914,6 @@ def _handle_ask(event: dict) -> dict:
             # reintroduce a blocked vice term as a fake prior assistant message.
             if q and a and _ask_question_safe(q)[0] and _ask_question_safe(a)[0]:
                 history.append((q, _scrub_blocked_terms(a)))
-
-        hazard_hit = _req.hazard_gate(question, "ask", "answer", CORS_HEADERS, extra={"remaining": 999})
-        if hazard_hit:
-            return hazard_hit
 
         # WR-40: Safety filter (privacy categories — a different question from the above)
         is_safe, safety_reason = _ask_question_safe(question)
@@ -1184,20 +1192,23 @@ def _handle_explain(event: dict) -> dict:
         return _error(500, "AI service error")
 
 
-def _handle_board_ask(event: dict) -> dict:
-    """POST /api/board_ask — board panel answers (up to the full 7-coach roster)."""
-    _paused = _ai_paused_response()
-    if _paused:
-        return _paused
-    source_ip = _rate_limit_identity(event)
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
-    # Phase 2.1: DDB-backed rate limit (was in-memory dict — didn't survive
-    # warm-container distribution).
-    #
-    # #1221 box 5: this charges ONE token, which covers the follow-up path (one
-    # Bedrock call) and the first persona of a panel. The REST of a panel's fan-out
-    # is charged after the persona list is resolved, below — the caller picks that
-    # list, so it cannot be priced here.
+def _board_rate_charge(ip_hash: str) -> dict | None:
+    """Charge ONE board_ask token for `ip_hash`; return the 429 response when the
+    hour is spent, else None.
+
+    Phase 2.1: DDB-backed rate limit (was in-memory dict — didn't survive
+    warm-container distribution).
+
+    #1221 box 5: this charges ONE token, which covers the follow-up path (one
+    Bedrock call) and the first persona of a panel. The REST of a panel's fan-out
+    is charged after the persona list is resolved by the caller — the caller picks
+    that list, so it cannot be priced here.
+
+    Extracted by #3560 so the opening turn and the follow-up turn charge the SAME
+    counter at the SAME point in their orders: after each door's hazard gate, never
+    before it. Both callers pass the same `endpoint="board_ask"`, so the hourly
+    budget is shared exactly as it was when the charge lived in the opening path.
+    """
     if _RATE_LIMITER_READY:
         _board_allowed, _board_remaining, _board_retry = _ddb_rate_check(
             table,
@@ -1214,40 +1225,70 @@ def _handle_board_ask(event: dict) -> dict:
                 "headers": {**CORS_HEADERS, "Retry-After": str(_board_retry or 3600)},
                 "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
             }
-    else:
-        now = int(time.time())
-        hour_ago = now - 3600
-        board_ts = [t for t in _board_rate_store.get(ip_hash, []) if t > hour_ago]
-        if len(board_ts) >= BOARD_RATE_LIMIT:
-            _emit_rate_limit_metric("board_ask")
-            return {
-                "statusCode": 429,
-                "headers": {**CORS_HEADERS, "Retry-After": "3600"},
-                "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
-            }
-        board_ts.append(now)
-        _board_rate_store[ip_hash] = board_ts[-20:]
+        return None
+    now = int(time.time())
+    hour_ago = now - 3600
+    board_ts = [t for t in _board_rate_store.get(ip_hash, []) if t > hour_ago]
+    if len(board_ts) >= BOARD_RATE_LIMIT:
+        _emit_rate_limit_metric("board_ask")
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+            "body": json.dumps({"error": "Rate limit reached. Try again in an hour."}),
+        }
+    board_ts.append(now)
+    _board_rate_store[ip_hash] = board_ts[-20:]
+    return None
+
+
+def _handle_board_ask(event: dict) -> dict:
+    """POST /api/board_ask — board panel answers (up to the full 7-coach roster).
+
+    #3560 ordering: parse → hazard gate → budget pause → rate limit → privacy
+    filter. Everything ahead of the hazard gate is pure and $0 (a JSON parse and a
+    length check), so an emergency described on the widest door is answered with
+    the resource copy at the 6th question of the hour and at budget tier 3 alike.
+    """
+    source_ip = _rate_limit_identity(event)
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
 
     body, _err = _req.json_object_body(event.get("body"))
     if body is None:
         return _error(400, _err or "Invalid JSON")
 
     # #546: a request carrying a session_token is a FOLLOW-UP — route it to the
-    # same coach with the thread's prior turns as context. The budget pause and
-    # the per-IP rate-limit token above already applied (a follow-up costs a
-    # Bedrock call too), so the follow-up path inherits both guards.
+    # same coach with the thread's prior turns as context. #3560 moved the pause
+    # and the rate-limit charge INTO that path (below its own hazard gate) rather
+    # than leaving them inherited from here, so the follow-up still pays exactly
+    # one token against the same `board_ask` counter — just not ahead of safety.
     if body.get("session_token"):
         return _handle_board_followup(body, ip_hash)
 
     question = _req.text_field(body, "question")
-    if len(question) < 5:
-        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
     # #3050: this OPENING turn had NO input filter pre-gate (WR-40 skipped it) — the
     # widest door: up to 12 Bedrock calls. History + why: _req.hazard_gate docstring.
     hazard_hit = _req.hazard_gate(question, "board_ask", "response", CORS_HEADERS)
     if hazard_hit:
         return hazard_hit
+
+    _paused = _ai_paused_response()
+    if _paused:
+        return _paused
+    _limited = _board_rate_charge(ip_hash)
+    if _limited:
+        return _limited
+
+    # The length rejection stays BELOW the token charge — #1439/#2828's
+    # charge-before-length-validation premise, which is what lets
+    # lambdas/operational/qa_check_edge_429.py observe a REAL edge 429 nightly for $0
+    # (a 2-char question burns a token and 400s, never reaching a model). #3560 moved
+    # the charge itself below the hazard gate; it deliberately did NOT move it below
+    # this validation, because that would silently turn the nightly enforcement probe
+    # into an all-400s RED that means nothing.
+    if len(question) < 5:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
+
     is_safe, safety_reason = _ask_question_safe(question)
     if not is_safe:
         return {
@@ -1380,6 +1421,15 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     hazard_hit = _req.hazard_gate(question, "board_followup", "response", CORS_HEADERS, extra={"persona": persona})
     if hazard_hit:
         return hazard_hit
+
+    # #3560: the two spend guards the opening path used to apply on this path's
+    # behalf, now applied HERE — after the hazard gate, before anything that costs.
+    _paused = _ai_paused_response()
+    if _paused:
+        return _paused
+    _limited = _board_rate_charge(ip_hash)
+    if _limited:
+        return _limited
 
     # WR-40 safety filter on the follow-up (the new untrusted input surface).
     is_safe, safety_reason = _ask_question_safe(question)

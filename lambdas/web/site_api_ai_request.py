@@ -70,9 +70,19 @@ def hazard_gate(
     is to pay for new lines out of a sibling. ONE deliberate ordering rule for
     callers, pinned by tests/test_safety_contract_3050.py: this gate runs BEFORE the
     WR-40 privacy filter (a question can be both a hazard and a privacy hit — the
-    hazard response must win) and BEFORE the rate limit (a person describing an
-    emergency must not be rate-limited into silence; this path is $0 and makes no
-    model call).
+    hazard response must win), BEFORE the rate limit (a person describing an
+    emergency must not be rate-limited into silence) and BEFORE the budget pause
+    (tier 3 must not answer "the AI is paused" to someone describing chest pain).
+    All three are safe to defer because this path is $0: a pure, offline regex
+    classification that makes no model call and no AWS call.
+
+    #3560: for eight weeks that sentence was true only of /api/ask. `board_ask`
+    charged its DDB rate token and every door served the tier-3 pause AHEAD of this
+    gate, and the ordering test compared the gate only against the privacy filter —
+    so a hazard question that was the reader's 6th of the hour got a 429, and at
+    tier 3 every door served the pause copy. The order is now asserted against the
+    pause and the limiter too (`test_the_hazard_check_precedes_every_spend_gate`),
+    against a synthetic wrong-ordered door as the checker's own positive control.
 
     ``response_key`` matches each door's existing payload shape ("answer" for
     /api/ask, "response" for the board doors); ``extra`` carries door-specific

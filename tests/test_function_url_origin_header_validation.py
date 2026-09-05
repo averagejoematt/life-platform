@@ -30,8 +30,14 @@ Run: python3 -m pytest tests/test_function_url_origin_header_validation.py -v
 v1.0.0 — 2026-03-21 (SEC-04)
 v1.1.0 — 2026-07-08 (#815): site-api-ai source-grep coverage + CDK wiring note.
 v1.2.0 — 2026-07-08 (#885): email-subscriber behavioral coverage.
+v1.3.0 — 2026-09-05 (#3561): /api/healthz answered ABOVE the gate — the guard below
+         pinned ONE route name (`_dispatch_route`) instead of the handler's early-return
+         SET, so the one route that returned before dispatch was invisible to it. Adds
+         the behavioural healthz case and two structural rules over `lambda_handler`:
+         no data-plane call above the gate, and no unregistered early return above it.
 """
 
+import ast
 import importlib
 import os
 import re
@@ -195,6 +201,169 @@ class TestOriginHeaderValidationEnabled:
 
         body = json.loads(resp["body"])
         assert "error" in body or "message" in body or body  # any non-empty JSON
+
+
+# ── /api/healthz (#3561) — the one route that returned before the gate ───────────
+
+
+class TestHealthzSitsBelowTheOriginGate:
+    """#3561. `/api/healthz` was answered above the SEC-04 block, so a direct hit on
+    the committed Function URL (auth_type NONE — the invocation itself cannot be
+    stopped in-handler) bought a DynamoDB `get_item`, an S3 `get_object` and a version
+    string, while every other route on the same function 403'd.
+
+    The health check's consumers all arrive through CloudFront and therefore carry the
+    header (`deploy/deploy_convergence.py` polls `{site}/api/healthz` for
+    `checks.lambda_warm`; the smoke suite fetches the site domain), so the
+    correct-header case below is the one that has to keep working.
+    """
+
+    SECRET = "test-cf-origin-secret-healthz-3561"
+
+    def _healthz(self, mod, headers):
+        return mod.lambda_handler(_make_event("/api/healthz", "GET", headers), None)
+
+    def test_direct_function_url_hit_is_rejected(self):
+        mod = _load_site_api(origin_secret=self.SECRET)
+        resp = self._healthz(mod, {})
+        assert resp["statusCode"] == 403, "healthz must not answer a request that bypassed CloudFront"
+
+    def test_direct_hit_discloses_nothing(self):
+        """Not merely a non-200: the version string and the freshness timestamp that
+        made this a disclosure must be absent from the body."""
+        mod = _load_site_api(origin_secret=self.SECRET)
+        body = self._healthz(mod, {})["body"]
+        assert "version" not in body and "last_daily_refresh" not in body, body
+
+    def test_wrong_header_value_rejected(self):
+        mod = _load_site_api(origin_secret=self.SECRET)
+        assert self._healthz(mod, {"x-amj-origin": "wrong-value"})["statusCode"] == 403
+
+    def test_via_cloudfront_still_answers(self):
+        """The consumer that matters: the convergence gate and the smoke suite."""
+        mod = _load_site_api(origin_secret=self.SECRET)
+        resp = self._healthz(mod, {"x-amj-origin": self.SECRET})
+        assert resp["statusCode"] == 200
+        import json as _json
+
+        assert "lambda_warm" in _json.loads(resp["body"])["checks"]
+
+    def test_fail_open_when_secret_unset(self):
+        """Same deploy-ordering contract every other route has — code may ship before
+        CloudFront injects the header."""
+        mod = _load_site_api(origin_secret="")
+        assert self._healthz(mod, {})["statusCode"] == 200
+
+
+# ── the structural rules (#3561): guard the SET of early returns, not one route ───
+
+_SITE_API_SRC_PATH = os.path.join(ROOT, "lambdas", "web", "site_api_lambda.py")
+with open(_SITE_API_SRC_PATH, encoding="utf-8") as _f:
+    _SITE_API_SRC = _f.read()
+
+
+def _handler_and_gate_index(src: str = None):
+    """`lambda_handler`'s node plus the index of the SEC-04 statement in its body."""
+    src = src if src is not None else _SITE_API_SRC
+    tree = ast.parse(src)
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "lambda_handler")
+    for i, st in enumerate(fn.body):
+        if isinstance(st, ast.If) and isinstance(st.test, ast.Name) and st.test.id == "SITE_API_ORIGIN_SECRET":
+            return fn, i
+    raise AssertionError("the SEC-04 block is no longer a top-level `if SITE_API_ORIGIN_SECRET:` in lambda_handler")
+
+
+def _walk_skipping_nested_functions(stmt):
+    """Every node under `stmt` EXCEPT the bodies of nested function definitions —
+    `lambda_handler` defines `_emit_route_log` inline, and its statements run only
+    when it is called, not at the point of definition."""
+    stack = [stmt]
+    while stack:
+        node = stack.pop()
+        yield node
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                continue
+            stack.append(child)
+
+
+#: Calls that reach DynamoDB or S3. Matched on the ATTRIBUTE name, so a rename of the
+#: `table` / `s3_client` binding cannot smuggle one past this rule.
+_DATA_PLANE_CALLS = {"get_item", "put_item", "update_item", "delete_item", "query", "scan", "batch_get_item", "get_object", "put_object"}
+
+#: Early returns sanctioned ABOVE the gate, each with the reason it is safe there.
+#: Both are static refusals: no data-plane call, no platform state in the body.
+_SANCTIONED_PRE_GATE_RETURNS = {
+    # CloudFront does not send the custom origin header on its own OPTIONS passthrough.
+    "OPTIONS preflight": lambda st: isinstance(st, ast.If) and all(t in ast.unparse(st.test) for t in ("method ==", "OPTIONS")),
+    # Phase 2.2 request-envelope validation — a 400 for an oversized/malformed request.
+    "request-envelope rejection": lambda st: isinstance(st, ast.Try) and "validate_envelope" in ast.unparse(st),
+}
+
+
+def test_no_data_plane_call_precedes_the_origin_gate():
+    """#3561's Outcome, structurally: no route on this Lambda performs a DynamoDB or S3
+    call for a request that did not come through CloudFront."""
+    fn, gate_i = _handler_and_gate_index()
+    offenders = []
+    for st in fn.body[:gate_i]:
+        for node in _walk_skipping_nested_functions(st):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _DATA_PLANE_CALLS:
+                offenders.append(f"{node.func.attr}() at line {node.lineno}")
+    assert not offenders, "data-plane call(s) run above the SEC-04 origin gate: " + ", ".join(offenders)
+
+
+def test_only_registered_early_returns_precede_the_origin_gate():
+    """The guard #3561 wanted: the SET of early returns, not the one route name the
+    previous ordering test happened to compare against."""
+    fn, gate_i = _handler_and_gate_index()
+    offenders = []
+    for st in fn.body[:gate_i]:
+        returns = [n for n in _walk_skipping_nested_functions(st) if isinstance(n, ast.Return)]
+        if not returns:
+            continue
+        if not any(pred(st) for pred in _SANCTIONED_PRE_GATE_RETURNS.values()):
+            offenders.append(f"line {st.lineno}: {ast.unparse(st).splitlines()[0]}")
+    assert not offenders, (
+        "unregistered early return(s) above the SEC-04 gate — a request that bypassed "
+        f"CloudFront gets an answer from them: {offenders}. Sanctioned: {sorted(_SANCTIONED_PRE_GATE_RETURNS)}"
+    )
+
+
+def test_the_pre_gate_rules_are_not_vacuous():
+    """Positive control for both rules above. Each must FAIL on a handler that
+    reintroduces the defect, and PASS on one that does not — a rule whose failing case
+    has never been demonstrated is not evidence."""
+    good = (
+        "def lambda_handler(event, context):\n"
+        "    if method == 'OPTIONS':\n        return {'statusCode': 200}\n"
+        "    if SITE_API_ORIGIN_SECRET:\n        return _error(403, 'Forbidden')\n"
+        "    if path == '/api/healthz':\n        table.get_item(Key={})\n        return {'statusCode': 200}\n"
+    )
+    fn, gate_i = _handler_and_gate_index(good)
+    assert gate_i == 1
+
+    bad = (
+        "def lambda_handler(event, context):\n"
+        "    if path == '/api/healthz':\n        table.get_item(Key={})\n        return {'statusCode': 200}\n"
+        "    if SITE_API_ORIGIN_SECRET:\n        return _error(403, 'Forbidden')\n"
+    )
+    fn, gate_i = _handler_and_gate_index(bad)
+    pre = fn.body[:gate_i]
+    dp = [
+        n
+        for st in pre
+        for n in _walk_skipping_nested_functions(st)
+        if isinstance(n, ast.Call) and getattr(n.func, "attr", "") in _DATA_PLANE_CALLS
+    ]
+    assert dp, "the data-plane rule would not have caught the #3561 defect"
+    unregistered = [
+        st
+        for st in pre
+        if any(isinstance(n, ast.Return) for n in _walk_skipping_nested_functions(st))
+        and not any(pred(st) for pred in _SANCTIONED_PRE_GATE_RETURNS.values())
+    ]
+    assert unregistered, "the early-return rule would not have caught the #3561 defect"
 
 
 # ── site-api-ai (#815) — source-grep style, matches test_ai_endpoint_hardening.py ──

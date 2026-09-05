@@ -122,9 +122,11 @@ def _extract_inline_paths(tree: ast.AST) -> dict[str, EndpointRecord]:
     now lives in `_dispatch_route`, the one function `lambda_handler` calls to
     resolve a route (see lambdas/web/site_api_lambda.py's `_dispatch_route`
     docstring). `/api/healthz` is the one branch that stayed in
-    `lambda_handler` itself (handled before dispatch, no auth needed) — so
-    both functions are walked and merged, keeping this discoverer correct
-    regardless of which of the two a future inline branch lands in.
+    `lambda_handler` itself (it emits its own route metric) — since #3561 it sits
+    BELOW the SEC-04 origin gate like every other route, so "handled outside
+    `_dispatch_route`" no longer means "answered without the gate". Both functions
+    are walked and merged, keeping this discoverer correct regardless of which of
+    the two a future inline branch lands in.
     """
     fns = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name in ("lambda_handler", "_dispatch_route")]
     if not fns:

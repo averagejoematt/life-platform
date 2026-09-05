@@ -14,24 +14,41 @@
       ]
     },
     {
-      "Sid": "Diagnose",
+      "Sid": "DiagnoseAccountLevel",
       "Effect": "Allow",
       "Action": [
-        "logs:FilterLogEvents",
-        "logs:GetLogEvents",
         "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
         "cloudwatch:DescribeAlarms",
         "cloudwatch:DescribeAlarmHistory",
         "cloudwatch:GetMetricData",
         "cloudwatch:GetMetricStatistics",
         "cloudwatch:ListMetrics",
-        "lambda:GetFunction",
-        "lambda:GetFunctionConfiguration",
         "lambda:ListFunctions",
         "ec2:DescribeRegions"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "DiagnoseLogRead",
+      "Effect": "Allow",
+      "Action": [
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:205930651321:log-group:/aws/lambda/*",
+        "arn:aws:logs:*:205930651321:log-group:/aws/apigateway/*"
+      ]
+    },
+    {
+      "Sid": "DiagnoseLambdaConfig",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration"
+      ],
+      "Resource": "arn:aws:lambda:*:205930651321:function:*"
     },
     {
       "Sid": "AiCostTelemetry",
@@ -50,10 +67,15 @@
       "Action": [
         "cloudformation:DetectStackDrift",
         "cloudformation:DetectStackResourceDrift",
-        "cloudformation:DescribeStackDriftDetectionStatus",
         "cloudformation:DescribeStackResourceDrifts",
         "cloudformation:ListStackResources"
       ],
+      "Resource": "arn:aws:cloudformation:*:205930651321:stack/LifePlatform*/*"
+    },
+    {
+      "Sid": "DriftSentinelDetectionStatus",
+      "Effect": "Allow",
+      "Action": "cloudformation:DescribeStackDriftDetectionStatus",
       "Resource": "*"
     },
     {
@@ -115,13 +137,16 @@
       "Resource": "arn:aws:s3:::matthew-life-platform"
     },
     {
-      "Sid": "EventBridgeRulesRead",
+      "Sid": "EventBridgeRulesList",
       "Effect": "Allow",
-      "Action": [
-        "events:ListRules",
-        "events:ListTargetsByRule"
-      ],
+      "Action": "events:ListRules",
       "Resource": "*"
+    },
+    {
+      "Sid": "EventBridgeRuleTargetsRead",
+      "Effect": "Allow",
+      "Action": "events:ListTargetsByRule",
+      "Resource": "arn:aws:events:*:205930651321:rule/*"
     },
     {
       "Sid": "RawReplicaDestinationRead",
@@ -181,7 +206,12 @@
         "ses:SendEmail",
         "sesv2:SendEmail"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:ses:us-west-2:205930651321:identity/mattsusername.com",
+      "Condition": {
+        "StringEquals": {
+          "ses:FromAddress": "awsdev@mattsusername.com"
+        }
+      }
     },
     {
       "Sid": "SecretsDescribe",

@@ -461,8 +461,16 @@ def test_remediation_role_declares_the_region_enumeration_grant_in_the_one_canon
     the copy that ran, and it put a stale document live on 2026-08-30). The script now
     applies the JSON verbatim via file://, so it must NOT carry the grant literal itself."""
     canonical = json.loads((ROOT / "infra" / "iam" / "github-actions-remediation-role.permissions.json").read_text())
-    diag = [s for s in canonical["Statement"] if s.get("Sid") == "Diagnose"][0]
-    assert slr.REGION_ENUMERATION_GRANT in diag["Action"]
+    # Derived, not Sid-pinned: #3562 split the old `Diagnose` statement into an
+    # account-level half and two resource-scoped ones, and a test that named the Sid
+    # broke on a rename while proving nothing about the grant. The property is that the
+    # grant is declared EXACTLY ONCE in this document, wherever it sits.
+    holders = [
+        st
+        for st in canonical["Statement"]
+        if slr.REGION_ENUMERATION_GRANT in (st["Action"] if isinstance(st["Action"], list) else [st["Action"]])
+    ]
+    assert len(holders) == 1, f"{slr.REGION_ENUMERATION_GRANT} must be declared once, found {len(holders)}"
     sh = (ROOT / "deploy" / "setup_remediation_role.sh").read_text(encoding="utf-8")
     assert "github-actions-remediation-role.permissions.json" in sh, "setup_remediation_role.sh must apply the canonical JSON by name"
     assert f'"{slr.REGION_ENUMERATION_GRANT}"' not in sh, "setup_remediation_role.sh must not carry a second copy of the grant (#3336)"

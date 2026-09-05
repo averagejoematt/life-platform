@@ -618,6 +618,89 @@ def test_live_oidc_role_grants_cover_the_derived_consumer_set():
     )
 
 
+#: Permissions documents edited in the repo whose out-of-band `put-role-policy` has not
+#: run yet. SHRINK-ONLY, exactly like `_PENDING_LIVE_APPLY`: the test below reds when an
+#: entry's apply HAS landed, so the queue cannot become a graveyard. The driver deletes
+#: the entry in the same commit as the apply.
+_PENDING_PERMISSIONS_APPLY: dict[str, str] = {
+    "github-actions-remediation-role": (
+        "2026-09-05 (#3562): SES scoped to the one identity + a ses:FromAddress condition, "
+        "logs:GetLogEvents/FilterLogEvents scoped to the /aws/lambda + /aws/apigateway log groups, "
+        "cloudformation drift scoped to the LifePlatform* stacks, events:ListTargetsByRule to rule/*. "
+        "Apply: aws iam put-role-policy --role-name github-actions-remediation-role "
+        "--policy-name remediation-permissions --policy-document "
+        "file://infra/iam/github-actions-remediation-role.permissions.json"
+    ),
+}
+
+
+@pytest.mark.integration
+@require_ci_sweep
+def test_live_oidc_permissions_documents_equal_the_checked_in_ones():
+    """#3562: statement-set parity, live vs declared, for every governed identity.
+
+    The sibling above asks "does the LIVE policy cover what the code reaches"; this one
+    asks the narrower, blunter question the 2026-08-30 twin incident turned on — is the
+    live document THE checked-in document. It reuses the shipping verifier's own
+    canonicaliser and role→policy-name map rather than restating either
+    (`deploy/verify_oidc_iam.py`, which is also the driver's `--strict` gate).
+
+    Read-only (`iam:GetRolePolicy`), and a LOUD skip without credentials.
+    """
+    if os.environ.get("SKIP_AWS_TESTS"):
+        pytest.skip("SKIP_AWS_TESTS set — LIVE permissions-document parity NOT checked this run")
+    if not _has_aws():
+        pytest.skip("no AWS credentials — LIVE permissions-document parity NOT checked this run (offline lane)")
+
+    import boto3
+
+    sys.path.insert(0, os.path.join(REPO, "deploy"))
+    import verify_oidc_iam  # noqa: PLC0415 — one canonicaliser, one role→policy-name map
+
+    iam = boto3.client("iam")
+    drifted, landed, checked = [], [], 0
+    for role, spec in verify_oidc_iam.ROLES.items():
+        try:
+            live = iam.get_role_policy(RoleName=role, PolicyName=spec["inline_policy_name"])["PolicyDocument"]
+        except Exception as e:  # NoSuchEntity: staged-not-applied, already a verify_oidc_iam finding
+            if "NoSuchEntity" not in type(e).__name__ and "NoSuchEntity" not in str(e):
+                raise
+            continue
+        checked += 1
+        declared = json.loads(open(os.path.join(REPO, "infra", "iam", spec["permissions_file"]), encoding="utf-8").read())
+        same = verify_oidc_iam.canon(declared) == verify_oidc_iam.canon(live)
+        if role in _PENDING_PERMISSIONS_APPLY:
+            if same:
+                landed.append(role)
+        elif not same:
+            drifted.append(role)
+
+    assert checked, "no governed role was read live — the role map broke, not the account"
+    assert not drifted, (
+        "LIVE inline policy != infra/iam/<role>.permissions.json for: "
+        + ", ".join(drifted)
+        + ". Run `python3 deploy/verify_oidc_iam.py` for the statement-level diff; apply the JSON "
+        "with `aws iam put-role-policy --policy-document file://…`, never a hand-written twin (#3336)."
+    )
+    assert not landed, (
+        "These _PENDING_PERMISSIONS_APPLY entries now match live — the apply ran. Delete them so the "
+        "queue stays a queue (#2824): " + ", ".join(landed)
+    )
+
+
+def test_the_pending_permissions_queue_names_only_governed_roles():
+    """Non-vacuity + anti-typo: a misspelled role name would silence the parity check for
+    a role that is actually drifting, and nobody would ever see it."""
+    sys.path.insert(0, os.path.join(REPO, "deploy"))
+    import verify_oidc_iam  # noqa: PLC0415
+
+    unknown = sorted(set(_PENDING_PERMISSIONS_APPLY) - set(verify_oidc_iam.ROLES))
+    assert not unknown, f"_PENDING_PERMISSIONS_APPLY names roles the verifier does not own: {unknown}"
+    for role, reason in _PENDING_PERMISSIONS_APPLY.items():
+        assert re.match(r"^\d{4}-\d{2}-\d{2} \(#\d+\): \S", reason), f"{role}: needs a dated `YYYY-MM-DD (#issue): reason`"
+        assert "put-role-policy" in reason and "file://" in reason, f"{role}: record the exact apply command in the entry"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # G. Mutation proofs — the gate must red in BOTH directions
 # ══════════════════════════════════════════════════════════════════════════════
