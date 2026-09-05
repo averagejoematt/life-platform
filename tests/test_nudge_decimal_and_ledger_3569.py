@@ -49,6 +49,7 @@ sys.path.insert(0, os.path.join(_REPO, "tests"))
 import emails.coach_nudge_lambda as shell  # noqa: E402
 from boto3.dynamodb.types import TypeSerializer  # noqa: E402
 from coach import coach_nudge_engine as eng  # noqa: E402
+from common.pacific_time import PACIFIC  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 from operational import nudge_ledger_qa as dead_man  # noqa: E402
 
@@ -293,7 +294,11 @@ def test_the_reservation_now_carries_a_timestamp(monkeypatch):
 # 4. The dead-man
 # ══════════════════════════════════════════════════════════════════════════════
 
-NOW = datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
+# The as-of instant handed to the dead-man. NOT a claim about the wall clock:
+# the check takes its clock as an argument (`pt_now`), and `_day()` derives every
+# fixture date from this same constant, so fixture and check cannot desync at a
+# midnight (#2376). Pacific, because a `DAY#` sk names a Pacific day.
+AS_OF = datetime(2026, 9, 4, 12, 0, tzinfo=PACIFIC)
 
 
 class _Check:
@@ -333,8 +338,12 @@ class _LedgerTable:
         return {"Item": item} if item else {}
 
 
+def _iso_z(dt):
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _day(offset_days):
-    return (NOW.date() - timedelta(days=offset_days)).isoformat()
+    return (AS_OF.date() - timedelta(days=offset_days)).isoformat()
 
 
 def _row(offset_days, status, **over):
@@ -351,7 +360,7 @@ def _row(offset_days, status, **over):
 
 
 def _run(table):
-    (check,) = dead_man.check_nudge_ledger_liveness(table, _Check, "content_truth", now_utc=NOW)
+    (check,) = dead_man.check_nudge_ledger_liveness(table, _Check, "content_truth", lambda: AS_OF)
     return check
 
 
@@ -419,7 +428,7 @@ def test_dead_man_is_green_on_a_healthy_pair():
 def test_dead_man_does_not_red_a_reservation_that_is_still_young():
     """A run in flight is not a fault: `attempting` inside the stuck window is
     the normal state for the seconds a nudge takes."""
-    fresh = _row(0, eng.STATUS_ATTEMPTING, attempted_at="2026-09-04T11:59:00Z", graded=True)
+    fresh = _row(0, eng.STATUS_ATTEMPTING, attempted_at=_iso_z(AS_OF - timedelta(minutes=1)), graded=True)
     check = _run(_LedgerTable([fresh]))
     assert check.passed is True, check.message
 

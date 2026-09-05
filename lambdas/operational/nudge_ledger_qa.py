@@ -35,10 +35,17 @@ qa_smoke_lambda stays a registry and this logic is testable with no AWS.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from coach.coach_nudge_engine import LEDGER_PK, LEDGER_SK_PREFIX, STATUS_ATTEMPTING, STATUS_FAILED, STATUSES_WITH_RECORD
+
+# #1964/#2811: the one Pacific frame and the one ISO parser. Both matter here —
+# a `DAY#` sk is the handler's PACIFIC calendar day (`now_pt.date()`), so both
+# the retention window and the sk-date age anchor must be read in that frame. A
+# UTC `.date()` would shift the window by a day for the 7–8 evening PT hours
+# that are already tomorrow in UTC.
+from common.pacific_time import PACIFIC, parse_iso_utc
 
 # A reservation older than this with no terminal status is stuck. One nudge run
 # is a single Lambda invocation of at most a few seconds; 24h is ~4 orders of
@@ -51,35 +58,34 @@ STUCK_HOURS = 24
 RETENTION_DAYS = 7
 
 
-def _stamped_age_hours(row: dict, now_utc: datetime):
+def _stamped_age_hours(row: dict, as_of):
     """Hours since the row was written, or None if it cannot be dated.
 
     Prefers the explicit stamp (``attempted_at``, added to the reservation by
-    #3569; ``sent_at`` on terminal rows). Pre-#3569 reservations carry NO
-    timestamp of any kind, so they fall back to the day their sk names, taken at
-    that day's LAST instant — the age is then understated, never overstated, so
-    the fallback can only delay a red and never manufacture one.
+    #3569; ``sent_at`` on terminal rows), parsed by the ONE parser so a tz-less
+    stamp can never be read in the runner's zone (#1964). Pre-#3569 reservations
+    carry NO timestamp of any kind and fall back to the day their sk names,
+    anchored at that PACIFIC day's LAST instant — the frame that named the key
+    (#2817/#3257) — so the age is understated, never overstated: the fallback can
+    only delay a red, never manufacture one.
+
+    ``as_of`` and the parsed stamp may sit in different frames; both are aware, so
+    the subtraction is exact either way.
     """
-    stamped = row.get("attempted_at") or row.get("sent_at")
-    if stamped:
-        try:
-            parsed = datetime.fromisoformat(str(stamped).replace("Z", "+00:00"))
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            return (now_utc - parsed).total_seconds() / 3600.0
-        except ValueError:
-            pass
+    stamped = parse_iso_utc(row.get("attempted_at") or row.get("sent_at"))
+    if stamped is not None:
+        return (as_of - stamped).total_seconds() / 3600.0
     day = str(row.get("sk") or "").replace(LEDGER_SK_PREFIX, "")
     try:
-        end_of_day = datetime.fromisoformat(day).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+        end_of_day = datetime.strptime(day, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=PACIFIC)
     except ValueError:
         return None
-    return (now_utc - end_of_day).total_seconds() / 3600.0
+    return (as_of - end_of_day).total_seconds() / 3600.0
 
 
-def check_nudge_ledger_liveness(table, Check, tier, *, now_utc=None, stuck_hours=STUCK_HOURS, retention_days=RETENTION_DAYS):
+def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK_HOURS, retention_days=RETENTION_DAYS):
     c = Check("coach_nudge:ledger_liveness", "Data Freshness", tier)
-    now = now_utc or datetime.now(timezone.utc)
+    now = pt_now()  # aware PACIFIC instant — the frame the DAY# sk is written in
     floor = f"{LEDGER_SK_PREFIX}{(now.date() - timedelta(days=retention_days)).isoformat()}"
     try:
         resp = table.query(KeyConditionExpression=Key("pk").eq(LEDGER_PK) & Key("sk").gte(floor))
