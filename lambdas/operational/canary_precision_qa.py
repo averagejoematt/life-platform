@@ -11,6 +11,15 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 
+# S3 error codes that mean "no canary record for that date", per-date and never fatal.
+# 403 belongs here for a reason worth stating: without s3:ListBucket on the prefix S3
+# refuses to confirm or deny a key's existence, so a MISSING object answers 403
+# AccessDenied rather than 404 NoSuchKey (#3502). The canary runs 3x/week and this
+# check walks 14 trailing dates, so 8+ absences per run are normal — treating one as
+# fatal took the whole check down.
+_ABSENT_CODES = {"NoSuchKey", "404", "403", "AccessDenied"}
+_DENIED_CODES = {"403", "AccessDenied"}
+
 CANARY_LOG_PREFIX = "ai-canary-log"
 CANARY_PRECISION_WINDOW_DAYS = 14
 CANARY_PRECISION_WARN_RATE = 0.2  # >20% of runs alarming grounded = chronic
@@ -34,13 +43,23 @@ def check_canary_precision(s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now):
     c = Check("canary:grounded_precision", "AI Canary", CONTENT_TRUTH)
     today = pt_now().date()
     runs, alarmed_dates = 0, []
+    denied = 0
+    window = CANARY_PRECISION_WINDOW_DAYS
     try:
-        for i in range(1, CANARY_PRECISION_WINDOW_DAYS + 1):
+        for i in range(1, window + 1):
             d = (today - timedelta(days=i)).strftime("%Y-%m-%d")
             try:
                 obj = s3.get_object(Bucket=S3_BUCKET, Key=f"{CANARY_LOG_PREFIX}/{d}.json")
-            except s3.exceptions.NoSuchKey:
+            except getattr(s3, "exceptions", None).NoSuchKey:  # the documented botocore shape, kept first
                 continue
+            except Exception as exc:  # noqa: BLE001 — classified below, never blanket-swallowed
+                code = _s3_error_code(exc)
+                if code in _DENIED_CODES:
+                    denied += 1
+                    continue
+                if code in _ABSENT_CODES:
+                    continue
+                raise  # a genuine transport/parse fault still reaches the outer handler
             rec = json.loads(obj["Body"].read())
             if rec.get("skipped") or rec.get("blind"):
                 continue  # no grounded verdict exists for these runs
@@ -48,12 +67,46 @@ def check_canary_precision(s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now):
             if any(str(a).endswith(":grounded") for a in rec.get("alarms") or []):
                 alarmed_dates.append(d)
     except Exception as e:
-        # #2378: chronic while the #1956 grant gap is open; branches below stay ALARMED.
-        return [c.warn(f"canary precision unreadable ({e}) — fail-soft; needs s3:GetObject on {CANARY_LOG_PREFIX}/* (#1956)", chronic=True)]
+        # A fault that is NOT a per-date absence/denial: keep the old fail-soft shape,
+        # but it is no longer the chronic-muted branch the grant gap used to land in.
+        return [c.warn(f"canary precision unreadable ({e}) — fail-soft; needs s3:GetObject on {CANARY_LOG_PREFIX}/* (#1956)")]
+    if denied == window:
+        # EVERY date denied means the prefix itself is unreadable — the #3502 grant gap,
+        # not missing records. Loud and NOT chronic: a muted warning is how this sat
+        # dark for 30 days (249 events, zero rate lines).
+        return [
+            c.warn(
+                f"canary precision unreadable — all {window} trailing dates returned AccessDenied; "
+                f"the role needs s3:ListBucket on {CANARY_LOG_PREFIX}/* as well as s3:GetObject "
+                f"(without List, a MISSING key answers 403 not 404) — #3502"
+            )
+        ]
     if runs == 0:
-        return [c.warn(f"no sighted canary runs in trailing {CANARY_PRECISION_WINDOW_DAYS}d — grounded precision unmeasurable")]
+        extra = f" ({denied} date(s) denied)" if denied else ""
+        return [c.warn(f"no sighted canary runs in trailing {window}d{extra} — grounded precision unmeasurable")]
     rate = len(alarmed_dates) / runs
-    line = f"grounded-ALARM rate {len(alarmed_dates)}/{runs} ({rate:.0%}) over trailing {CANARY_PRECISION_WINDOW_DAYS}d"
+    line = f"grounded-ALARM rate {len(alarmed_dates)}/{runs} ({rate:.0%}) over trailing {window}d"
+    if denied:
+        line += f" ({denied} date(s) unreadable — partial grant)"
     if runs >= CANARY_PRECISION_MIN_RUNS and rate > CANARY_PRECISION_WARN_RATE:
         return [c.warn(f"{line} — chronic firing, precision suspect (#1956 cried-wolf signature): {', '.join(alarmed_dates)}")]
     return [c.ok(line)]
+
+
+def _s3_error_code(exc) -> str:
+    """The error code from a botocore ClientError (or a bare NoSuchKey class), as a string.
+
+    Kept tiny and defensive: the check must classify an S3 error without importing
+    botocore (the lambda bundle has it, the offline tests stub it), and an exception
+    shaped unlike either form falls through to the caller's re-raise.
+    """
+    resp = getattr(exc, "response", None)
+    if isinstance(resp, dict):
+        err = resp.get("Error") or {}
+        code = err.get("Code")
+        if code is not None:
+            return str(code)
+        status = (resp.get("ResponseMetadata") or {}).get("HTTPStatusCode")
+        if status is not None:
+            return str(status)
+    return type(exc).__name__

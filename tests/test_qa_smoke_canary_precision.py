@@ -177,3 +177,98 @@ def test_qa_smoke_role_grants_the_canary_log_read():
     assert src is not None, "operational_qa_smoke() not found in any role_policies*.py"
     qa_policy = src.split("def operational_qa_smoke", 1)[1].split("\ndef ", 1)[0]
     assert '"ai-canary-log/*"' in qa_policy
+
+
+# ── #3502: a per-date S3 denial is not a dead check ───────────────────────────
+#
+# GetObject on ai-canary-log/* was granted; s3:ListBucket on the prefix was not.
+# Without List, S3 will not confirm or deny a key's existence, so a MISSING object
+# answers 403 AccessDenied instead of 404 NoSuchKey. The canary runs 3x/week and this
+# check walks 14 trailing dates, so 8+ absences are normal — every one came back 403,
+# the narrow `except s3.exceptions.NoSuchKey` missed it, and the whole check bailed to
+# a CHRONIC warn, which is excluded from the alarmed WarnCount. Measured before the
+# fix: 249 "canary precision unreadable" events in 30d and ZERO rate lines.
+
+
+class _ClientError(Exception):
+    """The botocore ClientError shape the lambda actually sees (offline stub)."""
+
+    def __init__(self, code, status=None):
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}, "ResponseMetadata": {"HTTPStatusCode": status or 403}}
+
+
+class _CodedS3:
+    """get_object serving real records, and raising a CODED error for every other key."""
+
+    exceptions = types.SimpleNamespace(NoSuchKey=_NoSuchKey)
+
+    def __init__(self, records, missing_code="AccessDenied"):
+        self.records = records
+        self.missing_code = missing_code
+
+    def get_object(self, Bucket, Key):
+        if Key not in self.records:
+            raise _ClientError(self.missing_code, 403 if self.missing_code in ("AccessDenied", "403") else 404)
+        return {"Body": io.BytesIO(json.dumps(self.records[Key]).encode())}
+
+
+def test_every_date_denied_warns_loudly_and_names_listbucket(monkeypatch):
+    """The live 30-day state: all 14 dates 403. It must be a LOUD warn naming the
+    missing ListBucket grant — not the chronic (muted) branch it used to take."""
+    monkeypatch.setattr(qa, "s3", _CodedS3({}))
+    (c,) = qa.check_canary_precision()
+    assert c.passed is None
+    assert "ListBucket" in c.message and "3502" in c.message
+    assert getattr(c, "chronic", False) is False, "a muted warn is how this sat dark for 30 days"
+
+
+def test_a_rate_is_returned_when_only_some_dates_are_denied(monkeypatch):
+    """The acceptance's contract test: one window date unreadable must not stop the
+    measurement — the canary runs 3x/week, so partial coverage is the normal case."""
+    dates = _dates_back(qa.CANARY_PRECISION_WINDOW_DAYS)
+    present = dates[:6]
+    monkeypatch.setattr(qa, "s3", _CodedS3(_records(present, alarmed=present[:1])))
+    (c,) = qa.check_canary_precision()
+    assert "grounded-ALARM rate 1/6" in c.message
+    assert "unreadable" in c.message and "partial grant" in c.message
+
+
+def test_absent_dates_answering_404_are_skipped_not_denied(monkeypatch):
+    """With ListBucket in place a missing key answers NoSuchKey/404 — the ordinary
+    'the canary did not run that day' case, and no partial-grant note is emitted."""
+    dates = _dates_back(qa.CANARY_PRECISION_WINDOW_DAYS)
+    present = dates[:6]
+    monkeypatch.setattr(qa, "s3", _CodedS3(_records(present, alarmed=present[:1]), missing_code="NoSuchKey"))
+    (c,) = qa.check_canary_precision()
+    assert "grounded-ALARM rate 1/6" in c.message
+    assert "partial grant" not in c.message
+
+
+def test_a_genuine_fault_still_fails_soft(monkeypatch):
+    """Negative control on the classifier: an error that is NOT an absence/denial must
+    still reach the fail-soft branch rather than being swallowed as a missing day."""
+
+    class _BrokenS3:
+        exceptions = types.SimpleNamespace(NoSuchKey=_NoSuchKey)
+
+        def get_object(self, Bucket, Key):
+            raise _ClientError("InternalError", 500)
+
+    monkeypatch.setattr(qa, "s3", _BrokenS3())
+    (c,) = qa.check_canary_precision()
+    assert c.passed is None and "unreadable" in c.message
+
+
+def test_the_canary_log_prefix_is_listable_in_the_role(monkeypatch):
+    """The other half of the fix, pinned: the lambda-side classification alone would
+    turn every 403 into a silent skip. The S3List prefix condition must carry the
+    canary log prefix, or absence never starts answering 404."""
+    import re
+
+    src = ""
+    for path in ROLE_POLICIES_FAMILY:
+        with open(path, encoding="utf-8") as fh:
+            src += fh.read()
+    conds = re.findall(r'"s3:prefix":\s*\[([^\]]*)\]', src)
+    assert any(qa.CANARY_LOG_PREFIX in c for c in conds), f"{qa.CANARY_LOG_PREFIX}/* missing from every s3:prefix condition"
