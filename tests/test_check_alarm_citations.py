@@ -254,9 +254,27 @@ def test_real_registry_entries_all_name_a_real_alarm():
     `scripts/check_alarm_citations.py` at wrap time, which is where it belongs;
     the flag-the-uncited behaviour itself is pinned by the unit tests above.
     """
-    names = _load_sync()._auto_discover_alarm_names()
+    sync = _load_sync()
+    names = sync._auto_discover_alarm_names()
+    # The composite discoverer is read from alarm_discovery.py directly — sync_doc_metadata
+    # is a baselined module (tests/test_module_size_guard.py) and gains no import for it.
+    disc_path = os.path.join(REPO, "deploy", "alarm_discovery.py")
+    disc_spec = importlib.util.spec_from_file_location("_alarm_discovery_for_citations", disc_path)
+    disc = importlib.util.module_from_spec(disc_spec)
+    disc_spec.loader.exec_module(disc)
     if not names:  # AST discovery unavailable — do not manufacture a false pass
         pytest.skip("alarm-name discovery returned nothing; cannot verify entries")
+    # #3503, one layer up: a composite is declared with `composite_alarm_name=`, which
+    # the metric discoverer never resolved — so a citation for a REAL composite was
+    # rejected as undeclared (main red 2026-09-05). The universe an entry may cite is
+    # metric ∪ composite. Positive control: the composite discoverer must actually see
+    # the platform's declared composites, or the union is the old metric-only set.
+    composites = disc._auto_discover_composite_alarm_names()
+    assert composites, "composite-alarm discovery returned nothing — cdk/stacks/*.py declares composites"
+    assert "ai-tokens-platform-daily-total-genesis-window" in composites, sorted(composites)
+    assert not (composites & set(names)), "a composite name collided with a metric alarm name"
+    assert "no-such-alarm-negative-control" not in (set(names) | composites)
+    names = set(names) | composites
     data = cac.load_citations()
     entries = [n for n in data if n != "_comment"]
     assert entries, "docs/alarm_citations.json has no citation entries"

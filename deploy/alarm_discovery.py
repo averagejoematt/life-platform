@@ -11,7 +11,7 @@ conditional-alarm gate, and the kwargs-spread resolver.
 
 Public surface (re-exported by sync_doc_metadata, the API every caller uses):
 _auto_discover_alarm_count · _auto_discover_alarm_names_by_stack ·
-_auto_discover_alarm_names. Full pattern documentation lives on each function.
+_auto_discover_alarm_names · _auto_discover_composite_alarm_names. Full pattern documentation lives on each function.
 """
 
 import ast
@@ -568,6 +568,44 @@ def _auto_discover_alarm_names_by_stack() -> dict | None:
         return {stem: sorted(names) for stem, names in sorted(by_stack.items())}
     except Exception:
         return None
+
+
+def _auto_discover_composite_alarm_names() -> set[str] | None:
+    """The SET of CDK-defined CloudWatch COMPOSITE alarm names.
+
+    The metric discoverer above resolves `alarm_name=`; a composite is declared with
+    `composite_alarm_name=` and so was invisible to every consumer of
+    _auto_discover_alarm_names(). That is the #3503 class one layer up — live,
+    `describe_alarms` without `AlarmTypes` hid composites; in-repo, the AST walk
+    did the same — and it redded main on 2026-09-05 when a citation for a real
+    composite (`ai-tokens-platform-daily-total-genesis-window`) was rejected as
+    "not declared in cdk/stacks/*.py". Kept SEPARATE from the metric set on purpose:
+    `alarm_count` (#795) and the routing census count metric alarms, and a composite
+    routes the alarms it composes rather than a metric of its own.
+
+    Returns None if the stacks directory is unreadable — never an empty set the
+    caller could mistake for "no composites exist".
+    """
+    cdk_stacks_dir = ROOT / "cdk" / "stacks"
+    if not cdk_stacks_dir.exists():
+        return None
+    names: set[str] = set()
+    read = 0
+    for stack_file in sorted(cdk_stacks_dir.glob("*.py")):
+        try:
+            tree = ast.parse(stack_file.read_text(encoding="utf-8"), filename=str(stack_file))
+        except Exception:
+            continue
+        read += 1
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            value = _kwarg_value(node, "composite_alarm_name")
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                names.add(value.value)
+    if read == 0:
+        return None
+    return names
 
 
 def _auto_discover_alarm_names() -> set[str] | None:
