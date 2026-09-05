@@ -35,10 +35,12 @@ nightly run. Own module (the module-size ceiling split idiom,
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
 import boto3
+from common import subscriber_cadence  # #3564 — the derived promise, rendered from the senders' crons
 
 from operational.qa_check import CONTENT_TRUTH, Check
 from operational.qa_check_reader_truth import SITE_BASE_URL
@@ -134,4 +136,67 @@ def check_subscriber_promise_truth():
         return [check.warn(f"sender Lambda introspection failed (fail-soft): {str(e)[:120]}")]
 
     ok, msg = assess_subscriber_promise_truth(site_up, confirmed_count, sender_flags)
+    return [check.ok(msg) if ok else check.fail(msg)]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #3564 — the CADENCE half. #1951 above checks the kill SWITCH ("is anything
+# sending at all?"); it is structurally blind to the promise being wrong about
+# WHAT sends. It was green for the whole month the live page promised "One email
+# a week, then quiet until next Wednesday" while three senders delivered up to
+# three, none of them on a Wednesday.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Any reader-facing weekly-volume claim, in words or digits. Phrase-anchored on the
+# only part that cannot be paraphrased away ("emails a week"), and the ASSERTION is
+# structural: whatever number the page states must equal the number the sender
+# registry produces.
+_COUNT_CLAIM = re.compile(r"\b(one|two|three|four|five|six|seven|\d+)\s+emails?\s+a\s+week\b", re.IGNORECASE)
+
+
+def assess_promise_cadence_agreement(page_text: str, promise: str, count_word: str) -> tuple:
+    """Pure: (ok, message). The live /subscribe/ page must carry the promise
+    sentence RENDERED from the senders' crons, and must state no other weekly
+    volume anywhere on the page."""
+    if not page_text:
+        return True, "/subscribe/ served no body — nothing is being promised to reconcile"
+    stale = sorted({m.group(1).lower() for m in _COUNT_CLAIM.finditer(page_text) if m.group(1).lower() != count_word})
+    if promise not in page_text:
+        return False, (
+            "/subscribe/ does not carry the cadence promise derived from the senders' own schedules "
+            f"(expected: {promise!r}"
+            + (f"; the page states {stale} emails a week instead" if stale else "")
+            + ") — the live page and the send infrastructure disagree about WHAT a subscriber receives (#3564)"
+        )
+    if stale:
+        return False, (
+            f"/subscribe/ carries the derived promise but ALSO claims {stale} emails a week elsewhere on the page "
+            f"— two contradicting volume claims, one of them stale (#3564)"
+        )
+    return (
+        True,
+        f"/subscribe/ states exactly the cadence the {len(subscriber_cadence.SUBSCRIBER_SENDERS)} subscriber-facing senders declare",
+    )
+
+
+def _fetch_text(path="/subscribe/", timeout=15):
+    req = urllib.request.Request(SITE_BASE_URL + path, headers={"User-Agent": "life-platform-qa-smoke"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 — fixed trusted host
+        return r.read().decode("utf-8", "replace")
+
+
+def check_subscriber_promise_cadence():
+    """CHECK — #3564. The promise on the live page must equal the promise the
+    schedules make. Fail-soft on fetch errors (a transient blip must never red the
+    nightly); a real disagreement is an ALARMED content-truth FAIL."""
+    check = Check("subscriber_promise:cadence_agreement", "Reader Truth", CONTENT_TRUTH)
+    try:
+        page_text = _fetch_text()
+    except Exception as e:
+        return [check.warn(f"/subscribe/ fetch failed (fail-soft): {str(e)[:120]}")]
+    ok, msg = assess_promise_cadence_agreement(
+        page_text,
+        subscriber_cadence.promise_sentence(),
+        subscriber_cadence.weekly_count_word(),
+    )
     return [check.ok(msg) if ok else check.fail(msg)]

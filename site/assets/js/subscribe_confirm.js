@@ -14,7 +14,7 @@
   // incoming reading, check = confirmed, flatline = signal lost.
   var p = new URLSearchParams(location.search);
   var states = {
-    "confirmed:true":      ["check", "You're in.", 'Subscription confirmed — The Measured Life lands every Wednesday.<br><br><a href="/story/chronicle/">Read the chronicle while you wait →</a>', "confirmed", "ok"],
+    "confirmed:true":      ["check", "You're in.", 'Subscription confirmed. At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.<br><br><a href="/story/chronicle/">Read the chronicle while you wait →</a>', "confirmed", "ok"],
     "confirmed:already":   ["check", "Already confirmed.", 'You were already on the list — nothing more to do.<br><br><a href="/story/chronicle/">Read the chronicle →</a>', "confirmed", "ok"],
     "error:invalid_token": ["flatline", "That link didn't check out.", 'The confirmation link is invalid — it may have been clipped by your email client.<br><br><a href="/subscribe/">Subscribe again →</a>', "invalid link", "err"],
     "error:token_expired": ["flatline", "That link expired.", 'Confirmation links are time-limited. Re-subscribe and a fresh one will land in your inbox.<br><br><a href="/subscribe/">Subscribe again →</a>', "link expired", "err"],
