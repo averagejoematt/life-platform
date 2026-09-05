@@ -714,6 +714,15 @@ def handle_predictions(event, *, _g):
                             "confidence": rec.get("confidence", "medium"),
                             "status": p_status,
                             "date": rec.get("created_date", ""),
+                            # #3480: `date` is the EFFECTIVE date (genesis for a
+                            # pre-registered claim — the window it grades from), not
+                            # the moment the coach committed. Serve the freeze instant
+                            # too, so the page can say "made <freeze> · from <genesis>"
+                            # instead of labelling a claim frozen on 09-04 as made on a
+                            # date that has not happened yet (ADR-104: a made-date is
+                            # when it was made). None for in-cycle coach calls, whose
+                            # created_date IS the event time.
+                            "pre_registered_at": rec.get("pre_registered_at"),
                             "due_date": due,
                             "gradeable": not ungradeable,
                             "metric": ev.get("metric"),

@@ -539,7 +539,16 @@ export function renderPredictions(d) {
   if (!(o.total > 0) && !list.length) return _sealBlock(d && d.prereg_seal) + empty("No scored predictions yet — the prediction ledger restarts with each genesis rather than carrying old scores forward. Coaches log forward calls that get auto-graded against measured outcomes as target dates pass, so the track record rebuilds honestly from day one. It fills in as the first calls come due.");
   const head = figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]);
   const badge = (s) => s === "confirmed" ? "rd-badge-live" : "";
-  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${esc(p.date || "")}</td></tr>`).join("");
+  // #3480: a pre-registered claim carries two dates — the instant it was FROZEN
+  // (pre_registered_at) and the day it grades FROM (date = genesis). Before the
+  // 2026-09-05 genesis the ledger printed "made 2026-09-05" on 2026-09-04, a date
+  // in the future; the freeze is the made-date, genesis is the effective date.
+  const made = (p) => {
+    const frozen = p.pre_registered_at ? String(p.pre_registered_at).slice(0, 10) : "";
+    if (frozen && p.date && frozen !== p.date) return `${esc(frozen)} <span class="rd-unit">· from ${esc(p.date)}</span>`;
+    return esc(frozen || p.date || "");
+  };
+  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${made(p)}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest.");
 }
