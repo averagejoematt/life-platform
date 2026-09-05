@@ -59,6 +59,7 @@ from operational import (
     acwr_liveness_qa,  # noqa: E402
     canary_precision_qa,  # noqa: E402  (#3485 size-split)
     chronicle_manifest_qa,  # noqa: E402  (#3485)
+    nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
     qa_check_edge_429,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
@@ -954,6 +955,8 @@ def check_steps():
     return [
         ("ddb_freshness", check_ddb_freshness),
         ("acwr_liveness", lambda: acwr_liveness_qa.check_acwr_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now)),  # #3443 dead-man
+        # #3569 dead-man: a nudge reservation must reach a terminal status and every terminal row must have its NUDGE# record
+        ("nudge_ledger_liveness", lambda: nudge_ledger_qa.check_nudge_ledger_liveness(table, Check, CONTENT_TRUTH)),
         ("hae_liveness_truth", check_hae_liveness_truth),  # #2001: dark HAE datatypes carry a numeric days_dark when findable
         ("s3_freshness", check_s3_freshness),
         # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)

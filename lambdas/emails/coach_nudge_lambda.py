@@ -39,6 +39,7 @@ from boto3.dynamodb.conditions import Key
 from coach import coach_nudge_engine as engine
 from coach.coach_checkin import read_cycle
 from coach.persona_registry import OPERATIONAL_COACH_IDS
+from common.numeric import floats_to_decimal  # #3569: the trigger payload carries real floats
 from common.pacific_time import PACIFIC
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
@@ -326,19 +327,12 @@ def run_grading_pass(now_utc: datetime) -> int:
 # ── the send path ────────────────────────────────────────────────────────────
 
 
-def _reserve_day(date_pt: str, firing: dict) -> bool:
+def _reserve_day(date_pt: str, firing: dict, now_utc: datetime | None = None) -> bool:
     """Atomically claim the daily nudge slot. False if already claimed."""
+    stamped = now_utc or datetime.now(timezone.utc)
     try:
         _table().put_item(
-            Item={
-                "pk": engine.LEDGER_PK,
-                "sk": engine.ledger_sk(date_pt),
-                "record_type": "coach_nudge_ledger",
-                "status": "attempting",
-                "trigger_type": firing["trigger_type"],
-                "coach_id": firing["coach_id"],
-                "graded": True,  # flipped to False only once a nudge is actually SENT
-            },
+            Item=floats_to_decimal(engine.build_reservation_item(date_pt, firing, stamped)),
             ConditionExpression="attribute_not_exists(pk)",
         )
         return True
@@ -427,11 +421,55 @@ def _send_email(coach_name: str, copy_text: str, dry_run: bool = False) -> None:
     )
 
 
+class NudgeWriteError(RuntimeError):
+    """#3569 — the nudge record could not be persisted.
+
+    Raised by `_finalize` only AFTER the ledger row has been stamped `failed`
+    with the exception, so a write failure is loud in three places at once (the
+    ledger row, an ERROR log line, and the Lambda's own error metric) and never
+    leaves the reservation at `attempting`.
+    """
+
+
 def _finalize(date_pt: str, nudge_item: dict) -> None:
     """Write the verbatim COACH# record + the final ledger row (overwrites the
-    'attempting' reservation)."""
-    _table().put_item(Item=nudge_item)
-    _table().put_item(Item=engine.build_ledger_item(date_pt, nudge_item))
+    'attempting' reservation).
+
+    #3569 — two things this used to get wrong, both of which cost every nudge
+    the feature ever produced:
+
+    1. NO DECIMAL COERCION. `trigger_payload` is `firing['payload']` verbatim,
+       and both firing triggers put a genuine Python float in it
+       (`_acwr_readings` does `float(it["acwr"])`, `_verdicts_resolving_tomorrow`
+       does `float(pred["confidence"])`). boto3 rejects floats, so this
+       `put_item` raised `TypeError: Float types are not supported` on
+       2026-08-06, 08-07 and 08-30 — and, because nothing else on the platform
+       writes a NUDGE# row, the partition held ZERO records since #1382 shipped.
+    2. IT RAN AFTER THE SES SEND. The email was already gone when the write
+       failed: an irreversible side effect ordered before a fallible durable
+       write. The handler now finalizes FIRST (see `lambda_handler`), so a nudge
+       whose record cannot be written is never delivered.
+    """
+    item = floats_to_decimal(nudge_item)
+    try:
+        _table().put_item(Item=item)
+        _table().put_item(Item=floats_to_decimal(engine.build_ledger_item(date_pt, item)))
+    except Exception as e:  # noqa: BLE001 — re-raised below; the ledger is stamped first
+        logger.error("[nudge] FAILED to persist nudge record %s/%s: %s", nudge_item.get("pk"), nudge_item.get("sk"), e)
+        _mark_ledger_failed(date_pt, nudge_item, e)
+        raise NudgeWriteError(f"could not persist nudge record for {date_pt}: {e}") from e
+
+
+def _mark_ledger_failed(date_pt: str, nudge_item: dict, error: Exception) -> None:
+    """Best-effort: stamp the day's reservation `failed` so it can never stay at
+    `attempting` (#3569). Fail-soft — the raise in `_finalize` is the backstop,
+    and the qa-smoke dead-man reds on either shape."""
+    try:
+        _table().put_item(
+            Item=floats_to_decimal(engine.build_failed_ledger_item(date_pt, nudge_item, str(error), datetime.now(timezone.utc)))
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error("[nudge] could not stamp ledger DAY#%s as failed: %s", date_pt, e)
 
 
 def lambda_handler(event: dict, context) -> dict:
@@ -457,7 +495,7 @@ def lambda_handler(event: dict, context) -> dict:
         return {"statusCode": 200, "graded": graded, "nudge": None, "reason": reason}
 
     # 3. Reserve the day atomically BEFORE any model call.
-    if not _reserve_day(date_pt, chosen):
+    if not _reserve_day(date_pt, chosen, now_utc):
         return {"statusCode": 200, "graded": graded, "nudge": None, "reason": "daily_cap_race"}
 
     coach_name = _coach_name(chosen["coach_id"])
@@ -482,18 +520,29 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info("[nudge] blocked by gates: %s", findings)
         return {"statusCode": 200, "graded": graded, "nudge": "blocked", "reason": "gate", "findings": findings}
 
+    # #3569: DURABLE WRITE BEFORE THE IRREVERSIBLE SIDE EFFECT. The send used to
+    # come first, so every one of the three float rejections delivered an email
+    # and then lost the record it was supposed to be graded from. `_finalize`
+    # raises NudgeWriteError (after stamping the ledger `failed`) rather than
+    # returning, so an unwritable record means the email is never sent at all.
+    item = engine.build_nudge_item(chosen, copy_text, engine.STATUS_SENT, date_pt=date_pt, now_utc=now_utc, cycle=cycle)
+    _finalize(date_pt, item)
+
     try:
         _send_email(coach_name, copy_text, dry_run=dry_run)
     except Exception as e:  # noqa: BLE001
         logger.error("[nudge] SES send failed: %s", e)
-        item = engine.build_nudge_item(
-            chosen, copy_text, engine.STATUS_BLOCKED, date_pt=date_pt, now_utc=now_utc, gate_findings=[f"ses_error:{e}"], cycle=cycle
-        )
-        _finalize(date_pt, item)
+        # Correct the record we already wrote — same pk/sk, so both rows are
+        # overwritten in place and the stored shape matches what the old
+        # send-first order produced on its SES-error path. If even the
+        # correction cannot land, `_finalize` has already stamped the ledger
+        # `failed` — swallow it here so the reported cause stays the SES one.
+        try:
+            _finalize(date_pt, engine.mark_send_failed(item, str(e)))
+        except NudgeWriteError as write_err:
+            logger.error("[nudge] could not downgrade the record after the SES failure: %s", write_err)
         return {"statusCode": 500, "graded": graded, "nudge": "error", "reason": "ses_error"}
 
-    item = engine.build_nudge_item(chosen, copy_text, engine.STATUS_SENT, date_pt=date_pt, now_utc=now_utc, cycle=cycle)
-    _finalize(date_pt, item)
     logger.info("[nudge] SENT %s nudge from %s (%s)", chosen["trigger_type"], chosen["coach_id"], item["sk"])
     return {
         "statusCode": 200,
