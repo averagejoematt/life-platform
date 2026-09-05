@@ -112,42 +112,12 @@ jobs:
           # --recover refuses to act on any verdict other than a confirmed phantom wedge.
           python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" --recover
 
-      # #3021: superseded-lease janitor. A `waiting` production-gate run is a deploy-
-      # group LEASE (approve or REJECT, never leave-waiting — #2467); when a newer main
-      # run supersedes an older waiting one, the older lease was disposed BY HAND every
-      # documented time (≥5). This sweep auto-rejects only PROVABLY superseded leases
-      # (strict-descendant head sha, newest waiting lease never touched — the pure
-      # predicate is offline-tested in tests/test_deploy_gate_janitor_3021.py) and the
-      # rejection comment carries the superseding run id (the audit trail lives in the
-      # rejected run's approvals record). A janitor-rejected run renders as the #2590
-      # shape check_main_green.py already disregards — same endpoint as
-      # deploy/reject_deployment.sh.
-      #
-      # TOKEN: reviewing pending deployments requires the caller to be a required
-      # reviewer of the `production` environment. github.token (github-actions[bot]) is
-      # not one, so an actual rejection will 4xx until the owner adds the secret
-      # DEPLOY_GATE_JANITOR_TOKEN (fine-grained PAT of the required reviewer, Actions
-      # read/write on this repo). Until then the sweep still runs; a failed rejection
-      # reds this job with the exact grant named in the log — loud, never silent.
-      # Same set +e / captured-code idiom as the head-coverage step below (#2746).
-      - name: Janitor — reject superseded production-gate leases (#3021)
-        id: janitor
-        env:
-          GH_TOKEN: ${{ secrets.DEPLOY_GATE_JANITOR_TOKEN || github.token }}
-        run: |
-          set -o pipefail
-          set +e
-          python3 scripts/check_deploy_wedge.py --janitor --apply | tee janitor_verdict.txt
-          code=$?
-          set -e
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          {
-            echo "## Deploy-gate lease janitor (#3021)"
-            echo
-            echo '```'
-            cat janitor_verdict.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+      # #3021's superseded-lease janitor ran here as a step from 2026-08-30 to 2026-09-04.
+      # It now lives in its own workflow, deploy-gate-janitor.yml (#3422): it needs a
+      # `concurrency:` group so an event-triggered sweep and a cron sweep cannot dispose the
+      # same lease at once, and THIS workflow must never own one (see the header + the
+      # #2052 test). The two stay disjoint by predicate: the janitor requires a non-empty
+      # pending_deployments; the phantom-wedge class has it empty by definition.
 
       - name: Fail loudly on a wedge
         if: steps.classify.outcome == 'failure'
@@ -226,14 +196,4 @@ jobs:
             echo "'coverage OK'. It is ALSO not a confirmed swallow — decode manually before assuming"
             echo "an incident: \`python3 scripts/check_main_green.py --head-coverage-check\`."
           } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
-
-      # #3021: a janitor that cannot do its job must red the run, never silently revert
-      # the class to manual. Keyed on the captured code so the janitor's own output above
-      # (already in the step summary) survives; placed last so it cannot mask the wedge/
-      # head-coverage verdicts above.
-      - name: Fail loudly on a janitor error (#3021)
-        if: steps.janitor.outputs.code != '0'
-        run: |
-          echo "::error title=Lease janitor error (#3021)::the superseded-lease sweep could not complete — see the 'Deploy-gate lease janitor' step summary (likely: token is not a required reviewer; add secret DEPLOY_GATE_JANITOR_TOKEN)."
           exit 1

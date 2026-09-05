@@ -126,6 +126,18 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "invisible for exactly as long as nobody looks, which is the incident it was "
         "built after.",
     },
+    "deploy-gate-janitor.yml": {
+        "watched": True,
+        "grace_hours": 8.0,
+        "basis": "declared */15, the SAME cron deploy-wedge-watch.yml carries (it was a step of that "
+        "workflow until #3422 split it out on 2026-09-04); MEASURED on that workflow's 60 newest "
+        "scheduled runs 2026-08-26 -> 2026-09-04: gap median 211 min, p90 417, max 729 (12.2h). "
+        "8h matches its sibling's grace; the max is why this workflow also fires on "
+        "`deployment_status` (the event hook is the fast path, the cron is only the dead-man).",
+        "reason": "The #3021/#3422 superseded-lease janitor. If its cron stops, a superseded "
+        "production-gate lease that the event hook missed holds the deploy-group slot until a "
+        "human notices (#2467) — the manual toil the janitor exists to retire.",
+    },
     "config-drift.yml": {
         "watched": True,
         "grace_hours": 14.0,
