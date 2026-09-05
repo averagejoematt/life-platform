@@ -41,8 +41,8 @@ function _points(data, valueKey, dateKey) {
 // #3556 — THE DOMAIN RULE (weightTrendChart's HARD RULE 4, generalised to every caller): the
 // y-domain is derived from the data this chart PLOTS — the series, plus the projection endpoint
 // when a dashed segment is actually drawn out to it. `goal` is an ANNOTATION drawn onto that
-// domain and is never folded into it: a distant target (goal 185 under a 324 lb series, a $252
-// ceiling under a $14 spend curve) used to rescale the real series against a number it never
+// domain and is never folded into it: a distant target (goal 185 under a 324 lb series; a spend
+// ceiling far above a young month's curve) used to rescale the real series against a number it never
 // touched, flattening a true slope to a few pixels AND moving the `dir` verdict's flat threshold
 // with it — the results door printed "holding flat" for the same weigh-ins the story page called
 // "trending down". An off-domain goal is pinned to the margin, marked, and named as off-scale.
