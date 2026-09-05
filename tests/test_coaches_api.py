@@ -373,3 +373,31 @@ def test_coach_analysis_ensemble_fallback_false_with_no_digest_at_all(monkeypatc
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
     data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
     assert data["ensemble_fallback"] is False
+
+
+def test_predictions_serve_the_freeze_instant_beside_the_effective_date(monkeypatch):
+    """#3480: a pre-registered claim's `date` is genesis by construction (the day it
+    grades FROM); the instant it was frozen is a different fact and is served as
+    `pre_registered_at` so the page never labels a 09-04 freeze as "made 09-05".
+    An in-cycle coach call has no freeze instant — it serves None, never a fabricated one."""
+
+    def _query_hook(table, **kw):
+        if len(table.query_calls) == 1:
+            return {
+                "Items": [
+                    {
+                        "status": "pending",
+                        "created_date": "2026-09-05",
+                        "claim_natural": "frozen",
+                        "pre_registered_at": "2026-09-04T16:53:28+00:00",
+                    },
+                    {"status": "pending", "created_date": "2026-09-05", "claim_natural": "in-cycle"},
+                ]
+            }
+        return {"Items": []}
+
+    monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_query_hook))
+    by_text = {p["text"]: p for p in _body(api.handle_predictions({}))["predictions"]}
+    assert by_text["frozen"]["date"] == "2026-09-05"
+    assert by_text["frozen"]["pre_registered_at"] == "2026-09-04T16:53:28+00:00"
+    assert by_text["in-cycle"]["pre_registered_at"] is None
