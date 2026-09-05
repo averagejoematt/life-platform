@@ -6,7 +6,6 @@ checker must exit 0 against the current tree. If one reds here, the wiki contrac
 the rule), don't skip the test.
 """
 
-import ast
 import importlib.util
 import re
 import subprocess
@@ -496,29 +495,21 @@ def test_og_source_count_ground_truth_is_the_registry():
     scan polices is live and self-correcting."""
     facts = _load("scripts/check_doc_facts.py")
     truth = facts._registry_source_count()
-    src = (ROOT / "lambdas" / "ingestion" / "source_registry.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    # Deliberately an INDEPENDENT count, not a call to the production function —
-    # comparing a function to itself proves nothing. It must therefore handle the
-    # same shapes the real one does: `X = {...}` is ast.Assign but `X: T = {...}`
-    # is ast.AnnAssign, and #1677 annotated SOURCE_REGISTRY. Both this copy and the
-    # production walk matched only ast.Assign, so the "independent" check inherited
-    # the identical blind spot and the pair agreed on None — two wrongs reading as
-    # a green cross-check. Count real string keys only; a `**SPLICE` entry
-    # contributes a None key.
-    counted = None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.AnnAssign):
-            tgts = [node.target]
-        elif isinstance(node, ast.Assign):
-            tgts = list(node.targets)
-        else:
-            continue
-        for tgt in tgts:
-            if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
-                counted = sum(1 for k in node.value.keys if isinstance(k, ast.Constant))
-    assert counted is not None and counted >= 1
-    assert truth == counted, f"registry discoverer ({truth}) disagrees with an independent AST count ({counted})"
+    # Deliberately an INDEPENDENT derivation, not a call to the production function —
+    # comparing a function to itself proves nothing. #3565 makes it the RUNTIME count:
+    # `len(SOURCE_REGISTRY)` is literally what og_image_lambda prints on the card, so
+    # the gate's ground truth must equal it. The previous "independent" copy re-walked
+    # the AST with the production function's own blind spots and inherited them twice
+    # over: both dropped every `**SPLICE` key, so the pair agreed on 19 for a registry
+    # whose runtime length is 22 (the three closed-social entries, #1677) — a green
+    # cross-check between two identical mistakes, and a gate whose truth was smaller
+    # than the claim it policed.
+    sys.path.insert(0, str(ROOT / "lambdas"))
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    counted = len(SOURCE_REGISTRY)
+    assert counted >= 1
+    assert truth == counted, f"registry discoverer ({truth}) disagrees with the runtime len(SOURCE_REGISTRY) ({counted})"
 
 
 def test_og_source_count_gate_is_not_vacuous():
