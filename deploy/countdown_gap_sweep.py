@@ -58,6 +58,9 @@ provenance only the reset tooling (or a #1233 write-time stamp) produces:
     keep-resurrection flow writes it);
   - a `cycle` attribute equal to the CURRENT cycle is self-declared new-cycle
     provenance (the freshly-written Prologue chronicle, #1233-stamped writers);
+  - rows the reset tooling stamps `reset_seed` on (the only general seed marker;
+    a bare current-cycle stamp is NOT one — live writers stamp it too, see
+    sanctioned_reason);
   - genesis pre-registration seeds: PREDICTION# rows with `pre_registered` AND
     content `created_date` >= genesis, and the seeder's `genesis_prereg_*`
     hypothesis ids. A bare content date >= genesis is deliberately NOT
@@ -240,12 +243,18 @@ def sanctioned_reason(item: dict, genesis_date_str: str, current_cycle: int | No
     """
     if item.get("redated_from_sk") is not None:
         return "chronicle keep-resurrection (redated_from_sk)"
-    if current_cycle is not None:
-        try:
-            if item.get("cycle") is not None and int(item["cycle"]) == int(current_cycle):
-                return f"self-declared current-cycle provenance (cycle={current_cycle})"
-        except (TypeError, ValueError):
-            pass
+    # A current-cycle stamp is NOT reset provenance by itself. Since #1233 every live
+    # writer stamps `cycle` at write time via phase_taxonomy.experiment_stamp(), and the
+    # reset bumps SSM /life-platform/experiment-cycle BEFORE genesis — so every countdown-
+    # window live write self-declares the new cycle, and the old rule made check 14
+    # report zero coach escapees by construction. Measured on cycle 16 Day 0 (2026-09-04,
+    # the 2026-09-05 review baseline, QS-1): 56 of the 73 "sanctioned" coach rows were
+    # the 17:0xZ coach-state-updater run (10 PREDICTION incl. 2 gradeable bets, 14 THREAD,
+    # 8 COMMITMENT, 7 BRIEF, 4 OUTPUT, 4 TRACE, 4 VOICE, 4 RELATIONSHIP, 1 RESULTS);
+    # only 17 were genuine seeds, every one of which the rules below already cover.
+    # Reset tooling that seeds a row with no other marker stamps `reset_seed` on it.
+    if item.get("reset_seed"):
+        return "reset-tooling seed marker (reset_seed)"
     hyp_id = item.get("hypothesis_id")
     if isinstance(hyp_id, str) and hyp_id.startswith("genesis_prereg_"):
         return f"genesis prereg seed hypothesis ({hyp_id})"
