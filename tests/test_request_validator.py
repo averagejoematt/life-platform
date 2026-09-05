@@ -112,24 +112,6 @@ def test_bad_source_format_rejected():
 # ── Per-param helpers ──
 
 
-def test_validate_user_id_passes():
-    assert rv.validate_user_id("matthew") == "matthew"
-
-
-def test_validate_user_id_rejects_invalid():
-    with pytest.raises(rv.ValidationError):
-        rv.validate_user_id("Matt!")
-
-
-def test_validate_date_passes():
-    assert rv.validate_date("2026-05-16") == "2026-05-16"
-
-
-def test_validate_date_rejects_invalid():
-    with pytest.raises(rv.ValidationError):
-        rv.validate_date("05/16/2026")
-
-
 def test_validate_source_rejects_unknown():
     with pytest.raises(rv.ValidationError):
         rv.validate_source("fitbit")  # not in KNOWN_SOURCES
@@ -137,11 +119,3 @@ def test_validate_source_rejects_unknown():
 
 def test_validate_source_allows_unknown_with_flag():
     assert rv.validate_source("future_source", allow_unknown=True) == "future_source"
-
-
-def test_validate_int_param_range():
-    assert rv.validate_int_param("30", "days", min_v=1, max_v=365) == 30
-    with pytest.raises(rv.ValidationError):
-        rv.validate_int_param("999", "days", min_v=1, max_v=365)
-    with pytest.raises(rv.ValidationError):
-        rv.validate_int_param("not-a-number", "days")

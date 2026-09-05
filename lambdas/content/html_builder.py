@@ -11,22 +11,11 @@ Exports:
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.digest_utils import compute_confidence
 
-try:
-    from common.digest_utils import compute_confidence
-
-    _HAS_CONFIDENCE = True
-except ImportError:
-    _HAS_CONFIDENCE = False
-
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def compute_confidence(**kw):
-            return {"level": "MEDIUM", "reason": "digest_utils unavailable", "badge_html": ""}
-
+_HAS_CONFIDENCE = True
 
 # ==============================================================================
 # INLINE UTILITIES (tiny — avoids import dependency on daily_brief_lambda)

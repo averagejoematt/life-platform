@@ -97,12 +97,7 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
     # Multi-device duplicates were harmless on the kJ scale (walks carried 0 kJ);
     # under the duration proxy they would double-count, so dedup here for every
     # caller. Lazy import: digest_utils imports this module at top level.
-    try:
-        from common.digest_utils import dedup_activities
-    except ImportError:  # pragma: no cover — digest_utils ships in the same layer
-
-        def dedup_activities(acts):
-            return acts
+    from common.digest_utils import dedup_activities
 
     strava_by_day = {}
     for r in strava_60d or []:

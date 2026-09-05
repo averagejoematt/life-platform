@@ -44,13 +44,14 @@ flake8 lambdas/ mcp/
 # Syntax check all Python
 find lambdas/ mcp/ -name '*.py' -exec python3 -m py_compile {} \;
 
-# Deploy a single Lambda (both args required; see deploy.md's mapping table)
+# Deploy a single Lambda (both args required; the function->source table is generated
+# into .claude/skills/deploy/SKILL.md from ci/lambda_map.json)
 bash deploy/deploy_lambda.sh <function-name> <source-file>
 
 # Deploy + run smoke test
 bash deploy/deploy_and_verify.sh <function-name> <source-file>
 
-# CDK deploy (drift-guarded — runs check_deploy_drift.py first, see CONVENTIONS.md §6)
+# CDK deploy (drift-guarded — runs check_deploy_drift.py first, see docs/CONVENTIONS.md §6)
 bash deploy/cdk_deploy.sh <StackName> [<StackName> ...]
 
 # Bare CDK deploy — override path only, skips the drift guard

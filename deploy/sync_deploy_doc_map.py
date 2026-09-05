@@ -10,7 +10,7 @@ GENERATOR OUTPUT between markers — derived from ci/lambda_map.json, the same m
 and deploy_lambda.sh already resolve regions/paths from.
 
 Usage:
-    python3 deploy/sync_deploy_doc_map.py            # rewrite the block in deploy.md
+    python3 deploy/sync_deploy_doc_map.py            # rewrite the block in the /deploy skill
     python3 deploy/sync_deploy_doc_map.py --check    # exit 2 if the doc block differs
     # --doc / --map override the default paths (used by tests/test_deploy_doc_map.py)
 
@@ -63,7 +63,7 @@ def _domain(source_path: str) -> str:
 
 
 def render_block(lambda_map: dict) -> str:
-    """Render the generated deploy.md block (markers included) from the parsed map."""
+    """Render the generated SKILL.md block (markers included) from the parsed map."""
     by_domain: dict[str, list[str]] = {}
     for source, entry in sorted(lambda_map.get("lambdas", {}).items()):
         if source.startswith("_") or not isinstance(entry, dict):

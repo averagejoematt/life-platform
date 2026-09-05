@@ -495,11 +495,6 @@ def _ambient_table() -> Any:
     return _AMBIENT_TABLE
 
 
-def reset_run_manifests() -> None:
-    """Drop the per-container cache. For tests and for an explicit re-judge."""
-    _RUN_MANIFESTS.clear()
-
-
 def current_run_manifest(compute_id: str, *, table: Any = None) -> Optional[Dict[str, Any]]:
     """This run's manifest for one compute Lambda, built at most once per PT day.
 
@@ -574,3 +569,8 @@ try:  # pragma: no cover — registration side effect only
     manifest_for = _pt_day_contract(extract=lambda m: m["as_of_day"], args=("daily-metrics-compute",))(manifest_for)
 except Exception:  # noqa: BLE001
     pass
+
+
+def reset_run_manifests() -> None:
+    """Drop the per-container cache. For tests and for an explicit re-judge."""
+    _RUN_MANIFESTS.clear()

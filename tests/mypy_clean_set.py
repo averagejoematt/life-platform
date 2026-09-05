@@ -9,11 +9,20 @@ Both consumers read this list so they can never drift:
   * the ci-lint.yml "Mypy gate" step: ``python -m mypy --config-file mypy.ini
     $(python tests/mypy_clean_set.py)``
 
-Scope note (#2638, open — NOT #1656, which is closed with the list non-empty): mypy.ini's
-``disable_error_code`` list still carries four structural codes — assignment / arg-type /
-return-value / operator — and ``check_untyped_defs``/``warn_return_any`` are still False.
-"Clean" here means "clean under the CURRENT mypy.ini", which is a real but narrower claim
-than "mypy strict". The cost of emptying the list is MEASURED rather than estimated —
+Scope note (NOT #1656, which is closed with the list non-empty): mypy.ini's
+``disable_error_code`` list still carries structural codes, and
+``check_untyped_defs``/``warn_return_any`` are still False. "Clean" here means "clean
+under the CURRENT mypy.ini", which is a real but narrower claim than "mypy strict".
+
+This paragraph deliberately does NOT enumerate the codes (#3539). It used to name four
+of them by hand, and by then one had been re-enabled (2026-08-15, #2745) leaving three —
+the docstring was edited on 2026-08-23 with the stale sentence untouched, next to a
+"#2638, open" citing an issue that had also closed. A prose copy of a config list is a
+fact nobody owns and nothing compares. The list has exactly one owner —
+``disable_error_code`` in mypy.ini — read by ``tests/test_mypy_clean_modules.py``
+(``_mypy_global_disabled_codes``), which holds it up-only and prunes stale entries.
+``test_this_docstring_names_no_error_codes`` there keeps this paragraph from growing a
+second copy. The cost of emptying the list is MEASURED rather than estimated —
 415 errors over this set as of 2026-08-15, itemised per code in mypy.ini and recomputable
 with ``python3 scripts/mypy_disable_cost.py`` — so the tranche is a decision someone can
 make from a number. Guarded up-only by

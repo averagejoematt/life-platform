@@ -170,16 +170,6 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
 }
 
 
-def caching_decision(function_name: Optional[str]) -> Optional[dict[str, Any]]:
-    """The recorded caching decision for `function_name`, or None if unrecorded.
-
-    Unrecorded is not a defect — most callers have never been measured. A caller
-    that IS recorded has been measured on the wire, and the test holds its
-    `engaged` flag consistent with `prefix_tokens` against its model's floor.
-    """
-    return CACHING_DECISIONS.get(function_name or "")
-
-
 def cache_floor(model_id: Optional[str]) -> int:
     """The minimum cacheable prefix, in tokens, for `model_id`.
 

@@ -22,8 +22,6 @@ import os
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from datetime import datetime, timezone
-from decimal import Decimal
-from typing import TYPE_CHECKING
 
 import boto3
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
@@ -113,21 +111,7 @@ COL_TO_FIELD = dict(NUTRIENT_COLUMNS)
 
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
-try:
-    from common.numeric import floats_to_decimal  # noqa: F401
-except ImportError:
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def floats_to_decimal(obj):
-            if isinstance(obj, bool):
-                return obj
-            if isinstance(obj, float):
-                return Decimal(str(obj))
-            if isinstance(obj, dict):
-                return {k: floats_to_decimal(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [floats_to_decimal(i) for i in obj]
-            return obj
+from common.numeric import floats_to_decimal  # noqa: F401
 
 
 # #970 KEPT (deliberate): CSV-value coercion contract (val) with string sanitation

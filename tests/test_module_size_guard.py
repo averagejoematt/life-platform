@@ -94,15 +94,32 @@ narrower, higher bar — ``*_lambda.py`` handlers over 2,000 lines. This guard i
 ~1,200 ceiling across ALL first-party source. They coexist; neither subsumes the other.
 """
 
+import io
 import os
 import re
 import subprocess
+import tokenize
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
-# The hard ceiling from docs/ENGINEERING_STANDARDS.md §2 (~800 smell / ~1,200 finding).
-HARD_CEILING = 1200
+# The hard ceiling from docs/ENGINEERING_STANDARDS.md §2, in LOGICAL lines (see
+# _line_count). #3537 changed the UNIT, so the number had to be re-derived — carrying
+# 1200 over to a smaller measure would have been a silent ~25% loosening of every
+# ceiling in the repo, which is the opposite of what this ratchet is for.
+#
+# THE DERIVATION (2026-09-05, over all 850 tracked first-party files). The largest
+# module that is compliant TODAY measures 965 logical lines
+# (scripts/generate_platform_model.py, 1136 physical). 1000 is the next round number
+# above it: the tightest ceiling under which NO file newly violates and no near-ceiling
+# file is left at zero headroom by the unit change alone. It is a real tightening for
+# code-dense modules (mcp/registry.py is 96% code, so 1000 logical is ~1041 physical
+# against 1200 before) and a real loosening for comment-dense ones
+# (lambdas/operational/reader_truth_rulings.py is 45% code) — which IS the change being
+# made: the ceiling measures code volume now, and prose is no longer charged against it.
+#
+# Shrink-only, like every ratchet here: this number may be lowered, never raised.
+HARD_CEILING = 1000
 
 # First-party source roots the ceiling applies to (§2). tests/ is deliberately excluded.
 SCOPE_DIRS = ("lambdas", "mcp", "scripts", "deploy", "cdk")
@@ -156,7 +173,7 @@ BASELINE = {
     # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
     # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.
-    "lambdas/emails/daily_brief_lambda.py": 2737,
+    "lambdas/emails/daily_brief_lambda.py": 1995,
     # site_api_social.py (2707 when #2515 ran) drained to a ~910-line facade — the handler
     # bodies now live in cohesive web/site_api_social_{experiments,challenges,membrane,
     # ladder,engage}.py, each well under the ceiling. The pure-subset ratchet forces the
@@ -168,10 +185,10 @@ BASELINE = {
     # site_api_vitals.py (2559 by the time the slice ran) drained to a ~220-line facade
     # by #1654 — the handler logic now lives in cohesive
     # web/site_api_{body,journey,character,sleep,biomarkers}.py, each under the ceiling.
-    "lambdas/compute/daily_insight_compute_lambda.py": 2352,
+    "lambdas/compute/daily_insight_compute_lambda.py": 1775,
     # 2409 -> 2424 (+15) 2026-08-09, #2351: find_days mode='similar' schema (mode/target_date/
     # features/k params + description). Deliberate feature addition, reasoned in the commit.
-    "mcp/registry.py": 2424,
+    "mcp/registry.py": 2330,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict
@@ -182,7 +199,7 @@ BASELINE = {
     # unchanged. 132 lines came out; 26 of them (a fifth — the #2610 earned-headroom rule)
     # are banked so the re-bill fix and the #3084 budget-stop clause have room, and 106 are
     # handed back. Measured 2264. Terminal cure is still under 1200 and pruning this line.
-    "lambdas/ai/ai_calls.py": 2245,
+    "lambdas/ai/ai_calls.py": 1677,
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.
@@ -194,9 +211,9 @@ BASELINE = {
     # file had ZERO headroom. delta_html + hit_bar (pure summary→cell formatters, no
     # table/clock/SES) moved to weekly_digest_extractors and are re-exported, paying for
     # the new cell formatter and handing 18 lines back. Lowering, never raising.
-    "lambdas/emails/weekly_digest_lambda.py": 1825,
-    "lambdas/health/character_engine.py": 2117,
-    "lambdas/content/html_builder.py": 2104,
+    "lambdas/emails/weekly_digest_lambda.py": 1464,
+    "lambdas/health/character_engine.py": 1609,
+    "lambdas/content/html_builder.py": 1634,
     # 1991 -> 1753 by #2667 (2026-08-16): the context/facts fetch layer moved to
     # cohesive lambdas/web/site_api_ai_context.py (459 lines, under the ceiling) so
     # the per-metric as-of work had room. Extracted ~312 net; banked 62 (a fifth,
@@ -206,13 +223,13 @@ BASELINE = {
     # lambdas/web/site_api_ai_session.py (168 lines, under the ceiling), which paid for
     # the #3118 turn-identity replay guard that stayed behind. Extracted 98, spent 38,
     # measured 1693; banked 7 of the ~19 the earned-headroom rule allows. Lowering.
-    "lambdas/web/site_api_ai_lambda.py": 1700,
+    "lambdas/web/site_api_ai_lambda.py": 1186,
     # 1989 -> 1829 by #2221: tool_get_social_connection_trend was lifted into cohesive
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
     # and still handed back 160 lines. The ratchet tightening.
-    "mcp/tools_lifestyle.py": 1829,
-    "lambdas/emails/coach_panel_podcast_lambda.py": 1904,
+    "mcp/tools_lifestyle.py": 1477,
+    "lambdas/emails/coach_panel_podcast_lambda.py": 1508,
     # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,
     # ledger,narrative}.py + web/site_api_thirdwall.py, each well under the ceiling. The
@@ -226,8 +243,8 @@ BASELINE = {
     # withings-recency arithmetic moved into the new intelligence/latest_readings.py
     # (which had to read the weigh-in anyway) and the overlay RULE lives in
     # experiment/canonical_facts.py. Net zero — no headroom taken, none banked.
-    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1898,
-    "deploy/archive/onetime/daily_brief_lambda.py": 1881,
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1527,
+    "deploy/archive/onetime/daily_brief_lambda.py": 1597,
     # 2026-08-24/25 (#3119): 1779 -> 1721. Four DIL-025 replay-safety fixes
     # (content-hashed raw-archive key, a monotonic guard on the
     # *_readings_count fields, a fail-toward-history dedup-map fix, and the
@@ -241,13 +258,13 @@ BASELINE = {
     # ALL of them handed back (no headroom banked) — the file lands 58 lines
     # BELOW its old baseline even after the fixes landed. The pure-subset
     # ratchet allows tightening a shrunk entry.
-    "lambdas/ingestion/health_auto_export_lambda.py": 1721,
-    "deploy/sync_doc_metadata.py": 1238,  # 2026-08-31: shrank again — the #3101 counts sync extracted to deploy/doc_platform_counts.py (#3384)
+    "lambdas/ingestion/health_auto_export_lambda.py": 1258,
+    "deploy/sync_doc_metadata.py": 1007,  # 2026-08-31: shrank again — the #3101 counts sync extracted to deploy/doc_platform_counts.py (#3384)
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
-    "lambdas/intelligence/intelligence_common.py": 1744,
-    "lambdas/coach/coach_history_summarizer.py": 1731,
-    "lambdas/coach/coach_prediction_evaluator.py": 1633,
+    "lambdas/intelligence/intelligence_common.py": 1350,
+    "lambdas/coach/coach_history_summarizer.py": 1264,
+    "lambdas/coach/coach_prediction_evaluator.py": 1218,
     # 2026-08-13 (#2610): 1623 → 1382. This file was at 1623/1623 — zero headroom — and
     # adding an alarm is the most routine change it ever takes, so it was the next
     # role_policies.py. Both CloudWatch DASHBOARDS (311 lines, pure composition, not one
@@ -279,21 +296,27 @@ BASELINE = {
     # earned-headroom rule) are banked so the file does not land straight back at zero.
     # The three moved alarms keep their construct ids, so the synthesized template shows
     # exactly one alarm added and nothing replaced.
-    "cdk/stacks/monitoring_stack.py": 1300,
+    # RETIRED by #3537: banked at 1300 PHYSICAL lines, measures 727 LOGICAL lines —
+    # under the 1000-line ceiling, so the entry is stale by the registry's own rule
+    # (test_baseline_has_no_stale_entries). The ratchet tightened: this file is now
+    # held to the ceiling like any other module, not to a private number.
     # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the
     # seam caller. A considered raise, not a reflexive one; the NEXT growth extracts.
-    "lambdas/compute/hypothesis_engine_lambda.py": 1637,
-    "lambdas/ai/ai_context.py": 1415,
-    "lambdas/content/output_writers.py": 1340,  # #2816: extracted _dedup_activities (51 lines) to digest_utils.py; banked 10
+    "lambdas/compute/hypothesis_engine_lambda.py": 1292,
+    "lambdas/ai/ai_context.py": 1076,
+    "lambdas/content/output_writers.py": 1113,  # #2816: extracted _dedup_activities (51 lines) to digest_utils.py; banked 10
     # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
     # import. That module exists because the compute Lambda and the daily brief had two
     # different definitions of "last week's weight" and the compute one was wrong (it took
     # the OLDEST reading in a 14-day window). The single line buys one shared definition —
     # the ratchet's first real bump, and the shape it is meant to allow.
-    "lambdas/compute/daily_metrics_compute_lambda.py": 1370,
-    "lambdas/coach/coach_narrative_orchestrator.py": 1292,
+    "lambdas/compute/daily_metrics_compute_lambda.py": 1048,
+    # RETIRED by #3537: banked at 1292 PHYSICAL lines, measures 971 LOGICAL lines —
+    # under the 1000-line ceiling, so the entry is stale by the registry's own rule
+    # (test_baseline_has_no_stale_entries). The ratchet tightened: this file is now
+    # held to the ceiling like any other module, not to a private number.
     # 1268 -> 1233 (#2418): the ADR-104 grounding gate on the derived reader prose is
     # ~85 lines of new substance, and this file was AT its recorded number. Paid for the
     # #2221 way rather than by raising it — the 143-line extraction-prompt literal moved
@@ -301,7 +324,7 @@ BASELINE = {
     # gate’s blob/regen/hold/read helpers live in coach/coach_derived_prose.py, which the
     # three serving paths import anyway. Tightened to the measured count so the 35 lines
     # handed back are not left as unpoliced headroom.
-    "mcp/tools_hevy_routine.py": 1218,
+    "mcp/tools_hevy_routine.py": 1022,
 }
 
 # ── #2610: make the red legible ─────────────────────────────────────────────────────────
@@ -387,9 +410,57 @@ def _tracked_scope_py_files():
     return sorted(files)
 
 
+# Tokens that carry no logical content. Everything else — including a docstring,
+# which is a STRING expression and not a comment in Python's grammar — is code.
+_NON_LOGICAL_TOKENS = frozenset(
+    {
+        tokenize.COMMENT,
+        tokenize.NL,
+        tokenize.NEWLINE,
+        tokenize.INDENT,
+        tokenize.DEDENT,
+        tokenize.ENDMARKER,
+        tokenize.ENCODING,
+    }
+)
+
+
 def _line_count(rel):
-    with open(os.path.join(_REPO, rel), encoding="utf-8", errors="replace") as fh:
-        return len(fh.read().splitlines())
+    """LOGICAL lines: physical lines carrying at least one token that is not a
+    comment, a blank or pure layout. #3537 — this used to be
+    ``len(fh.read().splitlines())``, which charged every ``#`` line and every blank
+    line against the ceiling.
+
+    That is not a neutral measurement choice, it is a tax on the next DOCUMENTATION
+    line rather than the next function. On 2026-09-04 it collected: eb777b5b5's
+    message reads "Both size failures were caused by COMMENTS I wrote explaining the
+    fix", and the fix was to delete the explanation (3 files, +4/-23) after CI run
+    33844077590 failed this guard three times. The guard's own line ~222 already
+    recorded comment compression as the practiced response — which #2610 rule 1
+    forbids in spirit, and docs/ENGINEERING_STANDARDS.md §2 had never named a unit.
+
+    A multi-line statement counts every line it spans (a 6-line call is 6 lines of
+    code), so wrapping is not an escape either. A file that cannot be tokenized
+    falls back to the physical count — fail toward the STRICTER number, never the
+    looser one.
+    """
+    return logical_line_count(os.path.join(_REPO, rel))
+
+
+def logical_line_count(path):
+    """``_line_count`` over an absolute path, so the measure can be exercised on a
+    synthetic file without staging one inside the repo."""
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    try:
+        lines = set()
+        for tok in tokenize.tokenize(io.BytesIO(raw).readline):
+            if tok.type in _NON_LOGICAL_TOKENS:
+                continue
+            lines.update(range(tok.start[0], tok.end[0] + 1))
+        return len(lines)
+    except (tokenize.TokenError, SyntaxError, IndentationError, UnicodeDecodeError):
+        return len(raw.decode("utf-8", errors="replace").splitlines())
 
 
 def _head(rel):
@@ -538,12 +609,20 @@ def test_baselined_file_exactly_at_its_cap_passes():
 
 def test_new_oversize_file_fails():
     """A fresh file over the ceiling, not baselined and not exception-marked, is caught."""
-    assert _classify(1300, in_baseline=False, has_exception=False) == "FAIL"
+    assert _classify(HARD_CEILING + 100, in_baseline=False, has_exception=False) == "FAIL"
 
 
 def test_under_ceiling_file_passes():
-    """A file at/under the ceiling is fine regardless of baseline/exception state."""
-    assert _classify(1200, in_baseline=False, has_exception=False) == "ok:under-ceiling"
+    """A file at/under the ceiling is fine regardless of baseline/exception state.
+
+    #3537: these two cases used to hardcode 1300 and 1200. Pinning the boundary as a
+    literal made them a second, silent copy of HARD_CEILING — moving the real ceiling
+    left them asserting about a number the guard no longer uses (test_under_ceiling
+    started claiming an over-ceiling file passes). Derive from the constant; the
+    boundary itself is what these cases are about.
+    """
+    assert _classify(HARD_CEILING, in_baseline=False, has_exception=False) == "ok:under-ceiling"
+    assert _classify(HARD_CEILING + 1, in_baseline=False, has_exception=False) == "FAIL"
 
 
 def test_exception_comment_exempts():
@@ -618,3 +697,71 @@ def test_generated_header_exempts():
     """A generated-file header is recognized as an exemption without a manual comment."""
     for marker in ("# @generated by tool", "# AUTO-GENERATED — do not edit", "# GENERATED FILE"):
         assert _GENERATED_RE.search(marker)
+
+
+# ── C. THE UNIT (#3537) — a comment may not move the number, a statement must ───────────
+_UNIT_BASE = """import os
+
+
+def f(a, b):
+    return os.path.join(a, b)
+"""
+
+
+def test_a_comment_only_diff_cannot_move_the_line_count(tmp_path):
+    """THE #3537 NEGATIVE CONTROL. On the old measure — ``len(splitlines())`` — each
+    of the three diffs below moved the number, so a module at its baseline reds on a
+    comment. That is not a hypothetical: eb777b5b5's own message reads "Both size
+    failures were caused by COMMENTS I wrote explaining the fix", and the fix was to
+    delete the explanation.
+    """
+    base = tmp_path / "base.py"
+    base.write_text(_UNIT_BASE)
+    n = logical_line_count(base)
+
+    # (1) a standalone comment line, (2) a trailing comment, (3) blank lines — the three
+    # shapes a written-up fix actually adds.
+    commented = tmp_path / "commented.py"
+    commented.write_text(
+        "# A four-line block explaining WHY this join is the way it is,\n"
+        "# with the incident number and the thing that bit.\n"
+        "#\n"
+        "# (#3537 — this used to cost four lines of ceiling.)\n"
+        + _UNIT_BASE.replace("    return os.path.join(a, b)", "    return os.path.join(a, b)  # trailing rationale\n\n")
+    )
+    assert logical_line_count(commented) == n, "a comment-only diff moved the logical line count"
+    assert len(commented.read_text().splitlines()) > len(
+        base.read_text().splitlines()
+    ), "the synthetic comment diff must grow the PHYSICAL count, or this control proves nothing"
+
+    # POSITIVE CONTROL: a code line must still move it, or the guard measures nothing.
+    coded = tmp_path / "coded.py"
+    coded.write_text(_UNIT_BASE + "\n\ndef g(x):\n    return x + 1\n")
+    assert logical_line_count(coded) == n + 2, "a real code addition must move the count"
+
+    # A multi-line STATEMENT is charged for every line it spans — wrapping is not an
+    # escape hatch from the ceiling.
+    wrapped = tmp_path / "wrapped.py"
+    wrapped.write_text("import os\n\n\ndef f(\n    a,\n    b,\n):\n    return os.path.join(\n        a,\n        b,\n    )\n")
+    assert logical_line_count(wrapped) > n
+
+    # A docstring is a string EXPRESSION, not a comment, and is charged. Named here so
+    # the boundary is a decision on the record rather than an accident of tokenize.
+    docstringed = tmp_path / "docstringed.py"
+    docstringed.write_text(_UNIT_BASE.replace("def f(a, b):\n", 'def f(a, b):\n    """One.\n\n    Two.\n    """\n'))
+    assert logical_line_count(docstringed) > n
+
+
+def test_an_untokenizable_file_falls_back_to_the_stricter_physical_count(tmp_path):
+    """Fail toward the STRICTER number. A file the tokenizer chokes on must not
+    silently measure 0 and slip under every ceiling in the repo."""
+    broken = tmp_path / "broken.py"
+    broken.write_text("def f(:\n" + "x = 1\n" * 40)
+    assert logical_line_count(broken) == 41
+
+
+def test_every_baseline_is_at_or_above_the_ceiling():
+    """The registry holds only files that are actually over the ceiling. Re-banking at
+    a new unit is exactly when a stale entry sneaks in as a private, lower ceiling."""
+    under = sorted((rel, cap) for rel, cap in BASELINE.items() if cap <= HARD_CEILING)
+    assert not under, f"BASELINE entr(ies) at/under the {HARD_CEILING}-line ceiling: {under}"

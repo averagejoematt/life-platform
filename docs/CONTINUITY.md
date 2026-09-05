@@ -220,7 +220,7 @@ session, but a human can follow them directly:
 | Skill | Process it encodes |
 |---|---|
 | `wrap.md` | Session close: archive the handover, replace the CLAUDE.md status block, update memory, distill a build beat (the #365 convention, §1–2 above) |
-| `deploy.md` | Deploying a Lambda, the site, or the fleet — the one-bundle rules (#781), ownership boundaries, verification steps |
+| `deploy/SKILL.md` | Deploying a Lambda, the site, or the fleet — the one-bundle rules (#781), ownership boundaries, verification steps |
 | `uplevel.md` | The improvement-session driver: fresh-eyes survey → rank against the north star → ship one flagship slice end-to-end |
 | `qa.md` | The render-level QA sweep of averagejoematt.com (smoke + Playwright visual QA) |
 | `review/SKILL.md` | The one graded-review spine. Seven lenses, each a rubric in `review/references/<lens>.md`: `accuracy` (the truth audit — are the published numbers true and the AI prose grounded, the layer above `/qa`), `site` (the holistic narrative/UX review — does each page's story land, human-in-the-loop), plus `craft`, `sdlc`, `full`, `platform` and `journey`. Cadence, exemptions and the dead-man live in `scripts/operating_calendar.py`, not in the skill |

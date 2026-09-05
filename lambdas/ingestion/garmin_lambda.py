@@ -75,7 +75,7 @@ import os
 import time
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import boto3
 
@@ -106,21 +106,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # ── Serialisation ──────────────────────────────────────────────────────────────
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
-try:
-    from common.numeric import floats_to_decimal  # noqa: F401
-except ImportError:
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def floats_to_decimal(obj):
-            if isinstance(obj, bool):
-                return obj
-            if isinstance(obj, float):
-                return Decimal(str(obj))
-            if isinstance(obj, dict):
-                return {k: floats_to_decimal(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [floats_to_decimal(v) for v in obj]
-            return obj
+from common.numeric import floats_to_decimal  # noqa: F401
 
 
 # #970 KEPT (deliberate): value-coercion contract (val) -> rounded 2dp, not digest_utils'
