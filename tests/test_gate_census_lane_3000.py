@@ -467,7 +467,11 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
 BASELINE_TOTAL_GATES = (
-    594  # +1 2026-09-04 (#3478's Day-1 synthetic-baseline guard joins the inventory), atop 593 (#3477's reset doc-gate sweep, atop 592)
+    # +2 2026-09-05 (#3529/#3531/#3534: the reset sweep's two declared-exemption registries —
+    # MULTILINE_RUN_EXEMPT and MUTATING_GATES — both landing WITH verdicts, so unproven is
+    # unchanged at 537), atop 594 (#3478's Day-1 synthetic-baseline guard), atop 593 (#3477's
+    # reset doc-gate sweep, atop 592)
+    596
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
