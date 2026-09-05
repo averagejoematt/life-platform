@@ -148,6 +148,47 @@
   --ember-line:     color-mix(in oklch, var(--ember) 42%, transparent);
   --ember-wash:     color-mix(in oklch, var(--ember) 9%, transparent);
 
+  /* ── Pillar identity colours (§8.6) — the character sheet's seven pillars.
+     Like --coach these encode IDENTITY (ring segments, radar vertices, stat-bar
+     fills, heatmap row accents) — but evidence_character.js / evidence_receipts.js
+     also render pillar NAMES in them (`.ch-cal-p`, the decay/calibration <strong>s,
+     `.ch-comp-n`), so they are text tokens and live here in the palette block with
+     a light-mode override in §9. Before #3545 they were declared ONCE, in a bare
+     `:root` far below §9 that neither light block ever overrode: all seven measured
+     2.81–3.47:1 on the light --page against a 4.5:1 AA floor while every one of them
+     passed on dark (4.92–6.05:1). Same shape as the --alert miss (#1222) and the
+     coach accents (#2919/#3057). The light values in §9 hold the OKLCH hue and
+     chroma of these and lower only L, so the identity survives the theme.
+     Held to AA in all three palette blocks by tests/test_token_contrast.py. */
+  --pillar-sleep:         #7B87C4;   /* indigo, calmed   */
+  --pillar-movement:      #4E9E7C;   /* green, muted     */
+  --pillar-nutrition:     #B8862F;   /* wheat gold       */
+  --pillar-metabolic:     #4E93A5;   /* teal, quiet      */
+  --pillar-mind:          #9781BC;   /* violet, muted    */
+  --pillar-relationships: #B06E6A;   /* clay rose        */
+  --pillar-consistency:   #8A9455;   /* olive            */
+
+  /* ── The recede grammar (#3544) — "receded" is a COLOUR STEP, never an opacity.
+     A locked tier rung, an unearned badge, an inert cross-pillar effect, an off
+     vital glyph and a de-celebrated timeline row all used to recede behind a
+     whole-element `opacity: 0.55` (0.75 in two places). Element opacity composites
+     the TEXT toward the page: --ink-faint landed at 2.57:1 dark / 2.16:1 light and
+     --ink-muted at 2.99:1 / 2.16:1, against the 4.5:1 AA floor, on informational
+     prose — "7 days to unlock", "No entry in 25 days", the tier descriptions.
+     WCAG 1.4.3 exempts inactive UI COMPONENTS; it does not exempt the copy inside
+     a card that happens to describe an inactive thing.
+     The two ink steps below are var() aliases onto the ramp, so they inherit its
+     AA guarantee in BOTH themes for free — and --ink-faint IS the floor (4.88:1 on
+     the light --page, no headroom under it). That is why a receded block recedes by
+     moving its PRIMARY text down one step and dimming its decorative marks, never
+     by pushing its faint text lower. --recede-viz is the one place an opacity is
+     still sanctioned, and only on marks that carry no text node (the aria-hidden
+     tier emblem and badge mark, the wall fingerprint, a book cover).
+     Guarded by tests/test_token_contrast.py. */
+  --recede-ink:   var(--ink-muted);  /* what was --ink in the lit state        */
+  --recede-ink-2: var(--ink-faint);  /* what was --ink-muted — the AA floor    */
+  --recede-viz:   0.55;              /* decorative, TEXT-FREE marks ONLY       */
+
   /* Hairlines & ticks (the rule system) */
   --rule:        rgba(236, 227, 210, 0.12);   /* structural hairline */
   --rule-strong: rgba(236, 227, 210, 0.20);
@@ -335,6 +376,18 @@
     --rule:        rgba(34, 30, 23, 0.13);
     --rule-strong: rgba(34, 30, 23, 0.22);
     --tick:        rgba(34, 30, 23, 0.30);
+    /* Pillar identity, light leg (#3545). Same OKLCH hue (within 2 deg) and chroma
+       as the dark block above; only L drops, so the seven identities survive the
+       theme while every one clears AA as TEXT on the light paper:
+       4.61-4.65:1 on --page / 4.98-5.02:1 on --surface (dark: 4.92-6.05 / 4.66-5.74).
+       The dark values on this page measured 2.81-3.47:1. */
+    --pillar-sleep:         #5D68A3;
+    --pillar-movement:      #267959;
+    --pillar-nutrition:     #8C6410;
+    --pillar-metabolic:     #2D7486;
+    --pillar-mind:          #77619A;
+    --pillar-relationships: #9A5A57;
+    --pillar-consistency:   #677032;
     /* The paper ramp, light leg (#1470). Elevation lifts toward warm white here —
        the root's derived raised formula (12% ink) DARKENED in light mode, so every
        "floating" surface (popover, tooltip, app-bar, TOC) read as a muddy inset.
@@ -361,6 +414,18 @@
   --rule:        rgba(34, 30, 23, 0.13);
   --rule-strong: rgba(34, 30, 23, 0.22);
   --tick:        rgba(34, 30, 23, 0.30);
+  /* Pillar identity, light leg (#3545). Same OKLCH hue (within 2 deg) and chroma
+     as the dark block above; only L drops, so the seven identities survive the
+     theme while every one clears AA as TEXT on the light paper:
+     4.61-4.65:1 on --page / 4.98-5.02:1 on --surface (dark: 4.92-6.05 / 4.66-5.74).
+     The dark values on this page measured 2.81-3.47:1. */
+  --pillar-sleep:         #5D68A3;
+  --pillar-movement:      #267959;
+  --pillar-nutrition:     #8C6410;
+  --pillar-metabolic:     #2D7486;
+  --pillar-mind:          #77619A;
+  --pillar-relationships: #9A5A57;
+  --pillar-consistency:   #677032;
   /* The paper ramp, light leg (#1470) — MUST mirror the @media block above exactly
      (the explicit-choice block is what makes the toggle win in both directions;
      tests/test_paper_ramp_contrast.py asserts the two blocks stay identical). */
@@ -911,8 +976,13 @@ td .evb .evb-tip { left: auto; right: 0; }
 .vg-lit { border-color: var(--ember-line); }
 .vg-lit .vg-dot { background: var(--ember); }
 .vg-lit .vg-word { color: var(--ember); }
-.vg-off { opacity: 0.55; border-style: dashed; }
+/* #3544 — an "off" glyph recedes by COLOUR + the dashed rule, not by a card-wide
+   opacity: at 0.55 the word (--ink-faint) fell to 2.56:1 and the ".vg-val" reading
+   ("No entry in 25 days") to 2.99:1. The lit/off distinction is already carried by
+   ember-vs-faint and the border style; only the text-free dot still dims. */
+.vg-off { border-style: dashed; }
 .vg-off .vg-word { color: var(--ink-faint); }
+.vg-off .vg-dot { opacity: var(--recede-viz); }
 a.vg-lit:hover { background: var(--ember-wash); }
 /* #3287 — a glyph whose reading belongs to a day other than the page's own Pacific date
    wears that date. Muted and dashed rather than alarmed: the number is real, the day is
@@ -1815,20 +1885,15 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 }
 
 /* ── Pillar identity colors (§8.6) — the character sheet's seven pillars.
-   Like --coach, these encode IDENTITY only (ring segments, radar vertices,
-   stat-bar fills, heatmap row accents, sparkline strokes) — never buttons,
-   text, alerts, or non-pillar data. Ember stays the "earned/up" accent.
-   Desaturated toward the v5 register; mid-lightness so one set reads on
-   both themes. */
-:root {
-  --pillar-sleep:         #7B87C4;   /* indigo, calmed   */
-  --pillar-movement:      #4E9E7C;   /* green, muted     */
-  --pillar-nutrition:     #B8862F;   /* wheat gold       */
-  --pillar-metabolic:     #4E93A5;   /* teal, quiet      */
-  --pillar-mind:          #9781BC;   /* violet, muted    */
-  --pillar-relationships: #B06E6A;   /* clay rose        */
-  --pillar-consistency:   #8A9455;   /* olive            */
-}
+   Like --coach, these encode IDENTITY (ring segments, radar vertices, stat-bar
+   fills, heatmap row accents, sparkline strokes) — never buttons, alerts, or
+   non-pillar data. Ember stays the "earned/up" accent.
+   THE TOKENS THEMSELVES MOVED to the §1 palette block and gained a §9 light-mode
+   leg (#3545): the seven values used to live HERE, in a bare `:root` below the
+   light blocks, which is precisely why no light override existed and pillar NAMES
+   rendered in them (`.ch-cal-p`, the decay/calibration <strong>s, `.ch-comp-n`)
+   measured 2.81-3.47:1 on the light paper. They are text tokens; they belong in
+   the palette, in every theme, where tests/test_token_contrast.py can see them. */
 /* Tier accent — set via data-tier on the character sheet's section root; used
    only on the tier emblem + hero frame (the tier IS an identity, not data). */
 [data-tier="foundation"] { --tier-accent: color-mix(in oklch, var(--ember) 55%, var(--ink)); }

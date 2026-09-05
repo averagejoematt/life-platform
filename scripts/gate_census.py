@@ -481,9 +481,9 @@ PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in STRUCTURAL_PROOF
 
 # Family 2 (guard-script) records that did not fit above — this module is ~1,175 of its
 # 1,200-line ceiling (#1665) and the rule is extraction, never a baseline raise (#2610).
-from gate_census_proofs import GUARD_PROOFS  # noqa: E402
+from gate_census_proofs import GUARD_PROOFS, REGISTRY_PROOFS  # noqa: E402  (#3544: family "registry" rides the same import)
 
-PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in GUARD_PROOFS.items()})
+PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in {**GUARD_PROOFS, **REGISTRY_PROOFS}.items()})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

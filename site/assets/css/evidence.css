@@ -631,7 +631,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   border-radius: var(--radius-xs); transition: background var(--dur-fast);
 }
 .ev-intro__go:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); }
-.ev-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); opacity: 0.8; }
+/* #3544 — --ink-muted is already the muted register; the extra 0.8 took it to
+   3.35:1 in light mode for no additional hierarchy. */
+.ev-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); }
 .ev-intro__x {
   position: absolute; top: var(--sp-3); right: var(--sp-3);
   appearance: none; cursor: pointer; background: transparent; border: 0;
@@ -665,7 +667,14 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rdg-cap { display: block; margin-top: 0.35rem; font-size: var(--fs-label); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rdg-rating { color: var(--ember); margin-left: 0.3rem; }
 .rdg-finished .rdg-face { border-left-color: var(--ink-faint); }
-.rdg-abandoned .rdg-face { border-left-color: var(--ink-faint); opacity: 0.72; }
+/* #3544 — an abandoned book fades its COVER and loses its colour; the spine title
+   and author keep their luminance. `opacity: 0.72` on the whole face put the author
+   line (--ink-faint) at 3.60:1 dark / 2.87:1 light. grayscale() is the treatment
+   already shipped for the paused-supplement cards above: it removes the ember
+   without moving relative luminance, so contrast lands exactly where the tokens
+   put it. */
+.rdg-abandoned .rdg-face { border-left-color: var(--ink-faint); filter: grayscale(1); }
+.rdg-abandoned .rdg-cover { opacity: var(--recede-viz); }
 .rdg-want .rdg-face { border-left-color: color-mix(in srgb, var(--ember) 55%, transparent); }
 
 .wh-row { display: grid; grid-template-columns: 6.5rem 1fr 2rem; align-items: center; gap: 0.6rem; margin: 0.3rem 0; }
@@ -760,8 +769,17 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* The atrophy chip — same badge grammar as `held`, muted ember. */
 .ch-atrophy { color: var(--ember); border-color: var(--ember-line); background: var(--ember-wash); }
 
-/* The quiet-stretch state banner — structural, persistent, muted ember. */
-.ch-state { border: 1px solid var(--ember-line); border-radius: var(--radius-sm); background: var(--ember-wash); padding: var(--sp-3) var(--sp-4); max-width: var(--measure); }
+/* The quiet-stretch state banner — structural, persistent, muted ember.
+   #3545 (the #2592 rule, second specimen): a TEXT-BEARING panel grounds on a ramp
+   step, never on an accent wash. `--ember-wash` is `color-mix(in oklch, --ember 9%,
+   transparent)` — translucent, so its real ground is the accent composited over
+   whatever it lands on: over the light --page that is #EDE1D1, a fifth surface
+   DARKER than any ramp step and outside the register the secondary inks are tuned
+   for. On it, .ch-state-line > .label (--ink-faint) measured 4.34:1 and
+   .ch-state-detail (--ink-muted) 4.38:1 — both under AA, in light mode only. On
+   --surface they read 5.27:1 and 5.33:1. The ember signal stays in the rule: a
+   3px ember-line spine plus the hairline border. */
+.ch-state { border: 1px solid var(--ember-line); border-left: 3px solid var(--ember-line); border-radius: var(--radius-sm); background: var(--surface); padding: var(--sp-3) var(--sp-4); max-width: var(--measure); }
 .ch-state .ch-state-line { color: var(--ink); }
 .ch-state .ch-state-line .num { font-family: var(--font-mono); font-size: var(--fs-data-lg); color: var(--ember); margin-right: var(--sp-1); }
 .ch-state .ch-state-detail { color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); margin-top: var(--sp-2); max-width: var(--measure-narrow); }
@@ -771,7 +789,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-tl li.ch-tl-down .ch-tl-ev { color: var(--ink-muted); }
 .ch-tl li.ch-tl-down .ch-tl-lv { color: var(--ink-faint); }
 .ch-tl-dn { color: var(--ink-faint); }
-.ch-tl li.ch-tl-muted { opacity: 0.75; }
+/* #3544 — de-celebrated, not dimmed: at 0.75 the row's --ink-faint label read
+   3.83:1 dark / 3.03:1 light. The recede is the neutral rule plus one ramp step. */
+.ch-tl li.ch-tl-muted { border-left-color: var(--rule); }
+.ch-tl li.ch-tl-muted .ch-tl-ev { color: var(--recede-ink); }
 .ch-tl li.ch-tl-muted .ch-tl-lv { color: var(--ink-faint); }
 
 /* The visible XP bleed line in the economy panel. */
@@ -792,8 +813,16 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-rung-fl { color: var(--ink-faint); font-size: var(--fs-small); }
 .ch-rung-now { color: var(--ember); }
 .ch-rung.is-current { border-color: var(--ember-line); background: var(--ember-wash); }
-.ch-rung.is-locked { opacity: 0.55; }
-.ch-rung.is-locked .ch-rung-em { color: var(--ink-faint); }
+/* #3544 — a locked rung recedes one step down the ink ramp plus a dashed rule,
+   not behind `opacity: 0.55`: that composited the band label to 2.99:1 and the
+   floor line ("The base holds and starts compounding.") to 2.56:1 in dark, 2.16:1
+   in light. Only the emblem dims — tierEmblem(tier, null) is a bare glyph, drawn
+   aria-hidden with no text node (sigils.js), so it is decorative by declaration. */
+.ch-rung.is-locked { border-style: dashed; }
+.ch-rung.is-locked .ch-rung-name { color: var(--recede-ink); }
+.ch-rung.is-locked .ch-rung-band,
+.ch-rung.is-locked .ch-rung-fl { color: var(--recede-ink-2); }
+.ch-rung.is-locked .ch-rung-em { color: var(--ink-faint); opacity: var(--recede-viz); }
 
 /* The record — level events, heatmap, waveform. */
 .ch-tl { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: grid; gap: var(--sp-2); }
@@ -848,9 +877,16 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-band-p { display: inline-flex; gap: var(--sp-2); }
 .ch-band-p .ico { width: 16px; height: 16px; display: block; }
 .ch-fxgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--sp-3); }
-.ch-fx { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); display: grid; gap: var(--sp-1); opacity: 0.75; }
-.ch-fx.is-active { opacity: 1; border-color: var(--ember-line); background: var(--ember-wash); }
-.ch-fx.is-inert { opacity: 0.55; }
+/* #3544 — the three effect states are told by BORDER + COLOUR, never by element
+   opacity. The old `opacity: 0.75` base put .ch-fx-cond (--ink-faint) at 3.83:1
+   dark / 3.03:1 light before a chip was even inert; `.is-inert`'s 0.55 took it to
+   2.56:1 / 2.16:1. Active keeps the ember wash+line, inert takes a dashed rule and
+   one ramp step down, the resting default is the plain hairline. */
+.ch-fx { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); display: grid; gap: var(--sp-1); }
+.ch-fx.is-active { border-color: var(--ember-line); background: var(--ember-wash); }
+.ch-fx.is-inert { border-style: dashed; }
+.ch-fx.is-inert .ch-fx-name { color: var(--recede-ink); }
+.ch-fx.is-inert .ch-fx-t { color: var(--recede-ink-2); }
 .ch-fx-name { font-family: var(--font-sans); color: var(--ink); }
 .ch-fx-cond { color: var(--ink-faint); }
 .ch-fx.is-active .ch-fx-cond { color: var(--ember); }
@@ -890,8 +926,16 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-bgroup { margin-top: var(--sp-4); }
 .ch-bgroup > .label { color: var(--ink-faint); display: block; margin-bottom: var(--sp-2); }
 .ch-bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }
-.ch-badge { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); display: grid; justify-items: center; gap: var(--sp-1); text-align: center; opacity: 0.55; }
-.ch-badge.is-earned { opacity: 1; border-color: var(--ember-line); background: var(--ember-wash); }
+/* #3544 — an unearned badge is already told by its mark colour (--ink-faint vs the
+   earned --ember) and by the ember wash+line on the earned card; the extra
+   `opacity: 0.55` only pushed the hint line ("7 days to unlock") to 2.56:1 dark /
+   2.16:1 light. It recedes now by a dashed rule + one ramp step on the name, and
+   the mark alone dims — badgeMark() renders aria-hidden with no text (sigils.js). */
+.ch-badge { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); display: grid; justify-items: center; gap: var(--sp-1); text-align: center; }
+.ch-badge.is-earned { border-color: var(--ember-line); background: var(--ember-wash); }
+.ch-badge:not(.is-earned) { border-style: dashed; }
+.ch-badge:not(.is-earned) .ch-badge-n { color: var(--recede-ink); }
+.ch-badge:not(.is-earned) .ch-badge-m { opacity: var(--recede-viz); }
 .ch-badge-m { width: 44px; height: 44px; color: var(--ink-faint); }
 .ch-badge.is-earned .ch-badge-m { color: var(--ember); }
 .ch-badge-m .badge-mark { display: block; width: 100%; height: 100%; }
@@ -1025,7 +1069,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .wall-dead { color: var(--ink-faint); }
 .wall-field { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; }
 .wall-cell { display: block; line-height: 0; opacity: .9; }
-.wall-attempt:not(.is-live) .wall-cell { opacity: .55; }        /* sealed attempts recede */
+/* #3544 — kept as an opacity, deliberately: a .wall-cell wraps ONLY the server-drawn
+   fingerprint SVG (evidence_wall.js renders `${d.svg}` and a title attribute, no text
+   node), so this is the decorative-mark channel, not a text one. It carries the token
+   now so the guard can tell the two apart. The attempt's own text — .wall-genesis,
+   .wall-status — was already outside this selector (#1822). */
+.wall-attempt:not(.is-live) .wall-cell { opacity: var(--recede-viz); }  /* sealed attempts recede */
 .wall-cell.is-warming { opacity: .5; }
 .wall-cell svg, .wall-cell .fingerprint { width: 100%; height: auto; display: block; }
 /* #1822: a staged attempt (genesis not yet reached) — upcoming, not dead.

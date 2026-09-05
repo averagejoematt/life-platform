@@ -467,7 +467,10 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
 BASELINE_TOTAL_GATES = (
-    594  # +1 2026-09-04 (#3478's Day-1 synthetic-baseline guard joins the inventory), atop 593 (#3477's reset doc-gate sweep, atop 592)
+    # +8 2026-09-05 (#3544/#3545: the 8 entries of tests/test_token_contrast.py::RECEDE_TEXT_RULES,
+    # one per rule in the site's recede state grammar — all 8 land PROVEN, so
+    # BASELINE_UNPROVEN_GATES is untouched at 541 and live unproven stays 537),
+    602  # atop 594 (#3478's Day-1 synthetic-baseline guard, atop 593 for #3477's reset doc-gate sweep, atop 592)
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
