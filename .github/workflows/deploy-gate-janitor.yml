@@ -1,0 +1,169 @@
+# Deploy-gate lease janitor (#3021, mechanized reject-only steward #3422).
+#
+# WHAT: `scripts/check_deploy_wedge.py --janitor --apply` — reject PROVABLY superseded
+# `waiting` production-gate leases (older main run, a strictly newer RUN-BEARING main sha
+# has parked or deployed past it). The predicate, the reject-only bound and the rejection-
+# comment contract are all in that script and its tests; this file only decides WHEN it runs.
+#
+# WHY THIS IS ITS OWN WORKFLOW, NOT A STEP IN deploy-wedge-watch.yml (where it lived
+# 2026-08-30 → 2026-09-04):
+#   1. The janitor needs a `concurrency:` group (below) so an event-triggered run and a cron
+#      run cannot dispose the same lease at the same moment. deploy-wedge-watch.yml MUST NOT
+#      own a concurrency group — a watchdog for a stuck concurrency queue that owns a queue
+#      becomes wedgeable by the failure it exists to catch (#2052; pinned by
+#      tests/test_deploy_wedge_2052.py::test_the_watchdog_owns_no_concurrency_group).
+#   2. The event trigger below fires on every production deployment status; the wedge
+#      classifier and the head-coverage check have no business running on that event.
+#
+# THE TRIGGER — PROVEN, NOT ASSUMED (#3422, 2026-09-04):
+#   The design assumed the 15-minute cron delivered "rejected within minutes". Measured over
+#   the 60 newest scheduled runs (2026-08-26 → 2026-09-04): inter-run gap median 211 min,
+#   p90 417 min, max 729 min, 58 of 59 gaps > 30 min, zero gaps ≤ 15 min. GitHub delays and
+#   drops high-frequency crons as a class; a `*/15` cron is a ~3.5-hour cron in practice.
+#
+#   `workflow_run: completed` CANNOT be the hook: a run parked at the production gate has
+#   status `waiting` and is not complete. `deployment_review` (type `requested`) is the event
+#   GitHub fires at that moment, but it is a GitHub-App-only WEBHOOK — it is absent from the
+#   list of events that can trigger a workflow (docs.github.com/en/actions/reference/
+#   workflows-and-actions/events-that-trigger-workflows lists `deployment` and
+#   `deployment_status`, never `deployment_review`; docs.github.com/en/webhooks/
+#   webhook-events-and-payloads#deployment_review: "Availability: GitHub Apps").
+#
+#   `deployment_status` IS a workflow trigger, and the park itself mints one: when a job
+#   reaches a protected environment GitHub creates a deployment object and a status with
+#   `state: waiting`. Verified on a real run in this repo — CI/CD run 33898072296 (sha
+#   e7d11a03, 2026-09-04): deployment 6269244369 created 17:10:16Z, status 17833411165
+#   `state: waiting` at 17:10:17Z (the Deploy job's own started_at is 17:10:16Z), then
+#   status 17833490466 `state: failure` at 17:12:13Z — the hand rejection recorded in the
+#   run's approvals. Both statuses carry the run+job in `log_url`
+#   (…/actions/runs/33898072296/job/101108767663), creator `averagejoematt` (User) — the
+#   workflow's actor, NOT github-actions[bot]/GITHUB_TOKEN, so the "events raised by
+#   GITHUB_TOKEN do not trigger workflows" rule does not apply to it.
+#
+#   Payload fields this job reads (webhook-events-and-payloads#deployment_status):
+#     github.event.deployment_status.state   — "waiting" is the park; the `if:` below keeps
+#                                              the other states (in_progress/success/failure)
+#                                              from spending a runner
+#     github.event.deployment.sha / .environment / .id
+#     github.event.workflow_run.id / .head_sha  (object-or-null; null for third-party
+#                                              deployments, populated for Actions ones)
+#   The janitor does not consume them — its candidate set is the live run list, re-read on
+#   every sweep — they are echoed into the step summary as the audit line that ties a hook
+#   run to the lease that woke it.
+#
+#   Only a workflow file on the default branch receives this event, so the first hook-
+#   triggered run is only observable AFTER merge: the driver verifies it in Actions (a run
+#   of this workflow with `event: deployment_status` at the next gate park), and the first
+#   unattended rejection comment is #3422's closing proof.
+#
+# THE CRON STAYS AS THE DEAD-MAN (the design's own composition rule): the hook is the fast
+# path; the cron catches whatever the hook missed — a dropped event, a compare-API read that
+# came back UNKNOWN at the moment of the park (unknown never rejects), a lease superseded by
+# a completed deploy rather than a new park. `scripts/scheduled_workflow_registry.py` rules
+# on this cron (watched, 8h grace — same basis as deploy-wedge-watch).
+#
+# CONCURRENCY: one group, never cancel-in-progress. A hook run and a cron run that overlap
+# serialize; the second sees the first's disposal on its own fresh read. The residual race —
+# both read `waiting`, one POSTs first — is closed in code: `reject_lease` treats "already
+# disposed" (empty pending_deployments on re-read after a failed POST) as success-with-note,
+# while a 401/403 or a still-pending lease after a failed POST stays a LOUD red run (#3021's
+# "a janitor that cannot do its job must red the run" rule survives; both branches are
+# fixture-tested in tests/test_janitor_event_hook_3422.py).
+#
+# TOKEN: reviewing pending deployments requires a required reviewer of the `production`
+# environment. github.token (github-actions[bot]) is not one; DEPLOY_GATE_JANITOR_TOKEN (a
+# fine-grained PAT of the required reviewer, Actions read/write, this repo only — set
+# 2026-08-30) is. Reject-only is held in CODE, not in the grant (#2833 / ADR-129 amendment
+# 2026-08-30; tests/test_reject_only_steward_3422.py). NO AWS credentials, ever.
+
+name: Deploy-gate lease janitor
+
+on:
+  # The fast path: fires on every production deployment status; the job filters to the
+  # `waiting` park (see the proof block above).
+  deployment_status:
+  schedule:
+    # The dead-man. Declared every 15 minutes; delivered every ~3.5h in practice (measured
+    # above) — which is exactly why the event hook exists.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print what would be rejected without posting (omits --apply)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # run/job/pending_deployments reads; the rejection POST rides the PAT's own scopes.
+  actions: read
+
+concurrency:
+  group: deploy-gate-lease-janitor
+  cancel-in-progress: false
+
+jobs:
+  janitor:
+    name: Reject superseded production-gate leases
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Every deployment_status event is delivered here; only the park is worth a runner.
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'waiting'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Declared interpreter (#3315). The script is stdlib-only — nothing to install.
+      - uses: ./.github/actions/setup-ci
+
+      - name: Record what woke the janitor
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DS_STATE: ${{ github.event.deployment_status.state }}
+          DEP_SHA: ${{ github.event.deployment.sha }}
+          DEP_ENV: ${{ github.event.deployment.environment }}
+          DEP_ID: ${{ github.event.deployment.id }}
+          WOKEN_BY_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          {
+            echo "## Deploy-gate lease janitor (#3021 / #3422)"
+            echo
+            echo "- trigger: \`$EVENT_NAME\`"
+            if [ "$EVENT_NAME" = "deployment_status" ]; then
+              echo "- deployment_status.state: \`$DS_STATE\` · deployment $DEP_ID · environment \`$DEP_ENV\` · sha \`$DEP_SHA\` · woken by CI/CD run $WOKEN_BY_RUN"
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Same set +e / captured-code idiom as deploy-wedge-watch.yml's head-coverage step
+      # (#2746): this step captures-and-forwards the verdict; the step below is the gate.
+      - name: Janitor — reject superseded production-gate leases (#3021)
+        id: janitor
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_GATE_JANITOR_TOKEN || github.token }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -o pipefail
+          set +e
+          if [ "$DRY_RUN" = "true" ]; then
+            python3 scripts/check_deploy_wedge.py --janitor | tee janitor_verdict.txt
+          else
+            python3 scripts/check_deploy_wedge.py --janitor --apply | tee janitor_verdict.txt
+          fi
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          {
+            echo '```'
+            cat janitor_verdict.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # #3021: a janitor that cannot do its job must red the run, never silently revert the
+      # class to manual. An "already disposed" lease is NOT this — reject_lease returns it
+      # as success-with-note and the sweep exits 0 (#3422).
+      - name: Fail loudly on a janitor error (#3021)
+        if: steps.janitor.outputs.code != '0'
+        run: |
+          echo "::error title=Lease janitor error (#3021)::the superseded-lease sweep could not complete — see the step summary (likely: token is not a required reviewer; add/renew secret DEPLOY_GATE_JANITOR_TOKEN)."
+          exit 1

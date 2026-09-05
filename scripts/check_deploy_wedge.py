@@ -91,6 +91,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -789,6 +790,13 @@ def recover(state: dict) -> int:
 #
 # #3422 (2026-09-02): this janitor IS the mechanized reject-only lease steward — the
 # production-support operator leg (docs/OPERATOR_SUBSTRATE_SPIKE.md, Actions lane).
+# Since 2026-09-04 it runs from its own workflow, deploy-gate-janitor.yml: on the
+# `deployment_status` event (state `waiting` = a run just parked at the gate — the fast
+# path) AND on the 15-minute cron as the dead-man, because the cron alone measured a
+# median 211-minute gap (n=60 runs, 59 gaps; p90 417, max 729) and never delivered "within minutes".
+# Two sweeps may therefore overlap or race on one lease; reject_lease() below is
+# idempotent on "already disposed" (success-with-note), while an auth refusal or a
+# lease that is STILL pending after a failed POST stays a loud red run.
 # Two rules it keeps STRUCTURALLY, held by tests/test_reject_only_steward_3422.py:
 #   * REJECT-ONLY (#2833; ADR-129 amendment 2026-08-30 — approval is a human act,
 #     with no re-promotion path short of a new ADR). No approval code path exists in
@@ -920,22 +928,67 @@ def _deployed_superseders(min_created: str) -> list[dict]:
     return deployed
 
 
-def reject_lease(run_id, comment: str) -> None:
-    """POST the rejection — the same call deploy/reject_deployment.sh makes. Re-reads
-    pending_deployments immediately before writing so a lease that moved under us
-    (approved/rejected between classify and apply) raises instead of mis-posting."""
+# reject_lease outcomes (#3422). Both are "done" to the sweep; only an exception is a
+# failure. "already-disposed" is decided STRUCTURALLY — by re-reading the run's own
+# pending_deployments — never by matching the error text (the #2959/#3003 rule: a
+# phrase-matched suppressor fails in the field the day GitHub rewords a message).
+LEASE_REJECTED = "rejected"
+LEASE_ALREADY_DISPOSED = "already-disposed"
+
+# HTTP codes that mean the CREDENTIAL is wrong, whatever happened to the lease. These
+# never take the idempotent branch: a janitor whose token cannot review must red the run
+# now, not on the next sweep that happens to find a lease still pending.
+_AUTH_HTTP_CODES = (401, 403)
+
+_GH_HTTP_STATUS = re.compile(r"\(HTTP (\d{3})\)")
+
+
+def _gh_http_status(stderr: str | None) -> int | None:
+    """The HTTP status `gh api` reports on failure — its stderr line is
+    `gh: <message> (HTTP <code>)` (wire-captured: `gh: Not Found (HTTP 404)`)."""
+    m = _GH_HTTP_STATUS.search(stderr or "")
+    return int(m.group(1)) if m else None
+
+
+def _pending_environment_ids(run_id) -> list:
     pending = _gh_api(f"repos/{REPO}/actions/runs/{run_id}/pending_deployments")
-    env_ids = [p.get("environment", {}).get("id") for p in pending if p.get("environment", {}).get("id") is not None]
+    return [p.get("environment", {}).get("id") for p in pending if p.get("environment", {}).get("id") is not None]
+
+
+def reject_lease(run_id, comment: str) -> str:
+    """POST the rejection — the same call deploy/reject_deployment.sh makes. Returns
+    LEASE_REJECTED, or LEASE_ALREADY_DISPOSED when the lease had already left `waiting`
+    (another sweep — the event hook and the cron can overlap, #3422 — or a hand steward
+    got there first). Raises on anything else: an auth refusal (401/403) always, and any
+    other failed POST after which the lease is STILL pending."""
+    env_ids = _pending_environment_ids(run_id)
     if not env_ids:
-        raise RuntimeError(f"run {run_id} has no pending deployments any more — state moved between classify and apply; not rejecting")
+        return LEASE_ALREADY_DISPOSED
     body = json.dumps({"environment_ids": env_ids, "state": "rejected", "comment": comment})
-    subprocess.run(
+    res = subprocess.run(
         ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/pending_deployments", "--method", "POST", "--input", "-"],
         input=body,
         capture_output=True,
         text=True,
         timeout=60,
-        check=True,
+        check=False,
+    )
+    if res.returncode == 0:
+        return LEASE_REJECTED
+    status = _gh_http_status(res.stderr)
+    detail = (res.stderr or res.stdout or "").strip()
+    if status in _AUTH_HTTP_CODES:
+        raise RuntimeError(
+            f"rejection of run {run_id} REFUSED (HTTP {status}): {detail} — the token is not a required reviewer of the "
+            "`production` environment (or DEPLOY_GATE_JANITOR_TOKEN has expired)"
+        )
+    # Not an auth refusal. The decisive fact is the lease itself, re-read: gone means the
+    # other steward disposed it between our read and our write; still there means the
+    # POST genuinely failed and the sweep must red.
+    if not _pending_environment_ids(run_id):
+        return LEASE_ALREADY_DISPOSED
+    raise RuntimeError(
+        f"rejection of run {run_id} FAILED (HTTP {status if status is not None else '?'}): {detail} — the lease is still pending"
     )
 
 
@@ -996,8 +1049,11 @@ def janitor(apply: bool) -> int:
             print(f"janitor[DRY-RUN]: would REJECT {line}")
             continue
         try:
-            reject_lease(older.get("id"), build_rejection_comment(older, cand))
-            print(f"janitor[APPLY]: REJECTED {line}")
+            outcome = reject_lease(older.get("id"), build_rejection_comment(older, cand))
+            if outcome == LEASE_ALREADY_DISPOSED:
+                print(f"janitor[APPLY]: ALREADY DISPOSED {line} — another sweep or a hand steward got there first; nothing to do (#3422)")
+            else:
+                print(f"janitor[APPLY]: REJECTED {line}")
         except Exception as e:  # noqa: BLE001 - a failed rejection must red the sweep, not vanish
             failures += 1
             print(

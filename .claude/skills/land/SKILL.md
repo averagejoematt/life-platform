@@ -75,7 +75,7 @@ silent until-loop: 'blocked' must be distinguishable from 'still waiting'.
 Decode before deciding: **reject any lease whose sha is already an ancestor of `main`** —
 approving it deploys a tree missing every later merge. The auto-filed wedge alert advises
 *approve* with no ancestry check; do not follow it blindly. The machine half of this step
-is the #3021 janitor (`deploy-wedge-watch.yml`): it auto-rejects superseded waiting leases
+is the #3021 janitor (`deploy-gate-janitor.yml`, fired by each gate park's `deployment_status` event + a 15-min dead-man cron, #3422): it auto-rejects superseded waiting leases
 once `DEPLOY_GATE_JANITOR_TOKEN` exists — if its job is red on a 4xx, the token is missing
 and this whole section is running on manual reflexes.
 

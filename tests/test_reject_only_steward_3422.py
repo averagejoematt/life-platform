@@ -4,7 +4,8 @@ two load-bearing contracts (#3422).
 #3422 asked for the reject half of production-gate lease disposal to be mechanized.
 The mechanized artifact ALREADY EXISTS — the #3021 superseded-lease janitor
 (`scripts/check_deploy_wedge.py --janitor --apply`, run every 15 minutes by
-`deploy-wedge-watch.yml` under `DEPLOY_GATE_JANITOR_TOKEN`) — so this file does not
+`deploy-gate-janitor.yml` under `DEPLOY_GATE_JANITOR_TOKEN`; it ran as a step of
+`deploy-wedge-watch.yml` until #3422's event hook moved it, 2026-09-04) — so this file does not
 add a second steward; it pins the two contracts #3422's acceptance names, which
 #3021's own test file (`tests/test_deploy_gate_janitor_3021.py`) left unpinned:
 
@@ -39,6 +40,7 @@ tests/test_deploy_gate_janitor_3021.py).
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -226,7 +228,8 @@ def test_reject_lease_posts_exactly_one_write_and_its_state_is_rejected(monkeypa
 
     def fake_subprocess_run(cmd, **kwargs):
         posted.append((cmd, json.loads(kwargs["input"])))
-        return None
+        # The wire shape reject_lease reads back (#3422): a CompletedProcess, exit 0.
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(cdw.subprocess, "run", fake_subprocess_run)
     cdw.reject_lease(123, "steward comment")
@@ -258,7 +261,7 @@ def test_no_workflow_invokes_the_approve_capable_scripts():
 
 
 def test_the_janitor_workflow_step_is_the_reject_sweep_and_grants_no_approval():
-    text = Path(_REPO, ".github", "workflows", "deploy-wedge-watch.yml").read_text()
+    text = Path(_REPO, ".github", "workflows", "deploy-gate-janitor.yml").read_text()
     assert "--janitor --apply" in text  # the mechanized reject-only sweep
     assert "DEPLOY_GATE_JANITOR_TOKEN" in text  # the required-reviewer credential
     assert re.search(r"""state["']?\s*[:=]\s*["']approved""", text) is None
