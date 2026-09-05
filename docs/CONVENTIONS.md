@@ -160,7 +160,27 @@ one push per layer. That masked-gate class bit twice on 2026-07-08 alone.) Gatin
 unchanged: any red gate still fails the Lint job, and `test-critical` (→ `plan` →
 `deploy`) `needs` Lint, so a **red Lint still blocks the deploy chain** — it just no
 longer hides the other gates' findings. NB: `always()` steps also run after a
-cancellation; with `cancel-in-progress: false` that only happens on a manual cancel.
+cancellation.
+
+**A `cancelled` CI/CD rollup is NOT a superseded push — read the JOBS (#3530).** This
+paragraph used to say a cancel "only happens on a manual cancel" under
+`cancel-in-progress: false`. That was false, and both green-readers believed it. Since
+#2009 the **workflow**-level concurrency group carries `${{ github.run_id }}`
+(`ci-cd.yml:129`), so it is unique per run and nothing supersedes a CI/CD run at all. The
+one canceller left is the `deploy` job's own group `ci-cd-deploy-${{ github.ref }}`
+(`ci-cd.yml:861-862`): GitHub allows exactly one *pending* entry per group, so a newer
+run's Deploy **evicts** the older run's still-pending Deploy, that job concludes
+`cancelled`, and the whole run rolls up `cancelled` — no matter what the validation jobs
+above it already concluded. Two merges inside one deploy-lease window is every merge-train
+session. Live 2026-09-04, three runs in one night: `33843452894` and `33843742114` both
+rolled up `cancelled` with `test / Unit Tests` FAILED and were invisible to
+`check_main_green.py` / `check_ci_warnings.py`; `33844077590` was the same red but its
+Deploy concluded `failure`, so only that one was seen. **The verdict is the run's job list,
+never the rollup** — `scripts/ci_run_verdicts.py` owns that predicate and both readers
+import it. Reading one by hand is the same move:
+`gh run view <id> --json jobs --jq '.jobs[] | "\(.conclusion)\t\(.name)"'`. (Distinct from,
+and additional to, the `timeout-minutes` kill GitHub *also* renders as `cancelled`, whose
+tell is the job annotation — `reference_job_timeout_renders_as_cancelled`.)
 
 **The doc/wiki gates are NOT in this job — they live in `Docs CI` (#1908).**
 `sync_doc_metadata --check`, `check_doc_links`, `check_doc_tombstones`, `check_doc_facts`,
