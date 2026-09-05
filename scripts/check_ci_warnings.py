@@ -33,6 +33,23 @@ THE FIX
   check_main_green.py's gate; triaging warnings on a run that isn't even green
   yet would be solving the wrong problem first.
 
+A `cancelled` ROLLUP IS NOT A SUPERSESSION (#3530)
+  `latest_green_main_info()` used to skip every `cancelled` run outright, the
+  same way check_main_green.py did, on the same stale reason. Since #2009 the
+  workflow concurrency group is unique per run (`ci-cd.yml:129`), so nothing
+  supersedes a CI/CD run; the one canceller left is the `ci-cd-deploy-<ref>`
+  group evicting a still-PENDING Deploy (`ci-cd.yml:861`), which rolls the whole
+  run up `cancelled` no matter what the validation jobs above it concluded. Live
+  2026-09-04: runs 33843452894 / 33843742114 rolled up `cancelled` with
+  `test / Unit Tests` FAILED, and both readers walked past them to an older
+  green — this gate then triaged the warning board of a run that was NOT the
+  newest verdict.
+  The predicate is `scripts/ci_run_verdicts.py`, imported by BOTH readers and
+  restated in neither: a cancelled run is skipped only when its own jobs prove
+  no failure. A cancelled run carrying a real failure becomes the newest verdict
+  here, which means "not green" — the run is NAMED in this gate's output as a
+  triage item and handed to check_main_green.py, never silently skipped.
+
 DEGRADE HONESTLY
   Any `gh`/API failure (no auth, rate limit, network, offline) prints an
   UNVERIFIED notice and exits 0 — a gate that can't read GitHub must not claim
@@ -45,8 +62,26 @@ USAGE
 """
 
 import json
+import os
 import subprocess
 import sys
+
+# #3530: the cancelled-run predicate lives in ONE module both readers import.
+# `scripts/` is on sys.path when this file is run as a script, but NOT when a
+# test loads it via importlib, so the directory is put there explicitly.
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+import ci_run_verdicts as civ  # noqa: E402 — must follow the sys.path insert above
+
+REPO = "averagejoematt/life-platform"
+
+# #3530: how many leading `cancelled` runs to probe before giving up. Matches
+# check_main_green.CANCELLED_PROBE_LIMIT — the walk stops at the first run that
+# is not a proven supersession, so this bounds a pathological history, not the
+# normal cost.
+CANCELLED_PROBE_LIMIT = 8
 
 
 def _gh_json(args):
@@ -71,24 +106,67 @@ def warning_annotations(check_runs, annotations_by_id):
     return out
 
 
+def latest_verdict_run(runs, cancelled_verdicts=None):
+    """The newest completed run that actually carries a verdict. Pure.
+
+    Mirrors `check_main_green.latest_completed_run` and shares its #3530 rule via
+    `ci_run_verdicts`: a `cancelled` run is walked past ONLY when its own jobs
+    proved it superseded. `cancelled_verdicts` maps run id → a
+    `ci_run_verdicts.CANCELLED_*` constant; an id absent from it was never
+    probed, which keeps the pre-#3530 skip for pure callers that supply no job
+    data (`main()` always probes).
+    """
+    verdicts = cancelled_verdicts or {}
+    for r in runs:
+        if r.get("status") != "completed":
+            continue
+        if r.get("conclusion") == "cancelled" and civ.cancelled_is_skippable(verdicts.get(r.get("databaseId"))):
+            continue
+        return r
+    return None
+
+
 def latest_green_main_info():
-    """(sha, error) for main's newest completed, non-cancelled CI/CD run.
+    """(sha, error, notes) for main's newest completed CI/CD run that is a verdict.
 
     `sha` is the run's headSha when that run is green (conclusion == "success"),
     else None — a not-yet-green newest run is check_main_green.py's problem, not
     this gate's, so it reads as "nothing to triage" rather than an error.
     `error` is a human string on any `gh` failure, in which case `sha` is always
     None and the caller must treat the result as UNVERIFIED, never as clean.
+    `notes` (#3530) is one line per `cancelled` run examined on the way — the
+    skipped supersessions AND the ones carrying a real failure, so a cancelled
+    rollup is never silently walked past.
     """
     try:
-        runs = _gh_json(["run", "list", "--branch", "main", "--workflow", "CI/CD", "--limit", "20", "--json", "status,conclusion,headSha"])
+        runs = _gh_json(
+            ["run", "list", "--branch", "main", "--workflow", "CI/CD", "--limit", "20", "--json", "status,conclusion,headSha,databaseId"]
+        )
     except Exception as e:  # noqa: BLE001 — any gh/network/auth failure must degrade, not crash
-        return None, str(e)
+        return None, str(e), []
+
+    # #3530: classify the leading `cancelled` runs from their OWN jobs before
+    # deciding which one is the verdict. Bounded, and it stops at the first run
+    # that is not a proven supersession — nothing older can be the verdict then.
+    cancelled_verdicts, notes = {}, []
     for r in runs:
-        if r.get("status") != "completed" or r.get("conclusion") == "cancelled":
+        if r.get("status") != "completed":
             continue
-        return (r.get("headSha") if r.get("conclusion") == "success" else None), None
-    return None, None
+        if r.get("conclusion") != "cancelled":
+            break
+        if len(notes) >= CANCELLED_PROBE_LIMIT:
+            break
+        jobs = civ.fetch_run_jobs(_gh_json, REPO, r.get("databaseId"))
+        verdict = civ.classify_cancelled_run(jobs)
+        cancelled_verdicts[r.get("databaseId")] = verdict
+        notes.append(civ.describe_cancelled(r, verdict, civ.failing_job_names(jobs)))
+        if not civ.cancelled_is_skippable(verdict):
+            break
+
+    run = latest_verdict_run(runs, cancelled_verdicts)
+    if run is None:
+        return None, None, notes
+    return (run.get("headSha") if run.get("conclusion") == "success" else None), None, notes
 
 
 def fetch_warnings_for_sha(sha):
@@ -108,21 +186,34 @@ def fetch_warnings_for_sha(sha):
         return [], str(e)
 
 
-def render(warnings, sha, unreachable_error):
-    """(exit_code, message) for a computed result. Pure — unit-tested offline."""
+def render(warnings, sha, unreachable_error, cancelled_notes=None):
+    """(exit_code, message) for a computed result. Pure — unit-tested offline.
+
+    `cancelled_notes` (#3530) rides along on EVERY verdict: a cancelled run this
+    gate examined is named whether it was skipped as a genuine supersession or
+    kept as a run carrying a real failure. Silence about a cancelled rollup is
+    exactly the shape that let three of them hide reds on 2026-09-04.
+    """
+    tail = list(cancelled_notes or [])
     if unreachable_error is not None:
-        return 0, (
-            f"⚠️  check_ci_warnings: GitHub unreachable ({unreachable_error}) — CI-warning "
-            "triage UNVERIFIED this run. Note that explicitly in the handover "
-            "(`**CI warnings:** unverified — GitHub unreachable`) rather than claiming a clean board."
+        return 0, "\n".join(
+            [
+                f"⚠️  check_ci_warnings: GitHub unreachable ({unreachable_error}) — CI-warning "
+                "triage UNVERIFIED this run. Note that explicitly in the handover "
+                "(`**CI warnings:** unverified — GitHub unreachable`) rather than claiming a clean board."
+            ]
+            + tail
         )
     if sha is None:
-        return (
-            0,
-            "ℹ️  check_ci_warnings: latest completed main run isn't green (or none found) — check_main_green.py owns that; nothing to triage here yet.",
+        return 0, "\n".join(
+            [
+                "ℹ️  check_ci_warnings: latest completed main run isn't green (or none found) — "
+                "check_main_green.py owns that; nothing to triage here yet."
+            ]
+            + tail
         )
     if not warnings:
-        return 0, f"✅ no ::warning:: annotations on the latest green main run ({sha[:8]})."
+        return 0, "\n".join([f"✅ no ::warning:: annotations on the latest green main run ({sha[:8]})."] + tail)
     lines = [f"❌ {len(warnings)} ::warning:: annotation(s) on the latest green main run ({sha[:8]}):"]
     for job, title, message in warnings:
         label = f"{job}: {title}" if title else job
@@ -133,16 +224,16 @@ def render(warnings, sha, unreachable_error):
         "(`**CI warnings:** <N> — <one-line triage per warning>`), then re-run with --decoded. "
         "A ::warning:: on green main may not silently normalize into background noise (#1966)."
     )
-    return 1, "\n".join(lines)
+    return 1, "\n".join(lines + tail)
 
 
 def main() -> int:
     decoded = "--decoded" in sys.argv
-    sha, err = latest_green_main_info()
+    sha, err, cancelled_notes = latest_green_main_info()
     warnings = []
     if err is None and sha is not None:
         warnings, err = fetch_warnings_for_sha(sha)
-    code, message = render(warnings, sha, err)
+    code, message = render(warnings, sha, err, cancelled_notes=cancelled_notes)
     print(message)
     if code == 0:
         return 0

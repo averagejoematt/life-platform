@@ -38,6 +38,14 @@ function _points(data, valueKey, dateKey) {
 }
 
 // A trend line with optional goal line + filled area. data: [{<dateKey>,<valueKey>}] or [numbers].
+// #3556 — THE DOMAIN RULE (weightTrendChart's HARD RULE 4, generalised to every caller): the
+// y-domain is derived from the data this chart PLOTS — the series, plus the projection endpoint
+// when a dashed segment is actually drawn out to it. `goal` is an ANNOTATION drawn onto that
+// domain and is never folded into it: a distant target (goal 185 under a 324 lb series; a spend
+// ceiling far above a young month's curve) used to rescale the real series against a number it never
+// touched, flattening a true slope to a few pixels AND moving the `dir` verdict's flat threshold
+// with it — the results door printed "holding flat" for the same weigh-ins the story page called
+// "trending down". An off-domain goal is pinned to the margin, marked, and named as off-scale.
 // `projection` (#1618): a forecast continuation drawn as a DASHED segment from the last actual
 // point to a caller-supplied value at a future date — { value, date, label }. The value is NEVER
 // re-derived here (the whole point is to plot ONE authoritative projection, not a second one that
@@ -74,7 +82,12 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
     }
   }
 
-  const vals = pts.map((p) => p.v).concat(goal != null ? [Number(goal)] : []).concat(projActive ? [projVal] : []);
+  // The data's own range — what the series actually did. The DOMAIN adds only the projection
+  // endpoint (it is plotted, as a dashed path, so it must be in frame). `goal` is absent from
+  // both by construction: it is an annotation, not a datum. See THE DOMAIN RULE above.
+  const dvals = pts.map((p) => p.v);
+  const dataMin = Math.min(...dvals), dataMax = Math.max(...dvals);
+  const vals = dvals.concat(projActive ? [projVal] : []);
   let min = Math.min(...vals), max = Math.max(...vals);
   if (min === max) { min -= 1; max += 1; }
   const x = (i) => P + (i / (pts.length - 1)) * frac * (W - 2 * P);
@@ -82,22 +95,37 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
   const area = `M${x(0).toFixed(1)} ${(H - P).toFixed(1)} ` + pts.map((p, i) => `L${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ") + ` L${x(pts.length - 1).toFixed(1)} ${(H - P).toFixed(1)} Z`;
   const delta = last.v - pts[0].v;
-  const dir = Math.abs(delta) < (max - min) * 0.02 ? "holding flat" : (delta > 0 ? "trending up" : "trending down");
+  // The flat/up/down verdict is a claim about THE DATA, so its threshold is 2% of the DATA's own
+  // range — never of a domain some annotation or forecast widened. (`<=` keeps a genuinely
+  // constant series, where dataMax === dataMin, reading "holding flat" rather than falling
+  // through to a direction.)
+  const dir = Math.abs(delta) <= (dataMax - dataMin) * 0.02 ? "holding flat" : (delta > 0 ? "trending up" : "trending down");
   // Date range, when the points carry dates — gives the trend a time axis in the
   // caption so a reader can see WHICH days a line covers (the rightmost dot is the
   // latest reading). Silently omitted for dateless numeric series.
   const _short = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return ""; return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+m[2] - 1]} ${+m[3]}`; };
   const _span = (pts[0].d && last.d) ? `${_short(pts[0].d)}–${_short(last.d)}` : "";
-  // The dashed forecast, from today's dot out to the right edge (month-end). Its endpoint
-  // sits at the projected value, so a projection that crosses `goal` visibly crosses it —
-  // the y-domain above already includes projVal, so the crossing is guaranteed in-frame.
+  // The dashed forecast, from today's dot out to the right edge (month-end). Its endpoint sits
+  // at the projected value and the y-domain includes projVal, so the forecast is always in
+  // frame. (#3556: when `goal` is off-domain the crossing is stated in the caption — the goal
+  // no longer drags the axis out just to guarantee a visual crossing.)
   const projSeg = projActive
     ? `<path class="chart-proj" d="M${x(pts.length - 1).toFixed(1)} ${y(last.v).toFixed(1)} L${(W - P).toFixed(1)} ${y(projVal).toFixed(1)}" vector-effect="non-scaling-stroke"/>`
       + `<circle class="chart-proj-dot" cx="${(W - P).toFixed(1)}" cy="${y(projVal).toFixed(1)}" r="3"/>`
     : "";
   const projCap = projActive ? ` · dashed = projected $${_r(projVal)} by month-end (governor estimate)` : "";
-  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goal != null ? `, goal ${_r(Number(goal))}${unit}` : ""}${projActive ? `, projected ${_r(projVal)}${unit} by month-end (estimate)` : ""}.`;
-  const goalLine = goal != null ? `<line class="chart-goal" x1="${P}" y1="${y(Number(goal)).toFixed(1)}" x2="${W - P}" y2="${y(Number(goal)).toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
+  // The goal ANNOTATION. In-domain it sits at its true y, exactly as before. Off-domain it is
+  // NOT allowed to stretch the axis (that is the bug) and it is NOT dropped either (being
+  // visible is its whole job): it is pinned to the margin band outside the padded plot area,
+  // flagged `chart-goal--off` so it reads as a marker rather than a value on the scale, and
+  // named as off-scale — with the real distance — in both the caption and the aria summary.
+  const goalV = goal != null && Number.isFinite(Number(goal)) ? Number(goal) : null;
+  const goalOff = goalV == null ? 0 : (goalV > max ? 1 : (goalV < min ? -1 : 0));
+  const goalY = goalV == null ? 0 : (goalOff === 0 ? y(goalV) : (goalOff > 0 ? P / 2 : H - P / 2));
+  const goalGap = goalV == null ? null : _r(Math.abs((goalOff > 0 ? max : min) - goalV));
+  const goalTxt = goalV == null ? "" : `goal ${_r(goalV)}${unit}${goalOff ? ` — off scale, ${goalGap}${unit} ${goalOff > 0 ? "above" : "below"} the plotted range` : ""}`;
+  const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goalV != null ? `, ${goalTxt}` : ""}${projActive ? `, projected ${_r(projVal)}${unit} by month-end (estimate)` : ""}.`;
+  const goalLine = goalV != null ? `<line class="chart-goal${goalOff ? " chart-goal--off" : ""}" x1="${P}" y1="${goalY.toFixed(1)}" x2="${W - P}" y2="${goalY.toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
   // SIGNATURE 1 — a measuring-rule tick spine on the y-axis: a ticked rail with the
   // max (top) and min (bottom) value, giving the trend a real scale. Token-driven ticks.
   const spineEl = spine
@@ -110,7 +138,7 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
     `<path class="chart-fill" d="${area}"/>${goalLine}` +
     `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>${projSeg}` +
     `<circle class="chart-dot" cx="${x(pts.length - 1).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
-    `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts${escAttr(projCap)}</figcaption></figure>`;
+    `<figcaption class="chart-cap label">${escAttr(label)}${goalV != null ? ` · ${escAttr(goalTxt)} (annotation, not the axis)` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts${escAttr(projCap)}</figcaption></figure>`;
 }
 
 // #421 — arc-trend line for slow-moving, long-horizon metrics (VO2max, walking HR). Unlike
@@ -412,6 +440,13 @@ export function ciWhisker(value, lo, hi, { unit = "", label = "", confidence = n
 // Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
 // For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
 // No correlation/Pearson — that's gated elsewhere by the ≥2-week rule. seriesA/B: [{date,value}].
+// #3557 — THE POSITION RULE: a point's x comes from its own VALUE (its date), on a t0→t1 frame
+// SHARED by both series (the autonomicHero pattern), never from its index in its own array.
+// x = i/(arr.length − 1) per series stretched two series of different lengths across the same
+// span, so the same calendar day landed at two different x and both lines ended at the right
+// edge however early one of them stopped — the comparison the chart exists to draw (projected
+// vs actual loss; strain vs recovery) was not comparing like with like. Missing days are now
+// gaps in time, exactly as arcTrend intends ("gaps shown as gaps").
 export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", unit = "", height = 140, label = "", emptyMsg = "", showGap = true } = {}) {
   const A = _points(seriesA || [], "value", "date"), B = _points(seriesB || [], "value", "date");
   if (A.length < 4 || B.length < 4) {
@@ -421,24 +456,49 @@ export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", un
   const all = A.concat(B).map((p) => p.v);
   let min = Math.min(...all), max = Math.max(...all);
   if (min === max) { min -= 1; max += 1; }
-  const xf = (arr) => (i) => P + (i / (arr.length - 1)) * (W - 2 * P);
   const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
-  const path = (arr) => { const x = xf(arr); return arr.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" "); };
   const _r = (n) => Math.round(n * 10) / 10;
-  const aLast = A[A.length - 1].v, bLast = B[B.length - 1].v, gap = _r(aLast - bLast);
-  const summary = `${aLabel} ${_r(aLast)}${unit} vs ${bLabel} ${_r(bLast)}${unit}, gap ${gap}${unit}.`;
-  // Interactive hover/tap: cpts track series A (the ember primary); when B has a
-  // point on the same date, the tooltip carries both so the gap is readable.
-  const xA = xf(A);
-  const bByD = new Map(B.filter((p) => p.d).map((p) => [p.d, p.v]));
-  const cpts = A.map((p, i) => ({
-    x: +(xA(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4),
-    l: (p.d ? _shortDate(p.d) + " · " : "") + `${aLabel} ${_r(p.v)}${unit}` + (p.d && bByD.has(p.d) ? ` · ${bLabel} ${_r(bByD.get(p.d))}${unit}` : ""),
-  }));
+  // Date positioning. Both series must be fully dated for a time frame to be honest; a dateless
+  // (plain-numeric) series falls back to an index frame that is still SHARED — divided by the
+  // LONGER series' span, so a shorter series ends early instead of being stretched to full width.
+  const _key = (p) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(p.d || "")); return m ? m[0] : null; };
+  const dated = A.every((p) => _key(p)) && B.every((p) => _key(p));
+  if (dated) { A.sort((a, b) => _key(a).localeCompare(_key(b))); B.sort((a, b) => _key(a).localeCompare(_key(b))); }
+  const _ts = (p) => Date.parse(_key(p) + "T00:00:00Z");
+  const nMax = Math.max(A.length, B.length);
+  let xOf;
+  if (dated) {
+    const ts = A.concat(B).map(_ts);
+    const t0 = Math.min(...ts), span = Math.max(1, Math.max(...ts) - t0);
+    xOf = (p) => P + ((_ts(p) - t0) / span) * (W - 2 * P);
+  } else {
+    xOf = (p, i) => P + (i / Math.max(1, nMax - 1)) * (W - 2 * P);
+  }
+  const path = (arr) => arr.map((p, i) => `${i ? "L" : "M"}${xOf(p, i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const aByD = new Map(A.map((p) => [_key(p), p.v])), bByD = new Map(B.map((p) => [_key(p), p.v]));
+  // The reported gap is measured on the last date BOTH series reach — comparing A's latest
+  // against B's latest when those are different days is the same not-like-with-like defect in
+  // prose form. With no shared date there is no gap to state, and the caption says so.
+  const shared = dated ? [...aByD.keys()].filter((d) => bByD.has(d)).sort() : [];
+  const gapDate = shared.length ? shared[shared.length - 1] : null;
+  const aLast = A[A.length - 1].v, bLast = B[B.length - 1].v;
+  const gap = gapDate ? _r(aByD.get(gapDate) - bByD.get(gapDate)) : (dated ? null : _r(aLast - bLast));
+  const gapTxt = gap == null ? "no shared date — no gap stated" : `gap ${gap}${unit}${gapDate ? ` on ${_shortDate(gapDate)}` : ""}`;
+  const summary = `${aLabel} ${_r(aLast)}${unit} vs ${bLabel} ${_r(bLast)}${unit}, ${gapTxt}.${dated ? " x positioned by real date, so gaps show as gaps." : ""}`;
+  // Interactive hover/tap: one cpt per DATE across BOTH series (union, not series A alone) —
+  // a B-only day used to be unreachable to the readout. The label carries whichever series has
+  // a point that day, so the gap is readable and a one-sided day is visibly one-sided.
+  const _lbl = (d) => [aByD.has(d) ? `${aLabel} ${_r(aByD.get(d))}${unit}` : null, bByD.has(d) ? `${bLabel} ${_r(bByD.get(d))}${unit}` : null].filter(Boolean).join(" · ");
+  const cpts = dated
+    ? [...new Set([...aByD.keys(), ...bByD.keys()])].sort().map((d) => {
+      const p = { d }, v = aByD.has(d) ? aByD.get(d) : bByD.get(d);
+      return { x: +(xOf(p) / W).toFixed(4), y: +(y(v) / H).toFixed(4), l: `${_shortDate(d)} · ${_lbl(d)}` };
+    })
+    : A.map((p, i) => ({ x: +(xOf(p, i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: `${aLabel} ${_r(p.v)}${unit}` }));
   return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<path class="chart-down" d="${path(B)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<path class="chart-line" d="${path(A)}" vector-effect="non-scaling-stroke"/></svg>` +
-    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span>${showGap ? ` · gap ${escAttr(String(gap))}${escAttr(unit)}` : ""}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
+    `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span>${showGap ? ` · ${escAttr(gapTxt)}` : ""}${label ? ` · ${escAttr(label)}` : ""}${dated ? " · x by real date" : ""}</figcaption></figure>`;
 }
 
 // Tiny inline sparkline (no axes/caption). values: [numbers].
