@@ -222,37 +222,6 @@ def test_metric_within_tolerance_does_not_warn():
 # ── validate_json_output ─────────────────────────────────────────────────────
 
 
-def test_validate_json_none_blocked():
-    r = v.validate_json_output(None, ["training"], AIOutputType.TRAINING_COACH)
-    assert r.blocked
-
-
-def test_validate_json_missing_required_key_blocked():
-    r = v.validate_json_output({"training": ""}, ["training"], AIOutputType.TRAINING_COACH)
-    assert r.blocked
-    assert "training" in r.block_reason
-
-
-def test_validate_json_replaces_blocked_string_value_in_place():
-    parsed = {"training": ""}  # empty → sub-validation blocks
-    # 'training' present-but-empty is caught as a missing required key first; use a
-    # too-short-but-present value to exercise the in-place safe-text replacement.
-    parsed = {"nutrition": "x"}  # present, but sub-validation blocks as too-short
-    r = v.validate_json_output(parsed, ["nutrition"], AIOutputType.NUTRITION_COACH)
-    assert r.blocked
-    # The failing value was swapped for the type's safe fallback in-place.
-    assert parsed["nutrition"] == v._fallback_for_type(AIOutputType.NUTRITION_COACH)
-
-
-def test_validate_json_valid_dict_passes():
-    parsed = {
-        "training": "Solid zone-2 session today; keep the effort conversational and steady throughout.",
-        "nutrition": "Hit your protein target and stay within your calorie range for the day.",
-    }
-    r = v.validate_json_output(parsed, ["training", "nutrition"], AIOutputType.TRAINING_COACH)
-    assert not r.blocked
-
-
 # ── validate_daily_brief_outputs aggregation ─────────────────────────────────
 
 

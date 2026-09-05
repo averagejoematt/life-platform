@@ -31,8 +31,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: workout DATE# keys name Pacific days
 
@@ -130,21 +129,7 @@ _INTERVAL_KW = ["interval", "intervals", "6 and 7", "6 and 8", "6↔8"]
 _LEVEL_RE = re.compile(r"\b(?:level|lvl|l)\s*(\d{1,3})\b", re.IGNORECASE)
 _LOAD_RE = re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*(lbs?|kg|kilos?|pounds?)\b", re.IGNORECASE)
 
-try:
-    from common.numeric import floats_to_decimal
-except ImportError:  # pragma: no cover - layer always provides numeric
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def floats_to_decimal(obj):
-            if isinstance(obj, bool):
-                return obj
-            if isinstance(obj, float):
-                return Decimal(str(obj))
-            if isinstance(obj, dict):
-                return {k: floats_to_decimal(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [floats_to_decimal(i) for i in obj]
-            return obj
+from common.numeric import floats_to_decimal
 
 
 # ──────────────────────────────────────────────────────────────────────────────

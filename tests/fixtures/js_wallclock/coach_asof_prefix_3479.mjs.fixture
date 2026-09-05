@@ -1,0 +1,46 @@
+// tests/fixtures/js_wallclock/coach_asof_prefix_3479.mjs.fixture
+//
+// THE #3479 SPECIMEN, VERBATIM. Lines 21-31 and 165-176 of
+// tests/js/coach_asof.test.mjs as they stood at 8b94c0d2d^ — the tree on which
+// this file redded `main` on 2026-09-04, exactly 8 days after the stamp it
+// hardcoded, on a commit that touched none of it.
+//
+// It is the negative control for tests/test_wallclock_js_fixture_bombs_3535.py:
+// a guard that would not have caught #3479 has failed its only real test case.
+// Both defect shapes the incident showed are present below, and the guard must
+// report both:
+//
+//   A. `weeklyAsOf("2026-08-27T14:02:46.793290+00:00", bad)` — a hardcoded
+//      instant handed to a function that compares it against Date.now(), with
+//      no clock injected. The strict-equality case is the one that detonated.
+//   B. `assert.match(..., /^as of Aug 27 · Day 11/)` — the sibling, which
+//      survived only because its regex lacked a `$` anchor: the "— next refresh
+//      pending" suffix appeared and the prefix match kept passing. One case
+//      failed loudly and one passed wrongly off identical input.
+//
+// The `.fixture` suffix keeps `node --test` from discovering it. DO NOT "fix"
+// this file — its defects are the assertion.
+import "./support/loader.mjs";
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Dynamic import after loader registration (the
+// reference_site_js_test_and_build_pairs gotcha — a static import would resolve
+// the graph before the "/assets/…" resolver exists).
+const { coachAsOf, regenerationPaused, ensembleFallback, weeklyAsOf, datableTensions } = await import("../../site/assets/js/coach_asof.js");
+
+
+test("weeklyAsOf: the day number joins the calendar date (#3252)", () => {
+  assert.match(weeklyAsOf("2026-08-27T14:02:46.793290+00:00", 11), /^as of Aug 27 · Day 11/);
+});
+
+test("weeklyAsOf: an unknown day renders the date ALONE, never Day 0 or a guess", () => {
+  // The must-fail direction is a fabricated anchor: a wrong day number is strictly
+  // worse than none, so every non-positive-integer collapses to no day at all.
+  for (const bad of [undefined, null, 0, -3, "11", 11.5, NaN, true]) {
+    assert.equal(weeklyAsOf("2026-08-27T14:02:46.793290+00:00", bad), "as of Aug 27",
+      `day ${JSON.stringify(bad)} must render no day label`);
+  }

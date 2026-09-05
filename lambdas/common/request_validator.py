@@ -153,20 +153,6 @@ def validate_envelope(event: dict, path: str = None, method: str = None) -> None
                 raise ValidationError("Invalid source format", status=400)
 
 
-def validate_user_id(user_id: str) -> str:
-    """Validate + return a user_id. Raises ValidationError on bad input."""
-    if not user_id or not _USER_ID_RE.match(user_id):
-        raise ValidationError("Invalid user_id format", status=400)
-    return user_id
-
-
-def validate_date(date_str: str) -> str:
-    """Validate + return an ISO date. Raises ValidationError on bad input."""
-    if not date_str or not _DATE_RE.match(date_str):
-        raise ValidationError("Invalid date format (expected YYYY-MM-DD)", status=400)
-    return date_str
-
-
 def validate_source(source: str, allow_unknown: bool = False) -> str:
     """Validate + return a source name."""
     if not source or not _SOURCE_RE.match(source):
@@ -174,16 +160,3 @@ def validate_source(source: str, allow_unknown: bool = False) -> str:
     if not allow_unknown and source not in KNOWN_SOURCES:
         raise ValidationError(f"Unknown source: {source}", status=400)
     return source
-
-
-def validate_int_param(value: str, name: str, min_v: int = None, max_v: int = None) -> int:
-    """Parse + range-check an integer query parameter."""
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        raise ValidationError(f"Parameter '{name}' must be an integer", status=400)
-    if min_v is not None and n < min_v:
-        raise ValidationError(f"Parameter '{name}' must be >= {min_v}", status=400)
-    if max_v is not None and n > max_v:
-        raise ValidationError(f"Parameter '{name}' must be <= {max_v}", status=400)
-    return n

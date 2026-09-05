@@ -156,4 +156,109 @@ def test_check_memory_body_facts_cli_runs_clean_or_skips():
     import sys
 
     r = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True)
-    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.returncode == 0, (
+        "the memory dir ON THIS MACHINE carries stale facts — this is the gate working, not a\n"
+        "broken test. CI has no memory dir and skips. Fix the flagged lines in\n"
+        "~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ (a `genesis <date>`\n"
+        "or `cycle <N> LIVE` token on a line marked LIVE/CURRENT must equal the live\n"
+        "constants; if the line is a record of a past cycle, frame it as history — 'was',\n"
+        "'superseded'), then re-run.\n\n" + r.stdout + r.stderr
+    )
+
+
+# ── #3539: the STATE tokens (`genesis <date>`, `cycle <N> LIVE`) ──────────────────────
+#
+# The #1342 rules above match exactly one phrasing, "always use <date>". The memory
+# surface does not write its genesis that way any more — it writes STATE, and on
+# 2026-09-05 the index said "cycle 16 LIVE, genesis 2026-09-04" against an
+# EXPERIMENT_START_DATE of 2026-09-05 while a topic file still said "CURRENT: cycle 13
+# LIVE, genesis 2026-08-10", three cycles stale. Neither line was reachable by any rule
+# in this gate, and `_scan_memory_files` excluded MEMORY.md outright on the stated
+# grounds that the index was "already-guarded" — nothing guarded it.
+
+
+def _plant(tmp_path, name, body):
+    p = tmp_path / name
+    p.write_text(body, encoding="utf-8")
+    return p
+
+
+def test_state_rule_fires_on_the_real_2026_09_05_lines(tmp_path):
+    """The lines are VERBATIM from the memory surface on the day #3539 was filed — a
+    synthetic control alone would not tell you the rule reaches the real corpus."""
+    chk = _load()
+    planted = [
+        _plant(
+            tmp_path,
+            "MEMORY.md",
+            "- [Monday reset](project_monday_reset.md) — **cycle 16 LIVE, genesis 2026-09-04** (future-genesis eve reset 09-03)\n",
+        ),
+        _plant(
+            tmp_path,
+            "project_monday_reset.md",
+            'description: "Experiment reset tooling (ADR-077) — CURRENT: cycle 13 LIVE, genesis 2026-08-10 (first truth-gated FUTURE genesis)"\n',
+        ),
+    ]
+    hits = chk._state_hits(planted, "2026-09-05", "16")
+    joined = "\n".join(hits)
+    assert "MEMORY.md:1" in joined and "2026-09-04" in joined, hits
+    assert "project_monday_reset.md:1" in joined and "2026-08-10" in joined, hits
+    assert "cycle 13" in joined, hits
+
+    # ...and the corrected forms must pass, or the gate forbids its own fix.
+    fixed = [
+        _plant(tmp_path, "MEMORY.md", "- [Monday reset](project_monday_reset.md) — **cycle 16 LIVE, genesis 2026-09-05**\n"),
+        _plant(tmp_path, "project_monday_reset.md", 'description: "reset tooling — CURRENT: cycle 16 LIVE, genesis 2026-09-05"\n'),
+    ]
+    assert chk._state_hits(fixed, "2026-09-05", "16") == []
+
+
+def test_state_rule_leaves_the_diary_alone(tmp_path):
+    """These files are half ledger and half DIARY. A record of a PAST cycle is true and
+    must never red — sweeping every `genesis <date>` token returned 17 hits on the live
+    dir, 12 of them history. The currentness marker is the discriminator."""
+    chk = _load()
+    history = _plant(
+        tmp_path,
+        "project_session_o.md",
+        "Cycle-5 reset executed early with a live pre-start countdown (genesis 2026-07-12) after the stall audits\n"
+        "the cycle-15 reset with future genesis 2026-09-01 and the official launch\n"
+        "runbook in **#2465** (genesis 2026-08-09, keep-chronicle DATE#2026-08-02)\n"
+        "Cycle 15 (genesis 2026-09-01) → **cycle 16, genesis 2026-09-04**, run as a future/eve reset\n",
+    )
+    assert chk._state_hits([history], "2026-09-05", "16") == []
+
+    # An explicitly historical framing is exempt even WITH a currentness marker.
+    retired = _plant(
+        tmp_path, "project_old.md", "This was CURRENT: cycle 13 LIVE, genesis 2026-08-10 — superseded by the cycle-16 re-anchor\n"
+    )
+    assert chk._state_hits([retired], "2026-09-05", "16") == []
+
+
+def test_the_index_itself_is_in_scope_now(tmp_path):
+    """`_scan_memory_files` used to exclude MEMORY.md. It is the first file a session
+    reads, and nothing guarded it."""
+    chk = _load()
+    _plant(tmp_path, "MEMORY.md", "index\n")
+    _plant(tmp_path, "project_topic.md", "body\n")
+    names = {p.name for p in chk._scan_memory_files(tmp_path)}
+    assert names == {"MEMORY.md", "project_topic.md"}
+
+
+def test_the_cycle_ground_truth_is_derived_not_typed():
+    """The needle comes from check_doc_facts._ground_truth() — the SAME discoverer the
+    genesis rule uses — so this gate can never hold its own copy of the cycle number.
+
+    Proved by swapping the discoverer's answer: if the gate typed the cycle anywhere, the
+    swap would not move it. (#3539's whole point is that a fact restated in a second
+    place is a fact with no owner.)"""
+    chk = _load()
+    assert chk._ground_truth_cycle().isdigit(), "cycle ground truth unresolved"
+
+    chk._TRUTH_CACHE.clear()
+    chk._TRUTH_CACHE.update({"experiment_genesis": "2099-12-31", "experiment_cycle": 99})
+    try:
+        assert chk._ground_truth_cycle() == "99"
+        assert chk._ground_truth_genesis() == "2099-12-31"
+    finally:
+        chk._TRUTH_CACHE.clear()

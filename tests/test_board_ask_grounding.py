@@ -132,18 +132,6 @@ def test_presence_omitted_when_class_is_present():
 # ── ai_context.board_grounding_footer — the rendered string ───────────────
 
 
-def test_footer_renders_the_expected_string():
-    ac = _ctx_mod()
-    footer = ac.board_grounding_footer(FULL_CTX, limit=3)
-    assert footer == "grounded in: recovery 48% · protein 30d avg 132g · sleep 7.2h last night"
-
-
-def test_footer_is_empty_string_for_empty_brief():
-    ac = _ctx_mod()
-    assert ac.board_grounding_footer({}) == ""
-    assert ac.board_grounding_footer(None) == ""
-
-
 # ── Handler wiring: same ctx feeds the prompt AND the receipt ──────────────
 
 

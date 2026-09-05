@@ -195,7 +195,13 @@ def test_artifact_content_contract():
     # the plan's real numbers (ADR-104: grounded, never fabricated)
     assert str(GOALS["timeline"]["start_weight_lbs"]) in md
     assert str(GOALS["targets"]["weight"]["goal_lbs"]) in md
-    assert "1,500" in md and "170" in md
+    # #3535: these were hand-typed ("1,500" and "170") two lines after their
+    # neighbours derived from GOALS, so a PLAN EDIT redded the test while a
+    # regeneration bug could not. Derive them the same way, in the publisher's own
+    # render form (`{:,}` for the calorie target, bare for the protein floor).
+    nut = GOALS["targets"]["nutrition"]
+    assert f"{nut['daily_calories_target']:,}" in md
+    assert str(nut["daily_protein_min_g"]) in md
     # no fabricated "finish-line odds" number
     assert "odds" not in md.lower()
 
