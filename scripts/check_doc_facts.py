@@ -590,14 +590,10 @@ _producer_mirror_hits = _pmc._producer_mirror_hits
 
 
 def _og_source_hits(files, truth: int) -> list[str]:
-    """Reader-facing "N data sources" literals that disagree with the registry.
+    """Reader-facing "N data sources" literals that disagree with the registry (#1260/#3565).
 
-    Scan set: og_*.py cards plus the subscriber-facing email templates (#3565 — the
-    confirmation email carried a hand-typed "19 sources" outside the old og-only net).
-
-    Skips full-line `#` comments and HISTORICAL-framed lines. Exposed so the regression test
-    can plant a stale "25 data sources" string in a scratch file and prove the rule bites (the
-    #1189 non-vacuous-scan lesson)."""
+    Scan set = `_scan_source_count_files()` (og cards + subscriber templates; doc_facts_og.py says
+    why). Skips `#` comment lines and HISTORICAL framing; the test plants a stale literal (#1189)."""
     hits = []
     for src in files:
         try:
