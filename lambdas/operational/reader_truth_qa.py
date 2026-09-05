@@ -542,21 +542,111 @@ def build_prompt(pages, phase, max_chars=MAX_PROSE_CHARS):
 
 
 # ── verdict parsing ────────────────────────────────────────────────────────────
+#
+# #3540 — THE UNEVALUATED CONTRACT. Until 2026-09-05 both no-JSON and
+# JSONDecodeError returned `{"findings": [], "severity": "ok", ...}`, and
+# `assess_prose` read only `.get("findings")` — so a judge that answered with
+# nothing, with prose, or with a reply cut off at `max_tokens` contributed zero
+# findings, left `errors` empty, and the batch reported exactly like a clean one.
+# The docstring's own claim ("not as a pass OR a fail") was false on that path:
+# every caller's "no findings" branch is a PASS. Measured: the live
+# `LifePlatform/AI TruncatedResponses{LambdaFunction=visual-ai-qa}` sum was 5
+# over 2026-08-21→09-05 while the gating visual-qa job stayed green.
+#
+# The fix is a NAMED third state on the verdict itself. `severity` becomes
+# "unknown" (never a severity any caller gates or clears on) and the
+# UNEVALUATED_FIELD carries WHY, so the two callers can route:
+#   * the CI gate (tests/visual_ai_qa.assess_reader_truth) FAILs the surfaces in
+#     an unevaluated batch — it blocks a deploy on `high`, so "the judge did not
+#     answer" is a failure to evaluate, never a pass;
+#   * the nightly advisory (operational/qa_check_reader_truth) WARNs — it is
+#     CONTENT_TRUTH-partitioned and may not revert a deploy (ADR-147), so a loud,
+#     counted warn is the honest ceiling there.
+# A deliberate budget-tier pause is NOT this state: it is caught upfront by
+# `budget_guard.allow` in both callers and reported as its own ⏸ SKIPPED-BY-BUDGET
+# outcome, which stays exactly as it was.
+UNEVALUATED_FIELD = "unevaluated"
+
+# The verdict-side kinds: the call RETURNED and the reply is unreadable.
+KIND_NO_VERDICT = "no_verdict"  # nothing JSON-shaped in the reply at all (incl. "")
+KIND_UNPARSEABLE = "unparseable"  # a `{...}` span that json.loads rejects
+KIND_TRUNCATED = "truncated"  # stop_reason == max_tokens (#2893's metered class)
+UNEVALUATED_KINDS = (KIND_NO_VERDICT, KIND_UNPARSEABLE, KIND_TRUNCATED)
+
+# The transport-side kind: the call did not return. DELIBERATELY NOT in
+# UNEVALUATED_KINDS — an exception has always landed in `errors` and has always
+# been printed by both callers, so it is already visible and its fail-soft
+# treatment was adjudicated (#1440's Bedrock-outage posture). What #3540 changes
+# is the class that was INVISIBLE. Widening the transport path to gating is a
+# separate, deliberate decision, not a side effect of this fix.
+KIND_TRANSPORT = "transport"
+
+
+class BatchOutcome(str):
+    """One `assess_prose` error entry that also carries structure (#3540).
+
+    `errors` has always been "per-batch error strings" and three call sites
+    format them straight into a message (`f"{err}"`, `"; ".join(errors)`,
+    `errors[0]` substring asserts). So the structure rides ON the string rather
+    than replacing it: every existing formatting and equality use keeps working
+    byte-for-byte (a str subclass compares and joins by value), while a caller
+    that must ROUTE on the outcome reads `.kind`/`.paths` instead of re-parsing
+    prose — the "suppressor rules must be structural, never phrase-matched"
+    rule, applied to the routing key itself.
+    """
+
+    kind: str
+    paths: tuple
+
+    def __new__(cls, message: str, kind: str = KIND_TRANSPORT, paths: tuple = ()) -> "BatchOutcome":
+        obj = super().__new__(cls, message)
+        obj.kind = kind
+        obj.paths = tuple(paths)
+        return obj
+
+
+def is_unevaluated(err) -> bool:
+    """True when `err` names a batch the judge RETURNED but did not answer (#3540).
+
+    A plain `str` (any legacy/hand-built entry) reads as transport — i.e. NOT
+    unevaluated — so this predicate can only ever be made true by a
+    `BatchOutcome` this module minted with a verdict-side kind.
+    """
+    return getattr(err, "kind", KIND_TRANSPORT) in UNEVALUATED_KINDS
 
 
 def parse_verdict(text):
     """Pull the JSON verdict out of the model reply, tolerating stray prose/fences.
 
-    Unparseable output degrades to a no-findings verdict (never raises) — the
-    hooks treat a missing verdict as advisory, not as a pass OR a fail.
+    NEVER raises. A reply with no JSON object, or one json.loads rejects, comes
+    back as an explicit UNEVALUATED verdict (#3540) — `severity` "unknown" plus
+    `unevaluated` naming which of the two it was. It is NOT a clean verdict:
+    `findings` is empty because nothing was read, not because nothing was found,
+    and callers must route on `unevaluated` before they read `findings`.
     """
     m = re.search(r"\{.*\}", text or "", re.DOTALL)
     if not m:
-        return {"findings": [], "severity": "ok", "summary": "(no structured verdict)", "raw": (text or "")[:200]}
+        return {
+            "findings": [],
+            "severity": "unknown",
+            "summary": "(no structured verdict)",
+            UNEVALUATED_FIELD: KIND_NO_VERDICT,
+            "raw": (text or "")[:200],
+        }
     try:
         v = json.loads(m.group(0))
     except json.JSONDecodeError:
-        return {"findings": [], "severity": "ok", "summary": "(unparseable verdict)", "raw": (text or "")[:200]}
+        return {
+            "findings": [],
+            "severity": "unknown",
+            "summary": "(unparseable verdict)",
+            UNEVALUATED_FIELD: KIND_UNPARSEABLE,
+            "raw": (text or "")[:200],
+        }
+    # No isinstance(v, dict) guard here on purpose: the regex above only ever
+    # yields a span that starts "{" and ends "}", so json.loads returns a dict or
+    # raises — a third case does not exist, and a guard that cannot fire is the
+    # thing this issue is about.
     if not isinstance(v.get("findings"), list):
         v["findings"] = []
     return v
@@ -612,8 +702,15 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
 
     Returns (findings, errors):
         findings: normalized dicts {"page", "category", "severity", "note"}.
-        errors: per-batch error strings — a failed batch is reported, never raised
-                (fail-soft: a Bedrock outage degrades to "no verdict", not a crash).
+        errors: per-batch `BatchOutcome` strings — a failed batch is reported,
+                never raised (fail-soft: a Bedrock outage degrades to "no
+                verdict", not a crash). #3540: a batch whose reply carried NO
+                readable verdict (no JSON / unparseable JSON / `stop_reason ==
+                max_tokens`) now lands here too, carrying `.kind` in
+                UNEVALUATED_KINDS — before, it contributed nothing to either
+                return value and the batch was indistinguishable from a clean
+                one. Use `is_unevaluated(err)` to route; `str(err)` is unchanged
+                in shape for every caller that just prints it.
     """
     phase = phase_context(today_iso)
     pages = [p for p in pages if (p.get("prose") or "").strip()]
@@ -627,7 +724,26 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                 model_name=model_name or DEFAULT_MODEL,
             )
             text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
-            for raw in parse_verdict(text).get("findings", []):
+            verdict = parse_verdict(text)
+            # #3540: the batch's own coverage verdict, decided BEFORE its findings
+            # are read. `stop_reason` outranks the parse result: a reply cut off at
+            # max_tokens is incomplete even in the rare case its prefix happens to
+            # close into valid JSON, so the batch is reported unevaluated and any
+            # findings that DID parse are still kept (an unreadable batch must never
+            # lose evidence, and must never claim coverage it does not have).
+            unread = verdict.get(UNEVALUATED_FIELD)
+            if isinstance(resp, dict) and (resp.get("stop_reason") or "") == "max_tokens":
+                unread = KIND_TRUNCATED
+            if unread:
+                errors.append(
+                    BatchOutcome(
+                        f"batch [{', '.join(str(p.get('path')) for p in batch)}]: UNEVALUATED ({unread}) — "
+                        f"the judge returned no readable verdict, so these surfaces were NOT judged (#3540)",
+                        kind=unread,
+                        paths=tuple(str(p.get("path")) for p in batch),
+                    )
+                )
+            for raw in verdict.get("findings", []):
                 f = _normalize_finding(raw, batch_paths)
                 if not f:
                     continue
@@ -736,7 +852,15 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                         )
                 findings.append(f)
         except Exception as e:
-            errors.append(f"batch [{', '.join(str(p.get('path')) for p in batch)}]: {str(e)[:140]}")
+            # The call did not return. Same list, same string, EXPLICIT transport
+            # kind (#3540) — visible and fail-soft exactly as before.
+            errors.append(
+                BatchOutcome(
+                    f"batch [{', '.join(str(p.get('path')) for p in batch)}]: {str(e)[:140]}",
+                    kind=KIND_TRANSPORT,
+                    paths=tuple(str(p.get("path")) for p in batch),
+                )
+            )
     return findings, errors
 
 

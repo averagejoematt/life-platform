@@ -656,3 +656,148 @@ def test_pillow_is_wired_into_every_ai_qa_lane():
         assert install_lines and all(
             "pillow" in ln for ln in install_lines
         ), f"{wf}: the --ai-qa lane's ci_pins install must include pillow"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3540 — THE UNEVALUATED CONTRACT (AI-vision judge)
+# ══════════════════════════════════════════════════════════════════════════════
+# The defect (finding AIQ-2, docs/reviews/FULLREVIEW_2026-09-05.md): `_parse_verdict`
+# returned `{"severity": "ok", "renders_ok": True}` on both the no-JSON and the
+# JSONDecodeError path, and `assess_results` then did `evaluated += 1` — so a page
+# the judge never actually judged was certified as rendering fine, in the job that
+# BLOCKS the deploy pipeline on a `high`. #2973 made the exception path a named
+# FAIL; this is the same class one level in, on the parse path. Live evidence:
+# `LifePlatform/AI TruncatedResponses{LambdaFunction=visual-ai-qa}` Sum = 5 over
+# 2026-08-21→09-05 while this gate stayed green.
+
+
+def _raw_bedrock(text, stop_reason=None, calls=None):
+    """A bedrock stand-in returning RAW `text` (not JSON-dumped), with an optional
+    `stop_reason` — the field `bedrock_client.invoke` passes through and #2893 meters."""
+
+    def invoke(body, model_name=None):
+        if calls is not None:
+            calls.append({"body": body, "model_name": model_name})
+        resp = {"content": [{"type": "text", "text": text}]}
+        if stop_reason is not None:
+            resp["stop_reason"] = stop_reason
+        return resp
+
+    return type("B", (), {"invoke": staticmethod(invoke)})()
+
+
+_VIS_MISSING = "The page looks good to me, nothing to report."
+_VIS_EMPTY = ""
+_VIS_MALFORMED = '{"renders_ok": true,, "issues": [], "severity": "ok"}'
+_VIS_TRUNCATED = '{"renders_ok": true, "issues": [{"type": "blank_chart", "severity": "high", "note": "the sleep'
+
+_VIS_UNREADABLE = [
+    pytest.param(_VIS_MISSING, "no_verdict", id="missing"),
+    pytest.param(_VIS_EMPTY, "no_verdict", id="empty"),
+    pytest.param(_VIS_MALFORMED, "unparseable", id="malformed"),
+    pytest.param(_VIS_TRUNCATED, "no_verdict", id="truncated-text"),
+]
+
+
+@pytest.mark.parametrize("text,kind", _VIS_UNREADABLE)
+def test_parse_verdict_unreadable_reply_is_unevaluated_never_ok(text, kind):
+    v = visual_ai_qa._parse_verdict(text)
+    assert v[visual_ai_qa._UNEVALUATED_FIELD] == kind
+    assert v["severity"] != "ok", "an unread verdict must never carry the severity a clean one does"
+    assert v["severity"] == "unknown"
+    assert v["renders_ok"] is False, "nobody looked — 'renders fine' is not available"
+
+
+@pytest.mark.parametrize("text,kind", _VIS_UNREADABLE)
+def test_assess_results_unreadable_verdict_fails_the_page_and_leaves_evaluated_at_zero(tmp_path, monkeypatch, text, kind):
+    """THE CI RULING for this caller: FAIL. The visual-qa job gates on `high`, so
+    "the judge did not answer" is a failure to evaluate, not a pass — the page
+    joins #2973's UNEVALUATED bucket (out of `evaluated`, red exit code)."""
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _raw_bedrock(text))
+    results = [_result_with_shot(tmp_path)]
+    status = visual_ai_qa.assess_results(results)
+    assert status == {"status": "ok", "evaluated": 0, "unevaluated": 1, "no_shots": 0}
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["ai_unevaluated"]
+    assert any("AI-vision UNEVALUATED (#3540)" in i for i in results[0]["issues"])
+    # the raw reply travels with the verdict so a human can triage without a re-run
+    assert results[0]["ai_verdict"]["severity"] == "unknown"
+
+
+def test_assess_results_stop_reason_max_tokens_is_unevaluated_even_when_the_json_parses(tmp_path, monkeypatch):
+    """The #2893 class, decided here rather than only metered. A reply cut off at
+    max_tokens is a PARTIAL judgement even when its prefix closes into valid JSON."""
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _raw_bedrock(json.dumps(_OK_VERDICT), stop_reason="max_tokens"))
+    results = [_result_with_shot(tmp_path)]
+    status = visual_ai_qa.assess_results(results)
+    assert status["unevaluated"] == 1 and status["evaluated"] == 0
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["ai_verdict"][visual_ai_qa._UNEVALUATED_FIELD] == "truncated"
+
+
+def test_assess_results_unevaluated_page_is_named_in_the_printed_tally(tmp_path, monkeypatch, capsys):
+    """#2973's accounting line must SAY it: a gate that measures nothing returns
+    clean, so the evaluated/targeted split is printed for a human to read."""
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _raw_bedrock(_VIS_MISSING))
+    visual_ai_qa.assess_results([_result_with_shot(tmp_path)])
+    out = capsys.readouterr().out
+    assert "UNEVALUATED" in out and "evaluated 0/1" in out
+
+
+# ── positive controls: the guard must not fire on a real verdict ─────────────
+
+
+def test_positive_control_wellformed_ok_verdict_still_passes(tmp_path, monkeypatch):
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT))
+    results = [_result_with_shot(tmp_path)]
+    status = visual_ai_qa.assess_results(results)
+    assert status == {"status": "ok", "evaluated": 1, "unevaluated": 0, "no_shots": 0}
+    assert results[0]["status"] == "PASS"
+    assert "ai_unevaluated" not in results[0]
+
+
+def test_positive_control_wellformed_high_verdict_still_fails_as_a_judged_page(tmp_path, monkeypatch):
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_HIGH_VERDICT))
+    results = [_result_with_shot(tmp_path)]
+    status = visual_ai_qa.assess_results(results)
+    assert status == {"status": "ok", "evaluated": 1, "unevaluated": 0, "no_shots": 0}
+    assert results[0]["status"] == "FAIL"
+    # a JUDGED failure and an UNJUDGED page are different facts about a deploy
+    assert any("AI-vision (high)" in i for i in results[0]["issues"])
+    assert "ai_unevaluated" not in results[0]
+
+
+def test_negative_control_the_pre_3540_verdict_shape_is_what_used_to_pass(tmp_path, monkeypatch):
+    """The guard's discriminating power, isolated. Replaying the EXACT dict
+    `_parse_verdict` returned before this fix — `{"severity": "ok",
+    "renders_ok": True, "summary": "(no structured verdict)"}` — the page passes
+    and counts as evaluated. So the new `unevaluated` field is what makes the
+    tests above red, not anything incidental in their fixtures."""
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT))
+    monkeypatch.setattr(
+        visual_ai_qa,
+        "_parse_verdict",
+        lambda text: {"severity": "ok", "renders_ok": True, "summary": "(no structured verdict)", "raw": text[:200]},
+    )
+    results = [_result_with_shot(tmp_path)]
+    status = visual_ai_qa.assess_results(results)
+    assert status == {"status": "ok", "evaluated": 1, "unevaluated": 0, "no_shots": 0}
+    assert results[0]["status"] == "PASS"
+
+
+def test_budget_pause_is_not_an_unevaluated_red(tmp_path, monkeypatch):
+    """A DELIBERATE tier-3 pause is an honest, named state and stays
+    distinguishable from a broken verdict — this fix must never redden it."""
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _raw_bedrock(_VIS_MISSING))
+    results = [_result_with_shot(tmp_path)]
+    status = visual_ai_qa.assess_results(results)
+    assert status == {"status": "skipped_by_budget", "tier": 3}
+    assert results[0]["status"] == "PASS"
+    assert "ai_unevaluated" not in results[0]

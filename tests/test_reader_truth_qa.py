@@ -259,8 +259,13 @@ def test_parse_verdict_tolerates_fences():
 
 
 def test_parse_verdict_garbage_degrades_to_no_findings():
+    """Still never raises and still yields no findings — but #3540 changed WHAT
+    that means: the verdict is now named UNEVALUATED with severity "unknown"
+    instead of the clean-looking "ok" it used to carry. The full contract is
+    pinned in the #3540 section at the bottom of this file."""
     v = rtq.parse_verdict("no json anywhere")
-    assert v["findings"] == [] and v["severity"] == "ok"
+    assert v["findings"] == [] and v["severity"] == "unknown"
+    assert v[rtq.UNEVALUATED_FIELD] == rtq.KIND_NO_VERDICT
     assert rtq.parse_verdict(None)["findings"] == []
 
 
@@ -1373,3 +1378,245 @@ def test_assess_prose_demotes_an_active_vs_passive_objection_high_to_low(capsys)
     # not which line printed. What must not change is that this ruling still fires.
     assert set(findings[0][rtq.RULINGS_FIELD]) >= {"active_vs_passive", "vagueness_objection"}
     assert "an active-vs-passive objection" in capsys.readouterr().out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3540 — THE UNEVALUATED CONTRACT (reader-truth judge)
+# ══════════════════════════════════════════════════════════════════════════════
+# The defect (finding AIQ-2, docs/reviews/FULLREVIEW_2026-09-05.md): a reply the
+# judge could not be read out of returned `severity: "ok"` with an empty
+# `findings` list, `assess_prose` read only `.get("findings")`, and the batch
+# therefore reported EXACTLY like a clean one — in a pass whose CI leg gates a
+# deploy. Four fixture classes, one per way the reply can be unreadable, plus the
+# positive and negative controls that keep this file from being the fifth
+# instrument that cannot fail.
+
+
+def _raw_invoke(text, stop_reason=None, calls=None):
+    """A bedrock_client.invoke stand-in returning RAW `text` (not JSON-dumped).
+
+    Optionally sets `stop_reason` — the field `bedrock_client.invoke` passes
+    through from the Bedrock body and `_note_truncation` (#2893) already meters.
+    """
+
+    def invoke(body, model_name=None):
+        if calls is not None:
+            calls.append({"body": body, "model_name": model_name})
+        resp = {"content": [{"type": "text", "text": text}]}
+        if stop_reason is not None:
+            resp["stop_reason"] = stop_reason
+        return resp
+
+    return invoke
+
+
+# The four ways a reply can carry no readable verdict. The truncated one is the
+# issue's own reproduction string, verbatim.
+_MISSING_VERDICT = "I looked at the four surfaces and they seem fine to me."
+_EMPTY_VERDICT = ""
+_MALFORMED_VERDICT = '{"findings": [{"severity": "high",, "note": "x"}], "severity": "high"}'
+_TRUNCATED_VERDICT = '{"findings": [{"severity": "high", "note": "truncated'
+
+_UNREADABLE = [
+    pytest.param(_MISSING_VERDICT, rtq.KIND_NO_VERDICT, id="missing"),
+    pytest.param(_EMPTY_VERDICT, rtq.KIND_NO_VERDICT, id="empty"),
+    pytest.param(_MALFORMED_VERDICT, rtq.KIND_UNPARSEABLE, id="malformed"),
+    pytest.param(_TRUNCATED_VERDICT, rtq.KIND_NO_VERDICT, id="truncated-text"),
+]
+
+
+@pytest.mark.parametrize("text,kind", _UNREADABLE)
+def test_parse_verdict_unreadable_reply_is_unevaluated_never_ok(text, kind):
+    v = rtq.parse_verdict(text)
+    assert v[rtq.UNEVALUATED_FIELD] == kind
+    assert v["severity"] != "ok", "an unread verdict must never carry the severity a clean one does"
+    assert v["severity"] == "unknown"
+    assert v["findings"] == []  # empty because nothing was READ, not because nothing was found
+
+
+def test_parse_verdict_none_is_unevaluated():
+    assert rtq.parse_verdict(None)[rtq.UNEVALUATED_FIELD] == rtq.KIND_NO_VERDICT
+
+
+@pytest.mark.parametrize("text,kind", _UNREADABLE)
+def test_assess_prose_unreadable_batch_lands_in_errors_as_unevaluated(text, kind):
+    findings, errors = rtq.assess_prose(_PAGES, _raw_invoke(text), today_iso=_DAY_2)
+    assert findings == []
+    assert len(errors) == 1, "a batch the judge did not answer must be REPORTED, never absorbed"
+    assert rtq.is_unevaluated(errors[0]) is True
+    assert errors[0].kind == kind
+    assert "UNEVALUATED" in errors[0] and "/now/" in errors[0]
+    # every surface in the batch is named, so the CI caller can fail the right rows
+    assert set(errors[0].paths) == {"/now/", "/", "/coaching/"}
+
+
+def test_assess_prose_stop_reason_max_tokens_is_unevaluated_even_when_the_json_parses():
+    """The #2893 class. A reply cut off at max_tokens is a PARTIAL judgement even
+    when its prefix happens to close into valid JSON — `stop_reason` outranks the
+    parse result, and the findings that DID parse are kept, never dropped."""
+    findings, errors = rtq.assess_prose(_PAGES, _raw_invoke(json.dumps(_HIGH_VERDICT), stop_reason="max_tokens"), today_iso=_DAY_2)
+    assert len(errors) == 1 and errors[0].kind == rtq.KIND_TRUNCATED
+    assert rtq.is_unevaluated(errors[0]) is True
+    assert len(findings) == 1 and findings[0]["severity"] == "high", "an unreadable batch must not lose evidence either"
+
+
+# ── positive controls: the guard must not fire on a real verdict ──────────────
+
+
+def test_positive_control_wellformed_clean_verdict_stays_clean():
+    findings, errors = rtq.assess_prose(_PAGES, _fake_invoke(_CLEAN_VERDICT), today_iso=_DAY_2)
+    assert findings == [] and errors == []
+
+
+def test_positive_control_wellformed_high_verdict_still_gates():
+    findings, errors = rtq.assess_prose(_PAGES, _fake_invoke(_HIGH_VERDICT), today_iso=_DAY_2)
+    assert errors == []
+    assert [f["severity"] for f in findings] == ["high"]
+
+
+def test_negative_control_a_transport_error_is_not_unevaluated():
+    """The guard's discrimination, proved in the other direction: a Bedrock
+    outage has ALWAYS landed in `errors` and has always been printed, so its
+    fail-soft posture (#1440) is deliberate and unchanged. `is_unevaluated` must
+    be False on it — otherwise the new state would just be "any error", and the
+    CI ruling below would silently start gating on outages."""
+    findings, errors = rtq.assess_prose(_PAGES, _raw_invoke("x"), today_iso=_DAY_2)  # readable-path baseline
+    assert rtq.is_unevaluated(errors[0]) is True
+
+    def boom(body, model_name=None):
+        raise RuntimeError("ThrottlingException")
+
+    _findings, errors = rtq.assess_prose(_PAGES, boom, today_iso=_DAY_2)
+    assert len(errors) == 1
+    assert errors[0].kind == rtq.KIND_TRANSPORT
+    assert rtq.is_unevaluated(errors[0]) is False
+
+
+def test_negative_control_a_plain_string_error_reads_as_transport():
+    """A hand-built/legacy plain `str` in the list must NOT read as unevaluated —
+    the predicate can only be made true by a BatchOutcome this module minted."""
+    assert rtq.is_unevaluated("batch [/now/]: something went wrong") is False
+
+
+# ── the CI caller (tests/visual_ai_qa.assess_reader_truth): FAIL ──────────────
+
+
+@pytest.mark.parametrize("text,kind", _UNREADABLE)
+def test_ci_gate_unevaluated_batch_fails_the_page(tmp_path, monkeypatch, text, kind):
+    """THE CI RULING. This pass gates the deploy pipeline on a `high`, so a batch
+    the judge did not answer is a failure to EVALUATE, never a pass."""
+    results = _harness_results(tmp_path, "Day 0. Your 30-day trend shows steady improvement.")
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: types.SimpleNamespace(invoke=_raw_invoke(text)))
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    status = visual_ai_qa.assess_reader_truth(results)
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["truth_unevaluated"]
+    assert any("Reader-truth UNEVALUATED (#3540)" in i for i in results[0]["issues"])
+    assert status["unevaluated"] == 1
+
+
+def test_ci_gate_unevaluated_batch_never_prints_clean(tmp_path, monkeypatch, capsys):
+    results = _harness_results(tmp_path, "anything")
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: types.SimpleNamespace(invoke=_raw_invoke(_MISSING_VERDICT)))
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    visual_ai_qa.assess_reader_truth(results)
+    out = capsys.readouterr().out
+    assert "surfaces clean" not in out, "'clean' is a claim about surfaces that were JUDGED"
+    assert "UNEVALUATED" in out and "batch(es) judged" in out
+
+
+def test_ci_gate_positive_control_clean_verdict_still_passes(tmp_path, monkeypatch):
+    results = _harness_results(tmp_path, "anything")
+    _patch_harness(monkeypatch, _CLEAN_VERDICT)
+    status = visual_ai_qa.assess_reader_truth(results)
+    assert results[0]["status"] == "PASS"
+    assert "truth_unevaluated" not in results[0]
+    assert status["unevaluated"] == 0
+
+
+def test_ci_gate_positive_control_high_verdict_still_fails(tmp_path, monkeypatch):
+    results = _harness_results(tmp_path, "Day 0. Your 30-day trend shows steady improvement.")
+    _patch_harness(monkeypatch, _HIGH_VERDICT)
+    status = visual_ai_qa.assess_reader_truth(results)
+    assert results[0]["status"] == "FAIL"
+    assert status["unevaluated"] == 0
+    assert any("Reader-truth (high)" in i for i in results[0]["issues"])
+
+
+def test_ci_gate_transport_error_stays_fail_soft(tmp_path, monkeypatch):
+    """The scope line, pinned: #3540 changes the INVISIBLE class only. A Bedrock
+    outage keeps the fail-soft ⚠ it was given by #1440."""
+
+    def boom(body, model_name=None):
+        raise RuntimeError("ServiceUnavailableException")
+
+    results = _harness_results(tmp_path, "anything")
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: types.SimpleNamespace(invoke=boom))
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    status = visual_ai_qa.assess_reader_truth(results)
+    assert results[0]["status"] == "PASS"
+    assert status["unevaluated"] == 0
+
+
+def test_ci_gate_budget_pause_is_not_an_unevaluated_red(tmp_path, monkeypatch):
+    """A DELIBERATE tier-3 pause is an honest, named state and must stay
+    distinguishable from a broken verdict — never turned red by this fix."""
+    results = _harness_results(tmp_path, "anything")
+    _patch_harness(monkeypatch, _CLEAN_VERDICT, tier=3)
+    status = visual_ai_qa.assess_reader_truth(results)
+    assert status["status"] == "skipped_by_budget"
+    assert results[0]["status"] == "PASS"
+    assert "truth_unevaluated" not in results[0]
+
+
+# ── the nightly caller (operational/qa_check_reader_truth): WARN ──────────────
+
+
+@pytest.mark.parametrize("text,kind", _UNREADABLE)
+def test_nightly_unevaluated_batch_warns_and_is_never_clean(monkeypatch, text, kind):
+    """THE NIGHTLY RULING. This check is CONTENT_TRUTH-partitioned (ADR-147) and
+    may not revert a deploy, so the honest ceiling is a loud, counted WARN — but
+    it may never read as clean, which is exactly what it did before."""
+    _patch_smoke(monkeypatch, invoke=_raw_invoke(text))
+    checks = qa_check_reader_truth.check_reader_truth()
+    assert not any(c.passed is False for c in checks), "the nightly must not red on an unreadable verdict"
+    unread = [c for c in checks if c.name == "reader_truth:unevaluated"]
+    assert len(unread) == 1 and unread[0].passed is None
+    assert "UNEVALUATED" in unread[0].message
+    verdicts = [c for c in checks if c.name == "reader_truth:verdict"]
+    assert len(verdicts) == 1
+    assert "surfaces clean at" not in verdicts[0].message, "the clean claim is about surfaces that were JUDGED"
+    assert "UNEVALUATED" in verdicts[0].message and "is NOT a clean result" in verdicts[0].message
+
+
+def test_nightly_unevaluated_batch_alongside_findings_carries_a_coverage_note(monkeypatch):
+    """Partial coverage: a run that judged some batches and could not read another
+    may not report the judged ones as if they were the whole sweep."""
+    six = _PAGES + [{"name": f"P{i}", "path": f"/p{i}/", "prose": "text"} for i in range(3)]
+    replies = [json.dumps({"findings": [{"page": "/now/", "category": "duplicated_narrative", "severity": "low", "note": "x"}]}), "no json"]
+
+    def invoke(body, model_name=None):
+        return {"content": [{"type": "text", "text": replies.pop(0) if replies else "no json"}]}
+
+    _patch_smoke(monkeypatch, surfaces=six, invoke=invoke)
+    checks = qa_check_reader_truth.check_reader_truth()
+    verdicts = [c for c in checks if c.name == "reader_truth:verdict"]
+    assert len(verdicts) == 1
+    assert "COVERAGE" in verdicts[0].message and "UNEVALUATED" in verdicts[0].message
+
+
+def test_nightly_positive_control_clean_run_is_still_ok_with_no_coverage_note(monkeypatch):
+    _patch_smoke(monkeypatch, payload=_CLEAN_VERDICT)
+    checks = qa_check_reader_truth.check_reader_truth()
+    verdicts = [c for c in checks if c.name == "reader_truth:verdict"]
+    assert len(verdicts) == 1 and verdicts[0].passed is True
+    assert "no truth findings" in verdicts[0].message
+    assert "COVERAGE" not in verdicts[0].message
+    assert not any(c.name == "reader_truth:unevaluated" for c in checks)
+
+
+def test_nightly_positive_control_high_finding_still_fails(monkeypatch):
+    _patch_smoke(monkeypatch, payload=_HIGH_VERDICT)
+    checks = qa_check_reader_truth.check_reader_truth()
+    fails = [c for c in checks if c.passed is False]
+    assert len(fails) == 1 and "temporal_contradiction" in fails[0].message

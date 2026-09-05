@@ -278,8 +278,38 @@ def check_reader_truth():
         checks.append(verdict.warn(f"Reader Truth AI unavailable — skipped this run (fail-soft): {str(e)[:120]}"))
         return checks
 
+    # #3540: the two batch outcomes are NAMED apart. `unevaluated` = the call
+    # returned and the verdict was unreadable (no JSON / unparseable / truncated
+    # at max_tokens) — a state that used to produce no error entry at all and
+    # therefore read as a judged, clean batch. `transport` = the call did not
+    # return, unchanged fail-soft posture (#1440).
+    #
+    # THE RULING FOR THIS CALLER IS **WARN**, not fail. This check is
+    # CONTENT_TRUTH-partitioned (ADR-147): it may not revert a deploy, it runs
+    # nightly with nothing downstream of it but the alert email, and a Bedrock-side
+    # unreadable reply is not evidence the SITE is wrong. So the honest ceiling here
+    # is "loud, counted, and never absorbed into a clean line" — which is what the
+    # coverage suffix on every summary below enforces. The CI gate
+    # (tests/visual_ai_qa.assess_reader_truth) rules the other way, because there
+    # "no answer" decides a deploy.
+    unread = [e for e in errors if reader_truth_qa.is_unevaluated(e)]
     for err in errors:
-        checks.append(Check("reader_truth:batch", "Reader Truth", CONTENT_TRUTH).warn(f"AI batch error (fail-soft): {err}"))
+        if reader_truth_qa.is_unevaluated(err):
+            checks.append(
+                Check("reader_truth:unevaluated", "Reader Truth", CONTENT_TRUTH).warn(
+                    f"AI batch UNEVALUATED — NOT a clean batch (#3540): {err}"
+                )
+            )
+        else:
+            checks.append(Check("reader_truth:batch", "Reader Truth", CONTENT_TRUTH).warn(f"AI batch error (fail-soft): {err}"))
+
+    # Appended to EVERY summary verdict below, including the ok() ones — a run that
+    # judged 3 of 4 batches may not report the 3 as if they were the whole sweep.
+    # On today's branch order the ok() branches are unreachable while `unread` is
+    # non-empty (the `elif errors` branch catches that case first and says so in
+    # full), so the suffix there is belt-and-braces against a future reordering
+    # silently minting a clean claim — not the load-bearing path.
+    coverage = f" [COVERAGE: {len(unread)} batch(es) UNEVALUATED this run, see reader_truth:unevaluated (#3540)]" if unread else ""
 
     # #2620: BOTH severities get the detail treatment, not just the failing one.
     # The low/med path is the one nobody reproduces by hand — a warn that cannot
@@ -340,12 +370,22 @@ def check_reader_truth():
 
     if highs:
         summary, detail_lines = summarize_findings(highs)
-        verdict.fail(f"{len(highs)} high truth finding(s) at {day}, confirmed on a second pass: {summary}").with_details(detail_lines)
+        verdict.fail(f"{len(highs)} high truth finding(s) at {day}, confirmed on a second pass: {summary}{coverage}").with_details(
+            detail_lines
+        )
     elif lower:
         summary, detail_lines = summarize_findings(lower)
-        verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: {summary}").with_details(detail_lines)
+        verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: {summary}{coverage}").with_details(detail_lines)
     elif errors:
-        verdict.warn(f"no verdict at {day} — all {len(errors)} AI batch(es) errored (fail-soft)")
+        # #3540: "errored" was the only word this branch had, and it was wrong for
+        # the unreadable-verdict half — those batches did not error, they answered
+        # with nothing. Both halves are named, and the count is of the batches that
+        # produced NO finding, never of the whole sweep.
+        verdict.warn(
+            f"no truth finding at {day} from {len(errors)} AI batch(es) that returned none — "
+            f"{len(unread)} UNEVALUATED (unreadable verdict, #3540), {len(errors) - len(unread)} transport error(s); "
+            f"this is NOT a clean result"
+        )
     elif advisory:
         # #3258: NOT "clean". Every finding this run produced was adjudicated
         # advisory by the ledger, which is a different statement from "the judge
@@ -354,9 +394,9 @@ def check_reader_truth():
         # to reader_truth:advisory are the honest version.
         verdict.ok(
             f"{len(surfaces)} surfaces at {day} — no truth finding survived the ruling ledger "
-            f"({len(advisory)} adjudicated advisory, see reader_truth:advisory)"
+            f"({len(advisory)} adjudicated advisory, see reader_truth:advisory){coverage}"
         )
     else:
-        verdict.ok(f"{len(surfaces)} surfaces clean at {day} — no truth findings")
+        verdict.ok(f"{len(surfaces)} surfaces clean at {day} — no truth findings{coverage}")
     checks.append(verdict)
     return checks
