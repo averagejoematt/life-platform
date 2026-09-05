@@ -19,7 +19,7 @@ import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — return
 import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // visual P2 + #590 seeded drift
 import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for the hover door affordance
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
-import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
+import { heroProofLine, BRIEF_LINE_KICKER, dialCopy, journeyFigures } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label; #3524 — the dial triple + the stat row's three figures
 import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
 import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with dispatches.js
 import { familyChip, isDark } from "/assets/js/absence_read.js"; // #2388 — a dark source never renders a trend verb
@@ -276,6 +276,25 @@ function drawConstellation(pillars, coupling, activeEffects) {
 // can drift (the bug that had Home on Week 1 while Story/Coaching were on Week 2).
 const STORY_GENESIS_SUFFIX = " — a transformation you can watch happen in real time.";
 function renderNumbers(journey, pre) {
+  // #3524 — EVERY figure in this row is bound in EVERY state, from ONE decision
+  // (journeyFigures, pure + unit-tested). Before this, `current` was written only
+  // when a weigh-in existed, so index.html's own static shimmer ("···") survived
+  // next to two rewritten "—" glyphs — three placeholder vocabularies in one row,
+  // and the odd one out read as a widget that had failed to load rather than a
+  // record that hadn't started. A figure with nothing behind it now always shows
+  // the same deliberate absence glyph plus a caption saying when it starts.
+  const _figs = journeyFigures(journey, pre);
+  for (const _k of ["lost", "current", "progress"]) {
+    const _f = _figs[_k];
+    if (!_f || _f.present) continue;
+    const _el = bind(_k);
+    if (!_el) continue;
+    _el.textContent = _f.text;
+    const _fig = _el.closest(".figure");
+    if (_fig) _fig.classList.remove("is-up");
+    const _cap = _fig && _fig.querySelector(".figure-cap");
+    if (_cap && _f.cap) _cap.textContent = _f.cap;
+  }
   // #931 pre-start: no baseline exists until Day 1's weigh-in, so the numbers beat
   // makes no delta/progress claims — launch-eve framing instead, quiet confidence.
   if (pre) {
@@ -284,13 +303,6 @@ function renderNumbers(journey, pre) {
       hp.textContent = `Launch eve — the instruments are on. The record starts ${pre.startLabel}, with the first weigh-in.`;
       hp.hidden = false;
     }
-    const lostEl = bind("lost");
-    if (lostEl) {
-      lostEl.textContent = "—";
-      const figEl = lostEl.closest(".figure");
-      const cap = figEl && figEl.querySelector(".figure-cap");
-      if (cap) cap.textContent = "lbs — counts from Day 1";
-    }
     const curEl = bind("current");
     if (curEl && journey && journey.current_weight_lbs != null) {
       curEl.textContent = journey.current_weight_lbs;
@@ -298,8 +310,6 @@ function renderNumbers(journey, pre) {
       const curCap = curFig && curFig.querySelector(".figure-cap");
       if (curCap) curCap.textContent = "lbs at the start line";
     }
-    const prEl = bind("progress");
-    if (prEl) prEl.textContent = "—";
     const pj = bind("projected");
     if (pj) pj.textContent = `No projections yet — the finish-line math begins with Day 1's weigh-in on ${pre.startLabel}. No fake finish line; watch it happen from the start.`;
     return;
@@ -816,23 +826,24 @@ async function load() {
   // The review's "central number": a prominent day-of-experiment counter in the hero.
   // Pre-start (#931) it counts DOWN to Day 1 — calm, dated, no marketing timer.
   const { dayN, weekN } = genesisCount();
-  const dn = bind("dayNum"), dc = bind("dayCap");
+  const dn = bind("dayNum"), dc = bind("dayCap"), de = bind("dayEyebrow");
+  // #3524 — the hub is THREE glyphs and all three are written together, from the
+  // pure dialCopy(). The eyebrow used to be a static "day" in index.html that no
+  // branch touched, so launch eve rendered DAY / 1 / DAY TO GO — the same three
+  // glyphs that mean "Day 1, running" the next morning. Recurs on every
+  // future-genesis reset, which is why the fix is structural rather than copy.
+  const _dial = dialCopy(pre, dayN, weekN);
+  if (_dial) {
+    if (de) de.textContent = _dial.eyebrow;
+    if (dn) { dn.textContent = _dial.num; if (!pre && window.__moCount) window.__moCount(dn); }
+    if (dc) dc.textContent = _dial.cap;
+  }
   if (pre && dn && dc) {
     // The hero daycount IS the countdown — the genesis stamp (which the client-only
     // stampGenesis may have written from a not-yet-rewritten GENESIS literal, or as
     // a duplicate countdown) stays hidden pre-start.
     const gs = bind("genesisStamp");
     if (gs) gs.hidden = true;
-    if (pre.daysUntil >= 2) {
-      dn.textContent = String(pre.daysUntil);
-      dc.textContent = `days until the experiment begins — ${pre.startLabel}`;
-    } else if (pre.daysUntil === 1) {
-      dn.textContent = "1";
-      dc.textContent = `day to go — the experiment begins tomorrow, ${pre.startLabel}`;
-    } else {
-      dn.textContent = "0";
-      dc.textContent = "the experiment begins today, with the first weigh-in";
-    }
     // #949 — the countdown moment gets its conversion hook: an inline follow CTA
     // right under the count, pre-start only (post-start the close beat owns it).
     // #1469: the day counter now lives at the dial hub (pointer-events:none overlay),
@@ -845,9 +856,6 @@ async function load() {
       if (dcWrap.classList.contains("dial-wrap")) dcWrap.appendChild(cta);
       else dcWrap.insertAdjacentElement("afterend", cta);
     }
-  } else if (dayN >= 1) {
-    if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }
-    if (dc) dc.textContent = dayN === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`;
   }
   dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
 

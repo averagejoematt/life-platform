@@ -19,7 +19,7 @@ import { ruleBand } from "/assets/js/texture.js"; // #1471 — the editorial tex
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
 import { quotesArchiveHTML } from "/assets/js/journal_quotes.js"; // #1568 — consent-per-line pull-quotes (ADR-142)
-import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
+import { sortChronicleNewestFirst, postForDate } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest; #3525 — the milestone→installment rule, pure + unit-tested
 import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with story.js
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
@@ -293,7 +293,11 @@ async function renderRead(s, id) {
     const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const moLabel = (mo) => { const m = /^(\d{4})-(\d{2})/.exec(mo || ""); return m ? `${MON[+m[2] - 1]} ${m[1]}` : mo; };
     // The chronicle installment that narrates a given date = the soonest week ending on/after it.
-    const postFor = (date) => { let best = null; for (const p of posts) { if (!p.date) continue; if (p.date >= date && (!best || p.date < best.date)) best = p; } return best || posts[0] || null; };
+    // #3525: the milestone→installment rule (and its honest null) now lives in the
+    // shared, DOM-free chronicle_order.js so it can be pinned by tests/js. The
+    // genesis floor comes from the LIVE journey, never a client literal.
+    const tlGenesis = (jr && jr.journey && jr.journey.started_date) || (jr && jr.started_date) || null;
+    const postFor = (date) => postForDate(posts, date, tlGenesis);
     const TYPE = { weight: "wt", level_up: "lv", experiment: "ex", discovery: "dx", correlation: "co", milestone: "ms", life_event: "le" };
     // Stat line (always shown): Day/Week/lbs + the jump link. #931 pre-start: the
     // Day-N clamp above would read "Day 1 · Week 1" on launch eve — count down instead.
@@ -390,8 +394,11 @@ async function renderRead(s, id) {
         const dt = String(e.date || "").slice(0, 10), mo = dt.slice(0, 7), last = i === events.length - 1;
         if (mo !== curMonth) { curMonth = mo; body += `<li class="tl-month" aria-hidden="true"><span class="label">${esc(moLabel(mo))}</span></li>`; }
         const p = postFor(dt);
+        // #3525: no installment narrates this moment YET — say so. A "Read Week 1 →"
+        // that resolves to another cycle's week is a worse answer than "not written
+        // yet", and it was the only answer the old fallback could give on Day 1.
         const xlink = p ? `<a class="tl-x" href="/story/chronicle/#${esc(p.date)}">Read ${esc(p.label || ("Week " + p.week))} →</a>`
-          : (e.link ? `<a class="tl-x" href="${esc(e.link)}">see more →</a>` : "");
+          : `<span class="tl-x tl-x-pending label">chronicle pending</span>${e.link ? ` <a class="tl-x" href="${esc(e.link)}">see more →</a>` : ""}`;
         body += `<li class="tl-item tl-${esc(TYPE[e.type] || "ms")}"${last ? ' id="tl-genesis"' : ""}>` +
           `<span class="tl-dot" aria-hidden="true"></span>` +
           `<div class="tl-body"><span class="tl-date label">${esc(dt)}</span>` +
