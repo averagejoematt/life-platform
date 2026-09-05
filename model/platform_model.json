@@ -3321,6 +3321,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/operational/chronicle_manifest_qa.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "life-platform-coherence-sentinel",
       "module": "lambdas/operational/coherence_sentinel_lambda.py",
@@ -6908,7 +6915,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 666,
+      "edges": 667,
       "lambdas": 104,
       "mcp_tool_modules": 26,
       "mcp_tools": 76,
@@ -6923,8 +6930,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 319,
-        "sites_resolved": 825,
-        "sites_total": 1144
+        "sites_resolved": 826,
+        "sites_total": 1145
       },
       "schedule_resolution": {
         "dynamic": 0,
