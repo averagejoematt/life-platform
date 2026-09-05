@@ -140,10 +140,20 @@ export function renderInference(d) {
   const mrows = (d.models || []).map((m) =>
     `<tr><td class="rd-name">${esc(m.model)}</td><td class="num">${fmt(m.today.input_tokens)} / ${fmt(m.today.output_tokens)}</td><td class="num">$${fmt(m.today.est_cost_usd)}</td><td class="num">${fmt(m.month.input_tokens)} / ${fmt(m.month.output_tokens)}</td><td class="num">$${fmt(m.month.est_cost_usd)}</td></tr>`).join("");
   const models = mrows ? sec("By model", `<table class="rd-tbl"><thead><tr><th>model</th><th>today in/out</th><th>today $</th><th>month in/out</th><th>month $</th></tr></thead><tbody>${mrows}</tbody></table>`) : "";
+  // #3555 — the per-feature DOLLAR column. It was withheld for four years' worth of
+  // reader-months on a stated reason that was never true of this platform ("the per-Lambda
+  // metric stream carries no model dimension"): the chokepoint has resolved the model and
+  // emitted EstimatedCostUSD per LambdaFunction since #142. `month_est_cost_usd` comes
+  // from the API — nothing is priced or summed here — and renders as "—" when a feature's
+  // spend genuinely was not metered, never as $0.
   const frows = (d.features || []).slice(0, 14).map((f) =>
-    `<tr><td class="rd-name">${esc(f.lambda)}</td><td class="num">${fmt(f.month_input_tokens)}</td><td class="num">${fmt(f.month_output_tokens)}</td></tr>`).join("");
-  const features = frows ? sec("By feature (month-to-date tokens)", `<table class="rd-tbl"><thead><tr><th>lambda</th><th>input</th><th>output</th></tr></thead><tbody>${frows}</tbody></table>`) : "";
-  return head + models + features + `<p class="correlative">${esc(d.note || "")}</p>`;
+    `<tr><td class="rd-name">${esc(f.lambda)}</td><td class="num">${fmt(f.month_input_tokens)}</td><td class="num">${fmt(f.month_output_tokens)}</td><td class="num">${f.month_est_cost_usd != null ? `$${fmt(f.month_est_cost_usd, 2)}` : "—"}</td></tr>`).join("");
+  const features = frows ? sec("By feature (month-to-date)", `<table class="rd-tbl"><thead><tr><th>lambda</th><th>input</th><th>output</th><th>month $</th></tr></thead><tbody>${frows}</tbody></table>`) : "";
+  const a = d.attribution;
+  const attribution = (a && a.note)
+    ? `<p class="rd-archive">${esc(a.note)}${a.reconciliation_ratio != null ? ` Right now that ratio is ${fmt(a.reconciliation_ratio, 3)}.` : ""}${a.unattributed_usd != null ? ` $${fmt(a.unattributed_usd, 2)} of this month sits in the unknown row.` : ""}</p>`
+    : "";
+  return head + models + features + attribution + `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 
 /* The Glass Engine (#1397) — the budget envelope as an instrument.
@@ -182,20 +192,43 @@ export function renderReceipts(d) {
       note("The governor reprojects every 8 hours; this page fills in on its next run.");
   }
 
-  const pct = d.projected_pct_of_ceiling;
+  // #3554 — the headline projection is the SCOPE-COMPLETE one when the API publishes it.
+  // This tile used to print `projected_month_end_usd` under the bare label "projected
+  // month-end". That is the governor's TIER-DECIDING projection, which extrapolates only
+  // the caller classes that recur on a schedule (#2892) — on 2026-09-05 it read $83.70 /
+  // 33.2% of ceiling in green while the same payload's all-class figure was $103.49. A
+  // narrow number wearing a broad label, on the page whose whole pitch is "here is what
+  // running this actually costs". Both figures now ship from the API and neither is
+  // derived here: `projected_all_classes_pct_of_ceiling` is computed server-side beside
+  // its sibling, so the front-end can never mint a second percentage.
+  const narrowProj = d.projected_month_end_usd;
+  const narrowPct = d.projected_pct_of_ceiling;
+  const allProj = d.projected_all_classes_usd;
+  const scoped = allProj != null && narrowProj != null && allProj !== narrowProj;
+  const proj_ = allProj != null ? allProj : narrowProj;
+  const pct = allProj != null ? d.projected_all_classes_pct_of_ceiling : narrowPct;
   const head = figs([
     d.month_to_date_usd != null && fig(`$${fmt(d.month_to_date_usd)}`, "spent this month", d.mtd_pct_of_ceiling != null ? `${fmt(d.mtd_pct_of_ceiling)}% of ceiling` : null),
-    d.projected_month_end_usd != null && fig(`$${fmt(d.projected_month_end_usd)}`, "projected month-end", pct != null ? `${fmt(pct)}% of ceiling` : null),
+    proj_ != null && fig(`$${fmt(proj_)}`, scoped ? "projected month-end · all spend" : "projected month-end", pct != null ? `${fmt(pct)}% of ceiling` : null),
     d.ceiling_usd != null && fig(`$${fmt(d.ceiling_usd)}`, d.surge_active ? "ceiling (surge mode)" : "hard ceiling (all-in)"),
     tier != null && fig(String(tier), "budget tier (0–3)"),
   ].filter(Boolean));
+
+  // The narrower figure is not hidden — it is the number the tier ladder above is
+  // actually decided on, so a reader who wants to know why nothing has switched off
+  // needs it. Its scope prose comes from the API (`projection_note`), never composed here.
+  const scopeBlock = (scoped || d.projection_note)
+    ? `<p class="rd-archive">${scoped ? `The tier ladder is decided on a narrower figure — <b>$${fmt(narrowProj)}</b>${narrowPct != null ? ` (${fmt(narrowPct)}% of ceiling)` : ""}. ` : ""}${esc(d.projection_note || "")}</p>`
+    : "";
 
   // #1618 — extend the curve past today with a dashed projection to month-end, anchored on
   // the governor's projected_month_end_usd (NOT re-extrapolated in JS — a second projection
   // that disagreed with the governor is the exact defect this avoids). When the projection is
   // absent (stale/null breakdown) `proj` is null and only the solid actual line renders.
-  const proj = (d.projected_month_end_usd != null && d.month_end_date)
-    ? { value: d.projected_month_end_usd, date: d.month_end_date, label: "projected" }
+  // #3554: the dashed segment anchors on the SAME figure the headline tile shows, so the
+  // chart and the number above it can never answer two different questions.
+  const proj = (proj_ != null && d.month_end_date)
+    ? { value: proj_, date: d.month_end_date, label: scoped ? "projected (all spend)" : "projected" }
     : null;
   const curveChart = (d.history || []).length
     ? lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend · UTC billing days", goal: d.ceiling_usd, projection: proj, emptyMsg: "The spend curve draws in as the month accrues." })
@@ -203,7 +236,7 @@ export function renderReceipts(d) {
   // ADR-105: the dashed line is a forecast, not a measurement — say so in prose, not just the
   // caption, so a reader can never mistake the projected continuation for recorded spend.
   const curveNote = (proj && curveChart)
-    ? `<p class="rd-archive">The solid line is what has actually been spent this month; the dashed line is the governor's projection to month-end — $${fmt(d.projected_month_end_usd)}, an estimate it re-runs every 8 hours, not a measured value (ADR-105). AWS bills on UTC days, so late in a Pacific evening the curve can already show a point for a day that hasn't finished here.</p>`
+    ? `<p class="rd-archive">The solid line is what has actually been spent this month; the dashed line is the governor's projection to month-end — $${fmt(proj_)}${scoped ? " across all spend classes" : ""}, an estimate it re-runs every 8 hours, not a measured value (ADR-105). AWS bills on UTC days, so late in a Pacific evening the curve can already show a point for a day that hasn't finished here.</p>`
     : "";
   const curve = curveChart
     ? sec(proj ? "The month so far — and where it's heading" : "The month so far", curveChart + curveNote)
@@ -222,9 +255,16 @@ export function renderReceipts(d) {
   // A projection ABOVE the ceiling is the single most important thing this page can
   // say, and in the figure row it renders in the same faint `.rd-delta` as a benign
   // "74% of ceiling" — no cue that one of them is a breach. State it in prose.
+  // #3554: the ladder responds to the TIER-DECIDING projection, so when the two scopes
+  // disagree about a breach the prose has to say which one is over — claiming "the tier
+  // ladder is the response" while the ladder's own input is under the ceiling would be a
+  // second untrue sentence on the same page.
+  const ladderResponds = narrowPct != null && narrowPct > 100;
   const breach = (pct != null && pct > 100)
-    ? `<p class="rd-archive"><b>Projected to finish the month over the ceiling</b> — $${fmt(d.projected_month_end_usd)} against $${fmt(d.ceiling_usd)} (${fmt(pct)}%). ` +
-      `The tier ladder above is the response: features switch off as the projection climbs, which is what pulls the real figure back under.</p>`
+    ? `<p class="rd-archive"><b>Projected to finish the month over the ceiling</b> — $${fmt(proj_)}${scoped ? " across all spend classes" : ""} against $${fmt(d.ceiling_usd)} (${fmt(pct)}%). ` +
+      (ladderResponds
+        ? `The tier ladder above is the response: features switch off as the projection climbs, which is what pulls the real figure back under.</p>`
+        : `The tier ladder above has not moved: it is decided on the recurring-classes-only projection, $${fmt(narrowProj)}${narrowPct != null ? ` (${fmt(narrowPct)}% of ceiling)` : ""}, which is still inside the ceiling.</p>`)
     : "";
 
   const surge = d.surge_active
@@ -244,7 +284,7 @@ export function renderReceipts(d) {
     ? `<p class="correlative">${esc(d.per_feature_note)} <a href="/method/inference/">See the per-model receipt →</a></p>`
     : "";
 
-  return head + breach + tierBlock + surge + window_ + curve + split + feat + prov +
+  return head + scopeBlock + breach + tierBlock + surge + window_ + curve + split + feat + prov +
     `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 

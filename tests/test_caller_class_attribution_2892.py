@@ -363,3 +363,158 @@ def test_breakdown_makes_no_attribution_claim_without_data(gov, monkeypatch):
     assert payload["prod_class_share"] is None
     assert payload["ai_class_split"] == {}
     assert payload["projected_all_classes"] is None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3554 — the PREMISE guard on the word "episodic"
+#
+# The #2892 narrowing above excludes `ci` and `dev-session` from the forward
+# extrapolation on a CLAIM about behaviour: their trailing rate says what a human did
+# last week, not what the calendar will do next week. Nothing measured that claim, so the
+# label could outlive the behaviour it described while the public receipt kept publishing
+# a projection narrowed on it. Measured 2026-09-05 on the live account:
+# `EstimatedCostUSD{CallerClass=ci}` had a datapoint on 12 of the 12 UTC days for which
+# the dimension had existed (daily 1.13, 0.91, 2.84, 3.57, 2.83, 0.39, 1.79, 1.36, 0.86,
+# 1.02, 0.23, 0.36 — about $44/month).
+#
+# The rule lives in `operational.episodic_premise` and is PURE — it takes its measurement
+# as an argument — so it is proved here with positive and negative controls rather than
+# against whatever the fleet happens to be doing on the day the suite runs.
+# ══════════════════════════════════════════════════════════════════════════════
+@pytest.fixture(scope="module")
+def ep():
+    return importlib.import_module("operational.episodic_premise")
+
+
+_EPISODIC = ("ci", "dev-session")
+
+
+def test_an_episodic_class_that_bills_daily_is_a_violation(ep):
+    """Positive control. The bar is 25 of 30 — "bills essentially every day"."""
+    days = {"prod-cron": 30, "remediation": 13, "ci": 28, "dev-session": 3}
+    assert ep.episodic_premise_violations(days, _EPISODIC) == ["ci"]
+
+
+def test_a_genuinely_episodic_class_is_not_flagged(ep):
+    """Negative control. Without this, a rule that flagged everything would look identical
+    to a rule that works."""
+    days = {"prod-cron": 30, "remediation": 13, "ci": 9, "dev-session": 3}
+    assert ep.episodic_premise_violations(days, _EPISODIC) == []
+
+
+def test_the_bar_is_inclusive_at_its_own_edge(ep):
+    assert ep.episodic_premise_violations({"ci": ep.EPISODIC_PREMISE_BAR_DAYS}, _EPISODIC) == ["ci"]
+    assert ep.episodic_premise_violations({"ci": ep.EPISODIC_PREMISE_BAR_DAYS - 1}, _EPISODIC) == []
+
+
+def test_a_recurring_class_billing_daily_is_never_a_violation(ep, gov, monkeypatch):
+    """prod-cron bills every day BY DESIGN — that is what "recurring" means, and flagging
+    it would make the signal noise. The rule only ever inspects the classes it is HANDED,
+    so this asserts the governor's own call site hands it the episodic set. The registries
+    come from the governor, so a class moved from one side to the other moves this with it."""
+    import json as _json
+
+    written = {}
+
+    class _SSM:
+        def put_parameter(self, **kw):
+            written.update(kw)
+
+    monkeypatch.setattr(gov, "_ssm", _SSM())
+    every_day = {c: ep.EPISODIC_PREMISE_WINDOW_DAYS for c in gov.CALLER_CLASSES}
+    gov._write_breakdown(0, 10.0, 20.0, 1.0, 1.0, datetime(2026, 9, 5, tzinfo=timezone.utc), 215.0, billing_days_by_class=every_day)
+    flagged = _json.loads(written["Value"])["episodic_premise_violations"]
+    assert flagged == sorted(gov.EPISODIC_CALLER_CLASSES)
+    assert not (set(flagged) & set(gov.PROJECTED_CALLER_CLASSES)), "a recurring class must never be flagged"
+
+
+def test_an_unknown_count_is_never_counted_as_a_pass(ep):
+    """A failed metric read records None, not 0. None must not enter the violation list
+    (there is no evidence) and must not be silently converted to a clean bill of health —
+    consumers surface it off the recorded None, which is why it is preserved."""
+    assert ep.episodic_premise_violations({"ci": None, "dev-session": None}, _EPISODIC) == []
+    assert ep.episodic_premise_violations({}, _EPISODIC) == []
+
+
+def test_billing_days_records_none_not_zero_when_cloudwatch_fails(ep):
+    """The absence-read-as-success guard, at the measurement rather than at the rule."""
+
+    class _CW:
+        def get_metric_statistics(self, **kw):
+            raise RuntimeError("cloudwatch down")
+
+    days = ep.billing_days_by_class(_CW(), _EPISODIC, "CallerClass", datetime(2026, 9, 5, tzinfo=timezone.utc))
+    assert set(days) == set(_EPISODIC)
+    assert all(v is None for v in days.values()), "a failed read must be UNKNOWN, never zero days"
+
+
+def test_billing_days_counts_days_with_spend_not_dollars(ep):
+    """The premise is about FREQUENCY. A class with one enormous day and a class with
+    thirty small ones must not read the same."""
+
+    class _CW:
+        def get_metric_statistics(self, Dimensions, **kw):
+            cls = Dimensions[0]["Value"]
+            if cls == "ci":
+                return {"Datapoints": [{"Sum": 0.01} for _ in range(28)]}
+            return {"Datapoints": [{"Sum": 18.33}, {"Sum": 0.0}]}
+
+    days = ep.billing_days_by_class(_CW(), _EPISODIC, "CallerClass", datetime(2026, 9, 5, tzinfo=timezone.utc))
+    assert days["ci"] == 28
+    assert days["dev-session"] == 1, "a zero-sum day is not a billing day"
+    assert ep.episodic_premise_violations(days, _EPISODIC) == ["ci"]
+
+
+def test_the_premise_measurement_reaches_the_persisted_breakdown(gov, monkeypatch):
+    """The whole point of measuring it: every consumer (the receipt, the brief) reads the
+    breakdown, so the measurement has to land there and not only in a log line."""
+    import json as _json
+
+    written = {}
+
+    class _SSM:
+        def put_parameter(self, **kw):
+            written.update(kw)
+
+    monkeypatch.setattr(gov, "_ssm", _SSM())
+    gov._write_breakdown(
+        0,
+        10.0,
+        20.0,
+        1.0,
+        1.0,
+        datetime(2026, 9, 5, tzinfo=timezone.utc),
+        215.0,
+        billing_days_by_class={"prod-cron": 30, "ci": 28, "dev-session": 3, "remediation": 13},
+    )
+    payload = _json.loads(written["Value"])
+    assert payload["episodic_billing_days"]["ci"] == 28
+    assert payload["episodic_premise_violations"] == ["ci"]
+    assert payload["episodic_premise_bar_days"] == gov._episodic.EPISODIC_PREMISE_BAR_DAYS
+    assert payload["episodic_premise_window_days"] == gov._episodic.EPISODIC_PREMISE_WINDOW_DAYS
+
+
+def test_the_premise_guard_does_not_move_the_arithmetic(gov):
+    """Deliberate scope limit: the guard reports, it does not silently re-scope the number
+    the tier ladder is calibrated against. That change belongs to a human."""
+    import inspect
+
+    src = inspect.getsource(gov.lambda_handler)
+    assert "_episodic.report(" in src, "the premise is evaluated every run"
+    # `projected` is assigned from the prod-class-share arithmetic and nothing downstream
+    # of the premise check reassigns it.
+    after = src.split("premise_broken =", 1)[1]
+    assert "projected =" not in after, "the premise guard must not rewrite the projection"
+
+
+def test_the_report_helper_logs_the_break_with_its_magnitude(ep, caplog):
+    """A violation with no magnitude beside it is a fact nobody can prioritise, so the
+    log line carries both projections. Negative control: an intact premise logs nothing."""
+    with caplog.at_level("WARNING"):
+        assert ep.report({"ci": 28}, _EPISODIC, 83.7, 103.49) == ["ci"]
+    assert "EPISODIC_PREMISE_BROKEN" in caplog.text
+    assert "83.70" in caplog.text and "103.49" in caplog.text
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        assert ep.report({"ci": 6}, _EPISODIC, 83.7, 103.49) == []
+    assert "EPISODIC_PREMISE_BROKEN" not in caplog.text
