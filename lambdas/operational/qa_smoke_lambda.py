@@ -693,7 +693,9 @@ from operational.qa_check_podcast_parity import (  # noqa: F401,E402
 # #1665/#1944/#1972/#1993); re-exported here so qa_smoke_lambda.check_subscriber_promise_truth
 # and .assess_subscriber_promise_truth are valid public entrypoints for tests and callers.
 from operational.qa_check_subscriber_promise import (  # noqa: F401,E402
+    assess_promise_cadence_agreement,
     assess_subscriber_promise_truth,
+    check_subscriber_promise_cadence,
     check_subscriber_promise_truth,
 )
 
@@ -972,6 +974,8 @@ def check_steps():
         ("content_cadence", check_content_cadence),
         # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
         ("subscriber_promise_truth", check_subscriber_promise_truth),
+        # #3564: and the promise must state the cadence the senders actually deliver
+        ("subscriber_promise_cadence", check_subscriber_promise_cadence),
         ("podcast_parity", check_podcast_parity),
         # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
         (

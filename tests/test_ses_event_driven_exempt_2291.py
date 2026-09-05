@@ -291,8 +291,10 @@ def onboarding_env(monkeypatch):
     monkeypatch.setattr(onboarding_mod, "ses", ses)
     monkeypatch.setattr(onboarding_mod, "table", table)
     monkeypatch.setattr(onboarding_mod, "s3", FailingS3())
-    # Pin the wall-clock-dependent Wednesday gate open (golden-test discipline).
-    monkeypatch.setattr(onboarding_mod, "_days_until_wednesday", lambda: 5)
+    # Pin the wall-clock-dependent send window open (golden-test discipline). #3564
+    # renamed it: the window is measured to the next Weekly Signal, not to a Wednesday
+    # no subscriber-facing sender delivers on.
+    monkeypatch.setattr(onboarding_mod, "_days_until_first_signal", lambda: 5)
     return ses, table
 
 

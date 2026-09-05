@@ -1,7 +1,13 @@
 """
 Subscriber Onboarding Lambda — Day 2 Bridge Email
 Sends curated Chronicle installments to new subscribers who confirmed
-1-6 days ago and whose next Wednesday is 3+ days away.
+1-6 days ago and whose first Weekly Signal is 3+ days away.
+
+#3564: that window used to be measured to the next WEDNESDAY — a day no
+subscriber-facing sender delivers on. The one unconditional weekly send is
+weekly-signal, `cron(30 16 ? * SUN *)`, so the gap this email exists to bridge
+is the gap to SUNDAY. The weekday is derived from that cron
+(`common.subscriber_cadence.signal_weekday`), never re-typed here.
 
 Schedule: EventBridge cron(5 17 * * ? *) — 10:05 AM PT daily (CDK SubscriberOnboarding,
 staggered from the daily brief; the old cron(0 16) hand-created rule was an orphan, #1257).
@@ -23,6 +29,7 @@ from datetime import datetime, timezone
 import boto3
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.send_guard import guarded_send_email, is_dry_run
+from common.subscriber_cadence import days_until_next, promise_sentence, signal_weekday, weekday_name  # #3564
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 
 try:
@@ -71,19 +78,31 @@ def _get_published_posts(max_posts=3):
         published = [p for p in posts if p.get("url") and p.get("status", "published") == "published"]
         if not published:
             return FALLBACK_PAGES
-        # Sort by week descending (most recent first), take top N
-        published.sort(key=lambda p: p.get("week", 0), reverse=True)
-        return [{"label": f"Week {p.get('week', '?')}", "title": p["title"], "path": p["url"]} for p in published[:max_posts]]
+        # #3565 (CPO-5): order by DATE (then the manifest's explicit same-date
+        # `sequence`), never by the integer `week` — chronicle_render.py stamps every
+        # pre-genesis installment `week: 0` deliberately, so an integer sort put three
+        # prologue parts in arbitrary order and could rank them above the newest post.
+        # This mirrors the manifest's own ordering key (chronicle_render.py:645).
+        published.sort(key=lambda p: (p.get("date", ""), p.get("sequence", 0)), reverse=True)
+        # #3565: the card label is the manifest's `label` — the genesis-anchored series
+        # marker chronicle_render.py carries PRECISELY so a prologue reads
+        # "Prologue · Part III" and never "Week 0". Rendering f"Week {p['week']}" here
+        # re-derived a label the manifest already publishes, and got it wrong: a Day-0
+        # welcome email read "Week 0 · The Plan, On the Record".
+        return [{"label": p.get("label") or "The Chronicle", "title": p["title"], "path": p["url"]} for p in published[:max_posts]]
     except Exception as e:
         logger.warning(f"Could not load posts.json: {e}")
         return FALLBACK_PAGES
 
 
-def _days_until_wednesday():
-    """Days from today until next Wednesday."""
-    today = datetime.now(timezone.utc).weekday()  # Mon=0, Wed=2
-    days = (2 - today) % 7
-    return days if days > 0 else 7
+def _days_until_first_signal():
+    """Days from today until the next Weekly Signal send.
+
+    #3564: was `_days_until_wednesday`, hand-coded to weekday 2. The Signal is the
+    one unconditional subscriber send and it goes out on the weekday derived from
+    `weekly-signal`s own cron — if that cron moves, this window moves with it.
+    """
+    return days_until_next(signal_weekday(), datetime.now(timezone.utc).date())
 
 
 def _build_onboarding_email(email: str) -> tuple[str, str]:
@@ -118,8 +137,12 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
             text-transform:uppercase;color:#F0B429;margin:0 0 24px;">The Weekly Signal</p>
 
   <h1 style="font-size:20px;font-weight:600;color:#E6EDF3;line-height:1.3;margin:0 0 16px;">
-    Your first Signal arrives Wednesday.
+    Your first Signal arrives {weekday_name(signal_weekday())}.
   </h1>
+
+  <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 24px;">
+    {promise_sentence()}
+  </p>
 
   <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 24px;">
     While you wait, here's what this experiment is about \u2014 the data,
@@ -160,12 +183,13 @@ def lambda_handler(event, context):
         logger.info("dry run — sends and onboarding_sent markers will be suppressed")
 
     now = datetime.now(timezone.utc)
-    days_to_wed = _days_until_wednesday()
+    days_to_signal = _days_until_first_signal()
 
-    # Only send if next Wednesday is 3+ days away
-    if days_to_wed < 3:
-        logger.info(f"Wednesday is {days_to_wed} days away — skipping onboarding emails")
-        return {"statusCode": 200, "body": "Too close to Wednesday — skipping"}
+    # Only send if the next Weekly Signal is 3+ days away — otherwise the bridge
+    # email and the real thing land on top of each other.
+    if days_to_signal < 3:
+        logger.info("the Weekly Signal is %s days away — skipping onboarding emails", days_to_signal)
+        return {"statusCode": 200, "body": "Too close to the Weekly Signal — skipping"}
 
     # Query all confirmed subscribers
     try:

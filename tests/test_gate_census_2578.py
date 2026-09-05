@@ -509,9 +509,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # of tests/api_schemas/api_vitals.json's real shape with one key hand-removed,
         # never the live site — proving the #3324 nullable-aware diff_shape() rule still
         # catches a genuine key removal).
+        # Upper bound raised 48 -> 49 (2026-09-05, #3564): the 49th proof is
+        # `qa::lambdas/operational/qa_check_subscriber_promise.py::check_subscriber_promise_cadence`
+        # — and it needed no planted mutation, because its first run FAILED on the live
+        # production /subscribe/, naming the stale "one email a week" claim against the
+        # promise rendered from the senders' crons. Recorded in gate_census.PROVEN_CAN_FAIL
+        # with the re-runnable command; the pass side and the contradiction case are
+        # covered by tests/test_subscriber_cadence_promise_3564.py.
         3
         <= len(proven)
-        <= 48
+        <= 49
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

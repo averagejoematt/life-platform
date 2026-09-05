@@ -590,7 +590,10 @@ _producer_mirror_hits = _pmc._producer_mirror_hits
 
 
 def _og_source_hits(files, truth: int) -> list[str]:
-    """Reader-facing "N data sources" literals in og_*.py that disagree with the registry.
+    """Reader-facing "N data sources" literals that disagree with the registry.
+
+    Scan set: og_*.py cards plus the subscriber-facing email templates (#3565 — the
+    confirmation email carried a hand-typed "19 sources" outside the old og-only net).
 
     Skips full-line `#` comments and HISTORICAL-framed lines. Exposed so the regression test
     can plant a stale "25 data sources" string in a scratch file and prove the rule bites (the
@@ -608,7 +611,7 @@ def _og_source_hits(files, truth: int) -> list[str]:
                 claim = _to_int(mo.group(1))
                 if claim is not None and claim != truth:
                     hits.append(
-                        f"{rel}:{lineno}: og card claims {claim} data sources, truth is {truth} "
+                        f"{rel}:{lineno}: reader-facing copy claims {claim} data sources, truth is {truth} "
                         f"(len(SOURCE_REGISTRY)); derive it, don't hardcode (#1260)\n"
                         f"      | {line.strip()[:120]}"
                     )
@@ -642,6 +645,7 @@ from doc_facts_og import (  # noqa: E402,F401
     SOURCE_REGISTRY_PATH,
     _registry_source_count,
     _scan_og_files,
+    _scan_source_count_files,
     og_literal_hits,
 )
 
@@ -1067,7 +1071,7 @@ def main():
     if registry_n is None:
         print("error: could not discover SOURCE_REGISTRY count for the og-card scan", file=sys.stderr)
         sys.exit(2)
-    hits += _og_source_hits(_scan_og_files(), registry_n)
+    hits += _og_source_hits(_scan_source_count_files(), registry_n)
     # #3261: the GENERAL rule — every numeric literal actually drawn onto a card must be
     # data-derived or explicitly exempted. #1260's phrase scan above could only ever see
     # the one card it was written for; two siblings published worse numbers for months.
@@ -1172,7 +1176,7 @@ def main():
         f"✅ doc + source facts OK — no live doc/source states a stale count/budget "
         f"({len(_scan_files())} docs + {len(_scan_source_files())} source files + "
         f"{len(_scan_site_surface())} site js/html/generator files + "
-        f"{len(_scan_og_files())} og cards + {len(_scan_governor_surface())} governor-surface files scanned)."
+        f"{len(_scan_source_count_files())} og cards + subscriber templates + {len(_scan_governor_surface())} governor-surface files scanned)."
     )
 
 

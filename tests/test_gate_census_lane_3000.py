@@ -466,9 +466,7 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
-BASELINE_TOTAL_GATES = (
-    594  # +1 2026-09-04 (#3478's Day-1 synthetic-baseline guard joins the inventory), atop 593 (#3477's reset doc-gate sweep, atop 592)
-)
+BASELINE_TOTAL_GATES = 595  # +1 2026-09-05 (#3564's subscriber-promise cadence check, PROVEN on live production), atop 594 (#3478's Day-1 synthetic-baseline guard, atop 593)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was
