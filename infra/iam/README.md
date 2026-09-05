@@ -40,6 +40,39 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 > any-ref trust) live for ≈6 minutes — `docs/INCIDENT_LOG.md`. `tests/test_iam_twin_free_3336.py`
 > fails the suite if an inline policy document for any role listed here reappears under `deploy/`.
 
+### PENDING APPLY — the remediation role's narrowed grants (#3562, 2026-09-05)
+
+`github-actions-remediation-role.permissions.json` was narrowed in the repo; **the
+out-of-band apply has not run**, so live is still the wider document:
+
+| Sid | was | now |
+|---|---|---|
+| `SES` | `ses:SendEmail`+`sesv2:SendEmail` on `*` | the one domain identity + a `ses:FromAddress` condition on the ops address |
+| `DiagnoseLogRead` (new) | `logs:FilterLogEvents`/`GetLogEvents`/`DescribeLogStreams` on `*` | `log-group:/aws/lambda/*` + `log-group:/aws/apigateway/*` |
+| `DiagnoseLambdaConfig` (new) | `lambda:GetFunction`/`GetFunctionConfiguration` on `*` | `function:*` in this account |
+| `DriftSentinel` | 5 actions on `*` | 4 actions on `stack/LifePlatform*/*`; the detection-id call keeps `*` in its own Sid |
+| `EventBridgeRuleTargetsRead` (new) | with `ListRules` on `*` | `rule/*` in this account |
+
+Apply (the sanctioned path applies trust + permissions verbatim and ends with the verifier):
+
+```bash
+bash deploy/setup_remediation_role.sh
+# or, permissions only:
+aws iam put-role-policy --role-name github-actions-remediation-role \
+  --policy-name remediation-permissions \
+  --policy-document file://infra/iam/github-actions-remediation-role.permissions.json
+python3 deploy/verify_oidc_iam.py --strict
+```
+
+Then delete the `github-actions-remediation-role` entry from
+`_PENDING_PERMISSIONS_APPLY` in `tests/test_grant_enumeration_drift.py` — that test
+reds once the apply has landed, so the queue cannot become a graveyard.
+
+**The wildcard rule (#3562).** `Resource: "*"` is admissible only for actions on the
+dated registry in `tests/test_iam_twin_free_3336.py` (`_WILDCARD_OK_ACTIONS` — probed
+with `aws iam simulate-custom-policy`, and the same registry the 38 `resources=["*"]`
+statements in `cdk/stacks/role_policies_*.py` satisfy). The registry may only SHRINK.
+
 ### Staged, NOT yet applied — the golden-eval role (#812)
 - `github-actions-golden-eval-role.trust.json` — trust policy (main-only subject from day one; no
   repo-wide grant to tighten later)
