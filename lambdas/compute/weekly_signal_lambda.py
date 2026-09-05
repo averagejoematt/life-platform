@@ -97,6 +97,7 @@ BOARD_ROTATION = [
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days, pacific_today
+from common.subscriber_cadence import genesis_week_label, genesis_week_number  # #3564 — ONE week numbering
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 
 
@@ -261,7 +262,7 @@ def _build_spotlight(week_num):
     )
 
 
-def _build_email(stats, posts_data, insight_text, week_num, unsub_url):
+def _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_label):
     now = datetime.now(timezone.utc)
     display_date = now.strftime("%B %d, %Y")
 
@@ -271,16 +272,16 @@ def _build_email(stats, posts_data, insight_text, week_num, unsub_url):
     s4 = _build_board_quote(week_num)
     s5 = _build_spotlight(week_num)
 
-    subject = f"Week {week_num} — The Measured Life"
+    subject = f"{week_label} — The Measured Life"
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Week {week_num} — The Weekly Signal</title></head>
+<title>{week_label} — The Weekly Signal</title></head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:0 16px;">
   <div style="padding:32px 0 24px;">
     <p style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#3db88a;margin:0 0 8px;">The Weekly Signal</p>
-    <p style="font-size:12px;color:#484f58;margin:0;">Week {week_num} — {display_date}</p>
+    <p style="font-size:12px;color:#484f58;margin:0;">{week_label} — {display_date}</p>
   </div>
   {s1}{s2}{s3}{s4}{s5}
   <div style="border-top:1px solid rgba(230,237,243,0.06);padding:20px 0 40px;">
@@ -315,9 +316,10 @@ def lambda_handler(event, context):
     dry_run = bool(event.get("dry_run"))
     try:
         # DIL-025 / #3113 replay guard, ahead of every S3 read and the whole
-        # fan-out. Keyed on the ISO week the letter IS: `week_num` below is
-        # `%W`, a Monday-based week number with a documented year-boundary
-        # wobble, so the guard uses the ISO week rather than re-using it.
+        # fan-out. Keyed on the ISO week the letter IS — deliberately NOT `week_num`
+        # below, which is the genesis-anchored EXPERIMENT week (#3564) and is not a
+        # calendar fact at all: it repeats across cycles after a restart, so reusing it
+        # as a replay key would make cycle 17 week 3 collide with cycle 16 week 3.
         # #2811: the letter's week is a PACIFIC calendar fact (a Sunday-evening PT send
         # must not key next week's ISO week just because UTC rolled) — pacific_today().
         period_key = f"week:{send_ledger.iso_week_key(pacific_now().date())}"
@@ -339,8 +341,14 @@ def lambda_handler(event, context):
         posts_data = _s3_json("generated/journal/posts.json")
         insight_text = _get_weekly_insight()
 
-        now = datetime.now(timezone.utc)
-        week_num = int(now.strftime("%W"))
+        # #3564: ONE week numbering across the subscriber-facing senders. `%W` is the
+        # Gregorian CALENDAR week — a subscriber received "Week 34" from this letter and
+        # "Week 2" from the chronicle about the same seven days. Both now read the
+        # genesis-anchored number, and a pre-genesis send says "Prologue" rather than
+        # inventing a week that has not started. The int stays the rotation index.
+        _week_day = pacific_now().date()
+        week_num = genesis_week_number(_week_day)
+        week_label = genesis_week_label(_week_day)
 
         # Load subscribers
         subscribers = _get_confirmed_subscribers()
@@ -348,7 +356,7 @@ def lambda_handler(event, context):
         if dry_run:
             preview_email = (subscribers[0].get("email") if subscribers else "") or "preview@example.com"
             unsub_url = unsub_url_or_fallback(preview_email, SITE_URL)  # #3044
-            subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url)
+            subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_label)
             logger.info(
                 "[DRY_RUN] Weekly Signal week %d would send to %d subscriber(s) — sending nothing",
                 week_num,
@@ -382,7 +390,7 @@ def lambda_handler(event, context):
                 continue
 
             unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044
-            subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url)
+            subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_label)
 
             try:
                 ses.send_email(
