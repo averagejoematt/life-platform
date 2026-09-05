@@ -148,18 +148,17 @@ def _parse_breakpoints(css: str) -> list[tuple[str, str, str]]:
 
 
 def _parse_pillar_colors(css: str) -> list[tuple[str, str]]:
-    # "Pillar identity colors" is a multi-line banner comment (doesn't close with `*/` on
-    # its own line like the numbered sections), so anchor on the header text directly
-    # rather than routing through the numbered-section splitter.
-    i = css.find("Pillar identity colors")
-    if i < 0:
-        raise AssertionError("tokens.css 'Pillar identity colors' header not found")
-    m = re.search(r":root\s*\{(.*?)\n\}", css[i:], re.S)
+    # #3545 moved the seven --pillar-* declarations INTO the §1 dark palette block (they
+    # render pillar names as text, so they need a light-mode leg, so they have to live where
+    # the theme blocks are). They used to sit in a standalone `:root {}` under a
+    # "Pillar identity colors" banner comment, which is now a pointer with no declarations —
+    # anchoring on that header again would parse the next unrelated :root block.
+    m = re.search(r":root\s*\{\s*color-scheme:\s*dark;(.*?)\n\}", css, re.S)
     if not m:
-        raise AssertionError("pillar identity colors :root block not found")
+        raise AssertionError("tokens.css dark :root palette block not found")
     pairs = re.findall(r"--(pillar-[\w-]+):\s*(#[0-9A-Fa-f]{6});", m.group(1))
     if len(pairs) != 7:
-        raise AssertionError(f"expected 7 pillar colors, parsed {len(pairs)}")
+        raise AssertionError(f"expected 7 pillar colors in the dark palette block, parsed {len(pairs)}")
     return pairs
 
 
@@ -306,8 +305,9 @@ def _write_pillar_colors(out_dir: Path, pillars: list[tuple[str, str]]) -> None:
         for t in tiers
     )
     body = (
-        f'<div class="ds-block"><p class="ds-cap mono">--pillar-* (identity encoding only'
-        f' — never buttons/text/alerts)</p><div class="ds-group">{swatches}</div></div>'
+        f'<div class="ds-block"><p class="ds-cap mono">--pillar-* (identity encoding + the pillar\'s own'
+        f" NAME as text — never buttons/alerts. Dark values shown; each has a light-mode"
+        f' override, #3545)</p><div class="ds-group">{swatches}</div></div>'
         f'<div class="ds-block"><p class="ds-cap mono">--tier-accent (set via [data-tier] —'
         f' tier emblem + hero frame only)</p><div class="ds-group">{tier_chips}</div></div>'
     )

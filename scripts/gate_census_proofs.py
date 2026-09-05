@@ -552,3 +552,79 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         "proved_on": "2026-08-30",
     },
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REGISTRY_PROOFS — census family "registry" (#3544). The eight entries of
+# `tests/test_token_contrast.py::RECEDE_TEXT_RULES`: one per CSS rule in the site's
+# "recede" state grammar, each measured as ink-token-over-background composited at the
+# opacity PARSED from the live sheet, in all three palette blocks.
+#
+# The bar is `gate_census.PROVEN_CAN_FAIL`'s bar and it is met PER ENTRY, not once for
+# the set: `test_recede_guard_reds_when_the_shipped_opacity_comes_back` is parametrised
+# over all eight, and each parameter restores THAT rule's own pre-#3544 opacity into a
+# copy of the live sheet and requires the evaluator to name that selector under-AA. A
+# ninth entry added with no control row reds `test_every_measured_rule_has_a_negative_
+# control`, so the set cannot grow unproven — which is the failure mode #3544 itself was
+# (five dim-the-card rules accumulated to ~230 axe nodes with no composite guard at all).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RECEDE_COMMAND = (
+    "python3 -m pytest tests/test_token_contrast.py -q   "
+    "# 21 tests; the 8 parametrised cases of "
+    "test_recede_guard_reds_when_the_shipped_opacity_comes_back are the per-entry controls"
+)
+_RECEDE_SCOPE = (
+    "A verdict on the ARITHMETIC and on the CSS parse, offline — not on the rendered page. It composites "
+    "each rule's ink tokens over --page and --surface at the opacity parsed from the sheet; it does not know "
+    "which background a given instance actually lands on, does not see a wash/image ground (the .ch-state "
+    "class, guarded separately by test_ch_state_grounds_on_a_ramp_step_not_an_accent_wash), and does not see "
+    "inline styles or JS-set colours. The live arbiter stays tests/visual_qa.py's axe sweep. Also scoped: the "
+    "companion set-completeness check test_every_opacity_declaration_is_classified sweeps evidence.css ONLY — "
+    "tokens.css's ~40 further opacity declarations are deliberately unclassified rather than asserted "
+    "text-free on inspection this change did not do."
+)
+
+
+def _recede_proof(selector: str, alpha: float, observed: str) -> dict:
+    return {
+        "gate_name": f"RECEDE_TEXT_RULES[{selector}]",
+        "command": _RECEDE_COMMAND,
+        "mutation": (
+            f"Restored `{selector}`'s own pre-#3544 declaration — `opacity: {alpha}` — into a copy of the live "
+            "sheet, leaving the other seven rules fixed, and re-ran the same _recede_failures() evaluator the "
+            "shipping test calls."
+        ),
+        "observed": observed,
+        "scope": _RECEDE_SCOPE,
+        "proved_on": "2026-09-05",
+    }
+
+
+_RECEDE_OBSERVED = {
+    # selector: (alpha, n failures produced, worst ratio per palette block)
+    ".ch-rung.is-locked": (0.55, 16, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+    ".ch-fx": (0.75, 11, "dark 3.70:1 / @media-light 3.03:1 / data-theme-light 3.03:1"),
+    ".ch-fx.is-inert": (0.55, 16, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+    ".ch-badge": (0.55, 10, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+    ".ch-tl li.ch-tl-muted": (0.75, 11, "dark 3.70:1 / @media-light 3.03:1 / data-theme-light 3.03:1"),
+    ".ev-intro__note": (0.8, 4, "@media-light 3.35:1 / data-theme-light 3.35:1 — dark held 5.13:1 and did NOT fail"),
+    ".rdg-abandoned .rdg-face": (0.72, 6, "dark 3.52:1 / @media-light 2.87:1 / data-theme-light 2.87:1"),
+    ".vg-off": (0.55, 12, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+}
+
+REGISTRY_PROOFS: dict[str, dict[str, Any]] = {
+    f"registry::tests/test_token_contrast.py::RECEDE_TEXT_RULES::{selector}": _recede_proof(
+        selector,
+        alpha,
+        (
+            f"2026-09-05, watched in both directions. CLEAN sheets: 0 failures, pytest exit 0 (21 passed). "
+            f"MUTATED: {n} AA failures naming `{selector} @ opacity {alpha}` — worst per block {worst}. "
+            "REVERTED: 0 failures, exit 0. The whole-file control run "
+            "(`.ch-rung.is-locked` restored in the real working tree, not a copy) was watched separately "
+            "at exit 1 with the same numbers, and `.ev-intro__note`'s light-only scope is asserted "
+            "explicitly by the control rather than assumed."
+        ),
+    )
+    for selector, (alpha, n, worst) in _RECEDE_OBSERVED.items()
+}

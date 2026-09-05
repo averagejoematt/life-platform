@@ -509,9 +509,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # of tests/api_schemas/api_vitals.json's real shape with one key hand-removed,
         # never the live site — proving the #3324 nullable-aware diff_shape() rule still
         # catches a genuine key removal).
+        # Upper bound raised 48 -> 56 (2026-09-05, #3544/#3545): the 49th-56th proofs are the
+        # eight entries of `registry::tests/test_token_contrast.py::RECEDE_TEXT_RULES`, recorded
+        # in gate_census_proofs.REGISTRY_PROOFS. Each is mutation-backed PER ENTRY, not once for
+        # the set: `test_recede_guard_reds_when_the_shipped_opacity_comes_back` is parametrised
+        # over all eight and each parameter restores THAT rule's own pre-#3544 opacity into a copy
+        # of the live sheet and requires the evaluator to name that selector under WCAG AA (16/11/
+        # 16/10/11/4/6/12 failures respectively; clean and reverted both 0). A ninth entry with no
+        # control row reds `test_every_measured_rule_has_a_negative_control`, so the set cannot
+        # grow unproven — which is the exact failure mode #3544 documented.
         3
         <= len(proven)
-        <= 48
+        <= 56
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
