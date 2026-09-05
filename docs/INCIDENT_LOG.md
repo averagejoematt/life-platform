@@ -24,6 +24,7 @@ Last updated: 2026-09-02 Session T drain-to-the-floor session (#1332 gate; +2 ro
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-09-04 | **P1** (the previous cycle narrated as THIS one on the story door, Home's chronicle beat and the timeline for ~7h on Day 0 of cycle 16; no subscriber email went out) | **The chronicle 48h auto-publish sweep resurrected cycle 15's tombstoned Week-1 draft** at 18:00:44Z on 2026-09-04 — ~10h after the Saturday re-anchor and ~6h before genesis. It overwrote `generated/journal/posts.json` with the draft-time snapshot (four cycle-15 posts, `updated_at 2026-09-02`), wrote `/journal/posts/week-04/`, committed a cycle-15 `RECAP#latest` (`experiment_day 1`, no phase stamp — primed to narrate "Matthew is behind before he's started" on Day 1), marked the row published, indexed it for recall and invoked the Elena updater. Live: `posts[0].title == "328.1"` ("The scale said 328.1 on the first morning of the experiment") the day before the experiment started. | `_find_stale_drafts` selected by `status == "draft"` alone — no `tombstone`, `phase` or `cycle` check. The reset (ADR-077) archives a draft by stamping it (`tombstone`, `tombstoned_at 03:42Z`, `phase=pilot`, `cycle=15`) and leaves `status`, so the archived row was indistinguishable from the "forgot to click" case the sweep exists for. Readers honour the wipe via `singleton_visible` (#946); the WRITER did not — the reset contract had a reader half and no writer half. Sibling of the #1287 owned-manifest clobber (a draft-time manifest snapshot written whole over the live one). | **~7h — found by four rows of the 2026-09-05 `/review full` baseline (cpo, narrative ×2, reader), not by any instrument**; qa-smoke had no check on the served manifest's provenance and the reader-truth judge runs once a day. | ~25 min once found (Session V, ~01:05–01:30Z 09-05): `posts.json` + `week-04/index.html` restored to their pre-sweep S3 versions + CloudFront invalidation; `DATE#2026-09-01` reverted to `draft` (`approved_at` removed, `resurrected_by_sweep_at` recorded); both RECAP rows stamped tombstone/pilot/cycle 15; the recall row `DOC#chronicle#2026-09-01` removed; Elena's 45 rows verified untouched. Structural fix PR #3486 (#3485): the write-side `_publishable` predicate (the reader's own `singleton_visible`), `_publish_to_s3` refuses archived rows on every path, the recap carries the ADR-077 stamp, and a nightly qa-smoke dead-man reds when any served post's chronicle row is archived. | Archived-draft blobs only: `_mark_published` REMOVEd the cycle-15 draft's `draft_*` pre-render fields from the tombstoned row; the rendered copies survive as S3 object versions (18:00:44Z) and the row's title/metadata are intact. No current-cycle data touched. |
 | 2026-09-02 | **P3** (tooling outage, no data/reader impact) | **`gh` CLI auth died mid-session** — `~/.config/gh/hosts.yml` truncated to 3 bytes at 19:28Z; every `gh` command failed ("not logged into any GitHub hosts") while git-remote auth kept working. Blocked merges/comments ~30 min at the height of the Session T merge queue. | A write race on hosts.yml among many concurrent gh processes (a 60s-poll lease Monitor + several 30s-poll wait_pr_green watchers + lane agents). Only the owner's `gh auth login` recovers — the session reordered to AWS-side work (backfill, content verification) meanwhile; a `gh run watch` that exited 0 pre-break was kept as a valid verdict. | minutes (first failed command) | ~30 min (owner re-auth) | None — git state untouched; memory `reference_gh_hosts_yml_write_race` |
 | 2026-09-02 | **P3** (near-miss: merged code undeployed, zero red signals) | **The undeployed-merge window** — three code-bearing merge runs (#3462/#3463/#3470) were lease-REJECTED as superseded by the then-tip, which was a docs-only commit whose Deploy the classifier SKIPPED; their lambda code sat merged-but-undeployed with every run green. | The steward reflex "reject ancestors, approve the tip" assumes the tip's run deploys what the ancestors carried; a docs-only tip supersedes the QUEUE position but not the DEPLOY. Caught by content-checking lambda LastModified against the merge log (never by a signal); cured with a `deploy_all=true` dispatch + approval, shipped bundle content-verified. Reflex added to the lease memory. | ~40 min (the next content check) | ~25 min (dispatch + approve + verify) | None — Sunday-cron lambdas, no daily-path staleness in the window |
 | 2026-09-02 | **P2** (a fleet-wide training-load signal dark 9 consecutive days; every consumer but one silently degraded) | **Every ACWR value computed since 2026-08-24 has been destroyed within hours of being written**: the acwr-compute lambda merges its 11 acwr_* fields onto the shared daily-metrics record via `update_item` at 16:55Z; the `DailyMetricsComputeEvening` cron (00:00Z, #109) re-runs `store_computed_metrics`, which rebuilds the item from scratch and `put_item`s it — erasing the merged fields ~7h later. Proof: the 09-01 run log says `ACWR written for 2026-08-31 — acwr=0.945` and the stored record (re-put 00:00:42Z) carries zero acwr_* fields; 9 consecutive dates verified field-less. | A co-owned DynamoDB record with two writers of different write shapes: one merges, one replaces. The flip is exactly 08-24. The filed #3135-fingerprint hypothesis was REFUTED in the Session T repair: evening recomputes fired both before and after 08-24 (log-verified — pre-flip evening runs also recomputed on genuinely newer whoop/habitify data). The real trigger is the #2811 Pacific-clock correction (train-2 #3184, deployed 08-25 16:53Z): before it the evening run derived its target from the UTC calendar and re-put UTC-yesterday's record — the WRONG record, a latent bug that accidentally protected the merge because the morning run rebuilt that record again anyway; after it the evening run re-puts PT-yesterday — exactly the record acwr had merged onto 7h earlier. Removing a confound revealed the second defect. The 17:00 daily brief reads inside the 5-minute survival window, so the one surface anyone looks at daily kept showing ACWR while MCP `get_acwr_status`, history, digests and coaches went stale — `get_acwr_status`'s own staleness gate degraded honestly (withholding coaching), which is also why nothing paged. | **9 days** — found by Session S's calculation-proof pass (a grader recomputing the stored records noticed the fields missing), not by any alarm; no dead-man watches `acwr_computed_at` age. The TTD is the row's lesson. | FIXED 2026-09-02 (Session T, PR #3457): the co-owned field set declared once in `compute/computed_metrics_contract.py`; `store_computed_metrics` (and the sick-day rebuild) carries it through a from-scratch re-put, read-failure loud; a derivation guard pins the acwr writer's UpdateExpression to the registry; dead-man `qa_smoke_lambda.check_acwr_liveness` reds at `acwr_computed_at` age >48h (would have paged on day 2). The 08-24→09-01 window backfilled by re-invoking acwr-compute per date after the #3442 day-row fix deployed, so the backfilled series is computed from clean day strain (#3442 member 2 unmasked and cured together). | Derived-only — every destroyed value is recomputable from the intact raw partitions. |
@@ -249,7 +250,7 @@ Last updated: 2026-09-02 Session T drain-to-the-floor session (#1332 gate; +2 ro
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 203 dated rows, 168 post-June** (newest row 2026-09-02):
+**Distribution — 204 dated rows, 169 post-June** (newest row 2026-09-04):
 
 | month | rows |
 |---|---|
@@ -260,9 +261,9 @@ Last updated: 2026-09-02 Session T drain-to-the-floor session (#1332 gate; +2 ro
 | 2026-06 | 2 |
 | 2026-07 | 36 |
 | 2026-08 | 126 |
-| 2026-09 | 6 |
+| 2026-09 | 7 |
 
-**By severity:** P1 5 · P2 31 · P3 73 · P4 89 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 31 · P3 73 · P4 89 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 24 match none):
@@ -270,7 +271,7 @@ than one, and 24 match none):
 | n | class |
 |---|---|
 | 127 | deployment error |
-| 54 | stale config / literal drift |
+| 55 | stale config / literal drift |
 | 42 | QA-oracle false positive |
 | 39 | QA false positive — deploy-race (#2978) |
 | 30 | deploy-plane wedge / strand / race |
@@ -306,17 +307,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**52 of 203 rows are silent.**
+**52 of 204 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 52 | 151 |
-| TTD parseable | 39 | 98 |
-| median TTD | **28 min** | 12.5 min |
-| mean TTD | 1,823 min | 1,711 min |
+| rows | 52 | 152 |
+| TTD parseable | 39 | 99 |
+| median TTD | **28 min** | 13 min |
+| mean TTD | 1,823 min | 1,698 min |
 | exceeded 1 day | 6 (15% of parsed) | 9 (9% of parsed) |
 
-Silent rows take **~2.2× longer to detect at the median** and are **~1.7× more likely to run past a day**. But the *means* are only 6% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **66 of 203 TTD cells (33%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~2.2× longer to detect at the median** and are **~1.7× more likely to run past a day**. But the *means* are only 7% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **66 of 204 TTD cells (32%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -327,7 +328,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August and 6 in September. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August and 7 in September. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)
