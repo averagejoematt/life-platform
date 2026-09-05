@@ -170,7 +170,11 @@ def test_gradable_share_fails_when_its_alarm_is_deleted(monkeypatch):
     """The DIL-007 failure mode is invisibility, so a MISSING alarm must FAIL, not skip."""
 
     class _CW:
-        def describe_alarms(self, AlarmNames):  # noqa: N803 — boto3 kwarg name
+        # #3503: AlarmTypes is stated on every alarm read now; the fake takes it so the
+        # fixture is the wire (a fake that rejects a real kwarg turns a shape change into
+        # a fake FAIL, which is what this signature did on the first run).
+        def describe_alarms(self, AlarmNames, AlarmTypes=None):  # noqa: N803 — boto3 kwarg names
+            assert AlarmTypes == ["MetricAlarm"], "the caller must state its alarm types"
             return {"MetricAlarms": []}
 
     monkeypatch.setitem(sys.modules, "boto3", type("m", (), {"client": staticmethod(lambda *a, **k: _CW())}))

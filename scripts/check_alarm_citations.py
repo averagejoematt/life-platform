@@ -103,6 +103,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# #3503: the by-construction flag-alarm registry lives with the CDK constants (the
+# SECURITY_TIER_LOG_FUNCTIONS precedent) so the stack and every sweep read ONE list.
+sys.path.insert(0, str(ROOT / "cdk"))
+try:
+    from stacks.constants import is_by_construction_flag
+except Exception:  # pragma: no cover — a checkout without cdk/ must not crash the gate
+
+    def is_by_construction_flag(_name):  # type: ignore[misc]
+        return False
+
+
 CITATIONS_PATH = ROOT / "docs" / "alarm_citations.json"
 MODEL_PATH = ROOT / "model" / "platform_model.json"
 REGION = "us-west-2"
@@ -224,6 +236,8 @@ def uncited_long_reds(alarms, citations, now=None, threshold_hours=ALARM_AGE_CIT
     out = []
     for a in alarms:
         name = a.get("name") or "?"
+        if a.get("by_construction"):
+            continue  # #3503: a gauge that is red on purpose is not an uncited incident
         age = alarm_age_hours(a, now)
         effective_threshold = READER_AUDIENCE_ESCALATION_HOURS if audience.get(name) == "reader" else threshold_hours
         if age is None or age <= effective_threshold:
@@ -246,6 +260,8 @@ def issueless_ancient_reds(alarms, citations, now=None, threshold_days=ALARM_TEN
     out = []
     for a in alarms:
         name = a.get("name") or "?"
+        if a.get("by_construction"):
+            continue  # #3503: see uncited_long_reds
         age = alarm_age_hours(a, now)
         if age is None or age <= threshold_days * 24.0:
             continue
@@ -492,10 +508,23 @@ def fetch_alarms():
         import boto3
 
         cw = boto3.client("cloudwatch", region_name=REGION)
-        resp = cw.describe_alarms(StateValue="ALARM", MaxRecords=100)
+        # #3503: AlarmTypes is REQUIRED to see composites — the API default is metric
+        # alarms only, so `ai-tokens-platform-daily-total-urgent` (whose ALARM is the sole
+        # routing of the raw token alarm) was invisible to this gate for its whole life.
+        resp = cw.describe_alarms(StateValue="ALARM", MaxRecords=100, AlarmTypes=["CompositeAlarm", "MetricAlarm"])
     except Exception as e:  # noqa: BLE001 — any AWS/boto3 failure must degrade, not crash
         return [], str(e)
-    alarms = [{"name": a.get("AlarmName", "?"), "updated": str(a.get("StateUpdatedTimestamp", ""))} for a in resp.get("MetricAlarms", [])]
+    alarms = [
+        {
+            "name": a.get("AlarmName", "?"),
+            "updated": str(a.get("StateUpdatedTimestamp", "")),
+            "composite": "AlarmRule" in a,
+            # #3503: a gauge whose ALARM state IS its designed normal (registry:
+            # cdk/stacks/constants.BY_CONSTRUCTION_FLAG_ALARMS). Not an uncited incident.
+            "by_construction": is_by_construction_flag(a.get("AlarmName", "?")),
+        }
+        for a in list(resp.get("MetricAlarms", [])) + list(resp.get("CompositeAlarms", []))
+    ]
     return alarms, None
 
 
@@ -515,7 +544,15 @@ def fetch_alarm_history(window_hours=FLAP_WINDOW_HOURS):
         items = []
         token = None
         for _ in range(_HISTORY_MAX_PAGES):
-            kwargs = {"HistoryItemType": "StateUpdate", "StartDate": start, "MaxRecords": 100}
+            # #3503: `describe_alarm_history` shares the metric-alarms-only default —
+            # without AlarmTypes a composite's whole state history is unreachable, so the
+            # flap check could never see a composite fire-and-clear between wraps.
+            kwargs = {
+                "HistoryItemType": "StateUpdate",
+                "StartDate": start,
+                "MaxRecords": 100,
+                "AlarmTypes": ["CompositeAlarm", "MetricAlarm"],
+            }
             if token:
                 kwargs["NextToken"] = token
             resp = cw.describe_alarm_history(**kwargs)

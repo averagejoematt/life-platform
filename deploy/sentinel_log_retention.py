@@ -49,8 +49,35 @@ grant-with-consumer discipline). It is NOT the SDK's static partition list filte
 "the call failed": a disabled opt-in region and a broken credential raise the same
 error, and skipping on it is exactly the #3156 swallow-and-believe shape.
 
-Cost: one DescribeRegions + (regions × candidate names) DescribeLogGroups reads weekly
-(~120 free API calls). Read-only, no new infra.
+THE SECOND LEG (#3507): THE WHOLE ESTATE, NOT FIVE DECLARED NAMES
+─────────────────────────────────────────────────────────────────
+The leg above reads five hand-declared function names. That is exactly right for the
+security TIER (those five have a stricter promise than everything else), and exactly
+wrong as the sweep's whole reach: a log group that belongs to no declared name is
+invisible to it, so the check that exists to catch a region-stray group could not catch
+one. Measured 2026-09-05: `/aws/lambda/life-platform-site-api` in **us-east-1** — created
+2026-03-16, last event 2026-03-21, 128,854 stored bytes, `retentionInDays` absent, and
+`aws lambda get-function --region us-east-1 life-platform-site-api` →
+ResourceNotFoundException. An orphan of a March deployment attempt, retained forever,
+while `drift-log/latest.json` recorded `log_retention: {status: clean, groups_found: 17}`.
+It is 128 KB; the CLASS is that a sweep scoped to a hand-typed list reports clean about a
+population it never looked at.
+
+So `observe()` now enumerates the FULL log-group estate in every swept region (one
+paginated `DescribeLogGroups` per region, no prefix — fewer API calls than the 5×17
+prefix reads it replaces) and the check reports TWO legs:
+
+  (a) SECURITY TIER — declared-vs-live on the five names, unchanged.
+  (b) ESTATE RETENTION — any group anywhere with `retentionInDays == null`, minus
+      `UNBOUNDED_RETENTION_ALLOWLIST`, which requires a reason and a date per entry. An
+      allowlist entry is an argued position; being absent from a list is not.
+
+Live baseline 2026-09-05, 17 enabled regions: 137 groups total (us-west-2 121, us-east-1 6,
+and 2 each in eu-central-1/eu-west-1/eu-west-2/us-east-2/us-west-1), of which exactly one
+is unbounded — the us-east-1 orphan above.
+
+Cost: one DescribeRegions + one paginated DescribeLogGroups per region weekly
+(~20 free API calls, down from ~85). Read-only, no new infra.
 """
 
 from __future__ import annotations
@@ -73,6 +100,21 @@ from stacks.constants import (  # noqa: E402
 REGION_ENUMERATION_GRANT = "ec2:DescribeRegions"
 APPLY_COMMAND = "python3 deploy/apply_log_retention.py --apply"
 
+# #3507: log groups that are DELIBERATELY unbounded. Every entry carries a reason and a
+# date, because the defect this leg fixes is precisely "it wasn't in the list" — an
+# exemption has to be an argued position with an author, not an omission nobody chose.
+# Empty is the correct steady state: the platform's declared posture is that every log
+# group has a retention policy. The one live unbounded group (the us-east-1
+# `/aws/lambda/life-platform-site-api` orphan) is deliberately NOT here — it is a finding.
+UNBOUNDED_RETENTION_ALLOWLIST: dict[str, dict] = {}
+
+ESTATE_FIX_HINT = (
+    "delete the group if it is an orphan (`aws logs delete-log-group --region <r> --log-group-name <n>`) "
+    "or give it a policy (`aws logs put-retention-policy --region <r> --log-group-name <n> "
+    "--retention-in-days 30`); if it is deliberately unbounded, add it to "
+    "sentinel_log_retention.UNBOUNDED_RETENTION_ALLOWLIST with a reason and a date"
+)
+
 
 def _client(service, region=REGION):
     import boto3
@@ -91,52 +133,63 @@ def list_enabled_regions():
     return sorted(r["RegionName"] for r in resp.get("Regions", []))
 
 
-def _describe_exact(logs_client, name):
-    """DescribeLogGroups by prefix, matched back to the EXACT name (a prefix read of
-    `/aws/lambda/life-platform-canary` would also return `...-canary-v2`)."""
+def _describe_all(logs_client):
+    """Every log group in one region, paginated. #3507: the sweep enumerates the estate
+    rather than asking about five names it already knows — a prefix read can only ever
+    confirm what the caller already suspected exists."""
+    out = []
     token = None
     while True:
-        kwargs = {"logGroupNamePrefix": name}
-        if token:
-            kwargs["nextToken"] = token
+        kwargs = {"nextToken": token} if token else {}
         resp = logs_client.describe_log_groups(**kwargs)
-        for lg in resp.get("logGroups", []):
-            if lg.get("logGroupName") == name:
-                return lg
+        out.extend(resp.get("logGroups", []) or [])
         token = resp.get("nextToken")
         if not token:
-            return None
+            return out
 
 
 def observe(regions=None):
     """The shared observation both the sentinel check and the apply script read.
 
-    Returns {"regions": [...], "groups": [{region, log_group, function, retention_days,
-    stored_bytes}], "unreadable": [{region, detail}]} — or raises if the region set
-    itself cannot be enumerated (the caller reports that as cannot-observe)."""
+    Returns {"regions": [...], "groups": [...security-tier only...], "all_groups":
+    [{region, log_group, retention_days, stored_bytes}] for the FULL estate,
+    "unreadable": [{region, detail}]} — or raises if the region set itself cannot be
+    enumerated (the caller reports that as cannot-observe).
+
+    `groups` keeps the security-tier shape (with `function`) because
+    `deploy/apply_log_retention.py` writes exactly that set; `all_groups` is the #3507
+    estate the second leg judges."""
     if regions is None:
         regions = list_enabled_regions()
     names = security_tier_log_group_names()
-    groups, unreadable = [], []
+    groups, all_groups, unreadable = [], [], []
     for region in regions:
         try:
-            logs_client = _client("logs", region)
-            for name, fn in names.items():
-                lg = _describe_exact(logs_client, name)
-                if lg is None:
-                    continue
-                groups.append(
-                    {
-                        "region": region,
-                        "log_group": name,
-                        "function": fn,
-                        "retention_days": lg.get("retentionInDays"),
-                        "stored_bytes": lg.get("storedBytes", 0),
-                    }
-                )
+            live = _describe_all(_client("logs", region))
         except Exception as e:  # noqa: BLE001
             unreadable.append({"region": region, "detail": f"{type(e).__name__}: {e}"})
-    return {"regions": list(regions), "groups": groups, "unreadable": unreadable}
+            continue
+        for lg in live:
+            name = lg.get("logGroupName") or ""
+            row = {
+                "region": region,
+                "log_group": name,
+                "retention_days": lg.get("retentionInDays"),
+                "stored_bytes": lg.get("storedBytes", 0),
+            }
+            all_groups.append(row)
+            if name in names:  # EXACT match: `...-canary-v2` is not `...-canary`
+                groups.append({**row, "function": names[name]})
+    return {"regions": list(regions), "groups": groups, "all_groups": all_groups, "unreadable": unreadable}
+
+
+def unbounded_groups(all_groups, allowlist=None):
+    """Every estate group with no retention policy, minus the allowlist (#3507).
+
+    Pure, so the positive control can plant one unbounded group in a second region and
+    watch the leg red without touching AWS."""
+    allowed = UNBOUNDED_RETENTION_ALLOWLIST if allowlist is None else allowlist
+    return [g for g in all_groups if g.get("retention_days") is None and g.get("log_group") not in allowed]
 
 
 def mismatches(groups, declared=LOG_RETENTION_SECURITY_DAYS):
@@ -171,36 +224,62 @@ def check_log_retention():
         }
 
     bad = mismatches(obs["groups"], declared)
+    unbounded = unbounded_groups(obs["all_groups"])
     result = {
         "status": "clean",
         "declared_days": declared,
         "functions": sorted(SECURITY_TIER_LOG_FUNCTIONS),
         "regions_swept": obs["regions"],
-        "groups_found": len(obs["groups"]),
+        # #3507: `groups_found` is now what the sweep ACTUALLY looked at — the whole
+        # estate. The old value (the five declared names) is kept beside it, named for
+        # what it is, so a record can never again report "clean, 17 groups" about a
+        # population of 137.
+        "groups_found": len(obs["all_groups"]),
+        "security_tier_groups_found": len(obs["groups"]),
         "groups": obs["groups"],
         "mismatches": bad,
+        "unbounded_groups": unbounded,
+        "allowlisted_unbounded": sorted(UNBOUNDED_RETENTION_ALLOWLIST),
         "unreadable_regions": obs["unreadable"],
     }
     unreadable_note = ""
     if obs["unreadable"]:
         unreadable_note = " (ALSO unreadable: " + ", ".join(f"{u['region']}: {u['detail']}" for u in obs["unreadable"]) + ")"
 
+    details = []
     if bad:
-        result["status"] = "drift"
         named = ", ".join(f"{m['region']} {m['log_group']}={_fmt_live(m['live'])}" for m in bad)
-        result["detail"] = (
+        details.append(
             f"{len(bad)} security-tier log group(s) not at the declared {declared}d "
-            f"(docs/DATA_GOVERNANCE.md): {named}. FIX: {APPLY_COMMAND}{unreadable_note}"
+            f"(docs/DATA_GOVERNANCE.md): {named}. FIX: {APPLY_COMMAND}"
         )
+    if unbounded:
+        named = ", ".join(f"{g['region']} {g['log_group']} ({g['stored_bytes']} bytes)" for g in unbounded[:10])
+        more = "" if len(unbounded) <= 10 else f" (+{len(unbounded) - 10} more)"
+        details.append(
+            f"{len(unbounded)} log group(s) of {len(obs['all_groups'])} have NO retention policy "
+            f"(retained forever): {named}{more}. FIX: {ESTATE_FIX_HINT}"
+        )
+
+    if details:
+        result["status"] = "drift"
+        result["detail"] = " | ".join(details) + unreadable_note
     elif obs["unreadable"]:
         result["status"] = "error"
         result["detail"] = (
             "could not read " + ", ".join(f"{u['region']} ({u['detail']})" for u in obs["unreadable"]) + " — partial sweep is not clean"
         )
+    elif not obs["all_groups"]:
+        result["status"] = "error"
+        result["detail"] = (
+            f"ZERO log groups found across {len(obs['regions'])} region(s) — every Lambda on the platform logs, "
+            "so an empty sweep is a blind sweep (the region set or the read is wrong), not a pass"
+        )
     elif not obs["groups"]:
         result["status"] = "error"
         result["detail"] = (
-            f"ZERO security-tier log groups found across {len(obs['regions'])} region(s) — the functions exist and log, "
-            "so an empty sweep is a blind sweep (candidate names or the region set are wrong), not a pass"
+            f"ZERO security-tier log groups found across {len(obs['regions'])} region(s) (of "
+            f"{len(obs['all_groups'])} groups seen) — the functions exist and log, "
+            "so an empty tier sweep is a blind sweep (candidate names are wrong), not a pass"
         )
     return result

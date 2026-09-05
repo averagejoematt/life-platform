@@ -219,17 +219,28 @@ class _FakeEC2:
 
 
 class _FakeLogs:
-    """Prefix semantics on the wire: returns EVERY group whose name starts with the
-    prefix (so an exact-name mismatch has to be filtered by the caller)."""
+    """The wire, both shapes. No prefix -> the region's WHOLE estate (what the #3507 sweep
+    now asks for), PAGINATED two at a time so the caller's nextToken loop is exercised
+    rather than assumed. With a prefix -> every group whose name starts with it, so an
+    exact-name mismatch still has to be filtered by the caller."""
+
+    _PAGE = 2
 
     def __init__(self, region, state, raise_exc=None, puts=None):
         self._region, self._state, self._raise, self._puts = region, state, raise_exc, puts
 
-    def describe_log_groups(self, logGroupNamePrefix, nextToken=None):  # noqa: N803 — boto3 kwarg casing
+    def describe_log_groups(self, logGroupNamePrefix=None, nextToken=None):  # noqa: N803 — boto3 kwarg casing
         if self._raise:
             raise self._raise
-        groups = [dict(v) for k, v in self._state.get(self._region, {}).items() if k.startswith(logGroupNamePrefix)]
-        return {"logGroups": groups}
+        items = sorted(self._state.get(self._region, {}).items())
+        if logGroupNamePrefix is not None:
+            items = [(k, v) for k, v in items if k.startswith(logGroupNamePrefix)]
+        start = int(nextToken) if nextToken else 0
+        page = items[start : start + self._PAGE]
+        out = {"logGroups": [dict(v) for _k, v in page]}
+        if start + self._PAGE < len(items):
+            out["nextToken"] = str(start + self._PAGE)
+        return out
 
     def put_retention_policy(self, logGroupName, retentionInDays):  # noqa: N803
         if self._raise:
@@ -296,15 +307,18 @@ def test_a_region_with_no_security_groups_is_not_drift(monkeypatch):
     assert {g["region"] for g in res["groups"]} == set(state)
 
 
-def test_prefix_read_never_matches_a_longer_name(monkeypatch):
-    """describe_log_groups is a PREFIX read; `...-canary-v2` at NEVER_EXPIRE must not be
-    counted as canary (false drift) nor as canary's own group (false clean)."""
+def test_a_near_miss_name_is_not_folded_into_the_security_tier(monkeypatch):
+    """`...-canary-v2` must not be counted as canary (false tier drift) nor as canary's
+    own group (false tier clean). #3507: it IS now an estate finding, because it never
+    expires — the same planted group proves both legs at once."""
     state = _all_at(C.LOG_RETENTION_SECURITY_DAYS)
     state["us-west-2"]["/aws/lambda/life-platform-canary-v2"] = _lg("/aws/lambda/life-platform-canary-v2", None)
     _wire(monkeypatch, state)
     res = slr.check_log_retention()
-    assert res["status"] == "clean"
+    assert res["mismatches"] == [], "the security tier is clean; -canary-v2 is not canary"
     assert all(g["log_group"] != "/aws/lambda/life-platform-canary-v2" for g in res["groups"])
+    assert res["status"] == "drift"
+    assert [g["log_group"] for g in res["unbounded_groups"]] == ["/aws/lambda/life-platform-canary-v2"]
 
 
 def test_cannot_enumerate_regions_is_error_naming_the_grant(monkeypatch):
@@ -341,6 +355,94 @@ def test_zero_groups_anywhere_is_error_not_clean(monkeypatch):
     res = slr.check_log_retention()
     assert res["status"] == "error"
     assert "ZERO" in res["detail"]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# C2. #3507 — the ESTATE leg: any unbounded group anywhere, not five declared names
+#
+# The leg above reads five hand-declared function names. Measured 2026-09-05 that scope
+# reported `{status: clean, groups_found: 17}` while `/aws/lambda/life-platform-site-api`
+# sat in us-east-1 with no retention policy at all — 128,854 bytes, last event 2026-03-21,
+# and `lambda get-function` in that region returns ResourceNotFoundException. An orphan
+# from a March deploy attempt, invisible to the one check whose purpose is region strays.
+# Live estate that day: 137 groups across 17 enabled regions, exactly one unbounded.
+# ═════════════════════════════════════════════════════════════════════════════
+_ORPHAN = "/aws/lambda/life-platform-site-api"
+
+
+def _estate_with_the_us_east_1_orphan():
+    """The measured 2026-09-05 shape: every security-tier group correct, plus one
+    unbounded orphan in a region the declared-name sweep had no reason to look at."""
+    state = _all_at(C.LOG_RETENTION_SECURITY_DAYS)
+    state.setdefault("us-east-1", {})[_ORPHAN] = _lg(_ORPHAN, None, 128854)
+    return state
+
+
+def test_the_orphan_unbounded_group_reds_the_leg(monkeypatch):
+    """POSITIVE CONTROL (#3507 acceptance box 2): a stub estate containing one unbounded
+    group in a second region reds the leg. Under the pre-#3507 scope this exact state was
+    reported `clean`."""
+    _wire(monkeypatch, _estate_with_the_us_east_1_orphan())
+    res = slr.check_log_retention()
+    assert res["status"] == "drift", "an unbounded orphan in us-east-1 must not read clean"
+    assert res["mismatches"] == [], "the security tier itself is clean — this is the estate leg speaking"
+    assert [(g["region"], g["log_group"]) for g in res["unbounded_groups"]] == [("us-east-1", _ORPHAN)]
+    assert _ORPHAN in res["detail"] and "us-east-1" in res["detail"]
+    assert "NO retention policy" in res["detail"]
+
+
+def test_the_leg_is_clean_once_the_orphan_has_a_policy(monkeypatch):
+    """NEGATIVE CONTROL for the same planted group — giving it a retention policy is what
+    clears the finding, so the red above is caused by the retention, not by its existence."""
+    state = _estate_with_the_us_east_1_orphan()
+    state["us-east-1"][_ORPHAN] = _lg(_ORPHAN, 30, 128854)
+    _wire(monkeypatch, state)
+    res = slr.check_log_retention()
+    assert res["status"] == "clean", res.get("detail")
+    assert res["unbounded_groups"] == []
+
+
+def test_groups_found_reports_the_estate_not_the_declared_five(monkeypatch):
+    """The number in `drift-log/latest.json` must describe what was LOOKED AT. The 09-02
+    record said `groups_found: 17` about a population of 137 — a true number answering the
+    wrong question is how a scoped sweep passes for a complete one."""
+    _wire(monkeypatch, _estate_with_the_us_east_1_orphan())
+    res = slr.check_log_retention()
+    assert res["security_tier_groups_found"] == 17
+    assert res["groups_found"] == 18, "groups_found must count every group the sweep enumerated"
+    assert res["groups_found"] == len(res["unbounded_groups"]) + 17
+
+
+def test_an_allowlisted_unbounded_group_is_not_a_finding(monkeypatch):
+    """A deliberate exemption is possible — but only through a named registry entry, never
+    by being absent from a hand-typed list."""
+    _wire(monkeypatch, _estate_with_the_us_east_1_orphan())
+    monkeypatch.setitem(slr.UNBOUNDED_RETENTION_ALLOWLIST, _ORPHAN, {"reason": "planted by the test", "since": "2026-09-05"})
+    res = slr.check_log_retention()
+    assert res["status"] == "clean", res.get("detail")
+    assert res["allowlisted_unbounded"] == [_ORPHAN]
+
+
+def test_the_shipped_allowlist_entries_all_carry_a_reason_and_a_date():
+    """An exemption with no argument and no date can never be re-reviewed. Empty is the
+    correct steady state and passes vacuously — which is fine, because the rule bites the
+    moment someone adds one."""
+    for name, meta in slr.UNBOUNDED_RETENTION_ALLOWLIST.items():
+        assert meta.get("reason"), f"{name} is allowlisted with no reason"
+        assert meta.get("since"), f"{name} is allowlisted with no date"
+
+
+def test_the_estate_sweep_paginates(monkeypatch):
+    """The us-west-2 estate is 121 groups — well past one DescribeLogGroups page. A sweep
+    that reads only page 1 is a scoped sweep wearing a full one's clothes."""
+    state = _all_at(C.LOG_RETENTION_SECURITY_DAYS)
+    for i in range(9):
+        name = f"/aws/lambda/life-platform-filler-{i}"
+        state["us-west-2"][name] = _lg(name, 30)
+    _wire(monkeypatch, state)
+    res = slr.check_log_retention()
+    assert res["groups_found"] == 17 + 9, "pagination dropped groups — the fake pages 2 at a time"
+    assert res["status"] == "clean"
 
 
 # ── the sweep seam: drift must reach the triage path, not just the record ────

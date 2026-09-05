@@ -48,6 +48,7 @@
       "Sid": "DriftSentinel",
       "Effect": "Allow",
       "Action": [
+        "cloudformation:DescribeStacks",
         "cloudformation:DetectStackDrift",
         "cloudformation:DetectStackResourceDrift",
         "cloudformation:DescribeStackDriftDetectionStatus",

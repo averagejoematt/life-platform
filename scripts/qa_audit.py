@@ -428,7 +428,7 @@ def live_reads():
                 else:
                     out[f"{key}_error"] = str(e)[:120]
         cw = boto3.client("cloudwatch", region_name="us-west-2")
-        alarms = cw.describe_alarms(AlarmNamePrefix="qa-", MaxRecords=50).get("MetricAlarms", [])
+        alarms = cw.describe_alarms(AlarmNamePrefix="qa-", MaxRecords=50, AlarmTypes=["MetricAlarm"]).get("MetricAlarms", [])
         out["qa_alarm_states"] = {a["AlarmName"]: a["StateValue"] for a in alarms}
     except Exception as e:
         out["error"] = f"live reads unavailable ({str(e)[:120]}) — offline audit is complete without them"

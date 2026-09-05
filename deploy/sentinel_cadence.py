@@ -44,16 +44,34 @@ this check cannot parse, that is NOT "no gap found" and NOT a soft `error` — i
 isn't sent chasing a fabricated missing-date list when the real problem is access/
 permissions. "Couldn't verify" and "verified nothing wrong" must never look the same.
 
-CADENCE SOURCE OF TRUTH
-────────────────────────
-Mon/Wed/Fri, mirroring `.github/workflows/remediation-agent.yml`'s
-`cron: "45 14 * * 1,3,5"` (cron weekday 1,3,5 = Mon/Wed/Fri; Python's
-`datetime.weekday()` 0=Mon..6=Sun, so the equivalent set is {0, 2, 4}). This module does
-not parse the workflow YAML — the two encodings are different weekday numbering systems
-maintained by hand in two places, same as `PUSH_TRIGGER_GLOBS` in `sentinel_github.py`
-mirrors its own workflow trigger list without parsing it. A change to the cron needs a
-matching change here; `tests/test_drift_sentinel.py` pins the {0, 2, 4} set so a drift
-in one without the other fails a test, not just a code review.
+CADENCE SOURCE OF TRUTH — ONE FACT, TWO READERS (#3508)
+───────────────────────────────────────────────────────
+This used to be a hand-maintained mirror: `EXPECTED_WEEKDAYS = {0, 2, 4}` with a docstring
+saying "this module does not parse the workflow YAML". Meanwhile the workflow ran the
+sentinel behind a THIRD encoding of the same fact —
+
+    if [ "$(date -u +%u)" = "1" ] || [ workflow_dispatch ]; then python3 deploy/drift_sentinel.py
+
+— "keep the sentinel weekly by running only on Mondays". So the declared cadence was
+Mon/Wed/Fri and the real one was Mondays, and the disagreement was not a latent risk but
+a live, permanent false finding: every Wed and Fri run reported "sentinel cadence gap" and
+the needs-human line "Investigate 4 missed weekly sentinel runs (08-19, 21, 26, 28)",
+identical in the 09-01, 09-02 and 09-04 reports. Worse than the noise: a REAL sentinel
+death on a Monday was indistinguishable from the designed Wed/Fri silence, and the agent
+handed off a 2-day-old drift record as current — the 09-04 17:49Z report cited six drifted
+stacks that had all been redeployed at 16:32–16:36Z that morning.
+
+The fix is the standing rule: derive, do not mirror. The schedule cron in
+`.github/workflows/remediation-agent.yml` is now the ONE fact. This module PARSES it
+(`workflow_cron_weekdays`) and the workflow's own guard asks this module whether today is
+a run day (`python3 deploy/sentinel_cadence.py --should-run-today`), so the expectation and
+the behaviour cannot disagree — there is only one literal left to change.
+
+If the workflow file cannot be read or parsed, `EXPECTED_WEEKDAYS` falls back to
+`FALLBACK_WEEKDAYS` and `CADENCE_SOURCE_ERROR` is set; the check then reports `drift` with
+that reason rather than quietly grading itself against a guess ("couldn't verify" and
+"verified nothing wrong" must never look the same — the same rule as the unreadable
+drift-log branch below).
 
 Cost: a handful of LIST calls per week (`drift-log/` has one object per run day plus
 `latest.json` — never more than a few hundred keys even at years of history). No new
@@ -61,11 +79,84 @@ infrastructure.
 """
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
-# Mirrors .github/workflows/remediation-agent.yml's `cron: "45 14 * * 1,3,5"`.
-# Cron weekday 1,3,5 (Mon,Wed,Fri) == Python datetime.weekday() {0, 2, 4}.
-EXPECTED_WEEKDAYS = frozenset({0, 2, 4})  # Mon, Wed, Fri
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORKFLOW_PATH = os.path.join(_ROOT, ".github", "workflows", "remediation-agent.yml")
+
+# The workflow's `- cron: "m h dom mon dow"` schedule lines. A regex rather than a YAML
+# parse so this module stays dependency-free in every runner it is imported from; the
+# shape is one well-known line and `tests/test_drift_sentinel.py` asserts the parse
+# against the real file, so a reformat that breaks it reds a test rather than going quiet.
+_CRON_RE = re.compile(r"^\s*-\s*cron:\s*['\"]([^'\"]+)['\"]", re.M)
+
+# Used ONLY when the workflow cannot be read/parsed — never as a silent default. See
+# CADENCE_SOURCE_ERROR.
+FALLBACK_WEEKDAYS = frozenset({0, 2, 4})  # Mon, Wed, Fri
+
+
+def _cron_dow_to_python(field):
+    """cron day-of-week (0 or 7 = Sunday, 1 = Monday) -> datetime.weekday() (0 = Monday).
+
+    Supports the forms GitHub Actions actually accepts in this field: `*`, a comma list,
+    a `a-b` range, and a bare number. Raises ValueError on anything else rather than
+    guessing — a schedule this module cannot read must be loud, not approximated.
+    """
+    field = field.strip()
+    if field == "*":
+        return frozenset(range(7))
+    out = set()
+    for part in field.split(","):
+        part = part.strip()
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            values = range(int(lo), int(hi) + 1)
+        elif "/" in part:
+            raise ValueError(f"step syntax {part!r} in the day-of-week field is not supported by this parser")
+        else:
+            values = [int(part)]
+        for v in values:
+            if not 0 <= v <= 7:
+                raise ValueError(f"cron day-of-week {v} out of range")
+            out.add((v % 7 - 1) % 7)  # cron 0/7=Sun -> py 6; cron 1=Mon -> py 0
+    if not out:
+        raise ValueError(f"empty day-of-week field {field!r}")
+    return frozenset(out)
+
+
+def workflow_cron_weekdays(path=WORKFLOW_PATH):
+    """The union of `datetime.weekday()` values the workflow's schedule cron(s) fire on.
+
+    This is THE cadence fact (#3508). Raises on an unreadable/unparseable workflow."""
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    crons = _CRON_RE.findall(text)
+    if not crons:
+        raise ValueError(f"no `- cron:` schedule found in {path}")
+    days = set()
+    for expr in crons:
+        fields = expr.split()
+        if len(fields) != 5:
+            raise ValueError(f"cron {expr!r} does not have 5 fields")
+        days |= _cron_dow_to_python(fields[4])
+    return frozenset(days)
+
+
+CADENCE_SOURCE_ERROR = None
+try:
+    EXPECTED_WEEKDAYS = workflow_cron_weekdays()
+except Exception as _e:  # noqa: BLE001 — a broken read must degrade LOUDLY, not crash the sweep
+    EXPECTED_WEEKDAYS = FALLBACK_WEEKDAYS
+    CADENCE_SOURCE_ERROR = f"{type(_e).__name__}: {_e}"
+
+
+def should_run_today(now=None):
+    """Is today a scheduled sentinel day? The workflow's run guard asks THIS, so the
+    expectation and the behaviour read the same literal (#3508)."""
+    now = now or datetime.now(timezone.utc)
+    return now.weekday() in EXPECTED_WEEKDAYS
+
 
 # The acceptance criteria's explicit staleness threshold (#3130): latest.json older
 # than this many days is drift, independent of whether every individual expected date
@@ -133,6 +224,23 @@ def check_sentinel_cadence(client_factory=None, now=None):
     region = os.environ.get("AWS_REGION", "us-west-2")
     now = now or datetime.now(timezone.utc)
 
+    if CADENCE_SOURCE_ERROR:
+        # #3508: the cadence fact is the workflow's own cron. If it could not be read,
+        # every "missing date" below would be graded against a GUESS. Say so instead —
+        # the same fail-closed rule as the unreadable drift-log branch.
+        return {
+            "status": "drift",
+            "reason": "unknown_cadence",
+            "missing_dates": [],
+            "latest_date": None,
+            "days_stale": None,
+            "detail": (
+                f"cannot read the sentinel's own schedule from {WORKFLOW_PATH} ({CADENCE_SOURCE_ERROR}) — "
+                "grading a cadence against a hardcoded guess is how the Mon-only/Mon-Wed-Fri split went "
+                "unnoticed for weeks (#3508). Fix the workflow read before trusting this leg."
+            ),
+        }
+
     try:
         s3 = client_factory("s3", region)
         present_dates = _list_dated_keys(s3, bucket)
@@ -196,3 +304,33 @@ def check_sentinel_cadence(client_factory=None, now=None):
         "days_stale": days_stale,
         "detail": "sentinel cadence gap — " + "; ".join(reasons),
     }
+
+
+def _main(argv=None):
+    """`--should-run-today` is the workflow's run guard (#3508): exit 0 = run the sentinel,
+    exit 1 = not a scheduled day. The workflow no longer carries its own weekday literal,
+    so the schedule cron in that same file is the only place the cadence is written.
+
+    An unreadable/unparseable schedule exits 0 (RUN) and says why on stderr: an extra
+    read-only sentinel run costs a handful of free API calls, while a silent skip is the
+    exact failure this issue is about.
+    """
+    import sys
+
+    argv = sys.argv[1:] if argv is None else argv
+    if "--should-run-today" not in argv:
+        print(f"usage: {os.path.basename(__file__)} --should-run-today", file=sys.stderr)
+        return 2
+    if CADENCE_SOURCE_ERROR:
+        print(f"[warn] cannot parse the schedule cron ({CADENCE_SOURCE_ERROR}) — running the sentinel anyway", file=sys.stderr)
+        return 0
+    today = datetime.now(timezone.utc)
+    if should_run_today(today):
+        print(f"{today.date()} (weekday {today.weekday()}) is a scheduled sentinel day: {sorted(EXPECTED_WEEKDAYS)}")
+        return 0
+    print(f"{today.date()} (weekday {today.weekday()}) is not in the schedule cron's day set {sorted(EXPECTED_WEEKDAYS)}")
+    return 1
+
+
+if __name__ == "__main__":  # pragma: no cover — exercised as a subprocess by the workflow
+    raise SystemExit(_main())
