@@ -174,29 +174,28 @@ jobs:
       # continuing to report green.
 
       - name: Test coverage gate (regression floor, ADR-080)
-        # ENFORCED regression floor. The codebase is integration-tested (handlers
-        # run live; most offline tests are structural/contract), so measured offline
-        # line coverage is 79.02% (read out of this job's own output on green main
-        # e806d7e4 / run 31274908729, after #1658's fourth tranche; the third took it
-        # from 70.50% to 78.24% — +7.74pt / 5,565 newly-covered statements across 15
-        # modules that sat at 0-72%). The --high-water mark below is banked at 83.20,
-        # a tenth of a point UNDER measured on purpose — the mark is a floor for real
-        # coverage, so rounding it down costs nothing and buys jitter margin. This floor (74%) prevents BACKSLIDING with ~5.0pt
-        # headroom under measured so normal fluctuation doesn't red main — it is
-        # not a quality bar, and it is no longer the tightest gate either: step (3)
-        # below polices measured coverage directly at 78.90 - 1.5 = 77.40%.
-        # NB #1658's third acceptance box ("enforce 70% as the merge gate") is now
-        # SATISFIED: the enforced merge gate is 74, comfortably above 70, and it is
-        # set from a measurement (78.24) rather than a target.
-        # Ratcheted 40→47 by #1658, 47→53 by #2152, 53→58 by #1658's first test
-        # tranche, 58→66 by its second, 66→74 by its third (lineage: #419 9%→25%, #1206 25→40); keep ratcheting up
-        # (ADR-080/ADR-107). The floor is CANONICAL in
-        # pyproject.toml `[tool.coverage.report] fail_under`; the explicit
-        # `--cov-fail-under` below is belt-and-suspenders and MUST match it —
-        # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn
-        # --floor below) ever drift or drop below the committed RATCHET_FLOOR
-        # (up-only). The gap-warning step below reminds a human to ratchet when the
-        # floor drifts >10pts under measured. Scope: lambdas/ + mcp/ only.
+        # ENFORCED regression floor (ADR-080/ADR-107). The codebase is integration-tested
+        # (handlers run live; most offline tests are structural/contract), so measured
+        # offline line coverage sits comfortably above this floor. The floor exists to
+        # stop BACKSLIDING; it is not a quality bar, and it is not the tightest gate —
+        # the measured-coverage high-water ratchet in the gap-warning step below is.
+        #
+        # NO MEASUREMENT IS WRITTEN HERE (#3539). This comment used to carry three
+        # different eras of hand-typed percentages at once — a "measured" figure, a
+        # "banked at" figure and a "catch line" arithmetic — while green main measured
+        # something different from all three. Each was a phrase-keyed copy of a fact owned
+        # elsewhere, and nothing compared any of them to anything. The numbers and the
+        # full ratchet lineage now live in ONE owner, tests/test_coverage_floor_ratchet.py
+        # (RATCHET_FLOOR / RATCHET_HIGH_WATER / HIGH_WATER_TOLERANCE + LINEAGE), and
+        # test_ci_comment_carries_no_uncommitted_percentage asserts that every percentage
+        # literal in this step's comments is one of those committed constants. To move a
+        # number, move the constant.
+        #
+        # The floor is CANONICAL in pyproject.toml `[tool.coverage.report] fail_under`;
+        # the explicit `--cov-fail-under` below is belt-and-suspenders and MUST match it —
+        # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn --floor
+        # below) ever drift or drop below the committed RATCHET_FLOOR (up-only). Keep
+        # ratcheting up. Scope: lambdas/ + mcp/ only.
         run: |
           # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
           # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`

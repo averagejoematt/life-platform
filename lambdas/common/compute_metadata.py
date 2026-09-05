@@ -46,13 +46,6 @@ def _get_run_id() -> str:
     return _RUN_ID
 
 
-def reset_run_id() -> None:
-    """Force a new run_id (useful for testing or if a Lambda explicitly wants
-    distinct ids per logical pass within the same invocation)."""
-    global _RUN_ID
-    _RUN_ID = None
-
-
 def tag_record(record: dict, source_id: str = "unknown", phase: str | None = None) -> dict:
     """Add run_id + computed_at + phase to a compute output record. Emits metric.
 

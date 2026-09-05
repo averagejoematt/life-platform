@@ -453,69 +453,6 @@ def validate_ai_output(
     return result
 
 
-def validate_json_output(
-    parsed: Optional[dict],
-    required_keys: list[str],
-    output_type: AIOutputType = AIOutputType.GENERIC,
-    health_context: dict = None,
-) -> AIValidationResult:
-    """Validate JSON-structured AI output (training_nutrition, tldr_guidance).
-
-    Args:
-        parsed:        Already-parsed dict from AI call (None if JSON parse failed)
-        required_keys: Keys that must be present and non-empty
-        output_type:   For fallback text selection
-        health_context: Health context for text-level checks on each value
-
-    Returns:
-        AIValidationResult. Checks each string value with validate_ai_output.
-    """
-    ctx = health_context or {}
-
-    if not parsed:
-        return AIValidationResult(
-            original_text="{}",
-            output_type=output_type,
-            blocked=True,
-            block_reason="JSON output is None or failed to parse",
-            safe_fallback="",
-        )
-
-    warnings = []
-    errors = []
-
-    for key in required_keys:
-        val = parsed.get(key)
-        if not val:
-            errors.append(f"Required key '{key}' missing or empty in JSON output")
-            continue
-        if isinstance(val, str):
-            sub_result = validate_ai_output(val, output_type, ctx)
-            if sub_result.blocked:
-                errors.append(f"Key '{key}' failed validation: {sub_result.block_reason}")
-                parsed[key] = sub_result.safe_fallback  # replace with safe text in-place
-            warnings.extend([f"[{key}] {w}" for w in sub_result.warnings])
-        elif isinstance(val, list):
-            for i, item in enumerate(val):
-                if isinstance(item, str):
-                    sub_result = validate_ai_output(item, output_type, ctx)
-                    if sub_result.blocked:
-                        warnings.append(f"Key '{key}[{i}]' blocked: {sub_result.block_reason}")
-                        val[i] = sub_result.safe_fallback
-
-    result = AIValidationResult(
-        original_text=str(parsed),
-        output_type=output_type,
-        warnings=warnings,
-    )
-    if errors:
-        result.blocked = True
-        result.block_reason = "; ".join(errors[:3])
-        result.safe_fallback = ""
-
-    return result
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 

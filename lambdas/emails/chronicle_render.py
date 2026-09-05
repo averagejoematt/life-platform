@@ -8,19 +8,13 @@ import re
 from datetime import datetime, timezone
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+
+# BS-05 confidence helpers (bundled digest_utils) — same optional-import shape as the facade.
+from common.digest_utils import _confidence_badge, compute_confidence
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.text_utils import truncate_at_word
 
-# BS-05 confidence helpers (bundled digest_utils) — same optional-import shape as the facade.
-try:
-    from common.digest_utils import _confidence_badge, compute_confidence
-
-    _HAS_CONFIDENCE = True
-except ImportError:
-    _HAS_CONFIDENCE = False
-
-    def _confidence_badge(level):
-        return ""
+_HAS_CONFIDENCE = True
 
 
 def markdown_to_html(md_text):

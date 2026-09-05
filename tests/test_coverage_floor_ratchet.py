@@ -253,3 +253,99 @@ def test_ci_passes_fail_on_regression():
         "the CI coverage-regression step does not pass --fail-on-regression, so a real coverage "
         "regression would only print an annotation and still pass (#1658)."
     )
+
+
+# ── #3539: THE CI STEP'S PROSE MAY NOT CARRY AN UNCOMMITTED PERCENTAGE ────────
+#
+# The coverage-gate step's comment block carried three eras of hand-typed numbers at
+# once — a "measured … 79.02%", a "banked at 83.20" and a catch line "78.90 - 1.5 =
+# 77.40%" — against a green main that measured 83.84%. Nothing compared any of them to
+# anything, because a comment is not a fact anyone owns: the numbers above (RATCHET_FLOOR,
+# RATCHET_HIGH_WATER, HIGH_WATER_TOLERANCE) plus the lineage in this file's own comments
+# ARE the owner, and the YAML prose was a phrase-keyed copy of them. The #2959/#3199
+# family: a detector keyed on a phrase instead of on the fact.
+#
+# So: every percentage-shaped literal in that step's comments must equal one of this
+# file's committed constants. Nothing else — not a measurement, not an arithmetic
+# worked example, not a historical era. Lineage belongs here, where it sits next to the
+# constant it explains and moves with it.
+_COVERAGE_STEP_NAME = "Test coverage gate (regression floor, ADR-080)"
+
+# A percentage-shaped literal: a number wearing %/pt/pts/points, or a bare decimal.
+# The lookbehind keeps it off issue/ADR tokens (`#3539`, `ADR-080`) and version-ish text.
+_PCT_RE = re.compile(r"(?<![\w.#\-])(\d+(?:\.\d+)?)\s*(?:%|pts?\b|points\b)|(?<![\w.#\-])(\d+\.\d+)(?![\w.])")
+
+
+def _coverage_step_comment_lines(yaml_text):
+    """The `#` comment lines of the coverage-gate step: from its `- name:` line to the
+    first `run:`/`if:` key that ends the comment block."""
+    lines = yaml_text.splitlines()
+    try:
+        start = next(i for i, ln in enumerate(lines) if _COVERAGE_STEP_NAME in ln and ln.strip().startswith("- name:"))
+    except StopIteration:
+        raise AssertionError(f"ci-test.yml no longer has a step named {_COVERAGE_STEP_NAME!r} — this guard has lost its subject")
+    out = []
+    for ln in lines[start + 1 :]:
+        stripped = ln.strip()
+        if stripped.startswith("#"):
+            out.append(stripped)
+            continue
+        if stripped:  # the first non-comment key ends the block
+            break
+    return out
+
+
+def _uncommitted_percentages(comment_lines):
+    # Both spellings of each constant: str(83.20) is "83.2", and the CI literal is
+    # written "83.20". A guard that rejects the very number CI passes is not a guard.
+    committed = set()
+    for value in (RATCHET_FLOOR, RATCHET_HIGH_WATER, HIGH_WATER_TOLERANCE):
+        committed |= {str(value), f"{float(value)}", f"{float(value):.2f}", f"{float(value):g}"}
+    bad = []
+    for ln in comment_lines:
+        for m in _PCT_RE.finditer(ln):
+            value = m.group(1) or m.group(2)
+            if value not in committed:
+                bad.append((value, ln))
+    return bad
+
+
+def _ci_test_yaml():
+    path = os.path.join(_REPO, ".github", "workflows", "ci-test.yml")
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def test_ci_comment_carries_no_uncommitted_percentage():
+    """Every percentage in the coverage-gate step's prose is one of this file's
+    committed constants — see the block comment above."""
+    bad = _uncommitted_percentages(_coverage_step_comment_lines(_ci_test_yaml()))
+    assert not bad, (
+        "ci-test.yml's coverage-gate comment carries percentage literal(s) that are not\n"
+        f"RATCHET_FLOOR ({RATCHET_FLOOR}), RATCHET_HIGH_WATER ({RATCHET_HIGH_WATER}) or\n"
+        f"HIGH_WATER_TOLERANCE ({HIGH_WATER_TOLERANCE}). A measurement written into a YAML\n"
+        "comment is owned by nobody and is stale the day after (#3539: three eras of them\n"
+        "sat there at once). Put the number in this file and let the comment point here:\n"
+        + "\n".join(f"  {v}  in: {ln[:110]}" for v, ln in bad)
+    )
+
+
+def test_the_percentage_scan_fires_on_a_planted_measurement():
+    """Mutation proof. A prohibition that matches nothing greens whether or not it
+    works — plant each of the three era-shapes the step actually carried."""
+    planted = [
+        "# line coverage is 79.02% (read out of this job's own output)",
+        "# the --high-water mark below is banked at 83.19,",
+        "# polices measured coverage directly at 78.90 - 1.5 = 77.40%.",
+        "# prevents BACKSLIDING with ~5.0pt headroom under measured",
+    ]
+    found = {v for v, _ in _uncommitted_percentages(planted)}
+    assert {"79.02", "83.19", "78.90", "77.40", "5.0"} <= found, found
+
+    # The committed constants themselves must NOT be flagged, or the guard forbids
+    # the one thing it wants the comment to say.
+    ok = [f"# the floor is {RATCHET_FLOOR}% and the mark is {RATCHET_HIGH_WATER}, tolerance {HIGH_WATER_TOLERANCE}pt"]
+    assert not _uncommitted_percentages(ok)
+
+    # ...and issue/ADR tokens are not percentages.
+    assert not _uncommitted_percentages(["# ENFORCED regression floor (ADR-080/ADR-107). See #3539 and #1658."])

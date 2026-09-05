@@ -297,14 +297,6 @@ def filter_kinds(corpus, kinds) -> list:
     return [doc for doc in (corpus or []) if (doc or {}).get("kind") in allowed]
 
 
-def resolve_precedent(table, precedent: dict) -> bool:
-    """AC2: does this precedent resolve to a REAL record? True iff the artifact it
-    points at (artifact_pk/artifact_sk) still exists in the table. A precedent whose
-    underlying artifact is gone must NOT be cited — the caller drops it and/or the
-    grounded gate blocks any output that cites it. Fail-closed: any error ⇒ False."""
-    return resolve_artifact(table, precedent) is not None
-
-
 def resolve_artifact(table, precedent: dict):
     """The record a precedent points at, or None. Same fail-closed contract as
     `resolve_precedent` — split out so the resolution read can ALSO be the join that
@@ -700,10 +692,3 @@ def precedent_citation_findings(text: str, resolved_precedents: list) -> list:
                 }
             )
     return findings
-
-
-def resolved_precedent_dates(precedents: list) -> set:
-    """The ISO dates of resolved precedents — feed as `allowed_dates` to
-    grounded_generation.grounding_findings() so the coach may cite these dates but
-    no others (the number/date allow-list already blocks an invented one)."""
-    return {(p or {}).get("date") for p in (precedents or []) if (p or {}).get("date")}

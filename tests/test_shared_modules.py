@@ -66,7 +66,6 @@ from ai.ai_output_validator import (
     AIOutputType,
     _fallback_for_type,
     validate_ai_output,
-    validate_json_output,
 )
 
 
@@ -162,24 +161,6 @@ def test_fallbacks_all_types():
         assert fb and len(fb) > 5, f"Fallback for {t} must be non-empty"
 
 
-def test_validate_json_none_blocked():
-    r = validate_json_output(None, ["training", "nutrition"])
-    assert r.blocked
-
-
-def test_validate_json_missing_key():
-    r = validate_json_output({"training": "good session planned"}, ["training", "nutrition"])
-    assert r.blocked
-
-
-def test_validate_json_ok():
-    r = validate_json_output(
-        {"training": "Moderate zone 2 is the right call today.", "nutrition": "Hit your protein target."},
-        ["training", "nutrition"],
-    )
-    assert not r.blocked
-
-
 _run("empty string blocked", test_empty_blocked)
 _run("None blocked", test_none_blocked)
 _run("too short blocked", test_too_short_blocked)
@@ -193,9 +174,6 @@ _run("2+ generic phrases -> warn", test_generic_phrases_warn)
 _run("sanitized_text returns fallback when blocked", test_sanitized_text_fallback)
 _run("sanitized_text returns original when passing", test_sanitized_text_original)
 _run("all output types have non-empty fallbacks", test_fallbacks_all_types)
-_run("validate_json: None input -> blocked", test_validate_json_none_blocked)
-_run("validate_json: missing required key -> blocked", test_validate_json_missing_key)
-_run("validate_json: all keys present -> passes", test_validate_json_ok)
 
 
 # ======================================================================
