@@ -124,27 +124,54 @@ def test_max_probes_lockstep_with_board_rate_limit():
     )
 
 
+#: The call that charges the probe's ONE token on the way in. #3560 extracted the
+#: DDB/in-memory limiter out of `_handle_board_ask` into this helper so the opening
+#: turn and the follow-up turn charge the same counter at the same point in their
+#: orders — which also means a pin naming `_ddb_rate_check` here now finds the
+#: FAN-OUT charge further down the function and silently measures the wrong pair.
+_ENTRY_CHARGE = "_board_rate_charge"
+
+
 def test_charge_before_validation_premise_holds():
-    """_handle_board_ask must hit the rate check BEFORE the length validation —
-    the ordering that makes a $0 probe possible (#1439's original analysis).
-    Source-order pin: the `_ddb_rate_check(` call site must appear before the
-    question-length rejection inside the same function body."""
+    """_handle_board_ask must hit the ENTRY rate charge BEFORE the length validation —
+    the ordering that makes a $0 probe possible (#1439's original analysis). Source-order
+    pin: the `_board_rate_charge(` call site must appear before the question-length
+    rejection inside the same function body.
+
+    #3560 note: the hazard gate and the budget pause now run ahead of the charge (the
+    gate is a $0 offline regex and a person describing an emergency must not be metered
+    into silence). Neither disturbs this probe — "hi" is benign, and the paused arm is
+    the module's own ⏸ outcome."""
     src = _WEB_SRC.read_text()
     tree = ast.parse(src)
     fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_handle_board_ask")
     rate_line = None
     length_line = None
     for node in ast.walk(fn):
-        if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "_ddb_rate_check":
+        if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == _ENTRY_CHARGE:
             rate_line = rate_line or node.lineno
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and "too short" in node.value.lower():
             length_line = length_line or node.lineno
-    assert rate_line is not None, "rate check call not found in _handle_board_ask"
+    assert rate_line is not None, f"{_ENTRY_CHARGE}() call not found in _handle_board_ask — the entry charge was renamed or removed"
     assert length_line is not None, "length validation not found in _handle_board_ask"
     assert rate_line < length_line, (
         "charge-before-validation ordering flipped in _handle_board_ask — the edge-429 "
         "probe premise is broken; re-design the probe before shipping this change"
     )
+
+
+def test_the_entry_charge_helper_actually_charges_the_board_ask_counter():
+    """Non-vacuity for the pin above: naming a helper is only a premise if the helper
+    is the thing that spends the token. A `_board_rate_charge` that had stopped calling
+    the limiter would leave the pin green and the probe dead."""
+    src = _WEB_SRC.read_text()
+    tree = ast.parse(src)
+    fn = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == _ENTRY_CHARGE), None)
+    assert fn is not None, f"{_ENTRY_CHARGE} was renamed or removed"
+    body = ast.unparse(fn)
+    assert "_ddb_rate_check(" in body, f"{_ENTRY_CHARGE} no longer calls the DDB limiter"
+    assert "endpoint='board_ask'" in body or '"board_ask"' in body, f"{_ENTRY_CHARGE} no longer charges the board_ask counter"
+    assert "_board_rate_store" in body, f"{_ENTRY_CHARGE} lost the in-memory fallback the fail-open lane uses"
 
 
 def test_pause_detector_tolerates_garbage():

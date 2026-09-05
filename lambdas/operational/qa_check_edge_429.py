@@ -9,11 +9,14 @@ habit. This check makes that habit a scheduled observation.
 
 Mechanism (reuses `deploy/probe_rate_limiter.py`'s trip429 design — #1439):
 POST `/api/board_ask` with a deliberately too-short question ("hi"). Reading
-`_handle_board_ask` (site_api_ai_lambda.py): the DDB rate check charges ONE
-token BEFORE body validation, so every probe request increments the real
-counter and then 400s at the length check — $0 model spend, no email, no
-reader quota touched (the counter is per-IP and this Lambda's egress IP is not
-a reader's). After BOARD_RATE_LIMIT charges, the next request must return a
+`_handle_board_ask` (site_api_ai_lambda.py): the entry rate charge
+(`_board_rate_charge`) takes ONE token BEFORE the question-length rejection, so
+every probe request increments the real counter and then 400s at the length
+check — $0 model spend, no email, no reader quota touched (the counter is
+per-IP and this Lambda's egress IP is not a reader's). #3560 moved the $0
+hazard gate and the budget pause AHEAD of that charge; neither disturbs the
+probe ("hi" is benign, and tier 3 is the ⏸ arm below), and the ordering this
+probe depends on is pinned by tests/test_qa_check_edge_429.py. After BOARD_RATE_LIMIT charges, the next request must return a
 real 429. The code cannot be imported here (importing the web handler would
 run its import-time AWS wiring inside qa-smoke), so `MAX_PROBES` is a local
 constant PINNED to the source by tests/test_qa_check_edge_429.py (AST read of

@@ -1265,8 +1265,6 @@ def _handle_board_ask(event: dict) -> dict:
         return _handle_board_followup(body, ip_hash)
 
     question = _req.text_field(body, "question")
-    if len(question) < 5:
-        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
     # #3050: this OPENING turn had NO input filter pre-gate (WR-40 skipped it) — the
     # widest door: up to 12 Bedrock calls. History + why: _req.hazard_gate docstring.
@@ -1280,6 +1278,16 @@ def _handle_board_ask(event: dict) -> dict:
     _limited = _board_rate_charge(ip_hash)
     if _limited:
         return _limited
+
+    # The length rejection stays BELOW the token charge — #1439/#2828's
+    # charge-before-length-validation premise, which is what lets
+    # lambdas/operational/qa_check_edge_429.py observe a REAL edge 429 nightly for $0
+    # (a 2-char question burns a token and 400s, never reaching a model). #3560 moved
+    # the charge itself below the hazard gate; it deliberately did NOT move it below
+    # this validation, because that would silently turn the nightly enforcement probe
+    # into an all-400s RED that means nothing.
+    if len(question) < 5:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
     is_safe, safety_reason = _ask_question_safe(question)
     if not is_safe:
