@@ -78,7 +78,7 @@ SANCTIONED_CHRONIC_SITES = {
     ("qa_smoke_lambda.py", "check_mcp_tool_calls"),
     ("qa_check_outputs.py", "check_score_sanity"),
     ("qa_check_outputs.py", "_range_check"),
-    ("qa_smoke_lambda.py", "check_canary_precision"),
+    ("canary_precision_qa.py", "check_canary_precision"),
     ("qa_smoke_lambda.py", "check_coach_ensemble_phase_stamp_coverage"),
     # #2640, class (a) — a recurring TIMING condition on a healthy platform. The hero-weight
     # arithmetic check has nothing to reconcile until Matthew's first post-genesis weigh-in
