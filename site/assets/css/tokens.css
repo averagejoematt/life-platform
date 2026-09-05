@@ -596,6 +596,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-line { fill: none; stroke: var(--ember); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .chart-fill { fill: var(--ember-wash); stroke: none; }
 .chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
+/* #3556 — a goal that sits OUTSIDE the plotted data range. The annotation stays visible (that
+   is its job) but never widens the axis: it is pinned to the margin band above/below the plot
+   area and drawn finer + fainter so it reads as an off-scale marker, not a value on the scale.
+   The caption and the aria label name it as off-scale and state the real distance. */
+.chart-goal--off { stroke-dasharray: 2 3; stroke-width: 0.8; opacity: 0.6; }
 .chart-down { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chart-dot { fill: var(--ember); }
 /* #1618 — the spend-curve PROJECTION: same ember hue as the actual line so the eye reads it
