@@ -1,0 +1,891 @@
+{
+  "jobs": [
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101229317532",
+      "completed_at": "2026-09-05T02:03:03Z",
+      "conclusion": "success",
+      "created_at": "2026-09-05T02:01:59Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101229317532",
+      "id": 101229317532,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Reconcile derived artifacts",
+      "node_id": "CR_kwDORVwPus8AAAAXkbzNnA",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions",
+      "runner_id": 1000032660,
+      "runner_name": "GitHub Actions 1000032660",
+      "started_at": "2026-09-05T02:02:02Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-05T02:02:03Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-05T02:02:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:02:08Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 2,
+          "started_at": "2026-09-05T02:02:03Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:02:08Z",
+          "conclusion": "success",
+          "name": "Run ./.github/actions/setup-ci",
+          "number": 3,
+          "started_at": "2026-09-05T02:02:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:02:10Z",
+          "conclusion": "success",
+          "name": "Install census dependency (PyYAML)",
+          "number": 4,
+          "started_at": "2026-09-05T02:02:08Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:02:45Z",
+          "conclusion": "success",
+          "name": "Regenerate derived artifacts; commit + push if (and only if) whitelist-clean",
+          "number": 5,
+          "started_at": "2026-09-05T02:02:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:01Z",
+          "conclusion": "success",
+          "name": "Reconcile self-check \u2014 every fact this job owns must be DERIVABLE here (#2578)",
+          "number": 6,
+          "started_at": "2026-09-05T02:02:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:02Z",
+          "conclusion": "success",
+          "name": "Post Run ./.github/actions/setup-ci",
+          "number": 11,
+          "started_at": "2026-09-05T02:03:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:02Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 12,
+          "started_at": "2026-09-05T02:03:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:02Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "started_at": "2026-09-05T02:03:02Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101229317532",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101229473653",
+      "completed_at": "2026-09-05T02:05:51Z",
+      "conclusion": "success",
+      "created_at": "2026-09-05T02:03:03Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101229473653",
+      "id": 101229473653,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "lint / Lint + Syntax Check",
+      "node_id": "CR_kwDORVwPus8AAAAXkb8vdQ",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions",
+      "runner_id": 1000032665,
+      "runner_name": "GitHub Actions 1000032665",
+      "started_at": "2026-09-05T02:03:06Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-05T02:03:09Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-05T02:03:07Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:15Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 2,
+          "started_at": "2026-09-05T02:03:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:23Z",
+          "conclusion": "success",
+          "name": "Run ./.github/actions/setup-ci",
+          "number": 3,
+          "started_at": "2026-09-05T02:03:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:24Z",
+          "conclusion": "success",
+          "name": "Install flake8",
+          "number": 4,
+          "started_at": "2026-09-05T02:03:23Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:39Z",
+          "conclusion": "success",
+          "name": "Run flake8",
+          "number": 5,
+          "started_at": "2026-09-05T02:03:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:03:41Z",
+          "conclusion": "success",
+          "name": "Install black + ruff",
+          "number": 6,
+          "started_at": "2026-09-05T02:03:39Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:04:31Z",
+          "conclusion": "success",
+          "name": "Format gate (black \u2014 ENFORCED, config in pyproject.toml)",
+          "number": 7,
+          "started_at": "2026-09-05T02:03:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:04:31Z",
+          "conclusion": "success",
+          "name": "Lint gate (ruff \u2014 ENFORCED; import-sort via ruff's isort rules)",
+          "number": 8,
+          "started_at": "2026-09-05T02:04:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:04:41Z",
+          "conclusion": "success",
+          "name": "Mypy gate (ENFORCED \u2014 clean-module set, ADR-080)",
+          "number": 9,
+          "started_at": "2026-09-05T02:04:31Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:04:55Z",
+          "conclusion": "success",
+          "name": "Syntax check (py_compile)",
+          "number": 10,
+          "started_at": "2026-09-05T02:04:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:14Z",
+          "conclusion": "success",
+          "name": "Dependency Security Scan (pip-audit \u2014 ENFORCED, allowlisted)",
+          "number": 11,
+          "started_at": "2026-09-05T02:04:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:16Z",
+          "conclusion": "success",
+          "name": "Secret scan (gitleaks \u2014 ENFORCED, default ruleset, ~30s)",
+          "number": 12,
+          "started_at": "2026-09-05T02:05:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:41Z",
+          "conclusion": "success",
+          "name": "License inventory (pip-licenses \u2014 ADVISORY,",
+          "number": 13,
+          "started_at": "2026-09-05T02:05:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:44Z",
+          "conclusion": "success",
+          "name": "Generate SBOM (syft \u2014 supply-chain provenance,",
+          "number": 14,
+          "started_at": "2026-09-05T02:05:41Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:45Z",
+          "conclusion": "success",
+          "name": "Upload SBOM artifact (#1661)",
+          "number": 15,
+          "started_at": "2026-09-05T02:05:44Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:45Z",
+          "conclusion": "success",
+          "name": "Check lambda_map coverage",
+          "number": 16,
+          "started_at": "2026-09-05T02:05:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:48Z",
+          "conclusion": "success",
+          "name": "Content-policy scan (ENFORCED \u2014",
+          "number": 17,
+          "started_at": "2026-09-05T02:05:45Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:48Z",
+          "conclusion": "success",
+          "name": "Shell syntax check (bash -n) \u2014 deploy/ (#2881)",
+          "number": 18,
+          "started_at": "2026-09-05T02:05:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:48Z",
+          "conclusion": "success",
+          "name": "Post Run ./.github/actions/setup-ci",
+          "number": 35,
+          "started_at": "2026-09-05T02:05:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:48Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 36,
+          "started_at": "2026-09-05T02:05:48Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:05:48Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 37,
+          "started_at": "2026-09-05T02:05:48Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101229473653",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101229875126",
+      "completed_at": "2026-09-05T02:08:22Z",
+      "conclusion": "success",
+      "created_at": "2026-09-05T02:05:51Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101229875126",
+      "id": 101229875126,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Deploy-critical tests",
+      "node_id": "CR_kwDORVwPus8AAAAXkcVPtg",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions",
+      "runner_id": 1000032691,
+      "runner_name": "GitHub Actions 1000032691",
+      "started_at": "2026-09-05T02:05:56Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-05T02:05:58Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-05T02:05:57Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:01Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 2,
+          "started_at": "2026-09-05T02:05:58Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:09Z",
+          "conclusion": "success",
+          "name": "Run ./.github/actions/setup-ci",
+          "number": 3,
+          "started_at": "2026-09-05T02:06:01Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:13Z",
+          "conclusion": "success",
+          "name": "Install test dependencies",
+          "number": 4,
+          "started_at": "2026-09-05T02:06:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:18Z",
+          "conclusion": "success",
+          "name": "Run deploy-critical test lane",
+          "number": 5,
+          "started_at": "2026-09-05T02:06:13Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:18Z",
+          "conclusion": "success",
+          "name": "Post Run ./.github/actions/setup-ci",
+          "number": 9,
+          "started_at": "2026-09-05T02:08:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:19Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 10,
+          "started_at": "2026-09-05T02:08:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:19Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "started_at": "2026-09-05T02:08:19Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101229875126",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101229875154",
+      "completed_at": "2026-09-05T02:44:13Z",
+      "conclusion": "success",
+      "created_at": "2026-09-05T02:05:51Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101229875154",
+      "id": 101229875154,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "test / Unit Tests",
+      "node_id": "CR_kwDORVwPus8AAAAXkcVP0g",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions",
+      "runner_id": 1000032690,
+      "runner_name": "GitHub Actions 1000032690",
+      "started_at": "2026-09-05T02:05:54Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-05T02:05:56Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-05T02:05:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:00Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 2,
+          "started_at": "2026-09-05T02:05:56Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:00Z",
+          "conclusion": "success",
+          "name": "Record job start time (#1349 duration budget)",
+          "number": 3,
+          "started_at": "2026-09-05T02:06:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:07Z",
+          "conclusion": "success",
+          "name": "Run ./.github/actions/setup-ci",
+          "number": 4,
+          "started_at": "2026-09-05T02:06:00Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:12Z",
+          "conclusion": "success",
+          "name": "Install test dependencies",
+          "number": 5,
+          "started_at": "2026-09-05T02:06:07Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:15Z",
+          "conclusion": "success",
+          "name": "Run unit tests",
+          "number": 6,
+          "started_at": "2026-09-05T02:06:12Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:16Z",
+          "conclusion": "success",
+          "name": "IAM policy linter (test_role_policies.py)",
+          "number": 7,
+          "started_at": "2026-09-05T02:06:15Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:17Z",
+          "conclusion": "success",
+          "name": "CDK handler consistency linter (test_cdk_handler_consistency.py)",
+          "number": 8,
+          "started_at": "2026-09-05T02:06:16Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:18Z",
+          "conclusion": "success",
+          "name": "CDK S3 path linter (test_cdk_s3_paths.py)",
+          "number": 9,
+          "started_at": "2026-09-05T02:06:17Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:19Z",
+          "conclusion": "success",
+          "name": "Safety module wiring linter (test_wiring_coverage.py)",
+          "number": 10,
+          "started_at": "2026-09-05T02:06:18Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:20Z",
+          "conclusion": "success",
+          "name": "DynamoDB pattern linter (test_ddb_patterns.py)",
+          "number": 11,
+          "started_at": "2026-09-05T02:06:19Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:21Z",
+          "conclusion": "success",
+          "name": "MCP registry integrity linter (test_mcp_registry.py)",
+          "number": 12,
+          "started_at": "2026-09-05T02:06:20Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:24Z",
+          "conclusion": "success",
+          "name": "Lambda handler integration linter (test_lambda_handlers.py)",
+          "number": 13,
+          "started_at": "2026-09-05T02:06:21Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:24Z",
+          "conclusion": "success",
+          "name": "Deprecated secrets scan",
+          "number": 14,
+          "started_at": "2026-09-05T02:06:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:24Z",
+          "conclusion": "success",
+          "name": "IAM/secrets consistency linter (test_iam_secrets_consistency.py)",
+          "number": 15,
+          "started_at": "2026-09-05T02:06:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:27Z",
+          "conclusion": "success",
+          "name": "Secret references linter (test_secret_references.py)",
+          "number": 16,
+          "started_at": "2026-09-05T02:06:24Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:06:28Z",
+          "conclusion": "success",
+          "name": "Upstream-API contract tests (test_upstream_contracts.py)",
+          "number": 17,
+          "started_at": "2026-09-05T02:06:27Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:44:09Z",
+          "conclusion": "success",
+          "name": "Test coverage gate (regression floor, ADR-080)",
+          "number": 18,
+          "started_at": "2026-09-05T02:06:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:44:09Z",
+          "conclusion": "success",
+          "name": "Coverage regression gate + drift warnings (ratchet,",
+          "number": 19,
+          "started_at": "2026-09-05T02:44:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:44:10Z",
+          "conclusion": "success",
+          "name": "Upload coverage artifact",
+          "number": 20,
+          "started_at": "2026-09-05T02:44:09Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:44:11Z",
+          "conclusion": "success",
+          "name": "Post Run ./.github/actions/setup-ci",
+          "number": 39,
+          "started_at": "2026-09-05T02:44:10Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:44:11Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 40,
+          "started_at": "2026-09-05T02:44:11Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:44:11Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 41,
+          "started_at": "2026-09-05T02:44:11Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101229875154",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101230228151",
+      "completed_at": "2026-09-05T02:12:59Z",
+      "conclusion": "success",
+      "created_at": "2026-09-05T02:08:22Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101230228151",
+      "id": 101230228151,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Plan deployments",
+      "node_id": "CR_kwDORVwPus8AAAAXkcqytw",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions",
+      "runner_id": 1000032701,
+      "runner_name": "GitHub Actions 1000032701",
+      "started_at": "2026-09-05T02:08:26Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completed_at": "2026-09-05T02:08:28Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "started_at": "2026-09-05T02:08:27Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:34Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 2,
+          "started_at": "2026-09-05T02:08:28Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:34Z",
+          "conclusion": "success",
+          "name": "Validate lambda_map.json",
+          "number": 3,
+          "started_at": "2026-09-05T02:08:34Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:08:35Z",
+          "conclusion": "success",
+          "name": "Configure AWS credentials (OIDC) \u2014 plan",
+          "number": 4,
+          "started_at": "2026-09-05T02:08:34Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:50Z",
+          "conclusion": "success",
+          "name": "CDK diff \u2014 detect IAM/infra drift",
+          "number": 5,
+          "started_at": "2026-09-05T02:08:35Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:53Z",
+          "conclusion": "success",
+          "name": "Assert stateful resources exist",
+          "number": 6,
+          "started_at": "2026-09-05T02:12:50Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:55Z",
+          "conclusion": "success",
+          "name": "Verify shared layer is fully retired (#781)",
+          "number": 7,
+          "started_at": "2026-09-05T02:12:53Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:55Z",
+          "conclusion": "success",
+          "name": "Validate handler function names",
+          "number": 8,
+          "started_at": "2026-09-05T02:12:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:55Z",
+          "conclusion": "success",
+          "name": "Detect changes and build deploy plan",
+          "number": 9,
+          "started_at": "2026-09-05T02:12:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:55Z",
+          "conclusion": "success",
+          "name": "Post Configure AWS credentials (OIDC) \u2014 plan",
+          "number": 17,
+          "started_at": "2026-09-05T02:12:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:55Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "number": 18,
+          "started_at": "2026-09-05T02:12:55Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-09-05T02:12:55Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 19,
+          "started_at": "2026-09-05T02:12:55Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101230228151",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101230875585",
+      "completed_at": "2026-09-05T02:13:59Z",
+      "conclusion": "cancelled",
+      "created_at": "2026-09-05T02:13:00Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101230875585",
+      "id": 101230875585,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Deploy",
+      "node_id": "CR_kwDORVwPus8AAAAXkdSTwQ",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": 0,
+      "runner_group_name": "",
+      "runner_id": 0,
+      "runner_name": "",
+      "started_at": "2026-09-05T02:13:00Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101230875585",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101231013457",
+      "completed_at": "2026-09-05T02:13:59Z",
+      "conclusion": "skipped",
+      "created_at": "2026-09-05T02:14:00Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101231013457",
+      "id": 101231013457,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Post-deploy integration checks (I1/I2/I5)",
+      "node_id": "CR_kwDORVwPus8AAAAXkdauUQ",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": null,
+      "runner_group_name": null,
+      "runner_id": null,
+      "runner_name": null,
+      "started_at": "2026-09-05T02:14:00Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101231013457",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101231013657",
+      "completed_at": "2026-09-05T02:13:59Z",
+      "conclusion": "skipped",
+      "created_at": "2026-09-05T02:14:00Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101231013657",
+      "id": 101231013657,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Visual + AI-vision QA",
+      "node_id": "CR_kwDORVwPus8AAAAXkdavGQ",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": null,
+      "runner_group_name": null,
+      "runner_id": null,
+      "runner_name": null,
+      "started_at": "2026-09-05T02:14:00Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101231013657",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101231013843",
+      "completed_at": "2026-09-05T02:13:59Z",
+      "conclusion": "skipped",
+      "created_at": "2026-09-05T02:14:00Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101231013843",
+      "id": 101231013843,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Smoke test",
+      "node_id": "CR_kwDORVwPus8AAAAXkdav0w",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": null,
+      "runner_group_name": null,
+      "runner_id": null,
+      "runner_name": null,
+      "started_at": "2026-09-05T02:14:00Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101231013843",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101231014031",
+      "completed_at": "2026-09-05T02:13:59Z",
+      "conclusion": "skipped",
+      "created_at": "2026-09-05T02:14:00Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101231014031",
+      "id": 101231014031,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Auto-rollback (smoke failure)",
+      "node_id": "CR_kwDORVwPus8AAAAXkdawjw",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": null,
+      "runner_group_name": null,
+      "runner_id": null,
+      "runner_name": null,
+      "started_at": "2026-09-05T02:14:00Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101231014031",
+      "workflow_name": "CI/CD"
+    },
+    {
+      "check_run_url": "https://api.github.com/repos/averagejoematt/life-platform/check-runs/101235178406",
+      "completed_at": "2026-09-05T02:44:13Z",
+      "conclusion": "skipped",
+      "created_at": "2026-09-05T02:44:14Z",
+      "head_branch": "main",
+      "head_sha": "e6daab648e0cdced9a451b63d23dc947472626c1",
+      "html_url": "https://github.com/averagejoematt/life-platform/actions/runs/33937903965/job/101235178406",
+      "id": 101235178406,
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Notify failure",
+      "node_id": "CR_kwDORVwPus8AAAAXkhY7pg",
+      "run_attempt": 1,
+      "run_id": 33937903965,
+      "run_url": "https://api.github.com/repos/averagejoematt/life-platform/actions/runs/33937903965",
+      "runner_group_id": null,
+      "runner_group_name": null,
+      "runner_id": null,
+      "runner_name": null,
+      "started_at": "2026-09-05T02:44:14Z",
+      "status": "completed",
+      "steps": [],
+      "url": "https://api.github.com/repos/averagejoematt/life-platform/actions/jobs/101235178406",
+      "workflow_name": "CI/CD"
+    }
+  ],
+  "total_count": 11
+}
