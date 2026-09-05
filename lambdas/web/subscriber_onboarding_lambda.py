@@ -98,11 +98,13 @@ def _get_published_posts(max_posts=3):
 def _days_until_first_signal():
     """Days from today until the next Weekly Signal send.
 
-    #3564: was `_days_until_wednesday`, hand-coded to weekday 2. The Signal is the
-    one unconditional subscriber send and it goes out on the weekday derived from
-    `weekly-signal`s own cron — if that cron moves, this window moves with it.
+    #3564: was `_days_until_wednesday`, hand-coded to weekday 2 AND to a UTC day. The
+    Signal is the one unconditional subscriber send; its weekday comes from
+    `weekly-signal`s own cron (move the cron, the window moves) and the day it is
+    counted from is PACIFIC (#2414) — the frame the send itself lands in (Sunday
+    16:30 UTC is Sunday 9:30 AM PT), and the frame every reader-facing day uses.
     """
-    return days_until_next(signal_weekday(), datetime.now(timezone.utc).date())
+    return days_until_next(signal_weekday(), datetime.now(PT).date())
 
 
 def _build_onboarding_email(email: str) -> tuple[str, str]:

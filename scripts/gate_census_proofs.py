@@ -552,3 +552,40 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         "proved_on": "2026-08-30",
     },
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
+# GUARD_PROOFS above, only because `gate_census.py` sits at its 1,200-line ceiling
+# (#1665) and the standing rule is extraction, never a baseline raise.
+# ─────────────────────────────────────────────────────────────────────────────
+
+QA_PROOFS: dict[str, dict[str, Any]] = {
+    "qa::lambdas/operational/qa_check_subscriber_promise.py::check_subscriber_promise_cadence": {
+        "gate_name": "check_subscriber_promise_cadence",
+        "command": (
+            'cd lambdas && python3 -c "from operational import qa_check_subscriber_promise as q; '
+            'print(q.check_subscriber_promise_cadence())"'
+        ),
+        "mutation": (
+            "none needed — the defect was live. The check fetches the real /subscribe/ and compares "
+            "it against the promise rendered from the senders' own crons "
+            "(common/subscriber_cadence.promise_sentence). Production still serves the #3564 copy, so "
+            "the first run of this gate was a real FAIL on a real defect rather than a synthetic one "
+            "(the 'fail-closed paths need a live proof' bar)."
+        ),
+        "observed": (
+            "ARMED 2026-09-05: passed=False, message 'the page states [one] emails a week instead' — it "
+            "named the stale count AND the expected sentence. Positive control (a page carrying the "
+            "derived sentence) returns ok, and a page carrying BOTH the new sentence and a leftover "
+            "'One email a week' fails as a contradiction: tests/test_subscriber_cadence_promise_3564.py, "
+            "3 assessor cases."
+        ),
+        "scope": (
+            "Fail-soft on fetch errors by design (a transient blip must not red the nightly), so its green "
+            "is only load-bearing while /subscribe/ is reachable. It reads the PAGE, not the senders' live "
+            "schedules — the mirror-vs-CDK half is the pytest gate."
+        ),
+        "proved_on": "2026-09-05",
+    },
+}
