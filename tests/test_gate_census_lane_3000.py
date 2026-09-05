@@ -466,7 +466,7 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
-BASELINE_TOTAL_GATES = 596  # +1 2026-09-05 (#3564's subscriber-promise cadence check, PROVEN on live production), atop 595 (#3512's prior-cycle archive-notice guard, atop 594)
+BASELINE_TOTAL_GATES = 597  # +1 2026-09-05 (#3503's repo-wide AlarmTypes sweep, PROVEN by the family-5 harness), atop 596 (#3564's subscriber-promise cadence check, atop 595, atop 594)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was
@@ -481,6 +481,21 @@ BASELINE_TOTAL_GATES = 596  # +1 2026-09-05 (#3564's subscriber-promise cadence 
 # sanctioned move is the opposite one — lower BOTH to the live count whenever the
 # measurement allows, which is the progress record the epic asks for.
 UNPROVEN_CEILING_HIGH_WATER = 541
+# 596 -> 597 (2026-09-05, #3503): ONE real gate —
+#   structural::test_composite_alarm_lookup_3390.py
+# The #3390 guard was a two-test, one-file pin on `deploy/restart_verify.py`; #3503 widened
+# it into a family-5 tree sweep over remediation/ scripts/ lambdas/ deploy/ cdk/ mcp/ that
+# requires every `describe_alarms`/`describe_alarm_history` call to state its `AlarmTypes`
+# (the API default is metric alarms only, so six real callers were structurally blind to
+# both composite alarms). The widening is what mints it as a census gate: same file, new
+# family. It arrives PROVEN, not unproven — `python3 scripts/gate_census_mutations.py --run
+# --gate test_composite_alarm_lookup_3390.py` plants an untracked
+# `deploy/_census_probe_3503.py` (a whole-estate sweep with no AlarmTypes) and reports
+# ARMED: baseline 11 passed, mutated 1 failed / 10 passed on
+# test_every_alarm_read_states_its_alarm_types, reverted 11 passed. So live UNPROVEN does
+# not move (538 -> 538) and BASELINE_UNPROVEN_GATES stays where its owner set it.
+# Measured by id-set diff with the tree git-added, per the warning above: exactly one id
+# enters and none leaves.
 BASELINE_UNPROVEN_GATES = 541
 
 # The gap this ceiling is allowed to carry before the census says "you can ratchet down".

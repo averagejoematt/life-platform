@@ -428,7 +428,7 @@ def prediction_gradable_share_healthy() -> Verdict:
         return _unknown(f"boto3 unavailable: {e}")
     try:
         cw = boto3.client("cloudwatch", region_name="us-west-2")
-        alarms = cw.describe_alarms(AlarmNames=["prediction-gradable-share-low"])["MetricAlarms"]
+        alarms = cw.describe_alarms(AlarmNames=["prediction-gradable-share-low"], AlarmTypes=["MetricAlarm"])["MetricAlarms"]
     except Exception as e:  # noqa: BLE001
         return _unknown(f"could not read CloudWatch: {e}")
 

@@ -90,15 +90,24 @@ def status(*, _g) -> dict:
 
     # ── CloudWatch alarm check — detect pipeline errors ──
     cw_alarm_states = {}
+    composite_alarms = []  # #3503: red composites, which carry no Dimensions to map by
     try:
         cw = boto3.client("cloudwatch", region_name=DDB_REGION)
-        alarms_resp = cw.describe_alarms(StateValue="ALARM", MaxRecords=50)
+        # #3503: `describe_alarms` returns METRIC ALARMS ONLY unless AlarmTypes is passed.
+        # The composites are named explicitly rather than left to the default, so a red
+        # composite (whose constituents may all be OK-by-design) reaches this page instead
+        # of being invisible to it — `ai-tokens-platform-daily-total-urgent` was red for
+        # ~24h on 2026-08-30 and no sweep but the alert digest could see it.
+        alarms_resp = cw.describe_alarms(StateValue="ALARM", MaxRecords=50, AlarmTypes=["CompositeAlarm", "MetricAlarm"])
         for alarm in alarms_resp.get("MetricAlarms", []):
             # Map alarm name back to source ID (convention: ingestion-error-{source} or {source}-errors)
             aname = alarm.get("AlarmName", "")
             for dim in alarm.get("Dimensions", []):
                 if dim.get("Name") == "FunctionName":
                     cw_alarm_states[dim["Value"]] = aname
+        # A composite carries no Dimensions, so it can never map to a source row. Surface
+        # the names directly — an unmappable red must be visible, not dropped on the floor.
+        composite_alarms = sorted(a.get("AlarmName", "") for a in alarms_resp.get("CompositeAlarms", []))
     except Exception as e:
         logger.warning(f"[status] CloudWatch alarm check failed (non-fatal): {e}")
 
@@ -896,6 +905,10 @@ def status(*, _g) -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "overall": overall,
         "cost": cost_info,
+        # #3503: composite alarms currently red. They have no FunctionName dimension, so
+        # they can never join a source row; without this key a composite red — the ONLY
+        # routing of ai-tokens-platform-daily-total — is absent from the status surface.
+        "composite_alarms": composite_alarms,
         "health_check": health_check_info,
         "groups": [
             {
