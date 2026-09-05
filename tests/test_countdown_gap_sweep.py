@@ -24,7 +24,7 @@ so a future re-anchor can't turn these into wall-clock time bombs.
 from __future__ import annotations
 
 import sys
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -197,12 +197,31 @@ def test_utc_dated_countdown_write_is_still_an_escapee():
     assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.ESCAPEE
 
 
-def test_current_cycle_stamp_is_sanctioned_old_cycle_stamp_is_not():
-    """The freshly-written Prologue chronicle carries cycle=<current> — self-declared
-    new-cycle provenance. The same row with a stale cycle stamp is an escapee."""
-    base = {"pk": CHRONICLE_PK, "sk": "DATE#x", "phase": PHASE_CURRENT, "generated_at": IN_WINDOW.isoformat()}
-    assert sweep.classify_item({**base, "cycle": CYCLE}, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.SANCTIONED
-    assert sweep.classify_item({**base, "cycle": CYCLE - 1}, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.ESCAPEE
+def test_current_cycle_stamp_alone_is_not_provenance():
+    """The 2026-09-04 specimen (review QS-1): the 17:09Z coach-state-updater run wrote a
+    gradeable PREDICTION# on Day 0 stamped cycle=<current> — every live writer stamps the
+    cycle since #1233 and the reset bumps SSM BEFORE genesis, so the stamp proves nothing
+    about who wrote the row. The old rule sanctioned it and check 14 could never fail on
+    the partitions #1947 was written for. A stale cycle stamp is still an escapee."""
+    row = {
+        "pk": COACH_PK,
+        "sk": "PREDICTION#pred_20260904_recovery_score",
+        "phase": PHASE_CURRENT,
+        "cycle": CYCLE,
+        "status": "pending",
+        "created_date": (date.fromisoformat(GENESIS) - timedelta(days=1)).isoformat(),
+        "created_at": IN_WINDOW.isoformat(),
+    }
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.ESCAPEE
+    assert sweep.classify_item({**row, "cycle": CYCLE - 1}, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.ESCAPEE
+
+
+def test_reset_seed_marker_is_sanctioned_the_same_row_without_it_is_not():
+    """Positive control on the replacement rule: the reset tooling's own marker is the
+    only general exemption; strip it and the identical row is an escapee."""
+    base = {"pk": CHRONICLE_PK, "sk": "DATE#x", "phase": PHASE_CURRENT, "cycle": CYCLE, "generated_at": IN_WINDOW.isoformat()}
+    assert sweep.classify_item({**base, "reset_seed": True}, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.SANCTIONED
+    assert sweep.classify_item(base, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.ESCAPEE
 
 
 def test_seeder_hypothesis_id_is_sanctioned():
