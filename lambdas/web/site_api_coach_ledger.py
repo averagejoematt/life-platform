@@ -251,6 +251,7 @@ _PREDICTION_PROJECTION_FIELDS = (
     "evaluation",
     "outcome_notes",
     "subdomain",
+    "pre_registered_at",  # #3480: the freeze instant, served beside the effective date
 )
 
 

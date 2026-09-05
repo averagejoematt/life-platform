@@ -68,6 +68,7 @@ def _full_pred(coach="sleep_coach"):
         "evaluation": {"metric": "sleep_duration_hours", "type": "threshold"},
         "outcome_notes": "cleared Wednesday",
         "subdomain": "recovery",
+        "pre_registered_at": "2026-07-18T22:00:00+00:00",  # #3480
     }
 
 
@@ -133,6 +134,9 @@ class TestProjectionCarriesEveryEmittedField:
             "eval_type": "threshold",
             "outcome_notes": "cleared Wednesday",
             "subdomain": "recovery",
+            # #3480: the freeze instant rides the projection too — dropped from
+            # _PREDICTION_PROJECTION_FIELDS it would silently serve None for every row.
+            "pre_registered_at": "2026-07-18T22:00:00+00:00",
         }
         assert body["by_coach"]["sleep"]["lifetime"]["confirmed"] == 1
 
