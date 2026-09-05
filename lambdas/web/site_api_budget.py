@@ -30,7 +30,12 @@ from common.pacific_time import parse_iso_utc  # #1964: the ONE ISO-8601 parser
 # cloudwatch/ssm/sns/ce boto3 clients (pure local object construction, no network call,
 # no new IAM requirement since site-api's role never calls their methods) — a deliberate,
 # informed cold-start tradeoff over a second hand-maintained copy that can drift.
-from operational.cost_governor_lambda import _AI_SAFETY_BUFFER, _PRICES as _BEDROCK_PRICES, MONTHLY_CEILING as _GOVERNOR_BASE_CEILING_USD
+from operational.cost_governor_lambda import (
+    _AI_SAFETY_BUFFER,
+    _PRICES as _BEDROCK_PRICES,
+    DRIFT_RATIO_BAR as _DRIFT_RATIO_BAR,
+    MONTHLY_CEILING as _GOVERNOR_BASE_CEILING_USD,
+)
 
 from web.site_api_common import _error, _ok, logger
 
@@ -40,15 +45,46 @@ __all__ = [
     "_BEDROCK_PRICES",
     "_BREAKDOWN_MAX_AGE_S",
     "_BUDGET_TIER_STATUS",
+    "_DRIFT_RATIO_BAR",
     "_TIER_SEMANTICS",
     "_budget_cost_block",
     "_budget_history",
     "_ceiling_envelope",
     "_ceiling_window_clause",
     "_price_for_model",
+    "_projection_scope",
     "inference_receipt",
     "receipts",
 ]
+
+# #3554: the scope of the governor's month-end projection is computed in exactly ONE
+# place — ai.budget_guard.projection_scope — so /api/receipts, /api/status and the daily
+# brief cannot describe the same quantity three different ways. Imported LAZILY (the same
+# shape _budget_cost_block already uses for budget_guard) and degrading to an empty scope,
+# because a packaging gap must cost the scope prose, never the whole receipt.
+_EMPTY_SCOPE: dict = {
+    "projected_usd": None,
+    "projected_all_classes_usd": None,
+    "projected_classes": [],
+    "episodic_classes": [],
+    "scope_label": None,
+    "scope_sentence": None,
+    "episodic_billing_days": {},
+    "episodic_premise_violations": [],
+    "episodic_premise_note": "",
+}
+
+
+def _projection_scope(breakdown) -> dict:
+    """budget_guard.projection_scope(), fail-soft to `_EMPTY_SCOPE`."""
+    try:
+        from ai.budget_guard import projection_scope
+
+        return projection_scope(breakdown)
+    except Exception as e:  # noqa: BLE001 — display-only
+        logger.warning(f"[receipts] projection scope unavailable (non-fatal): {e}")
+        return dict(_EMPTY_SCOPE)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # The inference receipt (2026-06-13) — radical cost transparency.
@@ -269,14 +305,39 @@ def inference_receipt() -> dict:
                 qid_map[("model", mid, field)] = qid
                 specs.append((qid, "AWS/Bedrock", metric_name, "ModelId", mid))
 
+        # ── #3555 (COST-04): one row per Lambda, not one row per dimension SET ────
+        # `list_metrics` returns a separate entry for every dimension COMBINATION a
+        # metric has been published under. site-api-ai emits its own inline token
+        # metrics beside the chokepoint's (site_api_ai_lambda._emit_token_metrics,
+        # dimensioned [LambdaFunction, Endpoint]) so it comes back three times:
+        # [Endpoint=api_ask, LambdaFunction], [Endpoint=api_board_ask, LambdaFunction]
+        # and the chokepoint's bare [LambdaFunction]. Every query below asks for the
+        # BARE dimension set, so those three entries produced three byte-identical rows
+        # (live 2026-09-05: 108,654 / 7,314 three times) and a reader summing the column
+        # triple-counted the ask endpoints. Filtering to single-dimension entries and
+        # de-duplicating fixes it at both ends: `len(Dimensions) == 1` is exactly the
+        # shape the query uses, and `seen` covers a future emitter that publishes the
+        # bare set more than once.
         fn_names = []
+        seen_fns = set()
         fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
         for m in fn_metrics.get("Metrics", []):
-            fn = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "LambdaFunction"), None)
-            if not fn:
+            dims = m.get("Dimensions") or []
+            if len(dims) != 1:
                 continue
+            fn = next((d["Value"] for d in dims if d["Name"] == "LambdaFunction"), None)
+            if not fn or fn in seen_fns:
+                continue
+            seen_fns.add(fn)
             fn_names.append(fn)
-            for field, metric_name in (("in", "AnthropicInputTokens"), ("out", "AnthropicOutputTokens")):
+            # #3555 (COST-03): the DOLLAR series rides the same batch — no extra round
+            # trip. `EstimatedCostUSD{LambdaFunction}` is emitted by the chokepoint on
+            # every call from the model it actually resolved (bedrock_client, #142).
+            for field, metric_name in (
+                ("in", "AnthropicInputTokens"),
+                ("out", "AnthropicOutputTokens"),
+                ("cost", "EstimatedCostUSD"),
+            ):
                 qid = f"q{len(specs)}"
                 qid_map[("feature", fn, field)] = qid
                 specs.append((qid, "LifePlatform/AI", metric_name, "LambdaFunction", fn))
@@ -324,8 +385,25 @@ def inference_receipt() -> dict:
         for fn in fn_names:
             tin, _ = _split(series.get(qid_map[("feature", fn, "in")], []))
             tout, _ = _split(series.get(qid_map[("feature", fn, "out")], []))
+            # An EMPTY cost series and a $0.00 cost series are different facts. No
+            # datapoints at all means this feature's spend was never metered (a
+            # token-only emitter, or a window that predates the cost metric) — that
+            # publishes as null, an honest gap, not as free.
+            cost_points = series.get(qid_map[("feature", fn, "cost")], [])
+            # The chokepoint emits UNBUFFERED list-price dollars. The x1.15 governor
+            # buffer is applied here for the same reason #1997 applies it per model row:
+            # every dollar figure this endpoint displays must be on one scale, or the
+            # feature column and the model column cannot be compared or summed.
+            cost_month = round(_split(cost_points)[0] * _AI_SAFETY_BUFFER, 4) if cost_points else None
             if tin or tout:
-                features.append({"lambda": fn, "month_input_tokens": int(tin), "month_output_tokens": int(tout)})
+                features.append(
+                    {
+                        "lambda": fn,
+                        "month_input_tokens": int(tin),
+                        "month_output_tokens": int(tout),
+                        "month_est_cost_usd": cost_month,
+                    }
+                )
         features.sort(key=lambda f: -(f["month_input_tokens"] + f["month_output_tokens"]))
 
         try:
@@ -364,6 +442,41 @@ def inference_receipt() -> dict:
                 "token counts are shown, no dollar figure is estimated for them, and they are "
                 "excluded from the total below rather than guessed."
             )
+        # ── #3555: publish the per-feature reconciliation, don't assert it ────────
+        # The two dollar columns are metered INDEPENDENTLY: the model rows are priced
+        # from AWS/Bedrock's own per-ModelId token counts (authoritative), the feature
+        # rows from the chokepoint's self-emitted per-Lambda EstimatedCostUSD. Their
+        # ratio is the receipt's visible copy of the governor's CostMetricDriftRatio;
+        # below the same DRIFT_RATIO_BAR the governor alarms on, the per-feature split
+        # can be trusted to plan against. Publishing the ratio is what makes the caveat
+        # checkable rather than a claim (ADR-105).
+        features_total = round(sum(f["month_est_cost_usd"] for f in features if f["month_est_cost_usd"] is not None), 2)
+        unattributed = next((f["month_est_cost_usd"] for f in features if f["lambda"] == "unknown"), None)
+        attribution = {
+            "features_est_cost_usd": features_total,
+            "models_est_cost_usd": month_total,
+            # models / features. 1.0 = every dollar the native meter saw also carries a
+            # feature name. None rather than a divide-by-zero when nothing was metered.
+            "reconciliation_ratio": round(month_total / features_total, 3) if features_total else None,
+            "drift_bar": _DRIFT_RATIO_BAR,
+            "unpriced_features": sum(1 for f in features if f["month_est_cost_usd"] is None),
+            # The one genuinely unattributable slice, named rather than hidden:
+            # bedrock_client.feature_name() falls back to "unknown" when no Lambda name
+            # resolves and the context label is not allowlisted — a local or MCP session.
+            "unattributed_label": "unknown",
+            "unattributed_usd": unattributed,
+            "note": (
+                "Per-feature dollars are self-metered at the inference chokepoint: every call is "
+                "priced from its own token usage and the model it actually resolved, then emitted "
+                "as EstimatedCostUSD per Lambda (ADR-062). They reconcile against AWS/Bedrock's own "
+                f"meter — the models/features ratio above must stay under {_DRIFT_RATIO_BAR}, the same bar "
+                "the cost-metric-drift-sustained alarm uses (#2883). One row is one Lambda, not one "
+                "budget-guard feature: several features can share an emitter, which is why the "
+                "per-feature budget ledger leaves those rows ungraded. Calls made outside a Lambda "
+                "(a local or MCP session) carry no function name and land in the 'unknown' row rather "
+                "than being dropped or reassigned."
+            ),
+        }
         note = (
             "Every Claude call routes through one audited chokepoint (ADR-062). "
             "Costs are estimated from token metrics (including cache read/write) x "
@@ -385,6 +498,7 @@ def inference_receipt() -> dict:
                 "ai_month_to_date_usd": month_total,
                 "models": models,
                 "features": features,
+                "attribution": attribution,
                 "note": note,
             },
             cache_seconds=900,
@@ -414,10 +528,23 @@ def inference_receipt() -> dict:
 #     missing or stale, the payload says so via `stale` + `stale_reason` and the
 #     figures are omitted rather than frozen at their last value. A silently
 #     stale cost page is worse than an absent one.
-#   * Per-feature spend is reported in TOKENS, not dollars. The per-Lambda metric
-#     stream (LifePlatform/AI) carries no model dimension, so tokens cannot be
-#     priced per feature without inventing a model mix. Stating tokens and saying
-#     why is honest; a plausible dollar figure would not be.
+#   * Per-feature spend is reported in TOKENS **and dollars** (#3555). The rule
+#     that stood here — "the per-Lambda metric stream carries no model dimension,
+#     so tokens cannot be priced per feature without inventing a model mix" — was
+#     never true of this platform. The chokepoint resolves the model on every call
+#     and emits LifePlatform/AI::EstimatedCostUSD{LambdaFunction} from it (#142,
+#     2026-06-16, five weeks before this paragraph was written); no model mix is
+#     inferred anywhere. A withholding reason that misstates the system's own
+#     capability is the same ADR-104 failure as a flattering number.
+#   * The limits that ARE real, and are stated in the payload instead: the dollars
+#     are a self-metered estimate against list prices, not the billed figure
+#     (reconciled to the native AWS/Bedrock meter by CostMetricDriftRatio, #2883),
+#     and a row is a LAMBDA — several budget_guard features can share one, which is
+#     why scripts/ai_budget_ledger.py gives those rows monthly_budget_usd=None.
+#   * The month-end projection carries its SCOPE (#3554). The governor's
+#     tier-deciding projection extrapolates only the caller classes that recur
+#     (#2892); publishing it under the bare label "projected month-end" made a
+#     narrow number claim a broad one. Both figures ship, both labelled.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Mirrors cost_governor_lambda._TIER_LABELS. Kept as prose the reader can act on:
@@ -524,6 +651,11 @@ def receipts() -> dict:
         # the governor rather than a literal, so the page can explain a raised base instead
         # of serving an unattributed delta.
         base_ceiling, surge_ceiling, ceiling_window = _ceiling_envelope(breakdown)
+        # #3554: what the projection above actually covers. The governor has published
+        # both figures since #2892; until now only the narrow one reached a reader, under
+        # a label ("projected month-end") that claims the broad one.
+        scope = _projection_scope(breakdown)
+        projected_all = scope["projected_all_classes_usd"]
 
         payload = {
             "as_of": now.isoformat(timespec="seconds"),
@@ -542,6 +674,22 @@ def receipts() -> dict:
             "recent_uniques": (breakdown or {}).get("recent_uniques"),
             "month_to_date_usd": mtd,
             "projected_month_end_usd": projected,
+            # ── #3554: the projection, with its scope, never without it ──────────
+            # `projected_month_end_usd` is the governor's TIER-DECIDING projection and
+            # deliberately extrapolates only the caller classes that recur on a schedule
+            # (#2892). That is the right number to gate features on and the wrong number
+            # to publish bare: on 2026-09-05 it read $83.70 / 33.2% of ceiling in green
+            # while the same breakdown carried $103.49 for all classes. Both figures ship
+            # now, with the scope of each stated in machine-readable form (`projected_scope`,
+            # `projected_classes`, `episodic_classes`) and in prose (`projection_note`), so
+            # the front-end renders the honest one without deriving anything itself.
+            "projected_all_classes_usd": projected_all,
+            "projected_scope": scope["scope_label"],
+            "projected_classes": scope["projected_classes"],
+            "episodic_classes": scope["episodic_classes"],
+            "episodic_billing_days": scope["episodic_billing_days"],
+            "episodic_premise_violations": scope["episodic_premise_violations"],
+            "projection_note": " ".join(p for p in (scope["scope_sentence"], scope["episodic_premise_note"]) if p) or None,
             # Where the projection lands (last day of the current month) — the dashed
             # spend-curve segment extends to this date, anchored on projected above (#1618).
             "month_end_date": month_end_date,
@@ -549,12 +697,26 @@ def receipts() -> dict:
             "non_ai_daily_usd": (breakdown or {}).get("non_ai_daily"),
             "computed_at": (breakdown or {}).get("computed_at"),
             "history": _budget_history(cw, month_start, now),
-            # Why there is no per-feature dollar column — surfaced in the payload so
-            # the page can state it rather than leave a reader guessing.
+            # ── #3555: the per-feature note, corrected ────────────────────────────
+            # This key used to read "the per-Lambda metric stream carries no model
+            # dimension, so pricing it would mean inventing a model mix" — a withholding
+            # reason that was never true. `ai.bedrock_client._emit_usage_metrics` has
+            # resolved the model and emitted `EstimatedCostUSD{LambdaFunction}` since
+            # #142 (2026-06-16), five weeks BEFORE that sentence was written (#1616,
+            # 2026-07-21); `scripts/ai_budget_ledger.py` has graded per-feature dollars
+            # off exactly that series since #3374. The dollars are published now (see
+            # /api/inference_receipt), and what stands here is the limit that IS real:
+            # a self-metered estimate is not the billed figure, and a row is a lambda,
+            # not a budget_guard feature.
             "per_feature_note": (
-                "Per-feature usage is reported in tokens, not dollars: the per-Lambda "
-                "metric stream carries no model dimension, so pricing it would mean "
-                "inventing a model mix. See /method/inference/ for per-model cost."
+                "Per-feature dollars are published on the inference receipt. They are "
+                "self-metered at the inference chokepoint (ADR-062) — each call priced "
+                "from its own token usage and its resolved model, then emitted per Lambda "
+                "— so they are an estimate against list prices, not the billed figure; the "
+                "governor reconciles them against the native AWS/Bedrock meter every 8 "
+                "hours and alarms if the ratio leaves the #2883 drift bar. One row is one "
+                "Lambda, and several budget-guard features can share a Lambda, so a row is "
+                "not a per-feature budget. See /method/inference/ for the full table."
             ),
             "note": (
                 "One AWS budget covers the WHOLE platform, not just AI. The governor "
@@ -565,6 +727,10 @@ def receipts() -> dict:
         }
         if ceiling and projected is not None:
             payload["projected_pct_of_ceiling"] = round(projected / ceiling * 100, 1)
+        if ceiling and projected_all is not None:
+            # #3554: the percentage the front-end headlines. Computed here, next to its
+            # sibling and from the same ceiling, so no consumer has to divide anything.
+            payload["projected_all_classes_pct_of_ceiling"] = round(projected_all / ceiling * 100, 1)
         if ceiling and mtd is not None:
             payload["mtd_pct_of_ceiling"] = round(mtd / ceiling * 100, 1)
         return _ok(payload, cache_seconds=900)
@@ -616,9 +782,18 @@ def _budget_cost_block() -> dict:
             ceiling = float(breakdown["ceiling"])
             projected = float(breakdown["projected"])
             tier = int(breakdown["tier"])
+            # #3554: `projected` is the recurring-classes-only projection the tier is
+            # decided from. /api/status published it as bare `projected` alongside a bare
+            # `pct_of_budget`, so a consumer had no way to know which question the number
+            # answered. Same scope helper /api/receipts uses — one vocabulary for one fact.
+            scope = _projection_scope(breakdown)
             cost_info = {
                 "mtd": round(float(breakdown["mtd"]), 2),
                 "projected": round(projected, 2),
+                "projected_scope": scope["scope_label"],
+                "projected_all_classes": (
+                    None if scope["projected_all_classes_usd"] is None else round(scope["projected_all_classes_usd"], 2)
+                ),
                 "budget": ceiling,  # key name kept — existing readers of this payload
                 "tier": tier,
                 # Same prose /api/receipts publishes, from the same dict — one
@@ -626,6 +801,11 @@ def _budget_cost_block() -> dict:
                 "tier_semantics": _TIER_SEMANTICS.get(tier),
                 "status": _BUDGET_TIER_STATUS.get(tier, "yellow"),
                 "pct_of_budget": round((projected / ceiling) * 100) if ceiling else None,
+                "pct_of_budget_all_classes": (
+                    round((scope["projected_all_classes_usd"] / ceiling) * 100)
+                    if ceiling and scope["projected_all_classes_usd"] is not None
+                    else None
+                ),
                 "as_of": breakdown.get("computed_at"),
             }
     except Exception as e:  # noqa: BLE001 — display-only; never break /api/status

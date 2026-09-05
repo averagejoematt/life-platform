@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 // pulls in root-relative "/assets/js/…" specifiers, and STATIC imports are resolved
 // during linking — i.e. before loader.mjs has had a chance to register the resolver.
 // A top-level await defers resolution until after registration.
-const { renderReceipts } = await import("../../site/assets/js/evidence_meta.js");
+const { renderReceipts, renderInference } = await import("../../site/assets/js/evidence_meta.js");
 
 const HEALTHY = {
   stale: false,
@@ -43,7 +43,19 @@ const HEALTHY = {
   ],
   mtd_pct_of_ceiling: 30.7,
   projected_pct_of_ceiling: 73.4,
-  per_feature_note: "reported in tokens, not dollars: the per-Lambda metric stream carries no model dimension",
+  // #3554 — the scope fields. `projected_month_end_usd` is the tier-deciding
+  // (recurring-classes-only) figure; `projected_all_classes_usd` is the scope-complete
+  // one. BOTH percentages are computed by the API beside each other — this renderer
+  // must never divide anything, or the page mints a second projection (#1618's rule).
+  projected_all_classes_usd: 77.9,
+  projected_all_classes_pct_of_ceiling: 91.6,
+  projected_scope: "recurring classes only (prod-cron, remediation)",
+  projected_classes: ["prod-cron", "remediation"],
+  episodic_classes: ["ci", "dev-session"],
+  episodic_billing_days: { "prod-cron": 30, ci: 6, "dev-session": 2, remediation: 13 },
+  episodic_premise_violations: [],
+  projection_note: "Scope: this month-end projection extrapolates only the spend classes that recur on a schedule (prod-cron, remediation). Episodic spend (ci, dev-session) is counted in full in month-to-date but is not multiplied out across the days remaining (#2892). Extrapolating every class instead gives $77.90.",
+  per_feature_note: "Per-feature dollars are published on the inference receipt. They are self-metered at the inference chokepoint (ADR-062).",
   note: "One AWS budget covers the WHOLE platform, not just AI.",
 };
 
@@ -59,6 +71,12 @@ const STALE = {
   history: [],
   mtd_pct_of_ceiling: undefined,
   projected_pct_of_ceiling: undefined,
+  // #3554: the new figures join the staleness contract rather than becoming the one
+  // number that quietly keeps rendering.
+  projected_all_classes_usd: null,
+  projected_all_classes_pct_of_ceiling: undefined,
+  projected_scope: null,
+  projection_note: null,
 };
 
 // ── the honesty contract ─────────────────────────────────────────────────────
@@ -194,14 +212,52 @@ test("no raw payload object ever reaches the output", () => {
 });
 
 // ── the over-ceiling case (found live on day one: projected $96.09 vs an $85 ceiling) ──
+// #3554 note: the breach is judged on the HEADLINE figure — the scope-complete one when
+// the API publishes it — because "will this month go over" is a question about the whole
+// bill, not about the subset the tier ladder happens to extrapolate.
+const UNSCOPED = (() => {
+  const p = { ...HEALTHY };
+  delete p.projected_all_classes_usd;
+  delete p.projected_all_classes_pct_of_ceiling;
+  delete p.projected_scope;
+  delete p.projection_note;
+  return p;
+})();
+
 test("over-ceiling — the breach is stated in prose, not left as a faint delta", () => {
-  const html = renderReceipts({ ...HEALTHY, projected_month_end_usd: 96.09, projected_pct_of_ceiling: 113.0 });
+  const html = renderReceipts({ ...UNSCOPED, projected_month_end_usd: 96.09, projected_pct_of_ceiling: 113.0 });
   assert.ok(html.includes("over the ceiling"), "a projection above the ceiling must be named, not just implied by a percentage");
   assert.ok(html.includes("$96.1") && html.includes("$85"), "both sides of the comparison appear");
 });
 
+test("over-ceiling — both scopes over: the ladder IS the response, and says so", () => {
+  const html = renderReceipts({
+    ...HEALTHY,
+    projected_month_end_usd: 96.09, projected_pct_of_ceiling: 113.0,
+    projected_all_classes_usd: 120.0, projected_all_classes_pct_of_ceiling: 141.2,
+  });
+  assert.ok(html.includes("over the ceiling"));
+  assert.ok(html.includes("The tier ladder above is the response"));
+  assert.ok(html.includes("$120"), "the breach is stated against the headline figure");
+});
+
+test("over-ceiling — only the ALL-CLASS figure is over: the prose must not claim the ladder responded", () => {
+  // #3554's second-order trap. The ladder is decided on the recurring-only projection,
+  // so "features switch off as the projection climbs" would be a second untrue sentence
+  // on the same page when that narrower figure is still inside the ceiling.
+  const html = renderReceipts({
+    ...HEALTHY,
+    projected_month_end_usd: 62.4, projected_pct_of_ceiling: 73.4,
+    projected_all_classes_usd: 96.09, projected_all_classes_pct_of_ceiling: 113.0,
+  });
+  assert.ok(html.includes("over the ceiling"), "the all-class breach must still be named");
+  assert.equal(html.includes("The tier ladder above is the response"), false, "the ladder has NOT responded — do not claim it has");
+  assert.ok(html.includes("The tier ladder above has not moved"));
+  assert.ok(html.includes("$62.4"), "the figure the ladder actually reads must be named");
+});
+
 test("under-ceiling — no breach language when the projection is fine", () => {
-  const html = renderReceipts(HEALTHY); // 73.4%
+  const html = renderReceipts(UNSCOPED); // 73.4%
   assert.equal(html.includes("over the ceiling"), false);
 });
 
@@ -210,4 +266,132 @@ test("run-rate labels read as prose, not ttl()-mangled keys", () => {
   assert.ok(html.includes("AI, per day"), "'ai_per_day' title-cases to the wrong-looking 'Ai Per Day'");
   assert.ok(html.includes("infrastructure, per day"));
   assert.equal(/\bAi\b/.test(html), false, "'Ai' must never render — it is AI");
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// #3554 — the headline projection carries its scope
+//
+// What a reader saw on 2026-09-05: "$83.7 projected month-end · 33.2% of ceiling",
+// green, with the word "projected" doing all the work. That figure extrapolates only
+// the recurring caller classes; the same payload's all-class figure was $103.49. This
+// renderer now headlines the scope-complete number and keeps the narrower one visible
+// as what the tier ladder is actually decided on.
+// ══════════════════════════════════════════════════════════════════════════════
+test("scoped — the headline projection is the all-class figure, labelled as such", () => {
+  const html = renderReceipts(HEALTHY);
+  assert.ok(html.includes("$77.9"), "the scope-complete figure headlines");
+  assert.ok(html.includes("projected month-end · all spend"), "the tile label names the scope");
+  assert.ok(html.includes("91.6% of ceiling"), "its percentage comes from the API, beside its own figure");
+});
+
+test("scoped — the narrower tier-deciding figure is stated, not hidden", () => {
+  const html = renderReceipts(HEALTHY);
+  assert.ok(html.includes("The tier ladder is decided on a narrower figure"));
+  assert.ok(html.includes("$62.4"), "the recurring-only projection");
+  assert.ok(html.includes("73.4% of ceiling"));
+});
+
+test("scoped — the scope prose is the API's sentence, not one composed here", () => {
+  const html = renderReceipts(HEALTHY);
+  assert.ok(html.includes("extrapolates only the spend classes that recur on a schedule"));
+  assert.ok(html.includes("ci, dev-session"), "the excluded classes reach the reader");
+});
+
+test("scoped — no percentage is ever derived in JS", () => {
+  // The negative control for #1618's rule, extended to the new pair: blank both
+  // API-supplied percentages and NO percentage may appear anywhere.
+  const html = renderReceipts({
+    ...HEALTHY,
+    mtd_pct_of_ceiling: undefined,
+    projected_pct_of_ceiling: undefined,
+    projected_all_classes_pct_of_ceiling: undefined,
+    projection_note: null,
+  });
+  assert.equal(/\d% of ceiling/.test(html), false, "a percentage was minted client-side");
+  // …and the detector is not vacuous: the healthy render does contain them.
+  assert.equal(/\d% of ceiling/.test(renderReceipts(HEALTHY)), true);
+});
+
+test("unscoped payload — renders exactly as before, with no invented scope label", () => {
+  // Back-compat: until the governor's next 8h run the payload may predate these fields.
+  const html = renderReceipts(UNSCOPED);
+  assert.ok(html.includes("$62.4"));
+  assert.equal(html.includes("all spend"), false, "no scope may be claimed that the API did not state");
+  assert.equal(html.includes("narrower figure"), false);
+});
+
+test("broken premise — the reader is told the excluded class bills like a schedule", () => {
+  const html = renderReceipts({
+    ...HEALTHY,
+    episodic_premise_violations: ["ci"],
+    projection_note: HEALTHY.projection_note + " Premise check: ci billed on 28 of the last 30 days — at or above the 25-day bar, so calling it episodic understates the forecast.",
+  });
+  assert.ok(html.includes("ci billed on 28 of the last 30 days"));
+});
+
+test("stale — the scope figures go blank with everything else", () => {
+  const html = renderReceipts(STALE);
+  assert.equal(html.includes("all spend"), false);
+  assert.equal(html.includes("narrower figure"), false);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// #3555 — the per-feature DOLLAR column on /method/inference/
+// ══════════════════════════════════════════════════════════════════════════════
+const INFERENCE = {
+  ai_month_to_date_usd: 10.61,
+  budget_ceiling_usd: 252.0,
+  budget_tier: 0,
+  models: [],
+  features: [
+    { lambda: "daily-brief", month_input_tokens: 320045, month_output_tokens: 64857, month_est_cost_usd: 2.8151 },
+    { lambda: "life-platform-site-api-ai", month_input_tokens: 108654, month_output_tokens: 7314, month_est_cost_usd: 0.1669 },
+    { lambda: "voice-fidelity-harness", month_input_tokens: 11454, month_output_tokens: 2636, month_est_cost_usd: null },
+  ],
+  attribution: {
+    features_est_cost_usd: 10.62,
+    models_est_cost_usd: 10.61,
+    reconciliation_ratio: 0.999,
+    drift_bar: 1.15,
+    unpriced_features: 1,
+    unattributed_label: "unknown",
+    unattributed_usd: 0.2071,
+    note: "Per-feature dollars are self-metered at the inference chokepoint: every call is priced from its own token usage and the model it actually resolved. One row is one Lambda, not one budget-guard feature.",
+  },
+  note: "Every Claude call routes through one audited chokepoint (ADR-062).",
+};
+
+test("inference — the per-feature dollar column renders from the API", () => {
+  const html = renderInference(INFERENCE);
+  assert.ok(html.includes("month $"), "the column exists");
+  assert.ok(html.includes("$2.82"), "daily-brief's month-to-date dollars");
+  assert.ok(html.includes("By feature (month-to-date)"));
+});
+
+test("inference — an unmetered feature renders an em dash, never $0.00", () => {
+  const html = renderInference(INFERENCE);
+  assert.equal(html.includes("$0.00"), false, "absence must not render as free");
+  assert.ok(html.includes("<td class=\"num\">—</td>"));
+});
+
+test("inference — a Lambda appears exactly once", () => {
+  // COST-04's reader-facing consequence: three identical site-api-ai rows meant a reader
+  // summing the column triple-counted the ask endpoints.
+  const html = renderInference(INFERENCE);
+  assert.equal((html.match(/life-platform-site-api-ai/g) || []).length, 1);
+});
+
+test("inference — the attribution caveat is published with its checkable ratio", () => {
+  const html = renderInference(INFERENCE);
+  assert.ok(html.includes("self-metered at the inference chokepoint"));
+  assert.ok(html.includes("0.999"), "the reconciliation ratio, so the caveat is checkable rather than asserted");
+  assert.ok(html.includes("unknown row"));
+  // The reason that was never true must not come back through the front-end either.
+  assert.equal(/model dimension|model mix/.test(html), false);
+});
+
+test("inference — a payload with no attribution block still renders", () => {
+  const html = renderInference({ ...INFERENCE, attribution: undefined });
+  assert.ok(html.includes("$2.82"));
+  assert.equal(html.includes("self-metered"), false);
 });

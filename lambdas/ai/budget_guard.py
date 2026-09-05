@@ -438,6 +438,125 @@ def read_breakdown(max_age_s: int = _BREAKDOWN_MAX_AGE_S):
         return None  # fail-soft: display-only, the brief just omits the line
 
 
+# ── #3554: the SCOPE of a projection is part of the projection ───────────────
+# Since #2892 the governor computes TWO month-end projections and persists both:
+#   `projected`             — extrapolates ONLY the caller classes that recur on a
+#                             schedule (`projected_classes`: prod-cron, remediation).
+#                             This is the number the tier ladder is decided on, and
+#                             that is correct: one dev session is not a run-rate.
+#   `projected_all_classes` — extrapolates every class, episodic ones included
+#                             (`episodic_classes`: ci, dev-session).
+# What was wrong is that every CONSUMER read `projected` and printed it under a
+# scope-free label. Measured on the live surface 2026-09-05T06:57Z: /api/receipts
+# served `projected_month_end_usd 83.7 · 33.2% of ceiling` (green) while the SAME
+# breakdown payload one hop upstream carried `projected_all_classes 103.49`, and
+# the excluded "episodic" `ci` class had billed on every UTC day for which the
+# dimension had existed. A narrow number wearing a broad label, on the one page
+# whose entire pitch is "here is what running this actually costs" — the ADR-104
+# failure in its most self-referential form.
+#
+# This function is the ONE place that turns a breakdown into scope facts + prose,
+# so /api/receipts, /api/status and the daily brief cannot describe the same
+# quantity three different ways. Pure and fail-soft: a garbled payload costs the
+# scope, never the caller.
+_SCOPE_ALL_CLASSES = "all spend classes"
+
+
+def projection_scope(breakdown) -> dict:
+    """Scope facts + reader prose for the governor's month-end projection (#3554).
+
+    Returns a dict that is ALWAYS shaped the same (keys never disappear), with
+    None/empty values where the breakdown does not state a fact — an honest gap,
+    never a guess:
+
+      projected_usd              the tier-deciding projection (may be None)
+      projected_all_classes_usd  the scope-complete projection (may be None)
+      projected_classes          classes the tier-deciding projection extrapolates
+      episodic_classes           classes it excludes from the extrapolation
+      scope_label                short label for `projected_usd`'s scope
+      scope_sentence             reader prose naming both figures and the exclusion
+      episodic_billing_days      {class: days billed in the premise window | None}
+      episodic_premise_violations classes labelled episodic that bill ~every day
+      episodic_premise_note      prose for the above, or ""
+
+    `prod_class_share is None` is the governor's own "no caller-class signal this
+    run" marker, in which case `projected` IS the all-class figure by construction
+    (see cost_governor_lambda.lambda_handler) — the scope is then honestly stated
+    as all-classes rather than as a narrowing that did not happen.
+    """
+    out: dict = {
+        "projected_usd": None,
+        "projected_all_classes_usd": None,
+        "projected_classes": [],
+        "episodic_classes": [],
+        "scope_label": None,
+        "scope_sentence": None,
+        "episodic_billing_days": {},
+        "episodic_premise_violations": [],
+        "episodic_premise_note": "",
+    }
+    if not isinstance(breakdown, dict):
+        return out
+    try:
+        if breakdown.get("projected") is not None:
+            out["projected_usd"] = float(breakdown["projected"])
+        if breakdown.get("projected_all_classes") is not None:
+            out["projected_all_classes_usd"] = float(breakdown["projected_all_classes"])
+        out["projected_classes"] = [str(c) for c in (breakdown.get("projected_classes") or [])]
+        out["episodic_classes"] = [str(c) for c in (breakdown.get("episodic_classes") or [])]
+        days = breakdown.get("episodic_billing_days")
+        if isinstance(days, dict):
+            out["episodic_billing_days"] = {str(k): (None if v is None else int(v)) for k, v in days.items()}
+        out["episodic_premise_violations"] = [str(c) for c in (breakdown.get("episodic_premise_violations") or [])]
+
+        narrowed = breakdown.get("prod_class_share") is not None and bool(out["episodic_classes"])
+        if not narrowed:
+            out["scope_label"] = _SCOPE_ALL_CLASSES
+            out["scope_sentence"] = (
+                "This month-end projection covers all spend classes — the governor has no "
+                "caller-class attribution for this run, so nothing is excluded from it."
+            )
+            return out
+
+        excluded = ", ".join(out["episodic_classes"])
+        included = ", ".join(out["projected_classes"]) or "the recurring classes"
+        out["scope_label"] = f"recurring classes only ({included})"
+        sentence = (
+            f"Scope: this month-end projection extrapolates only the spend classes that recur on a "
+            f"schedule ({included}). Episodic spend ({excluded}) is counted in full in month-to-date — "
+            f"it is real money already spent — but is not multiplied out across the days remaining (#2892)."
+        )
+        if out["projected_all_classes_usd"] is not None:
+            sentence += f" Extrapolating every class instead gives ${out['projected_all_classes_usd']:.2f}."
+        out["scope_sentence"] = sentence
+
+        # The premise the exclusion rests on: "episodic" means a class whose trailing
+        # rate says what a human did last week, not what the calendar will do next
+        # week. A class that bills on almost every day of the window is not that,
+        # whatever the registry calls it — say so here rather than let the label
+        # quietly outlive the behaviour it described.
+        window = breakdown.get("episodic_premise_window_days")
+        bar = breakdown.get("episodic_premise_bar_days")
+        notes = []
+        if out["episodic_premise_violations"] and window and bar:
+            for cls in out["episodic_premise_violations"]:
+                n = out["episodic_billing_days"].get(cls)
+                if n is None:
+                    continue
+                notes.append(f"{cls} billed on {n} of the last {int(window)} days")
+            if notes:
+                out["episodic_premise_note"] = (
+                    "Premise check: " + "; ".join(notes) + f" — at or above the {int(bar)}-day bar, so calling it "
+                    "episodic understates the forecast. The all-class figure is the one to read."
+                )
+        unknown = sorted(c for c in out["episodic_classes"] if out["episodic_billing_days"].get(c, "missing") is None)
+        if unknown and not out["episodic_premise_note"]:
+            out["episodic_premise_note"] = "Premise check: unavailable this run for " + ", ".join(unknown) + " (metric read failed)."
+        return out
+    except Exception:  # noqa: BLE001 — display-only; a garbled field costs the scope, nothing else
+        return out
+
+
 def format_headroom_line(breakdown) -> str:
     """One-line budget-headroom readout from a read_breakdown() dict, or "".
 
@@ -455,8 +574,19 @@ def format_headroom_line(breakdown) -> str:
         ai_daily = float(breakdown["ai_daily"])
         non_ai_daily = float(breakdown["non_ai_daily"])
         total_daily = ai_daily + non_ai_daily
+        # #3554: the scope clause. This line read "projected $84 vs $252 ceiling" while
+        # $84 was the recurring-classes-only figure and the all-class one was $103 — the
+        # brief's reader could not tell which question the number answered. The clause is
+        # empty by construction when the governor made no narrowing claim this run.
+        scope = projection_scope(breakdown)
+        scope_clause = ""
+        if scope["scope_label"] and scope["scope_label"] != _SCOPE_ALL_CLASSES:
+            scope_clause = " (recurring classes only"
+            if scope["projected_all_classes_usd"] is not None:
+                scope_clause += f", ${scope['projected_all_classes_usd']:.0f} all classes"
+            scope_clause += ")"
         line = (
-            f"Budget: tier {tier} · projected ${projected:.0f} vs ${ceiling:.0f} ceiling"
+            f"Budget: tier {tier} · projected ${projected:.0f}{scope_clause} vs ${ceiling:.0f} ceiling"
             f" · AI ${ai_daily:.2f}/day of the ${total_daily:.2f}/day burn"
         )
         slack = ceiling - projected
@@ -481,6 +611,15 @@ def format_headroom_line(breakdown) -> str:
             if _t > tier and crossings.get(str(_t)):
                 line += f" · tier {_t} ~{crossings[str(_t)]} at this burn"
                 break
+        # #3554 premise guard: an "episodic" class that bills nearly every day is not
+        # episodic, and the exclusion it justifies is then under-projecting. Terse here
+        # (the full sentence is on /api/receipts) but never silent.
+        if scope["episodic_premise_violations"]:
+            broken = []
+            for cls in scope["episodic_premise_violations"]:
+                n = scope["episodic_billing_days"].get(cls)
+                broken.append(f"{cls} {n}/{int(breakdown.get('episodic_premise_window_days') or 0)}d" if n is not None else cls)
+            line += " · episodic premise BROKEN (" + ", ".join(broken) + ")"
         line += format_paused_clause(tier)
         return line
     except Exception:

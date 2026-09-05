@@ -136,15 +136,16 @@ def _payload(resp):
 
 def test_metric_reads_are_batched_into_a_single_call(cw):
     """THE regression guard. 6 models x 4 metrics (in/out/cache_read/cache_write, #1997)
-    + 19 lambdas x 2 metrics is 62 metric series; pre-#1911 fix that was ~62 SERIAL round
-    trips. It must now be ONE batched call."""
+    + 19 lambdas x 3 metrics (in/out + #3555's EstimatedCostUSD) is 81 metric series;
+    pre-#1911 fix each of those was a SERIAL round trip. It must be ONE batched call."""
     _payload(sad.handle_inference_receipt())
     assert cw.calls["get_metric_statistics"] == 0, "no serial per-metric fan-out may remain"
     assert cw.calls["get_metric_data"] == 1, f"expected exactly 1 batched read, got {cw.calls['get_metric_data']}"
     assert cw.calls["list_metrics"] == 2, "one discovery call per namespace"
-    # 6 models x 4 metrics (in/out/cache_read/cache_write) + 19 lambdas x 2 metrics = 62
-    # series, all in the one call.
-    assert cw.query_counts == [62], f"all series must ride the single call, got {cw.query_counts}"
+    # 6 models x 4 metrics + 19 lambdas x 3 metrics = 81 series, all in the one call.
+    # #3555 added the dollar series INSIDE this batch on purpose: publishing per-feature
+    # cost must not cost a second round trip on the handler #1911 exists to keep at one.
+    assert cw.query_counts == [81], f"all series must ride the single call, got {cw.query_counts}"
 
 
 def test_total_cloudwatch_calls_stay_constant_as_metrics_grow(monkeypatch):
@@ -353,3 +354,137 @@ def test_iam_grants_get_metric_data():
     start = src.index('sid="InferenceReceiptMetrics"')
     block = src[start : start + 400]
     assert "cloudwatch:GetMetricData" in block, "#1911: site_api() must grant cloudwatch:GetMetricData"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3555 — per-feature DOLLARS, and one row per Lambda
+#
+# COST-03: /api/receipts withheld a per-feature dollar column citing "the per-Lambda
+# metric stream carries no model dimension, so pricing it would mean inventing a model
+# mix". That reason was never true of this platform. `ai.bedrock_client
+# ._emit_usage_metrics` resolves the model on every call and emits
+# `EstimatedCostUSD{LambdaFunction}` priced from it — landed #142 (2026-06-16), five
+# weeks BEFORE the sentence was written (#1616, 2026-07-21), and
+# `scripts/ai_budget_ledger.py` has graded per-feature dollars off that same series
+# since #3374.
+#
+# COST-04: `list_metrics` returns one entry per dimension COMBINATION. site-api-ai emits
+# its own inline token metrics ([LambdaFunction, Endpoint]) beside the chokepoint's bare
+# [LambdaFunction], so it came back three times and the receipt appended three
+# byte-identical rows — live 2026-09-05, 108,654 / 7,314 three times. Every query asks
+# for the bare dimension set, so the extra rows were duplicates, not detail.
+# ══════════════════════════════════════════════════════════════════════════════
+_DUP_FN = "life-platform-site-api-ai"
+_SOLO_FN = "daily-brief"
+# Per-day values the fake returns, keyed by metric. One day of data (see _MultiDimCW),
+# so month == today and the arithmetic is isolated from the bucketing logic.
+_FEATURE_TOKENS_IN = 1000.0
+_FEATURE_TOKENS_OUT = 200.0
+_FEATURE_COST = 0.5
+
+
+class _MultiDimCW:
+    """list_metrics returns site-api-ai under THREE dimension sets (two carrying an
+    Endpoint, one bare) — the live shape — plus one ordinary single-dimension feature."""
+
+    def __init__(self, cost_for=(_DUP_FN, _SOLO_FN)):
+        self.calls = {"list_metrics": 0, "get_metric_data": 0, "get_metric_statistics": 0}
+        self.query_counts = []
+        self._cost_for = set(cost_for)
+
+    def list_metrics(self, Namespace, MetricName, **kw):
+        self.calls["list_metrics"] += 1
+        if Namespace == "AWS/Bedrock":
+            return {"Metrics": []}
+        return {
+            "Metrics": [
+                {"Dimensions": [{"Name": "Endpoint", "Value": "api_ask"}, {"Name": "LambdaFunction", "Value": _DUP_FN}]},
+                {"Dimensions": [{"Name": "Endpoint", "Value": "api_board_ask"}, {"Name": "LambdaFunction", "Value": _DUP_FN}]},
+                {"Dimensions": [{"Name": "LambdaFunction", "Value": _DUP_FN}]},
+                {"Dimensions": [{"Name": "LambdaFunction", "Value": _SOLO_FN}]},
+            ]
+        }
+
+    def get_metric_statistics(self, **kw):  # pragma: no cover
+        raise AssertionError("must not fan out serial calls")
+
+    def get_metric_data(self, MetricDataQueries, StartTime, EndTime, **kw):
+        self.calls["get_metric_data"] += 1
+        self.query_counts.append(len(MetricDataQueries))
+        results = []
+        for q in MetricDataQueries:
+            stat = q["MetricStat"]["Metric"]
+            fn = stat["Dimensions"][0]["Value"]
+            name = stat["MetricName"]
+            if name == "EstimatedCostUSD":
+                if fn not in self._cost_for:
+                    # No datapoints at all — the "never metered" case, which must
+                    # publish as null and not as $0.00.
+                    results.append({"Id": q["Id"], "Timestamps": [], "Values": []})
+                    continue
+                val = _FEATURE_COST
+            elif name == "AnthropicInputTokens":
+                val = _FEATURE_TOKENS_IN
+            else:
+                val = _FEATURE_TOKENS_OUT
+            results.append({"Id": q["Id"], "Timestamps": [_NOW], "Values": [val]})
+        return {"MetricDataResults": results}
+
+
+@pytest.fixture
+def multidim_cw(monkeypatch):
+    fake = _MultiDimCW()
+    monkeypatch.setattr(sad.boto3, "client", lambda s, **k: fake if s == "cloudwatch" else _FakeSSM())
+    return fake
+
+
+def test_a_lambda_emitting_several_dimension_sets_yields_exactly_one_row(multidim_cw):
+    """COST-04. site-api-ai publishes three dimension sets; the receipt asks for the bare
+    one, so three rows were three copies of one answer and a reader summing the column
+    triple-counted the ask endpoints."""
+    body = _payload(sad.handle_inference_receipt())
+    names = [f["lambda"] for f in body["features"]]
+    assert names.count(_DUP_FN) == 1, f"one row per Lambda, got {names}"
+    assert sorted(names) == sorted([_DUP_FN, _SOLO_FN])
+
+
+def test_the_duplicate_rows_are_not_merely_deduped_after_being_queried(multidim_cw):
+    """The fix is at DISCOVERY, not at render: querying the same bare series three times
+    and then collapsing the rows would leave the round-trip cost the issue's fix removed.
+    2 features x 3 metrics = 6 queries, not 4 x 3 = 12."""
+    _payload(sad.handle_inference_receipt())
+    assert multidim_cw.query_counts == [6], f"duplicate dimension sets must not become queries: {multidim_cw.query_counts}"
+
+
+def test_per_feature_dollars_are_published_from_the_chokepoint_series(multidim_cw):
+    """COST-03. The dollars exist and always did — publish them. The x1.15 governor
+    buffer is applied for the same reason #1997 applies it to every model row: one scale
+    for every dollar figure this endpoint shows, or the two columns cannot be compared."""
+    body = _payload(sad.handle_inference_receipt())
+    row = next(f for f in body["features"] if f["lambda"] == _SOLO_FN)
+    assert row["month_est_cost_usd"] == round(_FEATURE_COST * sad._budget._AI_SAFETY_BUFFER, 4)
+    assert body["attribution"]["features_est_cost_usd"] == round(2 * _FEATURE_COST * sad._budget._AI_SAFETY_BUFFER, 2)
+
+
+def test_an_unmetered_feature_publishes_null_not_zero(monkeypatch):
+    """Absence read as success is the failure this platform keeps re-finding. A feature
+    with tokens but NO cost datapoints was not free — it was not metered."""
+    fake = _MultiDimCW(cost_for=(_SOLO_FN,))
+    monkeypatch.setattr(sad.boto3, "client", lambda s, **k: fake if s == "cloudwatch" else _FakeSSM())
+    body = _payload(sad.handle_inference_receipt())
+    row = next(f for f in body["features"] if f["lambda"] == _DUP_FN)
+    assert row["month_est_cost_usd"] is None, "an unmetered feature must not render as $0.00"
+    assert body["attribution"]["unpriced_features"] == 1
+
+
+def test_attribution_block_states_the_limit_that_is_real(multidim_cw):
+    """The withholding reason is replaced by the honest one, and the reconciliation it
+    cites is PUBLISHED rather than asserted (ADR-105) — a reader can check the ratio."""
+    a = _payload(sad.handle_inference_receipt())["attribution"]
+    assert "self-metered" in a["note"]
+    assert a["drift_bar"] == sad._budget._DRIFT_RATIO_BAR
+    assert a["reconciliation_ratio"] is not None
+    # The negative control for the whole issue: the reason that was never true must be
+    # gone, in every wording it appeared in.
+    assert "model dimension" not in a["note"]
+    assert "model mix" not in a["note"]
