@@ -81,16 +81,74 @@ def test_the_plan_root_is_readable():
     assert 50 < floor < 500, f"implausible protein floor {floor} — the root moved or changed units"
 
 
-def test_sealed_prereg_agrees_with_the_plan_root():
-    """The sealed artifact is generated FROM user_goals — they cannot disagree.
+def _canonical_kcal_target() -> int:
+    """The second plan fact the sealed artifact carries STRUCTURALLY (hypothesis h1's
+    condition threshold is built from it by `build_hypotheses`)."""
+    goals = json.loads(GOALS.read_text(encoding="utf-8"))
+    return int(goals["targets"]["nutrition"]["daily_calories_target"])
 
-    If this fails, either the plan changed without a re-seal (the prereg is frozen
-    and SHA-stamped, so the honest fix is a new cycle's prereg, never editing the
-    sealed file), or user_goals drifted. Do not 'fix' it by editing the seal.
+
+def _calorie_thresholds(sealed: dict) -> set:
+    """Every `condition_threshold` whose metric is calories, anywhere in the artifact."""
+    out = set()
+    for node in _walk(sealed):
+        if isinstance(node, dict) and "condition_threshold" in node and "calor" in str(node.get("condition_metric", "")):
+            out.add(int(node["condition_threshold"]))
+    return out
+
+
+def _sealed_disagreements(sealed_text: str, floor: int, kcal: int) -> list:
+    """The ONE check, so the positive control below runs the exact code the real
+    assertion runs (a guard that cannot be shown to fail is not a guard)."""
+    sealed = json.loads(sealed_text)
+    problems = []
+    # (a) Prose: the chokepoint's invariant is claims ⊆ plan facts, never the reverse —
+    # an artifact need not MENTION the floor, it must not CONTRADICT it. The 2026-09-05
+    # freeze mentioned no protein figure at all and redded main under the old "mentions
+    # 170" phrase match; Friday's had mentioned it by generator variance.
+    stale = _protein_figures(sealed_text) - {floor}
+    if stale:
+        problems.append(f"protein figure(s) {sorted(stale)} in the sealed prose are not the plan root's {floor} g")
+    # (b) Structure: the calorie threshold the hypotheses were built from.
+    thresholds = _calorie_thresholds(sealed)
+    if thresholds and thresholds != {kcal}:
+        problems.append(f"sealed calorie threshold(s) {sorted(thresholds)} != plan root's {kcal} kcal")
+    if not thresholds and not sealed.get("plan_facts"):
+        problems.append("sealed artifact carries neither a calorie threshold nor a plan_facts block — nothing structural to reconcile")
+    # (c) From the first freeze that carries it (cycle 17+): the structural block.
+    facts = sealed.get("plan_facts")
+    if facts is not None:
+        if int(facts.get("daily_protein_min_g", -1)) != floor:
+            problems.append(f"plan_facts.daily_protein_min_g {facts.get('daily_protein_min_g')} != {floor}")
+        if int(facts.get("daily_calories_target", -1)) != kcal:
+            problems.append(f"plan_facts.daily_calories_target {facts.get('daily_calories_target')} != {kcal}")
+    return problems
+
+
+def test_sealed_prereg_agrees_with_the_plan_root():
+    """The sealed artifact is generated FROM user_goals — they cannot DISAGREE.
+
+    Structural, never phrase-matched: the artifact is hash-stamped at freeze
+    (#1378) and `genesis_prereg_stamp.py` refuses a laundered re-stamp, so the
+    only honest fix for a real disagreement is a new cycle's prereg, never an
+    edit to the sealed file — and never a test that demands the LLM prose
+    happen to mention a number (the #2959/#3003/#3199 phrase-match class).
     """
-    floor = _canonical_protein_floor()
-    sealed = SEALED.read_text(encoding="utf-8")
-    assert str(floor) in sealed, f"sealed prereg does not mention the plan root's protein floor {floor} g"
+    problems = _sealed_disagreements(SEALED.read_text(encoding="utf-8"), _canonical_protein_floor(), _canonical_kcal_target())
+    assert not problems, "; ".join(problems)
+
+
+def test_sealed_prereg_guard_actually_fails_on_a_contradiction():
+    """Positive control: the same check, fed a sealed text that carries the dead
+    190 g figure (#1898's exact defect) and a moved calorie threshold, must red."""
+    floor, kcal = _canonical_protein_floor(), _canonical_kcal_target()
+    sealed = json.loads(SEALED.read_text(encoding="utf-8"))
+    sealed["coaches"] = {"planted": {"predictions": [{"claim_natural": "Hit the protein target (190g) every day."}]}}
+    planted = _sealed_disagreements(json.dumps(sealed), floor, kcal)
+    assert any("190" in p for p in planted), planted
+    sealed = json.loads(SEALED.read_text(encoding="utf-8"))
+    moved = json.dumps(sealed).replace(f'"condition_threshold": {kcal}', f'"condition_threshold": {kcal + 250}')
+    assert any("kcal" in p for p in _sealed_disagreements(moved, floor, kcal))
 
 
 @pytest.mark.parametrize("path", PLAN_SURFACES, ids=lambda p: p.name)

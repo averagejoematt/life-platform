@@ -418,7 +418,23 @@ def load_frozen():
     return frozen
 
 
-def freeze(coaches_out, hypotheses):
+def plan_facts(goals):
+    """The plan root's numbers, carried STRUCTURALLY in the frozen artifact so the
+    #1898 reconciliation test (tests/test_plan_literal_reconciliation.py) reads a
+    field instead of hoping the generated prose happens to mention a figure — the
+    2026-09-05 freeze mentioned no protein figure and redded main under that
+    phrase match. Only freezes made after this landed carry the block; a sealed
+    artifact is never edited to add it (#1378)."""
+    n = goals["targets"]["nutrition"]
+    return {
+        "source": "config/user_goals.json",
+        "daily_calories_target": int(n["daily_calories_target"]),
+        "daily_protein_min_g": int(n["daily_protein_min_g"]),
+        "eating_window": n.get("eating_window", {}).get("window"),
+    }
+
+
+def freeze(coaches_out, hypotheses, goals=None):
     frozen = {
         "genesis": EXPERIMENT_START_DATE,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -426,6 +442,8 @@ def freeze(coaches_out, hypotheses):
         "coaches": coaches_out,
         "hypotheses": hypotheses,
     }
+    if goals is not None:
+        frozen["plan_facts"] = plan_facts(goals)
     FROZEN_PATH.parent.mkdir(parents=True, exist_ok=True)
     FROZEN_PATH.write_text(json.dumps(frozen, indent=2) + "\n")
     print(f"FROZE pre-registration → {FROZEN_PATH}")
@@ -639,7 +657,7 @@ def main():
     if frozen is None:
         print("No frozen pre-registration found — generating via Bedrock (ADR-062, budget-gated)…")
         coaches_out = generate_predictions_via_bedrock(goals)
-        frozen = freeze(coaches_out, build_hypotheses(goals))
+        frozen = freeze(coaches_out, build_hypotheses(goals), goals)
     else:
         print(f"Using FROZEN pre-registration from {FROZEN_PATH} (generated {frozen['generated_at']})")
         # #1378: the write path is blocked on a tampered freeze — a hash mismatch
