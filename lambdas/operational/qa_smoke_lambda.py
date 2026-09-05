@@ -57,6 +57,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 # clients and the nightly wiring, raw_archive_qa owns the logic.
 from operational import (
     acwr_liveness_qa,  # noqa: E402
+    chronicle_manifest_qa,  # noqa: E402  (#3485)
     qa_check_edge_429,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
@@ -1007,7 +1008,12 @@ def check_steps():
         ("content_cadence", check_content_cadence),
         # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
         ("subscriber_promise_truth", check_subscriber_promise_truth),
-        ("podcast_parity", check_podcast_parity),  # #1243: a same-title podcast episode must date-match its journal article
+        ("podcast_parity", check_podcast_parity),
+        # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
+        (
+            "chronicle_manifest_provenance",
+            lambda: chronicle_manifest_qa.check_chronicle_manifest_provenance(table, s3, S3_BUCKET, Check, CONTENT_TRUTH),
+        ),  # #1243: a same-title podcast episode must date-match its journal article
         ("published_permalink_reachable", check_published_permalink_reachable),  # #3284: no published post url may be a redirect source
         ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)),  # #1894: home/cockpit vs coaching
         ("receipt_replay", check_receipt_replay),  # #1373: progression-receipt drift alarm (deterministic replay)

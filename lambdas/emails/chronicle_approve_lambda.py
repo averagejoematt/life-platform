@@ -33,6 +33,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 import boto3
+from experiment.phase_filter import singleton_visible  # #3485: writers honour the wipe's tombstone too
+from experiment.phase_taxonomy import experiment_stamp  # #3485: ADR-077 provenance on every recap write
 
 try:
     from common.platform_logger import get_logger
@@ -121,8 +123,31 @@ def _get_draft(date_str: str) -> dict | None:
         return None
 
 
+def _publishable(item: dict) -> bool:
+    """#3485: a chronicle row the reset has archived is NEVER publishable, by any path.
+
+    The 2026-09-03 reset tombstoned cycle 15's unpublished Week-1 draft (`tombstone`,
+    `tombstoned_at`, `phase=pilot`, `cycle=15`) but left `status=draft`, and on Day 0 of
+    cycle 16 the 48h sweep — which selected by status alone — published it: the story
+    door, Home's chronicle beat and RECAP#latest all narrated the previous cycle the day
+    before this one began. Readers honour the wipe through `singleton_visible` (#946);
+    this is the same predicate on the WRITE side, so the guard cannot drift from the
+    reader's definition of "current".
+    """
+    if not item:
+        return False
+    if item.get("tombstone") or item.get("tombstoned_at"):
+        return False
+    return singleton_visible(item)
+
+
 def _publish_to_s3(item: dict) -> list[str]:
     """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths."""
+    if not _publishable(item):
+        raise ValueError(
+            f"#3485: refusing to publish {item.get('sk') or item.get('date')}: the row is tombstoned or "
+            f"belongs to a non-current phase ({item.get('phase')!r}, cycle {item.get('cycle')!r})"
+        )
     invalidation_paths = []
 
     # Journal post
@@ -237,6 +262,11 @@ def _commit_recap(item: dict) -> None:
         base["source"] = "chronicle_recap"
         base["status"] = "published"
         base["generated_at"] = datetime.now(timezone.utc).isoformat()
+        # #3485: the recap is EXPERIMENT_SCOPED intelligence — stamp phase + cycle at
+        # write time (ADR-077 / #1233) so /api/recap's phase guard sees a stale recap
+        # on its own, instead of relying on `experiment_day > day_n` (which passes the
+        # moment Day 1 arrives).
+        base.update(experiment_stamp())
         for sk in (f"RECAP#{date_str}", "RECAP#latest"):
             row = dict(base)
             row["sk"] = sk
@@ -368,6 +398,11 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
         return out
     for it in resp.get("Items", []):
         if it.get("status") != "draft":
+            continue
+        if not _publishable(it):
+            # #3485: an archived draft (reset tombstone / previous-cycle phase) is not a
+            # "forgot to click" case — it is history, and the sweep must never promote it.
+            logger.info("sweep: skipping archived draft %s (tombstoned/non-current phase)", it.get("sk"))
             continue
         ga = str(it.get("generated_at") or "")
         try:
