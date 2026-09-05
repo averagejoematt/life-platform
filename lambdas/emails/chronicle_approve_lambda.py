@@ -33,8 +33,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import boto3
-from experiment.phase_filter import singleton_visible  # #3485: writers honour the wipe's tombstone too
-from experiment.phase_taxonomy import experiment_stamp  # #3485: ADR-077 provenance on every recap write
+from experiment.phase_filter import EXPERIMENT_PHASE_CURRENT, singleton_visible  # #3485: writers honour the wipe's tombstone too
 
 try:
     from common.platform_logger import get_logger
@@ -262,11 +261,15 @@ def _commit_recap(item: dict) -> None:
         base["source"] = "chronicle_recap"
         base["status"] = "published"
         base["generated_at"] = datetime.now(timezone.utc).isoformat()
-        # #3485: the recap is EXPERIMENT_SCOPED intelligence — stamp phase + cycle at
-        # write time (ADR-077 / #1233) so /api/recap's phase guard sees a stale recap
-        # on its own, instead of relying on `experiment_day > day_n` (which passes the
-        # moment Day 1 arrives).
-        base.update(experiment_stamp())
+        # #3485: the recap is EXPERIMENT_SCOPED intelligence — it carries the ADR-077
+        # provenance of the installment it summarizes (the installment's own write-time
+        # phase/cycle stamp, #1233), so /api/recap's phase guard sees a stale recap by
+        # itself instead of relying on `experiment_day > day_n` (which passes the moment
+        # Day 1 arrives). Inherited, not re-read from SSM: a recap's cycle IS its
+        # installment's cycle, and this role holds no experiment-cycle grant.
+        base["phase"] = item.get("phase") or EXPERIMENT_PHASE_CURRENT
+        if item.get("cycle") is not None:
+            base["cycle"] = item["cycle"]
         for sk in (f"RECAP#{date_str}", "RECAP#latest"):
             row = dict(base)
             row["sk"] = sk

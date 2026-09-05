@@ -167,13 +167,27 @@ def test_sweep_reports_the_refusal_and_publishes_nothing_else_for_that_row(mod):
 def test_commit_recap_carries_the_provenance_stamp(mod):
     """ADR-077: RECAP#latest is EXPERIMENT_SCOPED — it must carry phase (+ cycle when SSM
     answers) at write time, so /api/recap's phase guard can see a stale recap by itself."""
-    item = {"sk": "DATE#2026-09-12", "date": "2026-09-12", "draft_recap_json": json.dumps({"story_so_far": "x"})}
+    item = {
+        "sk": "DATE#2026-09-12",
+        "date": "2026-09-12",
+        "phase": "experiment",
+        "cycle": 16,
+        "draft_recap_json": json.dumps({"story_so_far": "x"}),
+    }
     writes = []
-    with (
-        mock.patch.object(mod.table, "put_item", side_effect=lambda Item: writes.append(Item)),
-        mock.patch.object(mod, "experiment_stamp", return_value={"phase": "experiment", "cycle": 16}),
-    ):
+    with mock.patch.object(mod.table, "put_item", side_effect=lambda Item: writes.append(Item)):
         mod._commit_recap(item)
     assert {w["sk"] for w in writes} == {"RECAP#2026-09-12", "RECAP#latest"}
     for w in writes:
         assert w["phase"] == "experiment" and w["cycle"] == 16
+
+
+def test_commit_recap_defaults_the_phase_when_the_installment_carries_none(mod):
+    """An un-stamped installment still yields a phase-bearing recap (current phase),
+    never a phase-less record the reader guard cannot classify (the 09-04 shape)."""
+    item = {"sk": "DATE#2026-09-12", "date": "2026-09-12", "draft_recap_json": json.dumps({"story_so_far": "x"})}
+    writes = []
+    with mock.patch.object(mod.table, "put_item", side_effect=lambda Item: writes.append(Item)):
+        mod._commit_recap(item)
+    assert all(w["phase"] == mod.EXPERIMENT_PHASE_CURRENT for w in writes)
+    assert all("cycle" not in w for w in writes)
