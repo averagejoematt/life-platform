@@ -552,3 +552,69 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         "proved_on": "2026-08-30",
     },
 }
+
+# ── #3529/#3534: the reset sweep's two declared-exemption registries ──────────────────
+# Both entered the inventory 2026-09-05 with the one derivation that closed #3529/#3531/#3534,
+# and both arrive with a verdict rather than joining the unproven pile: each is a DECLARED
+# EXCEPTION to a rule, and an exception nobody has watched failing is indistinguishable from
+# a rule that was never enforced.
+GUARD_PROOFS.update(
+    {
+        "registry::deploy/restart_verify_gates.py::MULTILINE_RUN_EXEMPT::Install census dependency (PyYAML)": {
+            "gate_name": "MULTILINE_RUN_EXEMPT[Install census dependency (PyYAML)]",
+            "command": (
+                "cp .github/workflows/docs-ci.yml /tmp/nc/docs-ci.yml; "
+                "printf '      - name: A thirteenth gate hiding in a block scalar\\n        if: always()\\n"
+                "        run: |\\n          python3 scripts/check_doc_links.py\\n' >> /tmp/nc/docs-ci.yml; "
+                "python3 -c \"import sys,pathlib; sys.path.insert(0,'deploy'); import restart_verify_gates as r; "
+                "r.WORKFLOW=pathlib.Path('/tmp/nc/docs-ci.yml'); sys.argv=['x','--skip-js','--skip-pytest']; "
+                "print('EXIT', r.main())\""
+            ),
+            "mutation": (
+                "appended a REAL gate (`python3 scripts/check_doc_links.py`) to a scratch copy of the live "
+                "docs-ci.yml in `run: |` block-scalar form — the one shape the sweep's line parser cannot see, "
+                "and therefore the one shape that would be derived silently as nothing."
+            ),
+            "observed": (
+                "ARMED: exit 2, `UNEVALUABLE (not a pass): docs-ci.yml has \\`run: |\\` step(s) invoking python3 "
+                "that this sweep cannot derive: · A thirteenth gate hiding in a block scalar`. Unmutated control "
+                "on the same scratch copy: exit 0, the exempted PyYAML bootstrap NOT reported. Both directions "
+                "watched 2026-09-05."
+            ),
+            "scope": (
+                "Detection is textual: a python3 invocation reached indirectly (a shell variable, a `bash -c`, a "
+                "composite action) is not seen. The exemption itself is name-keyed, so a step RENAME would strand "
+                "it — `test_multiline_exemptions_still_name_live_workflow_steps` is the guard for that, and it is "
+                "a static assertion, not a mutation proof."
+            ),
+            "proved_on": "2026-09-05",
+        },
+        "registry::deploy/restart_verify_gates.py::MUTATING_GATES::scripts/skill_lint.py --self-test": {
+            "gate_name": "MUTATING_GATES[scripts/skill_lint.py --self-test]",
+            "command": (
+                "python3 -m pytest tests/test_restart_verify_gates_3477.py -q -k "
+                "'read_only_by_effect or CAUGHT_by_effect or DOES_NOT_RESTORE'"
+            ),
+            "mutation": (
+                "two, because the entry has two failure directions. (A) a fixture gate OUTSIDE the exemption that "
+                "creates a file inside the repo — the read-only-by-EFFECT measurement must catch it. (B) a fixture "
+                "gate INSIDE the exemption that writes and never restores — the exemption's own restoration "
+                "assertion must catch that. (B) is the direction that matters: `skill_lint.py --self-test` restores "
+                "its victim on a good day, so without (B) the entry would be a declaration with no teeth."
+            ),
+            "observed": (
+                "ARMED (A): exit 1, `READ-ONLY VIOLATION` + `MUTATED the working tree`. ARMED (B): exit 1, "
+                "`DID NOT RESTORE THE TREE`. CONTROL: the same sweep over a no-op fixture gate exits 0 with "
+                "`git status --porcelain` byte-identical before and after. Live full sweep 2026-09-05 ran the real "
+                "`scripts/skill_lint.py --self-test` LAST and reported no restoration failure."
+            ),
+            "scope": (
+                "The measurement is `git status --porcelain` on the repo root, so a gate that writes OUTSIDE the "
+                "repo, or writes and restores within one gate's own runtime, is invisible to it. It also does not "
+                "cover the pytest or JS legs — only the derived docs-ci gates are measured, because those are the "
+                "ones contracted to be `--check` forms."
+            ),
+            "proved_on": "2026-09-05",
+        },
+    }
+)
