@@ -85,7 +85,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
 | CloudWatch | Alarms + logs | **~118 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
-| CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
+| CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + 88 EventBridge schedule rules (`model/platform_model.json` `meta.counts.schedules`, guarded by `check_doc_facts.py`; the live account holds more rules than CDK declares). Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$215/mo all-in cap** (ADR-063; base $75 -> $85 -> $150 -> $215, surge-to-$252 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
 | Concurrency quota | Account-level | **100** (raised 2026-05-19 from the account default of 10 — AWS Support case 177921309700709) |
@@ -201,11 +201,19 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 ### Failure handling
 
-DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. Alarm actions route to SNS `life-platform-alerts`.
+DLQ coverage: every async-invoked Lambda routes terminal failures to `life-platform-ingestion-dlq` EXCEPT these, whose CDK construct passes no DLQ at all — `life-platform-delete-user-data`, `life-platform-dlq-consumer`, `life-platform-mcp-warmer`, `life-platform-remediation-dispatcher`, `telegram-coach-worker` (#3500 owns closing the gap; the set is derived from CDK and diffed against this sentence by `scripts/doc_facts_infra.py`). Alarm actions route to SNS `life-platform-alerts`.
 
 CloudWatch carries **~118 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
 
-Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
+Additional safeguards — one per line so each cadence is a checkable claim (`scripts/doc_facts_infra.py` diffs both the
+`rate(...)` literal and the prose interval against the CDK schedule):
+
+- `life-platform-dlq-consumer` — drains the DLQ on `rate(6 hours)`, i.e. every 6 hours
+- `life-platform-canary` — synthetic DDB+S3+MCP round-trip on `rate(4 hours)`, i.e. every 4 hours
+- item size guard — `item_size_guard.py`, the 400KB DynamoDB write ceiling
+
+Two OTHER canaries exist and are not the one above: `life-platform-ai-quality-canary` runs `cron(20 16 ? * MON,WED,FRI *)`,
+and `life-platform-mcp-canary-15min` is a hand-made EventBridge rule (not a CDK-declared schedule) firing every 15 minutes.
 
 ---
 

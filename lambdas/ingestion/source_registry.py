@@ -12,8 +12,10 @@
 
 One place a source's identity, staleness threshold, behavioral-vs-infrastructure
 classification, and (since #498) every other per-source facet live. Derived by:
-  - lambdas/emails/freshness_checker_lambda.py  (StaleSourceCount → the paging
-    slo-source-freshness alarm)
+  - lambdas/emails/freshness_checker_lambda.py  (StaleSourceCount → the
+    slo-source-freshness alarm — `to_digest=True` in monitoring_stack.py per
+    ADR-052, so it lands in the daily alert digest; the alarm that wakes
+    someone for a dead pipeline is paging-pipeline-dead at ≥8)
   - lambdas/web/site_api_data.py                (/api/source_freshness — the
     public pipeline board)
   - mcp/tools_labs.py::tool_get_freshness_status (operator MCP view)
@@ -1100,10 +1102,11 @@ def behavioral_source_keys() -> set:
 # block, rendered by daily_brief_lambda next to the WR-48 Data Status banner).
 #
 # Explicitly NOT a reclassification to infrastructure: that would route these
-# sources into StaleSourceCount and page the slo-source-freshness alarm on a
-# correct rest state (a skipped weigh-in, a rest week) — the exact
-# mis-classification the header of this file warns about, and the drift #392
-# cured. `behavioral` stays True; the notice NEVER feeds a paging path.
+# sources into StaleSourceCount and fire slo-source-freshness (`to_digest=True`,
+# monitoring_stack.py) on a correct rest state (a skipped weigh-in, a rest
+# week) — the exact mis-classification the header of this file warns about, and
+# the drift #392 cured. `behavioral` stays True; the notice NEVER feeds a
+# paging path.
 #
 # Distinct-signal contract: the `stale_hours` facets above are canonical and
 # encode each WRITER's cadence (nutrition ~24h-lagged by design, weigh-ins
