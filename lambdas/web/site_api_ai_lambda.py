@@ -1134,17 +1134,16 @@ def _handle_explain(event: dict) -> dict:
 
     payload_txt = _shrink_for_prompt(payload)
     try:
-        from common.constants import EXPERIMENT_START_DATE
-        from common.pacific_time import pacific_day_n
-
-        _day_n = pacific_day_n(EXPERIMENT_START_DATE)  # #2414/#1955: THE one PT day-index formula
-        day_ctx = f"Experiment day {_day_n} (restarted {EXPERIMENT_START_DATE}) — a young record is short by design."
+        # #3519: the ONE shared phase block (ai.ai_context, #1086) — never a second
+        # hand-built line. Renders "PRE-START: …" ahead of genesis and "Day N …"
+        # after, matching /api/journey's own day_n derivation (pacific_day_n).
+        day_ctx = _phase_context_block()
     except Exception:
         day_ctx = ""
 
     user_msg = (
         f"SURFACE: {_EXPLAIN_SURFACES[surface]}\n"
-        + (f"CONTEXT: {day_ctx}\n" if day_ctx else "")
+        + (f"{day_ctx}\n" if day_ctx else "")  # #3519: already self-labeled (PHASE_CONTEXT_MARKER)
         + f"PAGE JSON (authoritative — cite only these numbers):\n{payload_txt}\n\n"
         "Explain what this page is showing right now, in 3-4 plain sentences."
     )

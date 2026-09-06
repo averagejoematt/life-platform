@@ -49,9 +49,18 @@ name: Deploy wedge watch
 
 on:
   schedule:
-    # Every 15 minutes. The wedge is only harmful while the tree it would deploy is
-    # still current; the 2026-08-02 recurrence was cancelled at 17 minutes holding a
-    # stale sha. 15 minutes bounds the blind window below that.
+    # Declared every 15 minutes — GitHub does NOT deliver that cadence (#3237 disposition
+    # item 1). Measured n=99 gaps (2026-08-23..27): declared cron: */15 = 0.25h; min
+    # 0.26h, median 0.71h, mean 0.83h, p90 1.18h, max 6.99h — the declared cadence held
+    # in 0 of 99 intervals. A LATER sweep (n=60, 2026-08-26..09-05) found gaps up to 729
+    # min (12.15h). The 2026-08-02 recurrence that motivated the original "15 minutes
+    # bounds the blind window" comment was cancelled at 17 minutes holding a stale sha —
+    # but that comment stated a guarantee GitHub has never once kept, and
+    # scripts/check_cron_freshness.py's own STALE-vs-healthy verdict for this workflow
+    # briefly inverted on it (#3541, #3237 disposition item 3): the true blind window is
+    # bounded by the MEASURED worst gap (re-derived live from the Actions API every run,
+    # scripts/scheduled_workflow_registry.py's grace_hours is a floor under it), not by
+    # the declared `*/15`.
     - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
