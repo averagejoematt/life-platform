@@ -229,29 +229,187 @@ def fetch_orchestrator_input_digest(lambda_client, coach_id: str, function_name:
         return None
 
 
+#: The inventory's rows: (display name, brief-data keys, registry source id or None).
+#:
+#: #3516: the registry id is what makes each line's caveat DERIVED rather than typed —
+#: `source_registry.availability_facet` supplies the paused/lag status and its reason, so
+#: a source becoming paused, or having its cadence loosened, changes this prompt with no
+#: edit here. `None` means the row has no ingest source at all: DEXA scans and lab draws
+#: are events, not pipes, and their absence carries no caveat to state.
+INVENTORY_ROWS = (
+    ("DEXA body composition", ("dexa",), None),
+    ("Lab bloodwork", ("labs",), None),
+    ("Body measurements", ("measurements",), "measurements"),
+    ("MacroFactor nutrition", ("macrofactor",), "macrofactor"),
+    ("Whoop recovery/sleep", ("whoop",), "whoop"),
+    ("Garmin steps", ("garmin",), "garmin"),
+    ("Strava activities", ("strava_7d",), "strava"),
+    ("Eight Sleep bed temp", ("eightsleep",), "eightsleep"),
+    ("CGM glucose", ("apple_health", "apple"), "apple_health"),
+)
+
+#: The rule that travels WITH the inventory rather than in the prompt template, so the
+#: #3107 "gate and prompt read the same bytes" property covers it too, and so a surface
+#: that renders the inventory cannot render it without the rule that reads it.
+INVENTORY_RULE = (
+    "  RULE: never attribute a CAUSE to an absence this inventory does not state. A row\n"
+    "  marked PAUSED or LAGGING BY DESIGN must never be described as 'not syncing yet',\n"
+    "  a sync failure, a connection problem, or something that 'needs to be running' —\n"
+    "  say it is paused, or say the designed lag, in the inventory's own terms."
+)
+
+
+def _facet_caveat(source_id: Optional[str]) -> str:
+    """The registry-derived caveat clause for one inventory row ('' when there is none).
+
+    The SENTENCE is `source_registry.availability_facet`'s, not this module's — one
+    wording for the whole platform, so this surface and the analyzer's
+    `movement_source_reason` cannot describe the same paused source two ways.
+    """
+    if not source_id:
+        return ""
+    from ingestion import source_registry as _sr
+
+    caveat = _sr.availability_facet(source_id)["caveat"]
+    return f" — {caveat}" if caveat else ""
+
+
 def data_inventory(data: dict) -> str:
-    """The AVAILABLE / not-available source list shown to every coach.
+    """The source list shown to every coach — availability PLUS the registry's facet.
 
     Extracted from `ai_calls._run_coach_v2_pipeline` (#3107) so the gate and the
     generation prompt read the SAME bytes — a gate keyed on a re-derived copy of
     a prompt fragment is a fixture-not-the-wire bug waiting to happen.
+
+    #3516: it used to render `AVAILABLE / not available` and nothing else. Live Day-0
+    coach output filled the missing reason in with a sync failure ("Garmin step data
+    isn't syncing to my dashboard yet"; "MacroFactor isn't syncing yet ... it needs to be
+    running by tomorrow") for a source paused by ADR-074 and one that is ~24h behind by
+    design. The caveat is now the registry's own facet + its own `method` string.
     """
     data = data or {}
     lines = []
-    for name, value in (
-        ("DEXA body composition", data.get("dexa")),
-        ("Lab bloodwork", data.get("labs")),
-        ("Body measurements", data.get("measurements")),
-        ("MacroFactor nutrition", data.get("macrofactor")),
-        ("Whoop recovery/sleep", data.get("whoop")),
-        ("Garmin steps", data.get("garmin")),
-        ("Strava activities", data.get("strava_7d")),
-        ("Eight Sleep bed temp", data.get("eightsleep")),
-        ("CGM glucose", data.get("apple_health") or data.get("apple")),
-    ):
+    for name, keys, source_id in INVENTORY_ROWS:
+        value = None
+        for key in keys:
+            value = data.get(key)
+            if value:
+                break
         available = bool(value) and (not isinstance(value, list) or len(value) > 0)
-        lines.append(f"  - {name}: {'AVAILABLE' if available else 'not available'}")
-    return "\n".join(lines)
+        lines.append(f"  - {name}: {'AVAILABLE' if available else 'not available'}{_facet_caveat(source_id)}")
+    return "\n".join(lines) + "\n" + INVENTORY_RULE
+
+
+# ── #3516: the paused/lagging misattribution gate (regenerate-or-hold) ───────
+#
+# WHAT IS STRUCTURAL, AND WHAT IS NOT — stated plainly, because every phrase-matched
+# suppressor in the #2959/#3003/#3199 family has failed in the field.
+#
+# The TRIGGER is structural and is the whole point: this can only fire on a source the
+# REGISTRY says is paused or lag-by-design (`caveated_source_ids`), and only for the
+# rows this inventory actually lists. It cannot be armed by a phrase, and it cannot fire
+# on a live source however the sentence is worded.
+#
+# The DETECTION inside that trigger is a small vocabulary of sync-failure attributions,
+# and it is not claimed to be exhaustive — a coach can always invent a new way to blame
+# the pipe. Two things keep that honest rather than decorative: the positive controls are
+# the two sentences that actually shipped on Day 0 (pinned in
+# tests/test_coach_source_facets_3516.py), and the prompt now STATES the rule
+# (`INVENTORY_RULE`), so the gate is the backstop for a rule the model was given, not the
+# only thing standing between a paused source and a fabricated sync failure.
+_SYNC_FAILURE_PATTERNS = (
+    r"(?:is|are|isn't|is\s+not|aren't|are\s+not|not)\s+syncing",
+    r"syncing\s+(?:yet|to\b)",
+    r"(?:hasn't|has\s+not|haven't|have\s+not)\s+synced",
+    r"sync(?:ing)?\s+(?:failure|issue|issues|problem|problems|gap|gaps|error|errors)",
+    r"(?:needs?|need)\s+to\s+be\s+(?:running|syncing|connected|hooked\s+up)",
+    r"(?:not|isn't|is\s+not)\s+connected",
+    r"(?:re)?connect\s+(?:it|the\s+\w+)",
+)
+
+
+def source_facet_findings(text: str, data: Optional[dict] = None) -> list:
+    """Sentences that blame a sync failure for a PAUSED or LAG-BY-DESIGN source.
+
+    Returns a list of `{"type": "source_facet_misattribution", "source": id,
+    "status": ..., "detail": ...}` — the grounded_generation finding shape, so a caller
+    can compose it with the other gates. Pure: no I/O, no model call.
+    """
+    import re
+
+    from ingestion import source_registry as _sr
+
+    if not text:
+        return []
+    caveated = _sr.caveated_source_ids()
+    watched = []
+    for name, _keys, source_id in INVENTORY_ROWS:
+        if not source_id or source_id not in caveated:
+            continue
+        label = _sr.source_label(source_id) or name.split()[0]
+        watched.append((source_id, label, _sr.availability_facet(source_id)["status"]))
+    if not watched:
+        return []
+    findings = []
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        low = sentence.lower()
+        if not any(re.search(p, low) for p in _SYNC_FAILURE_PATTERNS):
+            continue
+        for source_id, label, status in watched:
+            if label.lower().replace(" ", "") in low.replace(" ", ""):
+                findings.append(
+                    {
+                        "type": "source_facet_misattribution",
+                        "source": source_id,
+                        "status": status,
+                        "detail": f"{label} is {status} in the source registry — a sync-failure attribution is false: {sentence.strip()[:180]}",
+                    }
+                )
+                break
+    return findings
+
+
+def source_facet_correction(findings: list) -> str:
+    """The one corrective instruction handed back to the model on a regeneration."""
+    from ingestion import source_registry as _sr
+
+    bits = []
+    for f in findings:
+        facet = _sr.availability_facet(f.get("source") or "")
+        label = _sr.source_label(f.get("source") or "") or f.get("source")
+        bits.append(f"{label}: {facet['caveat']}")
+    return (
+        "CORRECTION — you attributed a sync failure to a source that has none:\n- "
+        + "\n- ".join(bits)
+        + "\nRewrite those sentences using the inventory's own words, and change nothing else."
+    )
+
+
+def enforce_source_facet_attribution(text: str, data: Optional[dict], regenerate_fn=None):
+    """Regenerate-or-hold on a paused/lagging misattribution (the ADR-108 shape).
+
+    Returns `(text, finding_or_None)`. `text` is None when the draft is HELD — one
+    corrective rewrite was offered and the claim survived it. A hold is the right
+    terminal state here: the sentence tells every reader that a deliberately-paused
+    source is a fixable outage, and shipping it is worse than shipping nothing.
+
+    Fail-soft on infrastructure only: if `regenerate_fn` raises, the ORIGINAL text is
+    held rather than published — a gate that cannot rewrite must not become a gate that
+    cannot fail (the #2578 dark-gate shape).
+    """
+    findings = source_facet_findings(text, data)
+    if not findings:
+        return text, None
+    if regenerate_fn is None:
+        return None, findings[0]
+    try:
+        rewritten = regenerate_fn(source_facet_correction(findings))
+    except Exception as e:  # noqa: BLE001
+        print(f"[SOURCE-FACET] regeneration failed ({e}) — holding the draft rather than publishing the misattribution")
+        return None, findings[0]
+    if rewritten and not source_facet_findings(rewritten, data):
+        return rewritten, findings[0]
+    return None, findings[0]
 
 
 def upstream_parts(

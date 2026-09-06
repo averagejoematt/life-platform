@@ -261,10 +261,20 @@ export async function renderChallenges(d) {
   // the recommending board persona. The served `icon` field is emoji — never drawn (§8).
   // Reader participation: a vote (want this next) + a follow (email when it launches),
   // wired to the live challenge_vote/challenge_follow endpoints — real counts, no padding.
+  // #3521: a personal measurement in the catalog is a PRIOR cycle's number — config
+  // survives every reset, so "HRV 29.56 — this is indicated now" kept saying "now" three
+  // cycles later. The API stamps `evidence_scope`/`evidence_as_of` and drops the number
+  // entirely pre-genesis; this says WHEN whatever survives was measured. A literature
+  // finding is cross-phase and carries no stamp — it is not about Matthew.
+  const evidenceStamp = (c) => {
+    if (c.evidence_scope !== "personal" || !c.evidence_as_of) return "";
+    const when = esc(String(c.evidence_as_of));
+    return ` <span class="rd-asof label">measured ${when}${c.evidence_prior_cycle ? " — a previous cycle, not this one" : ""}</span>`;
+  };
   const catCard = (c) => {
     const [tc, tl] = c.evidence_tier ? evClass(c.evidence_tier) : [null, null];
     const votes = voteMap ? voteMap[c.id] : null;
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${c.category ? `<span class="ch-ric">${domainIcon(c.category)}</span>` : ""}${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}${c.evidence_summary && !isBad(c.evidence_summary) ? `<p class="rd-line">${esc(c.evidence_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${[c.category, c.difficulty, c.duration_days && c.duration_days + "d", c.board_recommender && "recommended by " + c.board_recommender].filter(Boolean).map(esc).join("  ·  ")}</p>${voteFollowRow("challenge", "catalog_id", c.id, votes)}</article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${c.category ? `<span class="ch-ric">${domainIcon(c.category)}</span>` : ""}${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}${c.evidence_summary && !isBad(c.evidence_summary) ? `<p class="rd-line">${esc(c.evidence_summary)}${evidenceStamp(c)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${[c.category, c.difficulty, c.duration_days && c.duration_days + "d", c.board_recommender && "recommended by " + c.board_recommender].filter(Boolean).map(esc).join("  ·  ")}</p>${voteFollowRow("challenge", "catalog_id", c.id, votes)}</article>`;
   };
   const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet this cycle."));
   // "Available now" vs "Backlog" was a distinction without a difference — both are

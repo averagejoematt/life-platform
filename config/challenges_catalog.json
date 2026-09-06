@@ -68,7 +68,8 @@
       "board_recommender": "Dr. James Okafor",
       "board_quote": "The simplest longevity intervention that exists.",
       "protocol": "10,000 steps minimum per day. Auto-verified from Garmin/Apple Health.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "morning-walk-sunlight",
@@ -99,7 +100,8 @@
       "board_quote": "Building cardiovascular capacity is non-negotiable for the centenarian decathlon.",
       "protocol": "Complete a 5K (3.1 miles) running continuously.",
       "status": "backlog",
-      "type": "achievement"
+      "type": "achievement",
+      "evidence_scope": "literature"
     },
     {
       "id": "dead-hang-60",
@@ -161,7 +163,8 @@
       "board_recommender": "Dr. Lisa Park",
       "board_quote": "The single most impactful sleep hygiene change most people can make.",
       "protocol": "All screens off 60 minutes before target bedtime.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "same-bedtime",
@@ -311,7 +314,8 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "NSDR is the highest-ROI stress tool. Zero cost, 10 minutes.",
       "protocol": "10 min of NSDR or body scan meditation daily.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "museum-slow-looking",
@@ -388,7 +392,8 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Social connection is not a luxury. It is the foundation.",
       "protocol": "One in-person coffee/lunch/walk with a friend per week. Different person if possible.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "talk-to-stranger",
@@ -524,7 +529,8 @@
       "board_recommender": "Dr. Eli Marsh",
       "board_quote": "Learning to lean into chosen discomfort transfers to every other domain.",
       "protocol": "End of every shower: coldest setting, 30 seconds minimum.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "make-bed-daily",
@@ -584,7 +590,8 @@
       "board_recommender": "Dr. Lisa Park",
       "board_quote": "Half-life means half is still circulating. At 6pm you're still 50% caffeinated from a 12pm coffee.",
       "protocol": "No coffee, tea, pre-workout, or caffeine supplements after 12:00pm. Decaf allowed. Track compliance daily.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "sleep-environment-audit",
@@ -599,7 +606,8 @@
       "board_recommender": "Dr. Lisa Park",
       "board_quote": "Your bedroom should be a cave. Cool, dark, boring. That's the entire protocol.",
       "protocol": "Blackout curtains or eye mask, thermostat to 65°F or Eight Sleep cooling, phone charges outside bedroom. Measure deep sleep % change.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "wind-down-routine",
@@ -644,7 +652,8 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "The Finnish data is staggering. Regular sauna use is one of the strongest longevity signals we have.",
       "protocol": "3 sessions/week, 170-190°F, 15-20 min. Cool down 5 min between rounds if doing multiple. Hydrate aggressively. Log sessions.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "cold-exposure-daily",
@@ -659,7 +668,8 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "The discomfort IS the mechanism. Deliberate cold trains your stress response system.",
       "protocol": "End every shower with 2+ minutes of cold (as cold as it goes), OR cold plunge 50-59°F for 2 min. Morning preferred. Log daily.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "run-couch-to-5k",
@@ -674,7 +684,8 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "The evidence for running and all-cause mortality is bulletproof. Getting to a 5K is the single highest ROI fitness goal.",
       "protocol": "Follow structured C25K plan (3 runs/week, walk-run intervals progressing to continuous). Track with Strava. Target: run 5K without stopping.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "zone2-150-min",
@@ -689,7 +700,8 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "Zone 2 is boring. It's also the single most important exercise modality for longevity.",
       "protocol": "150+ minutes per week in HR Zone 2 (roughly 60-70% max HR). Can be walking, cycling, rowing, swimming. Track via Whoop/Strava.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "daily-mobility",
@@ -719,7 +731,8 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "The cheapest glucose drug in the world is a 10-minute walk after dinner.",
       "protocol": "Walk 10+ minutes within 30 min of each main meal. All 3 meals ideal, minimum 1/day (dinner). Track with steps + CGM correlation.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "grip-strength",
@@ -764,7 +777,8 @@
       "board_recommender": "Dr. Marcus Webb",
       "board_quote": "The evidence is nuanced. TRE probably helps via calorie control and circadian alignment, not magic.",
       "protocol": "Eating window 12pm-8pm (or similar 8-hour window). Water, black coffee, tea allowed outside. Track window compliance.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "meal-prep-sunday",
@@ -809,7 +823,8 @@
       "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Same meal, different order, dramatically different glucose response. The data is clear.",
       "protocol": "At every meal with carbs, eat the vegetables and protein first, carbs last. Track with CGM.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "breathwork-daily",
@@ -854,7 +869,8 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The evidence base for meditation is now enormous. 10 minutes daily is the minimum effective dose.",
       "protocol": "10 min daily: guided (Waking Up, Headspace) or unguided. Same time each day preferred. Track streak and subjective calm rating.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "nature-dose",
@@ -869,7 +885,8 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The Japanese have known this for decades. Nature exposure is a legitimate clinical intervention.",
       "protocol": "3x/week: 30+ min outdoors in green space. Phone on airplane mode. Walk, sit, or hike. Log location and subjective mood shift.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "worry-window",
@@ -899,7 +916,8 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The phone on the table is a third person in the conversation. Remove it.",
       "protocol": "Phone stays in another room during dinner. Both partners/all household members commit. Track compliance and conversation quality.",
-      "status": "backlog"
+      "status": "backlog",
+      "evidence_scope": "literature"
     },
     {
       "id": "reconnect-old-friend",
@@ -1084,7 +1102,8 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Motivation follows action. But first you have to clear the noise that's substituting for it.",
       "protocol": "Delete Reddit from phone for 7 days. Desktop research use fine. Leisure scroll is not. First 5 minutes of any urge: physical action — walk to another room, glass of water, open a book.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "literature"
     },
     {
       "id": "fiction-first",
@@ -1132,7 +1151,9 @@
       "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Your recovery score is 40. NSDR is the fastest zero-cost reversal. There is no downside.",
       "protocol": "1pm–3pm daily: 10–20 minutes Yoga Nidra script (free on YouTube), eyes closed, horizontal. Not napping. Log each session.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "personal",
+      "evidence_as_of": "2026-03-28"
     },
     {
       "id": "the-depth-rep",
@@ -1180,7 +1201,9 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "You can't buy fitness in a week of intensity. Zone 2 is the foundation everything else sits on.",
       "protocol": "4 Zone 2 sessions/week, 30–45 min each, HR 120–140 BPM. Walk, bike, elliptical — your call. If you can't hold a conversation, you're going too hard. Log every session.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "personal",
+      "evidence_as_of": "2026-03-28"
     },
     {
       "id": "10-day-walk-streak",
@@ -1196,7 +1219,9 @@
       "board_recommender": "Dr. Max Reyes",
       "board_quote": "The walk is the canary. When it goes, everything goes. You've proven that now.",
       "protocol": "5,000+ steps every single day for 10 consecutive days. No exceptions. Track in Apple Health or Garmin.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "personal",
+      "evidence_as_of": "2026-03-28"
     },
     {
       "id": "protein-anchor-protocol",
@@ -1212,7 +1237,8 @@
       "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Build from what's working. Protein distribution matters as much as total protein.",
       "protocol": "Every meal hits 35g protein minimum. Each morning, 2 minutes: pre-plan the day's protein sources before the day starts. Log in MacroFactor.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "literature"
     },
     {
       "id": "no-drift-weekends",
@@ -1228,7 +1254,9 @@
       "board_recommender": "Dr. Marcus Webb",
       "board_quote": "You're losing 5 lbs a month even with the drift. Imagine what you lose if you actually hold weekends.",
       "protocol": "Saturday and Sunday: log first meal within 30 min of breaking fast (11:30am IF window). All subsequent meals logged same-day. No morning logging required — IF window respected.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "personal",
+      "evidence_as_of": "2026-03-28"
     },
     {
       "id": "minimum-viable-day",
@@ -1244,7 +1272,9 @@
       "board_recommender": "Dr. Eli Marsh",
       "board_quote": "The goal isn't a lowered bar. It's proving to your nervous system that the bar still exists.",
       "protocol": "For 14 days, win the day by completing exactly three things: Walk 5k steps. Log food (even imperfectly). No alcohol. Everything else is a bonus. 12 of 14 days required.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "personal",
+      "evidence_as_of": "2026-03-28"
     },
     {
       "id": "the-discomfort-rep",
@@ -1276,7 +1306,8 @@
       "board_recommender": "Dr. Eli Marsh",
       "board_quote": "The gap between knowing and doing is where the real work lives. This is the practice.",
       "protocol": "Each morning: identify the single most avoided (not most urgent) task. Complete it before anything else. Log what it was in one line.",
-      "status": "available"
+      "status": "available",
+      "evidence_scope": "literature"
     },
     {
       "id": "no-doordash-week",
