@@ -84,6 +84,34 @@ def _files_to_scan() -> list[Path]:
     return files
 
 
+# ── #3539: the paths CLAUDE.md names INSIDE fenced blocks ───────────────────────
+#
+# The link scan above strips fenced blocks and code spans (`_FENCE_RE` / `_CODESPAN_RE`)
+# because links there are illustrative. CLAUDE.md's Commands block is not illustrative —
+# it is the operator's first five minutes, and it is entirely fenced. It sent every
+# reader to "deploy.md's mapping table" for months; `find . -name deploy.md` returns
+# nothing, and this gate could not see the line at all.
+#
+# So: inside CLAUDE.md's fenced blocks, any token that LOOKS like a repo path to a
+# markdown file must resolve. Deliberately narrow — a path-shaped token with a slash and
+# a .md suffix, or a bare `<word>.md` introduced by "see". A prose mention of "the
+# handover .md" is not path-shaped and is not checked.
+_FENCED_PATH_RE = re.compile(r"(?<![\w./-])((?:[\w.\-]+/)+[\w.\-]+\.md)\b")
+_SEE_BARE_MD_RE = re.compile(r"\bsee\s+`?([\w.\-]+\.md)\b")
+
+
+def _fenced_md_paths(doc: Path) -> list:
+    """[(token, resolves?), ...] for every markdown path named inside `doc`'s fences."""
+    src = doc.read_text(encoding="utf-8")
+    out = []
+    for fence in _FENCE_RE.findall(src):
+        for rx in (_FENCED_PATH_RE, _SEE_BARE_MD_RE):
+            for m in rx.finditer(fence):
+                token = m.group(1)
+                out.append((token, (ROOT / token).exists() or (doc.parent / token).exists()))
+    return out
+
+
 def main():
     verbose = "--list" in sys.argv
     dead = []
@@ -114,6 +142,14 @@ def main():
                     anchor_cache[dest] = _anchors(dest)
                 if frag not in anchor_cache[dest]:
                     dead.append(f"{rel_doc}: dead anchor → {m.group(1)}")
+
+    # #3539: CLAUDE.md's fenced Commands block, which the scan above deliberately strips.
+    claude_md = ROOT / "CLAUDE.md"
+    if claude_md.exists():
+        for token, ok in _fenced_md_paths(claude_md):
+            checked += 1
+            if not ok:
+                dead.append(f"CLAUDE.md: dead path named inside a fenced block → {token}")
 
     if dead:
         print(f"❌ {len(dead)} dead link(s) of {checked} checked:")

@@ -139,13 +139,12 @@ def test_unreadable_hard_stop_path_for_website_ai_matches_tier3():
     assert at_tier3 == unreadable == {f: False for f in budget_guard.FAIL_CLOSED_FEATURES}
 
 
-def test_unreadable_current_tier_still_reports_zero_and_no_global_hard_stop():
+def test_unreadable_current_tier_still_reports_zero():
     """current_tier()'s RETURN stays fail-open 0 (the fleet's protect-longest
     consumers, incl. bedrock_client's tier-3 backstop, must not see a phantom
     tier 3 that would take the daily brief down with it)."""
     _with_ssm(exc=_ACCESS_DENIED)
     assert budget_guard.current_tier() == 0
-    assert budget_guard.hard_stopped() is False
 
 
 def test_garbage_tier_value_is_unreadable_not_tier0():

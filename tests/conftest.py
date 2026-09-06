@@ -213,15 +213,51 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
+        "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
         "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
+        # #3568: the sending-vocabulary census. Verdict is pure repo shape — a new
+        # sender default or CDK EMAIL_SENDER on a domain SES has not verified must red
+        # BEFORE the merge. Post-merge is too late by construction: the next deploy
+        # puts a MessageRejected (or, for reader mail, a personal-domain From) in front
+        # of subscribers.
+        "test_email_sender_identity_3568.py",
+        # #3538: AST + string-literal sweep of lambdas/common + lambdas/ai. Verdict is
+        # pure repo shape — a public def landing in the every-bundle packages with no
+        # caller must red BEFORE the merge, because after it the dead code is already
+        # riding ~104 Lambda zips and reads as API to the next reader.
+        "test_no_dead_shared_defs_3538.py",
         # #2986: the derived-artifact registry. Verdict is pure repo shape — a new
         # generator writing a committed artifact must be classified BEFORE the merge,
         # and a guard placed in the wrong lane must red on the PR that placed it there.
         # Post-merge-only is the exact defect this registry was filed about.
         "test_derived_artifact_registry_2986.py",
+        # ── #3529: the reset's own artifact readers ────────────────────────────
+        # These read `deploy/generated/**` (the frozen pre-registration, its SHA-256 stamp,
+        # the channel-divergence prereg) or the deploy scripts that write it. A reset — or
+        # a PR that lands a regenerated artifact — stales them by construction, and until
+        # #3529 they ran in NEITHER the reset's own gate sweep NOR the pre-merge lane: 13
+        # tests red on main 2026-08-31, then `test_sealed_prereg_agrees_with_the_plan_root`
+        # on 5 consecutive runs 2026-09-04.
+        #
+        # THE LIST IS NOT THE SOURCE OF TRUTH — `deploy/restart_verify_gates.reset_artifact_test_files()`
+        # is, and `tests/test_restart_verify_gates_3477.py::test_every_derived_artifact_reader_is_in_the_premerge_lane`
+        # fails if the derivation grows past what is written here. Add the new name in the
+        # same PR that adds the test.
+        "test_channel_divergence_prereg_1844.py",
+        "test_genesis_preregistration.py",
+        "test_plan_literal_reconciliation.py",
+        "test_prereg_hash_stamp.py",
+        "test_qa_smoke_phase_stamp_coverage_1970.py",
+        # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this
+        # branch derived its list, and `reset_artifact_test_files()` picked it up on the
+        # merge — which is the whole point of deriving rather than hand-listing. It reads
+        # `deploy/generated/**` through the reset writers it contracts.
+        "test_reset_writer_contract_3598.py",
+        "test_restart_verify_gates_3477.py",
+        "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
         # constructed outside create_platform_lambda(), or landing with no deploy
         # registration and no alarm story, must red BEFORE the merge. Post-merge is
@@ -606,3 +642,24 @@ def pytest_runtest_logreport(report):
 def pytest_sessionfinish(session, exitstatus):
     for line in slow_test_warning_lines(_SLOW_TESTS):
         print(f"\n{line}")
+
+
+@pytest.fixture(autouse=True)
+def _write_day_is_genesis_day(monkeypatch):
+    """#3598: the provenance stamp derives phase + cycle from the WRITE'S DATE
+    (experiment_stamp / tag_record's undated path read `phase_taxonomy._write_date`).
+    Every writer test in this suite was written under the pre-#3598 assumption that
+    a write is "the experiment", and a future-genesis reset (the sanctioned eve
+    reset, #931) would otherwise turn all of them pilot for a day — and the #3477
+    sweep runs CI's gates INSIDE the reset, so that day is reset day. So the suite's
+    write day is GENESIS DAY unless a test says otherwise: pass `as_of=` (or re-pin
+    `_write_date`) to exercise the countdown window — tests/test_reset_writer_contract_3598.py
+    does, in both directions."""
+    try:
+        from common.constants import EXPERIMENT_START_DATE
+        from experiment import phase_taxonomy
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    monkeypatch.setattr(phase_taxonomy, "_write_date", lambda: EXPERIMENT_START_DATE)
+    yield

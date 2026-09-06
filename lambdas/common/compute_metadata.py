@@ -46,14 +46,7 @@ def _get_run_id() -> str:
     return _RUN_ID
 
 
-def reset_run_id() -> None:
-    """Force a new run_id (useful for testing or if a Lambda explicitly wants
-    distinct ids per logical pass within the same invocation)."""
-    global _RUN_ID
-    _RUN_ID = None
-
-
-def tag_record(record: dict, source_id: str = "unknown", phase: str | None = None) -> dict:
+def tag_record(record: dict, source_id: str = "unknown", phase: str | None = None, as_of: str | None = None) -> dict:
     """Add run_id + computed_at + phase to a compute output record. Emits metric.
 
     Mutates and returns the dict (caller can chain). Safe to call multiple
@@ -66,7 +59,10 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
       2. record["phase"] already set (preserved — no override).
       3. Auto-infer from record["sk"] if it matches DATE#YYYY-MM-DD:
          date < EXPERIMENT_START_DATE → "pilot", else "experiment".
-      4. Default: EXPERIMENT_PHASE_CURRENT ("experiment").
+      4. Otherwise from the WRITE'S OWN DATE (`as_of`, default: the Pacific calendar
+         day) against EXPERIMENT_START_DATE — pre-genesis → "pilot" (#3598). The
+         old default was the constant EXPERIMENT_PHASE_CURRENT, which stamped every
+         undated countdown-window write as the experiment.
 
     #3049 (DIL-024): this is also where a compute output picks up its
     SOURCE-COMPLETENESS manifest — what the run could actually see when it ran.
@@ -81,7 +77,7 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
     if phase is not None:
         record["phase"] = phase
     elif "phase" not in record:
-        record["phase"] = _infer_phase_from_record(record)
+        record["phase"] = _infer_phase_from_record(record, as_of=as_of)
     try:
         from common.input_manifest import stamp_output
 
@@ -92,11 +88,13 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
     return record
 
 
-def _infer_phase_from_record(record: dict) -> str:
-    """Infer phase from record sk if it embeds a date; else current phase.
+def _infer_phase_from_record(record: dict, as_of: str | None = None) -> str:
+    """Infer phase from record sk if it embeds a date; else from the write's date.
 
     Returns "pilot" for pre-EXPERIMENT_START_DATE dates, else the current
-    phase constant (typically "experiment").
+    phase constant (typically "experiment"). An undated record takes the phase of
+    the day it is WRITTEN (#3598) — the same rule experiment_stamp applies — so a
+    countdown-window write can never claim the experiment it precedes.
     """
     try:
         from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
@@ -111,7 +109,11 @@ def _infer_phase_from_record(record: dict) -> str:
             return "pilot" if date_str < EXPERIMENT_START_DATE else EXPERIMENT_PHASE_CURRENT
         except ValueError:
             pass
-    return EXPERIMENT_PHASE_CURRENT
+    if as_of is None:
+        from experiment.phase_taxonomy import _write_date
+
+        as_of = _write_date()
+    return "pilot" if str(as_of)[:10] < EXPERIMENT_START_DATE else EXPERIMENT_PHASE_CURRENT
 
 
 def _emit_write_metric(source_id: str) -> None:

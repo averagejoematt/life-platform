@@ -173,9 +173,24 @@ class ServeStack(Stack):
 
         # ── #809: site-api-ai error alarm (adopted from the 2026-05-25 orphan batch) ──
         # site-api-ai is SYNC (Function URL) — the ADR-116 DLQ path can't cover it,
-        # so it keeps a real Errors alarm. Threshold ≥3/hr like slo-mcp-availability:
-        # a single transient Bedrock hiccup surfaces to the reader as one failed ask,
-        # not an incident. Replaces the misnamed live orphan
+        # so it keeps a real Errors alarm.
+        #
+        # #3500 (owner ruling 2026-09-05, #3606 item 18.3 — "FIX, do not delete"):
+        # threshold 3 -> 1, RE-DERIVED from this surface's own measured traffic
+        # instead of inherited from another one. The old comment read "Threshold ≥3/hr
+        # like slo-mcp-availability", and that is precisely the defect: slo-mcp-
+        # availability guards a surface with a median of 5 invocations/hr, so 3/hr is
+        # reachable there; site-api-ai's failing SUB-surface (/api/board_ask) saw ~8
+        # gate attempts in 7 days. Measured (2026-09-05 review, CTO-2): across the 34h
+        # launch outage 2026-08-31T12Z→09-01T22Z the function emitted 2 Errors TOTAL
+        # (max 1.0 in any hour, n=15 hourly points); 14-day daily Errors ≤ 1; 30-day
+        # max hourly Errors = 5, once. A 100% failure of the board sub-surface could
+        # not reach 3 in an hour, so the alarm was unfirable for the outage class it
+        # exists to catch — the #3413 P1 was found by the canary, not by this.
+        # The cost of 1 is one digest LINE on a single transient Bedrock hiccup (this
+        # alarm is digest-routed, never paging — verified below, unchanged by #3500),
+        # which is the correct trade against a silent reader-facing outage.
+        # Replaces the misnamed live orphan
         # `life-platform-life-platform-site-api-ai-errors` (deleted after deploy).
         site_api_ai_errors = cloudwatch.Alarm(
             self,
@@ -189,7 +204,7 @@ class ServeStack(Stack):
                 statistic="Sum",
             ),
             evaluation_periods=1,
-            threshold=3,
+            threshold=1,
             comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
@@ -407,9 +422,16 @@ class ServeStack(Stack):
         # scheduled path has no human on the other end to notice it broke — the
         # inbound half at least has Matthew wondering why nobody answered. The
         # function was created with alerts_topic=None, so until now it had no error
-        # alarm at all. Threshold 3/hour rather than 1: the outbound gates are
-        # deliberately fail-soft and a single transient DDB/Bedrock blip is already
-        # absorbed, so one error is noise and a repeated one is a broken deploy.
+        # alarm at all.
+        #
+        # #3500 (same owner ruling as site-api-ai-errors above): threshold 3/hr -> 1.
+        # The original reasoning ("one error is noise and a repeated one is a broken
+        # deploy") is sound about SEVERITY and wrong about REACHABILITY: measured over
+        # 14 days the worker has 30 ACTIVE hours, 40 invocations total, median 1/hr,
+        # p95 5/hr, max 7/hr — so 3 errors in one clock hour requires a burst the
+        # surface has never produced, and a 100%-failure hour at the median (1 of 1)
+        # scores 1. The alarm could not fire for the outage it guards. Digest-routed
+        # (unchanged): the owner reads a broken worker in the 8AM email, not a page.
         _telegram_worker_errors = cloudwatch.Alarm(
             self,
             "TelegramWorkerErrors",
@@ -421,7 +443,7 @@ class ServeStack(Stack):
                 period=Duration.hours(1),
                 statistic="Sum",
             ),
-            threshold=3,
+            threshold=1,
             evaluation_periods=1,
             comparison_operator=GTE,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,

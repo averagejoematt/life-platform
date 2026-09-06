@@ -509,7 +509,31 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # of tests/api_schemas/api_vitals.json's real shape with one key hand-removed,
         # never the live site — proving the #3324 nullable-aware diff_shape() rule still
         # catches a genuine key removal).
-        # Upper bound raised 48 -> 56 (2026-09-05, #3544/#3545): the 49th-56th proofs are the
+        # Upper bound raised 48 -> 49 (2026-09-05, #3564): the 49th proof is
+        # `qa::lambdas/operational/qa_check_subscriber_promise.py::check_subscriber_promise_cadence`
+        # — and it needed no planted mutation, because its first run FAILED on the live
+        # production /subscribe/, naming the stale "one email a week" claim against the
+        # promise rendered from the senders' crons. Recorded in gate_census.PROVEN_CAN_FAIL
+        # with the re-runnable command; the pass side and the contradiction case are
+        # covered by tests/test_subscriber_cadence_promise_3564.py.
+        # Upper bound raised 49 -> 50 (2026-09-05, #3503): the 50th proof is
+        # `structural::test_composite_alarm_lookup_3390.py` — the #3390 one-file pin widened
+        # into a family-5 tree sweep requiring every describe_alarms/describe_alarm_history
+        # call in first-party source to state its AlarmTypes. Mutation-backed via the
+        # re-runnable harness (`gate_census_mutations.py --run --gate
+        # test_composite_alarm_lookup_3390.py`: ARMED 1/1, planting an untracked
+        # deploy/_census_probe_3503.py whose whole-estate sweep omits AlarmTypes).
+        # Upper bound raised 50 -> 51 (2026-09-06, #3568): the 51st proof is
+        # `structural::test_email_sender_identity_3568.py` — the sending-vocabulary census,
+        # which checks every code default and every CDK EMAIL_SENDER literal against the
+        # committed set of SES-verified domains, and additionally pins reader mail to the
+        # site domain. Mutation-backed via the re-runnable harness
+        # (`gate_census_mutations.py --run --gate test_email_sender_identity_3568.py`:
+        # ARMED 1/1, planting an untracked lambdas/common/_census_probe_3568.py whose
+        # sender default names a .invalid domain SES can never have verified).
+        # BASELINE_TOTAL_GATES is deliberately NOT moved: #3588/#3629 net-removed one gate
+        # in the same window, so the live total stays at the committed 597.
+        # Upper bound raised 53 -> 61 (2026-09-06, #3544/#3545): the eight new proofs are the
         # eight entries of `registry::tests/test_token_contrast.py::RECEDE_TEXT_RULES`, recorded
         # in gate_census_proofs.REGISTRY_PROOFS. Each is mutation-backed PER ENTRY, not once for
         # the set: `test_recede_guard_reds_when_the_shipped_opacity_comes_back` is parametrised
@@ -520,7 +544,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # grow unproven — which is the exact failure mode #3544 documented.
         3
         <= len(proven)
-        <= 56
+        <= 61  # 53 -> 61: #3544/#3545's eight RECEDE_TEXT_RULES entries, atop #3581's two proven mirror registries — measured on the merged tree (2026-09-06), not arithmetic
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

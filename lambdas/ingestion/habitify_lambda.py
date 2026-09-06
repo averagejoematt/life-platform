@@ -466,6 +466,20 @@ _config = IngestionConfig(
     # forever (pending is excluded from the pct denominator) and late-evening
     # checks never landed. One trailing-day refresh finalizes yesterday every run.
     refresh_trailing_days=1,
+    # #3504 (PR #2877's own body called this fast-follow "not done here", and it was
+    # never ticketed until the 2026-09-05 review found it): Habitify is in
+    # freshness_checker_lambda.DAILY_SOURCES with behavioral=False, so a day with no
+    # record is never a normal lapse — it is either a pipeline miss or a measured
+    # vendor absence, and the interior-gap alarm (Maximum(InteriorGapCount) >= 1 over a
+    # 14-day lookback) holds red until the day ages out of the window with no way to
+    # self-clear. #2643's marker is what closes it honestly: on the LAST run that will
+    # ever look at a date (the oldest day in the gap-fill window), a still-empty fetch
+    # writes an explicit `absent: True` record instead of letting the hole vanish.
+    # Eight Sleep has carried this since #2643; whoop and habitify are the two other
+    # framework-based DAILY_SOURCES members and now do too —
+    # tests/test_source_enumeration_drift.py asserts the SET, so a fourth one cannot
+    # enter without it.
+    record_gap_exhausted_absence=True,
 )
 
 

@@ -520,7 +520,7 @@ def main():
                 "the raw alarm's direct urgent-topic routing is unchanged from #1961's pre-fix state until then",
             )
         else:
-            raw = cw_tok.describe_alarms(AlarmNames=["ai-tokens-platform-daily-total"]).get("MetricAlarms", [])
+            raw = cw_tok.describe_alarms(AlarmNames=["ai-tokens-platform-daily-total"], AlarmTypes=["MetricAlarm"]).get("MetricAlarms", [])
             raw_actions = raw[0].get("AlarmActions", []) if raw else None
             # #3390: the detail branched on `if raw_actions`, so the PASSING state (an
             # empty action list — exactly what #2116 wants) rendered as "raw alarm
@@ -565,7 +565,7 @@ def main():
     # not the known reset artifact, and fails loudly.
     try:
         cw = boto3.client("cloudwatch", region_name=REGION)
-        alarms = cw.describe_alarms(AlarmNames=["compute-pipeline-stale"])["MetricAlarms"]
+        alarms = cw.describe_alarms(AlarmNames=["compute-pipeline-stale"], AlarmTypes=["MetricAlarm"])["MetricAlarms"]
         alarm_state = alarms[0]["StateValue"] if alarms else "MISSING"
         if alarm_state != "ALARM":
             check("compute-pipeline-stale is not a reset-predictable false red (#1962)", True, f"state={alarm_state}")

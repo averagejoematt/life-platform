@@ -393,9 +393,21 @@ function renderDomains() {
 
   const c = state.pillars.consistency;
   if (c) {
+    // #3522: the pillar ROWS above already refuse to print an unmeasured score (#747),
+    // but this band printed `raw_score ?? 0` unconditionally — so on a fresh cycle
+    // "WHERE YOU STAND" still showed a consistency of 0 with an empty bar, which reads
+    // as "measured, and it is zero". Same held vocabulary as the rows: no bar, "n/a".
+    const notInstrumented = !!c.not_instrumented;
     const score = Math.round(c.raw_score ?? 0);
-    bind("consistency-fill").style.width = `${Math.min(100, score)}%`;
-    bind("consistency-val").textContent = score;
+    bind("consistency-fill").style.width = notInstrumented ? "0%" : `${Math.min(100, score)}%`;
+    bind("consistency-val").textContent = notInstrumented ? "n/a" : String(score);
+    const cv = bind("consistency-val");
+    if (cv) {
+      cv.classList.toggle("label", notInstrumented);
+      cv.classList.toggle("num", !notInstrumented);
+      if (notInstrumented) cv.title = "not yet instrumented";
+      else cv.removeAttribute("title");
+    }
   }
 }
 

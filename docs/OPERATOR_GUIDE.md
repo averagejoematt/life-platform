@@ -174,7 +174,7 @@ aws ce get-cost-and-usage \
   --query 'ResultsByTime[0].Groups[].{Service:Keys[0],Cost:Metrics.UnblendedCost.Amount}' --output table
 ```
 
-If Anthropic is the cause, check the daily-brief AI token alarm `ai-tokens-daily-brief-daily` and the `LifePlatform/AI` metrics.
+If Anthropic is the cause, check the daily-brief AI token alarm `ai-tokens-daily-brief-runaway` and the `LifePlatform/AI` metrics.
 
 ### MCP Tool Usage Audit
 

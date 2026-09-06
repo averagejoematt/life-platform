@@ -296,3 +296,115 @@ def test_headroom_skips_exempt_and_ungated_docs(tmp_path, monkeypatch):
     _write_engine_doc(tmp_path, monkeypatch, name="FROZEN.md", verified=None, sources_line=False)
     monkeypatch.setattr(cdi, "ENGINE_DOC_EXEMPT", {"FROZEN.md": "frozen"})
     assert cdi.engine_doc_headroom(git_date_fn=lambda p: date(2026, 8, 9)) == []
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# #3534 — the gate must judge the tree it is ABOUT TO COMMIT, not only the committed tree
+#
+# Gate 5 dated every source by `git log -1` alone. The reset pipeline never commits (it
+# leaves that to the operator) and runs its gate sweep LAST, on a tree full of uncommitted
+# rewrites — so `config/character_sheet.json`, git-tracked and rewritten by every reset,
+# was structurally invisible to the one gate being asked whether the tree was safe to
+# commit. The cost was a standing hand-remembered step ("re-verify CHARACTER.md") carried
+# forward in the handover, reset after reset, instead of a gate that reds.
+#
+# These run against a REAL throwaway git repo, not an injected date function: the whole
+# defect lived in the git plumbing, so a test that mocks the plumbing would have passed
+# before the fix too.
+# ══════════════════════════════════════════════════════════════════════════════════════
+
+
+def _git(repo, *args, when=None):
+    env = dict(os.environ)
+    if when:
+        # %cs is the COMMITTER date; `git commit --date` only moves the AUTHOR date, so a
+        # fixture that pinned only the author date would be dated TODAY and flag on a clean
+        # tree — which is how a "control" quietly stops controlling anything.
+        env["GIT_COMMITTER_DATE"] = when
+        env["GIT_AUTHOR_DATE"] = when
+    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True, env=env)
+
+
+def _real_repo_engine_doc(tmp_path, monkeypatch, verified):
+    """A throwaway git repo containing one engine doc and its declared source, committed."""
+    repo = tmp_path / "repo"
+    (repo / "docs" / "engines").mkdir(parents=True)
+    (repo / "lambdas").mkdir()
+    src_rel = "lambdas/fake_engine.py"
+    (repo / src_rel).write_text("VERSION = 1\n", encoding="utf-8")
+    (repo / "docs" / "engines" / "FAKE.md").write_text(_HEADER.format(verified=verified) + _SOURCES.format(src=src_rel), encoding="utf-8")
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "t")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "seed", when="2020-01-01T00:00:00 +0000")
+    monkeypatch.setattr(cdi, "ROOT", repo)
+    monkeypatch.setattr(cdi, "ENGINES", repo / "docs" / "engines")
+    return repo, src_rel
+
+
+def test_a_clean_tree_is_not_flagged_the_positive_control(tmp_path, monkeypatch):
+    """The control that makes the mutation below mean something: with the source committed
+    long before the verify date and the tree clean, the gate says nothing."""
+    repo, _ = _real_repo_engine_doc(tmp_path, monkeypatch, verified="2026-07-10")
+    assert _git(repo, "status", "--porcelain").stdout == ""
+    flagged, _notes = cdi.check_engine_source_freshness()
+    assert flagged == []
+
+
+def test_an_UNCOMMITTED_source_rewrite_reds_the_gate(tmp_path, monkeypatch):
+    """THE MUTATION TEST (#3534): dirty a declared source, assert strict red.
+
+    This is the reset's situation exactly — the file is rewritten and not yet committed.
+    """
+    repo, src_rel = _real_repo_engine_doc(tmp_path, monkeypatch, verified="2026-07-10")
+    (repo / src_rel).write_text("VERSION = 2\n", encoding="utf-8")
+    flagged, _notes = cdi.check_engine_source_freshness()
+    assert [(d, s) for d, s, _c, _v in flagged] == [("docs/engines/FAKE.md", src_rel)]
+    assert flagged[0][2] == date.today().isoformat(), "an uncommitted rewrite is dated today"
+
+
+def test_the_commit_date_leg_ALONE_would_have_missed_it(tmp_path, monkeypatch):
+    """The negative control that proves the working-tree leg is load-bearing rather than
+    decorative: run the same dirty tree through the OLD dating function and watch it pass.
+    If this ever starts flagging, the union above is no longer what is doing the work."""
+    repo, src_rel = _real_repo_engine_doc(tmp_path, monkeypatch, verified="2026-07-10")
+    (repo / src_rel).write_text("VERSION = 2\n", encoding="utf-8")
+    assert cdi.check_engine_source_freshness(git_date_fn=cdi._git_last_commit_date)[0] == []
+
+
+def test_an_UNTRACKED_declared_source_is_dated_today_not_skipped(tmp_path, monkeypatch):
+    """A brand-new source file the reset wrote has NO commit date at all. Under the old
+    code that was a `git last-commit date unavailable` note — a silent skip. It is a change
+    the doc has never been verified against, so it must flag."""
+    repo, src_rel = _real_repo_engine_doc(tmp_path, monkeypatch, verified="2026-07-10")
+    (repo / "lambdas" / "new_engine.py").write_text("VERSION = 1\n", encoding="utf-8")
+    doc = repo / "docs" / "engines" / "FAKE.md"
+    doc.write_text(doc.read_text(encoding="utf-8").replace(f"`{src_rel}`", "`lambdas/new_engine.py`"), encoding="utf-8")
+    flagged, _notes = cdi.check_engine_source_freshness()
+    assert [(d, s) for d, s, _c, _v in flagged] == [("docs/engines/FAKE.md", "lambdas/new_engine.py")]
+
+
+def test_headroom_uses_the_same_union_so_the_two_reports_cannot_disagree(tmp_path, monkeypatch):
+    """The advisory headroom report and the blocking gate must date sources identically —
+    a headroom line saying '90d of room' about a file the gate is failing on is worse than
+    no report at all."""
+    repo, src_rel = _real_repo_engine_doc(tmp_path, monkeypatch, verified="2026-07-10")
+    (repo / src_rel).write_text("VERSION = 2\n", encoding="utf-8")
+    rows = cdi.engine_doc_headroom()
+    assert rows and rows[0][3] == date.today().isoformat()
+
+
+def test_working_tree_paths_are_parsed_including_renames_and_untracked(tmp_path, monkeypatch):
+    repo, src_rel = _real_repo_engine_doc(tmp_path, monkeypatch, verified="2026-07-10")
+    (repo / "untracked.txt").write_text("x", encoding="utf-8")
+    _git(repo, "mv", src_rel, "lambdas/renamed_engine.py")
+    paths = cdi._working_tree_changed_paths(repo)
+    assert "untracked.txt" in paths
+    assert src_rel in paths and "lambdas/renamed_engine.py" in paths
+
+
+def test_an_unreadable_git_never_narrows_the_verdict(tmp_path, monkeypatch):
+    """Widening machinery that cannot read its input must fall back to the commit-date leg,
+    not to silence. (Here: a directory that is not a git repo at all.)"""
+    assert cdi._working_tree_changed_paths(tmp_path) == frozenset()

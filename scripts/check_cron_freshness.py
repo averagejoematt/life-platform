@@ -134,6 +134,25 @@ ORPHANED = "orphaned"
 
 REPORTABLE = (STALE, NEVER_FIRED, UNRULED, ORPHANED)
 
+# ── #3541: the live grace derivation ─────────────────────────────────────────
+#
+# scripts/scheduled_workflow_registry.py's WATCH_POLICY `grace_hours` is a snapshot
+# taken from a founding-week measurement. #3237's own decode named the durable fix
+# (disposition item 3): "re-deriving grace from the measured distribution rather than
+# from the last maximum". These constants are that re-derivation's parameters, kept
+# here (not the registry) because the registry is deliberately network-free — this
+# module is the one IO layer allowed to call the Actions API.
+GRACE_HISTORY_SAMPLE = 60  # trailing scheduled runs sampled per workflow
+GRACE_MARGIN = 1.5  # multiplier over the observed max gap in that sample
+# Fewer than this many historical runs is the NEWBORN case: too little history to
+# safely widen (or narrow) the registry's declared grace. A workflow whose cron was
+# added yesterday has no distribution to measure yet, and deriving "1.5x the one gap
+# we happen to have seen" would be exactly the founding-week-snapshot mistake this
+# fix exists to retire, just re-committed on a shorter clock. The newborn rule: fall
+# back to the registry literal ALONE (never lowered, never live-widened) until the
+# sample clears this floor.
+NEWBORN_MIN_SAMPLES = 20
+
 
 # ── pure classification (offline-tested) ─────────────────────────────────────
 
@@ -166,6 +185,41 @@ def _parse_iso(ts: str | None) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def derive_live_grace_hours(
+    timestamps_oldest_first: list[str], *, margin: float = GRACE_MARGIN, min_samples: int = NEWBORN_MIN_SAMPLES
+) -> tuple[float | None, str]:
+    """(derived_grace_hours_or_None, note) — #3541. Pure: takes a plain list of ISO
+    timestamp strings (oldest first), never fetches anything.
+
+    Fewer than `min_samples` parseable timestamps is the NEWBORN case: too little
+    history to safely re-derive a grace window, so this deliberately returns `None`
+    rather than a number computed from a sample too small to trust — the caller then
+    falls back to the registry's declared `grace_hours` literal alone (never widened,
+    never narrowed). Otherwise the derived grace is `margin` times the largest gap
+    actually observed between consecutive fires in the sample — the #3237 disposition
+    item 3 fix, generalised: a grace window built from the measured DISTRIBUTION,
+    re-computed every run, rather than a founding-week snapshot of the last-seen max.
+    """
+    parsed = sorted(p for p in (_parse_iso(t) for t in timestamps_oldest_first) if p is not None)
+    if len(parsed) < min_samples:
+        return None, f"newborn: only {len(parsed)} scheduled run(s) observed (<{min_samples}) — registry literal used as-is"
+    gaps_hours = [(b - a).total_seconds() / 3600.0 for a, b in zip(parsed, parsed[1:])]
+    if not gaps_hours:
+        return None, "newborn: fewer than two usable timestamps — no gap to measure"
+    max_gap = max(gaps_hours)
+    return max_gap * margin, f"live: max gap {max_gap:.2f}h over {len(parsed)} runs x {margin} margin = {max_gap * margin:.2f}h"
+
+
+def effective_grace_hours(declared_grace_hours: float, live_grace_hours: float | None) -> float:
+    """#3541: the registry literal is a FLOOR, never a ceiling — `max()`, not a
+    replacement. A live derivation below the declared literal (a workflow that has
+    recently started firing MORE reliably than its founding week) must not narrow the
+    window; only a live measurement that exceeds the declared literal should widen it."""
+    if live_grace_hours is None:
+        return declared_grace_hours
+    return max(float(declared_grace_hours), float(live_grace_hours))
 
 
 def evaluate(rows: dict[str, dict[str, Any]], newest_by_file: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
@@ -201,8 +255,21 @@ def evaluate(rows: dict[str, dict[str, Any]], newest_by_file: dict[str, Any], no
     return findings
 
 
-def render(findings: list[dict[str, Any]], unruled: list[str], orphaned: list[str], scheduled_total: int) -> tuple[int, str]:
-    """(exit_code, report). Pure — the whole verdict is decided here and unit-tested."""
+def render(
+    findings: list[dict[str, Any]],
+    unruled: list[str],
+    orphaned: list[str],
+    scheduled_total: int,
+    grace_notes: dict[str, str] | None = None,
+) -> tuple[int, str]:
+    """(exit_code, report). Pure — the whole verdict is decided here and unit-tested.
+
+    `grace_notes` (#3541, optional — every pre-existing caller keeps working unchanged)
+    is `{file: note}` from `derive_live_grace_hours`, printed under each finding so a
+    reader can see WHY today's grace is what it is — live-derived, or the registry
+    literal because the cron is newborn or the live lookup failed — rather than trusting
+    an unlabelled number.
+    """
     lines: list[str] = []
     add = lines.append
     add("=" * 78)
@@ -235,6 +302,9 @@ def render(findings: list[dict[str, Any]], unruled: list[str], orphaned: list[st
             f"  [{mark}] {f['file']:<34} newest sched run {age} ago "
             f"(deadline {f['deadline_hours']}h = cadence {f['cadence_hours']}h + grace {f['grace_hours']}h)"
         )
+        _note = (grace_notes or {}).get(f["file"])
+        if _note:
+            add(f"           grace (#3541): {_note}")
         if f["verdict"] == STALE:
             add(f"           cron {f['crons']} — newest scheduled run {f['newest_scheduled_run']}")
             add("           GitHub has not delivered this cron inside its window. This is an")
@@ -296,6 +366,40 @@ def newest_scheduled_run(workflow_file: str) -> Any:
     return out or None
 
 
+def scheduled_run_history(workflow_file: str, per_page: int = GRACE_HISTORY_SAMPLE) -> Any:
+    """The trailing `per_page` `event: schedule` runs' `created_at` timestamps for
+    `workflow_file`, OLDEST FIRST (the shape `derive_live_grace_hours` wants).
+
+    Sentinel-compatible with `newest_scheduled_run`: `False` on a failed lookup
+    (auth/rate-limit/network — the caller must not read that as "zero history"), a
+    (possibly empty) list on success. A short list is not a failure — it is exactly
+    the newborn-cron signal `derive_live_grace_hours` is built to recognise.
+    """
+    try:
+        out = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{{owner}}/{{repo}}/actions/workflows/{workflow_file}/runs?event=schedule&per_page={per_page}",
+                "--jq",
+                "[.workflow_runs[].created_at] | reverse",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return False
+    if not out:
+        return []
+    try:
+        parsed = json.loads(out)
+    except json.JSONDecodeError:
+        return False
+    return parsed if isinstance(parsed, list) else False
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--json", action="store_true", help="machine-readable findings on stdout")
@@ -317,12 +421,52 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     now = datetime.now(timezone.utc)
-    newest = {name: newest_scheduled_run(name) for name, row in rows.items() if row.get("watched")}
+    watched_names = [name for name, row in rows.items() if row.get("watched")]
+    newest = {name: newest_scheduled_run(name) for name in watched_names}
+
+    # #3541: re-derive each watched workflow's grace from its OWN measured fire
+    # history every run, rather than trusting the registry's founding-week snapshot
+    # forever. The registry literal is a FLOOR (effective_grace_hours never narrows
+    # it); a newborn cron (or a failed history lookup) falls back to that literal
+    # alone, so a brand-new watched workflow never inherits a false-tight window
+    # derived from a handful of its first-ever fires.
+    grace_notes: dict[str, str] = {}
+    for name in watched_names:
+        if newest.get(name) is False:
+            # The basic recency lookup already failed (auth/rate-limit/network) — this
+            # row is already UNVERIFIED; don't spend a second Actions call learning the
+            # same thing about its history.
+            grace_notes[name] = "registry literal used — live history lookup skipped (recency lookup already unverified)"
+            continue
+        history = scheduled_run_history(name)
+        if history is False:
+            grace_notes[name] = "registry literal used — live history lookup failed (unverified)"
+            continue
+        live_grace, note = derive_live_grace_hours(history)
+        grace_notes[name] = note
+        declared = rows[name]["grace_hours"]
+        effective = effective_grace_hours(declared, live_grace)
+        if effective != declared:
+            rows[name]["grace_hours"] = round(effective, 2)
+            rows[name]["deadline_hours"] = round(rows[name]["cadence_hours"] + effective, 2)
+
     findings = evaluate(rows, newest, now)
-    code, report = render(findings, unruled, orphaned, len(rows))
+    code, report = render(findings, unruled, orphaned, len(rows), grace_notes)
 
     if args.json:
-        print(json.dumps({"now": now.isoformat(), "exit": code, "findings": findings, "unruled": unruled, "orphaned": orphaned}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "now": now.isoformat(),
+                    "exit": code,
+                    "findings": findings,
+                    "unruled": unruled,
+                    "orphaned": orphaned,
+                    "grace_notes": grace_notes,
+                },
+                indent=2,
+            )
+        )
     else:
         print(report)
 

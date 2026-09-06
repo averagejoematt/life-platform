@@ -13,9 +13,18 @@ Covers:
     life-platform-daily-brief-errors    Errors Sum >= 1, 300s
     life-platform-daily-brief-invocations Invocations Sum < 1, 93600s
 
-  AI token budget alarms (13):
-    ai-tokens-<lambda>-daily  AnthropicOutputTokens Sum, 86400s
-    Per-Lambda threshold: 1818 (most); 30000 (daily-brief); 250000 (platform total)
+  AI token + spend alarms (4 raw + 4 composite) — declared in the cohesive sibling
+  cdk/stacks/monitoring_token_alarms.py since #3505, which also corrected the stale
+  "13" this line used to carry, six months behind the 2026-03-10 COST-A consolidation
+  to two. BOTH NUMBERS ABOVE ARE DERIVED from that file by
+  tests/test_token_alarm_composite_2116.py::test_the_docstring_states_the_real_count,
+  so this line cannot rot again:
+    ai-tokens-daily-brief-runaway      AnthropicOutputTokens Sum >= 35000, 3600s (ONE run)
+    ai-tokens-platform-daily-total     AnthropicOutputTokens Sum >= 250000, 86400s
+    token-alarm-genesis-window-active  TokenAlarmGenesisWindowActive gauge (no routing)
+    ai-daily-spend-high                EstimatedCostUSD Sum >= $6, 86400s
+    composites: ai-tokens-platform-daily-total-{urgent,genesis-window} (#2116) and
+                ai-daily-spend-high-{urgent,genesis-window} (#3505)
 
   DynamoDB item-size warning (1):
     life-platform-ddb-item-size-warning  LifePlatform/DynamoDB ItemSizeBytes Max >= 307200, 300s
@@ -74,6 +83,7 @@ from stacks.monitoring_compute_alarms import add_compute_alarms  # #3473: comput
 from stacks.monitoring_dashboards import add_dashboards  # #2610: the dashboards live in a sibling
 from stacks.monitoring_prediction_alarms import add_prediction_alarms  # #727/#3046: the science alarms, same seam
 from stacks.monitoring_silence_alarms import add_silence_alarms  # #2977: the fail-soft token alarms, same seam
+from stacks.monitoring_token_alarms import add_token_alarms  # #3505: the AI token/spend family, same seam
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
@@ -758,146 +768,13 @@ class MonitoringStack(Stack):
             treat_missing=cloudwatch.TreatMissingData.BREACHING,  # #2754 — see daily-brief above
         )
 
-        # AI token budget alarms — consolidated 2026-03-10 (COST-A)
-        # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief
-        # (highest-cost Lambda) + platform total (catch-all).
-        # ══════════════════════════════════════════════════════════════
-        # 2026-05-03: bumped threshold 13333 → 18000. Today's healthy brief
-        # used 14414 tokens (above old threshold). With IC-3 max_tokens bumped
-        # to 600 + 6 coach narratives + ensemble, healthy budget is ~14-16k.
-        # 2026-05-28: bumped 18000 → 30000. Normal usage had crept to ~18003
-        # (8 coach V2 narratives post-restart), so 18000 sat right at the daily
-        # baseline and false-fired almost every day into the alarm digest.
-        # 30000 alerts only on a genuine ~1.7x spike, not normal operation.
-        _alarm(
-            "AiTokensDailyBriefDaily",
-            "ai-tokens-daily-brief-daily",
-            "LifePlatform/AI",
-            "AnthropicOutputTokens",
-            86400,
-            "Sum",
-            30000,
-            GTE,
-            {"LambdaFunction": "daily-brief"},
-            to_digest=True,
-        )
-
-        # Platform-level total (no dims). 2026-09-04 (#3474): 150000 → 250000, re-derived (ADR-105). Set in 2026-06
-        # against a ~59k/day baseline peaking ~121k, 150000 had become the platform's
-        # 75th PERCENTILE and fired on the ordinary working day. n=31 daily Sums to
-        # 2026-09-02: median 87,046 · Q3 145,161 · max 492,314, every breach on a
-        # working session — so the question is "anomalous for THIS distribution", and
-        # two robust estimators bracket it: Tukey Q3+1.5·IQR = 260,014, median+3·MAD·
-        # 1.4826 = 221,743. Fire rate 25.8% [13.7%, 43.2%] → 9.7% [3.3%, 24.9%] n=31,
-        # i.e. 7.7 → 2.9 per 30d. NOT a budget guard: 250k/day of output is ~$112/mo
-        # at sonnet's $15/1M against a $215 ceiling — sustained burn is cost_governor's
-        # tiering; this is the single-day outlier detector beside it.
-        #
-        # #1961 -> #2116 (this block closes #1961's residual gap, flagged in
-        # PR #2114): a genesis's predictable post-reset full-cycle rebuild spike
-        # (character sheet + compute + coach dossiers + chronicle backfill all
-        # regenerating at once) can clear 150000 and page exactly like an
-        # unexplained runaway (cycle 11 did, twice). #2114 fixed the AUTOMATED
-        # remediation-triage escalation (Lambda-side,
-        # `lambdas/common/token_alarm_window.py`, consulted by
-        # remediation_dispatcher_lambda.py) but left the raw CloudWatch alarm's
-        # own SNS action — routed straight to the urgent topic, which ALSO
-        # carries a direct human EmailSubscription (operational_stack.py) — with
-        # no window awareness at all: a predicted spike still emailed the
-        # operator directly.
-        #
-        # Mechanism (the composite-alarm design #2114 flagged as the follow-up):
-        # `lambdas/operational/cost_governor_lambda.py` (already on its existing
-        # 8h cron — no new schedule, #781) now publishes a
-        # LifePlatform/AI::TokenAlarmGenesisWindowActive 1/0 gauge from the SAME
-        # stamped window the dispatcher consults. The raw threshold alarm below
-        # carries NO SNS action of its own anymore — it exists only as a signal
-        # two composite alarms combine with the window gauge:
-        #   ai-tokens-platform-daily-total-urgent          breach AND NOT in-window -> urgent topic
-        #   ai-tokens-platform-daily-total-genesis-window  breach AND     in-window -> digest topic
-        # so a genesis-week breach is still recorded (digest), never paged, and
-        # an out-of-window breach still pages exactly as before #2116. This is a
-        # CDK-only change — NEEDS `cdk deploy LifePlatformMonitoring` to take
-        # effect; until that deploy, the raw alarm's behavior (and the direct
-        # human email) is UNCHANGED from #1961's pre-fix state.
-        ai_tokens_platform_metric = cloudwatch.Metric(
-            namespace="LifePlatform/AI",
-            metric_name="AnthropicOutputTokens",
-            period=Duration.seconds(86400),
-            statistic="Sum",
-        )
-        ai_tokens_platform_alarm = cloudwatch.Alarm(
-            self,
-            "AiTokensPlatformTotal",
-            alarm_name="ai-tokens-platform-daily-total",
-            metric=ai_tokens_platform_metric,
-            evaluation_periods=1,
-            threshold=250000,
-            comparison_operator=GTE,
-            treat_missing_data=NB,
-        )
-
-        # The window-gauge sub-alarm — NOT itself routed to any topic; it exists
-        # only to give the composite alarms below a boolean ALARM/OK state to
-        # combine with the threshold breach. Period matches cost_governor's 8h
-        # cadence. Missing data (gauge hasn't published recently) is
-        # NOT_BREACHING, i.e. "assume not in window" — the same fail-safe
-        # direction as token_alarm_window.py's own malformed-stamp handling: a
-        # missing/stale gauge must never silently suppress a real page.
-        genesis_window_metric = cloudwatch.Metric(
-            namespace="LifePlatform/AI",
-            metric_name="TokenAlarmGenesisWindowActive",
-            period=Duration.seconds(28800),
-            statistic="Maximum",
-        )
-        genesis_window_alarm = cloudwatch.Alarm(
-            self,
-            "TokenAlarmGenesisWindowActive",
-            alarm_name="token-alarm-genesis-window-active",
-            metric=genesis_window_metric,
-            evaluation_periods=1,
-            threshold=1,
-            comparison_operator=GTE,
-            treat_missing_data=NB,
-        )
-
-        _token_platform_breach = cloudwatch.AlarmRule.from_alarm(ai_tokens_platform_alarm, cloudwatch.AlarmState.ALARM)
-        _in_genesis_window = cloudwatch.AlarmRule.from_alarm(genesis_window_alarm, cloudwatch.AlarmState.ALARM)
-
-        ai_tokens_platform_urgent = cloudwatch.CompositeAlarm(
-            self,
-            "AiTokensPlatformUrgent",
-            composite_alarm_name="ai-tokens-platform-daily-total-urgent",
-            alarm_rule=cloudwatch.AlarmRule.all_of(_token_platform_breach, cloudwatch.AlarmRule.not_(_in_genesis_window)),
-        )
-        ai_tokens_platform_urgent.add_alarm_action(cw_actions.SnsAction(topic))
-
-        ai_tokens_platform_in_window = cloudwatch.CompositeAlarm(
-            self,
-            "AiTokensPlatformInGenesisWindow",
-            composite_alarm_name="ai-tokens-platform-daily-total-genesis-window",
-            alarm_rule=cloudwatch.AlarmRule.all_of(_token_platform_breach, _in_genesis_window),
-        )
-        ai_tokens_platform_in_window.add_alarm_action(cw_actions.SnsAction(digest))
-
-        # G2: daily AI-spend ceiling — the anomaly guard. EstimatedCostUSD is
-        # emitted (dimensionless) at the bedrock_client chokepoint (G1), so this
-        # SUM covers EVERY AI call platform-wide, not just the daily brief.
-        # Normal is ~$1.3/day; weekly-digest/podcast days add ~$1-2. $6/day is a
-        # ~4x runaway (≈$180/mo pace) — well clear of legitimate peaks. URGENT
-        # (not digest): a cost runaway should page promptly, not batch overnight.
-        # Future: swap to a CloudWatch anomaly-detection band once this metric
-        # has ~2 weeks of history to train on.
-        _alarm(
-            "AiDailySpendHigh",
-            "ai-daily-spend-high",
-            "LifePlatform/AI",
-            "EstimatedCostUSD",
-            86400,
-            "Sum",
-            6.0,
-            GTE,
-        )
+        # AI token + spend alarms (2 raw token alarms, the AI-spend ceiling, the
+        # genesis-window gauge and the four composites built on it) live in the cohesive
+        # sibling cdk/stacks/monitoring_token_alarms.py — extracted by #3505 under the
+        # module-size ratchet's extract-don't-raise rule, same seam as the dashboards
+        # (#2610) and the silence alarms (#2977). Construct ids are unchanged, so the
+        # move itself is a template no-op; what #3505 changed is documented there.
+        add_token_alarms(self, topic, digest)
 
         # ══════════════════════════════════════════════════════════════
         # SS-03: budget-tier HARD-STOP alarm — the kill-switch can't be silent.

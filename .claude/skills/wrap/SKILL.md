@@ -229,13 +229,25 @@ an outcome.**
 - **If something load-bearing was retired** (script/service/pattern): add a rule to
   `docs/_lint/tombstones.txt` in the same commit — that is what stops every other page
   from teaching the dead path (the #781 lesson).
-- Run the machinery before the wrap commit — all must be green (the four checkers
-  already ran in the Phase 1 batch; re-run them individually only while fixing a red):
+- Run the machinery before the wrap commit — all must be green (the doc gates already ran
+  in the Phase 1 batch; re-run them individually only while fixing a red):
   ```bash
   python3 deploy/sync_doc_metadata.py --apply
-  python3 scripts/check_doc_links.py && python3 scripts/check_doc_tombstones.py && \
-  python3 scripts/check_doc_index.py && python3 scripts/generate_adr_index.py --check
+  python3 scripts/wrap_gates.py --list        # what the battery runs, DERIVED — read it here, not from a list in this file
   ```
+  **Do not restate the doc-gate list here (#3531).** This section used to name four —
+  doc-links, doc-tombstones, doc-index (without `--strict`, while Docs CI runs it WITH)
+  and adr-index — while `.github/workflows/docs-ci.yml` ran **twelve**, and the wrap commit
+  touches `docs/**`, `CLAUDE.md` and `.claude/**`, which is exactly Docs CI's push trigger.
+  So the battery reported green over eight gates the very next push failed on — including
+  `check_doc_facts.py`, which line 149 above describes as guarding the doc surface.
+  `wrap_gates.py` now DERIVES its doc leg from `docs-ci.yml` through
+  `deploy/restart_verify_gates.py`'s `docs_ci_gate_commands()` — the same one derivation the reset
+  sweep uses — so a thirteenth CI gate joins this battery with no edit to the script and no
+  edit here. Its ONE declared omission is `restart_verify_gates.MUTATING_GATES`
+  (`skill_lint.py --self-test`, which edits a tracked SKILL.md in place); the reason is
+  written at the `derived_doc_gates()` definition, and
+  `tests/test_restart_verify_gates_3477.py` fails if the battery ever omits anything else.
   **`sync_doc_metadata.py --apply` is the doc-sync literal treadmill** (#3007): it
   stamps ~8 unrelated docs (`alarm`/`lambda_count`/`tool_count` doc headers — the
   counters themselves moved to the generated `lambdas/web/platform_counts.py` in #3101)

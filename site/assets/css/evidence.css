@@ -289,6 +289,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .hyp-verdict { border-left: 2px solid var(--rule); padding-left: var(--sp-2); }
 .rd-line { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); }
 .rd-line .label { display: inline; margin-right: var(--sp-2); }
+/* #3521: the provenance stamp on a prior-cycle personal measurement — quieter than
+   the claim it dates, never a badge. */
+.rd-line .rd-asof { color: var(--ink-faint); margin-right: 0; }
 .rd-line.rd-up .label { color: var(--ember); } .rd-line.rd-down .label { color: var(--ink-muted); }
 .rd-meta { margin-top: var(--sp-3); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
 /* Temporal-frame header above a group of trends (last-night vs same-day). */

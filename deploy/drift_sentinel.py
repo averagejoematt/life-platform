@@ -711,7 +711,8 @@ def check_doc_literals():
         live_alarms = 0
         token = None
         while True:
-            kw = {"MaxRecords": 100}
+            # #3503: without AlarmTypes the CompositeAlarms term below is dead code.
+            kw = {"MaxRecords": 100, "AlarmTypes": ["CompositeAlarm", "MetricAlarm"]}
             if token:
                 kw["NextToken"] = token
             resp = cw.describe_alarms(**kw)

@@ -25,7 +25,7 @@ if (action === 'confirmed') {
   sb.style.display = 'block';
   stateIcon(sb, 'check');
   sb.querySelector('.st').textContent = "You're in.";
-  sb.querySelector('.sb').innerHTML = "Subscription confirmed. You'll get The Measured Life every Wednesday.<br><br><a href=\"/story/chronicle/\">Read the chronicle while you wait →</a>";
+  sb.querySelector('.sb').innerHTML = "Subscription confirmed. At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.<br><br><a href=\"/story/chronicle/\">Read the chronicle while you wait →</a>";
 }
 if (action === 'unsubscribed') {
   document.getElementById('form-block').style.display = 'none';

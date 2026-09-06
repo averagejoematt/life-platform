@@ -52,41 +52,103 @@ exactly as an unstamped one did.
 
 v1.0.0 — 2026-06-07 (ADR-077; supersedes the ad-hoc lists in the restart tools)
 v1.1.0 — 2026-07-18 (#1233; add experiment_stamp() for write-time provenance)
+v1.2.0 — 2026-09-05 (#3598; the stamp derives phase + cycle from the WRITE'S DATE
+          against CYCLE_GENESES — a countdown-window write is pilot/closing-cycle,
+          never the experiment)
 """
 
 from __future__ import annotations
 
+_GENESES_CACHE: dict = {"value": None}
 
-def experiment_stamp(ssm_client=None, include_phase: bool = True) -> dict:
+
+def _cycle_geneses() -> dict | None:
+    """The cycle → genesis registry (site_api_data.CYCLE_GENESES), imported lazily
+    and fail-soft like coach_domain_facts / og_moments do. Only a successful import
+    is cached (the #1948 rule: a failed read must not latch). None when unavailable."""
+    if _GENESES_CACHE["value"] is None:
+        try:
+            from web.site_api_data import CYCLE_GENESES
+
+            _GENESES_CACHE["value"] = {int(k): str(v)[:10] for k, v in CYCLE_GENESES.items()}
+        except Exception:  # noqa: BLE001 — provenance never breaks a write
+            return None
+    return _GENESES_CACHE["value"]
+
+
+def _write_date() -> str:
+    """The write's own calendar day — Pacific, the calendar every genesis is declared in
+    (#2506/#2675: the site AND the gate clock are PT; #2811: never a UTC day here). The
+    callers wrap this in their fail-soft try, so an import failure costs the phase
+    claim, never the write."""
+    from common.pacific_time import pacific_today
+
+    return pacific_today()
+
+
+def cycle_for_date(as_of: str, cycle_geneses: dict | None) -> int | None:
+    """The cycle a date belongs to: the highest cycle whose genesis is <= `as_of`
+    (the same rule as site_api_freshness._carried_from_cycle, #2002). None for an
+    empty/unavailable registry or a date before cycle 1 — reported, never invented."""
+    if not cycle_geneses:
+        return None
+    d = str(as_of)[:10]
+    best = None
+    for n, genesis in sorted(cycle_geneses.items(), key=lambda kv: str(kv[1])[:10]):
+        if d >= str(genesis)[:10]:
+            best = int(n)
+        else:
+            break
+    return best
+
+
+def experiment_stamp(ssm_client=None, include_phase: bool = True, *, as_of: str | None = None, cycle_geneses: dict | None = None) -> dict:
     """Write-time provenance stamp for EXPERIMENT_SCOPED intelligence writes (#1233).
 
-    Returns ``{"phase": <current>, "cycle": <n>}`` (phase from
-    constants.EXPERIMENT_PHASE_CURRENT) so records on the tagger-blind
+    Returns ``{"phase": <pilot|current>, "cycle": <n>}`` so records on the tagger-blind
     COACH#/ENSEMBLE#/NARRATIVE# partitions describe their own reset generation at
     write time, instead of provenance resting entirely on the reset-time wipe.
+
+    #3598 — BOTH values derive from the write's own date (``as_of``, default: the
+    Pacific calendar day the write happens on):
+      * ``phase`` is ``pilot`` when ``as_of < EXPERIMENT_START_DATE`` and the current
+        phase otherwise. Until this change the stamp returned the constant phase
+        unconditionally, so every write in the countdown window between a reset and
+        its genesis (10 of the 24 cycle-16 predictions served on Day 1) was stamped as
+        the experiment. ``pilot`` is hidden by every existing read filter — no new
+        PRESTART value, nothing for a reader to learn.
+      * ``cycle`` is the cycle whose genesis window contains ``as_of`` (CYCLE_GENESES,
+        the explicit registry), NOT SSM /life-platform/experiment-cycle — the reset
+        bumps SSM BEFORE genesis, so SSM names the NEXT cycle throughout the countdown.
+        Pass ``cycle_geneses`` to pin the registry (tests); the SSM read survives only
+        as the fallback for a POST-genesis write when the registry is unavailable (there
+        it agrees with the registry by construction). Pre-genesis with no registry → no
+        cycle: an unknown provenance is reported, never invented (ADR-104).
 
     Pass ``include_phase=False`` for the NARRATIVE#arc partition, whose `phase`
     attribute already means the narrative-arc STATE (e.g. "building"), NOT the
     taxonomy phase — those records take the cycle stamp only so the arc semantic is
     preserved.
 
-    The cycle is read from SSM /life-platform/experiment-cycle via
-    ``coach_checkin.read_cycle()`` — cached once per warm container (the cycle only
-    changes on a reset), so this adds no per-put_item SSM call after the first read.
-
-    Fail-soft, by contract: if the cycle can't be read (missing param/grant, no AWS,
-    import failure) the stamp carries ``phase`` only (or nothing when include_phase
-    is False), and this NEVER raises. A provenance stamp must never break a write.
+    Fail-soft, by contract: whatever cannot be derived is omitted, and this NEVER
+    raises. A provenance stamp must never break a write.
     """
     stamp: dict = {}
-    if include_phase:
-        from common.constants import EXPERIMENT_PHASE_CURRENT
-
-        stamp["phase"] = EXPERIMENT_PHASE_CURRENT
     try:
-        from coach.coach_checkin import read_cycle  # cached, fail-soft SSM read (CHECKIN# precedent)
+        from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
 
-        cycle = read_cycle(ssm_client)
+        as_of = str(as_of)[:10] if as_of else _write_date()  # a caller's ISO instant is trimmed to its day; the default IS a day
+        pre_genesis = as_of < EXPERIMENT_START_DATE
+        if include_phase:
+            stamp["phase"] = "pilot" if pre_genesis else EXPERIMENT_PHASE_CURRENT
+    except Exception:  # noqa: BLE001 — constants unavailable: no phase claim at all
+        as_of, pre_genesis = (str(as_of)[:10] if as_of else ""), False
+    try:
+        cycle = cycle_for_date(as_of, cycle_geneses if cycle_geneses is not None else _cycle_geneses())
+        if cycle is None and not pre_genesis:
+            from coach.coach_checkin import read_cycle  # cached, fail-soft SSM read (CHECKIN# precedent)
+
+            cycle = read_cycle(ssm_client)
         if cycle is not None:
             stamp["cycle"] = int(cycle)
     except Exception:  # noqa: BLE001 — fail-soft: provenance never breaks a write

@@ -84,6 +84,9 @@ def _ground_truth() -> dict:
         # refreshed via `aws lambda get-account-settings`. The doc claim "limit: 10 …
         # awaiting approval" outlived the actual raise to 100 by two months.
         "account_concurrency_limit": facts.get("account_concurrency_limit"),
+        # #3509: CDK-defined EventBridge schedule rules — see doc_facts_infra for why the
+        # model's count, not `aws events list-rules`, is what that sentence means.
+        "eventbridge_rules": _infra.eventbridge_rule_count(),
     }
 
 
@@ -137,6 +140,8 @@ FACT_SPECS = [
     # "account concurrency limit of 100", "concurrency quota ... to 100" is NOT
     # matched (raise-request phrasing is historical narrative). The colon/of forms
     # are the current-state claims that rotted ("limit: 10 … awaiting approval").
+    # eventbridge_rules — exact (#3509). Ground truth: doc_facts_infra.eventbridge_rule_count().
+    ("eventbridge_rules", [NG + r"(\d+)\s+EventBridge\s+(?:schedule\s+)?rules?\b"], 0.0),
     (
         "account_concurrency_limit",
         [
@@ -590,11 +595,10 @@ _producer_mirror_hits = _pmc._producer_mirror_hits
 
 
 def _og_source_hits(files, truth: int) -> list[str]:
-    """Reader-facing "N data sources" literals in og_*.py that disagree with the registry.
+    """Reader-facing "N data sources" literals that disagree with the registry (#1260/#3565).
 
-    Skips full-line `#` comments and HISTORICAL-framed lines. Exposed so the regression test
-    can plant a stale "25 data sources" string in a scratch file and prove the rule bites (the
-    #1189 non-vacuous-scan lesson)."""
+    Scan set = `_scan_source_count_files()` (og cards + subscriber templates; doc_facts_og.py says
+    why). Skips `#` comment lines and HISTORICAL framing; the test plants a stale literal (#1189)."""
     hits = []
     for src in files:
         try:
@@ -608,7 +612,7 @@ def _og_source_hits(files, truth: int) -> list[str]:
                 claim = _to_int(mo.group(1))
                 if claim is not None and claim != truth:
                     hits.append(
-                        f"{rel}:{lineno}: og card claims {claim} data sources, truth is {truth} "
+                        f"{rel}:{lineno}: reader-facing copy claims {claim} data sources, truth is {truth} "
                         f"(len(SOURCE_REGISTRY)); derive it, don't hardcode (#1260)\n"
                         f"      | {line.strip()[:120]}"
                     )
@@ -620,6 +624,10 @@ def _og_source_hits(files, truth: int) -> list[str]:
 import sys as _sys
 
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
+# ── #3509: the infra-fact rules — rate(...) cadence, the EventBridge rule count, the DLQ
+# exception set, an alarm's route vs its `to_digest` flag. Ground truth + precision notes
+# for all four live in scripts/doc_facts_infra.py.
+import doc_facts_infra as _infra  # noqa: E402
 from doc_facts_governance import (  # noqa: E402,F401
     _DG_HISTORICAL,
     _REPO_VIS_UNSET,
@@ -642,6 +650,7 @@ from doc_facts_og import (  # noqa: E402,F401
     SOURCE_REGISTRY_PATH,
     _registry_source_count,
     _scan_og_files,
+    _scan_source_count_files,
     og_literal_hits,
 )
 
@@ -1067,7 +1076,7 @@ def main():
     if registry_n is None:
         print("error: could not discover SOURCE_REGISTRY count for the og-card scan", file=sys.stderr)
         sys.exit(2)
-    hits += _og_source_hits(_scan_og_files(), registry_n)
+    hits += _og_source_hits(_scan_source_count_files(), registry_n)
     # #3261: the GENERAL rule — every numeric literal actually drawn onto a card must be
     # data-derived or explicitly exempted. #1260's phrase scan above could only ever see
     # the one card it was written for; two siblings published worse numbers for months.
@@ -1114,6 +1123,15 @@ def main():
     # went live 2026-08-23 (#2892). Presence, not correctness — verifying the named driver
     # needs live Cost Explorer, which a docs gate must not call.
     hits += ops.monthly_close_driver_hits(exempt=line_is_exempt)
+
+    # #3509: the infra facts nothing owned — a `rate(...)`/interval cadence disagreeing
+    # with the CDK (#1205's rule matches `cron(` only), the DLQ exception set, an alarm's route.
+    infra_surface = _infra.scan_infra_surface(docs)
+    hits += _infra.rate_schedule_hits(infra_surface, _infra.cdk_schedule_map(), line_is_exempt)
+    hits += _infra.dlq_exception_hits()
+    routing = _infra.alarm_routing()
+    hits += _infra.alarm_route_hits(infra_surface, routing, line_is_exempt)
+    hits += _infra.registry_route_citation_hits(routing)
 
     # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
     # status, Verified-header freshness).
@@ -1172,7 +1190,7 @@ def main():
         f"✅ doc + source facts OK — no live doc/source states a stale count/budget "
         f"({len(_scan_files())} docs + {len(_scan_source_files())} source files + "
         f"{len(_scan_site_surface())} site js/html/generator files + "
-        f"{len(_scan_og_files())} og cards + {len(_scan_governor_surface())} governor-surface files scanned)."
+        f"{len(_scan_source_count_files())} og cards + subscriber templates + {len(_scan_governor_surface())} governor-surface files scanned)."
     )
 
 

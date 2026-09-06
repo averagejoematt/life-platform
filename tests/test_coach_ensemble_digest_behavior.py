@@ -172,6 +172,9 @@ def offline(monkeypatch):
     real stamp logic (phase from constants) while making it offline + frozen.
     """
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda *a, **k: FROZEN_CYCLE)
+    from experiment import phase_taxonomy
+
+    monkeypatch.setattr(phase_taxonomy, "_cycle_geneses", lambda: None)  # #3598: SSM is the fallback; pin the registry away
     monkeypatch.setattr(ced, "datetime", _FrozenDatetime)
     freeze_pacific(monkeypatch, ced, _FrozenDatetime)
     monkeypatch.setattr(ced, "_cw", FakeCloudWatch())

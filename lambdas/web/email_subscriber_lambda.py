@@ -102,8 +102,15 @@ import boto3
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.pacific_time import PACIFIC  # #2414 — the site's day boundary is Pacific (legacy-link sunset check)
 from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
+from common.subscriber_cadence import (  # #3564/#3565 — copy RENDERED from the senders' crons + the source registry, never re-typed
+    confirmation_cadence_phrase,
+    promise_sentence,
+    signal_weekday,
+    weekday_name,
+)
 from common.unsubscribe_token import (  # #3044 — signed one-click unsubscribe
     UNSUB_TOKEN_PARAM,
     get_unsub_secret,
@@ -117,6 +124,15 @@ from common.utm import (
     referrer_host as _referrer_host,
 )
 from content.subscriber_retention import REDACTED_EMAIL  # #3044 — ONE redaction literal, shared with the sweep
+
+# #3565: the confirmation email said "real biometric data from 19 sources" — a hand-typed
+# number, stale by three sources and matching nothing on the platform. The registry is what
+# makes the claim true, and scripts/doc_facts_og.py already names it "the ONE source of truth
+# for the reader-facing card count" (as distinct from PLATFORM_FACTS' curated public-catalogue
+# `data_sources`, which is a different, hand-maintained surface with no recorded exclusion
+# rule). The og-home card derives from exactly this; now so does the first email a subscriber
+# ever receives, and scripts/check_doc_facts.py's #1260 scan set was widened to cover this file.
+from ingestion.source_registry import SOURCE_REGISTRY  # #3565 — reader-facing source count, derived
 
 from web.site_api_common import SITE_API_ORIGIN_SECRET
 
@@ -137,7 +153,7 @@ SES_REGION = os.environ.get("SES_REGION", "us-west-2")  # SES verified identity 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SENDER = os.environ.get("EMAIL_SENDER", TRANSACTIONAL_SENDER)
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
@@ -421,9 +437,15 @@ def handle_subscribe(
     return _json_response(200, body)
 
 
-def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> None:
-    """Ava Moreau directive: warm, specific, on-brand. Not 'please confirm your email'."""
-    subject = "One click to confirm — then the actual numbers every Wednesday"
+def _confirmation_email_content(confirm_url: str) -> tuple[str, str]:
+    """Build the confirmation email (subject, HTML). Factored out of the sender
+    (the `_welcome_email_content` idiom) so the copy — and specifically the two
+    figures it states, the cadence and the source count — can be asserted offline
+    against their derivations without hitting SES (#3564/#3565).
+
+    Ava Moreau directive: warm, specific, on-brand. Not 'please confirm your email'.
+    """
+    subject = f"One click to confirm — then the actual numbers {confirmation_cadence_phrase()}"
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -437,9 +459,13 @@ def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False
   </h1>
 
   <p style="font-size:15px;color:#8b949e;line-height:1.65;margin:0 0 32px;">
-    One click to confirm. Then every Wednesday, the actual numbers &mdash;
-    real biometric data from 19 sources, habit performance, what worked, what didn't.
+    One click to confirm. Then the actual numbers &mdash; live biometrics from
+    {len(SOURCE_REGISTRY)} data sources, habit performance, what worked, what didn't.
     No filtered highlight reel.
+  </p>
+
+  <p style="font-size:14px;color:#8b949e;line-height:1.65;margin:0 0 32px;">
+    {promise_sentence()}
   </p>
 
   <a href="{confirm_url}"
@@ -455,7 +481,11 @@ def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False
 </div>
 </body>
 </html>"""
+    return subject, html
 
+
+def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> None:
+    subject, html = _confirmation_email_content(confirm_url)
     try:
         guarded_send_email(
             ses,
@@ -553,7 +583,9 @@ def _welcome_email_content(email: str) -> tuple[str, str]:
     unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044 — signed token, never plaintext email
     body_text = f"""Hey —
 
-You just subscribed to The Measured Life. Every Wednesday, you'll get a dispatch from the experiment: what the data showed, what I tried, what surprised me, and what I'm thinking about next.
+You just subscribed to The Measured Life. Here is exactly what that means. {promise_sentence()}
+
+Each one is a dispatch from the experiment: what the data showed, what I tried, what surprised me, and what I'm thinking about next.
 
 This is a real experiment with real data. Not a highlight reel. The weeks the numbers go the wrong direction are in there too.
 
@@ -566,7 +598,7 @@ A few things worth looking at while you're here:
 -> The evidence (every number, every source): {SITE_URL}/data/
 -> The Story (why I started): {SITE_URL}/story/
 
-See you Wednesday.
+See you {weekday_name(signal_weekday())}.
 
 — Matt
 

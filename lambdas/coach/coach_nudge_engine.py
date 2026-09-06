@@ -62,6 +62,18 @@ LEDGER_SK_PREFIX = "DAY#"
 
 STATUS_SENT = "sent"
 STATUS_BLOCKED = "blocked"  # failed a gate — audit-logged, never delivered
+# #3569: the day was reserved but the record could not be persisted. The shell's
+# `_reserve_day` stamps the reservation `attempting`, and it MUST end at one of
+# the three terminal statuses below — a row left at `attempting` is a silent
+# loss, which is exactly how three float rejections sat undetected for 25 days
+# while all four ledger days read "attempting" and zero NUDGE# rows existed.
+STATUS_FAILED = "failed"
+STATUS_ATTEMPTING = "attempting"
+TERMINAL_STATUSES = (STATUS_SENT, STATUS_BLOCKED, STATUS_FAILED)
+# The two statuses that assert "a nudge record was written": the ledger points at
+# a NUDGE# item that must exist. `failed` deliberately does NOT — that row exists
+# precisely because the record could not be written.
+STATUSES_WITH_RECORD = (STATUS_SENT, STATUS_BLOCKED)
 
 OUTCOME_PENDING = "pending"
 OUTCOME_HIT = "hit"
@@ -489,3 +501,65 @@ def build_ledger_item(date_pt: str, nudge_item: dict) -> dict:
         "sent_at": nudge_item["sent_at"],
         "graded": nudge_item["status"] != STATUS_SENT,  # only sent nudges need grading
     }
+
+
+def build_reservation_item(date_pt: str, firing: dict, now_utc: datetime) -> dict:
+    """The `attempting` reservation row the shell conditional-puts BEFORE any
+    model call (the daily cap).
+
+    #3569 added `attempted_at`: the reservation used to carry no timestamp at
+    all, so a row stuck at `attempting` could not even be aged — the dead-man in
+    `lambdas/operational/nudge_ledger_qa.py` had to fall back to the day the sk
+    names. Pre-#3569 rows still take that fallback; every new one is exact.
+    """
+    return {
+        "pk": LEDGER_PK,
+        "sk": ledger_sk(date_pt),
+        "record_type": "coach_nudge_ledger",
+        "status": STATUS_ATTEMPTING,
+        "trigger_type": firing["trigger_type"],
+        "coach_id": firing["coach_id"],
+        "attempted_at": _iso_z(now_utc),
+        "graded": True,  # flipped to False only once a nudge is actually SENT
+    }
+
+
+def build_failed_ledger_item(date_pt: str, nudge_item: dict, error: str, now_utc: datetime) -> dict:
+    """#3569 — the ledger row a FAILED record write leaves behind.
+
+    Before this, a `_finalize` crash left the reservation at `status=attempting`
+    forever: the Pacific day stayed consumed (`graded=True`), the failure was
+    invisible to every reader of the ledger, and three float rejections
+    (2026-08-06/08-07/08-30) sat undetected for 25 days. A write that cannot
+    land now says so, in the ledger, with the exception attached.
+    """
+    return {
+        "pk": LEDGER_PK,
+        "sk": ledger_sk(date_pt),
+        "record_type": "coach_nudge_ledger",
+        "status": STATUS_FAILED,
+        "trigger_type": nudge_item.get("trigger_type"),
+        "coach_id": nudge_item.get("coach_id"),
+        "nudge_pk": nudge_item.get("pk"),
+        "nudge_sk": nudge_item.get("sk"),
+        "attempted_at": _iso_z(now_utc),
+        "error": str(error)[:500],
+        "graded": True,  # nothing to grade — the record never landed
+    }
+
+
+def mark_send_failed(nudge_item: dict, error: str) -> dict:
+    """#3569 — downgrade an already-persisted STATUS_SENT record after the SES
+    send failed.
+
+    The durable write now precedes the irreversible send, so a send failure has
+    to CORRECT the record it already wrote rather than orphan it. Same pk/sk, so
+    the shell's second `_finalize` overwrites both rows in place, and the
+    resulting record is byte-identical to the one the old (send-first) order
+    wrote on its SES-error path.
+    """
+    item = dict(nudge_item)
+    item["status"] = STATUS_BLOCKED
+    item.pop("outcome", None)  # a nudge that never left is not awaiting an outcome
+    item["gate_findings"] = [f"ses_error:{error}"[:300]]
+    return item

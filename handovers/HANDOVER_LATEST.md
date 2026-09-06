@@ -1,358 +1,256 @@
-# Handover — 2026-09-03/04 (Opus 5): Session U — the re-anchor (Friday, then corrected to Saturday), the drain, and the sweep proving itself
+# Handover — 2026-09-04/05 (Fable 5.1 → Opus 5 → Fable 5.1): Session V — the review baseline, the batch paydown, the forensic RCA, the owner's pass, and one more reset
 
-**Session:** Claude Opus 5, driven by one owner instruction — *"do another full platform
-experiment reset so it all starts on friday september 4th"* — then, after it landed,
-*"review and take autonomy on anything you can close in the backlog throughout the night,
-and then once you are done - wrap"*, narrowed mid-session to **`model:opus` and below, no
-`model:fable` work**, and *"no need to publish email"*.
+**Session:** three owner instructions in sequence. Fable, 17:00 PT: *"fable is back and we have 24
+hours to use 100% of our allocation … closes as many issues open as possible … red team with
+experts"* — owner calls: run `/review full` NOW, implement #3373, promote #1364's smallest slice,
+tee both owner acts. Opus, 23:00 PT: *"manage yourself between now and 7am … pay down as many
+open issues as you can that dont need my support, as long as they arent fable"*, escalated to
+*"closer to going from 100+ issues back down to 30 with 70 closed … use red team and board
+recommendations"*. Then, on the morning's Q&A about the review: *"do a deep forensic analysis on
+the report, and then red team all of this … Part 1 root cause … Part 2 monitoring or self
+healing … Part 3 a plan to get all areas to grade A … everything should be epics and stories …
+if areas will materially increase the running cost of the platform - I do not want to do that
+without detailed scrutiny."*
 
-Not the Session U that was planned. The approved 09-08 plan (Architect ritual + the
-time-anchored batch, `~/.claude/plans/lovely-snacking-panda.md`) is **untouched and still
-valid** — this session was an owner-initiated re-anchor that arrived five days early.
+Session U proper (Architect ritual, 09-08, `~/.claude/plans/lovely-snacking-panda.md`) is
+**untouched**. #3373 and #1364 were parked when the owner switched models (#3373's worktree
+holds 22 dirty files, resumable).
 
-**Main:** green (eb777b5b) — it went red twice tonight, both mine, both from running targeted tests instead of the full suite: 5 checks after #3473 (fixed b73b41f58) and 4 ratchets after #3477 (fixed eb777b5b5, CI/CD success). Tip 87ec9d667 (the Day-1 static rebake) has its run in flight; v4 site gate, Cron freshness and CodeQL already green on it. Every red surfaced under a CI/CD `cancelled` rollup — three times in one night
-**Build beat:** none — the reset is a platform-state change and the rest is internal gate plumbing; the one reader-visible change (the Day-1 static rebake) is the reset flipping its own copy, not new work
-**Docs:** SCHEMA.md (genesis literal), engines/CHARACTER.md (re-verified), MCP_TOOL_CATALOG.md, ARCHITECTURE.md + INFRASTRUCTURE.md + MONITORING.md (alarm count), DEPENDENCY_GRAPH.md + model/platform_model.json, PROPORTIONALITY.md, alarm_citations.json
-**Decisions:** none needed — the threshold re-derivation and the extraction both follow existing ADRs (ADR-105 for the derivation, the #2604/#2610/#2977 extraction precedent); neither is a new governance posture
-**Incidents:** none — main was red ~22 min (03:50Z v4-site-gate fail → 04:12Z green on the fix commit), under the >1h bar; no auto-rollback fired, no data gap, no budget event. The five gate reds are recorded as #3477 instead, because they recur by construction rather than being an event
-**Stash/hooks:** clean
-**Closures:** #3473, #3474, #3477, #3476 commented · DoD: scanned 4, hits 0 — every closure carries the ADR-099 `**Shipped:**`/`**Outcome:**` pair
-**Backlog:** filed #3478 from the Day-1 runlist. Now 1 actionable in the opus lane; **NO REMEDY IN THE CORPUS** — `backlog_next.py --refill-now --lane opus` found zero startable promotions and correctly refused the 11 startable stories outside the lane (promoting one turns the count green while adding nothing this session could start). Floor NOT lowered. Later sweep — no stale issues (31 open all satisfy the contract). Filed #3476, #3477
-**Alarms:** 1 flap cited — `ai-tokens-platform-daily-total` fired-and-cleared in the 72h window (#2912 detector); dated self-clearing entry added, prune on/after 2026-09-07. That flap *is* the defect #3474 closed
-**CI warnings:** none — the `LifePlatformMonitoring` dashboard-`Tags` warning is GONE. #3476 shipped and `check_ci_warnings.py` now exits 0 with no `--decoded`, which is the one acceptance box I said could not be confirmed tonight
-**Ledger:** compute-pipeline liveness heartbeat (#3473) + reset doc-gate sweep (#3477) rows added; the #3477 row then AMENDED for #3479 (its JS leg went from one file to the v4 gate's whole `node --test`)
+## Part 1 — `/review full`, the NEW BASELINE (Fable, Day 0 of cycle 16)
 
----
+17 rows graded from scratch with adversarial verifiers. **No A- survived**; 13 fell a notch, qs
+rose C+→B-, 3 held. 116 findings → 99 CONFIRMED / 12 REFUTED (10% refutation vs the historic
+~50% — recompute-first briefs). Artifacts `docs/reviews/FULLREVIEW_2026-09-05.md` +
+`fullreview_grades_2026-09-05.json` reset both calendar clocks and discharged the #3245 hold.
+The run died once at ~70 min on the 5-hour session window (17 agents + 2 lanes) and was
+resumed from cache after the reset — see the memory entry. **Four rows independently found
+the P1 of the night**: the chronicle 48h sweep had republished cycle 15's tombstoned Week-1
+draft on Day 0 (#3485). Filed: 10 epics #3489–#3498 + 74 stories #3499–#3571.
 
-## Part 1 — The reset (the instruction)
+Two things had to be fixed before the panel could fan out: main was red on a test that
+phrase-matched `"170"` in the frozen prereg (fixed the TEST, never the hash-stamped artifact —
+PR #3483, three red-team panels caught my first draft), and #3478 (Day-1 phantom weigh-in)
+merged and deployed before 22:30 PT.
 
-Cycle 15 (genesis 2026-09-01) → **cycle 16, genesis 2026-09-04 (Friday)**. Run as a
-future/eve genesis from 2026-09-03 ~20:45 PT.
+## Part 2 — the paydown (Opus, 23:00 → ~09:00 PT)
 
-```
-python3 deploy/restart_pipeline.py --genesis 2026-09-04 \
-  --override-weight-lbs 324.64 --with-preregistration --sync-site --apply
-```
+**28 closed. Board 116 → 91; non-fable 80 → 57. 12 PRs merged.** The honest ceiling was 71,
+not 70-as-stretch: 80 non-fable open = 66 stories + 5 epics + 9 owner/date-gated. What moved
+the number was CLASS-SIZED BATCH PRs (one PR closing 2–4 siblings sharing files and a
+mechanism) chosen by a persona panel — which also found only THREE free closures in 66, so
+do not plan a paydown around a free-closure haul. The Day-1 flip was verified live at 00:00
+PT (`day_n 1, pre_start false, weighin_count 0`), the #3390 runlist executed (55 countdown
+stamps, 2 orphan bets voided), the static Day-1 proof rebaked, #3512's archive notices
+applied live.
 
-- **Baseline 324.64 lbs** — the 2026-09-03 weigh-in, the last real reading. The override
-  is mandatory for a future genesis; the supersede reflex is owed when Friday's weigh-in
-  lands (tracked on the re-anchored #3390).
-- Census preflight **98/98** pk families classify. 50 rows re-phased to `pilot`, **314
-  intelligence rows tombstoned** with `cycle=15` on the archive, ledger rolled to
-  `LIFETIME#aggregate` with `TOTALS#current` zeroed, **45 open pre-registered bets voided**.
-- Prologue lead-ins re-dated to genesis −6 / −2 / −1. Full `cdk deploy --all`, site synced.
-- **Hard gates: rendered 96/96 · semantic 8/8 · truth 8 surfaces clean** at 1d pre-start.
-  The truth gate ran for real (budget tier 0), not a loud skip.
-- Live by content: `/api/journey` and `/api/character` both serve `start_date: 2026-09-04`,
-  `day_n: 0`, `pre_start: true`. All 104 lambdas re-stamped 03:38–03:51Z.
+**Four green PRs are still open, blocked ONLY on the gate-census chain** — #3580 (+8), #3581
+(+2), #3583 (+1), #3588 (−2), 11 issues behind them. Each was VERDICT SUCCESS on its own head;
+they conflict only on `BASELINE_TOTAL_GATES`. **Merge ONE, rebase the rest, full suite, repeat**
+(~25 min/link). Two census movers merged to a silent DUPLICATE assignment earlier, not a
+conflict — never merge two without a rebase between.
 
-**Cycle 15 closes SEALED, not grandfathered.** Its prereg artifact + SHA-256 stamp are
-still live and verifying at `/experiments/prereg/genesis-2026-09-01.json`, so unlike
-cycles 10 and 13 it needs no `prereg_seal_gate.py` record. Its frozen file was archived in
-place as `genesis_preregistration_2026-09-01_cycle15.json` **before** seeding cycle 16 —
-the seeder aborts otherwise.
+## Part 3 — the forensic RCA (Opus, morning)
 
-**Cycle 16's claims are frozen but NOT public**: 8 coaches, 2 hypotheses, sha
-`cd8156f1…`. Predict-the-week seeded off them (week 2026-W36, 2 subjects).
+`docs/reviews/FORENSIC_RCA_2026-09-05.md` + `.json` (PR #3591); page
+https://claude.ai/code/artifact/7a89cfcc-24f3-4217-9357-aea29d4db057. Method: 4 forensic
+analysts (lifecycle stage · guard integrity · session-workflow velocity · data lifecycle) → 6
+red-team personas voting on all 26 proposed classes (none killed by ≥2) → 1 delivery
+architect. Load-bearing counts re-checked against the tree before publishing.
 
-### The reset's real lesson — a pipeline that exits 0 and reds main by construction
+**The 70 answer:** not a spike — ~5–6 confirmed findings per lens on every review since July;
+this one ran 17 lenses (10 ungraded-from-scratch for 5 weeks, ~600 commits/fortnight, 12
+resets) on Day 0 of a reset, 10h after a writer had undone the wipe, with anchors raised the
+same day. The findings were not silent, they were **unread**: the workflow's instruments
+measure the diff, the merge, the closing comment's shape and the count of gates; the defects
+live in served bytes, IAM-denied writes (49 days), captions drifted from their number, crons
+writing after a green snapshot. Measured: no pre-push hook and zero pytest in
+`agent_commit.sh`; ~half of main since 08-22 by direct push; PR template line 19 = "targeted
+pytest"; `closure_contract` warn-mode, median open→close 9h; 597 gates / 50 proven; 12 resets
+in 55 days on machinery priced "a few times a quarter" (6 of 7 P1s).
 
-`restart_pipeline.py` exited 0 with all three of its own gates green, and the resulting
-commit produced **five** gate reds. Three of them recur on *every* reset:
+**9 classes → 6 structural changes**, all FREE but one ≈$0.01/mo leg: ONE landing path (refuse
+code direct-pushes, don't test them) · close on first live output (`Refs` not `Fixes` for
+instrument PRs; one closure code armed block) · per-ENTRANT proof ratchet + `## Set` at
+intake · the reset writer contract (three one-function fixes first) · derive-don't-detect ·
+grade and prune on a clock. **Rent register:** accepted ≈$0.06/mo, ~$9/mo of proposals
+rejected, retirements net negative. **What the panel changed about the framing:** "why
+silent" → "why does nobody read what is already red"; "what would have stopped it" → "what
+bounds time-to-detection"; "all A on an identical re-run" is incoherent (anchors extend
+in-run; Day 0 ≠ Day 6; a zero-finding adversarial run has stopped looking) → replaced by:
+next full, anchors frozen, run Day 0 AND Day 6, zero P1/P2, no lens < B+, none carried >28d,
+instruments proven ≥ added, new rent < $1/mo. **Three owner decisions are named**: the reset
+cadence (priced), keep-or-retire the commitment loop, route reader-audience alarms to a
+channel you read.
 
-| red | cause |
-|---|---|
-| `tests/js/genesis_pt_2941.test.mjs` ×6 (v4 site gate) | genesis-anchored boundary instants; its own first assertion is the drift detector, and the file says "regenerate them with the sweep, don't loosen" |
-| `docs/SCHEMA.md:2852` (`check_doc_facts`) + `test_wiki_checkers.py` ×3 | stale genesis literal. **My first explanation was wrong** — see Part 3: `sync_doc_metadata` ran and *refused* the rewrite, because #2986's freshness hold classified a semantic date fact as a cosmetic re-stamp |
-| `docs/engines/CHARACTER.md` (`check_doc_index --strict`) | the reset rewrites `config/character_sheet.json`, invalidating the doc's `Verified` stamp **every time** |
-| `docs/MCP_TOOL_CATALOG.md` | the pipeline's catalog write disagrees with the canonical generator |
+**Filed:** epics #3592 (close on evidence) + #3593 (the review as an instrument); stories #3594–#3603 under #3489/#3490/#3493/#3592/#3593 (#3598 is the P1 — the three one-function reset fixes; #3601 is `gate:owner` — price and bound the reset cadence; #3600 is the only rent, ≈$0.01/mo with its demote trigger); #3528 AMENDED in place (refuse code direct-pushes, don't test them).
 
-Cause: the pipeline runs **one** doc gate (`sync_doc_metadata.py --apply`); CI runs
-**twelve**. Filed as **#3477** with the full table.
+**Sequence (the report's "what to do first"):** #3501 (qa-smoke cause identity) BEFORE any new
+nightly check → #3536 (per-entrant proof) BEFORE any new guard → `Refs` not `Fixes` + IAM-parity
+role family BEFORE any new closure rule or alarm → the three reset one-function fixes (P1),
+then the cadence decision with the monthly-close number in front of you → refuse code
+direct-pushes in `agent_commit.sh`, replace PR template line 19 → clear the four standing
+reds and pull one PROPORTIONALITY demote this month.
 
-The `CHARACTER.md` stamp was **re-derived, not date-bumped** (#973/#2619 — the stamp is a
-claim): whole-file config diff is 4 insertions / 4 deletions confined to `_meta` + the
-baseline block, line count 571 → 571, zero commits to `character_engine.py` or
-`character_sheet_lambda.py` since the 09-02 verify, so every line citation is unshifted by
-construction.
+## Part 4 — the owner's pre-authorized pass (afternoon/evening PT)
 
-## Part 2 — The backlog night (the autonomy grant)
+The owner asked why the plan stopped at A-; a second panel (Opus, 5 gap analysts + a
+relaxation model + an architect) answered: **cost is not the constraint** ($2.67/mo gross,
+$1.37 net closes every rent-priced gap; two anchors price machinery as a NEGATIVE); the
+distance is cycle length (11 cycles: 1,5,1,1,2,5,7,7,7,15,4 days; 30 days is the knee),
+~22 owner acts (~6h44m), four taste verdicts, anchors that move in-run, and
+'every'-quantified clauses whose sets nobody enumerated (538/597 gates unproven, 89 ISO-parse
+sites). **Part 4 merged (b8ff4706e, PR #3605).** Filed: **#3606** (the ONE gate:owner
+decisions issue, 22 items ordered by leverage) + stories **#3607–#3621** (folded into the
+existing epics; no new epic).
 
-Lane filter applied: `model:opus` and below. That correctly dropped **#3422, #3436, #3373,
-#3042** (all `model:fable`). **#3403** is genuinely date-gated — its last acceptance box
-requires a week of post-#3378 data (~09-08).
+Then: *"i give you blanket approval to do all autonomously for 1-22 … i pre-authorize
+everything."* Done under that grant, each recorded on #3606:
+- remediation role applied from `infra/iam/` (verifier CLEAN, 15/15) · orphan us-east-1 log
+  group deleted · **cycle 16 PUBLISHED + SEALED** (`/experiments/prereg/genesis-2026-09-05.json`
+  200, sha `a99fbb46…`; cycle-15 posts intact under the cycle-keyed archive) · tier-3 drill
+  (both reader doors paused honestly; brief/`BudgetExceeded`/CI-pause legs NOT exercised —
+  email invoke) · the five publicly readable reader-input objects rewritten without `email` +
+  `ip_hash` and every prior version purged (the panel's "delete-protected" premise was wrong;
+  the `email` field was worse than stated) · SES identity for averagejoematt.com created with
+  custom MAIL FROM · urgent/paging topics verified confirmed.
+- **Owner rulings 7–16 recorded** (#3606 + mirrored): 30-day minimum cycle · absence marker ·
+  Dropbox IS a channel · protocols stay experiment-scoped ("reset should be brute force") ·
+  Wednesday, one send · rebucket tap targets if the visual stays identical · light-theme QA
+  nightly · commitment loop KEPT (owner names their own adherence as the cause) · urgent
+  subscription confirmed · incident corpus moves to the repo after a privacy pass · item 18
+  demotes: keep/keep/FIX (#3500)/keep-but-cheaper (**#3624** filed)/per-row at #3602.
+- **Owner ran item 1 from a second session** (Operational UPDATE_COMPLETE, 24 Lambdas + the
+  QaSmokeRole change) and the Route 53 batch (INSYNC; SES identity VERIFIED, DKIM SUCCESS;
+  MAIL FROM converging). That session flagged that `build_bundle.py`'s zip is not
+  byte-reproducible (three synths, three hashes) — a residual Code.S3Key diff after every
+  deploy that reads as drift and is not. Worth a story. It also noted DKIM is the SOLE DMARC
+  alignment carrier under `aspf=s` — recorded on #3568. **PR #3623 merged** (f0b003aae).
+- **#3598 landed as PR #3622, MERGED 5eb516002** (Fable lane): all three legs — the wipe voids `draft` on what it
+  tombstones; `experiment_stamp(as_of=)` derives phase/cycle from the write's date via
+  `cycle_for_date`, SSM only post-genesis; `archive_one` keyed on (slug, cycle) under a
+  `WORK_CONTRACT` (`run_step` reds input>0 ∧ acted==0, exit 75); 39 tests with run positive
+  controls (22/39 fail on main); census 597 → 597; `Refs #3598` with the live proof named
+  (next reset's log + the first countdown-window COACH# row carrying `phase=pilot`). Post-merge:
+  the shared-bundle deploy. Worktree left locked for release after merge. **PR #3623** drops the
+  applied #3562 entry from `_PENDING_PERMISSIONS_APPLY` (my item-2 apply had turned that live
+  test red). Still in flight: the Day-1 supersede reflex (326.2 lb replaces the 324.64
+  override; `Refs #3390`), and the ~88-row provenance reconcile script (#3511/#3513/#3514).
+- **Blocked by the session classifier, owner runs from main:**
+  `bash deploy/cdk_deploy.sh LifePlatformOperational -- --require-approval never` (item 1;
+  also clears the IAM-gate red on main) ·
+  `aws route53 change-resource-record-sets --hosted-zone-id Z063312432BPXQH9PVXAI --change-batch file://infra/dns/ses_averagejoematt_com.json` (item 17) ·
+  ~~GitHub Settings → enable non-provider patterns + validity checks~~ — **NOT AVAILABLE on a
+  user-owned repo** (the owner's screenshot shows only Push protection under Secret Protection;
+  the REST PATCH returns 200 and changes nothing). The panel's 'free on a public repo' was wrong;
+  the in-repo equivalent (custom gitleaks rules for the platform's bearer shapes, with positive
+  controls) is folded into #3620. Also filed **#3625** (the deploy bundle is not
+  byte-reproducible — every post-deploy diff reads as 24 phantom code changes).
+- Not done by design: the GitHub org transfer (optional; high blast radius; free alternative)
+  and the four taste verdicts + portrait approval (the owner's judgment by definition).
 
-### #3474 — the token alarm fired on the platform's ordinary working day · CLOSED
+## Part 5 — "can we squeeze in one more reset please" (evening PT): cycle 16 → cycle 17, genesis 2026-09-06
 
-150,000 was set 2026-06-24 against a ~59k/day baseline peaking ~121k. Measured over 31 days
-it had become **the 75th percentile**.
+Owner at ~18:50 PT: *"experiment start date as sunday september 6th … figure it out without creating
+tech debt or more bugs, i just want to start tomorrow is all."* Flagged once that this closes cycle 16
+at ONE day against the 30-day ruling made an hour earlier (#3601, not yet enforced); read as
+"tomorrow is the true start". Cycle 16 was PUBLISHED + SEALED this afternoon, so closing it needs no
+grandfather record. Pre-reset: the supersede lane was STOPPED (PR #3626 closed as superseded; its one
+live write — PROFILE#v1 324.64 → 326.2 — stands and the reset overwrites it with the same 326.2
+override; **worth re-landing from branch `issue-3390-supersede-baseline`: `deploy/supersede_baseline_editors_note.py`
++ 12 tests, the gate-driven replacement for the cycle-11 one-shot editor's note — `weight_truth_qa`
+will demand a note on week-03 for any override→real gap > 1.5 lb**); the reconcile lane was told to
+land its script + dry-run and NOT apply (the reset wipes the cycle-16 rows it targets) —
+**PR #3627**: `deploy/reconcile_provenance_2026_09.py` (85 rows planned live: 77 #3514 CROSS_PHASE,
+6 #3513 — the SAME defect recurring daily on `INSIGHT#`, 2 #3511; 22 tests; nothing applied) **plus a
+one-line fix that matters for tomorrow: `countdown_gap_sweep.classify_item` called
+`should_tombstone(item, mode)` WITHOUT `pk`, so ADR-153's CROSS_PHASE carve-out was inert and the next
+`reconcile_countdown_gap.py --apply` would have tombstoned the coach `RELATIONSHIP#state` rows. MERGE
+#3627 BEFORE the Day-1 runlist's reconcile.** Post-reset apply order is in the PR body
+(`--disposition reset-durable --apply` first, the rest after tagger+wipe, then a 0-row re-plan). Dry run clean
+(census preflight, all twelve doc gates). Applied:
+`restart_pipeline.py --genesis 2026-09-06 --override-weight-lbs 326.2 --with-preregistration --sync-site --apply`.
+This is the FIRST reset under #3622's writer contract (the wipe voids drafts; `WORK_CONTRACT` lines
+in the log; cycle-keyed archive) — its log is #3598's live proof.
 
-```
-n=31 to 2026-09-02 · median 87,046 · Q1 68,592 · Q3 145,161 · p90 220,318 · max 492,314
-breach @150k: 8/31 = 25.8% [13.7%, 43.2%] Wilson → ~7.7 fires/30d
-```
+**How it went.** Run 1: steps 0–11 clean (`WORK_CONTRACT {"acted_count": 103, "input_count": 16789 …
+"step": "restart_intelligence_wipe"}` — the contract printed, the deploy converged, the live surface
+flipped to genesis 09-06 / baseline 326.2 / SSM cycle 17), then **the #3477 sweep ABORTED it** on
+`tests/js/genesis_pt_2941.test.mjs` (Nov 5 = Day 61 for a 09-06 genesis, not 62) — exactly the class
+it exists to catch, third specimen. Re-derived all nine instants by hand (never loosened; JS suite
+377/377). Run 2 (`--skip-deploy`, bundle already converged): rendered · semantic · truth **8/8 PASS**,
+site synced, then the seeder REFUSED to regenerate over cycle 16's frozen prereg (by design) →
+`git mv` the pair to `_2026-09-05_cycle16` → seeded (16 predictions + 2 hypotheses, sha `bd225d24…`,
+`plan_facts` present) → predict-the-week seeded (2026-W36, 2 subjects) → **published + sealed** the
+same evening (`/experiments/prereg/genesis-2026-09-06.json` 200, hash matches) → `/method/game/`
+rebaked. **Live at wrap:** `/api/journey` day_n 0 · pre_start true · start 326.2 · weighin_count 0.
+Not sent by choice: the genesis-eve prereg lock email (`send_prereg_lock_email.py`, eve-only) — the
+owner declined it at the last reset; not re-asked tonight.
 
-Every one of the 8 breaches fell on a working-session day, so the question is not "is this
-day expensive" but "is it anomalous for *this* distribution". The distribution is strongly
-right-skewed (CV 0.79), so mean±sd is meaningless here; two **robust** estimators bracket
-it and agree closely — Tukey `Q3+1.5·IQR` = **260,014**, `median+3·1.4826·MAD` =
-**221,743**. Shipped **250,000**, between them, rounded, erring low (an alarm should fail
-toward firing). New rate 3/31 = 9.7% [3.3%, 24.9%] ≈ 2.9/30d.
+**Day-1 runlist for 2026-09-06 (post-genesis, in this order):** (1) ~~merge PR #3627~~ **MERGED 1851a9c3d before wrap** — without it
+`reconcile_countdown_gap.py --apply` tombstones the coach `RELATIONSHIP#state` rows; (2)
+`python3 deploy/restart_verify.py`; (3) `reconcile_countdown_gap.py --apply` then
+`reconcile_prereg_voids.py --apply` (that order); (4) `reconcile_provenance_2026_09.py --disposition
+reset-durable --apply`, then `--apply`, then a 0-row re-plan; (5) the supersede reflex on the 09-06
+weigh-in (this time with the editor's-note tool from branch `issue-3390-supersede-baseline`);
+(6) `restart_integration_check.py --deep --synthetic --expect-cycle 17`; (7) read the 10:00 brief
+as the owner would. The 30-day minimum (#3601) now has a real cycle to protect.
 
-Scoped explicitly rather than silently: this is **not** budget protection — 250k/day of
-output is ~$112/mo at sonnet's $15/1M against a $215 ceiling. Sustained burn is
-`cost_governor`'s tiering, which already exists. Whether the outlier detector earns its keep
-*beside* the governor is a proportionality question left for the owner, stated on the issue.
+## Main went red twice more this morning — both opened, both separated
 
-Paid for **in place** (`monitoring_stack.py` was AT its 1331 ceiling): the new derivation
-REPLACES the 2026-06 one, 1331 → 1331.
+- **Unit Tests** (mine): the citation I added for the genesis-window COMPOSITE was rejected as
+  "not declared" — the AST alarm-name discoverer only resolved `alarm_name=`, the #3503 class
+  one layer up. **PR #3590**: a separate composite discoverer, universe = metric ∪ composite,
+  positive control inside the same test so the census stays at 594.
+- **Plan / IAM gate** (since #3573 merged at 23:56 PT, EVERY main run): the qa-smoke role's
+  S3List statement was modified in place (+`ai-canary-log/*`), which the additive-only gate
+  classifies as owner-required. **Owner act:** `bash deploy/cdk_deploy.sh LifePlatformOperational`
+  from main. Nothing on the CI deploy path ships until then (manual `deploy_lambda.sh` still works).
+- **Main also redded once on a FLAKE**: `test_wait_pr_green_swallow_3219::test_progress_line_says_how_many_attached_once_some_have` at 63ab2f189 — passes locally, green before and on rerun; the #3455 timing fix is incomplete (noted on #3493).
+- Local-only false red: `test_every_alarm_read_states_its_alarm_types` scans the gitignored
+  `cdk/_*_staging/` copies — noted on #3493.
 
-### #3473 — a heartbeat, and the ledger that should have caught its absence · CLOSED
+## Owner acts owed (in order)
 
-`compute-pipeline-stale` had no heartbeat, so a dark emitter read as a permanently healthy
-pipeline. **The missing alarm was the symptom.** The cause: `test_silent_failure_heartbeats.py`'s
-`_DETECTORS` ledger — the registry asserting every daily detector has *both* halves — named
-five pairs and **neither compute pair**. So this gap was invisible to the guard built to see
-it, *and* `compute-outputs-heartbeat` (shipped #1455) was equally unasserted — deleting it
-tomorrow would have gone unnoticed. Both pairs are ledgered now. That ledger also read
-`monitoring_stack.py` **by name**, so an alarm became "missing" the moment it moved to a
-sibling — the same fragility #2977 fixed in `cdk_alarm_pins.py`; it now scans all of
-`cdk/stacks/*.py`.
+1. **Day-1 weigh-in → supersede reflex.** No weigh-in had landed by the 09:30 PT compute; the
+   10:00 brief reasoned from the 324.64 override. Run it the moment the Withings row exists.
+2. **Attended cycle-16 prereg publish + stamp** — cycle 16 is FROZEN but UNSEALED.
+3. **`bash deploy/cdk_deploy.sh LifePlatformOperational`** (clears the IAM-gate red on main).
+4. **`bash deploy/setup_remediation_role.sh`** (#3562 + #3503), then delete the role's entry from
+   `_PENDING_PERMISSIONS_APPLY` in `tests/test_grant_enumeration_drift.py`.
+5. `aws logs delete-log-group --region us-east-1 --log-group-name /aws/lambda/life-platform-site-api`.
+6. The three decisions the RCA names (reset cadence · commitment loop · reader-alarm routing).
 
-Negative-controlled both ways: delete the heartbeat call → 2 tests red; keep the NAME but
-build it through the problem-alarm helper (silently `NOT_BREACHING`) → 1 test red; restore →
-3 green. The second control is the one that matters.
-
-**days=2, not the >26h the issue asked for — the issue's bar was unachievable.** The metric
-is emitted once daily at 17:00Z while CloudWatch's 86400s periods align to UTC midnight, so
-the in-progress period is empty 00:00Z–17:00Z *every day*; a 1-day BREACHING heartbeat would
-fire every morning. days=2 reds after >31h of real silence.
-
-Paid for by **extraction** (the FULL-file rule, never a raise): the compute liveness *pairs*
-moved to `cdk/stacks/monitoring_compute_alarms.py` with a stated membership rule. 51 lines
-out for a 5-line call site + import; measured 1290, baseline 1331 → **1300** (10 banked = a
-fifth, the #2610 rule).
-
-Verified against **live deployed state**, not a second synth: `85 → 86` resources, **zero
-dropped**, exactly one added, all three moved constructs keeping their logical ids.
-
-### #3390 — re-anchored, not closed
-
-Was titled for cycle 15 (genesis 09-01, override 326.24). My reset made its Outcome
-unachievable — cycle 15's Day 1 is history and its intelligence is tombstoned. Re-anchored
-in place to cycle 16, with the countdown-gap window corrected (~3.25h, vs cycle 15's
-~10.75h) and a section listing what the reset already verified so tomorrow's runlist is
-shorter and honest.
+## Deploys still owed (merged, not shipped)
+`site-api` (#3589's additive key) · `coach-nudge` + `qa-smoke` (#3569) · `qa-smoke` (#3540) ·
+`site-api-ai` (#3560) · `cost-governor` + `site-api` (#3583, when merged). #3569's dead-man
+will red its first nightly (a 2026-08-30 ledger row `attempting`, ages out 09-06).
 
 ## Gotchas hit this session
+- **The 5h session window kills a panel + lanes at ~70 min**; resume the Workflow from cache,
+  relaunch lanes INTO their worktree (memory).
+- **The frozen prereg is hash-stamped**: fix the test, never the artifact (memory).
+- **The gate census is the merge-train bottleneck**, not CI; and batched PRs trip
+  `check_pr_closing_set.py`'s single-int branch-name parse (folded into #3493).
+- **zsh does not word-split an unquoted `$VAR`** — a doc-gate loop "failed" with exit 2 (file
+  not found) until `${=c}`; the gates were green.
+- `agent_commit.sh` refuses `docs/reviews/*` as doc-sync literals — `ALLOW_DOC_LITERALS=1`.
+- **Every enumerator of "the alarms" must state which alarm TYPES it sees** — live API and
+  AST alike.
 
-- **`REAL_EXIT` is not the task's exit code.** Two background tasks reported "exit code 0"
-  while the wrapped command exited 1 and 4. Read the `REAL_EXIT=` line, always.
-- **`gh run list --commit <short-sha>` returns zero runs, silently.** Nearly read a bot
-  commit as swallowed. Resolve the full sha, or query `?head_sha=` via the API.
-- **zsh does not word-split an unquoted `$var`.** A loop over gate commands returned exit 2
-  for eleven of twelve gates — every one had run as a single filename, not a command. An
-  all-red board that is actually a shell bug.
-- **A local full-suite run concurrent with edits is evidence in neither direction.** It
-  produced one spurious failure *and* missed three real ones, because it read a
-  half-fixed tree in both directions.
-- **`git stash push` silently skips untracked files**, which made a before/after `cdk synth`
-  diff vacuous — both sides were identical. Compared against the live deployed stack instead,
-  which is better evidence anyway.
-- **Docs CI reports `cancelled`, not `failure`, over real step failures** — three hidden the
-  first time, one the second. On this repo a `cancelled` Docs CI is not a timeout; open the
-  steps.
-- **`agent_commit.sh` reverts `platform_counts.py`** rather than committing it (refused
-  outright, no escape hatch). On main the driver folds it in with `--amend --no-verify`;
-  leaving it stale reds 3 tests.
-- The reconcile bot raced me **twice**, both times making the identical fix. Rebase; the
-  duplicate commit drops out as already-applied.
-- **A CI/CD `cancelled` rollup hid real failures THREE times tonight.** Never read it as a
-  timeout or a concurrency cancel without opening the steps.
-- **`agent_commit.sh` reverts `platform_counts.py` and refuses it outright.** On main the
-  driver regenerates and folds it in with `--amend --no-verify`; do it AFTER agent_commit
-  runs, or the revert eats it.
-- **Backticks in a commit message passed as a shell argument** get command-substituted by
-  zsh. Write the message to a file and pass `"$(cat file)"`.
-- **`npx cdk diff | grep` can come back empty when the diff is non-empty** (buffering);
-  redirect to a file and grep the file, or you will "prove" a drift is gone when it isn't.
-- **A monitor's `until grep -q 'passed'`** matched black's "All checks passed!" and fired
-  ~13 minutes early. Wait on a token only the target emits (`REAL_EXIT`).
-
-## Part 3 — After the first wrap: "fix them then" (the post-midnight run)
-
-The wrap at `3ff0b5480` was not the end. The owner asked for #3477, #3476 and (at
-genesis) #3390. What follows is the honest record, including two self-inflicted reds.
-
-### I broke main. Twice, the same way.
-After #3473 I ran targeted tests and not the full suite; five checks caught it
-(`b73b41f5`). After #3477 I did **exactly the same thing** and four ratchets caught it
-(`eb777b5b5`). Both times the failure surfaced under a CI/CD **`cancelled`** rollup —
-which on this repo has now hidden real failures **three times in one night**. A
-`cancelled` CI/CD here is not a timeout; open the steps.
-
-The second breakage is the more interesting one: the two module-size failures were caused
-by **comments I wrote explaining the fix**, not the fix. The ratchet was right — the
-narrative already lived in the test docstrings — and the cure it demands (shrink, never
-raise) produced better code than what I first wrote.
-
-### #3477 — CLOSED, and the filed mechanism was wrong
-I blamed `restart_docs_update.py`. In fact `sync_doc_metadata --apply` ran as designed and
-reported "Applied 1 change(s)" — it *refused* this one rewrite. #2986's "no manufactured
-freshness" hold defers anything that `differs_only_by_date_stamp`, and
-`(currently 2026-09-01)` → `(currently 2026-09-04)` differs only by a date. **The one rule
-whose job is converging the genesis literal was structurally unable to fire.** CLAUDE.md's
-twin escaped by accident: it carries the cycle number, so masking leaves `cycle 15` vs
-`cycle 16` visible.
-
-The distinction already existed (`doc_restamp_guard.stamped_rules()`); it just wasn't
-consulted where the decision is made. Exactly two rules are in the semantic-date class,
-both genesis anchors — and #2986/#2649's own 167 tests still pass.
-
-Plus `deploy/restart_verify_gates.py`: the pipeline now runs CI's twelve doc gates
-**derived from `docs-ci.yml`**, never restated, as its final sub-script. It caught a stale
-`test_count` on its first run — one the tests written for #3477 had themselves moved.
-
-### #3476 — CLOSED without crossing a security boundary
-The obvious fix is a `TOLERATED_NON_IAM` entry. **That set is a ratchet that may only
-shrink**, and its own design says a widening must reach the owner via the ADR-065 baseline
-block, because tolerating a delta lets additive IAM ship beside it. So the fix changes
-**one advisory line and no verdict**, keyed on `(resource type, property)` rather than
-message text. Mutation-proven both ways, including the positive control.
-
-Verified after the fact: `check_ci_warnings.py` now exits 0 **with no `--decoded`** — the
-acceptance box I had recorded as unconfirmable tonight.
-
-### #3390 — worked to its limit, deliberately NOT closed
-**The genesis flip worked unattended**: at PT midnight `/api/journey` went `day_n` 0 → 1,
-`pre_start` true → false, `started_date: 2026-09-04`; `/api/predict_week` lit for 2026-W36.
-
-`restart_verify` finished **23 pass / 2 fail**, both owner-only: no Day-1 weigh-in yet
-(supersede reflex still owed) and cycle 16 still unsealed. Cleared during the run: the
-character sheet (forced compute wrote `DATE#2026-09-04`, `replay_verified=True`) and the
-baked static proof (`87ec9d667` — without it every meta card and noscript block still
-advertised "the experiment begins Friday, September 4" after it had begun).
-`restart_integration_check --expect-cycle 16`: **30 pass / 2 fail**, both known —
-three cited alarms, and `notion` stale 607h on a source whose registry says
-`behavioral: True, monitored: False`, i.e. a gate that reds on honest human behaviour.
-
-En route it turned out **this issue's own verifier had a check that had never once run**:
-the #2116 composite leg called `describe_alarms` without `AlarmTypes` (metric alarms only),
-so two deployed composites read as "not deployed" — and that verdict took the tolerant
-branch, silently skipping the four assertions beneath it. Fixed in `a5fce037b`; both now
-execute and pass.
-
-### Filed from the runlist
-**#3478** — `/api/journey` serves `last_weighin_date: 2026-09-04` and `weighin_count: 1`
-when no weigh-in happened. Mechanism verified, not guessed: the reset re-phased the 09-03
-row to `pilot`, `_latest_item` hides pilot by default, the series empties, and the
-genesis-baseline fallback supplies the genesis date *as a measurement date*. The
-`pre_start` branch already nulls exactly this ghost (#948); Day 1 has no equivalent guard.
-
-### The through-line, extended
-Six instruments this session were unable to fail, or failed to mean what they said:
-`restart_pipeline` (one gate vs twelve), the `_DETECTORS` ledger, the unshippable CI
-warning, `restart_verify`'s composite leg, its "raw alarm missing" message on a **passing**
-check — and my own first wire-guard for #3477, which passed over the exact defect it was
-written to catch until I mutated it.
-
-## Part 4 — the owner typo, and the sweep earning its keep the same night
-
-At 01:2x PT the owner said the reset should have been **Saturday 2026-09-05**, not Friday.
-Cycle 16 was ~1h old with **no weigh-in, no brief and no published prereg** — nothing of
-record.
-
-**Re-anchored IN PLACE rather than closing a phantom cycle** (owner picked this):
-`--genesis 2026-09-05 --no-close-cycle`, plus a hand-corrected `CYCLE_GENESES[16]`
-(2026-09-04 → 2026-09-05, with a comment saying why it is a correction and not an append).
-SSM stays 16. The deciding factor was the seal gate: cycle 16's prereg was frozen but never
-published, so **closing it would have required a permanent grandfather record** in
-`prereg_seal_gate.py` — the right record for cycle 13, which genuinely ran and missed its
-seal, and the wrong one for a typo caught in 90 minutes. The correction is still recorded
-three ways: the CYCLE_GENESES comment, the RESET_LOG line, and the archived Friday freeze
-(`genesis_preregistration_2026-09-04_cycle16.json`).
-
-### The #3477 sweep proved itself on its first live reset — twice
-It **ABORTED the pipeline** rather than letting it exit 0, both times:
-
-1. `generate_mcp_tool_catalog --check` + the genesis-anchored JS fixtures.
-2. After regenerating both: the **catalog again**.
-
-The second abort root-caused a defect that had been silently recurring on EVERY reset:
-`restart_docs_update.py` appended a `### Phase-filter behavior (ADR-058)` section to
-`docs/MCP_TOOL_CATALOG.md` — a file `scripts/generate_mcp_tool_catalog.py` regenerates
-WHOLE, and which already emits its own `##` version of that exact section ("behavioral doc,
-stable across regenerations"). Two writers, one file, a staler duplicate: the generator
-wiped the append, the append re-added itself, and `--check` redded whichever way the last
-write went. **The #1287 owned-manifest clobber, third specimen.** The duplicate writer is
-gone; the generator is the single owner.
-
-Scoreboard for #3477's three "recurs every reset" items, measured rather than argued:
-`SCHEMA.md` genesis literal **fixed at source** (converged automatically, gate passed);
-JS fixtures **caught pre-commit**; MCP catalog **caught pre-commit and root-caused**.
-
-### Verified live after the re-anchor
-`day_n: 0 · pre_start: true · started_date: 2026-09-05 · days_until_start: 1`, character
-`pre_start: true`, constants `2026-09-05`, SSM cycle **16** (unchanged), prereg re-frozen
-for Saturday (8 coaches, 2 hypotheses). Gates: rendered **96/96**, semantic **8/8**, truth
-**8 surfaces clean**, and the doc-gate sweep green.
-
-### Two more the re-anchor surfaced, AFTER the handover was first written
-
-**The engine-doc gate cannot be caught pre-commit.** `check_doc_index --strict` reds on
-`docs/engines/CHARACTER.md` the moment `config/character_sheet.json` is COMMITTED — it
-compares commit dates, so it is structurally invisible to the #3477 sweep, which runs
-against the working tree. It duly redded right after the re-anchor commit. Re-derived (2
-lines changed: `start_date` → 2026-09-05, `_meta.last_updated`; the weight did NOT move,
-only the date it anchors to) and the limitation is now recorded in the stamp itself so the
-next reset does not rediscover it.
-
-**#3479 — a fixture that redded main on a DATE, and the sweep running a subset of its
-gate.** `tests/js/coach_asof.test.mjs` pinned a hardcoded `2026-08-27` stamp and asserted
-the FRESH rendering; `weeklyAsOf` appends "— next refresh pending" past 8 days, so on
-2026-09-04, *exactly* 8 days later, it redded the v4 site gate on a commit that touched
-none of it. The sibling assertion one test above used the same stamp and survived only
-because its regex lacked a `$` anchor — **one case failed loudly and one passed wrongly
-off identical input, and the difference was an anchor character.**
-
-And the sweep did not catch it because its JS leg ran ONE file while the v4 site gate runs
-the whole `node --test`. That is #3477's own principle turned on #3477: **a check that
-executes a subset of another check can promise nothing about it.** Fixtures now derive from
-`Date.now()`; the sweep runs bare `node --test`; a guard pins it.
+**Build beat:** none — the shipped work this session is review machinery, Day-1 honesty
+fixes and a forensic report; no reader-facing feature merged AND deployed.
+**Docs:** none needed — the session's documents (the RCA, its Part 4) landed in their own PRs; the wrap touched only this handover and the status block.
+**Decisions:** none needed — the owner's rulings (30-day minimum cycle, commitment loop KEPT, Wednesday send, protocols brute-force reset, portrait-less cast) are recorded on #3606 / #3601 / #3621, not as ADRs.
+**Main:** red — ea41f094's Unit Tests failed on this handover's own missing gate lines and one ungated residual bullet (this docs-only fix at Session W boot; the run at the fix sha is the verdict).
+**Incidents:** none — the two red-mains are decoded in the section above (composite-alarm universe → PR #3590; the IAM gate → the owner's Operational deploy).
+**Stash/hooks:** one stash found at Session W boot — `stash@{0} On main: wrapfiles` (2026-09-05 17:40 PT, CLAUDE.md + this handover, a superseded draft of the wrap that ea41f094 then committed); left in place, not dropped, for Session W's wrap to dispose after a diff; the pre-commit hook is in place (`.git/hooks/pre-commit`, executable).
+**Closures:** #3511, #3513, #3514 addressed by PR #3627 (Refs — close on the live reconcile) · DoD: scanned=0 window=closed>=2026-09-06 hits=0 findings=0 dispositioned=0 mode=warn.
+**Backlog:** Now 22 actionable; 79 free issues across Now/Next/Later are the Session W plan's pool; no promotion this session.
+**Alarms:** ✅ every alarm in ALARM state >72h cites an incident row or issue (wrap_gates batch at Session W boot).
+**CI warnings:** run 34004648301 sha 6dadafc0 concluded `cancelled` with no failing job — a genuine supersession; the IAM-gate red on #3573's role diff clears on the owner's `bash deploy/cdk_deploy.sh LifePlatformOperational`.
+**Ledger:** none — no standing machinery shipped by the wrap itself; the RCA's rent register lives in `docs/reviews/FORENSIC_RCA_2026-09-05.md`.
 
 ## Residual / next picks
-
-- **#3390** — Day-1 runlist for cycle 16, now run ON or AFTER **2026-09-05** (post-genesis by
-  construction; `restart_verify.py`, the two reconcilers in order, the supersede reflex).
-- **#3478** — `/api/journey` reports a weigh-in that never happened on Day 1 of a cycle
-  (ADR-104). Filed from the Day-1 runlist; self-heals on the first weigh-in. Confirmed
-  scoped to POST-genesis Day 1: the pre-start branch correctly nulls both fields today.
-- **#3390** — still open by design: the Day-1 weigh-in + supersede reflex, the attended
-  prereg publish + stamp, and the cloud routine's own public-surface verdict. Its runlist
-  is otherwise executed and recorded on the issue.
-- **#3403** — CI duration budget; blocked until ~09-08 by its own acceptance (needs a week
-  of post-#3378 data).
-- **#2978** — deploy-race umbrella, `blocked:date` (~09-08).
-- **#2883** — AI-cost self-metric drift, `gate:owner`.
-- **#3422 / #3436 / #3373 / #3042** — all `model:fable`; out of lane for this session by
-  owner instruction, not by blocker.
-- `not-work — owner-only, and deliberately not automated`: **cycle 16's pre-registration is
-  frozen but unpublished** (sha `cd8156f1…`). `publish_genesis_preregistration.py` +
-  `genesis_prereg_stamp.py --apply` are attended by #1092 posture; the owner chose
-  "seed + review, then publish", and the publish dry-run was additionally blocked by the
-  auto-mode classifier. Cycle 16 stays unsealed until this runs — cycle 13's precedent is
-  a grandfather record.
-- `not-work — expired by design, owner declined`: the **genesis-eve prereg lock email**
-  was not sent ("no need to publish email"). It refuses after PT midnight by design;
-  recording the skip rather than backdating it.
-- `not-work — owner judgement`: **the `notion` staleness FAIL** in
-  `restart_integration_check` — that source is `behavioral: True, monitored: False`, so its
-  staleness is the datum, yet a flat 336h threshold reds the behavioural check. File it or
-  waive it; I did not want to manufacture an issue out of journaling habits.
-- `not-work — standing observable`: **`compute-pipeline-stale-heartbeat` has not yet
-  produced a first verdict** (`INSUFFICIENT_DATA — Unchecked: Initial alarm creation`).
-  The emitter is confirmed healthy (1 datapoint/day, 10 consecutive days) so OK is a
-  prediction; confirm it settled at the next session.
-- `not-work — the approved plan, unchanged`: **Session U proper** (Architect ritual + the
-  time-anchored batch) remains scheduled for 2026-09-08,
-  `~/.claude/plans/lovely-snacking-panda.md`.
+- The census chain: #3580 → #3581 → #3583 → #3588 (11 issues).
+- #3390 (owner acts 1–2 close it), #3403/#2978 (~09-08), #2883 (owner), #3422/#3436/#3373/#3042 fable.
+- Session U proper: 2026-09-08 (the #2849 reopen trigger), `~/.claude/plans/lovely-snacking-panda.md`.
