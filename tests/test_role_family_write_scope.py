@@ -642,15 +642,23 @@ def test_MUTATION_the_enrolment_leg_reds_on_a_planted_unmapped_writer():
 # deployed. Same shrink-only shape as KNOWN_GAPS, and the same two-way ratchet — a line whose
 # drift is gone reds and asks to be deleted, which is what makes the owner's deploy visible here
 # instead of being assumed.
-KNOWN_LIVE_DRIFT = {
-    "chronicle-email-sender::SES": (
-        "2026-09-06 (#3568, merged on main and not yet deployed) — `role_policies_base.SES_IDENTITY` moved to the "
-        "site-domain identity `arn:aws:ses:us-west-2:205930651321:identity/averagejoematt.com` so reader mail "
-        "stops leaving the personal domain; the deployed ChronicleEmailSenderRole still carries only the previous "
-        "identity, so the SES statement's resource set is behind the repo. Found by this leg on its first run "
-        "against the merged tree — a merge is not a deploy, which is the whole reason the leg exists. "
-        "CLEARS WHEN: `bash deploy/cdk_deploy.sh LifePlatformEmail` runs. Delete this line then."
-    ),
+KNOWN_LIVE_DRIFT: dict = {
+    # EMPTY, and that is a measurement rather than a default. It held exactly one line for a
+    # few hours on 2026-09-06 and both directions of the ratchet fired in the field the same
+    # day, which is this leg's own live proof:
+    #
+    #   OPENED  the leg's first run against merged main found `chronicle-email-sender::SES`
+    #           behind the repo — #3568 moved `role_policies_base.SES_IDENTITY` to the
+    #           site-domain identity so reader mail stops leaving the personal domain, and the
+    #           deployed role still carried only the previous identity. A merge is not a deploy.
+    #   CLOSED  ~3h later the LifePlatformEmail deploy landed and the SAME run went red the
+    #           OTHER way — "these KNOWN_LIVE_DRIFT lines no longer describe live drift; delete
+    #           them" — naming the line by key. Verified read-only before deleting it:
+    #           `aws iam get-role-policy` on
+    #           LifePlatformEmail-ChronicleEmailSenderRole5A0F7C29-BqQqb62zwbMX now lists
+    #           arn:aws:ses:us-west-2:205930651321:identity/averagejoematt.com in sid=SES.
+    #
+    # A new entry is a dated line saying what clears it, exactly like KNOWN_GAPS above.
 }
 
 LIVE_PARITY_WATCH = (
