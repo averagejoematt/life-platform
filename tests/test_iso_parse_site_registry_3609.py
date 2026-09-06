@@ -7,7 +7,7 @@ Pacific-frame re-derivation) plus a RATCHET on one narrow idiom
 (`.replace("Z", "+00:00")`). What that file does NOT enumerate is the much
 larger surface of plain `datetime.fromisoformat(...)` / `date.fromisoformat(...)`
 call sites that never went through the Z-replace idiom at all — an AST census
-(this file's own `discover_fromisoformat_sites()`) finds 64 files under
+(this file's own `discover_fromisoformat_sites()`) finds 65 files under
 `lambdas/` + `mcp/` with at least one, after this PR migrated four of the
 "obvious" shared-module sites (`common/digest_utils.py`, `common/auth_breaker.py`,
 `experiment/eval_retention.py`, `web/site_api_common.py`'s vintage-comparison
@@ -124,6 +124,7 @@ ISO_PARSE_SITE_REGISTRY: frozenset[str] = frozenset(
         "lambdas/ingestion/ingest_health.py",
         "lambdas/ingestion/ingestion_framework.py",
         "lambdas/ingestion/source_registry.py",
+        "lambdas/intelligence/analyzer_grounding.py",  # date.fromisoformat day-count delta — calendar-day, not an instant; landed on main during this PR's rebase
         "lambdas/intelligence/weight_recency.py",
         "lambdas/operational/acwr_liveness_qa.py",
         "lambdas/operational/as_of_agreement_qa.py",
@@ -212,7 +213,7 @@ def test_registry_count_is_the_frozen_2026_09_06_baseline_or_smaller():
     itself cannot silently grow via a bulk edit that also happens to satisfy
     the subset check (impossible under the subset check alone, but this makes
     the shrink-only intent independently legible without re-deriving history)."""
-    BASELINE_2026_09_06 = 64
+    BASELINE_2026_09_06 = 65
     assert len(ISO_PARSE_SITE_REGISTRY) <= BASELINE_2026_09_06, (
         f"ISO_PARSE_SITE_REGISTRY grew to {len(ISO_PARSE_SITE_REGISTRY)} entries, "
         f"above the frozen 2026-09-06 baseline of {BASELINE_2026_09_06}. The count may only go down."
