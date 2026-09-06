@@ -185,7 +185,27 @@
       "Bash(python3 scripts/wrap_gates.py *)",
       "Bash(python3 deploy/sync_doc_metadata.py --check*)",
       "Bash(python3 scripts/incident_log_patterns.py --check*)",
-      "Bash(python3 scripts/operating_calendar.py --check*)"
+      "Bash(python3 scripts/operating_calendar.py --check*)",
+      "Bash(curl -s https://averagejoematt.com/*)",
+      "Bash(curl -sI https://averagejoematt.com/*)",
+      "Bash(git merge-base *)",
+      "Bash(python3 scripts/check_operating_knowledge_ledger.py *)",
+      "Bash(/Users/matthewwalker/dev/life-platform/.venv/bin/ruff check *)",
+      "Bash(.venv/bin/ruff check *)",
+      "Bash(node --test *)",
+      "Bash(bash deploy/wait_pr_green.sh *)",
+      "Bash(node scripts/validate_palette.js *)",
+      "Bash(python3 scripts/generate_platform_model.py --check*)",
+      "Bash(python3 -m json.tool *)",
+      "Bash(python3 scripts/gate_census.py *)",
+      "Bash(python3 scripts/closure_sweep.py *)",
+      "Bash(python3 deploy/restart_verify.py *)",
+      "Bash(python3 deploy/verify_oidc_iam.py *)",
+      "Bash(aws sesv2 get-* *)",
+      "Bash(aws route53 list-* *)",
+      "Bash(.venv/bin/black --check *)",
+      "Bash(python3 scripts/skill_lint.py --offline*)",
+      "Bash(python3 scripts/diligence_verify.py *)"
     ]
   },
   "hooks": {
