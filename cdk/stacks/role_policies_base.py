@@ -7,9 +7,17 @@ ARNs. It is imported by the per-domain policy modules and re-exported by
 stacks, the sibling modules and the IAM linters that read them.
 """
 
+import sys
+from pathlib import Path
+
 from aws_cdk import aws_iam as iam
 
 from stacks.constants import ACCT, CF_DIST_ID, KMS_KEY_ID, REGION, S3_BUCKET, SES_DOMAIN, TABLE_NAME  # CONF-01, SEC-06, SEC-08
+
+# #3568: the site sending domain comes from the ONE registry, not a second
+# hand-typed constant — same sys.path pattern ingestion_stack.py uses.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
+from common.email_identity import SITE_DOMAIN  # noqa: E402
 
 # ── Constants ──────────────────────────────────────────────────────────────
 TABLE_ARN = f"arn:aws:dynamodb:{REGION}:{ACCT}:table/{TABLE_NAME}"
@@ -29,6 +37,29 @@ SES_IDENTITY = f"arn:aws:ses:{REGION}:{ACCT}:identity/{SES_DOMAIN}"  # SEC-08: d
 # identity AND the configuration-set when SendEmail includes ConfigurationSetName.
 # Missing this caused daily-brief AccessDeniedException for 2 days post-P1.6.
 SES_CONFIG_SET_ARN = f"arn:aws:ses:{REGION}:{ACCT}:configuration-set/life-platform-emails"
+# #3568: reader mail is From the SITE domain, which is a SECOND SES identity.
+# The grant is resource-scoped per identity, so moving the From address without
+# this ARN is an AccessDeniedException at send time, not a config warning — the
+# same failure mode as the config-set omission noted above (2 days of dark
+# daily-briefs). Added ONLY to the five reader-facing senders below; owner and
+# operational mail keeps the single-identity grant.
+SES_SITE_IDENTITY = f"arn:aws:ses:{REGION}:{ACCT}:identity/{SITE_DOMAIN}"
+
+
+def _ses_reader_resources() -> list[str]:
+    """A FRESH resource list for a reader-facing sender.
+
+    A function, not a module-level list: three policy functions use it, and a
+    shared mutable default that any one of them (or CDK) appended to would
+    silently widen the other two.
+
+    Underscore-prefixed on purpose. `tests/test_iam_secrets_consistency.py`
+    discovers policy factories as "every public function in a role_policies_*
+    module" and calls each expecting `list[PolicyStatement]`; a public helper
+    returning `list[str]` aborts collection for the whole suite. `_s3`,
+    `_secret_arn` and `_bedrock_statement` carry the prefix for the same reason.
+    """
+    return [SES_IDENTITY, SES_SITE_IDENTITY, SES_CONFIG_SET_ARN]
 
 
 def _secret_arn(name: str) -> str:

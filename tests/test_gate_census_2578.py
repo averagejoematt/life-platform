@@ -523,19 +523,19 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # re-runnable harness (`gate_census_mutations.py --run --gate
         # test_composite_alarm_lookup_3390.py`: ARMED 1/1, planting an untracked
         # deploy/_census_probe_3503.py whose whole-estate sweep omits AlarmTypes).
-        # Upper bound raised 50 -> 52 (2026-09-05, #3529/#3531/#3534; rebased after #3564 took
-        # the 49th and #3503 the 50th): the 51st and 52nd are
-        # the reset sweep's two declared-exemption registry entries, recorded in
-        # gate_census_proofs.GUARD_PROOFS. `MULTILINE_RUN_EXEMPT[Install census dependency
-        # (PyYAML)]` — planted a REAL gate in `run: |` block-scalar form on a scratch copy of
-        # the live docs-ci.yml: sweep exit 2 UNEVALUABLE; unmutated control exit 0.
-        # `MUTATING_GATES[scripts/skill_lint.py --self-test]` — two directions: an undeclared
-        # writer gate -> exit 1 READ-ONLY VIOLATION, and a declared mutator that does not
-        # restore -> exit 1 DID NOT RESTORE THE TREE; no-op control exit 0 with
-        # `git status --porcelain` byte-identical before and after.
+        # Upper bound raised 50 -> 51 (2026-09-06, #3568): the 51st proof is
+        # `structural::test_email_sender_identity_3568.py` — the sending-vocabulary census,
+        # which checks every code default and every CDK EMAIL_SENDER literal against the
+        # committed set of SES-verified domains, and additionally pins reader mail to the
+        # site domain. Mutation-backed via the re-runnable harness
+        # (`gate_census_mutations.py --run --gate test_email_sender_identity_3568.py`:
+        # ARMED 1/1, planting an untracked lambdas/common/_census_probe_3568.py whose
+        # sender default names a .invalid domain SES can never have verified).
+        # BASELINE_TOTAL_GATES is deliberately NOT moved: #3588/#3629 net-removed one gate
+        # in the same window, so the live total stays at the committed 597.
         3
         <= len(proven)
-        <= 52
+        <= 53  # 51 -> 53: #3581's two proven mirror registries, measured on the merged tree (2026-09-06)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

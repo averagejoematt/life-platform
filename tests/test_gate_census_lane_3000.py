@@ -488,27 +488,7 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
-BASELINE_TOTAL_GATES = (
-    # +2 2026-09-05 (#3529/#3531/#3534: the reset sweep's two declared-exemption registries —
-    # MULTILINE_RUN_EXEMPT and MUTATING_GATES — both landing WITH verdicts recorded in
-    # gate_census_proofs.GUARD_PROOFS, so the live `unproven` pile does NOT move and no line
-    # is added to tests/gate_census_unproven_residue.py), atop 596.
-    #
-    # THE BASE MOVED UNDER THIS BRANCH, and the number here follows the measurement rather
-    # than the arithmetic: this lane first measured 597 + 2 = 599 against main c01222426,
-    # then #3588 (#3535/#3537/#3538/#3539) merged and took the base 597 -> 596 — it retired
-    # more gate ids than it minted. Re-measured against main 2b4d09aff by id-set diff on the
-    # merged tree, git-added, each side running its own scripts/gate_census.py --json:
-    # main = 596, merged = 598, ADDED exactly the two ids above, REMOVED {}. So this is a
-    # LOWERING (599 -> 598), not a raise. Live unproven is 537 on both sides — the two
-    # entrants are `can-fail (proven)`, so the down-only ratchet does not move and
-    # tests/gate_census_unproven_residue.py is untouched.
-    #
-    # (Prior stack, for the trail: 596 = #3564's subscriber-promise cadence check atop 595,
-    # atop 594 = #3478's Day-1 synthetic-baseline guard, atop 593 = #3477's reset doc-gate
-    # sweep, atop 592. #3503's AlarmTypes sweep took it to 597; #3588 took it back to 596.)
-    598
-)
+BASELINE_TOTAL_GATES = 599  # +1 2026-09-06 (#3529/#3531/#3534's two derived mirror registries, PROVEN, net of #3568's +1 — re-measured on the merged tree by scripts/gate_census.py, not by arithmetic), atop 598 +1 2026-09-06 (#3568's sending-vocabulary census, PROVEN — 4 real-tree mutations each red their own assertion), atop 597 (#3503's repo-wide AlarmTypes sweep, atop 596, atop 595, atop 594)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was

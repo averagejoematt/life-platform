@@ -77,6 +77,17 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "roster and leaves an asymmetric family. Retiring a coach seat is a coaching-team "
         "decision, not a dead-code sweep."
     ),
+    "lambdas/common/email_identity.py:is_verified_sender": (
+        "the predicate half of #3568's sending-vocabulary registry, and the thing its gate "
+        "asserts with. Runtime code consumes the registry's CONSTANTS (CHRONICLE_SENDER et al. "
+        "are read by five senders and, at synth time, by email_stack/web_stack/role_policies_base); "
+        "the FUNCTIONS exist so tests/test_email_sender_identity_3568.py can decide whether an "
+        "arbitrary From address is on an SES-verified domain — which is the whole check. Deleting "
+        "it does not shrink the surface, it moves the flag: with is_verified_sender gone, "
+        "sender_domain becomes the unreferenced def (verified by removing it and re-running this "
+        "test). Same shape as structured_output_config below — half of a live contract test, not "
+        "a leftover."
+    ),
     "lambdas/ai/bedrock_client.py:structured_output_config": (
         "half of a live CONTRACT test, not a leftover. #1385 AC4 "
         "(tests/test_whole_life_context_1385.py) uses it to build the body it then feeds "

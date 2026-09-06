@@ -102,6 +102,7 @@ import boto3
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.pacific_time import PACIFIC  # #2414 — the site's day boundary is Pacific (legacy-link sunset check)
 from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
 from common.subscriber_cadence import (  # #3564/#3565 — copy RENDERED from the senders' crons + the source registry, never re-typed
@@ -152,7 +153,7 @@ SES_REGION = os.environ.get("SES_REGION", "us-west-2")  # SES verified identity 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SENDER = os.environ.get("EMAIL_SENDER", TRANSACTIONAL_SENDER)
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"

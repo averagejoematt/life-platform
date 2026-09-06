@@ -27,6 +27,7 @@ import os
 from datetime import datetime, timezone
 
 import boto3
+from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.send_guard import guarded_send_email, is_dry_run
 from common.subscriber_cadence import days_until_next, promise_sentence, signal_weekday, weekday_name  # #3564
@@ -43,7 +44,7 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SENDER = os.environ.get("EMAIL_SENDER", TRANSACTIONAL_SENDER)
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
