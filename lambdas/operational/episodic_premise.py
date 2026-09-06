@@ -50,7 +50,7 @@ EPISODIC_PREMISE_BAR_DAYS = 25
 
 
 def episodic_premise_violations(
-    billing_days_by_class: dict,
+    active_days_by_class: dict,
     episodic_classes=(),
     bar_days: int = EPISODIC_PREMISE_BAR_DAYS,
 ) -> list:
@@ -63,7 +63,7 @@ def episodic_premise_violations(
     """
     out = []
     for cls in episodic_classes or ():
-        n = (billing_days_by_class or {}).get(cls)
+        n = (active_days_by_class or {}).get(cls)
         if n is None:
             continue
         try:
@@ -74,7 +74,7 @@ def episodic_premise_violations(
     return sorted(out)
 
 
-def billing_days_by_class(
+def active_days_by_class(
     cw,
     classes,
     dimension: str,

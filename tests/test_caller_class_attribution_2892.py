@@ -422,7 +422,7 @@ def test_a_recurring_class_billing_daily_is_never_a_violation(ep, gov, monkeypat
 
     monkeypatch.setattr(gov, "_ssm", _SSM())
     every_day = {c: ep.EPISODIC_PREMISE_WINDOW_DAYS for c in gov.CALLER_CLASSES}
-    gov._write_breakdown(0, 10.0, 20.0, 1.0, 1.0, datetime(2026, 9, 5, tzinfo=timezone.utc), 215.0, billing_days_by_class=every_day)
+    gov._write_breakdown(0, 10.0, 20.0, 1.0, 1.0, datetime(2026, 9, 5, tzinfo=timezone.utc), 215.0, active_days_by_class=every_day)
     flagged = _json.loads(written["Value"])["episodic_premise_violations"]
     assert flagged == sorted(gov.EPISODIC_CALLER_CLASSES)
     assert not (set(flagged) & set(gov.PROJECTED_CALLER_CLASSES)), "a recurring class must never be flagged"
@@ -443,7 +443,7 @@ def test_billing_days_records_none_not_zero_when_cloudwatch_fails(ep):
         def get_metric_statistics(self, **kw):
             raise RuntimeError("cloudwatch down")
 
-    days = ep.billing_days_by_class(_CW(), _EPISODIC, "CallerClass", datetime(2026, 9, 5, tzinfo=timezone.utc))
+    days = ep.active_days_by_class(_CW(), _EPISODIC, "CallerClass", datetime(2026, 9, 5, tzinfo=timezone.utc))
     assert set(days) == set(_EPISODIC)
     assert all(v is None for v in days.values()), "a failed read must be UNKNOWN, never zero days"
 
@@ -459,7 +459,7 @@ def test_billing_days_counts_days_with_spend_not_dollars(ep):
                 return {"Datapoints": [{"Sum": 0.01} for _ in range(28)]}
             return {"Datapoints": [{"Sum": 18.33}, {"Sum": 0.0}]}
 
-    days = ep.billing_days_by_class(_CW(), _EPISODIC, "CallerClass", datetime(2026, 9, 5, tzinfo=timezone.utc))
+    days = ep.active_days_by_class(_CW(), _EPISODIC, "CallerClass", datetime(2026, 9, 5, tzinfo=timezone.utc))
     assert days["ci"] == 28
     assert days["dev-session"] == 1, "a zero-sum day is not a billing day"
     assert ep.episodic_premise_violations(days, _EPISODIC) == ["ci"]
@@ -485,7 +485,7 @@ def test_the_premise_measurement_reaches_the_persisted_breakdown(gov, monkeypatc
         1.0,
         datetime(2026, 9, 5, tzinfo=timezone.utc),
         215.0,
-        billing_days_by_class={"prod-cron": 30, "ci": 28, "dev-session": 3, "remediation": 13},
+        active_days_by_class={"prod-cron": 30, "ci": 28, "dev-session": 3, "remediation": 13},
     )
     payload = _json.loads(written["Value"])
     assert payload["episodic_billing_days"]["ci"] == 28

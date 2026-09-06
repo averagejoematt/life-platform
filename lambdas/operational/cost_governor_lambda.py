@@ -695,7 +695,7 @@ def _write_breakdown(
     ai_class_split: dict | None = None,
     prod_class_share=None,
     projected_all_classes: float | None = None,
-    billing_days_by_class: dict | None = None,
+    active_days_by_class: dict | None = None,
 ) -> None:
     """Persist the projection breakdown alongside the tier (#822).
 
@@ -757,7 +757,7 @@ def _write_breakdown(
         "projected_classes": list(PROJECTED_CALLER_CLASSES),
         "episodic_classes": list(EPISODIC_CALLER_CLASSES),
         # #3554: those two say WHAT the narrowing is; these say whether its premise holds.
-        **_episodic.premise_fields(billing_days_by_class or {}, EPISODIC_CALLER_CLASSES),
+        **_episodic.premise_fields(active_days_by_class or {}, EPISODIC_CALLER_CLASSES),
     }
     try:
         _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
@@ -1069,7 +1069,7 @@ def lambda_handler(event, context):
         # ProjectedMonthlySpend means is auditable instead of silent.
         projected_all_classes = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
         # #3554: measure the premise the narrowing rests on. Reports; never re-scopes.
-        active_days_by_class = _episodic.billing_days_by_class(_cw, CALLER_CLASSES, CALLER_CLASS_DIMENSION, now)
+        active_days_by_class = _episodic.active_days_by_class(_cw, CALLER_CLASSES, CALLER_CLASS_DIMENSION, now)
         premise_broken = _episodic.report(active_days_by_class, EPISODIC_CALLER_CLASSES, projected, projected_all_classes)
 
         # ADR-133 (#739): surge-mode ceiling. Pure function of reader traffic
@@ -1164,7 +1164,7 @@ def lambda_handler(event, context):
             ai_class_split=ai_class_split,
             prod_class_share=prod_class_share,
             projected_all_classes=projected_all_classes,
-            billing_days_by_class=active_days_by_class,
+            active_days_by_class=active_days_by_class,
         )
 
         return {
