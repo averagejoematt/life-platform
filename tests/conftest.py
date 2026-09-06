@@ -224,6 +224,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # puts a MessageRejected (or, for reader mail, a personal-domain From) in front
         # of subscribers.
         "test_email_sender_identity_3568.py",
+        # #3538: AST + string-literal sweep of lambdas/common + lambdas/ai. Verdict is
+        # pure repo shape — a public def landing in the every-bundle packages with no
+        # caller must red BEFORE the merge, because after it the dead code is already
+        # riding ~104 Lambda zips and reads as API to the next reader.
+        "test_no_dead_shared_defs_3538.py",
         # #2986: the derived-artifact registry. Verdict is pure repo shape — a new
         # generator writing a committed artifact must be classified BEFORE the merge,
         # and a guard placed in the wrong lane must red on the PR that placed it there.

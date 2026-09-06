@@ -106,13 +106,7 @@ except ImportError:
     logger = logging.getLogger("cost-governor")
     logger.setLevel(logging.INFO)
 
-try:
-    from common.token_alarm_window import is_within_token_alarm_window
-except ImportError:  # pragma: no cover - packaging drift; fail safe = gauge reads "not in window"
-
-    def is_within_token_alarm_window(check_date: date | None = None) -> bool:
-        return False
-
+from common.token_alarm_window import is_within_token_alarm_window
 
 try:
     from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASSES, PRICES as _BEDROCK_PRICES

@@ -531,6 +531,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (`gate_census_mutations.py --run --gate test_email_sender_identity_3568.py`:
         # ARMED 1/1, planting an untracked lambdas/common/_census_probe_3568.py whose
         # sender default names a .invalid domain SES can never have verified).
+        # BASELINE_TOTAL_GATES is deliberately NOT moved: #3588/#3629 net-removed one gate
+        # in the same window, so the live total stays at the committed 597.
         3
         <= len(proven)
         <= 51
