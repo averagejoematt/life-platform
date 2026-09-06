@@ -492,11 +492,22 @@ BASELINE_TOTAL_GATES = (
     # +2 2026-09-05 (#3529/#3531/#3534: the reset sweep's two declared-exemption registries —
     # MULTILINE_RUN_EXEMPT and MUTATING_GATES — both landing WITH verdicts recorded in
     # gate_census_proofs.GUARD_PROOFS, so the live `unproven` pile does NOT move and no line
-    # is added to tests/gate_census_unproven_residue.py), atop 597 (#3503's repo-wide
-    # AlarmTypes sweep), atop 596 (#3564's subscriber-promise cadence check), atop 595,
-    # atop 594 (#3478's Day-1 synthetic-baseline guard), atop 593 (#3477's reset doc-gate
-    # sweep, atop 592). Measured by id-set diff on the merged tree, git-added.
-    599
+    # is added to tests/gate_census_unproven_residue.py), atop 596.
+    #
+    # THE BASE MOVED UNDER THIS BRANCH, and the number here follows the measurement rather
+    # than the arithmetic: this lane first measured 597 + 2 = 599 against main c01222426,
+    # then #3588 (#3535/#3537/#3538/#3539) merged and took the base 597 -> 596 — it retired
+    # more gate ids than it minted. Re-measured against main 2b4d09aff by id-set diff on the
+    # merged tree, git-added, each side running its own scripts/gate_census.py --json:
+    # main = 596, merged = 598, ADDED exactly the two ids above, REMOVED {}. So this is a
+    # LOWERING (599 -> 598), not a raise. Live unproven is 537 on both sides — the two
+    # entrants are `can-fail (proven)`, so the down-only ratchet does not move and
+    # tests/gate_census_unproven_residue.py is untouched.
+    #
+    # (Prior stack, for the trail: 596 = #3564's subscriber-promise cadence check atop 595,
+    # atop 594 = #3478's Day-1 synthetic-baseline guard, atop 593 = #3477's reset doc-gate
+    # sweep, atop 592. #3503's AlarmTypes sweep took it to 597; #3588 took it back to 596.)
+    598
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
