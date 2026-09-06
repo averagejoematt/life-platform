@@ -134,16 +134,22 @@ class TestCodeAdmitsOnlyFalsifiableClaims:
         assert "not gradable" in reason
 
     def test_condition_vocabulary_matches_the_evaluator(self):
-        """The gate may only admit conditions `_evaluate_condition` actually grades."""
+        """The gate may only admit conditions `_evaluate_condition` actually grades.
+
+        Resolved through the evaluator MODULE, not by walking its file for a def of
+        that name: since #3551 the comparison lives in prediction_point_grader and is
+        imported back under the evaluator's name, and a file walk returned an empty
+        set — which this test caught rather than passed vacuously. The non-empty
+        control below keeps it that way."""
+        import inspect
+        import textwrap
+
         import coach_prediction_evaluator as cpe
 
-        src = ast.parse(open(os.path.join(_ROOT, "lambdas", "coach", "coach_prediction_evaluator.py")).read())
-        graded = set()
-        for node in ast.walk(src):
-            if isinstance(node, ast.FunctionDef) and node.name == "_evaluate_condition":
-                graded = {c.value for c in ast.walk(node) if isinstance(c, ast.Constant) and isinstance(c.value, str)}
+        fn = ast.parse(textwrap.dedent(inspect.getsource(cpe._evaluate_condition)))
+        graded = {c.value for c in ast.walk(fn) if isinstance(c, ast.Constant) and isinstance(c.value, str)}
+        assert graded, "positive control: the evaluator's condition grader names its vocabulary"
         assert set(dc.VALID_CONDITIONS) <= graded, "the gate admits a condition the evaluator cannot grade"
-        assert cpe is not None
 
     def test_qualitative_is_never_an_admissible_spec_type(self):
         """The evaluator SKIPS qualitative specs, so admitting one seeds a row that can
