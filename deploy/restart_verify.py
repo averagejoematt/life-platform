@@ -247,17 +247,19 @@ def main():
     pytest_ok = proc.returncode == 0
     check("pytest layer-retirement test passes", pytest_ok, proc.stdout.strip().splitlines()[-1] if proc.stdout else "no output")
 
-    # 11. Static/no-JS + OG proof rebake (#1815). Home's <noscript> core + OG tags and
-    # /coaching/'s OG title are BAKED (scripts/v4_build_home_proof.py, v4_build_coaching.py)
-    # and only regenerate as a side effect of `deploy/sync_site_to_s3.sh` — which only runs
-    # on a site/** push. If genesis has passed with no incidental site/** merge since, the
-    # crawler/social/no-JS layer is still serving pre-start copy ("the experiment begins
-    # Monday..."). Re-run the two generators here (offline-safe: they fall back to the
-    # committed proof_snapshot.json if the live API is unreachable) and diff the result —
-    # any change means the baked layer WAS stale and has now been rebaked in the working
-    # tree; commit + push (touches site/**, so the standing site-deploy.yml auto-deploys
-    # it) to actually publish the fix.
-    watched = ["site/index.html", "site/coaching/index.html"]
+    # 11. Static/no-JS + OG proof rebake (#1815, extended #3515). Home's <noscript>
+    # core + OG tags, /coaching/'s OG title, and the Data/Protocols hubs' #1395 baked
+    # core are BAKED (scripts/v4_build_home_proof.py, v4_build_coaching.py,
+    # v4_build_evidence.py) and only regenerate as a side effect of
+    # `deploy/sync_site_to_s3.sh` — which only runs on a site/** push. If genesis has
+    # passed (or a generator was silently missing from that builder list, #3515) with
+    # no incidental site/** merge since, the crawler/social/no-JS layer is still
+    # serving pre-start or stale-dated copy. Re-run the generators here (offline-safe:
+    # they fall back to the committed proof_snapshot.json if the live API is
+    # unreachable) and diff the result — any change means the baked layer WAS stale
+    # and has now been rebaked in the working tree; commit + push (touches site/**, so
+    # the standing site-deploy.yml auto-deploys it) to actually publish the fix.
+    watched = ["site/index.html", "site/coaching/index.html", "site/data/index.html", "site/protocols/index.html"]
     before = {}
     for rel in watched:
         p = REPO_ROOT / rel
@@ -267,7 +269,12 @@ def main():
     # re-flattens the doors nav/footer/head-chrome to the single source, so a
     # generator alone would otherwise leave the page on its own stale inline
     # chrome and manufacture a false "changed" diff below.
-    for script in ("scripts/v4_build_home_proof.py", "scripts/v4_build_coaching.py", "scripts/v4_apply_chrome.py"):
+    for script in (
+        "scripts/v4_build_home_proof.py",
+        "scripts/v4_build_coaching.py",
+        "scripts/v4_build_evidence.py",
+        "scripts/v4_apply_chrome.py",
+    ):
         r = subprocess.run(["python3", script], cwd=REPO_ROOT, capture_output=True, text=True)
         if r.returncode != 0:
             rebake_errors.append(f"{script}: exit {r.returncode}: {r.stderr.strip().splitlines()[-1] if r.stderr else ''}")

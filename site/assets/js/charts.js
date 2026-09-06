@@ -612,16 +612,21 @@ export function sparkline(values, { height = 34 } = {}) {
 // Horizontal 100%-stacked bar — for a composition (e.g. macro split P/C/F). segments:
 // [{label, value, tone}] where tone ∈ {ember, ink, faint} (no new hues — ember = the
 // tracked/primary segment, muted inks for the rest). Renders the % split + a legend.
-export function stackedBar(segments, { label = "", unit = "g" } = {}) {
+export function stackedBar(segments, { label = "", unit = "g", showPct = true } = {}) {
   const segs = (segments || []).map((s) => ({ l: s.label, v: Number(s.value) || 0, t: s.tone || "ink" })).filter((s) => s.v > 0);
   const total = segs.reduce((a, s) => a + s.v, 0);
   if (!total) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">No data yet.</figcaption></figure>`;
   const bar = segs.map((s) => `<span class="sbar-seg sbar-${escAttr(s.t)}" style="width:${((s.v / total) * 100).toFixed(1)}%"></span>`).join("");
-  const legend = segs.map((s) => `<span class="sbar-key"><i class="sbar-dot sbar-${escAttr(s.t)}"></i>${escAttr(s.l)} ${Math.round(s.v)}${escAttr(unit)} · ${Math.round((s.v / total) * 100)}%</span>`).join("");
+  // #3558: showPct:false drops the per-segment % from the legend/tooltip. A caller
+  // that ALSO states one of these segments' share as its own headline number (e.g.
+  // a DEXA body-fat %) must pass showPct:false — otherwise this bar's own %
+  // (computed over whatever total the caller happened to pass in) prints a SECOND,
+  // possibly-disagreeing body-fat percentage next to the caller's real one.
+  const legend = segs.map((s) => `<span class="sbar-key"><i class="sbar-dot sbar-${escAttr(s.t)}"></i>${escAttr(s.l)} ${Math.round(s.v)}${escAttr(unit)}${showPct ? ` · ${Math.round((s.v / total) * 100)}%` : ""}</span>`).join("");
   // Interactive hover/tap (#582): a point at each segment's centre — nearest-by-x
   // lands on the segment under the finger. Replaces the native title tooltip.
   let _acc = 0;
-  const cpts = segs.map((s) => { const cx = _acc + s.v / 2; _acc += s.v; return { x: +(cx / total).toFixed(4), y: 0.5, l: `${s.l} ${Math.round(s.v)}${unit} · ${Math.round((s.v / total) * 100)}%` }; });
+  const cpts = segs.map((s) => { const cx = _acc + s.v / 2; _acc += s.v; return { x: +(cx / total).toFixed(4), y: 0.5, l: `${s.l} ${Math.round(s.v)}${unit}${showPct ? ` · ${Math.round((s.v / total) * 100)}%` : ""}` }; });
   return `<figure class="chart"><div class="sbar" role="img" aria-label="${escAttr(label)}" data-cpts="${escAttr(JSON.stringify(cpts))}">${bar}</div><figcaption class="chart-cap label sbar-legend">${legend}</figcaption></figure>`;
 }
 

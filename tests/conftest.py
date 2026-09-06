@@ -522,6 +522,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_smoke_structural.py",
         "test_stance_behavioral_gate_2195.py",
         "test_traffic_green_report.py",
+        # #3567: imports tests/qa_manifest.py to derive the sitemap's own registry-vs-
+        # disk consistency (registry membership, live noindex, self-matching canonical)
+        # — same shape as the 20 files above, joined by the same import-detection rule.
+        "test_v4_build_sitemap_3567.py",
         "test_visual_ai_qa.py",
         "test_visual_qa_units.py",
         "test_webkit_weekly_qa.py",
