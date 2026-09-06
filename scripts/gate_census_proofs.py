@@ -551,6 +551,88 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-08-30",
     },
+    # #3515: the "as of" freshness guard sync_site_to_s3.sh runs right after the PII
+    # guard. Not a synthetic plant — the mutation IS the real historical defect: a
+    # `git archive origin/main@c0122242` snapshot taken before this fix still carried
+    # v4_build_evidence.py's 33-day-stale bake (v4_build_evidence.py was never in the
+    # deploy path's builder list). Watching the guard fire on the real specimen is a
+    # stronger proof than a synthetic one — the exact defect it exists to catch.
+    "guard::scripts/check_proof_freshness.py": {
+        "gate_name": "scripts/check_proof_freshness.py",
+        "command": "python3 scripts/check_proof_freshness.py --root <tree>   # tests/test_check_proof_freshness_3515.py covers it as pure logic",
+        "mutation": (
+            "a full snapshot of origin/main@c0122242 (git archive, before #3515's fix): "
+            "site/data/index.html and site/protocols/index.html both still carry the baked "
+            "'as of 2026-08-02' stamp because v4_build_evidence.py was never in "
+            "deploy/sync_site_to_s3.sh's builder list."
+        ),
+        "observed": (
+            "MUTATED (--root pointed at the origin/main@c0122242 snapshot): exit 1 — "
+            "\"2 stale baked 'as of' stamp(s): site/data/index.html: 'as of 2026-08-02' is "
+            "34d old (> 7d) — rebuild before publish; site/protocols/index.html: 'as of "
+            "2026-08-02' is 34d old (> 7d) — rebuild before publish\". REVERTED (this "
+            'branch, the fix applied): exit 0 — "all baked proof pages carry a fresh '
+            "'as of' stamp\". Both watched 2026-09-06. Positive control also carried in "
+            "tests/test_check_proof_freshness_3515.py "
+            "(test_positive_control_stale_stamp_fails, "
+            "test_main_exits_nonzero_on_stale_and_zero_when_clean, 7 cases total)."
+        ),
+        "scope": (
+            "Watches only the six named proof pages' baked 'as of <date>' stamps against a "
+            "fixed 7-day ceiling — a staleness class with no 'as of' literal at all (a wrong "
+            "number stamped with a fresh date) is invisible to it by construction; that class "
+            "is the doc-sync literal gate's job (sync_doc_metadata.py), not this one's."
+        ),
+        "proved_on": "2026-09-06",
+    },
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STRUCTURAL_HAND_PROOFS — census family 5 (structural-test) records that don't fit
+# `gate_census_mutations.MUTATION_SPECS`' auto-rerunnable harness (which requires a
+# brand-new, never-tracked plant file — #2999's `_dirty()` precondition): this gate's
+# real assertions read a COMMITTED build artifact (site/sitemap.xml, site/subscribe.html)
+# and the LIVE page registry, not "does any new file in the tree carry a defect". Same
+# hand-performed-and-watched bar as gate_census.py's own structural PROVEN_CAN_FAIL
+# records (e.g. test_fixture_frame_pairing_3222.py) — extracted here only because
+# gate_census.py sits at its 1,200-line ceiling (#1665).
+# ─────────────────────────────────────────────────────────────────────────────
+
+STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_v4_build_sitemap_3567.py": {
+        "gate_name": "test_v4_build_sitemap_3567.py",
+        "command": "python3 -m pytest tests/test_v4_build_sitemap_3567.py -q -p no:cacheprovider",
+        "mutation": (
+            "the gate's own test file, copied into a `git archive origin/main@c0122242` "
+            "snapshot (before #3567's fix) and run there against the OLD "
+            "scripts/v4_build_sitemap.py + the OLD site/sitemap.xml + site/subscribe.html — "
+            "the real pre-fix specimens, not a synthetic plant."
+        ),
+        "observed": (
+            "MUTATED (origin/main@c0122242 snapshot): 5 of 6 FAILED. Two AttributeErrors "
+            "(`module 'v4_build_sitemap' has no attribute 'registry_urls'` / "
+            "`'file_for_path'` — the old module lacks the registry-derivation functions "
+            "entirely) and, functionally, "
+            "test_real_repo_sitemap_has_no_dead_fragment_or_duplicate_subscribe_url FAILED "
+            "with 'the dead extensionless fragment URL is back' "
+            "(https://averagejoematt.com/journal/essays/org-chart-of-one/body present in "
+            "the OLD sitemap.xml), and "
+            "test_real_repo_subscribe_html_stub_is_noindex_with_a_matching_canonical FAILED "
+            "on the OLD subscribe.html (no noindex). REVERTED (this branch, the fix "
+            "applied): 6 passed. Both watched 2026-09-06."
+        ),
+        "scope": (
+            "Three of its six cases (the tmp_path-fixtured registry-derivation tests) are "
+            "pure-logic and were unaffected by the tree snapshot either way; only the three "
+            "real-repo cases are what this mutation proves. `test_every_indexable_registry_"
+            "page_has_a_self_matching_canonical` reads the LIVE `qa_manifest.MANIFEST`, so it "
+            "proves canonical presence/agreement only for pages the registry already knows "
+            "about — a wholly new, unregistered page is outside its reach by the same "
+            "registry-scoping #3567 itself argues for."
+        ),
+        "proved_on": "2026-09-06",
+    },
 }
 
 
