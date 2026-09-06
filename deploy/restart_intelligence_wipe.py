@@ -45,9 +45,11 @@ from botocore.exceptions import ClientError
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # #3598: sibling deploy module, imported by leaf name like the chronicle handler
 
 from coach.persona_registry import OPERATIONAL_COACH_IDS  # #2334: the canonical roster
 from experiment import phase_taxonomy as taxonomy  # ADR-077: single source of truth
+from restart_work_contract import work_report  # noqa: E402 — #3598: the per-step work contract
 
 from lambdas.common.constants import EXPERIMENT_START_DATE
 
@@ -245,6 +247,18 @@ TOMBSTONE_REASON = f"experiment_restart_{EXPERIMENT_START_DATE}"
 # carve-out (not a hardcoded pk check) so a future collision case is a one-line add.
 PRESERVE_PHASE_LABELS = {"narrative_arc"}
 
+# #3598 (the #3485 incident): a status a WRITER selects on. The 2026-09-03 wipe
+# tombstoned cycle 15's unpublished Week-1 chronicle draft but left `status=draft`,
+# and on Day 0 the 18:00Z auto-publish sweep — keyed on status alone — published it
+# onto the live site. Readers honour the tombstone; a writer keyed on status does
+# not see it. So the wipe now VOIDS the status of what it tombstones: a tombstoned
+# row can never again match a status-keyed selection, whatever the writer forgets
+# to check. The original value survives in `status_before_tombstone` (if_not_exists,
+# like every other generation-identity attr) so the archive still reads honestly.
+# Guard the SET, not the instance: add a status here when a writer selects on it.
+WRITER_SELECTABLE_STATUSES = frozenset({"draft"})
+VOIDED_STATUS = "voided"
+
 
 def extract_date(item: dict) -> str | None:
     """Best-effort YYYY-MM-DD extraction.
@@ -333,7 +347,7 @@ def is_already_tombstoned(item: dict) -> bool:
     return bool(item.get("tombstone"))
 
 
-def build_update(extra_attrs: dict, now_iso: str, cycle: int, preserve_phase: bool = False):
+def build_update(extra_attrs: dict, now_iso: str, cycle: int, preserve_phase: bool = False, item: dict | None = None):
     """Construct UpdateItem args for a tombstone write.
 
     ADR-077: stamps `cycle=<closing run>` so the archive is navigable by reset
@@ -358,6 +372,13 @@ def build_update(extra_attrs: dict, now_iso: str, cycle: int, preserve_phase: bo
     already-tombstoned NARRATIVE#arc row is skipped entirely by ``is_already_tombstoned``
     before reaching here, so this only ever fires once per singleton — but if_not_exists
     keeps the write correct regardless, mirroring the #1202 defence-in-depth rationale.
+
+    #3598: when ``item`` carries a WRITER_SELECTABLE_STATUSES status (a chronicle
+    ``draft``), the tombstone also SETs ``status = voided`` and records the original in
+    ``status_before_tombstone`` — the write-side half of #3485: the reader guard keeps a
+    status-keyed writer from PUBLISHING an archived draft; this keeps it from SELECTING
+    one. Rows without such a status are untouched (a completed experiment's ``completed``
+    still reads as what it was in the cycle archive).
     """
     phase_rhs = "if_not_exists(#p, :phase)" if preserve_phase else ":phase"
     sets = [
@@ -375,6 +396,12 @@ def build_update(extra_attrs: dict, now_iso: str, cycle: int, preserve_phase: bo
         ":cycle": cycle,
     }
     names = {"#p": "phase", "#cyc": "cycle"}
+    status = (item or {}).get("status")
+    if status in WRITER_SELECTABLE_STATUSES:
+        sets += ["#st = :voided", "status_before_tombstone = if_not_exists(status_before_tombstone, :st_before)"]
+        names["#st"] = "status"
+        values[":voided"] = VOIDED_STATUS
+        values[":st_before"] = status
     for k, v in extra_attrs.items():
         placeholder_name = f"#{k}"
         placeholder_val = f":val_{k}"
@@ -382,6 +409,20 @@ def build_update(extra_attrs: dict, now_iso: str, cycle: int, preserve_phase: bo
         names[placeholder_name] = k
         values[placeholder_val] = v
     return ("SET " + ", ".join(sets), names, values)
+
+
+def work_contract(grand: dict, apply: bool) -> dict:
+    """#3598 work contract for the wipe: input = every row in scope of its partition's
+    mode; acted = rows tombstoned (planned, in dry-run); skipped = rows a prior reset
+    already archived. Zero action on non-zero input is red UNLESS every in-scope row
+    already carries a tombstone — the idempotent re-run, named as such and nothing else.
+    (Errors are a subset of to_tombstone, so an all-errors run is acted=0 with NO reason.)"""
+    in_scope = int(grand["to_tombstone"]) + int(grand["skipped_already"])
+    acted = int(grand["applied"]) if apply else int(grand["to_tombstone"])
+    reason = None
+    if in_scope > 0 and acted == 0 and int(grand["skipped_already"]) == in_scope:
+        reason = f"every in-scope row ({in_scope}) already carries a tombstone from a prior reset (idempotent re-run)"
+    return {"input_count": in_scope, "acted_count": acted, "skipped_count": int(grand["skipped_already"]), "reason": reason}
 
 
 def assert_registry_coverage():
@@ -487,7 +528,9 @@ def main():
                 if len(samples[source]) < 3:
                     samples[source].append(item.get("sk", ""))
                 if args.apply:
-                    update_expr, names, values = build_update(extra, now_iso, cycle, preserve_phase=source in PRESERVE_PHASE_LABELS)
+                    update_expr, names, values = build_update(
+                        extra, now_iso, cycle, preserve_phase=source in PRESERVE_PHASE_LABELS, item=item
+                    )
                     try:
                         table.update_item(
                             Key={"pk": item["pk"], "sk": item["sk"]},
@@ -571,6 +614,8 @@ def main():
 
     if not args.apply:
         print(f"\n(dry-run) — would tombstone {grand['to_tombstone']} item(s). Pass --apply to commit.")
+
+    work_report("restart_intelligence_wipe", **work_contract(grand, args.apply))
 
 
 if __name__ == "__main__":

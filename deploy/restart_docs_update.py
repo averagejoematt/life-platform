@@ -73,7 +73,8 @@ challenges, experiments, chronicle, public site) anchors to it.
   `character-sheet-compute` for every day genesis→today with `force=true`.
   `fetch_date` filters tombstones so the cascade starts at Level 1.
 - **Chronicle** — `restart_chronicle_handler.py` archives chronicle HTML to
-  `*/archive/pilot/` (tombstone-overwrite originals, IAM blocks DeleteObject).
+  `*/archive/cycle-<N>/` — keyed on (slug, cycle) since #3598; the pre-cycle-16
+  `*/archive/pilot/` subtrees are history (tombstone-overwrite originals, IAM blocks DeleteObject).
   Indexes rewritten to Day-1 placeholder. Optional --resurrect-sk to keep + redate.
 - **Site copy** — `restart_site_copy_sync.py` regenerates
   `site_constants.js` journey block + hero copy, sweeps "Day 1 · 307 lbs" /
@@ -86,7 +87,7 @@ challenges, experiments, chronicle, public site) anchors to it.
   new date and re-converge all surfaces.
 - All pre-genesis data is preserved and recoverable (interpretation B
   preserves item content under tombstone flags; raw S3 objects are
-  tombstone-overwritten but accessible at `*/archive/pilot/*`).
+  tombstone-overwritten but accessible at `*/archive/cycle-<N>/*`, or `*/archive/pilot/*` before cycle 16).
 - Public-facing copy has no acknowledgement of any prior attempt. Per
   Matthew's D decision: full scrub, including the platform-build narrative.
 - Six pre-existing tech-debt failures in the integration test suite are
@@ -183,7 +184,7 @@ The pipeline runs (in order, each idempotent):
 7. `restart_site_copy_sync.py --apply` — regenerates JS/JSON/HTML site copy + CloudFront invalidate
 
 All steps preserve original data (interpretation B for DDB, archive-not-delete for S3).
-Roll back by removing tombstone flags (DDB) or copying from `*/archive/pilot/` (S3).
+Roll back by removing tombstone flags (DDB) or copying from `*/archive/cycle-<N>/` (S3; `*/archive/pilot/` before cycle 16).
 
 See ADR-058 in `docs/DECISIONS.md` for the design rationale.
 """

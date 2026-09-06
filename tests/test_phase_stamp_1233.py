@@ -20,9 +20,20 @@ os.environ.setdefault("USER_ID", "matthew")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "coach"))
 
+import pytest  # noqa: E402
 from coach import coach_checkin  # noqa: E402
 from common.constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
 from experiment import phase_taxonomy as pt  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_registry(monkeypatch):
+    """#3598: the cycle now derives from CYCLE_GENESES first; SSM (`read_cycle`) is the
+    post-genesis fallback these tests pin. Take the registry away so the pinned SSM
+    value is what the stamp sees — the registry path has its own tests in
+    tests/test_reset_writer_contract_3598.py."""
+    monkeypatch.setattr(pt, "_cycle_geneses", lambda: None)
+
 
 # ── the shared helper ─────────────────────────────────────────────────────────
 
