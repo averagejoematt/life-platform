@@ -19,7 +19,7 @@ THE DEFECT (measured, 2026-09-05 `/review full`, finding CTO-2)
 
 THE RULE, over the SET rather than the two specimens
   Every AWS/Lambda `Errors` alarm in `cdk/stacks/**` must carry threshold <= 1, UNLESS
-  its name appears in `MEASURED_TRAFFIC_EXEMPTIONS` below with the measurement that makes
+  its name appears in `MEASURED_TRAFFIC_WAIVERS` below with the measurement that makes
   a higher threshold reachable (the value, the date, and how it was read). An exemption
   without a measurement is a comment; that is what this test exists to stop.
 
@@ -49,7 +49,7 @@ ERRORS_THRESHOLD_CEILING = 1
 # name -> the measurement that makes a higher threshold reachable on THAT surface.
 # Every entry must state the number, the window and the read — a dated measurement, not
 # a comparison to another alarm (which is the exact mistake #3500 was filed for).
-MEASURED_TRAFFIC_EXEMPTIONS = {
+MEASURED_TRAFFIC_WAIVERS = {
     "slo-mcp-availability": (
         "measured 2026-09-05: AWS/Lambda Invocations on the MCP function, 30-day hourly "
         "median 5/hr (get-metric-statistics, period 3600) — a 100%-failure hour reaches 5 "
@@ -131,7 +131,7 @@ def lambda_errors_alarms(source: str) -> list:
 def unreachable_errors_alarms(source: str, exemptions=None) -> list:
     """[(alarm_name, threshold)] for every AWS/Lambda Errors alarm above the ceiling with
     no measured-traffic exemption."""
-    exemptions = MEASURED_TRAFFIC_EXEMPTIONS if exemptions is None else exemptions
+    exemptions = MEASURED_TRAFFIC_WAIVERS if exemptions is None else exemptions
     return [
         (name, threshold)
         for name, threshold in lambda_errors_alarms(source)
@@ -149,7 +149,7 @@ def test_no_lambda_errors_alarm_carries_an_unreachable_threshold():
         "AWS/Lambda Errors alarm(s) with threshold > "
         f"{ERRORS_THRESHOLD_CEILING} and no measured-traffic exemption: {offenders}\n"
         "Either re-derive the threshold from THAT surface's own measured hourly traffic, or add an entry to "
-        "MEASURED_TRAFFIC_EXEMPTIONS in this file stating the measurement (value, window, how it was read)."
+        "MEASURED_TRAFFIC_WAIVERS in this file stating the measurement (value, window, how it was read)."
     )
 
 
@@ -174,7 +174,7 @@ def test_the_two_repaired_specimens_are_at_threshold_one():
 
 def test_every_exemption_states_its_measurement():
     """An exemption without a measurement is the comment that caused this defect."""
-    for name, reason in MEASURED_TRAFFIC_EXEMPTIONS.items():
+    for name, reason in MEASURED_TRAFFIC_WAIVERS.items():
         assert "measured" in reason.lower(), f"{name}'s exemption does not state a measurement"
         assert any(ch.isdigit() for ch in reason), f"{name}'s exemption states no number"
 
@@ -182,8 +182,8 @@ def test_every_exemption_states_its_measurement():
 def test_every_exemption_names_a_real_alarm():
     """A rename must red here rather than leave an entry silently exempting nothing."""
     declared = {name for _module, source in _stack_sources() for name, _threshold in lambda_errors_alarms(source)}
-    orphans = sorted(set(MEASURED_TRAFFIC_EXEMPTIONS) - declared)
-    assert not orphans, f"MEASURED_TRAFFIC_EXEMPTIONS names alarm(s) no stack declares: {orphans}"
+    orphans = sorted(set(MEASURED_TRAFFIC_WAIVERS) - declared)
+    assert not orphans, f"MEASURED_TRAFFIC_WAIVERS names alarm(s) no stack declares: {orphans}"
 
 
 def test_the_rule_reds_on_a_planted_unreachable_alarm():
