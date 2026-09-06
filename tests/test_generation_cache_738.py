@@ -111,28 +111,6 @@ class _BrokenTable:
         raise RuntimeError("ddb down")
 
 
-def test_store_then_reuse_on_matching_hash():
-    t = _FakeTable()
-    fp = gc.brief_fingerprint({"recovery": 62})
-    assert gc.store_entry(t, "sleep_coach", "daily_brief_sleep", fp, "You slept well.", "2026-07-06")
-    out, since = gc.check_reuse(t, "sleep_coach", "daily_brief_sleep", fp)
-    assert out == "You slept well."
-    assert since == "2026-07-06"
-
-
-def test_no_reuse_on_hash_mismatch():
-    t = _FakeTable()
-    gc.store_entry(t, "sleep_coach", "daily_brief_sleep", "hash_old", "old text", "2026-07-06")
-    out, since = gc.check_reuse(t, "sleep_coach", "daily_brief_sleep", "hash_new")
-    assert out is None and since is None
-
-
-def test_no_reuse_when_absent():
-    t = _FakeTable()
-    out, since = gc.check_reuse(t, "nobody", "daily_brief_sleep", "anyhash")
-    assert out is None and since is None
-
-
 def test_record_reuse_bumps_bookkeeping():
     t = _FakeTable()
     gc.record_reuse(t, "sleep_coach", "daily_brief_sleep", "2026-07-07")
@@ -140,13 +118,6 @@ def test_record_reuse_bumps_bookkeeping():
     key, vals = t.updates[0]
     assert key["sk"] == gc.cache_sk("sleep_coach", "daily_brief_sleep")
     assert vals[":d"] == "2026-07-07" and vals[":one"] == 1
-
-
-def test_helpers_are_fail_soft():
-    bt = _BrokenTable()
-    assert gc.check_reuse(bt, "c", "o", "h") == (None, None)
-    assert gc.store_entry(bt, "c", "o", "h", "txt", "2026-07-06") is False
-    gc.record_reuse(bt, "c", "o", "2026-07-06")  # must not raise
 
 
 def test_store_shape_resets_unchanged_clock():

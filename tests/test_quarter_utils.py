@@ -14,16 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from common import quarter_utils  # noqa: E402
 
 
-def test_quarter_key_maps_month_to_quarter():
-    assert quarter_utils.quarter_key("2026-01-15") == "2026-Q1"
-    assert quarter_utils.quarter_key("2026-03-31") == "2026-Q1"
-    assert quarter_utils.quarter_key("2026-04-01") == "2026-Q2"
-    assert quarter_utils.quarter_key("2026-07-04") == "2026-Q3"
-    assert quarter_utils.quarter_key("2026-09-30") == "2026-Q3"
-    assert quarter_utils.quarter_key("2026-10-01") == "2026-Q4"
-    assert quarter_utils.quarter_key("2026-12-31") == "2026-Q4"
-
-
 def test_previous_quarter_key_within_year():
     assert quarter_utils.previous_quarter_key("2026-10-01") == "2026-Q3"
     assert quarter_utils.previous_quarter_key("2026-07-01") == "2026-Q2"

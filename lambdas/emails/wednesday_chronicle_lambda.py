@@ -94,16 +94,9 @@ except ImportError:
     _HAS_AI_VALIDATOR = False
 
 # BS-05: Confidence badge
-try:
-    from common.digest_utils import _confidence_badge, compute_confidence
+from common.digest_utils import compute_confidence
 
-    _HAS_CONFIDENCE = True
-except ImportError:
-    _HAS_CONFIDENCE = False
-
-    def _confidence_badge(level):
-        return ""
-
+_HAS_CONFIDENCE = True
 
 # #405: the per-chronicle share kit (email-stack module — text/JSON only, no Pillow/AI).
 try:

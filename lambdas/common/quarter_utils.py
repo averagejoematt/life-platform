@@ -13,8 +13,6 @@ not broken out as a widely-imported shared module, since only the memoir batch i
 
 from datetime import date
 
-from common.pacific_time import pacific_now  # #2811: quarter boundaries follow the Pacific day
-
 
 def quarter_key(iso_date: str) -> str:
     """'2026-07-04' -> '2026-Q3'."""
@@ -51,12 +49,3 @@ def quarter_bounds(quarter_key_str: str) -> tuple:
     else:
         end = date(year, start_month + 3, 1)
     return start.isoformat(), end.isoformat()
-
-
-def current_quarter_key(now=None) -> str:
-    # #2811 — NOT a billing calendar. These quarters bound `LEARNING#{iso_date}` SK
-    # ranges, and those dates are platform (Pacific) days; a UTC "now" rolls the
-    # quarter 7-8 hours early, so a learning written on the PT evening of Sep 30
-    # would be range-queried out of the quarter it belongs to.
-    now = now or pacific_now()
-    return quarter_key(now.date().isoformat())

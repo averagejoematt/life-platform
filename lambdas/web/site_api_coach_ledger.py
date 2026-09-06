@@ -471,8 +471,20 @@ def handle_calibration(event, *, _g):
         interval_forecasts = calibration_core.score_pairs(forecast_pairs)
         interval_forecasts_lifetime = calibration_core.score_pairs(forecast_career_pairs)
 
-        platform = calibration_core.score_pairs(platform_pairs + hyp_pairs + forecast_pairs)
-        platform_lifetime = calibration_core.score_pairs(platform_career_pairs + hyp_career_pairs + forecast_career_pairs)
+        # #3550: the platform-wide card is scored per STRATUM against each stratum's
+        # own base rate (calibration_core.score_strata), never as one pooled pair
+        # list against one pooled climatology. The live 2026-09-05 card read
+        # skilled=true / well-calibrated / reliable (pooled skill +0.17) while the
+        # coaches' 37 calls (skill -0.47) and the 137 interval forecasts (-0.001)
+        # were BOTH unskilled — the pooled reference Brier was worse than either
+        # stratum's own, so the pool credited "knowing which stratum a call came
+        # from" to the forecasters. Stratified, pooled skill > 0 is impossible
+        # unless a stratum earned it, the over-confidence trip is driven by the
+        # worst stratum's gap, and each stratum's numbers ride on the card.
+        platform = calibration_core.score_strata({"coaches": platform_pairs, "hypotheses": hyp_pairs, "interval_forecasts": forecast_pairs})
+        platform_lifetime = calibration_core.score_strata(
+            {"coaches": platform_career_pairs, "hypotheses": hyp_career_pairs, "interval_forecasts": forecast_career_pairs}
+        )
         platform["lifetime"] = platform_lifetime
 
         # #1893: the void ledger stops being write-only. Every reset stamps one
@@ -509,7 +521,11 @@ def handle_calibration(event, *, _g):
                     "calibrated means stated confidence matches how often calls turn out right (reliability); "
                     "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
                     "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
-                    "Calibrated. Voided bets: a reset voids — never grades — every still-open pre-registered "
+                    "Calibrated. The platform-wide card scores skill against a STRATIFIED base rate — coach "
+                    "calls, hypothesis bets and interval forecasts each against their own climatology — so "
+                    "pooling strata with different base rates cannot manufacture a skill no stratum has; its "
+                    "over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own "
+                    "n, Brier and skill are served beside it. Voided bets: a reset voids — never grades — every still-open pre-registered "
                     "bet; each is recorded in the ledger and counted in `voided` so the graded denominator "
                     "is honest. They are excluded from Brier because they never resolved. Every hit rate here "
                     "carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` — a hit rate off a small "

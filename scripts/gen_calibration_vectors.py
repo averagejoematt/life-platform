@@ -143,6 +143,63 @@ SCORE_CASES = [
     ),
 ]
 
+# (id, description, n_bins, {stratum: pairs}) — #3550: the pooled card scored
+# against a STRATIFIED base rate. The first case is the live 2026-09-05 shape that
+# read skilled=true / well-calibrated while both strata were unskilled.
+STRATA_CASES = [
+    (
+        "two_unskilled_strata_pooled",
+        "coaches at 0.5/22% + interval forecasts at 0.8/79% — pooled skill against a pooled "
+        "base rate manufactures +0.17; stratified reads negative, and the worst stratum's "
+        "gap trips over-confident",
+        10,
+        {
+            "coaches": [[0.5, 1]] * 8 + [[0.5, 0]] * 29,
+            "hypotheses": [],
+            "interval_forecasts": [[0.8, 1]] * 108 + [[0.8, 0]] * 29,
+        },
+    ),
+    (
+        "one_skilled_stratum_carries_the_pool",
+        "a genuinely skilled stratum beside an unskilled one — pooled skill may be positive " "only because a stratum earned it",
+        10,
+        {
+            "sharp": [[0.9, 1], [0.85, 1], [0.1, 0], [0.15, 0], [0.9, 1], [0.1, 0], [0.88, 1], [0.12, 0]],
+            "flat": [[0.5, 1], [0.5, 0], [0.5, 1], [0.5, 0], [0.5, 0]],
+        },
+    ),
+    (
+        "single_stratum_matches_score_pairs_skill",
+        "one stratum: the stratified reference IS the pooled reference, so skill equals score_pairs",
+        10,
+        {"only": [[0.9, 1], [0.9, 0], [0.9, 0], [0.85, 1], [0.85, 0], [0.8, 0], [0.95, 0], [0.9, 1]]},
+    ),
+    (
+        "empty_and_degenerate_strata",
+        "an empty stratum and an all-identical-outcome stratum contribute no reference — skill undefined, not zero",
+        10,
+        {"nothing": [], "always_right": [[0.8, 1], [0.9, 1], [0.7, 1]]},
+    ),
+    (
+        "small_strata_below_the_verdict_floor",
+        "no stratum reaches n>=5, so the pooled n-weighted gap drives the verdict",
+        10,
+        {"a": [[0.9, 0], [0.9, 0], [0.9, 1]], "b": [[0.8, 0], [0.85, 0], [0.9, 0]]},
+    ),
+    (
+        "under_confident_worst_stratum",
+        "the worst-|gap| stratum is under-confident while the pool is not",
+        10,
+        {
+            # NB: not [0.25, 1] in slot 5 — that input lands the stratum's skill on an exact
+            # 4-dp tie (-3.08625) where the Python and JS Brier-skill sums differ by one ulp;
+            # a parity vector must test the scorer, not the platform's float summation order.
+            "hedgers": [[0.2, 1], [0.2, 1], [0.3, 1], [0.2, 1], [0.2, 1], [0.3, 1], [0.2, 0]],
+            "steady": [[0.8, 1]] * 30 + [[0.8, 0]] * 8,
+        },
+    ),
+]
+
 CONFIDENCE_CASES = [
     None,
     0.4,
@@ -281,6 +338,17 @@ def build():
         for (cid, desc, n_bins, pairs) in SCORE_CASES
     ]
 
+    strata_cases = [
+        {
+            "id": cid,
+            "description": desc,
+            "n_bins": n_bins,
+            "strata": strata,
+            "expected": platform_core.score_strata({k: [tuple(p) for p in v] for k, v in strata.items()}, n_bins=n_bins),
+        }
+        for (cid, desc, n_bins, strata) in STRATA_CASES
+    ]
+
     confidence_cases = [{"input": v, "expected": platform_core.normalize_confidence(v)} for v in CONFIDENCE_CASES]
     outcome_cases = [{"input": v, "expected": platform_core.outcome_to_binary(v)} for v in OUTCOME_CASES]
 
@@ -320,7 +388,7 @@ def build():
         "schema": "calibration-core/test-vectors@1",
         "issue": "https://github.com/averagejoematt/life-platform/issues/1396",
         "note": (
-            "Shared parity fixture. `core_cases`, `confidence_cases`, `outcome_cases` and "
+            "Shared parity fixture. `core_cases`, `strata_cases`, `confidence_cases`, `outcome_cases` and "
             "`record_cases` are generated from the deployed platform grader "
             "(lambdas/calibration_core.py) and must be reproduced EXACTLY — not within a "
             "tolerance — by the extracted Python package and the JS port. `adapter_cases` "
@@ -329,6 +397,7 @@ def build():
             "Regenerate with scripts/gen_calibration_vectors.py."
         ),
         "core_cases": core_cases,
+        "strata_cases": strata_cases,
         "confidence_cases": confidence_cases,
         "outcome_cases": outcome_cases,
         "record_cases": record_cases,
@@ -346,7 +415,10 @@ def main() -> int:
         json.dump(payload, fh, indent=2, sort_keys=False)
         fh.write("\n")
     n = len(payload["core_cases"])
-    print(f"wrote {VECTORS_PATH}: {n} core cases, {len(payload['confidence_cases'])} confidence, {len(payload['outcome_cases'])} outcome")
+    print(
+        f"wrote {VECTORS_PATH}: {n} core cases, {len(payload['strata_cases'])} strata, "
+        f"{len(payload['confidence_cases'])} confidence, {len(payload['outcome_cases'])} outcome"
+    )
     return 0
 
 

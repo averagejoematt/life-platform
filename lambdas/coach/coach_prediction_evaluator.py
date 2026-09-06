@@ -10,7 +10,7 @@ engine (9:45 AM PT) so EWMA trends are fresh.
 
 Evaluation types:
   1. machine      — metric crosses threshold within window
-  2. directional  — metric moves in predicted direction (EWMA-based)
+  2. directional  — metric moves in predicted direction (EWMA-based); point (#3551) — reading on the target date within ±tolerance
   3. conditional  — if X then Y (check precondition, then evaluate)
   4. qualitative  — skip (needs human/LLM, not this Lambda)
 
@@ -110,8 +110,7 @@ EWMA_DECAY = 0.87
 # + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
-# #2221 — the EWMA observation floor + the provisional-grade rules, reasoned out there.
-from coach.prediction_grading import (  # noqa: E402
+from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observation floor + the provisional-grade rules, reasoned out there
     EWMA_MIN_OBSERVATIONS,
     EWMA_MIN_PRIOR_POINTS,
     EWMA_PRIOR_LAG,
@@ -119,6 +118,12 @@ from coach.prediction_grading import (  # noqa: E402
     build_outcome_notes,
     check_expiry as _check_expiry,
     grading_window_still_open,
+)
+from coach.prediction_point_grader import (  # noqa: E402,F401  (#3551 — the point path + the threshold comparison it shares with machine specs)
+    POINT_GRACE_DAYS,
+    POINT_LOOKBACK_DAYS,
+    evaluate_condition as _evaluate_condition,
+    evaluate_point,
 )
 
 # ── AWS clients ──────────────────────────────────────────────────────────────
@@ -605,20 +610,6 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
 # =============================================================================
 
 
-def _evaluate_condition(actual, condition, threshold):
-    """Evaluate a prediction condition against a threshold."""
-    if actual is None or threshold is None:
-        return None  # Inconclusive — missing data
-    cond_map = {
-        "gt": actual > threshold,
-        "gte": actual >= threshold,
-        "lt": actual < threshold,
-        "lte": actual <= threshold,
-        "eq": abs(actual - threshold) < 0.01,
-    }
-    return cond_map.get(condition)
-
-
 def _get_effective_window(eval_spec, subdomain):
     """Domain-clamped evaluation window — delegates to the shared policy module
     (coach.prediction_windows, #3046); semantics unchanged."""
@@ -655,7 +646,7 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
     # evaluator — the same grading path C-3 gives new predictions. No inferable
     # direction → inconclusive with an explicit reason (expiry will retire it).
     if threshold is None:
-        direction = infer_direction(None, pred.get("claim_natural") or "")
+        direction = infer_direction(None, pred.get("claim_natural") or "", metric_key)  # #3551: metric name excluded
         if direction:
             rescued_spec = dict(eval_spec)
             rescued_spec["condition"] = direction
@@ -792,6 +783,13 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
         "actual_value": slope,
         "beats_null": beats_null,
     }
+
+
+def _evaluate_point(pred, eval_spec, data_cache, today_str):
+    """#3551 — delegates to prediction_point_grader with this module's own data path."""
+    return evaluate_point(
+        pred, eval_spec, data_cache, today_str, get_source_data=_get_source_data, extract_metric_series=_extract_metric_series
+    )
 
 
 def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
@@ -1019,7 +1017,7 @@ def _evaluate_all(predictions, today_str):
     For each prediction:
       1. Determine effective evaluation window (with domain minimum)
       2. Check if window has elapsed
-      3. Route to appropriate evaluator (machine / directional / conditional)
+      3. Route to appropriate evaluator (machine / directional / point / conditional)
       4. Handle expiry for unevaluable predictions
       5. Update prediction status in DynamoDB
       6. Update Bayesian confidence if confirmed or refuted
@@ -1072,8 +1070,8 @@ def _evaluate_all(predictions, today_str):
         try:
             if eval_type == "machine":
                 result = _evaluate_machine(pred, eval_spec, data_cache, today_str)
-            elif eval_type == "directional":
-                result = _evaluate_directional(pred, eval_spec, data_cache, today_str)
+            elif eval_type in ("directional", "point"):  # #3551: point rides the same branch
+                result = (_evaluate_point if eval_type == "point" else _evaluate_directional)(pred, eval_spec, data_cache, today_str)
             elif eval_type == "conditional":
                 result = _evaluate_conditional(pred, eval_spec, data_cache, today_str)
             else:

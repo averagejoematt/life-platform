@@ -85,8 +85,15 @@ permissions:
   actions: read # reading another workflow's run history
   issues: write # the #1447 advisory filer
 
+# #3533's family: this workflow triggers ONLY on push-to-main (by design, see
+# the box-2 note above) plus workflow_dispatch, and the static group name used
+# to be shared across EVERY push — so a follow-up push (the reconcile bot's
+# commit, or any push landing while a prior check is still running) could
+# cancel this dead-man's own in-flight verdict. The `${{ github.sha }}` suffix
+# makes each push's group unique so pushes can never cancel one another;
+# concurrent manual `workflow_dispatch` runs at the SAME sha still dedupe.
 concurrency:
-  group: cron-freshness
+  group: cron-freshness-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
