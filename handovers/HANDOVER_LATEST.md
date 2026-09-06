@@ -10,8 +10,8 @@ watcher waits; the work itself finished on time.
 
 | | count | issues |
 |---|---|---|
-| **CLOSED on live proof** | **22** | #3536 #3519 #3549 #3550 #3500 #3505 #3551 #3517 #3521 #3541 #3533 #3535 #3537 #3538 #3539 #3515 #3526 #3558 #3567 #3544 #3545 #3504 |
-| **MERGED, awaiting first live output** | **12** | #3501 (qa-smoke 11:30 PT) · #3516 (Mon analyzer) · #3532 · #3529 (next reset) · #3531 (this wrap's battery — see Backlog line) · #3534 · #3568 + #3559 (owner deploys) · #3518 · #3614 · #3608 · #3609 · #3566 · #3570 · #3619 (partial, stays open) |
+| **CLOSED on live proof** | **23** | #3536 #3519 #3549 #3550 #3500 #3505 #3551 #3517 #3521 #3541 #3533 #3535 #3537 #3538 #3539 #3515 #3526 #3558 #3567 #3544 #3545 #3504 #3559 (after the 10:10 PT owner-authorized Serve deploy) |
+| **MERGED, awaiting first live output** | **11** | #3501 (qa-smoke 11:30 PT) · #3516 (Mon analyzer) · #3532 · #3529 (next reset) · #3531 · #3534 · #3568 (one test send, owner) · #3518 (next coach-state-updater run) · #3614 · #3608 · #3609 · #3566 · #3570 · #3619 (partial, stays open) |
 | filed | 7 | #3640–#3646 (label `review:overnight-drain-2026-09-06`); finding 8 folded onto #3608 |
 | PRs merged | 13 | #3629 #3588 #3630 #3632 #3633 #3634 #3628 #3581 #3635 #3637 #3580 #3583 #3647 (+ #3639 landed via #3580, #3631 superseded by #3635) |
 | open PR | 1 | #3638 (#3595/#3596, lane 3a) — CONFLICTING after the chain, blocker commented |
@@ -67,6 +67,8 @@ watcher waits; the work itself finished on time.
 - Wave 5 (the #1364 promotion) and the sonnet tail (#3594 #3616 #3618 #3612 #3624 #3625) were not started.
 
 ## Owner acts, in order (the exact commands)
+
+**Post-wrap addendum (10:06–10:30 PT):** the owner authorized all deploys at 09:52; acts 1 and 2 below were then run by the driver — `cdk_deploy.sh LifePlatformEmail LifePlatformWeb LifePlatformOperational LifePlatformServe -- --require-approval never` (all four UPDATE_COMPLETE), `deploy_fleet.sh` 105/0/0 from 57f1ddfb8, `iam_additive_gate.py --live` → every stack NO-IAM-CHANGE (CI unstranded; dispatched run 34048557626 is the proof), and the #3559 probe (403 public / 230 bytes owner-side under `reader_input/`) closed #3559. Remaining owner acts: 3 (the #3568 test send — an email Lambda), 4 (weigh-in supersede), 5 (the delete-user-data `apply: true` invoke), 6 (the two PM calls).
 
 1. `bash deploy/cdk_deploy.sh LifePlatformEmail LifePlatformWeb LifePlatformOperational LifePlatformServe`
    — unstrands CI's deploy pipeline (#3628's SES grants), clears the #3573 qa-smoke role red, applies #3637's
