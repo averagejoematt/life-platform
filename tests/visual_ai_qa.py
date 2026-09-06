@@ -125,6 +125,52 @@ _MAX_IMAGE_BLOCKS_PER_CALL = 40
 # only (ADR-125 as amended by #1927), same posture as reader_truth_qa below.
 _BUDGET_FEATURE = "visual_ai_qa"
 
+# ── The per-page verdict budget (#3652) ───────────────────────────────────────
+# 700 until 2026-09-06, a bare literal with nothing pinning it. It was not enough,
+# and the cost was not a warning: #3540 (correctly) turns a truncated reply into an
+# UNEVALUATED FAIL, `visual_qa_verdict.py` (before #3652) read that string as a
+# site/**-reachable defect, and the site-deploy rollback therefore reverted EVERY
+# `site/**` merge (runs 34056404335 / 34057051481, 2026-09-06).
+#
+# SIZED AGAINST A MEASURED CEILING, not the next round number — the repo's cure for
+# this class (`lambdas/ai/ai_calls.py` 200 -> 600 -> 1500) and NOT a retry, because
+# #2893 rules a billed truncation is metered, never retried
+# (`tests/test_billed_discarded_ai_2893.py`, `lambdas/ai/ai_transport.py`).
+#
+#   evidence 1 — the distribution. CloudWatch
+#   `LifePlatform/AI::AnthropicOutputTokens{LambdaFunction=visual-ai-qa}`,
+#   2026-08-26 -> 09-06 (the metric's full retained history), n=752 calls:
+#   p50 158, p90 235, p95 434, p99 637, max 700. That max is CENSORED — 700 was the
+#   cap — and `TruncatedResponses{visual-ai-qa}` Sum=6 over the same window (0.80%).
+#
+#   evidence 2 — the largest COMPLETE verdict, and the chars/token ratio.
+#   Run 34057051481 (2026-09-06 20:32Z) returned a full `/coaching/` verdict at
+#   615 output tokens; the verdict recovered from that run's `report.json`
+#   artifact is 1,863 chars of the indented JSON the model actually emits
+#   => 3.03 chars/token for this model+prompt+page.
+#
+#   evidence 3 — WHAT makes `/coaching/` the long one, and its bound. The #2383
+#   page rule asks for one `undated_ai_band` issue per AI-authored band. The
+#   complete verdict carried exactly 7 — one per coach in
+#   `coach.persona_registry.display_map(include=("operational",))` — at 163-185
+#   chars each (mean 175 ~= 58 tok), over a 641-char fixed scaffold (~212 tok).
+#   The rule's full enumeration is the 7 coach cards + the "where the board
+#   disagrees" tensions band + the integrator's call = 9 bands, and generic
+#   rendering issues stack on top of the page-rule ones.
+#
+#   the ceiling: 212 + (9 bands + 3 generic-issue headroom) * 58 = 908 tokens.
+#
+# 1200 is that ceiling plus 32% margin (and ~2.0x the largest complete verdict ever
+# observed). It stays below the reader-truth judge's 1500, which covers a 4-6 page
+# BATCH rather than one page, so the two budgets remain ordered the way their
+# workloads are. Output tokens bill only when produced, so the raise costs nothing
+# on the p50 call; the 6 truncated calls would have cost ~$0.0005 more in total.
+#
+# `tests/test_visual_ai_qa_max_tokens_3652.py` pins this literal AND re-derives the
+# inequality from the LIVE roster, so growing the coaching board without growing the
+# budget reds a test instead of reverting a deploy.
+_VERDICT_MAX_TOKENS = 1200
+
 _PROMPT = """You are a meticulous UI QA reviewer looking at screenshot(s) of ONE page of a \
 personal health dashboard ("{name}", path {path}). The site is data-driven — charts and \
 numbers legitimately change every day — so judge whether the page RENDERED CORRECTLY, not \
@@ -542,7 +588,7 @@ def _assess_page(bedrock, name, path, shots):
     if n_images > len(shots):  # #3067 — at least one capture was tiled
         prompt += "\n\n" + _TILED_NOTE
     content.append({"type": "text", "text": prompt})
-    body = {"messages": [{"role": "user", "content": content}], "max_tokens": 700}
+    body = {"messages": [{"role": "user", "content": content}], "max_tokens": _VERDICT_MAX_TOKENS}
     # #2888 — name this spend. Outside Lambda the cost chokepoint's LambdaFunction
     # dimension is the literal "unknown", and that bucket is the LARGEST row in the
     # per-feature ranking (17.9M input tok / $33.19 trailing 30d, measured
