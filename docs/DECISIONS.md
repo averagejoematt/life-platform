@@ -1105,6 +1105,10 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 
 ---
 
+**Amendment 2026-09-05 (#3559, SEC-1) — reader INPUT is not generated OUTPUT, and never shares its prefix.** The `generated/` public-read grant is prefix-wide, and the two reader-input doors (`/api/board_question`, `/api/submit_finding`) had been writing their moderation records — a reader's optional `email` and an `ip_hash` — under it since the reader-engagement loop landed, at a key derivable from the public answers feed. Nothing in ADR-046 said a Lambda-written object was therefore publishable; the prefix rule was about deploy-sync safety, and the doors inherited the grant by co-location. The rule is now stated: **the `generated/` prefix holds only what the platform GENERATES for readers; anything a reader TYPES lives under `reader_input/`** — no public-read statement, no CloudFront behaviour, no lifecycle expiry (a moderation queue must not self-destruct; `uploads/` expires at 30 days, which is why it was not used), and not in the `ProtectDataFromDeployScripts` Deny (the owner must be able to purge a moderated record — third-party PII is not raw data). The key is minted in ONE place (`web/site_api_capture_store.capture_key`); `tests/test_reader_input_prefix_3559.py` sweeps every `put_capture_record` call site and derives the public-read set from `deploy/bucket_policy.json`, so the next door cannot inherit the grant by accident. Curated, PII-free derivatives (`generated/findings/_published_index.json`, `generated/board_answers/answers.json`) stay where they are: they are output.
+
+---
+
 ### ADR-047 — Coach Intelligence Architecture: Stateless Prompts → Stateful Agents
 
 **Status:** Active

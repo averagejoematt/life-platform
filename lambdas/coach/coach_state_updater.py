@@ -462,8 +462,10 @@ try:
     from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings, regen_once
     from ai.grounding_gate_params import cycle_gate_params  # #1967 — the cycle anchors, one provider
     from ai.night_scope import nightly_vitals_from_narrative  # #1968 arming, from the source's own dated claims
+    from ai.plan_facts_gate import derived_prose_plan_findings  # #3518 — a plan-framed figure must equal the plan root
 except ImportError:  # pragma: no cover — environment-dependent
     allowed_dates = allowed_numbers = grounding_findings = regen_once = nightly_vitals_from_narrative = None
+    derived_prose_plan_findings = None
 
     def cycle_gate_params(generation_date_iso=None):  # type: ignore[misc]
         return {}
@@ -485,7 +487,8 @@ def _gate_derived_prose(coach_id, date, output_text, extraction):
                    see `night_scope.nightly_vitals_from_narrative` for why that is the
                    right authority for a derived text (#1968/#2343);
       * freshness — a stale "Day N" / baseline framing carried into the card (#1691/
-                   #1897), anchored on the record's own date rather than on today.
+                   #1897), anchored on the record's own date rather than on today;
+      * plan     — a plan-FRAMED step/calorie figure that is not the plan root's (#3518).
 
     ONE corrective regeneration through the shared `regen_once` harness, then the
     caller HOLDS. Returns `(extraction, findings)` and raises nothing: `regen_once`
@@ -503,7 +506,7 @@ def _gate_derived_prose(coach_id, date, output_text, extraction):
     holder = {"latest": extraction}
 
     def _findings_fn(candidate):
-        return grounding_findings(
+        findings = grounding_findings(
             candidate,
             facts=None,
             allowed=allowed,
@@ -511,6 +514,9 @@ def _gate_derived_prose(coach_id, date, output_text, extraction):
             nightly_vitals=_nights,
             **cycle_gate_params(date),
         )
+        # #3518: the plan class is armed HERE and not via the allow-list on purpose — the
+        # narrative is where "8,000+ steps/day protocol" came from, so it cannot license it.
+        return findings + (derived_prose_plan_findings(candidate, coach_id) if derived_prose_plan_findings is not None else [])
 
     def _regen_fn(correction):
         holder["latest"] = coach_derived_prose.recondense(coach_id, output_text, extraction, correction, _call_haiku)

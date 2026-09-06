@@ -297,6 +297,18 @@ _BLIND_ALARM_SWEEP_PY = (
 )
 
 
+# #3559: a capture door that builds its own `generated/` key instead of asking the seam.
+# Assembled from fragments: the literal prefix is what the guard refuses, and this module
+# is not in the guard's sweep scope (lambdas/) — but the plant path is.
+_PUBLIC_PREFIX_DOOR_PY = (
+    '"""Census probe (#3559) — a reader-input door minting a public-prefix key."""\n\n'
+    "from web.site_api_capture_store import put_capture_record\n\n\n"
+    "def handle(s3, bucket, record, body, qid):\n"
+    '    s3_key = f"' + _lit("gener", "ated/board_", "questions/") + '{qid}.json"\n'
+    '    return put_capture_record(s3, bucket, s3_key, record, body, door="board_question")\n'
+)
+
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_composite_alarm_lookup_3390.py": MutationSpec(
         gate_id="structural::test_composite_alarm_lookup_3390.py",
@@ -461,6 +473,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             "the live site"
         ),
         plants=(_drift_probe_plant(),),
+        track=False,
+    ),
+    # #3559: a reader-input capture door minting its own key under generated/* — the exact
+    # SEC-1 shape (a prefix the bucket policy grants anonymous GetObject on, records that
+    # carry a reader's email). The guard sweeps lambdas/ on disk for every
+    # put_capture_record(...) call site and requires the key to come from
+    # web.site_api_capture_store.capture_key(). Untracked plant, filesystem walk.
+    "structural::test_reader_input_prefix_3559.py": MutationSpec(
+        gate_id="structural::test_reader_input_prefix_3559.py",
+        target="tests/test_reader_input_prefix_3559.py",
+        detects="a reader-input door writing its moderation record under the anonymously readable generated/* prefix (#3559, SEC-1)",
+        plants=(("lambdas/web/_census_probe_3559.py", _PUBLIC_PREFIX_DOOR_PY),),
         track=False,
     ),
 }
@@ -753,6 +777,19 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "tests/test_api_schema_completeness.py's TestDiffShape/TestJsonShape classes and the "
         "scan_json_value_leaks tests, not by this mutation.",
         proved_on="2026-08-31",
+    ),
+    "structural::test_reader_input_prefix_3559.py": _proof(
+        "structural::test_reader_input_prefix_3559.py",
+        "baseline: 11 passed | mutated: 1 failed, 10 passed :: test_every_capture_door_in_lambdas_keys_through_the_seam | reverted: 11 passed",
+        "lambdas/ on disk (os.walk, .py only), so an UNTRACKED door is in scope. The sweep keys on the literal call "
+        "name `put_capture_record(` and resolves the key argument one hop: a `capture_key(...)` call, or a name bound "
+        "to one in the same function body. A door that reaches the key through a helper the resolver cannot follow, "
+        "or that writes reader input with a bare `put_object` instead of the capture-store seam, is invisible to "
+        "THIS sweep (the e2e write-path test's `(c) S3 writes` assertion is the second net for the live doors). The "
+        "public-read set is derived from deploy/bucket_policy.json, so the guard is only as current as that file — "
+        "drift_sentinel.check_bucket_policy holds the live policy to it. It judges the KEY, never the object: whether "
+        "an object already sitting under generated/ is readable is the owner's migration, not this gate's.",
+        proved_on="2026-09-05",
     ),
 }
 

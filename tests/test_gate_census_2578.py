@@ -523,9 +523,17 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # re-runnable harness (`gate_census_mutations.py --run --gate
         # test_composite_alarm_lookup_3390.py`: ARMED 1/1, planting an untracked
         # deploy/_census_probe_3503.py whose whole-estate sweep omits AlarmTypes).
+        # Upper bound raised 50 -> 51 (2026-09-05, #3559): the 51st proof is
+        # `structural::test_reader_input_prefix_3559.py` — every reader-input capture door
+        # keys through web.site_api_capture_store.capture_key() and the minted prefix is
+        # derived-not-public against deploy/bucket_policy.json. Mutation-backed via the
+        # re-runnable harness (`gate_census_mutations.py --run --gate
+        # test_reader_input_prefix_3559.py`: ARMED 1/1, planting an untracked
+        # lambdas/web/_census_probe_3559.py door that mints its own generated/ key — the
+        # exact SEC-1 shape). Arrived proven under #3536's per-entrant rule: unproven 537 -> 537.
         3
         <= len(proven)
-        <= 50
+        <= 51
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -1,0 +1,16 @@
+{
+  "id": "2026-09-04-coaching-dashboard-data-phase-established-on-day-0",
+  "issue": "#3519",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md AIQ-8",
+  "captured_at": "2026-09-04",
+  "surface": "/api/coaching-dashboard coaches[*].data_phase",
+  "verbatim": true,
+  "status": "open",
+  "closes_with": "#3519",
+  "gate": null,
+  "expect_type": null,
+  "specimen": "{\"coach_id\": \"physical\", \"data_phase\": \"established\", \"position_summary\": \"\", \"analysis_generated_at\": \"\"}",
+  "control": "{\"coach_id\": \"physical\", \"data_phase\": \"pre_start\", \"position_summary\": \"\", \"analysis_generated_at\": \"\"}",
+  "inputs": null,
+  "why_open": "A structured field, not prose: site_api_lambda hard-codes data_phase='established' for every coach (the only assignment). No text gate can replay it; #3519 (PR #3632) derives it. Recorded so the corpus count is the review's eight, not a prose-only seven."
+}

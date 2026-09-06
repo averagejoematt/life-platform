@@ -38,7 +38,7 @@ def site_api() -> list[iam.PolicyStatement]:
     WEB-WCT: Added S3 site/config/* read for /api/current_challenge endpoint.
     R17-04: Added dedicated Secrets read for life-platform/site-api-ai-key (isolated from main ai-keys).
     BL-02: Added S3 dashboard/* and generated/* read for /api/labs (clinical.json) and health check (public_stats.json).
-    BL-02: Added S3 generated/findings/* write for /api/submit_finding.
+    BL-02: Added S3 findings/* write for /api/submit_finding (generated/ until #3559; reader_input/ since).
     #1781: codified 3 permissions that were live-only (out-of-band console grants,
     never in CDK) since the status/observatory page shipped — docs/audits/
     AUDIT_2026-03-30_security.md documented them as intentional exceptions but they
@@ -100,12 +100,17 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3FindingsWrite",
             actions=["s3:PutObject"],
-            # generated/findings/* — /api/submit_finding (reader correlation findings)
-            # generated/board_questions/* — /api/board_question (reader questions for the AI board)
+            # reader_input/findings/* — /api/submit_finding (reader correlation findings)
+            # reader_input/board_questions/* — /api/board_question (reader questions for the AI board)
             # Both are moderation queues Matthew reviews; capture only, never auto-published.
+            # #3559 (SEC-1): moved OFF generated/*, whose bucket-policy statement grants anonymous
+            # GetObject — the records carry a reader's email + ip_hash. The prefix leaf names are
+            # web/site_api_capture_store.CAPTURE_DOORS; tests/test_reader_input_prefix_3559.py
+            # holds this grant to that seam. The old generated/* grant is deliberately NOT kept:
+            # the code no longer writes there and a residual PutObject is the next leak's seam.
             resources=[
-                f"{BUCKET_ARN}/generated/findings/*",
-                f"{BUCKET_ARN}/generated/board_questions/*",
+                f"{BUCKET_ARN}/reader_input/findings/*",
+                f"{BUCKET_ARN}/reader_input/board_questions/*",
             ],
         ),
         iam.PolicyStatement(

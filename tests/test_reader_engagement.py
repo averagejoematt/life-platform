@@ -179,7 +179,7 @@ def test_board_question_happy_path(monkeypatch):
     fake = _patch_board(monkeypatch)
     r = social._handle_board_question(_event({"question": "Is my sleep actually improving over the month?", "email": "a@b.com"}))
     assert r["statusCode"] == 200
-    assert fake.puts and fake.puts[0]["Key"].startswith("generated/board_questions/")
+    assert fake.puts and fake.puts[0]["Key"].startswith("reader_input/board_questions/")
     stored = json.loads(fake.puts[0]["Body"])
     assert stored["status"] == "pending"
     assert "203.0.113.7" not in stored["ip_hash"]  # IP hashed

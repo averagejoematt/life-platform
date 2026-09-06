@@ -3,7 +3,9 @@
 publish_board_answer.py — answer a reader's "ask the board" question and publish it.
 
 The capture side (POST /api/board_question) drops reader questions into the S3
-moderation queue at generated/board_questions/{YYYY-MM}_{id}.json. This is the
+moderation queue at reader_input/board_questions/{id}.json (#3559 — it was the
+anonymously readable generated/board_questions/ until SEC-1; the pre-move objects are
+still LISTED from the legacy prefix until the owner moves them). This is the
 human-in-the-loop publish side: pick a question, attach the board's answer, and
 append it to the public Reader Q&A feed (generated/board_answers/answers.json) that
 the coaching page renders. No AI is called here — you supply the board's answer
@@ -37,10 +39,13 @@ import boto3
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 from privacy import privacy_guard  # noqa: E402 — fail-closed publish gate (#397)
+from web.site_api_capture_store import LEGACY_CAPTURE_PREFIXES, capture_prefix  # noqa: E402 — #3559: ONE key seam
 
 BUCKET = "matthew-life-platform"
 REGION = "us-west-2"
-QUEUE_PREFIX = "generated/board_questions/"
+QUEUE_PREFIX = capture_prefix("board_question")  # reader_input/board_questions/
+# Pre-#3559 objects the owner has not moved yet. Listed, flagged `legacy`, never written to.
+LEGACY_QUEUE_PREFIX = LEGACY_CAPTURE_PREFIXES["board_question"]
 FEED_KEY = "generated/board_answers/answers.json"
 
 s3 = boto3.client("s3", region_name=REGION)
@@ -64,17 +69,19 @@ def _list_questions():
     """Pending (and answered) reader questions in the queue, newest first."""
     out = []
     paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=BUCKET, Prefix=QUEUE_PREFIX):
-        for obj in page.get("Contents", []):
-            if not obj["Key"].endswith(".json"):
-                continue
-            try:
-                rec = json.loads(s3.get_object(Bucket=BUCKET, Key=obj["Key"])["Body"].read())
-            except Exception as e:
-                print(f"  ! skip {obj['Key']}: {e}", file=sys.stderr)
-                continue
-            rec["_key"] = obj["Key"]
-            out.append(rec)
+    for prefix, legacy in ((QUEUE_PREFIX, False), (LEGACY_QUEUE_PREFIX, True)):
+        for page in paginator.paginate(Bucket=BUCKET, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                if not obj["Key"].endswith(".json"):
+                    continue
+                try:
+                    rec = json.loads(s3.get_object(Bucket=BUCKET, Key=obj["Key"])["Body"].read())
+                except Exception as e:
+                    print(f"  ! skip {obj['Key']}: {e}", file=sys.stderr)
+                    continue
+                rec["_key"] = obj["Key"]
+                rec["_legacy"] = legacy  # #3559: still under the public prefix — move it
+                out.append(rec)
     out.sort(key=lambda r: r.get("submitted_at", ""), reverse=True)
     return out
 
@@ -107,8 +114,13 @@ def cmd_list():
         status = r.get("status", "?")
         mark = "✓ answered" if status == "answered" else "· pending "
         q = (r.get("question") or "").replace("\n", " ")
-        print(f"  {mark}  {r.get('id', '?'):14s}  {r.get('submitted_at', '')[:10]}  {q[:80]}")
+        legacy = "  [LEGACY public prefix — move: #3559]" if r.get("_legacy") else ""
+        print(f"  {mark}  {r.get('id', '?'):14s}  {r.get('submitted_at', '')[:10]}  {q[:80]}{legacy}")
     print(f"\n{sum(1 for r in qs if r.get('status') != 'answered')} pending · {len(qs)} total")
+    if any(r.get("_legacy") for r in qs):
+        print(
+            f"   {sum(1 for r in qs if r.get('_legacy'))} object(s) still under {LEGACY_QUEUE_PREFIX} — anonymously readable until moved (#3559)."
+        )
 
 
 def cmd_answer(args):
@@ -149,13 +161,16 @@ def cmd_answer(args):
     _put_json(FEED_KEY, feed)
     print(f"✅ published answer for {rec['id']} → s3://{BUCKET}/{FEED_KEY} ({len(feed['answers'])} total)")
 
-    # mark the queue item answered (we can't delete generated/* — bucket policy — but we
-    # can overwrite it with status=answered so --list shows it's handled).
-    rec.pop("_key", None)
+    # mark the queue item answered IN PLACE — write back to the key it was read from.
+    # (It used to re-mint a `{YYYY-MM}_{id}` key: a pre-#3118 shape that, since keys became
+    # the bare content hash, minted a SECOND object per answer.) A legacy-prefix object is
+    # written back where it sits: this script never migrates, the owner's `aws s3 mv` does.
+    queue_key = rec.pop("_key", None) or f"{QUEUE_PREFIX}{rec['id']}.json"
+    rec.pop("_legacy", None)
     rec["status"] = "answered"
     rec["answered_at"] = datetime.now(timezone.utc).isoformat()
-    _put_json(f"{QUEUE_PREFIX}{(rec.get('submitted_at') or '')[:7]}_{rec['id']}.json", rec)
-    print("   marked the queued question as answered.")
+    _put_json(queue_key, rec)
+    print(f"   marked the queued question as answered ({queue_key}).")
 
     # #404: mint the answer's permalink + share card now instead of waiting for
     # the daily og-image-generator run. Fail-soft — the sweep also runs daily.

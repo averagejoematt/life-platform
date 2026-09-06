@@ -263,8 +263,8 @@ FINDING = {
 QUESTION = {"question": "e2e-test question: is the morning-daylight protocol moving sleep onset?"}
 
 DOORS = [
-    ("/api/submit_finding", FINDING, "generated/findings/", "finding_id"),
-    ("/api/board_question", QUESTION, "generated/board_questions/", "id"),
+    ("/api/submit_finding", FINDING, "reader_input/findings/", "finding_id"),
+    ("/api/board_question", QUESTION, "reader_input/board_questions/", "id"),
 ]
 
 
