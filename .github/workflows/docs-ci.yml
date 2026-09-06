@@ -149,11 +149,20 @@ on:
 permissions:
   contents: read
 
-# CI-minutes hygiene (#1453): a superseded push/PR update cancels its predecessor's
+# CI-minutes hygiene (#1453): a superseded PR update cancels its predecessor's
 # still-running gate instead of letting both burn Actions minutes to completion.
+#
+# #3533: a PUSH to main shares `github.ref` (always `refs/heads/main`) across
+# every push, so `cancel-in-progress: true` let the reconcile bot's follow-up
+# commit cancel the human commit's still-running verdict underneath it — 16 of
+# 40 Docs CI runs on main measured `cancelled`, one hiding a real Literal-drift
+# gate FAILURE (#3483). The `${{ github.sha }}` suffix makes every push's group
+# unique, so a push can never again collide with (and cancel) another push's
+# run; cancel-in-progress itself is scoped to `pull_request` only, so a PR's
+# superseded runs still get cancelled exactly as before (#1453's intent).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   wiki-gates:
