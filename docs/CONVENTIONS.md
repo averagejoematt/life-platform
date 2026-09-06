@@ -521,12 +521,20 @@ is `git checkout <ref> -- site/` plus a sync of the `site/` prefix — it touche
 no DynamoDB row, and not bucket-root `config/`. The gate that fires it judges `/api/*`
 content too, so for any failure sourced from DynamoDB the rollback reverts good static
 content, reports success on every step and leaves the defect live (it did exactly that to a
-wanted build beat). Two reflexes: when a gating copy reds, ask **which storage layer
+wanted build beat). Since #3352/#3395/#3652 the rollback asks
+`tests/visual_qa_verdict.py` first and DECLINES by name on an `api`, `deploy-script` or
+`ai-unevaluated` verdict — `ai-unevaluated` being "the AI oracle never returned a
+judgement for this page", which reverted every `site/**` merge for a day when it read as
+an ordinary rendering defect. Two reflexes: when a gating copy reds, ask **which storage layer
 produced the failing content** before trusting the remediation — an `/api/`-sourced truth
 finding is a hold-and-page, not a `site/` revert; and after any auto-rollback, **rerun the
 FULL workflow**, never the failed jobs only — a failed-jobs rerun greens against the
 rolled-back content and ships nothing. The `config/` asymmetry (shipped by the same
-workflow, not covered by the rollback) is open on #2799.
+workflow — `config_twin_sync.py --apply --strict` — but not covered by
+`rollback_site.sh`, which is `git checkout <ref> -- site/` and nothing else) is open on
+**#3654**. It used to point at #2799, which CLOSED 2026-08-31 as the completed
+silent-failure-floor epic; a live rule pointing at a closed issue is a rule with no
+owner, and #3652 found it that way.
 
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 

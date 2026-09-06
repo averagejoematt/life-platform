@@ -62,12 +62,16 @@ on:
       # Reachable ONLY from workflow_dispatch — the env var below is set from
       # `github.event.inputs.*`, which is empty on a push, and the guard is pinned in
       # tests/test_site_deploy_workflow.py so a push can never inject.
+      #
+      # The option list must equal `visual_qa_verdict.injection_choices()` — pinned by
+      # tests/test_site_deploy_workflow.py, because a surface the classifier can decline
+      # but the lever cannot fire is a decline path with no live proof (#3652).
       qa_inject_failure:
-        description: 'Inject one synthetic visual-QA failure of this surface (live proof of the #3352 rollback scope check)'
+        description: 'Inject one synthetic visual-QA failure of this surface (live proof of the #3352/#3652 rollback scope check)'
         required: false
         default: none
         type: choice
-        options: [none, api, deploy-script]
+        options: [none, ai-unevaluated, api, deploy-script]
       # #3395 box 3 — the smoke leg's twin of the input above: one synthetic /api-class
       # smoke failure, so `rollback-site-on-failure` can be watched DECLINING on a
       # data-plane red the smoke gate raised (the 2026-09-01 P3 shape). Same guard:
