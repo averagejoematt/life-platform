@@ -49,10 +49,14 @@
 # is least predictable is a guard with a hole where implementers stand. See the
 # staging block for the one shape still refused (a vanished DIRECTORY).
 #
-# Refuses to commit if: no paths given, an unresolved merge conflict (UU) exists,
-# a named path is a doc-sync literal file (or the generated counter module, which
-# has no override), a changed doc-literal file is unnamed, a named path is neither
-# on disk nor tracked-and-deleted, or black/ruff reject the staged Python.
+# Refuses to commit if: no paths given, a merge is in progress (.git/MERGE_HEAD
+# exists — #3642, concluding a merge here drops its second parent), the commit
+# subject fails the same Conventional-Commits pattern the commit-msg hook
+# applies (#3642, shared from deploy/lib/commit_subject_pattern.sh), an
+# unresolved merge conflict (UU) exists, a named path is a doc-sync literal
+# file (or the generated counter module, which has no override), a changed
+# doc-literal file is unnamed, a named path is neither on disk nor
+# tracked-and-deleted, or black/ruff reject the staged Python.
 # EVERY refusal exits nonzero and prints a terminal "REFUSED" line (#2464) — a
 # success is exit 0 plus the "✅ committed N path(s)" line, nothing else is.
 set -uo pipefail
@@ -81,6 +85,58 @@ fi
 MSG="$1"
 shift
 PATHS=("$@")
+
+# ── Refuse to conclude a merge through this script (#3642) ────────────────────
+# `git merge origin/main` on a lane branch, followed by this script to land it,
+# produced a SINGLE-PARENT commit: git only records MERGE_HEAD as a second
+# parent when the merge commit takes the index EXACTLY as the merge left it (no
+# pathspec, no `-a`) — and this script's entire job is staging exactly the
+# named paths, which is precisely the shape that discards it. The restore block
+# below then diffs platform_counts.py against the MERGE-BASE and reverts it to
+# what this branch had BEFORE the merge, silently regressing the file the merge
+# was largely fetching. Two lanes hit this independently on 2026-09-06 (the SES
+# lane and the #3588 rebase lane).
+#
+# The fix is a refusal, not a smarter merge: concluding a merge has a
+# well-known, correct recipe (plain `git commit`, hooks intact — the hook's
+# doc-sync sweep is fine here because a real merge commit is supposed to carry
+# whatever origin/main already moved) and this script's staging model is the
+# wrong shape for it regardless of how carefully paths are chosen.
+if [ -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]; then
+  echo "[agent-commit] ❌ a merge is in progress (.git/MERGE_HEAD exists) — this script cannot conclude it (#3642)." >&2
+  echo "[agent-commit]    Concluding a merge through here drops the second parent (a single-parent commit that" >&2
+  echo "[agent-commit]    looks merged but isn't) and can revert platform_counts.py to its pre-merge value." >&2
+  echo "[agent-commit]    Use the plain recipe instead:" >&2
+  echo "[agent-commit]      git commit   # hooks intact; the default merge message is fine, no -m needed" >&2
+  echo "[agent-commit]    Then verify:   git log -1 --format=%p   # must print TWO parent shas" >&2
+  refuse 1
+fi
+
+# ── Refuse a subject the commit-msg hook would also refuse (#3642) ────────────
+# --no-verify below is deliberate for the hook's OTHER job (the doc-sync sweep,
+# wrong on a feature branch) — but it also skips the hook's Conventional-Commits
+# subject gate, which this script never replaced. That let a subject the hook
+# refuses land anyway, every time a caller used this script instead of a plain
+# `git commit`. Applying the identical shared pattern here closes that gap: the
+# decision on what the pattern admits (including the repo's own multi-issue
+# scope form, `fix(#3535,#3537): …`) lives in ONE place,
+# deploy/lib/commit_subject_pattern.sh, sourced by both this script and the
+# installed hook, so the two paths cannot independently disagree again.
+_CSP_LIB="${ROOT}/deploy/lib/commit_subject_pattern.sh"
+if [ ! -f "${_CSP_LIB}" ]; then
+  echo "[agent-commit] ❌ ${_CSP_LIB} is missing — cannot verify the commit-msg subject pattern." >&2
+  refuse 1
+fi
+# shellcheck source=lib/commit_subject_pattern.sh
+. "${_CSP_LIB}"
+SUBJECT="$(printf '%s\n' "${MSG}" | head -n1)"
+if ! commit_subject_is_exempt "${SUBJECT}" && ! printf '%s' "${SUBJECT}" | grep -qE "${COMMIT_SUBJECT_PATTERN}"; then
+  echo "[agent-commit] ❌ subject is not a Conventional Commit — the commit-msg hook would also reject this:" >&2
+  echo "[agent-commit]      ${SUBJECT}" >&2
+  echo "[agent-commit]    Expected:  <type>(<optional-scope>): <subject>" >&2
+  echo "[agent-commit]    Types:     feat fix chore docs refactor test ci build perf style revert" >&2
+  refuse 1
+fi
 
 # ── Refuse on an unresolved conflict ──────────────────────────────────────────
 # `git add`-ing a file that still carries <<<<<<< markers has shipped to main

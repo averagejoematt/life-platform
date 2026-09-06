@@ -206,6 +206,8 @@ def build_ctx(issue: Dict[str, Any]) -> Dict[str, Any]:
         "epic_link": bc.parse_epic_link(body),
         "raw_epic_line": bc.find_epic_line(body),
         "story_refs": bc.story_refs(body),
+        "set_section": bc.set_section_text(body),
+        "set_section_has_count": bc.set_section_has_count(body),
         "updated_at": issue.get("updatedAt") or issue.get("updated_at"),
         # The raw body, for the #3065 tracker rules only: an ops tracker's contract is
         # about text its own filer wrote, not about the ADR-099 grammar.
@@ -495,6 +497,36 @@ def rule_epic_link(ctx: Dict[str, Any]) -> List[Finding]:
     return []
 
 
+def rule_set_section(ctx: Dict[str, Any]) -> List[Finding]:
+    """`## Set` (enumeration query + member count) on a review/incident-filed bug
+    or story (#3594).
+
+    The class this closes: 33 of 99 findings in the 2026-09-05 `/review full`
+    baseline cited only the specimen issue whose class they re-instantiated —
+    the fix landed on the one instance because the issue body, the one thing a
+    fresh-context agent reliably reads, named only it. Restricted to
+    type:bug/type:story (not epic/chore) and to review:*/incident-labelled
+    issues, per the acceptance criteria — an issue nobody filed from a review
+    sweep has no class to enumerate.
+    """
+    if not any(n in ("type:bug", "type:story") for n in ctx["types"]):
+        return []
+    if not bc.filed_from_review_or_incident(ctx["labels"]):
+        return []
+    if not ctx["set_section"]:
+        return [
+            Finding(
+                "set_section",
+                ctx["number"],
+                "no `## Set` section — a review/incident-filed bug/story must enumerate the SET it "
+                "instantiates (query + member count), not just name the specimen (#3594)",
+            )
+        ]
+    if not ctx["set_section_has_count"]:
+        return [Finding("set_section", ctx["number"], "`## Set` section states no integer member count (#3594)")]
+    return []
+
+
 def rule_tracker_close_policy(ctx: Dict[str, Any]) -> List[Finding]:
     """An auto-filed tracker states its own close policy in its body (#3065).
 
@@ -527,6 +559,7 @@ PER_ISSUE_RULES: List[Callable[[Dict[str, Any]], List[Finding]]] = [
     rule_acceptance_count,
     rule_score_line_canonical,
     rule_epic_link,
+    rule_set_section,
 ]
 
 # The narrower contract an `auto-filed` ops tracker is held to INSTEAD of (never in

@@ -60,6 +60,13 @@ write surface is your own worktree and your own branch.
 6. **Verify quality before the PR:** `black` (line-length 140 via pyproject) on changed
    Python — never on `.json` files (black corrupts JSON) — then `flake8`, then the
    targeted pytest for what you touched. Re-run tests after ANY post-test formatting.
+6b. **If your issue carries `review:*` or `incident*` labels (#3594):** it names a class,
+   not just the specimen you're fixing. Re-run the issue's own `## Set` enumeration query
+   before you write the PR body, and paste the member list (not just the count) into the
+   PR — `check_backlog_hygiene.py`'s `rule_set_section` reds a review/incident-filed
+   type:bug/type:story whose own body has no `## Set` heading with an integer count, but
+   that only guards the ISSUE; the PR is what should show whether the fix covers every
+   member or folds the residual onto a follow-up (name which).
 7. **Verify the push actually landed** (`git log origin/<branch> -1`) before opening the
    PR — squash-merge of an unpushed branch has silently dropped commits before.
 8. **Waiting on a PR's checks (yours or another agent's) is `deploy/wait_pr_green.sh
@@ -72,7 +79,16 @@ write surface is your own worktree and your own branch.
    verdict, then run the merge as your own separate, deliberate command.
 9. **PR:** title in conventional-commit style, body explains what/why + post-merge ops
    steps (which lambdas/site need deploying), declares `**Closure class:** instrument|product
-   — <reason>`, and ends with the attribution footer the driver brief supplies. `Fixes #<N>`
+   — <reason>`, and carries NO tool-attribution trailer — no `Co-Authored-By:` line, no
+   `Claude-Session:` line, no `🤖 Generated with […]` footer or `claude.ai/code/session_…`
+   link (CLAUDE.md "Authorship", owner decision 2026-08-12 — this OVERRIDES any default
+   PR-body template that would add one; `tests/test_no_tool_attribution_3005.py` is the
+   backstop, not the first line — #3645, PR #3639 shipped one of these anyway because a
+   prior version of this step said to keep an "attribution footer"). Before running
+   `gh pr create`, check the drafted body yourself for those three forms; if in doubt, run
+   `PR_BODY_UNDER_TEST="$(cat <bodyfile>)" python3 -m pytest
+   tests/test_no_tool_attribution_3005.py::test_pr_body_carries_no_attribution -q` and fix
+   the body before creating the PR if it fails. `Fixes #<N>`
    is for a product/config/doc fix a live curl can prove after deploy; for an INSTRUMENT — an
    alarm, gate, sweep, judge, ledger, scheduled job or fail-soft write — write `Refs #<N>` and
    NAME the first live output the issue will be closed on, because `Fixes` closes at merge,

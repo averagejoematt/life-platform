@@ -39,6 +39,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "deploy" / "agent_commit.sh"
 RESOLVER = REPO_ROOT / "deploy" / "lib" / "pinned_formatters.sh"
+CSP_LIB = REPO_ROOT / "deploy" / "lib" / "commit_subject_pattern.sh"
 
 STUB_VERSION = "0.0.0-stub"
 STUB = """#!/bin/sh
@@ -83,6 +84,7 @@ def scratch(tmp_path):
     (repo / "deploy" / "lib").mkdir(parents=True)
     (repo / "deploy" / "agent_commit.sh").write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
     (repo / "deploy" / "lib" / "pinned_formatters.sh").write_text(RESOLVER.read_text(encoding="utf-8"), encoding="utf-8")
+    (repo / "deploy" / "lib" / "commit_subject_pattern.sh").write_text(CSP_LIB.read_text(encoding="utf-8"), encoding="utf-8")
     (repo / "requirements-dev.txt").write_text(f"black=={STUB_VERSION}\nruff=={STUB_VERSION}\n", encoding="utf-8")
 
     (repo / "scripts").mkdir()

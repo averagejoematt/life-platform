@@ -36,6 +36,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "deploy" / "agent_commit.sh"
 RESOLVER = REPO_ROOT / "deploy" / "lib" / "pinned_formatters.sh"
+CSP_LIB = REPO_ROOT / "deploy" / "lib" / "commit_subject_pattern.sh"
 
 # The version the stubs report AND the version the scratch repo pins — they must
 # match or the resolver refuses the stubs before their exit code is ever consulted.
@@ -73,6 +74,7 @@ def scratch(tmp_path):
     (repo / "deploy" / "agent_commit.sh").write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
     (repo / "deploy" / "lib").mkdir()
     (repo / "deploy" / "lib" / "pinned_formatters.sh").write_text(RESOLVER.read_text(encoding="utf-8"), encoding="utf-8")
+    (repo / "deploy" / "lib" / "commit_subject_pattern.sh").write_text(CSP_LIB.read_text(encoding="utf-8"), encoding="utf-8")
     (repo / "requirements-dev.txt").write_text(f"black=={STUB_VERSION}\nruff=={STUB_VERSION}\n", encoding="utf-8")
     (repo / "scripts").mkdir()
     (repo / "scripts" / "mod.py").write_text("x = 1\n", encoding="utf-8")
@@ -163,6 +165,32 @@ def test_doc_literal_refusal_exits_nonzero(scratch):
 
 
 def test_unresolved_conflict_refusal_exits_nonzero(scratch):
+    """A conflict with NO MERGE_HEAD (a cherry-pick, not a merge) still hits the
+    generic UU-conflict refusal. #3642: a REAL `git merge` conflict now hits the
+    earlier, more specific MERGE_HEAD refusal instead (see the test below) — that
+    refusal fires whether or not the merge's conflicts are resolved, because the
+    problem it names (this script cannot conclude ANY merge) is true either way."""
+    repo, _ = scratch
+    _git(repo, "checkout", "-q", "-b", "other")
+    (repo / "notes.txt").write_text("theirs\n", encoding="utf-8")
+    _git(repo, "commit", "-q", "-am", "theirs")
+    _git(repo, "checkout", "-q", "main")
+    (repo / "notes.txt").write_text("ours\n", encoding="utf-8")
+    _git(repo, "commit", "-q", "-am", "ours")
+    cherry = subprocess.run(["git", "-C", str(repo), "cherry-pick", "other"], capture_output=True, text=True)
+    assert cherry.returncode != 0  # a real UU conflict exists, with NO MERGE_HEAD
+    assert not (repo / ".git" / "MERGE_HEAD").exists()
+    before = _head(repo)
+    (repo / "scripts" / "mod.py").write_text("x = 3\n", encoding="utf-8")
+    r = run_script(scratch, ["feat: mid-merge", "scripts/mod.py"])
+    assert "unresolved merge conflict" in r.stderr
+    _assert_refused(repo, before, r)
+
+
+def test_in_progress_merge_refuses_before_the_generic_conflict_check_3642(scratch):
+    """#3642: a REAL merge (conflicted or not) is refused by name, with the
+    plain-`git commit` recipe — never silently concluded as a single-parent
+    commit that drops MERGE_HEAD as the second parent."""
     repo, _ = scratch
     _git(repo, "checkout", "-q", "-b", "other")
     (repo / "notes.txt").write_text("theirs\n", encoding="utf-8")
@@ -171,11 +199,13 @@ def test_unresolved_conflict_refusal_exits_nonzero(scratch):
     (repo / "notes.txt").write_text("ours\n", encoding="utf-8")
     _git(repo, "commit", "-q", "-am", "ours")
     merge = subprocess.run(["git", "-C", str(repo), "merge", "other"], capture_output=True, text=True)
-    assert merge.returncode != 0  # a real UU conflict exists
+    assert merge.returncode != 0  # a real UU conflict, WITH MERGE_HEAD
+    assert (repo / ".git" / "MERGE_HEAD").exists()
     before = _head(repo)
     (repo / "scripts" / "mod.py").write_text("x = 3\n", encoding="utf-8")
     r = run_script(scratch, ["feat: mid-merge", "scripts/mod.py"])
-    assert "unresolved merge conflict" in r.stderr
+    assert "a merge is in progress" in r.stderr, r.stderr
+    assert "(#3642)" in r.stderr
     _assert_refused(repo, before, r)
 
 

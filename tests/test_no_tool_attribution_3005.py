@@ -60,6 +60,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ALLOWLIST = {
     "CLAUDE.md",  # the owner decision itself, which quotes all three banned forms
     "tests/test_no_tool_attribution_3005.py",  # this guard
+    # #3645: the "attribution footer"/"attribution trailer" PARAPHRASE sweep (added
+    # below) makes every file that merely NAMES the ban to describe or restate it —
+    # never to instruct adding one — a new offender unless allowlisted. All of these
+    # state the ban; none instructs it.
+    ".claude/README.md",
+    "CONTRIBUTING.md",
+    "docs/CONVENTIONS.md",
+    "remediation/prompt.md",
+    "scripts/gate_census_mutations.py",
+    "handovers/HANDOVER_LATEST.md",  # a session's own incident narrative, not an instruction
+    # #3645: worktree-implementer.md's step 9 now STATES the three banned forms by name
+    # (so an agent reading it recognizes what to refuse) instead of instructing one —
+    # PR #3639 shipped a footer under a prior version of this step that said to keep it.
+    ".claude/agents/worktree-implementer.md",
 }
 
 BAN_DATE = "2026-08-12"
@@ -78,6 +92,16 @@ _MENTION_FORMS = {
     # is pinned to `/code/session` on purpose — `claude.ai/code/artifact/…` links
     # (portrait contact sheets under config/portraits/) are not attribution.
     "generated-with footer / session link": re.compile(r"generated with \[claude code\]|claude\.ai/code/session", re.IGNORECASE),
+    # #3645: "attribution footer" survives sweep 1 as a PARAPHRASE — a prior version
+    # of worktree-implementer.md step 9 said "ends with the attribution footer the
+    # driver brief supplies", which names none of the three literal forms above and
+    # so passed this sweep clean while still instructing a lane to add one. PR #3639
+    # is the live positive control: a sonnet lane briefed "no tool-attribution
+    # trailers" still emitted the footer + session link because this step told it
+    # to keep one. An instruction can no longer say "attribution footer" or
+    # "attribution trailer" without saying the FORM (which then trips the ban
+    # directly) or being a ban-STATING file on the allowlist.
+    "attribution footer/trailer paraphrase": re.compile(r"attribution (?:footer|trailer)", re.IGNORECASE),
 }
 
 # Message/body patterns: an ACTUAL attribution, not a mention.
