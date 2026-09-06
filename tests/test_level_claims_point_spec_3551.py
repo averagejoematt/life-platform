@@ -145,7 +145,9 @@ class TestResolveEvalSpec:
         assert old["type"] == "directional" and old["condition"] == "up"
 
     def test_a_level_claim_becomes_a_point_spec_even_when_the_extractor_says_up(self):
-        spec, window, shape = pe.resolve_eval_spec(LIVE_CLAIM, "recovery_score", "up", "", "2026-09-04", _tol_ok, mm.infer_direction)
+        spec, window, shape = pe.resolve_eval_spec(
+            LIVE_CLAIM, "recovery_score", {"direction": "up", "timeframe_hint": ""}, "2026-09-04", _tol_ok, mm.infer_direction
+        )
         assert shape == "level"
         assert spec["type"] == pe.POINT_TYPE and spec["type"] != "directional"
         assert spec["metric"] == "recovery_score" and spec["condition"] == "within"
@@ -154,28 +156,44 @@ class TestResolveEvalSpec:
         assert window == 14 and spec["target_date"] == "2026-09-18"
 
     def test_a_level_claim_with_no_derivable_tolerance_is_an_observation_never_directional(self):
-        spec, _w, shape = pe.resolve_eval_spec(LIVE_CLAIM, "recovery_score", "up", "", "2026-09-04", _tol_none, mm.infer_direction)
+        spec, _w, shape = pe.resolve_eval_spec(
+            LIVE_CLAIM, "recovery_score", {"direction": "up", "timeframe_hint": ""}, "2026-09-04", _tol_none, mm.infer_direction
+        )
         assert shape == "level" and spec["type"] == "qualitative"
         status, gradeable_by = pe.emission_status(spec)
         assert status == pe.OBSERVATION_STATUS and gradeable_by == pe.GRADEABLE_BY_NONE
 
     def test_tomorrow_is_a_one_day_window_and_target(self):
-        spec, window, _ = pe.resolve_eval_spec(DECIDED_CLAIM, "recovery_score", None, "", "2026-08-17", _tol_ok, mm.infer_direction)
+        spec, window, _ = pe.resolve_eval_spec(
+            DECIDED_CLAIM, "recovery_score", {"direction": None, "timeframe_hint": ""}, "2026-08-17", _tol_ok, mm.infer_direction
+        )
         assert window == 1 and spec["target_date"] == "2026-08-18"
         assert pe.prediction_window_days("tomorrow") == 1 and pe.prediction_window_days("2 weeks") == 14
 
     def test_an_iso_date_in_the_claim_sets_the_window(self):
         spec, window, _ = pe.resolve_eval_spec(
-            "weight will sit at 318 by 2026-09-20", "weight_lbs", None, "", "2026-09-06", _tol_ok, mm.infer_direction
+            "weight will sit at 318 by 2026-09-20",
+            "weight_lbs",
+            {"direction": None, "timeframe_hint": ""},
+            "2026-09-06",
+            _tol_ok,
+            mm.infer_direction,
         )
         assert window == 14 and spec["target_date"] == "2026-09-20"
 
     def test_a_directional_claim_still_routes_exactly_as_before(self):
         spec, window, shape = pe.resolve_eval_spec(
-            "HRV should improve over two weeks", "hrv", None, "2 weeks", "2026-09-04", _tol_ok, mm.infer_direction
+            "HRV should improve over two weeks",
+            "hrv",
+            {"direction": None, "timeframe_hint": "2 weeks"},
+            "2026-09-04",
+            _tol_ok,
+            mm.infer_direction,
         )
         assert shape == "other" and spec == pe.build_prediction_eval_spec("hrv", "up", 14)
-        spec, _, _ = pe.resolve_eval_spec("anything", "hrv", "down", "", "2026-09-04", _tol_ok, mm.infer_direction)
+        spec, _, _ = pe.resolve_eval_spec(
+            "anything", "hrv", {"direction": "down", "timeframe_hint": ""}, "2026-09-04", _tol_ok, mm.infer_direction
+        )
         assert spec["type"] == "directional" and spec["condition"] == "down"  # the extractor still wins for non-level claims
 
     def test_the_writer_routes_every_claim_through_resolve_eval_spec(self):
@@ -201,7 +219,12 @@ class TestPointEmissionContract:
 
     def test_the_evaluator_dispatches_point_specs(self):
         src = inspect.getsource(ev._evaluate_all)
-        assert 'eval_type == "point"' in src and "_evaluate_point(" in src
+        assert 'in ("directional", "point")' in src and "_evaluate_point" in src
+        # The evaluator's name is the grader module's function with the evaluator's own data path injected.
+        from coach import prediction_point_grader as ppg
+
+        assert "return evaluate_point(" in inspect.getsource(ev._evaluate_point) and ev.evaluate_point is ppg.evaluate_point
+        assert ev.POINT_LOOKBACK_DAYS == ppg.POINT_LOOKBACK_DAYS
 
     def test_the_coherence_sentinel_counts_point_as_gradable(self):
         from operational import coherence_sentinel_lambda as cs

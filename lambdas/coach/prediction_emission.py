@@ -264,8 +264,9 @@ def build_point_eval_spec(metric_hint, target, tolerance, tolerance_rule, window
     }
 
 
-def resolve_eval_spec(claim, metric_hint, extractor_direction, timeframe_hint, generation_date, tolerance_for, infer_direction):
+def resolve_eval_spec(claim, metric_hint, pred, generation_date, tolerance_for, infer_direction):
     """THE emission-time routing for one coach claim — pure, dependency-injected.
+    `pred` is the extractor's prediction dict (its `direction` / `timeframe_hint` are read here).
 
     Order matters (#3551): the claim SHAPE is classified first. A level claim
     becomes a `point` spec when `tolerance_for(metric)` can derive one from the
@@ -276,7 +277,8 @@ def resolve_eval_spec(claim, metric_hint, extractor_direction, timeframe_hint, g
     Returns (eval_spec, window_days, shape).
     """
     shape = classify_claim_shape(claim, metric_hint) if metric_hint else {"shape": "other", "window_hint": None, "target_date": None}
-    window_days = prediction_window_days(timeframe_hint or shape.get("window_hint") or "")
+    extractor_direction = (pred or {}).get("direction")
+    window_days = prediction_window_days((pred or {}).get("timeframe_hint") or shape.get("window_hint") or "")
     if shape.get("target_date") and generation_date:
         # An ISO date in the claim IS the window — "will sit at 318 by 2026-09-20".
         try:
