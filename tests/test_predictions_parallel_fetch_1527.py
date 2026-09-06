@@ -137,6 +137,10 @@ class TestProjectionCarriesEveryEmittedField:
             # #3480: the freeze instant rides the projection too — dropped from
             # _PREDICTION_PROJECTION_FIELDS it would silently serve None for every row.
             "pre_registered_at": "2026-07-18T22:00:00+00:00",
+            # #3520: the walk includes RETIRED seats (their career records are real and
+            # keep their real byline), and the scorecard used to render them beside the
+            # live cast with nothing to say so. The flag is registry-derived.
+            "retired": False,
         }
         assert body["by_coach"]["sleep"]["lifetime"]["confirmed"] == 1
 

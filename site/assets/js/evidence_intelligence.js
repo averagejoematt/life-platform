@@ -449,6 +449,13 @@ const _OPEN_ARTIFACT_LINE =
 // archived PREDICTION#) beside this season (current cycle only) — sports-card
 // pattern. A reset wipes the SEASON view honestly to zero; it must never wipe
 // the platform's actual track record out of sight along with it.
+// #3520: the scorecard walks retired seats too — their career records are real and keep
+// their real byline — but it said nothing about it, so a stranger met "Dr. Sarah Chen"
+// alongside seven current coaches with no way to tell she left at the cycle-13 genesis.
+// The flag is served by /api/calibration and /api/predictions, derived from the persona
+// registry's own `retired` field; the page never decides who is retired.
+const _retiredTag = (c) => (c && c.retired ? ' <span class="rd-unit">· retired</span>' : "");
+
 export function renderCalibration(d) {
   const p = (d && d.platform) || {};
   const life = p.lifetime || {};
@@ -513,7 +520,7 @@ export function renderCalibration(d) {
       // #3450: the CI rides as a title tooltip in this dense per-coach table — the
       // platform-wide figure above carries the same interval inline, uncollapsed.
       const accTitle = c.accuracy_ci95 ? ` title="95% CI ${fmt(c.accuracy_ci95[0])}–${fmt(c.accuracy_ci95[1])}%"` : "";
-      return `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}</td><td class="num">${seasonN}</td><td class="num">${careerN}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range"${accTitle}>${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${calCell}</td></tr>`;
+      return `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}${_retiredTag(c)}</td><td class="num">${seasonN}</td><td class="num">${careerN}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range"${accTitle}>${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${calCell}</td></tr>`;
     })
     .join("");
   const board = sec(
@@ -588,7 +595,7 @@ export function renderPredictions(d) {
     if (frozen && p.date && frozen !== p.date) return `${esc(frozen)} <span class="rd-unit">· from ${esc(p.date)}</span>`;
     return esc(frozen || p.date || "");
   };
-  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${made(p)}</td></tr>`).join("");
+  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${made(p)}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest.");
 }

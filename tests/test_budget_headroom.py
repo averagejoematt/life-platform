@@ -103,6 +103,13 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         "surge_active": False,
         "recent_uniques": None,
         "surge_threshold": gov.SURGE_UNIQUES_THRESHOLD,
+        # #3510: the derived bar, its derivation string and the trailing-30d flip count.
+        # All three default to the pre-#3510 shape (the documented floor, no rule, no
+        # count) when the caller does not pass them, so a call site that predates the
+        # derivation still writes an honest payload rather than a fabricated one.
+        "surge_threshold_rule": None,
+        "surge_threshold_floor": gov.SURGE_UNIQUES_THRESHOLD,
+        "surge_flips_30d": None,
         # #1999: the ADR-133 envelope the effective ceiling was drawn from, so no
         # consumer has to hardcode the base literal to describe it.
         "base_ceiling": gov._active_ceilings()[0],

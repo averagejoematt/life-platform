@@ -162,6 +162,54 @@ def _days_at_tier(cw, start: date, end: date) -> int | None:
         return None
 
 
+# ── Query 2b: surge flips (#3510) ────────────────────────────────────────────
+_GOVERNOR_SRC = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "operational", "cost_governor_lambda.py"
+)
+
+
+def _governor_flip_bar(default: int = 2) -> int:
+    """`SURGE_FLIPS_30D_ALARM` read from the governor's source by AST — the same
+    two-literals-cannot-drift pattern tests/test_cost_drift_alarm_2883.py uses. Importing
+    the module here would drag boto3 clients and the whole lambda import graph into a
+    reporting script; restating the number would give the close a second opinion that
+    ages separately from the governor that actually alerts."""
+    try:
+        tree = ast.parse(open(_GOVERNOR_SRC, encoding="utf-8").read(), filename=_GOVERNOR_SRC)
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "SURGE_FLIPS_30D_ALARM" for t in node.targets):
+                if isinstance(node.value, ast.Constant) and isinstance(node.value.value, int):
+                    return node.value.value
+    except Exception as e:
+        _problem(f"could not read SURGE_FLIPS_30D_ALARM from the governor source: {e}")
+    return default
+
+
+def _surge_flips(cw, start: date, end: date) -> int | None:
+    """Surge engage/disengage edges inside the month, from the governor's own
+    LifePlatform/Budget::SurgeFlip series (one datapoint per edge).
+
+    ADR-133's threshold used to sit at the MEAN of the weekly baseline, so surge mode —
+    and with it the effective ceiling and all three tier bands — flipped on week-to-week
+    noise: five edges in seven weeks, recorded nowhere but five owner emails and an SSM
+    parameter history. The close now reads the count beside the tier-residence line, so
+    a mis-set threshold shows up in the month's own record. None on a read failure — an
+    unknown count must not print as a calm zero."""
+    try:
+        resp = cw.get_metric_statistics(
+            Namespace="LifePlatform/Budget",
+            MetricName="SurgeFlip",
+            StartTime=datetime(start.year, start.month, 1, tzinfo=timezone.utc),
+            EndTime=datetime(end.year, end.month, 1, tzinfo=timezone.utc),
+            Period=86400,
+            Statistics=["Sum"],
+        )
+        return int(sum(d["Sum"] for d in resp.get("Datapoints", [])))
+    except Exception as e:
+        _problem(f"SurgeFlip query failed: {e}")
+        return None
+
+
 # ── Query 3: cost per reader-week ────────────────────────────────────────────
 def _reader_week(cw, start: date, end: date) -> dict | None:
     try:
@@ -337,6 +385,16 @@ def main(argv=None) -> int:
     tier_days = _days_at_tier(cw, start, end)
     if tier_days is not None:
         print(f"  {tier_days} / {days_in_month} days")
+    flips = _surge_flips(cw, start, end)
+    gov_flip_bar = _governor_flip_bar()
+    print(
+        f"  surge flips this month: {flips if flips is not None else '??'}"
+        + (
+            f"  <-- at/above the {gov_flip_bar}-flip bar (#3510): the threshold is inside the baseline's noise"
+            if (flips or 0) >= gov_flip_bar
+            else ""
+        )
+    )
 
     # 3. Cost per reader-week
     print("\n[3/5] Cost per reader-week (LifePlatform/Traffic::UniqueVisitors7d)")

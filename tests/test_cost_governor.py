@@ -239,34 +239,126 @@ def test_non_ai_series_excludes_bedrock_edition_services(gov, monkeypatch):
 
 
 # ── ADR-133 (#739): surge-mode ceiling — rule + isolation from spend creep ────
-# The $85 base ceiling (ADR-133 amendment) floats to $100 when trailing 7-day
-# unique visitors (traffic_digest_lambda's UniqueVisitors7d CloudWatch metric)
-# cross SURGE_UNIQUES_THRESHOLD (900). Surge is a pure function of reader
-# traffic — it must never be triggerable by spend alone.
+# The base ceiling floats to the surge ceiling when trailing 7-day unique visitors
+# (traffic_digest_lambda's UniqueVisitors7d CloudWatch metric) cross the engage bar.
+# Surge is a pure function of reader traffic — it must never be triggerable by spend
+# alone. #3510: the bar is no longer the SURGE_UNIQUES_THRESHOLD constant; that is now
+# only a FLOOR, and the live bar is derived per-run from the trailing weekly baseline.
+
+# The real recorded weekly UniqueVisitors7d series, 2026-07-01 → 2026-09-05, as written
+# into the ADR-133 2026-09-06 amendment. These are ground truth for the derivation tests
+# below: the derived bar must sit ABOVE every one of them, which is the property the
+# 900 constant lost when the baseline grew 3-4x and nothing carried the revisit.
+DOCUMENTED_WEEKLY_UNIQUES = [972, 728, 803, 892, 973, 773, 838, 1011]
 
 
 @pytest.mark.parametrize(
     "recent_uniques,expected_ceiling,expected_surge",
     [
         (0, 215.0, False),
-        (899, 215.0, False),  # boundary: one under the threshold
-        (900, 252.0, True),  # boundary: exactly at the threshold — crosses
+        (899, 215.0, False),  # boundary: one under the floor
+        (900, 252.0, True),  # boundary: exactly at the floor — crosses when no baseline is supplied
         (901, 252.0, True),
         (5000, 252.0, True),  # a genuine viral spike
         (None, 215.0, False),  # no signal yet (metric never emitted) → fails closed to the BASE
     ],
 )
 def test_effective_ceiling_rule(gov, recent_uniques, expected_ceiling, expected_surge):
+    """With no derived bar passed, the floor is the bar — the pre-#3510 behaviour, kept
+    so a baseline read failure degrades to the documented constant rather than to zero."""
     ceiling, surge_active = gov._effective_ceiling(recent_uniques)
     assert ceiling == expected_ceiling
     assert surge_active is expected_surge
 
 
+def test_derived_threshold_exceeds_every_documented_baseline_reading(gov):
+    """ADR-133's "revisit the threshold as the baseline traffic grows" clause, CARRIED.
+
+    This assertion is the carrier the clause never had. If the weekly baseline grows
+    again, the derived bar grows with it; if someone re-pins the bar to a constant, this
+    test reds against the series the ADR itself records.
+    """
+    threshold, rule = gov.surge_threshold_from_baseline(DOCUMENTED_WEEKLY_UNIQUES)
+    assert threshold > max(DOCUMENTED_WEEKLY_UNIQUES), (
+        f"derived bar {threshold} is not above the highest recorded weekly reading "
+        f"{max(DOCUMENTED_WEEKLY_UNIQUES)} — surge would still flip on the baseline's own noise"
+    )
+    # And specifically above the MEAN, which is where the retired constant sat.
+    assert threshold > sum(DOCUMENTED_WEEKLY_UNIQUES) / len(DOCUMENTED_WEEKLY_UNIQUES)
+    assert threshold >= gov.SURGE_UNIQUES_THRESHOLD, "the documented 900 is a floor, never a ceiling"
+    # The derivation travels with the number — n, mean and SD in the rule string.
+    for token in ("mean", "SD", "n=8", "floor 900"):
+        assert token in rule, f"{token!r} missing from the rule string {rule!r}"
+
+
+def test_the_retired_900_constant_would_have_flipped_on_the_real_series(gov):
+    """The defect, stated as an assertion: five of the eight recorded weeks sit within
+    ±15% of 900, and three of them are ABOVE it — which is how the SSM history got five
+    edges in seven weeks. The derived bar classifies every one of them as normal."""
+    threshold, _ = gov.surge_threshold_from_baseline(DOCUMENTED_WEEKLY_UNIQUES)
+    over_old = [v for v in DOCUMENTED_WEEKLY_UNIQUES if v >= gov.SURGE_UNIQUES_THRESHOLD]
+    assert len(over_old) >= 3, "the recorded series no longer straddles 900 — re-derive this test's premise"
+    assert not [v for v in DOCUMENTED_WEEKLY_UNIQUES if v >= threshold], "a baseline week still engages surge"
+
+
+def test_derived_threshold_falls_back_to_the_floor_when_the_baseline_is_too_thin(gov):
+    """Two readings are not an SD. The floor stands and the rule SAYS which it used —
+    a silently-derived bar from n=2 would be the same unstated number 900 became."""
+    threshold, rule = gov.surge_threshold_from_baseline([100, 200])
+    assert threshold == gov.SURGE_UNIQUES_THRESHOLD
+    assert "floor" in rule and "n=2" in rule
+    threshold, rule = gov.surge_threshold_from_baseline([])
+    assert threshold == gov.SURGE_UNIQUES_THRESHOLD
+    assert "n=0" in rule
+
+
+def test_a_widening_baseline_raises_the_bar_with_it(gov):
+    """The negative control for "is this actually derived": same mean, more spread."""
+    tight, _ = gov.surge_threshold_from_baseline([1000, 1000, 1000, 1000, 1000, 1000])
+    wide, _ = gov.surge_threshold_from_baseline([700, 1300, 700, 1300, 700, 1300])
+    assert wide > tight, "the bar ignores the baseline's spread — it is not derived from variance"
+    assert tight == max(gov.SURGE_UNIQUES_THRESHOLD, 1000), "a zero-variance baseline should sit at the mean (floored)"
+
+
+@pytest.mark.parametrize(
+    "recent,prev_surge,expected_surge",
+    [
+        (1187, False, False),  # one under the bar — no engage
+        (1188, False, True),  # exactly at the bar — engage
+        (1000, True, True),  # already surging, inside the 0.8x hold band — HOLD
+        (951, True, True),  # just above 0.8 * 1188 = 950.4 — HOLD
+        (950, True, False),  # below the hold band — disengage
+        (1000, False, False),  # the same 1000 does NOT engage from the off state
+    ],
+)
+def test_hysteresis_holds_through_the_noise_band(gov, recent, prev_surge, expected_surge):
+    """Without hysteresis a series oscillating on the bar mints an unbounded run of
+    edges — five in seven weeks, each an owner email and a 17% ceiling swing."""
+    _, surge_active = gov._effective_ceiling(recent, 1188, prev_surge)
+    assert surge_active is expected_surge
+
+
+def test_hysteresis_cannot_engage_below_the_bar(gov):
+    """The band is a HOLD, never an entry: the disengage ratio must not become a second,
+    lower engage threshold when the previous state was off."""
+    for recent in (960, 1000, 1100, 1187):
+        _, surge_active = gov._effective_ceiling(recent, 1188, False)
+        assert surge_active is False, f"{recent} engaged surge below the {1188} bar"
+
+
 def test_surge_engages_only_on_traffic_never_on_spend(gov):
     """Constraint #3 (#739 scope): the ceiling stays at the $215 base when
     uniques are below threshold REGARDLESS of projection. A heavy, over-budget
-    spend projection with organic (sub-threshold) traffic must not float it."""
-    ceiling, surge_active = gov._effective_ceiling(recent_uniques=288)  # real recent baseline
+    spend projection with organic (sub-threshold) traffic must not float it.
+
+    #3510 retired the old `288 = "real recent baseline"` fixture used here: 288 was the
+    2026-07-06 reading and the baseline has since tripled, so pinning it as ground truth
+    was the same stale-number defect this issue is about. The figure below is the MEAN of
+    the documented series, which is a fact about today's traffic.
+    """
+    organic = round(sum(DOCUMENTED_WEEKLY_UNIQUES) / len(DOCUMENTED_WEEKLY_UNIQUES))
+    threshold, _ = gov.surge_threshold_from_baseline(DOCUMENTED_WEEKLY_UNIQUES)
+    ceiling, surge_active = gov._effective_ceiling(organic, threshold, False)
     assert ceiling == 215.0
     assert surge_active is False
     # Feed that ceiling into _decide_tier with a way-over-budget projection —
@@ -705,3 +797,113 @@ def test_drift_bar_is_the_issue_2883_acceptance_bar(gov):
     (tests/test_cost_drift_alarm_2883.py separately pins the CloudWatch alarm's
     threshold to this same constant by AST.)"""
     assert gov.DRIFT_RATIO_BAR == 1.15
+
+
+# ── #3510: the surge-flip signal ─────────────────────────────────────────────
+# "Two flips in a month is itself an alarm" is the issue's own Outcome. There is no
+# CloudWatch metric ALARM resource: the governor already holds PutMetricData,
+# GetMetricStatistics and the alerts topic, so the flip count is emitted as a series,
+# read back as a trailing-30d sum, and published as an owner notice on the edge that
+# reaches the bar. These tests pin all three halves and the fail-quiet behaviour.
+
+
+class _FlipCW:
+    """Records put_metric_data and answers the SurgeFlip series query."""
+
+    def __init__(self, flip_sums=(), raise_on_get=False):
+        self.puts = []
+        self._flip_sums = list(flip_sums)
+        self._raise_on_get = raise_on_get
+
+    def put_metric_data(self, **kwargs):
+        self.puts.append(kwargs)
+
+    def get_metric_statistics(self, **kwargs):
+        if self._raise_on_get:
+            raise RuntimeError("boom")
+        assert kwargs["MetricName"] == "SurgeFlip"
+        assert kwargs["Statistics"] == ["Sum"]
+        return {"Datapoints": [{"Timestamp": datetime(2026, 9, 1, tzinfo=timezone.utc), "Sum": s} for s in self._flip_sums]}
+
+
+def test_surge_flips_30d_sums_the_edge_series(gov, monkeypatch):
+    monkeypatch.setattr(gov, "_cw", _FlipCW(flip_sums=[1.0, 1.0, 1.0]))
+    assert gov._surge_flips_30d(datetime(2026, 9, 6, tzinfo=timezone.utc)) == 3
+
+
+def test_surge_flips_30d_read_failure_is_none_not_zero(gov, monkeypatch):
+    """An unmeasured flip count must never render as a calm zero — that is the
+    'absence read as success' shape, on the one number that says the bar is mis-set."""
+    monkeypatch.setattr(gov, "_cw", _FlipCW(raise_on_get=True))
+    assert gov._surge_flips_30d(datetime(2026, 9, 6, tzinfo=timezone.utc)) is None
+
+
+def test_emit_surge_flip_publishes_one_datapoint(gov, monkeypatch):
+    fake = _FlipCW()
+    monkeypatch.setattr(gov, "_cw", fake)
+    gov._emit_surge_flip()
+    assert fake.puts == [{"Namespace": "LifePlatform/Budget", "MetricData": [{"MetricName": "SurgeFlip", "Value": 1, "Unit": "Count"}]}]
+
+
+def test_flip_gauge_publishes_the_count_and_skips_an_unknown_one(gov, monkeypatch):
+    fake = _FlipCW()
+    monkeypatch.setattr(gov, "_cw", fake)
+    gov._emit_surge_flip_gauge(4)
+    assert fake.puts[0]["MetricData"] == [{"MetricName": "SurgeFlips30d", "Value": 4.0, "Unit": "Count"}]
+    gov._emit_surge_flip_gauge(None)
+    assert len(fake.puts) == 1, "an unknown flip count was published as a number"
+
+
+def test_flapping_alert_names_the_count_the_bar_and_the_derivation(gov, monkeypatch):
+    fake_sns = _FakeSNS()
+    monkeypatch.setattr(gov, "_sns", fake_sns)
+    threshold, rule = gov.surge_threshold_from_baseline(DOCUMENTED_WEEKLY_UNIQUES)
+    gov._alert_surge_flapping(3, threshold, rule, 1011)
+    assert len(fake_sns.calls) == 1
+    subj, body = fake_sns.calls[0]["Subject"], fake_sns.calls[0]["Message"]
+    assert "3 flips" in subj
+    assert str(threshold) in body and "mean" in body and "SD" in body, body
+    assert "1011" in body
+
+
+def test_flapping_alert_never_raises_on_publish_failure(gov, monkeypatch):
+    class _BrokenSNS:
+        def publish(self, **kwargs):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(gov, "_sns", _BrokenSNS())
+    gov._alert_surge_flapping(2, 1188, "rule", 1200)  # must not raise
+
+
+def test_alert_surge_quotes_the_derived_bar_not_the_floor(gov, monkeypatch):
+    """The #1998 lesson applied to the threshold: an alert that quotes the module
+    constant emails a number the governor did not decide on."""
+    monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
+    fake_sns = _FakeSNS()
+    monkeypatch.setattr(gov, "_sns", fake_sns)
+    gov._alert_surge(active=True, recent_uniques=1300, mtd=50.0, projected=80.0, threshold=1188, rule="mean 873.8 + 3*SD 104.4 = 1188")
+    body = fake_sns.calls[0]["Message"]
+    assert "1188" in body and "mean 873.8" in body, body
+    assert "(900)" not in body, f"the alert quoted the floor constant as the bar: {body!r}"
+
+
+def test_weekly_uniques_baseline_returns_the_series_oldest_first(gov, monkeypatch):
+    points = [
+        {"Timestamp": datetime(2026, 8, 31, tzinfo=timezone.utc), "Maximum": 1011},
+        {"Timestamp": datetime(2026, 7, 1, tzinfo=timezone.utc), "Maximum": 972},
+        {"Timestamp": datetime(2026, 8, 1, tzinfo=timezone.utc), "Maximum": 973},
+    ]
+    monkeypatch.setattr(gov, "_cw", _FakeCW(points))
+    assert gov._weekly_uniques_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == [972, 973, 1011]
+
+
+def test_weekly_uniques_baseline_read_failure_is_empty(gov, monkeypatch):
+    class _BrokenCW:
+        def get_metric_statistics(self, **kwargs):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(gov, "_cw", _BrokenCW())
+    assert gov._weekly_uniques_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == []
+    # …and the empty series degrades to the documented floor, with the reason stated.
+    threshold, rule = gov.surge_threshold_from_baseline([])
+    assert threshold == gov.SURGE_UNIQUES_THRESHOLD and "floor" in rule
