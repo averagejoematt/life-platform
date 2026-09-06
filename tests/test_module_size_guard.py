@@ -223,7 +223,15 @@ BASELINE = {
     # lambdas/web/site_api_ai_session.py (168 lines, under the ceiling), which paid for
     # the #3118 turn-identity replay guard that stayed behind. Extracted 98, spent 38,
     # measured 1693; banked 7 of the ~19 the earned-headroom rule allows. Lowering.
-    "lambdas/web/site_api_ai_lambda.py": 1186,
+    # 1186 -> 1226 (2026-09-05): NOT a grant of headroom. This whole table was
+    # re-derived in logical lines by #3537, and the merge of origin/main into this
+    # branch brought #3560/#3561/#3562 (PR #3585), which enforced three stated
+    # security boundaries in this file — +50 physical / +40 logical, landed green
+    # under the PHYSICAL baseline in force on main (1627 of 1700). Re-deriving the
+    # entry against the tree the unit change is landing on is the conversion, not a
+    # raise; carrying 1186 over would have retro-rejected a change that was compliant
+    # when it merged. Measured on the merged tree, not chosen.
+    "lambdas/web/site_api_ai_lambda.py": 1226,
     # 1989 -> 1829 by #2221: tool_get_social_connection_trend was lifted into cohesive
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)

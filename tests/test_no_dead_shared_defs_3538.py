@@ -115,6 +115,25 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "is misplaced (it belongs on the test side, where it would not ride ~104 bundles), "
         "not unused; moving it is a separate change with a real regression risk."
     ),
+    "lambdas/common/subscriber_cadence.py:delivery_weekdays": (
+        "the DERIVATION half of #3564's cadence contract, arriving with the merge of "
+        "origin/main. tests/test_subscriber_cadence_promise_3564.py"
+        "::test_promise_names_every_delivery_weekday_and_the_derived_count iterates it to "
+        "assert the rendered promise names every day a subscriber can actually hear from "
+        "the platform on — the exact disagreement #3564 was filed for. `promise_sentence` "
+        "IS live (email_subscriber_lambda, subscriber_onboarding_lambda, "
+        "qa_check_subscriber_promise); deleting the set the promise is checked AGAINST "
+        "would leave the promise asserted only against itself."
+    ),
+    "lambdas/common/subscriber_cadence.py:chronicle_weekday": (
+        "the second seat of a symmetric two-sender family — `signal_weekday()` (live: "
+        "email_subscriber_lambda + subscriber_onboarding_lambda both render 'see you "
+        "<day>' from it) and this, the chronicle's own cron day. Both are one line over "
+        "`required_weekday(sender(<id>).cron)`; keeping only the seat that happens to have "
+        "a caller today is the shrink-a-safety-set anti-pattern (#2610) that the "
+        "send_guard entry above records. Retiring a subscriber sender is an email-cadence "
+        "decision (#3564), not a dead-code sweep."
+    ),
     "lambdas/ai/prompt_cache.py:cached_prefix_blocks": (
         "same class as clears_floor: the byte-stable prefix assembler the #2888 tests "
         "drive directly. Its production callers are the ones #2888/#3085 are still "

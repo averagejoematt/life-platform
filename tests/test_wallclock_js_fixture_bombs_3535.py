@@ -506,20 +506,30 @@ def test_the_genesis_allowlist_has_no_dead_entries():
 
 def test_the_genesis_scan_fires_on_a_synthetic_retype(tmp_path):
     """Mutation proof, and the discrimination that makes the rule fact-keyed
-    rather than value-keyed."""
+    rather than value-keyed.
+
+    The synthetic bombs below inject ``_LIVE_GENESIS`` rather than a typed date —
+    the same discipline the rule enforces. Typed, they were themselves a retype of
+    the anchor: written against 2026-09-05, they stopped being bombs the moment the
+    cycle-17 reset moved the anchor to 2026-09-06, and this mutation proof went
+    green-by-vacuity (a scan that matches nothing) on the very reset it exists to
+    survive. That is #1908's shape inside the guard against it.
+    """
     (tmp_path / "js").mkdir()
     (tmp_path / "test_injected_genesis.py").write_text(
-        'from common.constants import EXPERIMENT_START_DATE\n\n\ndef test_x():\n    assert EXPERIMENT_START_DATE == "2026-09-05"\n'
+        f'from common.constants import EXPERIMENT_START_DATE\n\n\ndef test_x():\n    assert EXPERIMENT_START_DATE == "{_LIVE_GENESIS}"\n'
     )
     assert "test_injected_genesis.py" in _scan_handtyped_genesis(tmp_path)
 
-    (tmp_path / "js" / "injected.test.mjs").write_text('assert.equal(GENESIS_ISO, "2026-09-05");\n')
+    (tmp_path / "js" / "injected.test.mjs").write_text(f'assert.equal(GENESIS_ISO, "{_LIVE_GENESIS}");\n')
     assert "injected.test.mjs" in _scan_handtyped_genesis(tmp_path)
 
     # A date that merely HAPPENS to equal the anchor, asserted on a subject that
     # claims nothing about it, is not this class (tests/test_coaches_api.py's
     # fixture round-trip is the live specimen).
-    (tmp_path / "test_injected_coincidence.py").write_text('def test_y(by_text):\n    assert by_text["frozen"]["date"] == "2026-09-05"\n')
+    (tmp_path / "test_injected_coincidence.py").write_text(
+        f'def test_y(by_text):\n    assert by_text["frozen"]["date"] == "{_LIVE_GENESIS}"\n'
+    )
     assert "test_injected_coincidence.py" not in _scan_handtyped_genesis(tmp_path)
 
     # The prescribed fix — comparing against the imported constant — must pass.
