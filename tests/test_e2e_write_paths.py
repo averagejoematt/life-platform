@@ -655,7 +655,7 @@ def test_board_question_stored_pending_hashed_and_rate_limited(wp):
     status, body = wp.call("/api/board_question", body={"question": q, "email": SUB_EMAIL}, ip=IP_A)
     assert (status, body["success"]) == (200, True)
 
-    keys = [k for k in wp.s3.put_keys if k.startswith("generated/board_questions/")]
+    keys = [k for k in wp.s3.put_keys if k.startswith("reader_input/board_questions/")]
     assert len(keys) == 1
     stored = json.loads(wp.s3.objects[keys[0]])
     assert stored["status"] == "pending" and stored["question"] == q
@@ -674,7 +674,7 @@ def test_submit_finding_stored_content_stable_and_rate_limited(wp):
     status, first = wp.call("/api/submit_finding", body=body_payload, ip=IP_A)
     assert (status, first["success"]) == (200, True)
 
-    keys = [k for k in wp.s3.put_keys if k.startswith("generated/findings/")]
+    keys = [k for k in wp.s3.put_keys if k.startswith("reader_input/findings/")]
     assert len(keys) == 1
     stored = json.loads(wp.s3.objects[keys[0]])
     assert stored["status"] == "pending" and IP_A not in stored["ip_hash"]
@@ -683,7 +683,7 @@ def test_submit_finding_stored_content_stable_and_rate_limited(wp):
     # (content-stable id) — no duplicate pending finding to triage.
     status, second = wp.call("/api/submit_finding", body=body_payload, ip=IP_A)
     assert status == 200 and second["finding_id"] == first["finding_id"]
-    assert len({k for k in wp.s3.put_keys if k.startswith("generated/findings/")}) == 1
+    assert len({k for k in wp.s3.put_keys if k.startswith("reader_input/findings/")}) == 1
 
     # Real limiter: 3/h — third passes, fourth 429s.
     assert wp.call("/api/submit_finding", body=dict(body_payload, finding="e2e-test finding variant three here"), ip=IP_A)[0] == 200
@@ -881,5 +881,5 @@ def test_writes_stay_inside_sanctioned_partitions(wp):
     user_pks = {pk for pk in wp.table.written_pks if pk.startswith("USER#")}
     assert user_pks <= sanctioned_user_partitions, f"write path escaped into a data partition: {user_pks - sanctioned_user_partitions}"
 
-    # (c) S3 writes: only the two moderated capture prefixes.
-    assert all(k.startswith(("generated/findings/", "generated/board_questions/")) for k in wp.s3.put_keys), wp.s3.put_keys
+    # (c) S3 writes: only the two moderated capture prefixes (#3559: reader_input/, never the public generated/).
+    assert all(k.startswith(("reader_input/findings/", "reader_input/board_questions/")) for k in wp.s3.put_keys), wp.s3.put_keys

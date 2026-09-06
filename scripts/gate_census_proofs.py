@@ -585,6 +585,43 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    # #3518: the plan-figure grounding class. Family 2 by NAME (`*_gate.py`) and by the
+    # bool-verdict API the classifier saw (`plan_figure_findings` returns the findings the
+    # caller HOLDS on). Not a synthetic plant — the mutation IS the live R4 specimen the
+    # class exists to catch, and the widened-plan control is what turns the verdict OFF.
+    "guard::lambdas/ai/plan_facts_gate.py": {
+        "gate_name": "lambdas/ai/plan_facts_gate.py",
+        "command": (
+            "python3 -m pytest tests/test_plan_facts_gate_3518.py tests/test_grounding_corpus_3614.py -q   # 42 + 24 tests; "
+            "the specimen row is tests/grounding_corpus/2026-09-04-physical-8000-steps-shelf-protocol.json"
+        ),
+        "mutation": (
+            "The live 2026-09-04 physical position_summary, verbatim — 'Garmin step data isn't syncing to my dashboard "
+            "yet, which blocks meaningful tracking of his 8,000+ steps/day protocol' — graded against the plan block "
+            "derived from config/user_goals.json (daily_steps_range [6000, 7000]); then the same sentence pushed through "
+            "the REAL coach_state_updater._gate_derived_prose with the regen returning the same condensation; then the "
+            "control: the identical specimen against a plan whose range is widened to [6000, 9000]."
+        ),
+        "observed": (
+            "RED: plan_figure_findings returns one `plan_figure_contradiction` (quantity steps, claimed 8000.0, plan "
+            "[6000.0, 7000.0]); through _gate_derived_prose the derived set is HELD (derived_prose_held True, "
+            "public_summary None) after the one regen fails to remove it. GREEN: the '6,000-step floor' control and the "
+            "narrative's own 6,000-7,000 range return []; the widened plan returns [] for the specimen "
+            "(test_a_specimen_that_stops_failing_is_visible), so the verdict is the plan's, not the sentence's. "
+            "Both files pass on the merged tree: 42 passed + 24 passed."
+        ),
+        "scope": (
+            "FRAMING-SCOPED: only a figure with plan framing (protocol/floor/target/goal/minimum/prescribed/...) in its "
+            "own clause is graded, bound to the NEAREST number, so an observation ('walked 4,312 steps') is never a "
+            "finding here — the numbers class owns it. The derived-prose seam grades steps and calories ONLY "
+            "(DERIVED_PROSE_QUANTITIES): protein/fiber have a second configured source (the profile target the "
+            "AUTHORITATIVE FACTS block hands every coach) that seam does not hold; a caller passing `observed` grades "
+            "all four. DISARMED (returns [], one WARNING per container) when the plan cannot load from the repo file "
+            "or S3 — never a guess. Armed on one surface (coach_state_updater), not registered as a GATE_CLASSES "
+            "member in tests/grounding_wiring.py, so the other 31 surfaces are not covered by this verdict."
+        ),
+        "proved_on": "2026-09-06",
+    },
 }
 
 

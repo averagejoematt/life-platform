@@ -28,6 +28,37 @@ from typing import Any, Dict
 
 logger = logging.getLogger()
 
+# ── #3559: WHERE reader input lives ──────────────────────────────────────────
+# Both doors used to write under `generated/` — a prefix the bucket policy's
+# `PublicReadGenerated` statement grants anonymous `s3:GetObject` on (ADR-046: it is
+# the CloudFront-served output prefix). The records carry a reader's optional `email`
+# and an `ip_hash`, and the key was derivable from the public answers feed, so a
+# stranger's email was one URL away (SEC-1, 2026-09-05; the live objects were redacted
+# in place by the owner the same day). Reader input is not generated output and never
+# belonged there. `reader_input/` has no public-read statement, no CloudFront
+# behaviour, no lifecycle expiry (a moderation queue must not self-destruct — `uploads/`
+# expires at 30 days, which is why the issue's first suggestion was not taken) and is
+# not in the `ProtectDataFromDeployScripts` Deny, so the owner can purge a moderated
+# record. `capture_key()` is the ONLY place a door's key is minted;
+# tests/test_reader_input_prefix_3559.py asserts every `put_capture_record` call site
+# goes through it and that the prefix is not anonymously readable.
+READER_INPUT_PREFIX = "reader_input/"
+CAPTURE_DOORS = {"submit_finding": "findings", "board_question": "board_questions"}
+# The pre-#3559 locations. Readers (the moderation script) still LIST them until the
+# owner moves the existing objects; nothing writes there any more.
+LEGACY_CAPTURE_PREFIXES = {door: f"generated/{leaf}/" for door, leaf in CAPTURE_DOORS.items()}
+
+
+def capture_prefix(door: str) -> str:
+    """`reader_input/<leaf>/` for one door — the listing prefix the moderator reads."""
+    return f"{READER_INPUT_PREFIX}{CAPTURE_DOORS[door]}/"
+
+
+def capture_key(door: str, record_id: str) -> str:
+    """The S3 key for one moderated reader record. Content-addressed, no clock (#3118)."""
+    return f"{capture_prefix(door)}{record_id}.json"
+
+
 # botocore surfaces the 412 as a ClientError with this code; the raw HTTP status
 # is checked too because the modelled name has varied across botocore releases.
 _PRECONDITION_CODES = {"PreconditionFailed", "ConditionalRequestConflict"}

@@ -275,10 +275,12 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
     # key and duplicated the pending finding; and the put was unconditional, so a
     # replay of an item Matthew had already moderated reset `status` to "pending".
     # The conditional write (and its fail-open fallback) lives in web/site_api_capture_store.py.
-    from web.site_api_capture_store import put_capture_record
+    from web.site_api_capture_store import capture_key, put_capture_record
 
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    s3_key = f"generated/findings/{finding_id}.json"
+    # #3559: minted by the capture store — never a literal prefix here (SEC-1: the old
+    # `generated/` key was anonymously readable and carried the reader's email).
+    s3_key = capture_key("submit_finding", finding_id)
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
         stored = put_capture_record(s3_client, S3_BUCKET, s3_key, record, json.dumps(record, indent=2), door="submit_finding")
@@ -663,10 +665,10 @@ def _handle_board_question(event: dict, *, _g) -> dict:
     # #3118: content hash alone (the `{YYYY-MM}_` prefix made a month-boundary retry
     # a duplicate) + a conditional put, so a replay can never overwrite a question
     # Matthew has already answered back to "pending". See _handle_submit_finding.
-    from web.site_api_capture_store import put_capture_record
+    from web.site_api_capture_store import capture_key, put_capture_record
 
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    s3_key = f"generated/board_questions/{qid}.json"
+    s3_key = capture_key("board_question", qid)  # #3559: see _handle_submit_finding
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
         stored = put_capture_record(s3_client, S3_BUCKET, s3_key, record, json.dumps(record, indent=2), door="board_question")
