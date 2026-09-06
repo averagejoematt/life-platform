@@ -1,0 +1,20 @@
+{
+  "id": "2026-09-04-nutrition-macrofactor-not-syncing-yet",
+  "issue": "#3516",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md AIQ-4",
+  "captured_at": "2026-09-04T17:04:56Z",
+  "surface": "/api/coach_analysis?domain=nutrition",
+  "verbatim": true,
+  "status": "open",
+  "closes_with": "#3516",
+  "gate": "composite",
+  "expect_type": null,
+  "specimen": "MacroFactor isn't syncing yet and needs to be running by tomorrow.",
+  "control": "MacroFactor lands about a day behind by design, so today's nutrition is not in yet.",
+  "inputs": {
+    "allowed": [],
+    "generation_date_iso": "2026-09-04",
+    "start_date_iso": "2026-09-04"
+  },
+  "why_open": "A lag-by-design source (stale_hours 96, ~24h behind) narrated as broken. Same class as the Garmin specimen; closes with #3516."
+}

@@ -218,6 +218,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
         "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
+        # #3559: AST sweep of lambdas/ — every reader-input capture door keys through
+        # web.site_api_capture_store.capture_key(), whose prefix is derived-not-public
+        # against deploy/bucket_policy.json. A door minting its own `generated/` key must
+        # red BEFORE merge: after it, the next reader's email is on a public prefix.
+        "test_reader_input_prefix_3559.py",
         # #3568: the sending-vocabulary census. Verdict is pure repo shape — a new
         # sender default or CDK EMAIL_SENDER on a domain SES has not verified must red
         # BEFORE the merge. Post-merge is too late by construction: the next deploy

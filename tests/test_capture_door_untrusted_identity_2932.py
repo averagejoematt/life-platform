@@ -118,7 +118,7 @@ def test_two_identityless_readers_same_finding_both_stored(wp):
     s2, b2 = _identityless(wp, "/api/submit_finding", FINDING, "198.51.100.2")
     assert (s1, s2) == (200, 200)
 
-    keys = [k for k in wp.s3.put_keys if k.startswith("generated/findings/")]
+    keys = [k for k in wp.s3.put_keys if k.startswith("reader_input/findings/")]
     assert len(set(keys)) == 2, f"two readers' identical findings landed on {len(set(keys))} S3 object(s) — the second was overwritten"
     assert b1["finding_id"] != b2["finding_id"]
     # The stored records still carry the honest fail-closed rate identity.
@@ -132,7 +132,7 @@ def test_two_identityless_readers_same_board_question_both_stored(wp):
     s2, b2 = _identityless(wp, "/api/board_question", QUESTION, "198.51.100.2")
     assert (s1, s2) == (200, 200)
 
-    keys = [k for k in wp.s3.put_keys if k.startswith("generated/board_questions/")]
+    keys = [k for k in wp.s3.put_keys if k.startswith("reader_input/board_questions/")]
     assert len(set(keys)) == 2, f"two readers' identical questions landed on {len(set(keys))} S3 object(s) — the second was overwritten"
     assert b1["id"] != b2["id"]
 

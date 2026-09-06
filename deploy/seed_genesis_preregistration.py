@@ -425,13 +425,11 @@ def plan_facts(goals):
     2026-09-05 freeze mentioned no protein figure and redded main under that
     phrase match. Only freezes made after this landed carry the block; a sealed
     artifact is never edited to add it (#1378)."""
-    n = goals["targets"]["nutrition"]
-    return {
-        "source": "config/user_goals.json",
-        "daily_calories_target": int(n["daily_calories_target"]),
-        "daily_protein_min_g": int(n["daily_protein_min_g"]),
-        "eating_window": n.get("eating_window", {}).get("window"),
-    }
+    # #3518: ONE derivation, shared with the runtime plan-figure gate
+    # (lambdas/ai/plan_facts_gate.py) so the freeze and the gate cannot disagree.
+    from experiment.plan_facts import plan_facts_from_goals
+
+    return plan_facts_from_goals(goals)
 
 
 def freeze(coaches_out, hypotheses, goals=None):
