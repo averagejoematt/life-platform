@@ -47,8 +47,22 @@ export async function renderPostmortems(d) {
 
 // The Survival Curve — engagement strips per cycle + loudly-caveated odds.
 export function renderSurvival(d) {
+  // #3549: null odds are the honest state until a prior cycle has been observed
+  // at the horizon — render the counts that explain the dash, never "—%".
+  const oddsFig = d.p_reach_30_pct != null
+    ? fig(
+        `${fmt(d.p_reach_30_pct)}%`,
+        `odds of reaching day ${fmt(d.horizon_days)} · ${fmt(d.reached_horizon_n)} of ${fmt(d.n_prior_cycles)} prior cycles reached it`,
+        Array.isArray(d.p_reach_30_ci95_pct) ? `95% CI ${fmt(d.p_reach_30_ci95_pct[0])}–${fmt(d.p_reach_30_ci95_pct[1])}%` : null,
+      )
+    : fig(
+        "—",
+        d.n_prior_cycles != null
+          ? `odds of reaching day ${fmt(d.horizon_days)} · none of ${fmt(d.n_prior_cycles)} prior cycles reached it — no odds served`
+          : `odds of reaching day ${fmt(d.horizon_days)}`,
+      );
   const head = figs([
-    fig(`${fmt(d.p_reach_30_pct)}%`, `odds of reaching day ${fmt(d.horizon_days)}`),
+    oddsFig,
     fig(fmt(d.current_silent_days), "silent days right now"),
   ]);
   const rows = (d.cycles || []).map((c) => {
@@ -367,13 +381,39 @@ if (typeof document !== "undefined") {
 // "THIS SEASON · CYCLE 14" adjacent to the CAREER count and read one claim: 26
 // graded forecasts inside a 5-day cycle. Every number was true; only the frame
 // travelled badly. A stat that can span a reset now says which side it is on.
+// #3550: a pooled card must show the strata it was pooled from. The platform card
+// is scored against a STRATIFIED base rate (calibration_core.score_strata) so it can
+// never read skilled / well-calibrated while every stratum is unskilled — and this
+// line puts each stratum's own n, skill and gap beside the pooled figures so the
+// reader can see which stratum drove the verdict (the 2026-09-05 card hid a 27-point
+// coach over-confidence under 137 well-behaved interval forecasts).
+const _STRATUM_LABEL = { coaches: "coach calls", hypotheses: "hypothesis bets", interval_forecasts: "interval forecasts" };
+function _strataLine(s) {
+  const strata = s && s.strata;
+  if (!strata || typeof strata !== "object") return "";
+  const parts = Object.entries(strata).map(([k, v]) => {
+    const name = _STRATUM_LABEL[k] || String(k).replace(/_/g, " ");
+    if (!(v && v.n > 0)) return `${esc(name)} n=0`;
+    const skill = v.brier_skill != null ? `skill ${fmt(v.brier_skill, 2)}` : "skill undefined";
+    const gap = v.reliability_gap != null ? ` · gap ${v.reliability_gap > 0 ? "+" : ""}${fmt(v.reliability_gap, 2)}` : "";
+    const verdict = v.calibration && v.calibration !== "insufficient_data" ? ` (${esc(ttl(String(v.calibration).replace(/_/g, " ")))})` : "";
+    return `${esc(name)} n=${esc(String(v.n))} · ${skill}${gap}${verdict}`;
+  });
+  const driver = s.worst_stratum_gap && s.worst_stratum_gap.stratum
+    ? ` Verdict driven by the worst stratum's gap: ${esc(_STRATUM_LABEL[s.worst_stratum_gap.stratum] || s.worst_stratum_gap.stratum)}.`
+    : "";
+  return `<p class="cs-fresh cs-strata">By stratum, each against its own base rate — ${parts.join(" · ")}.${driver}</p>`;
+}
+
 function _calStatFigs(s, scope) {
   const cal = String(s.calibration || "").replace(/_/g, " ");
   const nLabel = scope ? `graded forecasts · ${scope}` : "graded forecasts";
+  const skillLabel = s.skill_reference === "stratified" ? "skill vs stratified base-rate" : "skill vs base-rate";
+  const skillMethod = s.skill_reference === "stratified" ? "calibration_score_strata" : "brier_skill_score";
   return figs([
-    fig(s.n, nLabel, null, "calibration_score_pairs"),
+    fig(s.n, nLabel, null, s.skill_reference === "stratified" ? "calibration_score_strata" : "calibration_score_pairs"),
     s.brier != null && fig(fmt(s.brier), "Brier", null, "brier_score"),
-    s.brier_skill != null && fig(fmt(s.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
+    s.brier_skill != null && fig(fmt(s.brier_skill), skillLabel, null, skillMethod),
     // #3450, ADR-105: a bare hit rate off a small n reads as more precise than it
     // is — the 95% Wilson interval rides along as the figure's delta line.
     s.accuracy_pct != null &&
@@ -388,7 +428,7 @@ function _calStatFigs(s, scope) {
     s.calibration === "not_yet_skillful"
       ? fig("Not Yet Skillful", `n=${s.n}, skill ≤ base rate`, null, "brier_skill_score")
       : s.calibration && s.calibration !== "insufficient_data" && fig(ttl(cal), "calibration", null, "calibration_verdict"),
-  ]);
+  ]) + _strataLine(s);
 }
 
 // Predictions — the coaches' forward calls, scored against measured outcomes.

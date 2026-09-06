@@ -20,6 +20,7 @@ from stacks.role_policies_base import (
     KMS_KEY_ARN,
     REGION,
     SES_IDENTITY,
+    SES_SITE_IDENTITY,
     TABLE_ARN,
     _bedrock_statement,
     _s3,
@@ -627,7 +628,12 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
             sid="DynamoDB", actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"], resources=[TABLE_ARN]
         ),
         iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
-        iam.PolicyStatement(sid="SES", actions=["ses:SendEmail", "ses:SendRawEmail"], resources=[SES_IDENTITY]),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "ses:SendRawEmail"],
+            # #3568: + the site identity — onboarding is reader mail.
+            resources=[SES_IDENTITY, SES_SITE_IDENTITY],
+        ),
         iam.PolicyStatement(
             sid="SecretsRead",
             actions=["secretsmanager:GetSecretValue"],

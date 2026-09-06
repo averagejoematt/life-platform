@@ -223,6 +223,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # against deploy/bucket_policy.json. A door minting its own `generated/` key must
         # red BEFORE merge: after it, the next reader's email is on a public prefix.
         "test_reader_input_prefix_3559.py",
+        # #3568: the sending-vocabulary census. Verdict is pure repo shape — a new
+        # sender default or CDK EMAIL_SENDER on a domain SES has not verified must red
+        # BEFORE the merge. Post-merge is too late by construction: the next deploy
+        # puts a MessageRejected (or, for reader mail, a personal-domain From) in front
+        # of subscribers.
+        "test_email_sender_identity_3568.py",
         # #3538: AST + string-literal sweep of lambdas/common + lambdas/ai. Verdict is
         # pure repo shape — a public def landing in the every-bundle packages with no
         # caller must red BEFORE the merge, because after it the dead code is already
@@ -233,6 +239,30 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # and a guard placed in the wrong lane must red on the PR that placed it there.
         # Post-merge-only is the exact defect this registry was filed about.
         "test_derived_artifact_registry_2986.py",
+        # ── #3529: the reset's own artifact readers ────────────────────────────
+        # These read `deploy/generated/**` (the frozen pre-registration, its SHA-256 stamp,
+        # the channel-divergence prereg) or the deploy scripts that write it. A reset — or
+        # a PR that lands a regenerated artifact — stales them by construction, and until
+        # #3529 they ran in NEITHER the reset's own gate sweep NOR the pre-merge lane: 13
+        # tests red on main 2026-08-31, then `test_sealed_prereg_agrees_with_the_plan_root`
+        # on 5 consecutive runs 2026-09-04.
+        #
+        # THE LIST IS NOT THE SOURCE OF TRUTH — `deploy/restart_verify_gates.reset_artifact_test_files()`
+        # is, and `tests/test_restart_verify_gates_3477.py::test_every_derived_artifact_reader_is_in_the_premerge_lane`
+        # fails if the derivation grows past what is written here. Add the new name in the
+        # same PR that adds the test.
+        "test_channel_divergence_prereg_1844.py",
+        "test_genesis_preregistration.py",
+        "test_plan_literal_reconciliation.py",
+        "test_prereg_hash_stamp.py",
+        "test_qa_smoke_phase_stamp_coverage_1970.py",
+        # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this
+        # branch derived its list, and `reset_artifact_test_files()` picked it up on the
+        # merge — which is the whole point of deriving rather than hand-listing. It reads
+        # `deploy/generated/**` through the reset writers it contracts.
+        "test_reset_writer_contract_3598.py",
+        "test_restart_verify_gates_3477.py",
+        "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
         # constructed outside create_platform_lambda(), or landing with no deploy
         # registration and no alarm story, must red BEFORE the merge. Post-merge is
@@ -532,6 +562,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_smoke_structural.py",
         "test_stance_behavioral_gate_2195.py",
         "test_traffic_green_report.py",
+        # #3567: imports tests/qa_manifest.py to derive the sitemap's own registry-vs-
+        # disk consistency (registry membership, live noindex, self-matching canonical)
+        # — same shape as the 20 files above, joined by the same import-detection rule.
+        "test_v4_build_sitemap_3567.py",
         "test_visual_ai_qa.py",
         "test_visual_qa_units.py",
         "test_webkit_weekly_qa.py",

@@ -30,6 +30,13 @@ test("the shipped module scores every core vector exactly as the platform grader
   }
 });
 
+test("the shipped module scores every strata vector exactly as the platform grader does (#3550)", () => {
+  for (const c of VECTORS.strata_cases) {
+    assert.deepStrictEqual(cc.scoreStrata(c.strata, c.n_bins), c.expected, `strata case: ${c.id} — ${c.description}`);
+  }
+  assert.ok(VECTORS.strata_cases.length > 0, "the strata fixture must not be empty");
+});
+
 test("confidence normalisation matches the platform grader on every vector", () => {
   for (const c of VECTORS.confidence_cases) {
     assert.deepStrictEqual(cc.normalizeConfidence(c.input), c.expected, `confidence: ${JSON.stringify(c.input)}`);

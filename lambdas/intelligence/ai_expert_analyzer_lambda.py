@@ -46,6 +46,8 @@ from typing import TYPE_CHECKING, Any
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from intelligence import analyzer_grounding as _ag  # #3517/#3516: the shared phase frame + the registry source facet
+
 # #1993: labs fact extraction against the real draw-record schema (SCHEMA.md).
 from intelligence.labs_facts import build_labs_fact_block
 
@@ -258,7 +260,7 @@ def gather_data_for_expert(expert_key):
     today = pacific_today()
     # Clamp lookback to experiment start — data before April 1 is pre-experiment
     d30 = max((pacific_now() - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    days_in_experiment = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+    _frame = _ag.experiment_frame(today_iso=today)  # #3517: NO clamp to 1 before genesis
 
     if expert_key == "mind":
         # Journal analysis + mood + vice streaks
@@ -283,7 +285,7 @@ def gather_data_for_expert(expert_key):
         _j_since, _j_14 = _recency_stats(_item_dates(ja_items), today)
         return {
             "expert_key": "mind",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             "journal_entry_count": len(ja_items),
             "days_since_last_journal": _j_since,
             "journal_entries_last_14d": _j_14,
@@ -302,10 +304,10 @@ def gather_data_for_expert(expert_key):
         if not items:
             return {  # #2756: an empty window hands the model the TRUE absence span, never a vacuum
                 "expert_key": "nutrition",
-                "period": f"experiment days 1-{days_in_experiment}",
+                "period": _frame.period,
                 "food_logs_last_14d": 0,
                 "recency_note": _recency_note,
-                **nutrition_absence_facts(_latest_item("macrofactor"), days_in_experiment, EXPERIMENT_START),
+                **nutrition_absence_facts(_latest_item("macrofactor"), _frame.days_in, EXPERIMENT_START),
             }
         # ADR-104 (#2221): `is not None`, not truthiness — a row that EXISTS with no macro fields is absence (a null
         # average, never "0 kcal across N tracked days"); a logged 0 (the fast `zero_calorie_days` counts) stays in.
@@ -325,7 +327,7 @@ def gather_data_for_expert(expert_key):
         _f_since, _f_14 = _recency_stats(_item_dates(items), today)
         return {
             "expert_key": "nutrition",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             "days_since_last_food_log": _f_since,
             "food_logs_last_14d": _f_14,
             "avg_calories": avg_cal,
@@ -367,7 +369,7 @@ def gather_data_for_expert(expert_key):
             step_source = "apple_health"
         avg_steps = round(sum(step_vals) / len(step_vals)) if step_vals else 0
         # Step completeness = days with a usable step value / experiment days (DI-1.4 flag).
-        step_completeness_pct = round(len(step_vals) / max(1, days_in_experiment) * 100)
+        step_completeness_pct = round(len(step_vals) / max(1, _frame.days_in) * 100)
 
         # Hevy (lifting) — primary training-stimulus signal.
         hevy_dates = set(str(h.get("sk", ""))[5:15] for h in hevy_items if str(h.get("sk", "")).startswith("DATE#"))
@@ -390,7 +392,7 @@ def gather_data_for_expert(expert_key):
 
         # A training day = a day with ANY logged workout (Hevy OR Strava).
         training_dates = hevy_dates | strava_dates
-        rest_days = max(0, days_in_experiment - len(training_dates))
+        rest_days = max(0, _frame.days_in - len(training_dates))
 
         # Movement-source state for the honesty guard (DI-1.1 source-state resolver):
         # live / paused / rate_limited / stale. Freshness wins for 'live' — so when Strava
@@ -413,7 +415,7 @@ def gather_data_for_expert(expert_key):
         _, _sessions_14 = _recency_stats(training_dates, today)
         return {
             "expert_key": "training",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             "training_days": len(training_dates),
             "days_since_last_lift": _lift_since,
             "sessions_last_14d": _sessions_14,
@@ -430,6 +432,7 @@ def gather_data_for_expert(expert_key):
             "rest_days": rest_days,
             "modality_breakdown": modalities,
             "movement_source_state": source_state,
+            "movement_source_reason": _ag.movement_source_reasons(source_state),  # #3516
             "movement_ingest_health": movement_ingest_health,
             "hevy_summary": hevy_summary,
         }
@@ -442,7 +445,7 @@ def gather_data_for_expert(expert_key):
 
         data = {
             "expert_key": "physical",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             # #1894: each weight fact carries its own reading date + staleness, so a
             # stale weigh-in can't be narrated as today's. See intelligence/weight_recency.
             **weight_recency.summarize_weight_readings(weight_items, today),
@@ -485,7 +488,7 @@ def gather_data_for_expert(expert_key):
 
         return {
             "expert_key": "explorer",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             "significant_correlations": len(sig_pairs),
             "top_pairs": sig_pairs[:5] if sig_pairs else [],
             "active_experiments": len(active_exps),
@@ -507,7 +510,7 @@ def gather_data_for_expert(expert_key):
         total_readings = sum(int(float(i.get("blood_glucose_readings_count", 0))) for i in glucose_days)
         return {
             "expert_key": "glucose",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             "total_readings": total_readings,
             "days_with_data": len(glucose_days),
             "avg_glucose_mg_dl": avg_glucose,
@@ -538,7 +541,7 @@ def gather_data_for_expert(expert_key):
         avg = lambda lst: round(sum(lst) / len(lst), 1) if lst else None
         return {
             "expert_key": "sleep",
-            "period": f"experiment days 1-{days_in_experiment}",
+            "period": _frame.period,
             "nights_tracked": len(whoop_items),
             "avg_sleep_hours": avg(sleep_hours),
             "avg_sleep_score": avg(score_vals),
@@ -554,9 +557,7 @@ def gather_data_for_expert(expert_key):
 
 def build_prompt(expert_key, data, days_in_experiment=None, week_number=None):
     p = EXPERT_PERSONAS[expert_key]
-    if days_in_experiment is None:
-        days_in_experiment = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
-    week_num = week_number or max(1, days_in_experiment // 7 + 1)
+    _frame = _ag.experiment_frame(days_in_experiment, week_number, pacific_today())  # #3517: pre-start is DERIVED, never overridable
 
     prior_summary = data.pop("_prior_analysis_summary", "")
     prior_recommendation = data.pop("_prior_recommendation", "")
@@ -572,7 +573,7 @@ def build_prompt(expert_key, data, days_in_experiment=None, week_number=None):
         "Focus on whether Matthew's current trajectory is sustainable for 3 more months.",
         "Focus on what a clinician would flag if this were a patient chart review.",
     ]
-    lens = lenses[(week_num - 1) % len(lenses)]
+    lens = lenses[(max(1, _frame.week_num) - 1) % len(lenses)]
 
     prior_block = ""
     if prior_summary:
@@ -734,7 +735,7 @@ Your analytical focus: {p['focus']}.
 {preamble_block}
 
 You are writing your weekly analysis for Matthew's public health experiment (averagejoematt.com).
-This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment}).
+{_frame.phase_block}
 Your analysis is the CENTERPIECE of the observatory page — it appears at position 2,
 immediately after the key metrics. Returning readers come back specifically to read
 what you have to say this week. This is a weekly appointment, not a generic report.
@@ -1111,9 +1112,8 @@ def generate_and_cache(expert_key, shared_system=None):
     if prior_recommendation:
         data["_prior_recommendation"] = prior_recommendation
 
-    days_in = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
-    week_number = max(1, days_in // 7 + 1)
-    prompt = build_prompt(expert_key, data, days_in, week_number)
+    _gframe = _ag.experiment_frame(today_iso=pacific_today())  # #3517: one derivation, no clamp before genesis
+    prompt = build_prompt(expert_key, data, _gframe.days_in, _gframe.week_num)
     api_key = _get_api_key()
 
     # COST-OPT: Use system message with prompt caching for shared context
@@ -1209,8 +1209,8 @@ def generate_and_cache(expert_key, shared_system=None):
         "analysis": analysis_text,
         "generated_at": now.isoformat(),
         "data_snapshot": json.dumps(data, default=str)[:5000],
-        "week_number": week_number,
-        "days_in_experiment": days_in,
+        "week_number": _gframe.week_num,
+        "days_in_experiment": _gframe.days_in,
         "ttl": ttl,
     }
     if key_recommendation:

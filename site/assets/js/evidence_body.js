@@ -358,16 +358,36 @@ export function _physDexaAgeDays(scanDate) {
   const today = new Date(); return Math.round((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - t) / 86400000);
 }
 
-export function physicalDexaBaseline(d) {
+export function physicalDexaBaseline(d, journey) {
   const x = d.latest_dexa; if (!x) return "";
   const bc = x.body_composition || {};
   const lean = Number(bc.lean_mass_lb), fat = Number(bc.fat_mass_lb);
   if (!Number.isFinite(lean) || !Number.isFinite(fat)) return "";
   const age = _physDexaAgeDays(x.scan_date);
   const bfp = bc.body_fat_pct != null ? `${fmt(bc.body_fat_pct, 1)}% body fat` : "";
-  const bar = stackedBar([{ label: "lean mass", value: lean, tone: "ember" }, { label: "fat mass", value: fat, tone: "ink" }], { label: `Lean vs fat · ${esc(x.scan_date)}`, unit: " lb" });
+  // #3558: ONE body-fat percentage, not two that disagree. stackedBar's own legend
+  // % is fat/(sum of the segments passed in) — passing only {lean, fat} makes that
+  // denominator soft tissue only, a DIFFERENT number than body_fat_pct (of
+  // total_mass_lb, which also includes bone + residual). Two fixes at once: (a)
+  // add the remainder as a third, muted "bone/other" segment so the BAR's own
+  // proportions read against the true total, and (b) showPct:false so the only
+  // printed body-fat percentage is the caption's real body_fat_pct — never a
+  // second, bar-derived one that can round to a different figure.
+  const total = Number(bc.total_mass_lb);
+  const other = Number.isFinite(total) ? total - lean - fat : NaN;
+  const segs = [{ label: "lean mass", value: lean, tone: "ember" }, { label: "fat mass", value: fat, tone: "ink" }];
+  if (Number.isFinite(other) && other > 0) segs.push({ label: "bone/other", value: other, tone: "faint" });
+  const bar = stackedBar(segs, { label: `Lean vs fat · ${esc(x.scan_date)}`, unit: " lb", showPct: false });
+  // #3526: pre-start, "this is where the cut started ... shows where it is now" is
+  // a temporal premise the scan can't back — nothing has started yet. Branch on the
+  // SAME /api/journey.pre_start the other doors' banners use (v4_proof.py's home
+  // banner, coaching's pre-start read) rather than a static, dateless claim.
+  const preStart = !!(journey && journey.pre_start);
+  const cutClause = preStart && journey.start_date
+    ? `This is the pre-cut baseline — the cut starts ${esc(_physShortDate(journey.start_date))}.`
+    : `This is where the cut <em>started</em>; the weight cockpit above shows where it is now.`;
   return sec("DEXA baseline — lean vs fat (one scan, dated)",
-    bar + `<p class="rd-meta label"><strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. This is where the cut <em>started</em>; the weight cockpit above shows where it is now. Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
+    bar + `<p class="rd-meta label"><strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. ${cutClause} Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
 }
 
 // P1.3 — visceral fat callout (dated). The fat around the organs — a better predictor of
@@ -380,16 +400,31 @@ export function physicalVisceralCallout(d) {
   const vlb = Number(bc.visceral_fat_lb), vg = Number(bc.visceral_fat_g);
   if (!Number.isFinite(vlb) && !Number.isFinite(vg)) return "";
   const lb = Number.isFinite(vlb) ? vlb : vg / 453.592;
-  const maxS = 3; // lb full-scale
-  const pos = Math.max(0, Math.min(100, (lb / maxS) * 100));
+  const maxS = 3; // lb full-scale — the drawn zone widths (vf-z1/2/3, CSS) are fixed
+  // thirds tied to the REAL 1 lb / 2 lb band boundaries, so maxS can't just grow to
+  // fit a bigger datum without also misdrawing where "moderate" ends and "elevated"
+  // starts. #3558 (DV-7): the only scan on record already exceeds this scale, which
+  // clamped the marker to the right edge (100%) while the aria-label kept asserting
+  // "0–3 lb" as if the datum were on it. Clamp the MARKER short of the edge and say
+  // so explicitly — never silently misplace it at the boundary as if it fit.
+  const offScale = lb > maxS;
+  // Clamp the visual marker to 97% max regardless — never flush against the
+  // gauge's right edge (the boundary case lb === maxS is still "on scale" for
+  // the text/aria below, but a marker rendered at the literal 100% edge reads
+  // identically to one that's actually off it, and the track's overflow:hidden
+  // can clip a translateX(-50%)-centred dot sitting exactly at 100%).
+  const pos = Math.max(0, Math.min(97, (lb / maxS) * 100));
   const band = lb < 1 ? "low" : lb < 2 ? "moderate" : "elevated";
   const age = _physDexaAgeDays(x.scan_date);
   const fig6 = `${fmt(Math.round(lb * 100) / 100)} lb${Number.isFinite(vg) ? ` · ${fmt(Math.round(vg))} g` : ""}`;
+  const scaleAria = offScale
+    ? `Visceral fat ${esc(fig6)} — ${band} band, off the right edge of the drawn 0–${maxS} lb scale`
+    : `Visceral fat ${esc(fig6)} — ${band} band on a directional 0–${maxS} lb scale`;
   return sec("Visceral fat — the number under the number",
     `<div class="vf-wrap"><div class="vf-fig"><span class="vf-v mono">${esc(fig6)}</span><span class="vf-band label vf-${band}">${esc(band)}</span></div>` +
-    `<div class="vf-gauge" role="img" aria-label="Visceral fat ${esc(fig6)} — ${band} band on a directional 0–3 lb scale"><span class="vf-zone vf-z1"></span><span class="vf-zone vf-z2"></span><span class="vf-zone vf-z3"></span><span class="vf-mark" style="left:${pos.toFixed(1)}%"></span></div>` +
-    `<div class="vf-scale label"><span>0</span><span>low · moderate · elevated</span><span>${maxS} lb</span></div></div>` +
-    `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early. Dated <strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
+    `<div class="vf-gauge" role="img" aria-label="${scaleAria}"><span class="vf-zone vf-z1"></span><span class="vf-zone vf-z2"></span><span class="vf-zone vf-z3"></span><span class="vf-mark${offScale ? " vf-mark-offscale" : ""}" style="left:${pos.toFixed(1)}%"></span></div>` +
+    `<div class="vf-scale label"><span>0</span><span>low · moderate · elevated</span><span>${maxS}${offScale ? "+" : ""} lb</span></div></div>` +
+    `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early.${offScale ? ` This reading is past the drawn scale's ${maxS} lb edge — still elevated, just off the chart.` : ""} Dated <strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
 }
 
 // P1.4 — lean / ALMI longevity context, demoted. Appendicular lean mass index is the
@@ -554,7 +589,7 @@ export async function renderPhysical(d) {
     "The slow measurements, grouped and dated — they move on scans and blood draws, not mornings. Read them as chapters, not a feed.",
     [cad.dexa, cad.phenoage, cad.tape]));
   parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
-  parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
+  parts.push(physicalDexaBaseline(d, j)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
   parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
   parts.push(physicalLeanLongevity(d)); // P1.4 — lean/ALMI longevity context (dated, demoted)
   parts.push(physicalPhenoAge(pa)); // P1.5 — transparent PhenoAge (Option A: no chronological/gap)

@@ -563,6 +563,28 @@ REGISTRY = {
         "f1d7ff696095",
         used_by="/api/calibration, /api/coach_team's per-coach calibration line.",
     ),
+    "calibration_score_strata": _entry(
+        "calibration_score_strata",
+        "Pooled calibration card scored against a stratified base rate",
+        calibration_core.score_strata,
+        "Calibration",
+        "Pooled Brier over every stratum's pairs; reference Brier = Σ n_i · bs_ref_i / Σ n_i where bs_ref_i "
+        "is stratum i's OWN base-rate Brier; skill = 1 − brier / reference. Over/under-confidence is tripped "
+        "by the worst stratum's n-weighted reliability gap (among strata with n ≥ 5), not the pooled gap",
+        "Every resolved pair on the platform, partitioned by stratum (coach calls · hypothesis bets · " "interval forecasts), to date.",
+        "Pooling strata with different base rates and scoring the pool against ONE pooled base rate can "
+        "manufacture a positive skill no stratum has (the pooled reference is worse than either stratum's "
+        "own, so knowing the stratum beats it) — the 2026-09-05 lifetime card read skilled / well-calibrated "
+        "while both strata were unskilled (#3550). Against the stratified reference, pooled skill > 0 is "
+        "impossible unless a stratum beats its own climatology; `skilled` is additionally forced False when "
+        "no stratum is skilled, and each stratum's own n / Brier / skill / gap is served on the card. Same "
+        "n ≥ 5 verdict floor and the same fixed ±0.15 gap trip as calibration_verdict (a documented ADR-105 "
+        "exception). A stratum with n < 2 or every outcome identical contributes no reference — unknown, "
+        "never counted as unskilled.",
+        "15c2ca104392",
+        min_n=5,
+        used_by="/api/calibration's platform + platform.lifetime cards; the State of Matthew calibration section.",
+    ),
     "directional_trend_verdict": _entry(
         "directional_trend_verdict",
         "Directional trend verdict (up / down / flat)",

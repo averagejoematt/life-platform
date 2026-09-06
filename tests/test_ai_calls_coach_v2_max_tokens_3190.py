@@ -1,6 +1,6 @@
 """tests/test_ai_calls_coach_v2_max_tokens_3190.py — #3190: pair-contract guard
 tying the coach-v2 generation prompt's word budget to the `max_tokens` cap at
-all five `_run_coach_v2_pipeline` call sites in `lambdas/ai/ai_calls.py`.
+every `_run_coach_v2_pipeline` call site in `lambdas/ai/ai_calls.py`.
 
 THE BUG THIS GUARDS AGAINST
 ----------------------------
@@ -44,21 +44,23 @@ places). So this test parses the REAL SOURCE of `_run_coach_v2_pipeline` in
 `lambdas/ai/ai_calls.py` — the file that actually ships — and asserts, from
 the source text itself:
 
-  1. There are exactly five `call_anthropic(..., system=system_prompt)` call
-     sites inside `_run_coach_v2_pipeline` (a count regression — someone
-     adding or removing a call site without noticing — is itself a finding).
-  2. Every one of those five sites carries the SAME `max_tokens=<N>` integer
-     literal — no site may drift from its siblings.
+  1. Every gate's regenerate arm routes through the ONE shared `_regen_fn`
+     closure, and NO inline `lambda …: call_anthropic(…)` survives inside
+     `_run_coach_v2_pipeline` (#3516 folded the five hand-copied argument lists
+     into one; an inline lambda is how a sixth arm would grow its own copy of
+     `max_tokens` again, which is precisely what the old count-of-five was for).
+  2. Every surviving `call_anthropic(..., system=system_prompt)` site carries
+     the SAME `max_tokens=<N>` integer literal — no site may drift.
   3. The prompt text (the same source slice) states a "do not exceed <W>
      words" ceiling — the pair's other half must exist at all.
   4. N >= W * TOKENS_PER_WORD_ESTIMATE (the pair-contract inequality) — if a
      future change raises the word budget without raising the token cap to
      match, or lowers the cap without lowering the word budget, this fails.
 
-Mutation-proof (reported in PR #3190's body): temporarily hand-editing ONE
-call site's `max_tokens=1000` down to a different literal (breaking check #2)
-reds this test; reverting turns it green again. Same for lowering the shared
-cap below the word-budget floor (breaking check #4).
+Mutation-proof (reported in PR #3190's body, re-run under the #3516 shape):
+handing one gate an inline `lambda _n: call_anthropic(..., max_tokens=600,
+system=system_prompt)` instead of `_regen_fn` reds THREE of these tests
+(checks #1, #2 and #4); reverting turns them green again.
 """
 
 import os
@@ -89,8 +91,8 @@ def _read_source():
 def _pipeline_body(source):
     """Slice out `_run_coach_v2_pipeline`'s full body: from its `def` line to
     the next top-level `def` (i.e. `call_sleep_coach_v2`, the first of the
-    thin per-domain wrappers). This is the ONE function all five coach-v2
-    generation call sites live in — sliced so the test only ever inspects the
+    thin per-domain wrappers). This is the ONE function every coach-v2
+    generation call site lives in — sliced so the test only ever inspects the
     real shipped source, never a hand-copied fixture that could drift from it.
     """
     m = _PIPELINE_START_RE.search(source)
@@ -118,24 +120,30 @@ def _call_site_windows(body):
     return windows
 
 
-def test_five_coach_v2_generation_call_sites_share_one_max_tokens():
-    """The five `call_anthropic(..., system=system_prompt)` sites in
-    `_run_coach_v2_pipeline` (initial generation, grounding correction, N-06
-    quality-gate regen, presence-ack regen, self-graded-verdict regen) must
-    all carry the identical `max_tokens` literal. A partial fix that raises
-    only the initial call — the #3190 acceptance bar states this explicitly —
-    leaves the regenerate arms truncating exactly when the ADR-108 quality
-    gate asks for a retry, which is the bug this issue fixes.
+def test_coach_v2_generation_call_sites_share_one_max_tokens():
+    """Every `call_anthropic(..., system=system_prompt)` site in `_run_coach_v2_pipeline`
+    must carry the identical `max_tokens` literal. A partial fix that raises only the
+    initial call — the #3190 acceptance bar states this explicitly — leaves the
+    regenerate arms truncating exactly when the ADR-108 quality gate asks for a retry,
+    which is the bug this issue fixes.
+
+    #3516 CHANGED THE SHAPE, AND THIS TEST WITH IT. There used to be FIVE sites (initial
+    generation + four gate regens), each with its own copy of the kwargs, and this test
+    counted them. The four regen arms now share ONE `_regen_fn` closure, so the
+    drift #3190 was filed for is prevented by construction rather than by five literals
+    agreeing. Counting five would now be counting the old shape, so the assertion moved
+    to the property: EVERY site that names `system_prompt` carries the same `max_tokens`,
+    and `test_every_regen_arm_routes_through_the_one_shared_callable` below is what stops
+    a sixth arm growing its own copy again — which is the thing the count was really for.
     """
     body = _pipeline_body(_read_source())
     windows = [w for w in _call_site_windows(body) if _SYSTEM_PROMPT_RE.search(w)]
 
-    assert len(windows) == 5, (
-        f"expected exactly 5 call_anthropic(..., system=system_prompt) sites in "
-        f"_run_coach_v2_pipeline, found {len(windows)} — a call site was added, "
-        f"removed, or no longer threads system_prompt; update this test's count "
-        f"deliberately if that's an intentional change, and audit whether the "
-        f"new/changed site(s) need the same max_tokens treatment"
+    assert len(windows) >= 2, (
+        f"expected at least 2 call_anthropic(..., system=system_prompt) sites in "
+        f"_run_coach_v2_pipeline (the base generation and the shared regen callable), "
+        f"found {len(windows)} — if the pipeline no longer threads system_prompt at all, "
+        f"the ADR-049 cached prefix has nothing to wrap"
     )
 
     max_tokens_values = []
@@ -145,10 +153,36 @@ def test_five_coach_v2_generation_call_sites_share_one_max_tokens():
         max_tokens_values.append(int(m.group(1)))
 
     assert len(set(max_tokens_values)) == 1, (
-        f"the five coach-v2 generation call sites have DRIFTED apart: {max_tokens_values} "
-        f"— all five must move together (this is exactly how #3190 was introduced: "
-        f"max_tokens=600 hardcoded independently at all five sites)"
+        f"the coach-v2 generation call sites have DRIFTED apart: {max_tokens_values} "
+        f"— all of them must move together (this is exactly how #3190 was introduced: "
+        f"max_tokens=600 hardcoded independently at every site)"
     )
+
+
+def test_every_regen_arm_routes_through_the_one_shared_callable():
+    """The structural half of #3190, and what #3516's fold has to earn.
+
+    Five hand-copied `lambda _note: call_anthropic(..., max_tokens=1000, system=…)`
+    arguments were five chances to drift; the fix is that every gate's `regenerate_fn`
+    is the SAME closure. This asserts that directly:
+
+      * the pipeline defines exactly one `_regen_fn`;
+      * no gate is handed an inline `lambda` that calls `call_anthropic` — that is the
+        shape a sixth arm would reintroduce, and it is what the old count-of-five was
+        really guarding;
+      * every gate arm that takes a regenerate callable names `_regen_fn`.
+    """
+    body = _pipeline_body(_read_source())
+
+    assert body.count("def _regen_fn(") == 1, "the pipeline must define exactly one shared corrective-regeneration callable"
+    inline = re.findall(r"lambda[^\n:]*:\s*call_anthropic\(", body)
+    assert (
+        not inline
+    ), f"{len(inline)} inline lambda(s) still call call_anthropic directly inside _run_coach_v2_pipeline — route them through _regen_fn (#3190/#3516)"
+    # The named arms, each proven present by name rather than by a count of copies.
+    for arm in ("_gg_mod.regen_once(", "_enforce_quality_gate(", "enforce_presence_acknowledgment(", "enforce_source_facet_attribution("):
+        assert arm in body, f"{arm} is no longer in the pipeline — this guard would be measuring nothing"
+    assert body.count("_regen_fn") >= 6, "every gate arm (+ the self-graded-verdict regen) must be handed the shared callable by name"
 
 
 def test_max_tokens_covers_the_prompts_own_word_budget():

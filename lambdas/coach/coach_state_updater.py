@@ -16,6 +16,7 @@ decision classes, anti-pattern violations), then writes results to DynamoDB:
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -119,10 +120,13 @@ def _parse_confidence(raw) -> float:
 # spec building, timeframe→window mapping, subdomain inference, and the record
 # builder that decides status/gradeable_by (qualitative → "observation", never
 # "pending"). Re-exported because the suite pins the spec builder off this module.
-from coach.prediction_emission import (  # noqa: E402
+from coach.metric_trailing_series import point_tolerance as _point_tolerance  # noqa: E402  (#3551: level-claim tolerance)
+from coach.prediction_emission import (  # noqa: E402,F401  (F401: _build_prediction_eval_spec/_prediction_window_days are the #3046 contract's re-exports; the loop routes through _resolve_eval_spec since #3551)
+    POINT_TYPE as _POINT_TYPE,  # #3551
     build_prediction_eval_spec as _build_prediction_eval_spec,
     build_prediction_record as _build_prediction_record,
     prediction_window_days as _prediction_window_days,
+    resolve_eval_spec as _resolve_eval_spec,  # #3551: shape-first routing (level → point, never directional)
 )
 
 # ── #813: write-time data-liveness gate ──────────────────────────────────────
@@ -200,6 +204,12 @@ def _metric_has_recent_data(metric_key, liveness_cache):
         alive = True
     liveness_cache[base] = alive
     return alive
+
+
+def _metric_point_tolerance(
+    metric_key, tolerance_cache
+):  # #3551: (tolerance, rule, n) from the metric's own trailing SD, or None → observation
+    return _point_tolerance(table, USER_ID, metric_key, tolerance_cache, _LIVENESS_LOOKBACK_DAYS)
 
 
 # Maximum opening history to keep in voice state
@@ -840,7 +850,6 @@ def _build_default_extraction(output_text):
 
 def _timeframe_to_window_days(timeframe_hint, default=7):
     """Map a natural timeframe hint to a revisit window in days (commitments, #532)."""
-    import re
 
     if not timeframe_hint:
         return default
@@ -866,7 +875,6 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
     kept/broken. Metric-less commitments stay pending until the coach asks directly.
     Returns (created_count, checkable_count).
     """
-    import re
 
     created = 0
     checkable = 0
@@ -879,7 +887,7 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
         direction = None
         action_check = None
         if metric:
-            direction = _infer_direction(c.get("direction"), text)
+            direction = _infer_direction(c.get("direction"), text, metric)  # #3551: metric name excluded
             if direction in ("up", "down"):
                 action_check = {"metric": metric, "direction": direction}
                 checkable += 1
@@ -1115,9 +1123,11 @@ def lambda_handler(event, context):
 
     # 6. Create formal PREDICTION# records (Phase 4B)
     predictions_made = extraction.get("predictions_made", [])
-    _gradable_n = 0  # SS-06: track directional (gradable) vs qualitative for the run metric
+    _gradable_n = 0  # SS-06: track directional/point (gradable) vs qualitative for the run metric
     _qualitative_n = 0
     _liveness_cache = {}  # #813: one data-liveness read per source per run
+    _tolerance_cache = {}  # #3551: one trailing-SD read per metric per run, for level claims only
+    _tolerance_for = lambda m: _metric_point_tolerance(m, _tolerance_cache)  # noqa: E731
     for pred in predictions_made:
         claim = pred.get("claim_natural", "")
         if not claim:
@@ -1147,13 +1157,13 @@ def lambda_handler(event, context):
                 coach_id,
             )
             metric_hint = ""
-        # C-3 gradability: resolve the expected direction so a metric-backed claim
-        # routes to the directional (EWMA) evaluator instead of a dead machine spec.
-        direction = _infer_direction(pred.get("direction"), claim) if metric_hint else None
-        window_days = _prediction_window_days(pred.get("timeframe_hint", ""))
-
-        eval_spec = _build_prediction_eval_spec(metric_hint, direction, window_days)
-        if eval_spec.get("type") == "directional":
+        # C-3 gradability + #3551 shape-first routing: a numeric LEVEL claim ("will be
+        # approximately 53.5%") becomes a `point` spec (tolerance = the metric's own trailing
+        # SD) — never a directional bet; everything else resolves a direction as before.
+        eval_spec, window_days, _shape = _resolve_eval_spec(claim, metric_hint, pred, generation_date, _tolerance_for, _infer_direction)
+        if _shape == "level" and eval_spec.get("type") != _POINT_TYPE:
+            logger.info("Level claim for %s: no derivable tolerance — emitted as observation (coach=%s)", metric_hint, coach_id)
+        if eval_spec.get("type") in ("directional", _POINT_TYPE):
             _gradable_n += 1
         else:
             _qualitative_n += 1

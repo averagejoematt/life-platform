@@ -85,8 +85,14 @@ SCHEDULED_WORKFLOW_FLOOR = 8
 #                  disappearance is a defect worth reporting? Box 5 of #3213: every
 #                  scheduled workflow gets an explicit ruling in one direction or the
 #                  other, and the ruling carries its argument.
-#   grace_hours  — float. Added to the DERIVED cadence to form the report deadline.
-#                  Only read when watched.
+#   grace_hours  — float. A FLOOR added to the DERIVED cadence to form the report
+#                  deadline (#3541 — was the sole source before this; a founding-week
+#                  snapshot breached the very next day). `scripts/check_cron_freshness.py`
+#                  re-derives a LIVE grace from the workflow's own trailing fire history
+#                  every run and takes whichever is larger; this literal only ever widens
+#                  the window if the live derivation withholds an opinion (a newborn cron
+#                  with too little history, or a failed Actions lookup). Only read when
+#                  watched.
 #   basis        — str. Where grace_hours came from. A number with no basis is the
 #                  thing ADR-105 exists to forbid.
 #   reason       — str. Why watched, or why deliberately not. Never blank.

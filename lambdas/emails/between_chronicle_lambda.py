@@ -35,6 +35,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
+from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 
 try:
     from common.platform_logger import get_logger
@@ -48,7 +49,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
-SENDER = os.environ.get("EMAIL_SENDER", "Elena Voss <elena@averagejoematt.com>")
+SENDER = os.environ.get("EMAIL_SENDER", CHRONICLE_SENDER)
 SEND_RATE_PER_SEC = float(os.environ.get("SEND_RATE_PER_SEC", "14.0"))
 DECIDED_WINDOW_DAYS = int(os.environ.get("DECIDED_WINDOW_DAYS", "10"))
 

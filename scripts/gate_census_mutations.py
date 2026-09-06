@@ -309,7 +309,22 @@ _PUBLIC_PREFIX_DOOR_PY = (
 )
 
 
+# Assembled: tests/test_email_sender_identity_3568.py AST-scans every module under
+# lambdas/ for an EMAIL_SENDER default and checks its domain against the committed
+# SES-verified set. A .invalid TLD can never be a real identity (RFC 2606).
+_UNVERIFIED_SENDER_PY = "# probe\n" "import os\n" "\n" 'SENDER = os.environ.get("EMAIL_SENDER", "reader@census-probe-3568.invalid")\n'
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_email_sender_identity_3568.py": MutationSpec(
+        gate_id="structural::test_email_sender_identity_3568.py",
+        target="tests/test_email_sender_identity_3568.py",
+        detects=(
+            "a sender default on a domain SES has not verified for sending — the shape that let "
+            "between_chronicle default to an identity that did not exist while every test stayed green (#3568)"
+        ),
+        plants=(("lambdas/common/_census_probe_3568.py", _UNVERIFIED_SENDER_PY),),
+        track=False,  # the guard rglobs lambdas/ on disk, not the git index
+    ),
     "structural::test_composite_alarm_lookup_3390.py": MutationSpec(
         gate_id="structural::test_composite_alarm_lookup_3390.py",
         target="tests/test_composite_alarm_lookup_3390.py",
@@ -545,6 +560,21 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_email_sender_identity_3568.py": _proof(
+        "structural::test_email_sender_identity_3568.py",
+        "baseline: 9 passed | mutated: 1 failed, 8 passed :: test_every_code_default_is_on_a_verified_domain | reverted: 9 passed",
+        "lambdas/ on disk (.rglob, .py only) for code defaults and cdk/stacks/*.py for CDK literals, so an "
+        "UNTRACKED sender is in scope and deploy/archive/ deliberately is not — its senders are dead code kept "
+        'for history. It reads the AST for two shapes: `os.environ.get("EMAIL_SENDER", <default>)` and a bare '
+        '`SENDER = "..."`; a module that builds its From address any other way (an f-string, a helper call, a '
+        "value read from SSM at runtime) is invisible to it — those are gaps, not passes. It judges the SOURCE "
+        "against a COMMITTED list of verified domains, never SES itself: whether an identity is still verified "
+        "in the account is a live fact no offline gate can assert, so the list is re-derived by the "
+        "list-email-identities command recorded in lambdas/common/email_identity.py. The reader-facing "
+        "assertions additionally pin the From to the site domain, which is the half that would still red if "
+        "every domain in the set were verified but reader mail drifted back to the personal one.",
+        proved_on="2026-09-06",
+    ),
     "structural::test_composite_alarm_lookup_3390.py": _proof(
         "structural::test_composite_alarm_lookup_3390.py",
         "baseline: 11 passed | mutated: 1 failed, 10 passed :: test_every_alarm_read_states_its_alarm_types | reverted: 11 passed",
