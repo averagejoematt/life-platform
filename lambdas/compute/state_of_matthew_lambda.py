@@ -217,7 +217,7 @@ def gather_coach_consensus_section(integrator_item: dict | None) -> dict | None:
 
 
 def gather_calibration_section(platform_summary: dict | None) -> dict | None:
-    """Shape the platform-wide calibration_core.score_pairs() summary. None when
+    """Shape the platform-wide calibration_core.score_strata() summary. None when
     nothing has resolved yet (n=0) — the documented post-reset empty state."""
     if not platform_summary or not platform_summary.get("n"):
         return None
@@ -689,11 +689,11 @@ def _fetch_hypothesis_calibration_pairs() -> list:
 def fetch_calibration_summary() -> dict:
     """Platform-wide (all coaches + the hypothesis ledger) — same shared scorer
     the public /api/calibration scoreboard uses (#538)."""
-    pairs = []
+    coach_pairs = []
     for cid in COACH_IDS:
-        pairs.extend(_fetch_coach_prediction_pairs(cid))
-    pairs.extend(_fetch_hypothesis_calibration_pairs())
-    return calibration_core.score_pairs(pairs)
+        coach_pairs.extend(_fetch_coach_prediction_pairs(cid))
+    # #3550: stratified, never one pooled pair list — see site_api_coach_ledger.
+    return calibration_core.score_strata({"coaches": coach_pairs, "hypotheses": _fetch_hypothesis_calibration_pairs()})
 
 
 def lambda_handler(event: dict, context) -> dict:

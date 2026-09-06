@@ -16,6 +16,8 @@ import from here. Pure (no boto3) — bundled with the lambdas/ asset, not the l
 
 from __future__ import annotations
 
+import re
+
 # Metric key → the DynamoDB source partition the evaluator reads it from.
 # Keep additions here; the allowlist + the suffix-aggregate logic follow automatically.
 # INVARIANT (#813): the key must be the EXACT attribute name on that source's DATE#
@@ -198,22 +200,66 @@ DIR_DOWN_WORDS = (
 )
 
 
-def infer_direction(extractor_direction, claim_natural):
+def _phrase_pattern(phrase):
+    """A word-boundary regex for one direction phrase that tolerates ordinary English
+    inflection — `improve` matches improve/improves/improved/improving and `drop`
+    matches drop/drops/dropped/dropping — but NEVER a different word that merely
+    starts with it: `recover` no longer matches `recovery` (#3551).
+
+    Each word: strip a trailing 'e', allow an optional doubled final consonant,
+    then an optional inflection suffix, then a word boundary."""
+    parts = []
+    for word in phrase.split():
+        stem = word[:-1] if word.endswith("e") else word
+        doubled = re.escape(stem[-1]) + "?" if stem and stem[-1].isalpha() and stem[-1] not in "aeiou" else ""
+        parts.append(rf"{re.escape(stem)}{doubled}(?:e|es|s|ed|d|ing)?")
+    return re.compile(r"\b" + r"\s+".join(parts) + r"\b")
+
+
+_DIR_UP_PATTERNS = tuple(_phrase_pattern(w) for w in DIR_UP_WORDS)
+_DIR_DOWN_PATTERNS = tuple(_phrase_pattern(w) for w in DIR_DOWN_WORDS)
+
+
+def _strip_metric_name(claim, metric_hint):
+    """Blank out the metric's own name from the claim so a direction word can never
+    be read off it: for `recovery_score` the tokens `recovery` / `score` and every
+    prose needle that normalizes to it (`recovery score`, `recovery`) are removed
+    at word boundaries. THE #3551 FEEDER: 'recover' in DIR_UP_WORDS substring-
+    matched the metric name 'recovery', so every recovery_score claim without a
+    down-word was emitted condition='up' regardless of its content."""
+    if not metric_hint:
+        return claim
+    names = {tok for tok in str(metric_hint).lower().split("_") if len(tok) >= 3}
+    names |= {needle for needle, target in _METRIC_HINT_NORMALIZERS if target == metric_hint}
+    out = claim
+    for name in sorted(names, key=len, reverse=True):
+        out = re.sub(r"\b" + re.escape(name) + r"\b", " ", out)
+    return out
+
+
+def infer_direction(extractor_direction, claim_natural, metric_hint=None):
     """Resolve a prediction's expected direction → 'up' | 'down' | None.
 
     Prefers the extractor's explicit `direction`; falls back to deterministic
     keyword inference from the claim text. Ambiguous (both directions present)
     or directionless claims return None — the caller keeps them qualitative
     rather than guessing (ADR-105: deterministic computation only).
+
+    #3551: keyword matching is word-boundary + inflection aware (never a bare
+    substring), and the metric's own name is excluded from the text first, so
+    'Recovery score will be approximately 53.5%' cannot receive 'up' from the
+    word 'recovery'. A numeric LEVEL claim is not a directional claim at all —
+    prediction_emission.classify_claim_shape routes those to a `point` spec
+    before this function is consulted.
     """
     d = (extractor_direction or "").strip().lower()
     if d in ("up", "rise", "increase", "higher"):
         return "up"
     if d in ("down", "fall", "decrease", "lower"):
         return "down"
-    c = (claim_natural or "").lower()
-    up = any(w in c for w in DIR_UP_WORDS)
-    down = any(w in c for w in DIR_DOWN_WORDS)
+    c = _strip_metric_name((claim_natural or "").lower(), metric_hint)
+    up = any(p.search(c) for p in _DIR_UP_PATTERNS)
+    down = any(p.search(c) for p in _DIR_DOWN_PATTERNS)
     if up and not down:
         return "up"
     if down and not up:

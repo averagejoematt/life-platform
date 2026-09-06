@@ -115,6 +115,35 @@ def test_extracted_package_matches_platform_record_extractors(case):
     _exact(platform, case["expected_pairs"], f"{case['id']} (committed vector)")
 
 
+@pytest.mark.parametrize("case", VECTORS["strata_cases"], ids=lambda c: c["id"])
+def test_extracted_package_matches_platform_score_strata(case):
+    """#3550: the pooled-card scorer is part of the three-way surface too."""
+    strata = {k: [tuple(p) for p in v] for k, v in case["strata"].items()}
+    _exact(oss_core.score_strata(strata, n_bins=case["n_bins"]), case["expected"], case["id"])
+    _exact(platform_core.score_strata(strata, n_bins=case["n_bins"]), case["expected"], case["id"])
+
+
+def test_a_pooled_card_never_claims_skill_or_reliability_no_stratum_has():
+    """#3550 — the invariant, in BOTH copies, on the live 2026-09-05 shape: coaches
+    at 0.5 stated / 22% observed beside interval forecasts at 0.8 / 79%. The
+    positive control is score_pairs itself: pooled against ONE base rate it reads
+    skilled=True / well-calibrated / reliable — the defect — so the fixture is
+    proven to reproduce it before the strata scorer is held to the invariant."""
+    coaches = [(0.5, 1)] * 8 + [(0.5, 0)] * 29
+    forecasts = [(0.8, 1)] * 108 + [(0.8, 0)] * 29
+    for core in (platform_core, oss_core):
+        pooled = core.score_pairs(coaches + forecasts)
+        assert pooled["skilled"] is True and pooled["calibration"] == "well-calibrated" and pooled["label"] == "reliable"
+        card = core.score_strata({"coaches": coaches, "hypotheses": [], "interval_forecasts": forecasts})
+        strata = card["strata"]
+        assert strata["coaches"]["skilled"] is False and strata["interval_forecasts"]["skilled"] is False
+        assert all(s["calibration"] != "well-calibrated" for s in strata.values())
+        assert card["skilled"] is False and card["brier_skill"] < 0
+        assert card["calibration"] not in ("well-calibrated",) and card["label"] not in ("reliable", "authoritative")
+        assert card["calibration"] == "over-confident" and card["worst_stratum_gap"]["stratum"] == "coaches"
+        assert card["skill_reference"] == "stratified"
+
+
 def test_every_public_platform_symbol_survives_the_extraction():
     """A function the platform grades with but the package lacks is a silent hole."""
     missing = [

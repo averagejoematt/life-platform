@@ -151,7 +151,7 @@ def _gather_predictions():
             # have graded" made prediction_health perma-red on dead cruft. The actionable
             # signal is "do GRADABLE predictions, whose windows have closed, fail to grade".
             etype = ev.get("type")
-            gradable = etype == "directional" or (etype == "machine" and ev.get("threshold") is not None)
+            gradable = etype in ("directional", "point") or (etype == "machine" and ev.get("threshold") is not None)  # #3551: point
             closed = False
             if created and gradable:
                 try:
