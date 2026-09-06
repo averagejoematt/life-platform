@@ -239,8 +239,18 @@ will red its first nightly (a 2026-08-30 ledger row `attempting`, ages out 09-06
 
 **Build beat:** none — the shipped work this session is review machinery, Day-1 honesty
 fixes and a forensic report; no reader-facing feature merged AND deployed.
+**Docs:** none needed — the session's documents (the RCA, its Part 4) landed in their own PRs; the wrap touched only this handover and the status block.
+**Decisions:** none needed — the owner's rulings (30-day minimum cycle, commitment loop KEPT, Wednesday send, protocols brute-force reset, portrait-less cast) are recorded on #3606 / #3601 / #3621, not as ADRs.
+**Main:** red — ea41f094's Unit Tests failed on this handover's own missing gate lines and one ungated residual bullet (this docs-only fix at Session W boot; the run at the fix sha is the verdict).
+**Incidents:** none — the two red-mains are decoded in the section above (composite-alarm universe → PR #3590; the IAM gate → the owner's Operational deploy).
+**Stash/hooks:** one stash found at Session W boot — `stash@{0} On main: wrapfiles` (2026-09-05 17:40 PT, CLAUDE.md + this handover, a superseded draft of the wrap that ea41f094 then committed); left in place, not dropped, for Session W's wrap to dispose after a diff; the pre-commit hook is in place (`.git/hooks/pre-commit`, executable).
+**Closures:** #3511, #3513, #3514 addressed by PR #3627 (Refs — close on the live reconcile) · DoD: scanned=0 window=closed>=2026-09-06 hits=0 findings=0 dispositioned=0 mode=warn.
+**Backlog:** Now 22 actionable; 79 free issues across Now/Next/Later are the Session W plan's pool; no promotion this session.
+**Alarms:** ✅ every alarm in ALARM state >72h cites an incident row or issue (wrap_gates batch at Session W boot).
+**CI warnings:** run 34004648301 sha 6dadafc0 concluded `cancelled` with no failing job — a genuine supersession; the IAM-gate red on #3573's role diff clears on the owner's `bash deploy/cdk_deploy.sh LifePlatformOperational`.
+**Ledger:** none — no standing machinery shipped by the wrap itself; the RCA's rent register lives in `docs/reviews/FORENSIC_RCA_2026-09-05.md`.
 
 ## Residual / next picks
 - The census chain: #3580 → #3581 → #3583 → #3588 (11 issues).
 - #3390 (owner acts 1–2 close it), #3403/#2978 (~09-08), #2883 (owner), #3422/#3436/#3373/#3042 fable.
-- Session U proper: 2026-09-08, `~/.claude/plans/lovely-snacking-panda.md`.
+- Session U proper: 2026-09-08 (the #2849 reopen trigger), `~/.claude/plans/lovely-snacking-panda.md`.
