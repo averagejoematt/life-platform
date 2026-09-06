@@ -1,0 +1,19 @@
+{
+  "id": "2026-09-04-physical-september-5th-reset-a",
+  "issue": "#3517",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md NARR-3 / AIQ-3",
+  "captured_at": "2026-09-04T17:04:56Z",
+  "surface": "/api/coaching-dashboard coaches[physical].position_summary (served 2026-09-04, cycle-16 genesis 2026-09-04)",
+  "verbatim": true,
+  "status": "caught",
+  "gate": "composite",
+  "expect_type": "stale_reset_date",
+  "specimen": "No weight reading has arrived since the September 5th reset, so I'm treating baseline as unestablished.",
+  "control": "No weight reading has arrived since the September 4th reset, so I'm treating baseline as unestablished.",
+  "inputs": {
+    "allowed": [],
+    "generation_date_iso": "2026-09-04",
+    "start_date_iso": "2026-09-04"
+  },
+  "why_it_passed_then": "stale_phase reads only 'Day N' tokens and the #1242 date class reads only FULL dates with a year; a month-day reset date had no class."
+}

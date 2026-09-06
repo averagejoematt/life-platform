@@ -1,0 +1,33 @@
+{
+  "id": "2026-09-04-physical-8000-steps-shelf-protocol",
+  "issue": "#3518",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md R4",
+  "captured_at": "2026-09-04T17:04:56Z",
+  "surface": "/api/coaching-dashboard coaches[physical].position_summary (Dr. Max Reyes)",
+  "verbatim": true,
+  "status": "caught",
+  "gate": "plan",
+  "expect_type": "plan_figure_contradiction",
+  "specimen": "Garmin step data isn't syncing to my dashboard yet, which blocks meaningful tracking of his 8,000+ steps/day protocol.",
+  "control": "Garmin step data isn't syncing to my dashboard yet, which blocks meaningful tracking of the 6,000-step floor.",
+  "inputs": {
+    "plan_facts": {
+      "source": "config/user_goals.json",
+      "daily_calories_target": 1500,
+      "daily_protein_min_g": 170,
+      "eating_window": "11:30am-7:30pm",
+      "daily_steps_floor": 6000,
+      "daily_steps_range": [
+        6000,
+        7000
+      ],
+      "daily_fiber_min_g": 25,
+      "protein_figures_named_g": [
+        160,
+        170,
+        180
+      ]
+    }
+  },
+  "why_it_passed_then": "8,000 was IN the prompt (config/experiment_library.json's unactivated 'Daily 8,000+ Steps' shelf experiment), so every allow-list number gate licensed it; _NUMERIC_CLAIM_RE sees unit-bearing numbers only."
+}

@@ -1,0 +1,19 @@
+{
+  "id": "2026-09-04-physical-september-5th-reset-b",
+  "issue": "#3517",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md AIQ-3 (grep count 2 on /api/coach_analysis?domain=physical)",
+  "captured_at": "2026-09-04T17:04:56Z",
+  "surface": "/api/coach_analysis?domain=physical (the second 'since the September 5th reset' sentence)",
+  "verbatim": false,
+  "verbatim_note": "Only the fragment 'since the September 5th reset' was captured verbatim (AIQ-3 reproduction: grep -c = 2); the cycle-17 reset of 2026-09-05 wiped the OUTPUT# row before the full second sentence was recorded. The framing sentence around it is reconstructed from the coach's register.",
+  "status": "caught",
+  "gate": "composite",
+  "expect_type": "stale_reset_date",
+  "specimen": "Training volume stays capped until a weigh-in lands since the September 5th reset.",
+  "control": "Training volume stays capped until a weigh-in lands since the reset.",
+  "inputs": {
+    "allowed": [],
+    "generation_date_iso": "2026-09-04",
+    "start_date_iso": "2026-09-04"
+  }
+}

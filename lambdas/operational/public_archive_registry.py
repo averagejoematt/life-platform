@@ -89,8 +89,11 @@ GENERATED_ROUTES: dict[str, tuple[str, str]] = {
 # these is reachable through `generated_decision`.
 UNROUTED_GENERATED_PREFIXES: dict[str, str] = {
     "/qa_archive/": "generation-time QA capture — internal review material, 90-day retention",
-    "/board_questions/": "raw reader-submitted questions before curation — third-party text",
-    "/findings/": "raw reader-submitted findings before curation — third-party text",
+    # #3559: nothing WRITES under these two any more (the doors mint reader_input/* keys —
+    # web/site_api_capture_store.capture_key); the entries stay until the owner has moved
+    # the pre-#3559 objects, because the archive must keep refusing what is still there.
+    "/board_questions/": "raw reader-submitted questions before curation — third-party text (legacy location, #3559)",
+    "/findings/": "raw reader-submitted findings before curation — third-party text (legacy location, #3559)",
     "/coach_daily.json": "coach reflection state — internal engine output, not a published surface",
     "/coach_memoirs.json": "coach reflection state — internal engine output, not a published surface",
 }
