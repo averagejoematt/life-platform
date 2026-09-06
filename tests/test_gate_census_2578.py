@@ -523,9 +523,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # re-runnable harness (`gate_census_mutations.py --run --gate
         # test_composite_alarm_lookup_3390.py`: ARMED 1/1, planting an untracked
         # deploy/_census_probe_3503.py whose whole-estate sweep omits AlarmTypes).
+        # Upper bound raised 50 -> 52 (2026-09-06, #3515/#3567): the 51st and 52nd proofs are
+        # `guard::scripts/check_proof_freshness.py` and
+        # `structural::test_v4_build_sitemap_3567.py` — both hand-records in
+        # gate_census_proofs.py, watched against the REAL pre-fix specimens rather than a
+        # synthetic plant: a `git archive origin/main@c0122242` snapshot taken before the fix
+        # still carries the #3515 stale-stamp defect (check_proof_freshness.py correctly
+        # exits 1, naming both stale pages) and the #3567 dead-fragment/duplicate-subscribe
+        # defect (the sitemap test correctly fails 5/6, including the "dead extensionless
+        # fragment URL is back" assertion); both are clean on the fixed tree.
         3
         <= len(proven)
-        <= 50
+        <= 52
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
