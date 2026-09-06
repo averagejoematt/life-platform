@@ -145,6 +145,40 @@ def test_partial_bundle_importerror_fails_closed(monkeypatch):
     assert "48" not in body["explanation"] and "63" not in body["explanation"]
 
 
+def test_explain_phase_line_is_the_shared_block_not_a_hand_built_one(monkeypatch):
+    """#3519 (AIQ-6): `_handle_explain` used to hand-build its own
+    "Experiment day N (restarted DATE)" line — tensing genesis as past even on
+    a pre-start day, beside the ONE shared `ai.ai_context` block every other
+    narrative surface grounds on (#1086). It must now derive `day_ctx` from
+    `_phase_context_block()` (== `format_experiment_phase_context(build_experiment_phase_context())`),
+    the SAME source `/api/journey` derives `day_n`/`pre_start` from
+    (`common.pacific_time.pacific_day_n` / `web.site_api_common.pre_start_meta`)."""
+    ai = _ai()
+    from ai import ai_context
+
+    monkeypatch.setattr(ai, "_ai_paused_response", lambda: None)
+    monkeypatch.setattr(ai, "_ask_rate_check", lambda ip, limit=5: (True, 4))
+    monkeypatch.setattr(ai, "_fetch_surface_json", lambda s: {"deltas": []})
+    # A genesis far in the future puts build_experiment_phase_context on its
+    # pre-start branch — the exact tree this issue was filed against.
+    monkeypatch.setattr(ai_context, "EXPERIMENT_START_DATE", "2099-01-01")
+
+    captured = {}
+
+    class _FakeBedrock:
+        @staticmethod
+        def invoke(req):
+            captured["user"] = req["messages"][0]["content"]
+            return {"content": [{"type": "text", "text": "The experiment has not started yet."}], "usage": {}}
+
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
+    resp = ai._handle_explain(_post_event({"surface": "what_changed"}))
+    assert resp["statusCode"] == 200
+    assert "PRE-START" in captured["user"]
+    assert "restarted" not in captured["user"]
+    assert "Experiment day" not in captured["user"]  # the old hand-built phrasing
+
+
 def test_shrink_bounds_lists_not_midtoken():
     ai = _ai()
     fat = {"deltas": [{"i": i, "label": f"metric-{i}"} for i in range(400)]}
