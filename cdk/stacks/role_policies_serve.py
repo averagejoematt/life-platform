@@ -571,11 +571,40 @@ def og_image() -> list[iam.PolicyStatement]:
 
 
 def food_delivery_ingestion() -> list[iam.PolicyStatement]:
-    """Food delivery: DDB write, S3 read from uploads/food_delivery/."""
+    """Food delivery: DDB write, S3 read from the CSV import prefix.
+
+    #3563 — TWO grants this role was missing, both found by inspection and NOT by a live
+    denial, because this role has never been exercised. The function's log group holds
+    exactly ONE stream (2026-03-28 18:26-18:30Z, events long since aged out of the 30-day
+    retention) and AWS/Lambda Invocations has no datapoint in the trailing 90 days; that
+    single run predates the 2026-03-30 CDK adoption of this role (f44531a80), so it ran
+    under the hand-made predecessor. Everything below is therefore a correctness fix on a
+    cold path, stated as such, not a measured incident:
+
+      * BatchWriteItem — food_delivery_lambda.py:161 writes through `table.batch_writer()`,
+        which issues BatchWriteItem. PutItem does NOT imply it, so the 1,700-row import is
+        the FIRST thing the next invocation would fail on (and unlike the two #3563
+        incidents this path re-raises, so it would DLQ rather than go silent).
+      * imports/food_delivery/* — the live S3 notification on matthew-life-platform filters
+        `imports/food_delivery/` + `.csv` (verified read-only via
+        get-bucket-notification-configuration, and the only two objects that prefix has ever
+        held are the 2026-03-28 backfills). `uploads/food_delivery/` has never held an
+        object. The legacy prefix is KEPT rather than replaced only because removing a
+        resource from an existing Allow is a narrowing that strands CI's #2834 gate; it is a
+        dead ARN and an owner-run narrowing may drop it.
+    """
     return [
-        iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:PutItem", "dynamodb:BatchWriteItem", "dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
         iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
-        iam.PolicyStatement(sid="S3Read", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/uploads/food_delivery/*"]),
+        iam.PolicyStatement(
+            sid="S3Read",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/imports/food_delivery/*", f"{BUCKET_ARN}/uploads/food_delivery/*"],
+        ),
         iam.PolicyStatement(sid="DLQ", actions=["sqs:SendMessage"], resources=[DLQ_ARN]),
     ]
 

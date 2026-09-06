@@ -263,7 +263,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 90 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 — of 122 alarms (4 composite)
+Routing: digest 92 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 — of 124 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -282,6 +282,7 @@ Routing: digest 90 · digest+paging 2 · paging 2 · urgent 25 · via-composite 
 | `budget-tier-sustained-7d` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `budget-tier-unreadable` | monitoring_budget_alarms | metric | digest | declaration |  |
 | `chronicle-delivery-heartbeat` | email_stack | metric | urgent | declaration |  |
+| `chronicle-status-write-failed` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `coherence-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `coherence-overall` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `compute-outputs-heartbeat` | monitoring_compute_alarms | metric | digest | factory:_compute_heartbeat_alarm |  |
@@ -298,6 +299,7 @@ Routing: digest 90 · digest+paging 2 · paging 2 · urgent 25 · via-composite 
 | `freshness-checker-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `freshness-interior-gap` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `freshness-interior-gap-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
+| `freshness-sentinel-write-failed` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `grading-stalled` | monitoring_prediction_alarms | metric | digest | declaration |  |
 | `hae-webhook-errors` | ingestion_stack | metric | digest | constructor:create_platform_lambda |  |
 | `hae-webhook-no-invocations-24h` | monitoring_stack | metric | digest | declaration |  |
@@ -481,7 +483,7 @@ Field-level rulings (only non-default fields are declared):
 
 - Edge sites: 1146 total · 826 resolved · 320 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 122 literal-named declarations across three idioms, 4 composite; routing digest 90 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 124 literal-named declarations across three idioms, 4 composite; routing digest 92 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 13 owner-only + 2 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 88 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -498,7 +500,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 18 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 122 | this model's alarms plane (CDK AST) |
+| alarms | 124 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 88 | this model's schedules plane (CDK AST) |
 | secrets | 28 | `tests/test_secret_references.py::KNOWN_SECRETS` |

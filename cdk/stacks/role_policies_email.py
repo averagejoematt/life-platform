@@ -446,7 +446,14 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
     No S3 read — no config or file reads needed.
     Separate from wednesday-chronicle IAM by design (Board: independent failure domains).
     UpdateItem is scoped to the delivered_at/sent_to_count marker on the installment
-    row (the #2112 double-send guard) — the handler's only write.
+    row (the #2112 double-send guard).
+    #3563: PutItem on the email_log#wednesday_chronicle partition — `_record_email_send`
+    writes the row /api/status reads for the "Wednesday chronicle" component. #2254 moved
+    that write out of the generator and into this sender WITHOUT widening this grant, so
+    every send since 2026-08-08 logged a swallowed AccessDeniedException and the public
+    status page read the flagship weekly product as red / "46d ago" while it shipped 3/3.
+    It gets its OWN statement, scoped by dynamodb:LeadingKeys to that one partition (the
+    #468 shape), so a read-mostly sender still cannot write an arbitrary row.
     #2820: + cloudwatch:PutMetricData (the ChronicleSent delivery-heartbeat datapoint;
     PutMetricData only accepts "*" as a resource) and ssm:GetParameter on budget-tier
     (the sanctioned budget-pause check — tier >= 2 pauses generation per ADR-125, so
@@ -457,6 +464,16 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            # #3563 (finding G-3): the ONE row this sender creates — the delivery record
+            # site_api_status.py reads as the "Wednesday chronicle" component. Separate
+            # statement rather than a fourth action on sid="DynamoDB" so the write scope
+            # stays a single partition and stays readable next to the reason above.
+            sid="DynamoDBWriteEmailLog",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#email_log#wednesday_chronicle"]}},
         ),
         iam.PolicyStatement(
             sid="DeliveryHeartbeatMetric",
