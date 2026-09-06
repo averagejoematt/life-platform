@@ -142,26 +142,42 @@ BASELINE_CHECKS=(
   "CodeQL analysis (javascript-typescript)"
 )
 
+# ── the path-conditional half: DERIVED from the workflow YAML, never restated ──
+#
+# #3532: this used to be two hand-written regexes restating v4-gate.yml's and
+# docs-ci.yml's `pull_request.paths` filters, and BOTH had drifted — the v4 one was
+# missing `tests/js/**`, `package.json` and the two JS-graph scripts; the docs-ci one was
+# missing `.github/workflows/**` and six named gate scripts; and `surface-drift.yml` (a
+# THIRD path-filtered PR workflow, check name "Surface-drift gate (new pages/routes/
+# crons/JS land registered)") was not represented at all. A JS-test, workflow-only or
+# gate-script PR therefore expected only the six baseline names, so a path-conditional
+# gate that was still running — or red — was invisible to the watch. That is exactly the
+# #3219 shape this script exists to catch.
+#
+# `deploy/workflow_path_checks.py` parses the workflow YAML and returns the job `name:`
+# values of every PR-triggered workflow whose `paths:` filter the changed set matches.
+# Adding a path to a filter, or a job to one of those workflows, needs no edit here.
+# `tests/test_wait_pr_green.py` asserts glob-by-glob parity against the live YAML.
+_WPG_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+DERIVE_CHECKS_CMD="${WAIT_PR_GREEN_DERIVE_CMD:-python3 ${_WPG_SELF_DIR}/workflow_path_checks.py}"
+
 # derive_expected_checks <newline-separated changed files>
-#   Prints the baseline set plus path-conditional additions, one name per line.
-#   Grounded in the real `paths:` filters in .github/workflows/{v4-gate,docs-ci}.yml
-#   — read those files if this drifts, never hand-guess a new name.
+#   Prints the baseline set plus the YAML-derived path-conditional additions, one name
+#   per line. Returns 1 (with a loud NOTE on stderr) when the derivation cannot run at
+#   all — the caller must refuse to watch rather than watch a truncated set, because a
+#   short expected set is precisely how a red gate reads SUCCESS.
 derive_expected_checks() {
-  local files="$1"
+  local files="$1" derived rc
   printf '%s\n' "${BASELINE_CHECKS[@]}"
-  # v4-gate.yml pull_request paths: site/**, scripts/v4_*.py, tests/pr_render_gate.py,
-  # tests/visual_qa.py, tests/accuracy_audit.py, tests/fixtures/render_gate/**, etc.
-  if grep -qE '^site/|^scripts/v4_[^/]*\.py$|^tests/pr_render_gate\.py$|^tests/visual_qa\.py$|^tests/accuracy_audit\.py$|^tests/fixtures/render_gate/' <<<"${files}"; then
-    printf '%s\n' \
-      "Migration coverage + HTML well-formedness" \
-      "Render + accuracy gate (local render)"
+  derived=$(printf '%s\n' "${files}" | ${DERIVE_CHECKS_CMD})
+  rc=$?
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "NOTE expected-check derivation FAILED ('${DERIVE_CHECKS_CMD}' exited ${rc})." >&2
+    echo "  The path-conditional checks CANNOT be asserted; refusing to watch a truncated set (#3532)." >&2
+    return 1
   fi
-  # docs-ci.yml pull_request paths: docs/**, README.md, CLAUDE.md, .claude/{skills,agents}/**,
-  # deploy/sync_doc_metadata.py, scripts/check_doc_*.py, + the code half
-  # (lambdas/**, mcp/**, config/**, cdk/**) + two named tests/ fact-source files.
-  if grep -qE '^docs/|^README\.md$|^CLAUDE\.md$|^\.claude/(skills|agents)/|^\.claude/README\.md$|^deploy/sync_doc_metadata\.py$|^scripts/check_doc_.*\.py$|^scripts/doc_facts_ops\.py$|^scripts/generate_adr_index\.py$|^scripts/generate_mcp_tool_catalog\.py$|^scripts/operating_calendar\.py$|^lambdas/|^mcp/|^config/|^cdk/|^tests/qa_manifest\.py$|^tests/leak_token_sweep\.py$|^tests/test_platform_stats_truth\.py$' <<<"${files}"; then
-    echo "Wiki drift gates"
-  fi
+  [[ -n "${derived}" ]] && printf '%s\n' "${derived}"
+  return 0
 }
 
 # ── the sanctioned reconcile-owned path set (#3200) — DERIVED, never hand-listed ──
@@ -418,6 +434,9 @@ classify_zero_check_diagnosis() {
 #     NONGREEN <name> <state-or-ABSENT>
 #     RECONCILE-OWNED-RED <name>: <path>[, <path>...]   (#3200, "Wiki drift
 #       gates" only — see below)
+#   plus, for every check that ATTACHED with bucket=fail and is NOT in the expected
+#   set (#3532 — an attached red is a red, expected or not):
+#     NONGREEN <name> FAILURE (attached but not in the expected set — #3532)
 #   then a final line:
 #     VERDICT SUCCESS|PENDING|WAITING|FAIL|GREEN-WITH-RECONCILE-OWNED-RED
 #   Returns 0=SUCCESS, 3=PENDING (keep polling), 2=WAITING, 1=FAIL,
@@ -511,6 +530,32 @@ evaluate_checks_json() {
       fi
     fi
   done
+
+  # ── #3532: an ATTACHED red is a red, expected or not ────────────────────────
+  #
+  # Before this, the loop above looked only at the expected names, so a check the
+  # expected-set derivation missed could be sitting there FAILED and the verdict still
+  # read SUCCESS. That is the same #3219 shape as an absent check, one layer over: the
+  # derivation is now YAML-derived and cannot silently drop a gate, and this makes the
+  # evaluator independent of the derivation being right in the first place.
+  #
+  # Scope is deliberately `bucket == "fail"` only. `skipping` is the NORMAL outcome for
+  # a path-conditional job on a PR that does not touch its paths, and `cancel` is the
+  # normal outcome of the `cancel-in-progress` concurrency groups every one of these
+  # workflows declares — treating either as a red would make the watcher cry wolf on
+  # every ordinary PR. An expected name still keeps its stricter treatment above
+  # (skipping/cancel on a check we asserted BY NAME remains a hard NONGREEN).
+  local unexpected_name
+  while IFS= read -r unexpected_name; do
+    [[ -n "${unexpected_name}" ]] || continue
+    local is_expected=0
+    for exp in "${expected[@]}"; do
+      [[ "${exp}" == "${unexpected_name}" ]] && is_expected=1 && break
+    done
+    [[ "${is_expected}" -eq 1 ]] && continue
+    echo "NONGREEN ${unexpected_name} FAILURE (attached but not in the expected set — #3532)"
+    any_nongreen=1
+  done < <(jq -r '[.[] | select(.bucket == "fail") | .name] | unique | .[]' <<<"${checks_json}" 2>/dev/null)
 
   # "No checks reported at all" must NEVER read as done — with zero entries every
   # expected name is ABSENT above, which already routes to "keep polling" (not an
@@ -699,9 +744,18 @@ main() {
     checks_json=$(cat "${fixture}")
     local -a expected=()
     if [[ "${no_derive}" -eq 0 ]]; then
+      # #3532: capture FIRST, then split. `done < <(derive_expected_checks …)` runs the
+      # derivation in a subshell whose exit status the loop discards — a failed
+      # derivation would have read as "no path-conditional checks", the exact truncation
+      # this refuses.
+      local derived_out
+      derived_out=$(derive_expected_checks "") || {
+        echo "ERROR: cannot derive the expected check set — refusing to watch a truncated set (#3532)" >&2
+        return 1
+      }
       while IFS= read -r line; do
         [[ -n "${line}" ]] && expected+=("${line}")
-      done < <(derive_expected_checks "")
+      done <<<"${derived_out}"
     else
       expected+=("${BASELINE_CHECKS[@]}")
     fi
@@ -728,9 +782,16 @@ main() {
 
   local -a expected=()
   if [[ "${no_derive}" -eq 0 ]]; then
+    # #3532: capture first (see the fixture-mode note above) — a failed derivation must
+    # abort the watch, never quietly narrow the expected set.
+    local derived_out
+    derived_out=$(derive_expected_checks "${changed_files}") || {
+      echo "ERROR: cannot derive the expected check set — refusing to watch a truncated set (#3532)" >&2
+      return 1
+    }
     while IFS= read -r line; do
       [[ -n "${line}" ]] && expected+=("${line}")
-    done < <(derive_expected_checks "${changed_files}")
+    done <<<"${derived_out}"
   else
     expected+=("${BASELINE_CHECKS[@]}")
   fi

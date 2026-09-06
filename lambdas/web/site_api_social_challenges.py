@@ -9,6 +9,96 @@ test monkeypatch surface are unchanged. This module does NOT import the facade,
 so there is no import cycle.
 """
 
+# ── #3521: prior-cycle evidence never serves as current ──────────────────────
+#
+# THE DEFECT (live, Day 0 of cycle 16). `/api/challenges` and `/api/challenge_catalog`
+# passed `evidence_summary` through verbatim, and 26 of the catalog's 82 entries carry a
+# digit. Five of those are Matthew's OWN measurements, written into the catalog on
+# 2026-03-28 (git blame 1c44301ef7) — "HRV 29.56 — this is indicated now", "Walk 5k was
+# missed 14 of 20 tracked days", "Calorie goal was missed 13 of 20 tracked days". The
+# reader-truth judge raised three reproduced highs on /protocols/challenges/ for exactly
+# these. `config/challenges_catalog.json` is CONFIG: the shared wipe manifest lists
+# challenges as EXPERIMENT_SCOPED, but no reset reaches a config file, so those numbers
+# survive every re-anchor and keep saying "now".
+#
+# The fix is a scope stamp in the catalog plus this derivation:
+#   * evidence_scope "literature" — a published finding ("10,000 steps/day associated
+#     with 40-50% reduction in all-cause mortality"). CROSS-PHASE by nature: it is not
+#     about Matthew, no reset invalidates it, and it serves unchanged.
+#   * evidence_scope "personal"   — a measurement of Matthew. EXPERIMENT-SCOPED. It
+#     carries `evidence_as_of`, and this derives whether that date precedes the live
+#     genesis. PRE-GENESIS the summary is DROPPED entirely (day_n < 1: there is no "now"
+#     for it to be true of); in-cycle it serves stamped with its as-of date.
+#   * NO stamp but a digit in the summary — fail CLOSED, dropped. An unstamped number
+#     can never reach a reader, so the guard cannot be defeated by forgetting it.
+_EVIDENCE_LITERATURE = "literature"
+_EVIDENCE_PERSONAL = "personal"
+
+
+def _has_digit(text) -> bool:
+    return any(ch.isdigit() for ch in str(text or ""))
+
+
+def challenge_evidence_view(entry: dict = None, *, today_iso: str = None) -> dict:
+    """The reader-facing evidence fields for one catalog entry (#3521). Pure.
+
+    Returns {evidence_summary, evidence_scope, evidence_as_of, evidence_prior_cycle,
+    evidence_evaluated_on} — always all five keys, so a consumer cannot read an absent
+    stamp as "current".
+
+    `evidence_evaluated_on` is the PACIFIC day the pre-genesis decision was made on. It is
+    real provenance (a reader or a debugger can see WHICH day decided the strip) and it is
+    the #2813 contract's observable — the sweep drives this at a PT-evening instant and
+    asserts the default day is the Pacific one, because the site's whole clock is PT
+    (#2506/#2675) and a UTC "today" would un-strip the numbers seven hours early.
+    """
+    from common.constants import EXPERIMENT_START_DATE, day_n
+    from common.pacific_time import pacific_today  # the site's clock is PT (#2506/#2675)
+
+    entry = entry or {}
+    try:
+        today_iso = str(today_iso or pacific_today())
+    except Exception:  # noqa: BLE001
+        today_iso = ""
+    summary = str(entry.get("evidence_summary") or "")
+    scope = entry.get("evidence_scope") or ""
+    as_of = entry.get("evidence_as_of") or None
+    view = {
+        "evidence_summary": summary,
+        "evidence_scope": scope or None,
+        "evidence_as_of": as_of,
+        "evidence_prior_cycle": False,
+        "evidence_evaluated_on": today_iso,
+    }
+    if not summary or not _has_digit(summary):
+        return view  # no number, nothing to date
+    if scope == _EVIDENCE_LITERATURE:
+        return view
+    if scope != _EVIDENCE_PERSONAL or not as_of:
+        # Fail closed: an unstamped number is undateable, so it cannot be shown as current.
+        view["evidence_summary"] = ""
+        return view
+    view["evidence_prior_cycle"] = str(as_of) < str(EXPERIMENT_START_DATE)
+    try:
+        pre_genesis = day_n(today_iso) < 1
+    except Exception:  # noqa: BLE001 — an unreadable clock must not publish the number
+        pre_genesis = True
+    if pre_genesis:
+        view["evidence_summary"] = ""
+    return view
+
+
+# #2813: the day-default contract. This function's "today" decides whether a prior-cycle
+# number is stripped, so the sweep drives it at a PT-evening instant and asserts the
+# resolved day is PACIFIC. Registration is inert at runtime and fail-soft on a partial
+# bundle (the decorator returns the same function object).
+try:
+    from common.pt_day_contract import pt_day_contract
+
+    challenge_evidence_view = pt_day_contract(extract=lambda v: v["evidence_evaluated_on"])(challenge_evidence_view)
+except Exception:  # noqa: BLE001
+    pass
+
 
 def handle_current_challenge(*, _g) -> dict:
     """
@@ -290,6 +380,7 @@ def handle_challenge_catalog(*, _g) -> dict:
     total_votes = 0
     for ch in challenges:
         ch["votes"] = vote_counts.get(ch.get("id", ""), 0)
+        ch.update(challenge_evidence_view(ch))  # #3521: prior-cycle evidence is stamped or dropped
         total_votes += ch["votes"]
     result["challenges"] = challenges
     result["total_votes"] = total_votes
@@ -454,9 +545,10 @@ def handle_challenges(*, _g) -> dict:
                 "duration_days": c.get("duration_days"),
                 "difficulty": c.get("difficulty"),
                 "evidence_tier": c.get("evidence_tier"),
-                "evidence_summary": c.get("evidence_summary", ""),
                 "board_recommender": c.get("board_recommender", ""),
                 "icon": c.get("icon", ""),
+                # #3521: evidence_summary + its provenance, never the raw catalog string.
+                **challenge_evidence_view(c),
             }
         )
     catalog.sort(key=lambda x: (x["status"] != "available", (x.get("category") or ""), (x.get("name") or "").lower()))
