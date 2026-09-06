@@ -535,7 +535,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # in the same window, so the live total stays at the committed 597.
         3
         <= len(proven)
-        <= 51
+        <= 53  # 51 -> 53: #3581's two proven mirror registries, measured on the merged tree (2026-09-06)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
