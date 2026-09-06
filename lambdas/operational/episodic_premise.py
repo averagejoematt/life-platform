@@ -111,7 +111,7 @@ def billing_days_by_class(
     return out
 
 
-def premise_fields(billing_days: dict, episodic_classes) -> dict:
+def premise_fields(active_days_by_class: dict, episodic_classes) -> dict:
     """The four breakdown keys the receipt and the daily brief read (#3554).
 
     Assembled here rather than inline in `_write_breakdown` so the window, the bar and
@@ -120,24 +120,24 @@ def premise_fields(billing_days: dict, episodic_classes) -> dict:
     return {
         # None means the metric read failed — UNKNOWN, not zero — so a telemetry gap
         # can never read as a clean bill of health for the label.
-        "episodic_billing_days": {k: (None if v is None else int(v)) for k, v in (billing_days or {}).items()},
+        "episodic_billing_days": {k: (None if v is None else int(v)) for k, v in (active_days_by_class or {}).items()},
         "episodic_premise_window_days": EPISODIC_PREMISE_WINDOW_DAYS,
         "episodic_premise_bar_days": EPISODIC_PREMISE_BAR_DAYS,
-        "episodic_premise_violations": episodic_premise_violations(billing_days or {}, episodic_classes),
+        "episodic_premise_violations": episodic_premise_violations(active_days_by_class or {}, episodic_classes),
     }
 
 
-def report(billing_days: dict, episodic_classes, projected: float, projected_all_classes: float) -> list:
+def report(active_days_by_class: dict, episodic_classes, projected: float, projected_all_classes: float) -> list:
     """Evaluate the premise and log the break loudly. Returns the violation list.
 
     The log line carries BOTH projections because that gap is the size of the error the
     broken label is causing — a violation with no magnitude beside it is a fact nobody
     can prioritise.
     """
-    broken = episodic_premise_violations(billing_days or {}, episodic_classes)
+    broken = episodic_premise_violations(active_days_by_class or {}, episodic_classes)
     if broken:
         logger.warning(
-            f"EPISODIC_PREMISE_BROKEN classes={broken} billing_days={billing_days} "
+            f"EPISODIC_PREMISE_BROKEN classes={broken} active_days_by_class={active_days_by_class} "
             f"bar={EPISODIC_PREMISE_BAR_DAYS}/{EPISODIC_PREMISE_WINDOW_DAYS}d — the projection excludes a class that "
             f"bills like a schedule; projected=${projected:.2f} vs all-classes=${projected_all_classes:.2f}"
         )

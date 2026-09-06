@@ -1069,8 +1069,8 @@ def lambda_handler(event, context):
         # ProjectedMonthlySpend means is auditable instead of silent.
         projected_all_classes = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
         # #3554: measure the premise the narrowing rests on. Reports; never re-scopes.
-        billing_days = _episodic.billing_days_by_class(_cw, CALLER_CLASSES, CALLER_CLASS_DIMENSION, now)
-        premise_broken = _episodic.report(billing_days, EPISODIC_CALLER_CLASSES, projected, projected_all_classes)
+        active_days_by_class = _episodic.billing_days_by_class(_cw, CALLER_CLASSES, CALLER_CLASS_DIMENSION, now)
+        premise_broken = _episodic.report(active_days_by_class, EPISODIC_CALLER_CLASSES, projected, projected_all_classes)
 
         # ADR-133 (#739): surge-mode ceiling. Pure function of reader traffic
         # (trailing 7d uniques) — never of spend — so it floats the ceiling up
@@ -1164,7 +1164,7 @@ def lambda_handler(event, context):
             ai_class_split=ai_class_split,
             prod_class_share=prod_class_share,
             projected_all_classes=projected_all_classes,
-            billing_days_by_class=billing_days,
+            billing_days_by_class=active_days_by_class,
         )
 
         return {
