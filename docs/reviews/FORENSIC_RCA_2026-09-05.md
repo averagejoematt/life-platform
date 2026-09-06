@@ -16,7 +16,7 @@ A delivery architect resolved the votes into 9 classes, 6 structural changes, a 
 register. The driver re-checked the load-bearing counts (hook inventory, the commit helper's test references, the PR
 template line, the closure contract's mode, the PROPORTIONALITY reset row, the genesis registry, main's author split since
 08-22) against the tree before publishing; the gate census figures (597 / 50 proven) are the panel's own run of
-`scripts/gate_census.py`. Disposition: the stories were filed under the existing review epics where one owns the class
+`scripts/gate_census.py`. **Part 4 (added the same day, second panel, Opus):** five gap analysts took each lens's A anchor literally and priced every remaining gap after all filed work as FREE / RENT / OWNER / TIME; a cost-and-cadence relaxation model and a delivery architect produced the per-lens ladder, the residual stories and the single owner-decisions issue. Disposition: the stories were filed under the existing review epics where one owns the class
 (#3489, #3490, #3493) and two new epics; the issue map is in the closing comment of this PR.
 
 **Owner constraints honoured:** nothing here lowers a bar to reach a grade; every standing-rent item carries a demote trigger
@@ -176,3 +176,167 @@ Every standing-rent proposal from all four analysts, resolved. **Accepted: ≈$0
 4. The three reset one-function fixes (P1) — then decide the cadence with the monthly-close number in front of you.
 5. Refuse code direct-pushes in agent_commit.sh; replace PR template line 19.
 6. Clear the four standing reds and pull at least one PROPORTIONALITY demote trigger this month.
+
+---
+
+## Part 4 — From A- to A
+
+# Part 4 — From A− to A
+
+*You asked: is cost the reason most of this plan tops out at A−? Here is the answer, priced.*
+
+---
+
+## 1. The answer
+
+**No. Cost is not the reason, and on two lenses spending money makes the grade worse.**
+
+Closing every dollar-priced gap across all 17 lenses costs **$2.67/month gross — $1.37/month net** after two removals that pay for themselves. That is 1.24% of the $215 ceiling. If the plan were funded at ten times that, **not one additional lens would move.**
+
+Four things actually hold it at A−, and a fifth nobody had named:
+
+1. **Cadence.** Five lenses need cycles of 14–30 days. There were 12 resets in 55 days; cycle lengths since 2026-07-12 are 1, 5, 1, 1, 2, 5, 7, 7, 7, 15, 4 (median 5). Exactly one of those eleven cycles could have matured a 14-day bet.
+2. **Your hands.** 21 acts, **~6h 44m** total, plus two standing behaviours. One of them is a two-minute IAM command that a merged-and-closed fix has been waiting on since yesterday morning.
+3. **Taste and market.** Four verdicts only you can give, and one only a stranger can give.
+4. **The bar moves while it is being scored.** Four anchors carry stale hand-typed numbers; three were extended mid-run *by the run that found their specimen*.
+5. **The denominators were never counted.** Every anchor clause says *every*; every filed fix is scoped to the specimen the review sampled.
+
+That fifth reason is the biggest single block of work between here and A, it is **free in dollars**, and **nothing filed schedules any of it**: 538 of 597 gates have never been shown able to fail (and the estate grew from 513 in twelve days); 89 unguarded ISO-parse sites; 225 memory incident topics; 32 grounding surfaces with no fail-mode facet; 28 chart builders with one guarded surface; 20 text tokens against a hand-typed contrast list of 5; 92 pages against a measured floor of 3.
+
+---
+
+## 2. Where the platform actually lands
+
+**Zero of the 17 lenses reaches a full A if nothing changes about cost, cadence or your acts.** Not because the work is hard — because every last clause on every lens ends in a decision, a verdict, or a calendar.
+
+| Lens | Now | After filed | Ceiling if nothing changes | What the last step costs |
+|---|---|---|---|---|
+| principal | B+ | A− | **A−** | OWNER (org move) *or* TIME (4 clean wraps) |
+| devex | B+ | A− | **A−** | OWNER (1 ruling: where the incident corpus lives) |
+| cto | B+ | A− | **A−** | ANCHOR (CloudWatch makes one clause unsatisfiable) + OWNER |
+| observability | B+ | A− | **A−** | RENT $0.43 + OWNER (demotes) + TASTE |
+| aiq | B | A− | **A−** | TIME (a cycle that reaches Day 4) |
+| data-architect | B | A− | **A−** | OWNER (one ~88-row reconcile) |
+| integrations | B+ | A− | **A−** | OWNER (2 IAM deploys + 1 ruling) |
+| cost | B+ | A− | **A−** | OWNER (authorize the tier-3 drill) |
+| cpo | B− | B+ | **A−** | OWNER (cadence, commitment, premiere) + TIME |
+| reader | B− | B+ | **A−** | OWNER (a human read) + FREE (a glossary) |
+| growth | C+ | B− | **B+** | OWNER (distribution) + TIME (30 days of demand) |
+| narrative | C+ | B+ | **A−** | OWNER (cadence) — the anchor and the cadence contradict |
+| designer | B+ | A− | **A−** | TIME (14 days) + OWNER (a taste verdict) |
+| dataviz | B | A− | **A−** | TIME (14 days + 4 weigh-ins) |
+| a11y | B+ | A− | **A−** | OWNER (2 rulings: tap targets, the light-theme gate) |
+| qs | B− | A− | **A−** | OWNER (publish the seal) + TIME (14/17/21/30 days) |
+| security | B+ | A− | **A−** | OWNER (2 min of IAM + 2 toggles) |
+
+**Read that last row twice.** Security is one attended *hour* from a full A, and none of it is money, cadence or taste. The blockers are: instruments that were built and never scheduled, and two switches nobody flipped.
+
+---
+
+## 3. The money question, answered line by line
+
+Every rent item below carries its demote trigger. **YES** = buy it. **NO** = it makes a grade worse or buys nothing. **OWNER-CALL** = the grade is identical either way.
+
+| Buy? | Item | $/mo | Moves | Demote when |
+|---|---|---|---|---|
+| **YES** | Producer census dead-man (52 waivers → measured) | **$0.43** | observability → A on its biggest clause | 90d zero findings + EXEMPT at 0 |
+| **YES** | Daily Haiku fresh-eyes panel (weekly run may have budget-skipped) | **$1.40** | reader, cpo — latency 7d → 24h | 2 months zero high/med |
+| **YES** | Voice-fidelity weekly *(after the free sampler fix)* | **$0.46** | narrative — 2 weeks not 2 months | n ≥ 12, stable verdict ×2 |
+| **YES** | Surge-flip dead-man (#3510) | **$0.30** or $0 | cost — 900 sits inside a 728–1011 range | 6 months zero flips |
+| **YES** | ADR-103 rent re-derived monthly | **$0.05** | cto — 104 snapshot rows | 6 months in-band |
+| **YES** | Capability self-test per liveness sensor | **$0.0001** | cto, observability | 90d clean + #3596 green |
+| **YES** | Nightly wiped-cycle census (#3600) | **$0.01** | aiq, narrative | 2 resets + 60 nights clean |
+| **YES** | `pii_surface_guard --endpoints` on a schedule | **$0–0.015** | security — the instrument exists, runs nowhere | 90 clean nights |
+| **YES** | MCP OAuth live probe leg | **$0.00025** | security | never for green results |
+| **YES** | Citation re-resolution on a schedule | **$0–0.0006** | qs | 12 clean months → quarterly |
+| **YES** | Raw-filename sampling in #3570 | **$0.0002** | data-architect | 4 clean quarters |
+| **CREDIT** | Delete the duplicated token emitter | **−$1.20** | cost — receipt stops triple-counting | — |
+| **CREDIT** | Delete the orphan garmin auth alarm | **−$0.10** | integrations — it is OK *by construction* | — |
+| **OWNER** | Chronicle podcast TTS (or withdraw the link, $0) | $0.30–0.60 | cpo — same grade either way | zero 90d requests |
+| **OWNER** | Voice-fidelity 5 judges × 4 samples | ~$1.50 | speed + interval width only | as above |
+| **OWNER** | Daily **Sonnet** 3-judge reader panel | ~$14 | a better proxy, still not a stranger | 2 clean months |
+| **NO** | 52 per-producer alarms | ~$20.80 | **breaches** cto's no-new-machinery clause | — |
+| **NO** | 4 ERROR MetricFilters + digest alarms | $1.50–2.90 | moves integrations **away** from A | — |
+| **NO** | qa-smoke per-check dimension, per-hook series, per-feed series | ~$9.30 | zero clauses; one is lit by construction | — |
+| **NO** | Richer AIQ judge (Sonnet) | $36–54 | zero clauses — the gaps are deterministic | — |
+| **NO** | Hosted pixel-diff (Percy/Chromatic) | $15–49 | ADR-076 rejected pixel-diff here on purpose | — |
+| **OWNER** | Real-device / real-AT lab (BrowserStack) | ~$29 | raises quality *above* the anchor, not to it | — |
+
+**Total if every YES: $2.67/mo gross, $1.37/mo net.** For scale: $25/mo would buy ~83 always-on metric series or ~250 alarms — vastly more detection than any lens needs, and on two lenses that purchase is a demotion by definition.
+
+---
+
+## 4. What cadence buys — the one lever bigger than everything else
+
+| At | What becomes possible |
+|---|---|
+| **14 days** | **dataviz and designer reach a full A.** dataviz's live-encoding clause is about served bytes: the weight-domain fix only reproduces from the 4th weigh-in, the date-positioning fix only at 14 overlapping days. designer can finally *measure* two sub-floor rules that are latent until the heat strip holds real days. Five more lenses (qs, cpo, aiq, reader, narrative) become **gradeable** rather than UNOBSERVED. Reset-manufactured reds roughly halve. |
+| **30 days** | **qs, narrative, cpo and aiq reach A.** The day-30 survival horizon gets n=1 (today it publishes 47% over *zero* observations at that horizon). Hypotheses become evaluable at all (17 days minimum), so protocol levers can be spawned. observability goes B+ → A− **on cadence alone, with no code**: three of its four standing reds are reset artifacts, and one alarm's 14-day lookback is *longer than the cycles producing its data*. growth B− → B+. |
+| **90 days** | Little new — but the **demote triggers finally fire**, so the machinery this plan adds starts shrinking instead of accumulating. Latent defects surface (a11y's `--tier-accent` fails AA at 1.75:1 in light mode and is invisible to every axe run until the character tier advances). And the "12 resets in 55 days" class — six of the RCA's seven P1s — leaves the incident stream entirely. |
+
+**Unmoved at any length:** security (zero time-dependent clauses), devex, principal, integrations, cost, data-architect. So *cycle length* cannot be the general answer either — it is decisive on seven lenses and irrelevant on six.
+
+---
+
+## 5. Your list — 21 acts, ~6h 44m
+
+Filed as one `gate:owner` issue. In order of leverage per minute:
+
+**The one that moves twelve lenses (30 min):** rule on reset cadence — a *minimum* cycle length (#3601).
+
+**Under five minutes, and something is broken right now:**
+- **2 min** — apply the tracked IAM JSON to the live remediation role. main has 24 Sids with SES scoped; the live role has 20 Sids and 5 wildcards including `ses:SendEmail` Resource:*. #3562 closed on merge and never reached the role.
+- **2 min** — flip `secret_scanning_non_provider_patterns` and `validity_checks`; both are off, so the platform's own bearer shapes are invisible to its own scanner.
+- **5 min** — confirm the urgent SNS topic has a subscription you actually read.
+- **5 min** — the Dropbox capture-channel ruling (#3571).
+
+**Ten to twenty minutes:** publish the cycle-16 seal (both URLs 404 today, on Day 1) · rule on `freshness-interior-gap` (red 5.1 days) · rule on the protocol-lever phase class · rule on where the incident corpus lives · commit to a chronicle weekday · reverse or re-affirm the dark-only deploy gate · rule on tap targets (a green test currently asserts a 2px target passes) · authorize the tier-3 drill (the band has *never* run) · remove the 5 public reader-input objects carrying unsalted IP hashes.
+
+**Twenty to forty-five:** two CDK IAM deploys · **one** combined ~88-row provenance reconcile (three issues, one act) · SES identity for averagejoematt.com · every demote ruling in one sitting · the ADR-106 portraits.
+
+**Optional (60 min):** the GitHub org transfer. Declining is fine — the alternative is four clean wraps, which a ≥30-day cadence makes achievable.
+
+**Standing, and nothing substitutes:** 21 days of daily weigh-ins (the record is 14 in 65 days → an SD on n=3), and posting the experiment somewhere strangers read it (3 subscriber rows, one confirmed in March, zero new in 64 days).
+
+**Four verdicts, once per cycle, ~45 min:** premiere · sparse-designed · stranger-gets-it · paged-for-what-matters. Every automation in this plan bounds the risk of a **wrong** A. None of them awards the A.
+
+---
+
+## 6. Freeze the anchors, or "all A" is not a target
+
+Thirteen of seventeen rows fell this run and nothing separates *the platform got worse* from *the bar moved*. Both happened.
+
+- Two anchors still say **$85** when the live budget reads **215.0**. narrative says **cycle-6**; SSM says **16**. designer says **89 pages**; the registry returns **92**.
+- Three qs extensions were written mid-run by the run that found their specimen.
+- Six clauses currently pass **by silence** — graded on Day 0 when the data does not exist yet, or against an empty payload.
+
+The proposal: **`docs/reviews/anchors/ANCHORS.json`, sealed with a `.sha256.json` sibling** (the same content-addressed shape as the pre-registration). Every number becomes a `${...}` placeholder resolved from the platform's own derivation — a bare literal reds the freeze test. An extension proposed mid-run binds the **next** run, and the report prints both grades so you can see which clause moved the row. The diff **reds on any loosening**; tightening is free. And every clause resolves to **MET / FAILED / UNOBSERVED** — with the rule that **a lens carrying any UNOBSERVED clause cannot be graded A.**
+
+That single rule is what turns "all A" from a taste target into a hard one, because it makes silence a failure everywhere it currently reads as a pass.
+
+Four amendments are mandatory before *any* work can qualify, because the clause as written cannot be satisfied:
+- A CloudWatch composite can only reference alarm **states**, so a suppressor flag must **be** an alarm and must be **lit** to work. One has been red 4.2 days doing its job while the sweeps acked it 7× as an incident. Fix: a declared suppressor registry with a window, an end condition and a dead-man — *stricter* than today, where the flag is unbounded.
+- GitHub 422s an Integration bypass actor on a personal-account repo, so "every landing path" is unenforceable server-side without the org move.
+- a11y's tap-target clause contradicts a documented owner posture encoded in a **green** test.
+- narrative's *"reset seams are invisible to a binge reader"* — **I am deliberately not amending this one.** Every available rewording trades "invisible" for "legible", and legible is what the filed work already buys. Leave it saying the true thing: a story you restart every four days is not one story. Price it, don't reword it.
+
+None of these lowers a bar. Three of them make currently-passing clauses fail.
+
+---
+
+## 7. What still needs writing
+
+**14 residual stories** — work no filed issue covers. Highlights:
+
+- **`scripts/deploy.command`** is executable, Finder-double-clickable, and ships **one file** as the entire code of `life-platform-mcp` — stripping every bundled module. The guard names four scripts by hand and misses it. The March review closed that exact outage with *"The guard prevents recurrence."* **One test and one `rm`** — the cheapest grade-moving item in the whole review.
+- **The voice-fidelity sampler** filters its query to the current cycle, on a harness whose own docstring declares it cross-phase — so twelve cycles of coach prose are sitting archived and invisible, and every coach reads `insufficient_data`. A query-argument change turns an apparent 90-day wait into roughly one run.
+- **There is no glossary.** Not a thin one — none. "HRV" appears on 52 pages, "Brier" on 31, and the reader anchor's second of four clauses is entirely unbuilt. It produced no review finding because nothing is broken; something is absent.
+- **One nightly cross-surface census** replaces four one-offs: a hook × cycle-day × artifact matrix where a *missing* cell is a red, and a same-week fact agreement gate over every surface that narrates a week.
+- **11 pages advertise a podcast feed with zero episodes** — 200 OK, a channel, no items, so it unfurls as real in every podcast client.
+- **329 live rows** name a genesis the cycle registry can no longer resolve, and the mechanism that makes the reset idempotent is precisely what freezes the wrong provenance in place. The fix keeps the history (register the abandoned genesis) rather than erasing it.
+
+---
+
+## 8. The one sentence
+
+Cost is not what is holding this at A−. The whole bill for it is **under two dollars a month**, and on two lenses spending money makes the grade worse. What holds it there is **one cadence decision**, about **seven hours of your hands** across twenty-one acts, **four verdicts only you can give**, **an anchor freeze** so the bar stops moving while it is being scored — and a large, boring, free enumeration of the sets that every *"every"* in the rubric quantifies over, which nobody has yet scheduled.
