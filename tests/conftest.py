@@ -240,6 +240,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_plan_literal_reconciliation.py",
         "test_prereg_hash_stamp.py",
         "test_qa_smoke_phase_stamp_coverage_1970.py",
+        # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this
+        # branch derived its list, and `reset_artifact_test_files()` picked it up on the
+        # merge — which is the whole point of deriving rather than hand-listing. It reads
+        # `deploy/generated/**` through the reset writers it contracts.
+        "test_reset_writer_contract_3598.py",
         "test_restart_verify_gates_3477.py",
         "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
