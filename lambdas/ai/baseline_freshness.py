@@ -135,6 +135,44 @@ def _is_day_reference(text: str, start: int) -> bool:
     return bool(_DAY_REFERENCE_ANCHOR_RE.search(text[max(0, start - _DAY_ANCHOR_LOOKBACK) : start]))
 
 
+# ── #3517: the pre-start temporal-direction rule ─────────────────────────────
+#
+# A direction word, then up to one clause of object text. `obj` is what
+# `_mentions_genesis` inspects, so the match is "this direction word governs a GENESIS
+# reference", never "this text mentions a reset somewhere". Clause-bounded (it stops at
+# sentence punctuation and at the coordinating/subordinating words that start a new
+# clause) so "since March, and the reset lands tomorrow" cannot be swept in.
+_PRE_START_DIRECTION_RE = re.compile(
+    r"\b(?:since|after|following|post)\b(?P<obj>[^.;!?\n]{0,70}?)(?=\s*(?:,|\band\b|\bbut\b|\bso\b|\bwhich\b|[.;!?\n]|$))",
+    re.IGNORECASE,
+)
+
+# The month names a narrative uses for the genesis date. Built once; the DATE is supplied
+# per call, so a re-anchor needs no edit here.
+_MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")
+
+# The genesis EVENT nouns. Deliberately not a mood list: these are the words that name
+# the cycle boundary itself, and pre-start there is nothing on the far side of it.
+_GENESIS_NOUN_RE = re.compile(r"\b(reset|restart|re-?anchor|relaunch|genesis|cycle\s+(?:start|began|begun|kickoff))\b", re.IGNORECASE)
+
+
+def _mentions_genesis(fragment: str, start_date_iso: str) -> bool:
+    """True iff `fragment` names the genesis — by event noun or by the genesis DATE."""
+    frag = fragment or ""
+    if _GENESIS_NOUN_RE.search(frag):
+        return True
+    try:
+        d = _dt.date.fromisoformat(str(start_date_iso))
+    except (TypeError, ValueError):
+        return False
+    month = _MONTHS[d.month - 1]
+    low = frag.lower()
+    if d.isoformat() in low:
+        return True
+    # "September 6", "September 6th", "Sept 6", "9/6" — the forms a coach actually writes.
+    return bool(re.search(rf"\b(?:{month}|{month[:3]})\.?\s+{d.day}(?:st|nd|rd|th)?\b", low) or re.search(rf"\b{d.month}/{d.day}\b", low))
+
+
 def _phase_for(generation_date_iso: str, start_date_iso: str):
     """Pure phase resolver mirroring pre_start_meta()/day_n().
 
@@ -450,4 +488,36 @@ def baseline_freshness_findings(
                             ),
                         }
                     )
+
+    # ── #3517: pre-start TEMPORAL DIRECTION ──────────────────────────────────
+    #
+    # THE GAP. Pre-start, this module handled only "Day N" claims — the #1691 shape. The
+    # live Day-0 sentence was a different one: "No weight reading has arrived SINCE the
+    # September 5th reset", with genesis a day away. It names no day number, so nothing
+    # above could see it; the genesis date is in the dates ALLOW-list (it is a real,
+    # grounded date), so the #1242 gate passed it; and the coach-quality judge scored the
+    # draft 92. Every deterministic instrument was green on a claim that a future event
+    # had already happened.
+    #
+    # The rule is about DIRECTION, not vocabulary: before genesis, no clause may place an
+    # event AFTER the genesis instant. `since|after|following|post` governing a genesis
+    # reference within the same clause is that placement, and there is no honest
+    # pre-start sentence of that shape. Positive control = the live sentence; negative
+    # control = "the reset lands tomorrow" (no direction word). Both pinned in
+    # tests/test_prestart_temporal_direction_3517.py.
+    if phase == "pre_start":
+        for m in _PRE_START_DIRECTION_RE.finditer(text):
+            if not _mentions_genesis(m.group("obj"), start_date_iso):
+                continue
+            findings.append(
+                {
+                    "type": "stale_phase",
+                    "claimed_day": None,
+                    "detail": (
+                        f'the narrative places an event AFTER genesis ("{m.group(0).strip()[:90]}"), but the generation '
+                        f"date {generation_date_iso} is BEFORE genesis {start_date_iso} — nothing can have happened "
+                        "since a reset that has not occurred"
+                    ),
+                }
+            )
     return findings

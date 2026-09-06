@@ -1161,6 +1161,83 @@ def mcp_sources() -> dict:
     return {k: v["checker_label"] for k, v in _freshness_pool().items()}
 
 
+# ── #3516: the narrative availability facet ──────────────────────────────────
+#
+# WHY. Every AI narrative surface collapsed a source to AVAILABLE / not available
+# (`coach_brief_input_gate.data_inventory`) or to a bare label (`ai_expert_analyzer`'s
+# `movement_source_state: {"garmin": "paused"}`). With no REASON attached, coaches filled
+# one in, and the one they reached for was a sync failure: live Day-0 output read "Garmin
+# step data isn't syncing to my dashboard yet" and "MacroFactor isn't syncing yet — that's
+# fine for today, but it needs to be running by tomorrow". Garmin is paused by ADR-074 and
+# cannot report at all; MacroFactor is ~24h behind BY DESIGN. Neither is a sync problem,
+# and on every day either is absent (Garmin: permanently) readers were told otherwise.
+#
+# `absence_sourcing`'s #3268 rule already says the right thing — "'no steps' grounded on a
+# paused Garmin is a hole in the record, not a fact about Matthew" — but it is wired into
+# grounded_generation/behavior_logs/pulse, not into the coach inventory. This is that same
+# ruling as a facet the inventory can render, derived from `paused` / `stale_hours` /
+# `method` rather than hand-typed at each surface.
+AVAILABILITY_LIVE = "live"
+AVAILABILITY_PAUSED = "paused"
+AVAILABILITY_LAGGING = "lagging"
+
+
+def availability_facet(source: str) -> dict:
+    """{status, reason, lag_hours, caveat} — why `source` may legitimately be silent.
+
+    status   AVAILABILITY_PAUSED  — the registry's `paused` facet is set. It CANNOT
+                                    report; an absence is a hole in the record.
+             AVAILABILITY_LAGGING — its `stale_hours` override exceeds the platform
+                                    default, i.e. the registry itself expects gaps
+                                    longer than a day between records.
+             AVAILABILITY_LIVE    — neither; an absence is about the world, not the pipe.
+    reason   the registry's own `method` string (falling back to `desc`) — never a
+             sentence composed here, so the ADR reference and the cadence come from the
+             one place they are maintained.
+    lag_hours the `stale_hours` override for a lagging source, else None.
+    caveat   THE one canonical sentence a narrative surface renders. Composed here, once,
+             so the coach inventory and the analyzer's `movement_source_reason` cannot
+             word the same fact two ways (that divergence is how the two live sentences
+             got their different fictions).
+
+    An unknown source id is `live` with an empty reason: a caller must never be able to
+    manufacture a caveat by mistyping a key.
+    """
+    entry = SOURCE_REGISTRY.get(source) or {}
+    reason = str(entry.get("method") or entry.get("desc") or "")
+    if entry.get("paused"):
+        caveat = (
+            "PAUSED in the source registry: it CANNOT report, so an absence here is a hole in the record,"
+            f" never a fact about Matthew and never a sync failure. Registry method: {reason}"
+        )
+        return {"status": AVAILABILITY_PAUSED, "reason": reason, "lag_hours": None, "caveat": caveat}
+    hours = entry.get("stale_hours")
+    if isinstance(hours, (int, float)) and hours > DEFAULT_STALE_HOURS:
+        caveat = (
+            f"LAGGING BY DESIGN: the registry expects up to {int(hours)}h between records before this source counts"
+            f" as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: {reason}"
+        )
+        return {"status": AVAILABILITY_LAGGING, "reason": reason, "lag_hours": int(hours), "caveat": caveat}
+    return {"status": AVAILABILITY_LIVE, "reason": reason if entry else "", "lag_hours": None, "caveat": ""}
+
+
+def caveated_source_ids() -> set:
+    """Every source whose absence needs a stated reason — THE SET, derived (#3516).
+
+    A narrative surface that renders availability must render this facet for every member
+    of this set that it lists. `tests/test_coach_source_facets_3516.py` asserts that over
+    the whole registry rather than over the two sources the live defect happened to name,
+    so a source becoming paused (or having its cadence loosened past the default) cannot
+    silently go back to being narrated as a sync failure.
+    """
+    return {k for k in SOURCE_REGISTRY if availability_facet(k)["status"] != AVAILABILITY_LIVE}
+
+
+def source_label(source: str) -> str:
+    """The registry's human label for `source` ('Garmin', 'MacroFactor'), '' if unknown."""
+    return str((SOURCE_REGISTRY.get(source) or {}).get("label") or "")
+
+
 # ── #498 facet helpers — each replaces a named hand-rolled enumeration ─────────
 
 

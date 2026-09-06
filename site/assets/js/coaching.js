@@ -38,6 +38,7 @@ import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 �
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
+import { rosterEntries } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 
 const SECTIONS = [
@@ -106,7 +107,10 @@ function entriesFor(s, data) {
   if (s.kind === "bycoach" || s.kind === "team") {
     // #1112: the head coach rides the same roster at lead tier — the card carries
     // c.tier so the list can render the cast hierarchy (lead treatment + badge).
-    const roster = (data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live, tier: c.tier }));
+    // #3517: the subtitle is pre-start-gated HERE, so every tab of the door tells one
+    // story. Before this, `preStart()` was applied per TAB (the Read tab only) while the
+    // roster served each coach's live Day-0 read as a card subtitle.
+    const roster = rosterEntries(data.coaches, { preStart: !!preStart() });
     // The Team leads with the collective read (CC-10, re-mounted from the retired
     // /story/coaches/ surface) — the head coach + huddle live here now.
     return s.kind === "team" ? [{ id: "team", title: "My Team", date: "the team's collective read on you" }].concat(roster) : roster;
@@ -1449,7 +1453,10 @@ async function selectSection(key, preId, push = true) {
   const listEl = $("[data-dx-list]");
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   let data = await secFetch(s);
-  if (s.kind === "bycoach" || s.kind === "team") data = await enrichCoachLive(data);
+  // #3517: no live enrichment pre-start — the only board read that exists before genesis
+  // is the WIPED prior cycle's. Fetching it and then dropping it would still ship it in
+  // the payload, so the fetch itself is gated.
+  if ((s.kind === "bycoach" || s.kind === "team") && !preStart()) data = await enrichCoachLive(data);
   const entries = entriesFor(s, data);
   if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-prose">Nothing to read yet. This section fills in once the experiment is underway — the first entries land after Day 1.</p>`; return; }
   listEl.innerHTML = entries.map((e) => `<li><button class="dx-item${e.tier === "lead" ? " dx-item--lead" : ""}" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}</span>${e.tier === "lead" ? `<span class="dx-item-lead label">head coach</span>` : ""}<span class="dx-item-d label">${esc(e.date || "")}</span>${e.sub ? `<span class="dx-item-sub">${esc(String(e.sub).slice(0, 90))}</span>` : ""}</button></li>`).join("");
