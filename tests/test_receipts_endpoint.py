@@ -18,6 +18,7 @@ numbers, so the guards here are mostly honesty guards:
   5. A CloudWatch failure costs you the spend curve, not the whole receipt.
 """
 
+import importlib
 import json
 import os
 import sys
@@ -323,11 +324,235 @@ def test_total_ssm_failure_returns_503_not_a_fabricated_receipt(monkeypatch):
     assert d["tier"] is None and d["stale"] is True
 
 
-# ── per-feature honesty (the reason there is no dollar column) ───────────────
-def test_per_feature_note_explains_why_tokens_not_dollars(monkeypatch):
+# ══════════════════════════════════════════════════════════════════════════════
+# #3555 — the withholding reason has to be TRUE
+#
+# This key used to read: "Per-feature usage is reported in tokens, not dollars: the
+# per-Lambda metric stream carries no model dimension, so pricing it would mean
+# inventing a model mix." Every clause of that is false of this platform.
+# `ai.bedrock_client._emit_usage_metrics` computes `estimate_cost_usd(usage, model_id)`
+# — the model IS known at the chokepoint — and emits `EstimatedCostUSD{LambdaFunction}`
+# from it. That landed 2026-06-16 (#142); the sentence was written 2026-07-21 (#1616),
+# five weeks later. Measured on the live account 2026-09-05, one GetMetricData over the
+# month returns daily-brief $2.4479, visual-ai-qa $1.7060, remediation-agent $1.5824 …
+# and the per-LambdaFunction sum ($9.2349) equals the per-CallerClass sum to the cent,
+# i.e. attribution is complete, not partial.
+#
+# A withholding excuse that misstates the system's own capability is the same ADR-104
+# failure as a flattering number, so it is guarded the same way: a phrase list that
+# must NOT appear, and a positive control proving the detector can fire.
+# ══════════════════════════════════════════════════════════════════════════════
+_DISPROVED_REASON_PHRASES = ("model dimension", "model mix", "inventing a model")
+
+
+def _false_reason_hits(note: str) -> list:
+    """Pure detector: which disproved-claim phrases a note contains (#3555)."""
+    low = (note or "").lower()
+    return [p for p in _DISPROVED_REASON_PHRASES if p in low]
+
+
+def test_the_false_withholding_reason_detector_actually_fires():
+    """Positive control FIRST (the check_doc_facts house rule). Without this, a green
+    assertion below could mean "the phrase list never matched anything"."""
+    old_note = (
+        "Per-feature usage is reported in tokens, not dollars: the per-Lambda metric "
+        "stream carries no model dimension, so pricing it would mean inventing a model mix."
+    )
+    assert _false_reason_hits(old_note) == list(_DISPROVED_REASON_PHRASES)
+
+
+def test_per_feature_note_no_longer_states_a_reason_that_was_never_true(monkeypatch):
     _install(monkeypatch, _ssm_with(_breakdown()))
     note = _payload(sai.handle_receipts())["per_feature_note"]
-    assert "tokens" in note and "model dimension" in note
+    assert _false_reason_hits(note) == [], f"the disproved withholding reason is back: {note}"
+
+
+def test_per_feature_note_states_the_limit_that_is_real(monkeypatch):
+    """Not simply deleting the excuse: the honest limits are self-metering (an estimate
+    against list prices, reconciled to the native meter) and the row being a LAMBDA
+    rather than a budget_guard feature — which is why several ledger rows are ungraded."""
+    _install(monkeypatch, _ssm_with(_breakdown()))
+    note = _payload(sai.handle_receipts())["per_feature_note"].lower()
+    assert "self-metered" in note
+    assert "estimate" in note and "billed figure" in note
+    assert "lambda" in note and "feature" in note
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3554 — a projection may not wear a label broader than its scope
+#
+# Live 2026-09-05T06:57Z: /api/receipts served `projected_month_end_usd 83.7`,
+# `projected_pct_of_ceiling 33.2`, tier 0/green, and NO scope field, while
+# /life-platform/budget-breakdown one hop upstream carried `projected_all_classes
+# 103.49`, `prod_class_share 0.6956`, `projected_classes ['prod-cron','remediation']`
+# and `episodic_classes ['ci','dev-session']`. The published figure extrapolates only
+# the recurring caller classes (#2892 — the right input for the tier ladder) and was
+# printed under the bare label "projected month-end".
+#
+# Derivation of both numbers from that same payload, for the record:
+#   days_remaining = 30 - 4 = 26
+#   all classes:  13.8 + (0.95 + 2.50) * 26            = 103.5   (payload: 103.49)
+#   recurring:    13.8 + (0.95 + 2.50 * 0.6956) * 26   =  83.7   (payload:  83.70)
+# ══════════════════════════════════════════════════════════════════════════════
+_SCOPED = {
+    "prod_class_share": 0.6956,
+    "projected_all_classes": 103.49,
+    "projected_classes": ["prod-cron", "remediation"],
+    "episodic_classes": ["ci", "dev-session"],
+}
+# The effective ceiling on the day the defect was captured — DERIVED, never hand-typed
+# (#2898 binds tests too). Reader traffic was 1,011 uniques/7d against the 900 threshold,
+# so the surge ceiling was in force.
+_LIVE_CEILING = importlib.import_module("operational.cost_governor_lambda").SURGE_CEILING_USD
+
+
+def _scope_contract_violations(payload: dict) -> list:
+    """Pure decision function: the ways a receipts payload can publish a narrow number
+    under a broad label. Takes the payload as an argument and reads nothing else, so the
+    RULE can be mutation-proved against a synthetic pre-#3554 payload."""
+    bad = []
+    if payload.get("projected_month_end_usd") is None:
+        return bad  # nothing published, nothing to mislabel
+    if not payload.get("projected_scope"):
+        bad.append("projection published with no scope")
+    if payload.get("projected_all_classes_usd") is None:
+        bad.append("no all-class projection published beside the narrowed one")
+    if not payload.get("projection_note"):
+        bad.append("no reader-facing statement of what the projection covers")
+    if payload.get("projected_all_classes_usd") is not None and payload.get("projected_all_classes_pct_of_ceiling") is None:
+        bad.append("all-class figure published with no percentage beside its sibling")
+    return bad
+
+
+def test_the_scope_contract_detector_reds_on_the_pre_fix_payload():
+    """The negative control: reintroduce the defect as a payload and the rule must fail.
+    These are the exact keys the live endpoint served on 2026-09-05."""
+    pre_fix = {"projected_month_end_usd": 83.7, "projected_pct_of_ceiling": 33.2}
+    assert _scope_contract_violations(pre_fix), "the scope rule cannot fail — it guards nothing"
+    assert len(_scope_contract_violations(pre_fix)) == 3
+    # …and the fourth leg, on a payload that publishes the all-class dollar figure but
+    # leaves the reader to divide it by the ceiling themselves.
+    half_fixed = dict(pre_fix, projected_scope="x", projection_note="y", projected_all_classes_usd=103.49)
+    assert _scope_contract_violations(half_fixed) == ["all-class figure published with no percentage beside its sibling"]
+
+
+def test_the_projection_never_ships_without_its_scope(monkeypatch):
+    _install(monkeypatch, _ssm_with(_breakdown(**_SCOPED)))
+    d = _payload(sai.handle_receipts())
+    assert _scope_contract_violations(d) == []
+
+
+def test_both_projections_ship_with_the_ceiling_percentage_of_each(monkeypatch):
+    bd = _breakdown(projected=83.7, ceiling=_LIVE_CEILING, **_SCOPED)
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+    assert d["projected_month_end_usd"] == 83.7
+    assert d["projected_all_classes_usd"] == 103.49
+    assert d["projected_pct_of_ceiling"] == round(83.7 / _LIVE_CEILING * 100, 1)
+    assert d["projected_all_classes_pct_of_ceiling"] == round(103.49 / _LIVE_CEILING * 100, 1)
+    # …and the two percentages are genuinely different, or this asserts nothing.
+    assert d["projected_all_classes_pct_of_ceiling"] > d["projected_pct_of_ceiling"] + 5
+    # Both figures are the governor's own; neither is recomputed here.
+    assert d["projected_classes"] == ["prod-cron", "remediation"]
+    assert d["episodic_classes"] == ["ci", "dev-session"]
+
+
+def test_the_scope_label_names_the_classes_that_are_and_are_not_extrapolated(monkeypatch):
+    _install(monkeypatch, _ssm_with(_breakdown(**_SCOPED)))
+    d = _payload(sai.handle_receipts())
+    assert "recurring" in d["projected_scope"]
+    assert "prod-cron" in d["projected_scope"] and "remediation" in d["projected_scope"]
+    note = d["projection_note"]
+    assert "ci" in note and "dev-session" in note
+    assert "103.49" in note, "the all-class figure must be stated in prose, not only as a field"
+
+
+def test_no_caller_class_signal_is_stated_as_all_classes_not_as_a_narrowing(monkeypatch):
+    """`prod_class_share is None` is the governor's own "no attribution this run" marker,
+    and in that case `projected` IS the all-class figure by construction. Claiming a
+    narrowing that did not happen would be the inverse of this issue's defect."""
+    bd = _breakdown(projected=90.0, prod_class_share=None, projected_all_classes=90.0)
+    bd["projected_classes"] = ["prod-cron", "remediation"]
+    bd["episodic_classes"] = ["ci", "dev-session"]
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+    assert d["projected_scope"] == "all spend classes"
+    assert "all spend classes" in d["projection_note"]
+    assert "recurring" not in d["projected_scope"]
+
+
+# ── #3554 AC3: the premise the narrowing rests on, surfaced ──────────────────
+def test_a_broken_episodic_premise_reaches_the_reader(monkeypatch):
+    """An "episodic" class that bills on ~every day of the window is not episodic, and
+    the exclusion it justifies is then under-projecting. The page says so."""
+    bd = _breakdown(
+        **_SCOPED,
+        episodic_billing_days={"prod-cron": 30, "ci": 28, "dev-session": 4, "remediation": 13},
+        episodic_premise_window_days=30,
+        episodic_premise_bar_days=25,
+        episodic_premise_violations=["ci"],
+    )
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+    assert d["episodic_premise_violations"] == ["ci"]
+    assert "28 of the last 30 days" in d["projection_note"]
+    assert d["episodic_billing_days"]["ci"] == 28
+
+
+def test_an_intact_premise_adds_no_alarming_prose(monkeypatch):
+    """The negative control for the clause above: a genuinely episodic class must not
+    produce a warning, or the warning stops meaning anything."""
+    bd = _breakdown(
+        **_SCOPED,
+        episodic_billing_days={"prod-cron": 30, "ci": 6, "dev-session": 2, "remediation": 13},
+        episodic_premise_window_days=30,
+        episodic_premise_bar_days=25,
+        episodic_premise_violations=[],
+    )
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+    assert d["episodic_premise_violations"] == []
+    assert "Premise check" not in d["projection_note"]
+
+
+def test_an_unreadable_premise_measurement_says_so_rather_than_passing(monkeypatch):
+    """A failed metric read records None, not 0 — absence must never render as a clean
+    bill of health for the label."""
+    bd = _breakdown(
+        **_SCOPED,
+        episodic_billing_days={"ci": None, "dev-session": None},
+        episodic_premise_window_days=30,
+        episodic_premise_bar_days=25,
+        episodic_premise_violations=[],
+    )
+    _install(monkeypatch, _ssm_with(bd))
+    d = _payload(sai.handle_receipts())
+    assert "unavailable this run" in d["projection_note"]
+
+
+def test_a_stale_breakdown_publishes_no_scope_figures_either(monkeypatch):
+    """The staleness rule is the page's oldest honesty contract; the new fields join it
+    rather than becoming the one number that quietly freezes."""
+    _install(monkeypatch, _ssm_with(_breakdown(age_hours=72, **_SCOPED)))
+    d = _payload(sai.handle_receipts())
+    assert d["stale"] is True
+    assert d["projected_month_end_usd"] is None
+    assert d["projected_all_classes_usd"] is None
+    assert d["projected_scope"] is None
+
+
+# ── /api/status reads the same scope, so the two surfaces cannot disagree ────
+def test_status_cost_block_carries_the_same_scope(monkeypatch):
+    from ai import budget_guard
+
+    bd = _breakdown(projected=83.7, ceiling=_LIVE_CEILING, tier=0, **_SCOPED)
+    monkeypatch.setattr(budget_guard, "read_breakdown", lambda *a, **k: bd)
+    block = sai._budget._budget_cost_block()
+    assert block["projected"] == 83.7
+    assert block["projected_all_classes"] == 103.49
+    assert "recurring" in block["projected_scope"]
+    assert block["pct_of_budget"] == round(83.7 / _LIVE_CEILING * 100)
+    assert block["pct_of_budget_all_classes"] == round(103.49 / _LIVE_CEILING * 100)
 
 
 # ── 6. the projection anchor date (#1618) ────────────────────────────────────
@@ -357,3 +582,45 @@ def test_receipts_route_registered():
     from web import site_api_lambda as sal
 
     assert sal.ROUTES["/api/receipts"] is sai.handle_receipts
+
+
+# ── the schema baselines pin the new fields (#3554 / #3555) ──────────────────
+def _snapshot(slug):
+    return json.loads((Path(__file__).resolve().parent / "api_schemas" / f"{slug}.json").read_text())["shape"]["keys"]
+
+
+def test_receipts_schema_baseline_pins_the_scope_fields():
+    """The contract baseline, not just the handler: a later PR that drops a scope field
+    from the payload has to drop it here too, which is a reviewable edit rather than a
+    silent regression to a narrow number under a broad label."""
+    keys = _snapshot("api_receipts")
+    for k in (
+        "projected_month_end_usd",
+        "projected_all_classes_usd",
+        "projected_all_classes_pct_of_ceiling",
+        "projected_scope",
+        "projected_classes",
+        "episodic_classes",
+        "episodic_billing_days",
+        "episodic_premise_violations",
+        "projection_note",
+    ):
+        assert k in keys, f"api_receipts.json no longer pins {k}"
+
+
+def test_inference_receipt_schema_baseline_pins_the_dollar_column():
+    keys = _snapshot("api_inference_receipt")
+    assert "month_est_cost_usd" in keys["features"]["items"]["keys"], "the per-feature dollar field left the contract"
+    assert "attribution" in keys
+    for k in ("reconciliation_ratio", "drift_bar", "unattributed_usd", "note"):
+        assert k in keys["attribution"]["keys"]
+
+
+def test_the_served_payload_supplies_every_scope_key_the_baseline_pins(monkeypatch):
+    """Fixture must be the wire: the two assertions above are about a committed FILE, so
+    without this one they could both pass against a handler that publishes none of it."""
+    _install(monkeypatch, _ssm_with(_breakdown(**_SCOPED)))
+    served = _payload(sai.handle_receipts())
+    baseline = set(_snapshot("api_receipts"))
+    scope_keys = {k for k in baseline if k.startswith(("projected_", "episodic_", "projection_"))}
+    assert scope_keys <= set(served), f"handler omits pinned keys: {sorted(scope_keys - set(served))}"

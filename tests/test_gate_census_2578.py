@@ -533,7 +533,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # sender default names a .invalid domain SES can never have verified).
         # BASELINE_TOTAL_GATES is deliberately NOT moved: #3588/#3629 net-removed one gate
         # in the same window, so the live total stays at the committed 597.
-        # Upper bound raised 55 -> 56 (2026-09-06, #3596): the 56th proof is
+        # Upper bound raised 66 -> 67 (2026-09-06, #3596): the 67th proof is
         # `structural::test_role_family_write_scope.py` — IAM write-scope parity as a ROLE
         # FAMILY (every create_platform_lambda's module AST-read for DynamoDB write verbs and
         # pk literals against the role_policies* statements its stack wires to it). Mutation-
@@ -543,7 +543,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # DynamoDB and that no CDK stack maps to a role).
         3
         <= len(proven)
-        <= 56  # 55 -> 56: #3596's role-family parity; 53 -> 55: #3635's two hand-proven structural entrants, measured on the merged tree (2026-09-06)  # 51 -> 53: #3581's two proven mirror registries, measured on the merged tree (2026-09-06)
+        <= 67  # 66 -> 67: #3596's role-family parity; 65 -> 66: #3570's raw-zone-drift guard proof (guard::scripts/check_raw_zone_drift.py), measured on the merged tree (2026-09-06), atop 65 (re-measured 2026-09-06 on the merged tree: #3580's eight proven entrants atop main)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

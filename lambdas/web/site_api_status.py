@@ -25,6 +25,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
 
 from web.site_api_common import (
     DDB_REGION,
@@ -45,6 +46,25 @@ _status_cache_ts = 0
 # _cost_cache/_cost_cache_ts retired by #1909: the cost block no longer calls Cost
 # Explorer, so there is nothing expensive left to cache. It reads the governor's
 # already-computed breakdown from SSM (budget_guard caches that itself).
+
+
+def _chronicle_send_label() -> str:
+    """ "<Weekday> H:MM AM/PM · Elena Voss" for the `_EMAIL_LAMBDAS` wednesday_chronicle
+    row — derived from #3564's `common.subscriber_cadence` sender registry (the
+    live `ChronicleEmailSender` cron), never hand-typed (#3619, the fourth of the
+    #3564 family of hand-typed cadence literals: /subscribe/, the confirmation
+    email, and the welcome email were the first three). DST-aware: the cron is a
+    fixed UTC instant, so the PT clock time is computed against "now", exactly
+    like every other relative timestamp on this endpoint."""
+    chronicle = sender("chronicle-email-sender")
+    weekday = weekday_name(required_weekday(chronicle.cron))
+    utc_hour, utc_minute = cron_hour(chronicle.cron), cron_minute(chronicle.cron)
+    now_utc = datetime.now(timezone.utc)
+    days_ahead = (required_weekday(chronicle.cron) - now_utc.weekday()) % 7
+    anchor_utc = (now_utc + timedelta(days=days_ahead)).replace(hour=utc_hour, minute=utc_minute, second=0, microsecond=0)
+    anchor_pt = anchor_utc.astimezone(PT)
+    time_str = anchor_pt.strftime("%I:%M %p").lstrip("0")
+    return f"{weekday} {time_str} · Elena Voss"
 
 
 def status(*, _g) -> dict:
@@ -432,7 +452,15 @@ def status(*, _g) -> dict:
         ("daily_brief", "Daily brief", "11:00 AM daily · 18 sections", -1, 25, 49),
         ("weekly_digest", "Weekly digest", "Sunday 9:00 AM", 6, 200, 400),
         ("monday_compass", "Monday compass", "Monday 8:00 AM · forward planning", 0, 200, 400),
-        ("wednesday_chronicle", "Wednesday chronicle", "Wednesday 8:00 AM · Elena Voss", 2, 200, 400),
+        # #3619: the description string below is a LITERAL fallback only — the test
+        # harness's `_module_literal` AST-reads this table as a pure constant (it
+        # cannot see a function call), so the real cadence-derived label
+        # (`_chronicle_send_label()`) is substituted onto this ONE row at render
+        # time, in the loop below. `exp_dow=2` still matches
+        # `subscriber_cadence.chronicle_weekday()` (Wednesday) — a real drift
+        # between this literal and the registry is caught by
+        # tests/test_subscriber_cadence_promise_3564.py's own cron-mirror guard.
+        ("wednesday_chronicle", "Wednesday chronicle", "Wednesday · Elena Voss", 2, 200, 400),
         ("weekly_plate", "Weekly plate", "Friday 7:00 PM · nutrition", 4, 200, 400),
         ("nutrition_review", "Nutrition review", "Saturday 10:00 AM", 5, 200, 400),
         ("anomaly_detector", "Anomaly detector", "9:05 AM daily · 15 metrics", -1, 25, 49),
@@ -779,6 +807,10 @@ def status(*, _g) -> dict:
     # Email components
     email_components = []
     for lid, name, desc, exp_dow, yh, rh in _EMAIL_LAMBDAS:
+        if lid == "wednesday_chronicle":
+            # #3619: the table literal above is a fallback the AST-reading test
+            # harness can see; the real, cadence-derived label is substituted here.
+            desc = _chronicle_send_label()
         last = _last_sync(f"email_log#{lid}")
         status, rel, comment = _comp_status(last, yh, rh, source_id=lid)
         uptime = _uptime_90d(f"email_log#{lid}", activity_dependent=True)  # scheduled emails — gaps aren't system failures

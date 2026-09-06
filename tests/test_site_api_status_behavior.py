@@ -1427,6 +1427,28 @@ def test_the_published_mcp_tool_count_matches_the_registry(monkeypatch):
     assert int(published.group(1)) == tool_count
 
 
+def test_wednesday_chronicle_description_is_cadence_derived_not_hand_typed(monkeypatch):
+    """#3619 (ROW3, the fourth #3564 hand-typed-cadence-literal): the
+    wednesday_chronicle row's description used to be the hand-typed string
+    'Wednesday 8:00 AM · Elena Voss' — 10 minutes imprecise (the sender's real
+    cron is 15:10 UTC, not 15:00) and structurally unable to move if the cron
+    ever did. It is now rendered from `common.subscriber_cadence`'s live
+    `ChronicleEmailSender` cron at request time (`_chronicle_send_label`), the
+    same registry #3564 built for the /subscribe/ promise. FROZEN_NOW
+    (2026-08-05, a Wednesday, PDT) proves the exact derived clock time."""
+    from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender
+
+    chronicle = sender("chronicle-email-sender")
+    desc = by_id(Harness(monkeypatch, healthy_platform().build()).body(), "email", "wednesday_chronicle")["description"]
+    assert desc.endswith("Elena Voss")
+    assert desc.startswith("Wednesday")
+    # The exact PT clock time for the sender's real UTC cron, not a rounded guess.
+    utc_hour, utc_minute = cron_hour(chronicle.cron), cron_minute(chronicle.cron)
+    assert (utc_hour, utc_minute) == (15, 10), "sender cron changed — update this test's expected PT time too"
+    assert "8:10 AM" in desc  # 15:10 UTC - 7h PDT
+    assert required_weekday(chronicle.cron) == 2  # Wednesday — must still match the _EMAIL_LAMBDAS exp_dow literal
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 11. The rollup — one traffic light
 # ══════════════════════════════════════════════════════════════════════════════

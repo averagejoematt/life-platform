@@ -397,6 +397,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # 'YYYY-MM-DD.json'); the registry previously claimed a single generation.
             "filename_legacy": "DD.json",
             "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+            # #3570: a further, no-user-segment predecessor generation — same X-9
+            # family whoop/todoist/weather already carry — found live 2026-09-06 by
+            # the raw-zone drift check, previously undocumented for this source.
+            "unmodeled_legacy": {
+                "dated": "2026-09-06",
+                "prefix": "raw/withings/measurements",
+                "scheme": "date-tree",
+                "filename": "DD.json",
+                "note": "1155 objects, all written 2026-02-21 (a one-time bulk historical import — content dates "
+                "2012-06..2026-03), live-confirmed via read-only aws s3 ls. Same X-9 no-user-segment predecessor "
+                "shape as raw/whoop and raw/todoist; modeling a replay path is out of this Small story's scope. #3570.",
+            },
         },
         # #914: weigh-ins are a manual engagement channel — he has to step on the
         # scale. Sporadic (~weekly is healthy), so a lenient ~10d before "quiet".
@@ -426,6 +438,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # 'YYYY-MM-DD.json'; the registry previously claimed a single generation.
             "filename_legacy": "DD.json",
             "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+            # #3570: a further, no-user-segment predecessor generation — same X-9
+            # family whoop/todoist/weather already carry — found live 2026-09-06 by
+            # the raw-zone drift check, previously undocumented for this source.
+            "unmodeled_legacy": {
+                "dated": "2026-09-06",
+                "prefix": "raw/strava/activities",
+                "scheme": "date-tree",
+                "filename": "DD.json",
+                "note": "1173 objects, all written 2026-02-21 (a one-time bulk historical import — content dates "
+                "2009-05..2026-03), live-confirmed via read-only aws s3 ls. Same X-9 no-user-segment predecessor "
+                "shape as raw/whoop and raw/todoist; modeling a replay path is out of this Small story's scope. #3570.",
+            },
         },
         # #3252: an activity IS a workout record, and it arrives without Matthew
         # typing anything. That is exactly the auto-synced case the 2026-08-28 ruling
@@ -460,6 +484,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # on is 'YYYY-MM-DD.json'; the registry previously claimed a single generation.
             "filename_legacy": "DD.json",
             "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+            # #3570: a further, no-user-segment predecessor generation — same X-9
+            # family whoop/todoist/weather already carry — found live 2026-09-06 by
+            # the raw-zone drift check, previously undocumented for this source.
+            "unmodeled_legacy": {
+                "dated": "2026-09-06",
+                "prefix": "raw/eightsleep",
+                "scheme": "date-tree",
+                "filename": "DD.json",
+                "note": "882 objects, all written 2026-02-22 (a one-time bulk historical import — content dates "
+                "2023-07..2026-03), live-confirmed via read-only aws s3 ls. Same X-9 no-user-segment predecessor "
+                "shape as raw/whoop and raw/todoist; modeling a replay path is out of this Small story's scope. #3570.",
+            },
         },
     },
     "apple_health": {
@@ -517,10 +553,82 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "filename": "DD_{contenthash16}.json",
             "filename_legacy": "DD_HHMMSS.json",
             "sub_layouts": {
-                "cgm_readings": {"prefix": "raw/matthew/cgm_readings", "scheme": "date-tree", "filename": "DD.json"},
+                "cgm_readings": {
+                    "prefix": "raw/matthew/cgm_readings",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                    # #3570: no-user-segment predecessor, found live 2026-09-06.
+                    "unmodeled_legacy": {
+                        "dated": "2026-09-06",
+                        "prefix": "raw/cgm_readings",
+                        "scheme": "date-tree",
+                        "filename": "DD.json",
+                        "note": "163 objects, live-confirmed via read-only aws s3 ls; same X-9 no-user-segment "
+                        "predecessor shape as raw/whoop. Modeling a replay path is out of this Small story's scope. #3570.",
+                    },
+                },
                 "blood_pressure": {"prefix": "raw/matthew/blood_pressure", "scheme": "date-tree", "filename": "DD.json"},
-                "state_of_mind": {"prefix": "raw/matthew/state_of_mind", "scheme": "date-tree", "filename": "DD.json"},
-                "workouts": {"prefix": "raw/matthew/workouts", "scheme": "date-tree", "filename": "DD.json"},
+                "state_of_mind": {
+                    "prefix": "raw/matthew/state_of_mind",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                    # #3570: no-user-segment predecessor, found live 2026-09-06.
+                    "unmodeled_legacy": {
+                        "dated": "2026-09-06",
+                        "prefix": "raw/state_of_mind",
+                        "scheme": "date-tree",
+                        "filename": "DD.json",
+                        "note": "1 object, live-confirmed via read-only aws s3 ls; same X-9 no-user-segment "
+                        "predecessor shape as raw/whoop. Modeling a replay path is out of this Small story's scope. #3570.",
+                    },
+                },
+                "workouts": {
+                    "prefix": "raw/matthew/workouts",
+                    "scheme": "date-tree",
+                    "filename": "DD.json",
+                    # #3570: no-user-segment predecessor, found live 2026-09-06.
+                    "unmodeled_legacy": {
+                        "dated": "2026-09-06",
+                        "prefix": "raw/workouts",
+                        "scheme": "date-tree",
+                        "filename": "DD.json",
+                        "note": "10 objects, live-confirmed via read-only aws s3 ls; same X-9 no-user-segment "
+                        "predecessor shape as raw/whoop. Modeling a replay path is out of this Small story's scope. #3570.",
+                    },
+                },
+            },
+            # #3570 (DA-8, found by the 2026-09-05 /review full baseline, reverified
+            # live 2026-09-06): a WHOLLY SEPARATE historical generation — a one-time
+            # Apple Health full-export gz dump (YYYY/MM/DD.json.gz, 2012-onward
+            # records), distinct from the HAE webhook sub-datatypes above (which are
+            # live near-real-time captures, not a historical bulk export). It exists
+            # in TWO real copies neither previous review named:
+            #   raw/apple_health/            3864 objects, written 2026-02-21
+            #   raw/matthew/apple_health/    3871 objects, written 2026-03-08
+            # A third and fourth copy exist under raw/matthew/matthew/ — those are an
+            # ACCIDENT (a recursive re-copy of the whole raw/matthew/ tree made during
+            # the 2026-03-08 bulk import, not a real generation of apple_health's own
+            # history) and are documented once, generically, in
+            # NON_INGESTION_RAW_PREFIXES['raw/matthew/matthew'] below rather than here.
+            # Read by scripts/check_raw_zone_drift.py; no production reader resolves a
+            # key from this facet (same posture as `unmodeled_legacy` elsewhere —
+            # modeling a REPLAY path for a one-time historical dump is out of this
+            # story's Small scope; this exists so a registry reader sees a sized,
+            # dated, explained gap instead of silently inferring apple_health has no
+            # more history before the HAE webhook went live).
+            "unmodeled_legacy": {
+                "dated": "2026-09-06",
+                "prefix": "raw/apple_health, raw/matthew/apple_health, raw/health_auto_export",
+                "scheme": "date-tree",
+                "filename": "YYYY/MM/DD.json.gz (raw/health_auto_export: timestamped, DD_HHMMSS.json)",
+                "note": "Two real full-history Apple Health gz-export generations, live-confirmed 2026-09-06 via "
+                "read-only aws s3 ls: raw/apple_health/ (3864 objects, written 2026-02-21) and "
+                "raw/matthew/apple_health/ (3871 objects, written 2026-03-08). PLUS a no-user-segment predecessor "
+                "of the HAE webhook payload archive itself — raw/health_auto_export/ (55 objects, written "
+                "2026-02-24..2026-03-07) — same X-9 family as raw/whoop/raw/todoist. The similarly-named "
+                "raw/matthew/matthew/apple_health/ and raw/matthew/matthew/matthew/apple_health/ are the "
+                "recursive-copy ACCIDENT documented on NON_INGESTION_RAW_PREFIXES['raw/matthew/matthew'], not a "
+                "third/fourth generation of this one. #3570.",
             },
         },
         # #746: the manual HAE capture channel. The partition itself is passive
@@ -704,6 +812,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                     "note": "historical — written by the 2026-02 one-off backfill, not by the current lambda",
                 },
             },
+            # #3570: a further, no-user-segment predecessor generation — same X-9
+            # family whoop/todoist/weather already carry — found live 2026-09-06 by
+            # the raw-zone drift check, previously undocumented for this source.
+            "unmodeled_legacy": {
+                "dated": "2026-09-06",
+                "prefix": "raw/macrofactor",
+                "scheme": "date-tree",
+                "filename": "<uploaded-filename>.csv",
+                "note": "28 objects, written 2026-02-23..2026-03-07 (ingest-month content 2026-02..2026-03), "
+                "live-confirmed via read-only aws s3 ls. Same X-9 no-user-segment predecessor shape as raw/whoop "
+                "and raw/todoist; modeling a replay path is out of this Small story's scope. #3570.",
+            },
         },
         # #914: the PRIMARY presence anchor — the daily-expected manual channel and
         # the first, most reliable thing to stop when routine breaks.
@@ -806,6 +926,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # not what date it names.
             "filename_legacy": "DD.json",
             "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped DD.json→YYYY-MM-DD.json mid-tree; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+            # #3570: a further, no-user-segment predecessor generation — same X-9
+            # family whoop/todoist/weather already carry — found live 2026-09-06 by
+            # the raw-zone drift check, previously undocumented for this source.
+            "unmodeled_legacy": {
+                "dated": "2026-09-06",
+                "prefix": "raw/garmin",
+                "scheme": "date-tree",
+                "filename": "DD.json",
+                "note": "1406 objects, all written 2026-02-23 (a one-time bulk historical import — content dates "
+                "2022-04..2026-03), live-confirmed via read-only aws s3 ls. Same X-9 no-user-segment predecessor "
+                "shape as raw/whoop and raw/todoist; modeling a replay path is out of this Small story's scope. #3570.",
+            },
         },
         # TR-07 (#415): NO provider_reconcile facet — deliberate. Garmin is paused
         # (ADR-074, datacenter-IP 429 block) and even when live is capped at 4x/day
@@ -1047,6 +1179,53 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "metrics": None,
         "posture": "load-bearing",  # nutrition's transport
         "raw_layout": None,
+    },
+}
+
+# ── Non-ingestion / accidental raw/ prefixes (#3570) ──────────────────────────────
+# Top-level prefixes live under `raw/` or `raw/matthew/` that are NOT accounted for by
+# any source's `raw_layout` (or its `sub_layouts`/`unmodeled_legacy`) above, but ARE
+# real, live S3 content a drift walker must not flag as an unexplained gap. Two kinds:
+#   - a real non-ingestion capture prefix (labs, inbound_email): no SOURCE_REGISTRY
+#     entry because nothing in this file ingests it — a human uploads the object
+#     directly, or it is intake-side capture rather than a normalized metric source.
+#   - a dated, explained ACCIDENT (matthew/matthew): a real generation gets a
+#     `raw_layout`/`unmodeled_legacy` entry on its OWN source instead — this dict is
+#     for content that isn't a source's history at all.
+# Each entry: {dated, note}, keyed by the FULL prefix (raw/<x> or raw/matthew/<x>) —
+# read by scripts/check_raw_zone_drift.py, which asserts every live top-level prefix
+# under raw/ and raw/matthew/ is covered by either a raw_layout-derived root or an
+# entry here. No production code path resolves a key from this dict — same posture as
+# `unmodeled_legacy` (nothing to resolve; it exists so a reader sees an honest,
+# explained gap instead of silently inferring one doesn't exist).
+NON_INGESTION_RAW_PREFIXES: dict[str, dict[str, str]] = {
+    "raw/matthew/labs": {
+        "dated": "2026-09-06",
+        "note": "raw/matthew/labs/<draw-date>/*.pdf|.md — hand-uploaded lab documents (DEXA, bloodwork), 7 objects "
+        "live-confirmed 2026-09-06 via read-only aws s3 ls. No SOURCE_REGISTRY ingestion entry: nothing in this "
+        "file writes here, a human uploads the PDF/markdown pair directly. #3570.",
+    },
+    "raw/inbound_email": {
+        "dated": "2026-09-06",
+        "note": "Legacy no-user-segment inbound-email capture prefix, 4 objects live-confirmed 2026-09-06 — see "
+        "raw/matthew/inbound_email below for the current one. Intake-side message capture, not a normalized "
+        "SOURCE_REGISTRY metric source. #3570.",
+    },
+    "raw/matthew/inbound_email": {
+        "dated": "2026-09-06",
+        "note": "Current inbound-email capture prefix, 4 objects live-confirmed 2026-09-06. Same non-metric "
+        "posture as raw/inbound_email above. #3570.",
+    },
+    "raw/matthew/matthew": {
+        "dated": "2026-09-06",
+        "note": "An ACCIDENT, not a fourth generation of anything: 9,634 objects total (apple_health 3864, a "
+        "further-nested raw/matthew/matthew/matthew/apple_health/ 3246, garmin 1406, eightsleep 882, "
+        "cgm_readings 149, health_auto_export 55, macrofactor 28, inbound_email 4), every object written "
+        "2026-03-08, live-confirmed 2026-09-06 via read-only aws s3 ls — an accidental recursive re-copy of "
+        "raw/matthew/** made during that day's bulk historical import (the nested .../matthew/matthew/apple_health/ "
+        "is the SAME bug one level deeper, apple_health only). raw/* is delete-protected (ADR-032/033/046), so "
+        "this cannot be cleaned up; DIL-028 replay tooling must treat raw/matthew/matthew/** as excluded, never "
+        "as additional source history. #3570.",
     },
 }
 

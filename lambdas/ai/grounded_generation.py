@@ -95,6 +95,14 @@ try:
 except ImportError:  # pragma: no cover — flat/layer bundle layout
     import regen_discard_telemetry as _regen_telemetry  # type: ignore[no-redef]
 
+# 9. The plan-figure class (#3518) lives in ai/plan_facts_gate.py — a plan-FRAMED figure
+# must equal what the plan root states, never what the prompt happened to contain. Only
+# its correction line is needed here; callers arm it directly (coach_state_updater).
+try:
+    from ai import plan_facts_gate as _plan_gate
+except ImportError:  # pragma: no cover — flat/layer bundle layout
+    import plan_facts_gate as _plan_gate  # type: ignore[import-not-found,no-redef]
+
 # 8. The regen keep/discard predicate (#3217) lives in ai/regen_keep_predicate.py — the
 # decision is a registry of finding classes plus a multiset comparison, and it needs to be
 # exercisable on adversarial inputs without a model call in the way.
@@ -862,6 +870,12 @@ def correction_prompt(findings: list) -> str:
             )
         elif f.get("type") in _night_scope.FINDING_TYPES:  # #1968
             lines.append(f"{i}. {_night_scope.correction_line(f)}")
+        elif f.get("type") == "stale_reset_date":  # #3614
+            lines.append(
+                f"{i}. {f['detail']}. Use {f['expected']} for the reset/genesis date, or drop the date — never a reset that did not happen."
+            )
+        elif f.get("type") == _plan_gate.FINDING_TYPE:  # #3518
+            lines.append(f"{i}. {_plan_gate.correction_line(f)}")
         elif f.get("type") == "unresolvable_precedent":
             lines.append(
                 f"{i}. {f['detail']}. Cite ONLY a precedent date that was provided to you (with its link + similarity), "

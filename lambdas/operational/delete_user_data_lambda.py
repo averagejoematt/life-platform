@@ -49,6 +49,12 @@ SUBSCRIBER RETENTION SWEEP (#1350):
   past lambdas/subscriber_retention.py::RETENTION_WINDOW_DAYS (=0). Only the
   PII is scrubbed — sk/status/timestamps and the subscriber COUNT are preserved. The
   attended operator equivalent is deploy/subscriber_retention_purge.py.
+
+  Same event also runs the PENDING-EXPIRY leg (#3566): a `pending_confirmation` row
+  whose confirm token expired more than `PENDING_EXPIRY_GRACE_DAYS` (=7) days ago is a
+  dead attempt, not a live one — it transitions to a terminal `status="expired"` with
+  the same PII scrub, so it stops being counted as a live pending in the funnel and
+  stops retaining a plaintext email nobody will ever click to confirm.
 """
 
 from __future__ import annotations
@@ -67,10 +73,13 @@ import boto3
 # other bundled lambdas/ tree module per #781), so the scheduled sweep here and the attended CLI
 # (deploy/subscriber_retention_purge.py) can never drift on the window Matthew signed.
 from content.subscriber_retention import (
+    PENDING_EXPIRY_GRACE_DAYS,
     RETENTION_MODE,
     RETENTION_WINDOW_DAYS,
     anonymized_item,
+    expired_pending_item,
     needs_anonymization,
+    needs_pending_expiry,
     retention_cutoff_iso,
 )
 
@@ -289,10 +298,18 @@ def _handle_retention_sweep(apply: bool) -> dict:
     the row rebuilt by `subscriber_retention.anonymized_item`. Idempotent — already
     -anonymized rows no longer match `needs_anonymization`, so a re-run is a no-op.
     Only `status=unsubscribed` rows past the window are ever touched; active
-    (pending/confirmed) subscribers and the subscriber COUNT are preserved."""
+    (pending/confirmed) subscribers and the subscriber COUNT are preserved.
+
+    Same run also transitions dead `pending_confirmation` rows (#3566): a row whose
+    token expired more than PENDING_EXPIRY_GRACE_DAYS ago moves to a terminal
+    `status="expired"`, PII-scrubbed via `expired_pending_item`. Reported under its
+    own `pending_expired_*` keys — never folded into `eligible`/`acted` above, so
+    the two independent policies (unsubscribe-retention, pending-expiry) each stay
+    individually auditable in the plan/summary and in the CloudWatch log line."""
     cutoff_iso = retention_cutoff_iso()
     rows = _scan_subscribers()
     targets = [r for r in rows if needs_anonymization(r, cutoff_iso)]
+    pending_targets = [r for r in rows if needs_pending_expiry(r)]
 
     plan = {
         "mode": RETENTION_MODE,
@@ -300,6 +317,8 @@ def _handle_retention_sweep(apply: bool) -> dict:
         "cutoff": cutoff_iso,
         "subscribers_total": len(rows),
         "eligible": len(targets),
+        "pending_expiry_grace_days": PENDING_EXPIRY_GRACE_DAYS,
+        "pending_expired_eligible": len(pending_targets),
         "apply": apply,
     }
 
@@ -316,11 +335,25 @@ def _handle_retention_sweep(apply: bool) -> dict:
             table.put_item(Item=anonymized_item(row, now_iso))
         acted += 1
 
-    summary = {**plan, "acted": acted, "completed_at": now_iso}
+    pending_expired_acted = 0
+    for row in pending_targets:
+        # Terminal transition only — never a delete. A "who tried and never
+        # confirmed" row stays legible in aggregate, same posture as anonymize mode.
+        table.put_item(Item=expired_pending_item(row, now_iso))
+        pending_expired_acted += 1
+
+    summary = {**plan, "acted": acted, "pending_expired_acted": pending_expired_acted, "completed_at": now_iso}
     # Audit by aggregate only — the trail never holds a plaintext email.
     _write_audit_record(
         "subscriber_retention_sweep",
-        {"acted": acted, "eligible": len(targets), "mode": RETENTION_MODE, "window_days": RETENTION_WINDOW_DAYS},
+        {
+            "acted": acted,
+            "eligible": len(targets),
+            "pending_expired_acted": pending_expired_acted,
+            "pending_expired_eligible": len(pending_targets),
+            "mode": RETENTION_MODE,
+            "window_days": RETENTION_WINDOW_DAYS,
+        },
     )
     logger.info("retention_sweep_complete %s", summary)
     return {"statusCode": 200, "body": json.dumps(summary)}

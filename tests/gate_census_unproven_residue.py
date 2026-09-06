@@ -261,7 +261,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::deploy/doc_platform_counts.py::PR_EXEMPT_FIELDS::test_count": "2026-09-05 seal (#3536)",
     "registry::deploy/sentinel_events.py::KNOWN_OUT_OF_IAC_RULES::life-platform-mcp-canary-15min": "2026-09-05 seal (#3536)",
     "registry::deploy/sentinel_events.py::KNOWN_OUT_OF_IAC_RULES::life-platform-nightly-warmer": "2026-09-05 seal (#3536)",
-    "registry::lambdas/ai/budget_guard.py::_SCOPE_ALL_CLASSES": "2026-09-05 in flight at the seal: PR #3583 (#3554), measured on its branch export — a `.*_CLASSES` registry mint; the #3315 cure is a rename",
     "registry::lambdas/ai/platform_memory.py::_BLOCK_RULES": "2026-09-05 seal (#3536)",
     "registry::lambdas/coach/coach_corrections.py::ERROR_CLASSES::checkable-metric": "2026-09-05 seal (#3536)",
     "registry::lambdas/coach/coach_corrections.py::ERROR_CLASSES::cross-coach-inconsistency": "2026-09-05 seal (#3536)",

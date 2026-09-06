@@ -63,6 +63,37 @@
       "computed_at": {
         "type": "string"
       },
+      "episodic_billing_days": {
+        "keys": {
+          "ci": {
+            "type": "integer"
+          },
+          "dev-session": {
+            "type": "integer"
+          },
+          "prod-cron": {
+            "type": "integer"
+          },
+          "remediation": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "episodic_classes": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 2,
+        "type": "array"
+      },
+      "episodic_premise_violations": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 0,
+        "type": "array"
+      },
       "history": {
         "items": {
           "keys": {
@@ -96,11 +127,30 @@
       "per_feature_note": {
         "type": "string"
       },
+      "projected_all_classes_pct_of_ceiling": {
+        "type": "number"
+      },
+      "projected_all_classes_usd": {
+        "type": "number"
+      },
+      "projected_classes": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 2,
+        "type": "array"
+      },
       "projected_month_end_usd": {
         "type": "number"
       },
       "projected_pct_of_ceiling": {
         "type": "number"
+      },
+      "projected_scope": {
+        "type": "string"
+      },
+      "projection_note": {
+        "type": "string"
       },
       "recent_uniques": {
         "type": "integer"

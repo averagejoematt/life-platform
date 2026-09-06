@@ -29,7 +29,7 @@ from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny p
 from ingestion.source_registry import stale_hours_overrides  # #2235: one staleness threshold, not three copies
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
-from common.pacific_time import pacific_now  # #2811: the Banister decay walks PACIFIC days
+from common.pacific_time import pacific_now, parse_iso_utc  # #2811 pacific_now; #3609 the canonical ISO-8601 parser
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS
@@ -233,9 +233,9 @@ def get_food_delivery_streak_state(table, user_id="matthew", now=None):
         updated_at = item.get("updated_at")
         if not updated_at:
             return None
-        updated_dt = datetime.fromisoformat(str(updated_at))
-        if updated_dt.tzinfo is None:
-            updated_dt = updated_dt.replace(tzinfo=timezone.utc)
+        updated_dt = parse_iso_utc(str(updated_at))  # #3609: the canonical parser (naive == UTC, same semantic this hand-rolled)
+        if updated_dt is None:
+            return None
         now = now or datetime.now(timezone.utc)
         stale_hours = stale_hours_overrides(["food_delivery"]).get("food_delivery")
         if stale_hours is not None:

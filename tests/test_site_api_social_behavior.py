@@ -912,7 +912,7 @@ def test_a_reader_finding_lands_in_the_moderation_queue_not_on_the_site(monkeypa
     _t, s3, _sec = wire(monkeypatch)
     ok_body(social._handle_submit_finding(post(GOOD_FINDING)))
     key, raw = s3.puts[0]
-    assert key.startswith("generated/findings/") and json.loads(raw)["status"] == "pending"
+    assert key.startswith("reader_input/findings/") and json.loads(raw)["status"] == "pending"
 
 
 def test_finding_html_is_stripped_before_it_is_stored(monkeypatch):
@@ -979,7 +979,7 @@ def test_a_board_question_is_captured_pending_and_invokes_no_ai(monkeypatch):
     _t, s3, _sec = wire(monkeypatch)
     ok_body(social._handle_board_question(post(GOOD_QUESTION)))
     key, raw = s3.puts[0]
-    assert key.startswith("generated/board_questions/") and json.loads(raw)["status"] == "pending"
+    assert key.startswith("reader_input/board_questions/") and json.loads(raw)["status"] == "pending"
 
 
 def test_a_blocked_vice_question_is_refused_at_the_door(monkeypatch):
