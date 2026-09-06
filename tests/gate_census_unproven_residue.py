@@ -413,8 +413,23 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_no_hardcoded_feature_tier.py::_ALLOWLIST::bedrock_client.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_no_hardcoded_feature_tier.py::_ALLOWLIST::budget_guard.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_no_private_markers_3043.py::ALLOWLIST::tests/test_no_private_markers_3043.py": "2026-09-05 seal (#3536)",
+    # #3645: a new sweep-1 mention pattern in tests/test_no_tool_attribution_3005.py
+    # (the two-word phrase this comment deliberately avoids spelling out, so as not to
+    # trip its own detector) makes every file that legitimately STATES the ban — never
+    # instructs it — a new ALLOWLIST entrant. See that test file's ALLOWLIST comment
+    # for the per-file reason.
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::.claude/README.md": "2026-09-06 (#3645)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::.claude/agents/worktree-implementer.md": "2026-09-06 (#3645)",
     "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::CLAUDE.md": "2026-09-05 seal (#3536)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::CONTRIBUTING.md": "2026-09-06 (#3645)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::docs/CONVENTIONS.md": "2026-09-06 (#3645)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::handovers/HANDOVER_LATEST.md": "2026-09-06 (#3645)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::remediation/prompt.md": "2026-09-06 (#3645)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::scripts/gate_census_mutations.py": "2026-09-06 (#3645)",
     "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::tests/test_no_tool_attribution_3005.py": "2026-09-05 seal (#3536)",
+    "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::tests/test_worktree_implementer_no_footer_instruction_3645.py": (
+        "2026-09-06 (#3645)"
+    ),
     "registry::tests/test_og_card_coverage.py::ORPHAN_ALLOWLIST": "2026-09-05 seal (#3536)",
     "registry::tests/test_pacific_today_guard_2414.py::_EXEMPT_MARKER": "2026-09-05 seal (#3536)",
     "registry::tests/test_partial_gate_cluster_2430.py::REQUIRED_CLASSES::dates": "2026-09-05 seal (#3536)",

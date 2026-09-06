@@ -74,6 +74,10 @@ ALLOWLIST = {
     # (so an agent reading it recognizes what to refuse) instead of instructing one —
     # PR #3639 shipped a footer under a prior version of this step that said to keep it.
     ".claude/agents/worktree-implementer.md",
+    # #3645: this repo's own regression test for the fix above states (never instructs)
+    # the same three literal forms, in docstrings and string literals, to test that the
+    # paraphrase detector catches them — see tests/test_worktree_implementer_no_footer_instruction_3645.py.
+    "tests/test_worktree_implementer_no_footer_instruction_3645.py",
 }
 
 BAN_DATE = "2026-08-12"
