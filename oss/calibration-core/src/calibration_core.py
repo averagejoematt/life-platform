@@ -46,7 +46,7 @@ import json
 import math
 import os
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "WORD_CONFIDENCE",
@@ -57,6 +57,7 @@ __all__ = [
     "brier_skill_score",
     "reliability_bins",
     "score_pairs",
+    "score_strata",
     "pairs_from_prediction_records",
     "pairs_from_calibration_rows",
     "pairs_from_forecast_resolution_rows",
@@ -351,6 +352,140 @@ def score_pairs(pairs, n_bins=10):
         "calibration": calibration,
         "label": label,
         "score": score,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Scoring strata -- a pooled card that cannot claim what no stratum has
+# ──────────────────────────────────────────────────────────────────────────
+
+_MIN_N_FOR_VERDICT = 5  # the same floor score_pairs applies before it names a verdict
+
+
+def _stratum_reference_brier(pairs):
+    """(n, Brier, reference Brier, base rate) of ONE stratum against its OWN climatology."""
+    clean = clean_pairs(pairs)
+    n = len(clean)
+    if not n:
+        return 0, None, None, None
+    base_rate = sum(y for _, y in clean) / n
+    bs = sum((p - y) ** 2 for p, y in clean) / n
+    bs_ref = sum((base_rate - y) ** 2 for _, y in clean) / n
+    return n, bs, bs_ref, base_rate
+
+
+def _reliability_gap(pairs, n_bins=10):
+    """The n-weighted mean (stated confidence - observed rate) over the reliability
+    bins -- positive = over-confident. Unrounded; None when there are no bins."""
+    bins = reliability_bins(pairs, n_bins=n_bins)
+    if not bins:
+        return None
+    total = sum(b["n"] for b in bins)
+    return sum(b["n"] * (b["mean_confidence"] - b["observed_rate"]) for b in bins) / total
+
+
+def score_strata(strata, n_bins=10):
+    """Score named strata of pairs into ONE pooled card whose skill and verdict
+    cannot claim a property no stratum has.
+
+    ``strata`` maps a stratum name -> its (confidence, outcome) pairs; insertion
+    order is the reported order. Why this exists: pooling two forecasters with
+    different base rates and scoring the pool against ONE pooled base rate can
+    manufacture positive skill when neither beats its own climatology -- the
+    pooled reference is worse than either stratum's, so merely knowing which
+    stratum a call came from beats it. The result carries every ``score_pairs``
+    field for the pooled pairs, with these differences:
+
+      * ``brier_skill`` / ``skilled`` are scored against the STRATIFIED reference
+        (the n-weighted mean of each stratum's own base-rate Brier), and
+        ``skill_reference`` is ``"stratified"``. Pooled skill > 0 is then
+        impossible unless at least one stratum beats its own base rate.
+      * ``calibration`` (over/under-confident) is tripped by the WORST stratum's
+        reliability gap among strata with n >= 5, never by the n-weighted pool.
+      * ``strata`` carries each stratum's own n, Brier, skill, verdict, gap and
+        base rate; ``reliability_gap`` is the pooled gap; ``worst_stratum_gap``
+        names the stratum that drove the verdict.
+      * ``skilled`` is forced False whenever no stratum is itself skilled --
+        implied by the arithmetic, asserted explicitly.
+
+    Field-for-field identical to the reference platform's ``score_strata``.
+    """
+    named = list((strata or {}).items())
+    pooled_pairs = [pr for _, pairs in named for pr in (pairs or [])]
+    summary = score_pairs(pooled_pairs, n_bins=n_bins)
+    n = summary["n"]
+
+    per = {}
+    bs_sum = 0.0
+    ref_sum = 0.0
+    any_skilled = False
+    worst = None  # (abs gap, name, gap)
+    for name, pairs in named:
+        s = score_pairs(pairs, n_bins=n_bins)
+        s_n, bs, bs_ref, base_rate = _stratum_reference_brier(pairs)
+        gap = _reliability_gap(pairs, n_bins=n_bins)
+        if s_n:
+            bs_sum += bs * s_n
+            ref_sum += bs_ref * s_n
+        if s["skilled"] is True:
+            any_skilled = True
+        if gap is not None and s_n >= _MIN_N_FOR_VERDICT and (worst is None or abs(gap) > worst[0]):
+            worst = (abs(gap), name, gap)
+        per[name] = {
+            "n": s["n"],
+            "confirmed": s["confirmed"],
+            "brier": s["brier"],
+            "brier_skill": s["brier_skill"],
+            "skilled": s["skilled"],
+            "calibration": s["calibration"],
+            "reliability_gap": round(gap, 3) if gap is not None else None,
+            "base_rate": round(base_rate, 3) if base_rate is not None else None,
+        }
+
+    skill = None
+    if n >= 2 and ref_sum > 0:
+        skill = 1.0 - bs_sum / ref_sum
+    skilled = None if skill is None else bool(skill > 0)
+    if skilled is True and not any_skilled:
+        skilled = False
+
+    pooled_gap = _reliability_gap(pooled_pairs, n_bins=n_bins)
+    bins = summary["reliability_bins"]
+    calibration = "insufficient_data"
+    if n >= _MIN_N_FOR_VERDICT and bins:
+        driver = worst[2] if worst is not None else pooled_gap
+        if driver is not None and driver > 0.15:
+            calibration = "over-confident"
+        elif driver is not None and driver < -0.15:
+            calibration = "under-confident"
+        elif skilled is False:
+            calibration = "not_yet_skillful"
+        else:
+            calibration = "well-calibrated"
+
+    brier = summary["brier"]
+    if n < 3:
+        label, score = "nascent", 30
+    elif skilled is False:
+        label, score = "not_yet_skillful", 45
+    elif brier is not None and brier <= 0.15 and n >= 12:
+        label, score = "authoritative", 90
+    elif brier is not None and brier <= 0.20:
+        label, score = "reliable", 70
+    else:
+        label, score = "developing", 50
+
+    return {
+        **summary,
+        "brier_skill": round(skill, 4) if skill is not None else None,
+        "skilled": skilled,
+        "skill_reference": "stratified",
+        "reliability_gap": round(pooled_gap, 3) if pooled_gap is not None else None,
+        "worst_stratum_gap": {"stratum": worst[1], "gap": round(worst[2], 3)} if worst is not None else None,
+        "calibration": calibration,
+        "label": label,
+        "score": score,
+        "strata": per,
     }
 
 

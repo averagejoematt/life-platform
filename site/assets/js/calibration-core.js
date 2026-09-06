@@ -20,7 +20,7 @@
 //
 // Licence: MIT.
 
-export const VERSION = "1.1.0";
+export const VERSION = "1.2.0";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Exact Python-compatible rounding
@@ -351,6 +351,130 @@ export function scorePairs(pairs, nBins = 10) {
     calibration,
     label,
     score,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Scoring strata — a pooled card that cannot claim what no stratum has
+// ──────────────────────────────────────────────────────────────────────────
+
+const MIN_N_FOR_VERDICT = 5; // the same floor scorePairs applies before it names a verdict
+
+/** [n, Brier, reference Brier, base rate] of ONE stratum against its OWN climatology. */
+function stratumReferenceBrier(pairs) {
+  const clean = cleanPairs(pairs);
+  const n = clean.length;
+  if (!n) return [0, null, null, null];
+  let ysum = 0;
+  for (const [, y] of clean) ysum += y;
+  const baseRate = ysum / n;
+  let bsAcc = 0;
+  for (const [p, y] of clean) bsAcc += (p - y) ** 2;
+  let refAcc = 0;
+  for (const [, y] of clean) refAcc += (baseRate - y) ** 2;
+  return [n, bsAcc / n, refAcc / n, baseRate];
+}
+
+/** n-weighted mean (stated − observed) over the reliability bins. Unrounded; null when no bins. */
+function reliabilityGap(pairs, nBins = 10) {
+  const bins = reliabilityBins(pairs, nBins);
+  if (!bins.length) return null;
+  let total = 0;
+  for (const b of bins) total += b.n;
+  let acc = 0;
+  for (const b of bins) acc += b.n * (b.mean_confidence - b.observed_rate);
+  return acc / total;
+}
+
+/**
+ * Score named strata into ONE pooled card whose skill and verdict cannot claim
+ * a property no stratum has. Field-for-field identical to
+ * calibration_core.score_strata — `strata` is a plain object {name: pairs};
+ * key insertion order is the reported order.
+ */
+export function scoreStrata(strata, nBins = 10) {
+  const named = Object.entries(strata || {});
+  const pooledPairs = [];
+  for (const [, pairs] of named) for (const pr of pairs || []) pooledPairs.push(pr);
+  const summary = scorePairs(pooledPairs, nBins);
+  const n = summary.n;
+
+  const per = {};
+  let bsSum = 0;
+  let refSum = 0;
+  let anySkilled = false;
+  let worst = null; // [abs gap, name, gap]
+  for (const [name, pairs] of named) {
+    const s = scorePairs(pairs, nBins);
+    const [sN, bs, bsRef, baseRate] = stratumReferenceBrier(pairs);
+    const gap = reliabilityGap(pairs, nBins);
+    if (sN) {
+      bsSum += bs * sN;
+      refSum += bsRef * sN;
+    }
+    if (s.skilled === true) anySkilled = true;
+    if (gap !== null && sN >= MIN_N_FOR_VERDICT && (worst === null || Math.abs(gap) > worst[0])) {
+      worst = [Math.abs(gap), name, gap];
+    }
+    per[name] = {
+      n: s.n,
+      confirmed: s.confirmed,
+      brier: s.brier,
+      brier_skill: s.brier_skill,
+      skilled: s.skilled,
+      calibration: s.calibration,
+      reliability_gap: gap !== null ? pyRound(gap, 3) : null,
+      base_rate: baseRate !== null ? pyRound(baseRate, 3) : null,
+    };
+  }
+
+  let skill = null;
+  if (n >= 2 && refSum > 0) skill = 1.0 - bsSum / refSum;
+  let skilled = skill === null ? null : skill > 0;
+  if (skilled === true && !anySkilled) skilled = false;
+
+  const pooledGap = reliabilityGap(pooledPairs, nBins);
+  const bins = summary.reliability_bins;
+  let calibration = "insufficient_data";
+  if (n >= MIN_N_FOR_VERDICT && bins.length) {
+    const driver = worst !== null ? worst[2] : pooledGap;
+    if (driver !== null && driver > 0.15) calibration = "over-confident";
+    else if (driver !== null && driver < -0.15) calibration = "under-confident";
+    else if (skilled === false) calibration = "not_yet_skillful";
+    else calibration = "well-calibrated";
+  }
+
+  const brier = summary.brier;
+  let label;
+  let score;
+  if (n < 3) {
+    label = "nascent";
+    score = 30;
+  } else if (skilled === false) {
+    label = "not_yet_skillful";
+    score = 45;
+  } else if (brier !== null && brier <= 0.15 && n >= 12) {
+    label = "authoritative";
+    score = 90;
+  } else if (brier !== null && brier <= 0.2) {
+    label = "reliable";
+    score = 70;
+  } else {
+    label = "developing";
+    score = 50;
+  }
+
+  return {
+    ...summary,
+    brier_skill: skill === null ? null : pyRound(skill, 4),
+    skilled,
+    skill_reference: "stratified",
+    reliability_gap: pooledGap !== null ? pyRound(pooledGap, 3) : null,
+    worst_stratum_gap: worst !== null ? { stratum: worst[1], gap: pyRound(worst[2], 3) } : null,
+    calibration,
+    label,
+    score,
+    strata: per,
   };
 }
 

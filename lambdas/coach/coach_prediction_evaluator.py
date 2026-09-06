@@ -11,6 +11,8 @@ engine (9:45 AM PT) so EWMA trends are fresh.
 Evaluation types:
   1. machine      — metric crosses threshold within window
   2. directional  — metric moves in predicted direction (EWMA-based)
+  2b. point       — metric's reading on the target date lands within ±tolerance of a
+                    stated level (#3551; tolerance frozen at emission from personal SD)
   3. conditional  — if X then Y (check precondition, then evaluate)
   4. qualitative  — skip (needs human/LLM, not this Lambda)
 
@@ -109,6 +111,12 @@ EWMA_DECAY = 0.87
 # rescue path. Stamp, reach + re-derive trigger: registry entry `directional_trend_verdict`
 # + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
+
+# #3551 point specs: the reading ON the target date, else the latest within this many
+# days before it (a missed weigh-in is not a refutation); the source fetch reaches
+# back far enough that a domain-clamped window cannot push the target off the range.
+POINT_GRACE_DAYS = 2
+POINT_LOOKBACK_DAYS = 60
 
 # #2221 — the EWMA observation floor + the provisional-grade rules, reasoned out there.
 from coach.prediction_grading import (  # noqa: E402
@@ -655,7 +663,7 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
     # evaluator — the same grading path C-3 gives new predictions. No inferable
     # direction → inconclusive with an explicit reason (expiry will retire it).
     if threshold is None:
-        direction = infer_direction(None, pred.get("claim_natural") or "")
+        direction = infer_direction(None, pred.get("claim_natural") or "", metric_key)  # #3551: metric name excluded
         if direction:
             rescued_spec = dict(eval_spec)
             rescued_spec["condition"] = direction
@@ -791,6 +799,84 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
         "reason": reason,
         "actual_value": slope,
         "beats_null": beats_null,
+    }
+
+
+def _metric_value_on(metric_key, data_cache, today_str, target_date):
+    """(value, date) of `metric_key` ON `target_date` — the reading that day, else
+    the latest within POINT_GRACE_DAYS before it; an aggregate key (`_7day_avg`)
+    is the mean of the last N readings on or before the target. (None, None) when
+    nothing qualifies. Reads the shared source cache anchored on today (its key is
+    source+lookback, never the end date), then filters by date itself."""
+    base = metric_key
+    agg_days = None
+    for suffix, days in (("_30day_avg", 30), ("_14day_avg", 14), ("_7day_avg", 7)):
+        if metric_key.endswith(suffix):
+            base = metric_key[: -len(suffix)]
+            agg_days = days
+            break
+    source = METRIC_SOURCES.get(base)
+    if not source or not target_date:
+        return None, None
+    records = _get_source_data(source, data_cache, today_str, lookback_days=POINT_LOOKBACK_DAYS)
+    series = [(d, v) for d, v in _extract_metric_series(records, base) if d <= target_date]
+    if not series:
+        return None, None
+    if agg_days:
+        recent = [v for _, v in series[-agg_days:]]
+        return sum(recent) / len(recent), target_date
+    try:
+        floor = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=POINT_GRACE_DAYS)).strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None, None
+    d, v = series[-1]
+    if d < floor:
+        return None, None
+    return v, d
+
+
+def _evaluate_point(pred, eval_spec, data_cache, today_str):
+    """
+    Point evaluation (#3551): a numeric LEVEL claim — "recovery will be approximately
+    53.5%" — is confirmed iff the metric's reading on the target date lands within
+    ±tolerance of the stated level, refuted otherwise; only a missing reading is
+    inconclusive. The tolerance and the rule that produced it were frozen into the
+    spec at emission (personal trailing SD, ADR-105 rule 4), so the served grade is
+    reproducible from the record: |actual − target| <= tolerance.
+    """
+    metric_key = eval_spec.get("metric")
+    target = eval_spec.get("threshold")
+    tolerance = eval_spec.get("tolerance")
+    if not metric_key or target is None or tolerance is None:
+        return None
+    target_date = eval_spec.get("target_date")
+    if not target_date:
+        try:
+            created = datetime.strptime(pred.get("created_date"), "%Y-%m-%d")
+            target_date = (created + timedelta(days=int(eval_spec.get("evaluation_window_days") or 14))).strftime("%Y-%m-%d")
+        except (TypeError, ValueError):
+            return None
+    actual, on_date = _metric_value_on(metric_key, data_cache, today_str, target_date)
+    if actual is None:
+        return {
+            "status": "inconclusive",
+            "reason": f"No reading for '{metric_key}' on {target_date} (or within {POINT_GRACE_DAYS} days before it)",
+            "actual_value": None,
+            "beats_null": False,
+        }
+    target = float(target)
+    tolerance = float(tolerance)
+    delta = actual - target
+    hit = abs(delta) <= tolerance
+    rule = eval_spec.get("tolerance_rule") or f"±{tolerance}"
+    return {
+        "status": "confirmed" if hit else "refuted",
+        "reason": (
+            f"{metric_key}={actual:.2f} on {on_date} vs predicted {target:g} ±{tolerance:g} ({rule}); "
+            f"|Δ|={abs(delta):.2f} → {'within' if hit else 'outside'} tolerance"
+        ),
+        "actual_value": round(actual, 4),
+        "beats_null": hit,
     }
 
 
@@ -1019,7 +1105,7 @@ def _evaluate_all(predictions, today_str):
     For each prediction:
       1. Determine effective evaluation window (with domain minimum)
       2. Check if window has elapsed
-      3. Route to appropriate evaluator (machine / directional / conditional)
+      3. Route to appropriate evaluator (machine / directional / point / conditional)
       4. Handle expiry for unevaluable predictions
       5. Update prediction status in DynamoDB
       6. Update Bayesian confidence if confirmed or refuted
@@ -1074,6 +1160,8 @@ def _evaluate_all(predictions, today_str):
                 result = _evaluate_machine(pred, eval_spec, data_cache, today_str)
             elif eval_type == "directional":
                 result = _evaluate_directional(pred, eval_spec, data_cache, today_str)
+            elif eval_type == "point":  # #3551
+                result = _evaluate_point(pred, eval_spec, data_cache, today_str)
             elif eval_type == "conditional":
                 result = _evaluate_conditional(pred, eval_spec, data_cache, today_str)
             else:

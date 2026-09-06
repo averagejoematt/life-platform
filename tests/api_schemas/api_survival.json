@@ -22,8 +22,14 @@
         },
         "type": "object"
       },
+      "censored_before_horizon_n": {
+        "type": "integer"
+      },
       "collapse_definition": {
         "type": "string"
+      },
+      "collapsed_before_horizon_n": {
+        "type": "integer"
       },
       "confidence": {
         "type": "string"
@@ -70,13 +76,28 @@
       "in_progress_note": {
         "type": "string"
       },
+      "longest_run_days": {
+        "type": "integer"
+      },
       "method": {
         "type": "string"
+      },
+      "n_prior_cycles": {
+        "type": "integer"
       },
       "note": {
         "type": "string"
       },
+      "p_reach_30_ceiling_pct": {
+        "type": "integer"
+      },
+      "p_reach_30_ci95_pct": {
+        "type": "null"
+      },
       "p_reach_30_pct": {
+        "type": "null"
+      },
+      "reached_horizon_n": {
         "type": "integer"
       }
     },
