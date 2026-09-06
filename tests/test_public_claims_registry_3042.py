@@ -214,6 +214,38 @@ def test_the_agent_merge_prohibition_is_load_bearing(monkeypatch):
     assert any("gh pr merge" in f for f in findings), f"removing the in-band merge prohibition did not red: {findings}"
 
 
+def test_an_unscoped_affiliate_claim_reds_the_comparator(monkeypatch):
+    """#3619 ROW6, proven both ways. The real committed page passes clean (it now says
+    'no affiliate links in these emails' and links to /gear/#affiliate-disclosure). Plant
+    the ORIGINAL, unscoped sentence back and the comparator must red — proving it reads
+    the wire, not a recorded assertion about it — and confirm removing the /gear/
+    disclosure link (while keeping the scope word) reds on the second finding."""
+    assert reg.compare_subscribe_affiliate_scope() == [], "the live page should already be scoped"
+
+    real = reg._read
+
+    def unscoped(path):
+        text = real(path)
+        if str(path).endswith("site/subscribe/index.html"):
+            text = text.replace("no affiliate links in these emails", "no affiliate links")
+        return text
+
+    monkeypatch.setattr(reg, "_read", unscoped)
+    findings = reg.compare_subscribe_affiliate_scope()
+    assert findings, "an unscoped 'no affiliate links' sentence did not red the comparator"
+    assert any("no email/newsletter/inbox scope word" in f for f in findings), findings
+
+    def no_disclosure_link(path):
+        text = real(path)
+        if str(path).endswith("site/subscribe/index.html"):
+            text = text.replace('<a href="/gear/#affiliate-disclosure">disclosed on the gear page</a>', "disclosed on the gear page")
+        return text
+
+    monkeypatch.setattr(reg, "_read", no_disclosure_link)
+    findings = reg.compare_subscribe_affiliate_scope()
+    assert any("no longer links to /gear/#affiliate-disclosure" in f for f in findings), findings
+
+
 def test_the_deletion_comparator_reads_the_signed_policy(monkeypatch):
     """Same proof for the reader-facing promise: change the signed retention policy and
     the privacy page's 'on the spot' wording must red."""

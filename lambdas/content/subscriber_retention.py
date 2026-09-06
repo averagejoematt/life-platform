@@ -30,11 +30,26 @@ avoid coupling independently deployed contexts):
     access (Scan + PutItem + DeleteItem) — no new IAM.
   - the attended CLI — deploy/subscriber_retention_purge.py (operator-run, dry-run by
     default), whose --window-days / --mode default to these same constants.
-"""
+
+PENDING-CONFIRMATION EXPIRY (#3566): the anonymize-at-unsubscribe policy above has no
+terminal state for a `pending_confirmation` row whose confirm token expired and was
+never re-sent — `is_retention_eligible` requires `status == "unsubscribed"`, so a stale
+pending row is structurally NEVER eligible for the sweep above and sits forever
+carrying a plaintext email (found live: two 2026-07-03 rows, tokens expired 2026-07-05,
+still `pending_confirmation` 61+ days later). `PENDING_EXPIRY_GRACE_DAYS` below is a
+SEPARATE, independent grace window — not the unsubscribe retention window — governing
+when a dead confirmation attempt is declared over: `is_pending_expired` fires
+`PENDING_EXPIRY_GRACE_DAYS` after `token_expires` (never at expiry itself — a slow
+inbox check should not race the sweep), and `expired_pending_item` transitions the row
+to a terminal `status="expired"` with the same PII scrub `anonymized_item` applies to
+an unsubscribed row (plaintext `email` redacted, `ip_hash` dropped). The same two
+enactment paths above run this leg too."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+
+from common.pacific_time import parse_iso_utc  # #1964 — THE ISO parser, never a private fork
 
 # ── Signed window (docs/DATA_GOVERNANCE.md "Subscriber emails" row) ──────────────
 RETENTION_WINDOW_MONTHS = 0
@@ -46,6 +61,10 @@ RETENTION_WINDOW_DAYS = 0
 # subscriber-count analytics survive. "purge" (hard-delete the row) is the other option.
 RETENTION_MODE = "anonymize"
 REDACTED_EMAIL = "[redacted]"
+
+# ── Pending-confirmation expiry (#3566) — a SEPARATE grace window from the
+# unsubscribe-retention one above; see the module docstring. ─────────────────────
+PENDING_EXPIRY_GRACE_DAYS = 7
 
 
 def retention_cutoff_iso(now: datetime | None = None) -> str:
@@ -76,4 +95,44 @@ def anonymized_item(item: dict, now_iso: str | None = None) -> dict:
     out["email"] = REDACTED_EMAIL
     out.pop("ip_hash", None)
     out["anonymized_at"] = now_iso
+    return out
+
+
+def is_pending_expired(item: dict, now: datetime | None = None) -> bool:
+    """True iff `item` is a `pending_confirmation` row whose `token_expires` is more
+    than `PENDING_EXPIRY_GRACE_DAYS` in the past. Fails safe: a pending row missing
+    `token_expires` is NOT eligible — never act on missing data, same posture as
+    `is_retention_eligible`'s `unsubbed_at` check. Already-expired rows (this
+    function returning True on a prior sweep) stay eligible until actually
+    transitioned — the sweep-side idempotence lives in `needs_pending_expiry`."""
+    if item.get("status") != "pending_confirmation":
+        return False
+    expires = parse_iso_utc(item.get("token_expires"))
+    if expires is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return now >= expires + timedelta(days=PENDING_EXPIRY_GRACE_DAYS)
+
+
+def needs_pending_expiry(item: dict, now: datetime | None = None) -> bool:
+    """Sweep-time filter: `is_pending_expired` AND not already transitioned. Makes
+    the expiry sweep idempotent, mirroring `needs_anonymization`'s contract."""
+    return is_pending_expired(item, now) and item.get("status") == "pending_confirmation"
+
+
+def expired_pending_item(item: dict, now_iso: str | None = None) -> dict:
+    """A copy of `item` transitioned to the terminal `status="expired"`, with the
+    same PII scrub `anonymized_item` applies (plaintext `email` redacted, `ip_hash`
+    dropped). `token_expires`/`confirm_token` are dropped too — a terminal row has
+    no live confirmation path left to protect. `email_hash`/`created_at`/`sk` are
+    preserved so the row's history and the suppression record survive."""
+    now_iso = now_iso or datetime.now(timezone.utc).isoformat()
+    out = dict(item)
+    out["status"] = "expired"
+    out["email"] = REDACTED_EMAIL
+    out.pop("ip_hash", None)
+    out.pop("confirm_token", None)
+    out.pop("token_expires", None)
+    out["anonymized_at"] = now_iso
+    out["expired_at"] = now_iso
     return out

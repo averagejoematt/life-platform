@@ -535,7 +535,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # in the same window, so the live total stays at the committed 597.
         3
         <= len(proven)
-        <= 65  # re-measured 2026-09-06 on the merged tree: #3580's eight proven entrants atop main
+        <= 66  # 65 -> 66: #3570's raw-zone-drift guard proof (guard::scripts/check_raw_zone_drift.py), measured on the merged tree (2026-09-06), atop 65 (re-measured 2026-09-06 on the merged tree: #3580's eight proven entrants atop main)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

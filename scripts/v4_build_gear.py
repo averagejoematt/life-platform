@@ -461,7 +461,7 @@ def render(entries: list[dict]) -> str:
       {loop_ribbon("gear")}
     </div>
     <div class="gr-wrap">
-      <div class="gr-disclosure" role="note" aria-label="Affiliate disclosure">
+      <div class="gr-disclosure" id="affiliate-disclosure" role="note" aria-label="Affiliate disclosure">
         <p class="gr-disc-h">Affiliate disclosure</p>
         <p>{DISCLOSURE}</p>
       </div>

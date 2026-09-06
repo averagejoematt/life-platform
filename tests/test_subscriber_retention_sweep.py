@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
 from content import subscriber_retention as sr  # noqa: E402
+from content.subscriber_retention import PENDING_EXPIRY_GRACE_DAYS  # noqa: E402
 
 DOC = ROOT / "docs" / "DATA_GOVERNANCE.md"
 
@@ -197,3 +198,113 @@ def test_sweep_is_idempotent_second_run_noop(env):
             resp = m.lambda_handler({"subscriber_retention_sweep": True, "apply": True}, None)
     assert json.loads(resp["body"])["acted"] == 0
     m.table.put_item.assert_not_called()
+
+
+# ── 5. Pending-confirmation expiry (#3566) — a SEPARATE terminal transition ──────
+# for a `pending_confirmation` row that is never `unsubscribed` and so was
+# structurally unreachable by the checks above. See lambdas/content/subscriber_retention.py.
+
+PENDING_NOW = datetime(2026, 9, 6, tzinfo=timezone.utc)
+
+
+def test_recent_pending_row_is_not_expired():
+    # Token expires in the future — nowhere near the grace window.
+    future = (PENDING_NOW + timedelta(days=2)).isoformat()
+    assert not sr.is_pending_expired({"status": "pending_confirmation", "token_expires": future}, PENDING_NOW)
+
+
+def test_pending_row_inside_grace_window_is_not_yet_expired():
+    # Token expired 3 days ago — inside the 7-day grace window, not yet eligible.
+    just_expired = (PENDING_NOW - timedelta(days=3)).isoformat()
+    assert not sr.is_pending_expired({"status": "pending_confirmation", "token_expires": just_expired}, PENDING_NOW)
+
+
+def test_pending_row_past_grace_window_is_expired():
+    # The live defect this closes: a token expired 61 days ago (2026-07-05 vs "now"
+    # 2026-09-06 in the finding), still pending_confirmation.
+    long_expired = (PENDING_NOW - timedelta(days=61)).isoformat()
+    assert sr.is_pending_expired({"status": "pending_confirmation", "token_expires": long_expired}, PENDING_NOW)
+
+
+def test_pending_row_missing_token_expires_fails_safe():
+    assert not sr.is_pending_expired({"status": "pending_confirmation"}, PENDING_NOW)
+
+
+def test_confirmed_row_is_never_pending_expired():
+    # A confirmed row is not pending_confirmation, regardless of a stale token field.
+    long_expired = (PENDING_NOW - timedelta(days=61)).isoformat()
+    assert not sr.is_pending_expired({"status": "confirmed", "token_expires": long_expired}, PENDING_NOW)
+
+
+def test_expired_pending_item_scrubs_pii_and_drops_the_dead_token():
+    item = {
+        "pk": "USER#matthew#SOURCE#subscribers",
+        "sk": "EMAIL#abc123",
+        "email": "person@example.com",
+        "email_hash": "abc123",
+        "status": "pending_confirmation",
+        "created_at": "2026-07-03T23:45:00+00:00",
+        "confirm_token": "deadbeef" * 8,
+        "token_expires": "2026-07-05T23:45:00+00:00",
+        "ip_hash": "deadbeef",
+    }
+    out = sr.expired_pending_item(item, now_iso="2026-09-06T00:00:00+00:00")
+    assert out["status"] == "expired"
+    assert out["email"] == "[redacted]"
+    assert "ip_hash" not in out
+    assert "confirm_token" not in out
+    assert "token_expires" not in out
+    assert out["anonymized_at"] == "2026-09-06T00:00:00+00:00"
+    assert out["expired_at"] == "2026-09-06T00:00:00+00:00"
+    # History preserved:
+    assert out["sk"] == "EMAIL#abc123"
+    assert out["email_hash"] == "abc123"
+    assert out["created_at"] == "2026-07-03T23:45:00+00:00"
+
+
+def test_needs_pending_expiry_is_idempotent():
+    long_expired = (PENDING_NOW - timedelta(days=61)).isoformat()
+    row = {"status": "pending_confirmation", "token_expires": long_expired}
+    assert sr.needs_pending_expiry(row, PENDING_NOW)
+    # Once transitioned, status is "expired" — no longer a target.
+    assert not sr.needs_pending_expiry(sr.expired_pending_item(row), PENDING_NOW)
+
+
+def _pending_fixture_rows():
+    now = datetime.now(timezone.utc)
+    return [
+        # Two dead pendings — the live #3566 finding shape.
+        {"sk": "EMAIL#dead1", "status": "pending_confirmation", "token_expires": (now - timedelta(days=61)).isoformat()},
+        {"sk": "EMAIL#dead2", "status": "pending_confirmation", "token_expires": (now - timedelta(days=61)).isoformat()},
+        # A fresh pending — inside the grace window, must survive untouched.
+        {"sk": "EMAIL#fresh", "status": "pending_confirmation", "token_expires": (now + timedelta(hours=1)).isoformat()},
+        # An active confirmed subscriber — never touched by either leg.
+        {"sk": "EMAIL#active", "status": "confirmed", "confirmed_at": (now - timedelta(days=800)).isoformat()},
+    ]
+
+
+def test_sweep_dry_run_reports_pending_expired_eligible_separately(env):
+    m = _import(env)
+    with patch.object(m, "_scan_subscribers", return_value=_pending_fixture_rows()):
+        resp = m.lambda_handler({"subscriber_retention_sweep": True}, None)
+    plan = json.loads(resp["body"])["plan"]
+    assert plan["eligible"] == 0  # no unsubscribed rows in this fixture
+    assert plan["pending_expired_eligible"] == 2
+    assert plan["pending_expiry_grace_days"] == PENDING_EXPIRY_GRACE_DAYS
+    m.table.put_item.assert_not_called()
+
+
+def test_sweep_apply_transitions_only_dead_pendings(env):
+    m = _import(env)
+    with patch.object(m, "_scan_subscribers", return_value=_pending_fixture_rows()):
+        with patch.object(m, "_write_audit_record") as audit:
+            resp = m.lambda_handler({"subscriber_retention_sweep": True, "apply": True}, None)
+    body = json.loads(resp["body"])
+    assert body["acted"] == 0  # no unsubscribed target in this fixture
+    assert body["pending_expired_acted"] == 2
+    puts = [c.kwargs["Item"] for c in m.table.put_item.call_args_list]
+    assert {p["sk"] for p in puts} == {"EMAIL#dead1", "EMAIL#dead2"}
+    for put in puts:
+        assert put["status"] == "expired"
+        assert put["email"] == "[redacted]"
+    assert audit.call_args.args[1]["pending_expired_acted"] == 2

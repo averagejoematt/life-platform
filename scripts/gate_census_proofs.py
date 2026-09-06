@@ -622,6 +622,43 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    # #3570: same idiom as check_proof_freshness.py directly above — the mutation is
+    # the REAL pre-fix registry (origin/main, before this PR's source_registry.py
+    # additions), not a synthetic plant, watched against the actual live bucket.
+    "guard::scripts/check_raw_zone_drift.py": {
+        "gate_name": "scripts/check_raw_zone_drift.py",
+        "command": "python3 scripts/check_raw_zone_drift.py   # live read-only S3 check; tests/test_raw_zone_drift_3570.py covers the pure logic (check_coverage/expand_prefix/prefix_root/known_prefix_roots) offline",
+        "mutation": (
+            "origin/main@4ba5c490d's lambdas/ingestion/source_registry.py (before this PR's "
+            "additions), loaded via `git show` in place of the current module — no apple_health "
+            "gz-export unmodeled_legacy, no NON_INGESTION_RAW_PREFIXES entries (labs/inbound_email/"
+            "matthew-matthew), and none of the 9 X-9 no-user-segment predecessor generations "
+            "(withings/strava/eightsleep/garmin/macrofactor/cgm_readings/state_of_mind/workouts/"
+            "health_auto_export) this PR's #3570 fix documents."
+        ),
+        "observed": (
+            "MUTATED (known_prefix_roots() built from the origin/main module, checked against the "
+            "SAME live top-level prefix lists this script reads from S3): 14 uncovered — "
+            "raw/apple_health, raw/cgm_readings, raw/eightsleep, raw/garmin, raw/health_auto_export, "
+            "raw/inbound_email, raw/macrofactor, raw/state_of_mind, raw/strava, raw/workouts, "
+            "raw/matthew/apple_health, raw/matthew/inbound_email, raw/matthew/labs, "
+            "raw/matthew/matthew — exactly the #3570 finding's own live count (9,634-object "
+            "raw/matthew/matthew/** plus the apple_health/labs/inbound_email gaps plus the 9 "
+            "previously-undocumented X-9 legacy prefixes the drift check itself surfaced). "
+            "REVERTED (this branch, `python3 scripts/check_raw_zone_drift.py`, live, read-only, "
+            'against s3://matthew-life-platform): exit 0 — "CLEAN — 16 raw/ prefixes + 17 '
+            'raw/matthew/ prefixes all covered." Both watched 2026-09-06.'
+        ),
+        "scope": (
+            "A LIST-only read (ListObjectsV2, Delimiter='/', one level under raw/ and raw/matthew/) "
+            "against facets a human still writes — it proves the registry and the bucket agree at "
+            "the top level, not that a `raw_layout`'s deeper claim (scheme/filename) matches every "
+            "object inside a covered prefix (DIL-028's job, tests/test_dil028_raw_layout_replay.py). "
+            "Not wired into CI or the reset pipeline (see the script's own docstring) — an operator "
+            "runs it periodically; a new undocumented prefix is caught at the NEXT run, not on write."
+        ),
+        "proved_on": "2026-09-06",
+    },
 }
 
 
