@@ -12,6 +12,13 @@ WHAT IT FINDS (each code is registered in scripts/closure_contract.py — the ON
                          or `not-work — <home>` — the handover's (e4) rule, applied to the close.
   no-outcome-verdict     a COMPLETED close after the ADR-099 amendment with no verdict comment.
   epic-children-open     a closed `type:epic` while an open issue still declares `**Epic:** #N`.
+  no-live-proof          BLOCK (#3595): an INSTRUMENT issue — one carrying the
+                         `closure:live-proof` label — closed without a comment naming its
+                         first non-degraded live output (`**Live proof:** <instant> — <where>`).
+                         Armed block from day one, whatever the ambient posture: the four
+                         instruments that read CLOSED while dead (INT-1 49d, G-3 28d, OBS-1
+                         30d+, CPO-2 21 runs) are what warn-mode bought. Going-forward-only
+                         from closure_contract.LIVE_PROOF_SINCE.
 
 TWO MODES, ONE PARSER
   --fixture FILE   offline: FILE is `{"issues": [<GraphQL Issue node>...], "open_issues":
@@ -25,10 +32,11 @@ TWO MODES, ONE PARSER
   --since DATE     window = closed since DATE (the audit shape: `--since 2026-08-16`)
   --last N         window = the N most recently closed (the /sdlc-review sample)
 
-POSTURE (closure_contract.mode(): `warn` today)
+POSTURE (closure_contract.mode(): `warn` today, per-code via closure_contract.arming_for)
   warn   every finding printed; exit 0. A fetch failure prints UNVERIFIED and exits 0 — the
          same fail-open-noted-in-handover shape as the (e7) hygiene gate.
   block  findings exit 1; a fetch failure exits 2 ("could not look" is never a pass).
+  Any finding whose code is in closure_contract.BLOCK_CODES exits 1 in EITHER posture.
   The last line is always machine-readable:
     CLOSURE-SWEEP scanned=<n> window=<…> hits=<k> dispositioned=<d> mode=<warn|block>
   (or `CLOSURE-SWEEP UNVERIFIED — <reason>`), so scripts/wrap_gates.py fills the
@@ -122,6 +130,19 @@ def evaluate_issue(issue: Issue, open_children: tuple = ()) -> list:
         for block in cc.unhomed_residuals(body):
             findings.append(Finding("unhomed-residual", issue.number, f"names a residual with no home: {block.splitlines()[0][:100]!r}"))
 
+    # #3595: an instrument closes on its first non-degraded live output, never on the merge.
+    # The class is the label (a sweep sees labels, never a diff); the proof is structural.
+    if cc.INSTRUMENT_LABEL in issue.labels and issue.closed_at.date().isoformat() >= cc.LIVE_PROOF_SINCE:
+        if not any(cc.names_live_proof(body) for (_t, _login, body) in issue.comments):
+            findings.append(
+                Finding(
+                    "no-live-proof",
+                    issue.number,
+                    f"labelled `{cc.INSTRUMENT_LABEL}` and closed with no `**Live proof:** <instant> — <where>` "
+                    "comment — an instrument closes on its first non-degraded output, not on the merge",
+                )
+            )
+
     if cc.EPIC_LABEL in issue.labels and open_children:
         kids = ", ".join(f"#{n}" for n in sorted(open_children))
         findings.append(Finding("epic-children-open", issue.number, f"closed epic with open children still declaring it: {kids}"))
@@ -168,10 +189,13 @@ def render(result: dict, window: str, mode: str) -> tuple:
         d = cc.DISPOSITIONED_ESCAPES[num]
         lines.append(f"DISPOSITIONED #{num} ({d.date}: {d.reason[:80]}) — {len(fs)} finding(s) suppressed")
     hits = len(by_issue)
+    blocking = sorted({f.code for f in result["findings"] if cc.arming_for(f.code, mode) == "block"})
     lines.append(
         f"CLOSURE-SWEEP scanned={result['scanned']} window={window} hits={hits} findings={len(result['findings'])} "
-        f"dispositioned={len(result['dispositioned'])} mode={mode}"
+        f"dispositioned={len(result['dispositioned'])} mode={mode} blocking={','.join(blocking) or 'none'}"
     )
+    if blocking:
+        return 1, lines
     if hits and mode == "block":
         return 1, lines
     return 0, lines

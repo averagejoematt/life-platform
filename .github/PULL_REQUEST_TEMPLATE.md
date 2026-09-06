@@ -11,7 +11,19 @@ checkbox went unused in 0/20 merged PRs); this one keeps only what every PR need
 
 Outcome: <!-- one sentence: who is better off and how (the closing-comment verdict starts here) -->
 
-Fixes #<!-- issue number -->
+**Closure class:** <!-- instrument | product — one-clause reason -->
+
+<!--
+#3595: `Fixes #N` closes at MERGE, before the deploy. Use it ONLY for a product/config/doc
+fix a live curl can prove after deploy. Anything that is an alarm, gate, sweep, judge,
+ledger, scheduled job or fail-soft write is an INSTRUMENT: write `Refs #N` instead, name
+the first live output below, and close the issue by hand with
+`**Live proof:** <UTC instant> — <where>` once you have seen it. The closure contract's
+`no-live-proof` code is armed BLOCK (registry: scripts/closure_contract.py).
+-->
+
+Fixes #<!-- issue number — product/config/doc only -->
+Refs #<!-- issue number — instrument; first live output that will close it: ... -->
 
 ## Checklist
 

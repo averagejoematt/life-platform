@@ -523,9 +523,17 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # re-runnable harness (`gate_census_mutations.py --run --gate
         # test_composite_alarm_lookup_3390.py`: ARMED 1/1, planting an untracked
         # deploy/_census_probe_3503.py whose whole-estate sweep omits AlarmTypes).
+        # Upper bound raised 50 -> 51 (2026-09-06, #3596): the 51st proof is
+        # `structural::test_role_family_write_scope.py` — IAM write-scope parity as a ROLE
+        # FAMILY (every create_platform_lambda's module AST-read for DynamoDB write verbs and
+        # pk literals against the role_policies* statements its stack wires to it). Mutation-
+        # backed via the re-runnable harness (`gate_census_mutations.py --run --gate
+        # test_role_family_write_scope.py`: ARMED 1/1, planting an untracked
+        # lambdas/operational/_census_probe_3596_lambda.py — a Lambda entrypoint that writes
+        # DynamoDB and that no CDK stack maps to a role).
         3
         <= len(proven)
-        <= 50
+        <= 51
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

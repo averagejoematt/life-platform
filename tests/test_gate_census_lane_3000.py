@@ -488,6 +488,27 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
+# 596 -> 597 (2026-09-06, #3596): ONE real gate — `structural::test_role_family_write_scope.py`,
+# IAM write-scope parity as a ROLE FAMILY (every create_platform_lambda's module AST-read for
+# DynamoDB write verbs and pk literals against the role_policies* statements its stack wires to
+# it). Registered in tests/conftest.py's _PREMERGE_EXTRA_FILES in the same PR. Verified by
+# id-set diff, not count delta: each tree ran its OWN scripts/gate_census.py --json with the
+# branch fully `git add`ed (main from a `git archive` export at this branch's merge-base
+# 4139da139 = 596, branch = 597); ADDED exactly {structural::test_role_family_write_scope.py},
+# REMOVED {}.
+#
+# It arrives PROVEN, not unproven: `python3 scripts/gate_census_mutations.py --run --gate
+# test_role_family_write_scope.py` plants an untracked
+# `lambdas/operational/_census_probe_3596_lambda.py` — a Lambda entrypoint that writes DynamoDB
+# and that no stack maps to a role — and reports ARMED (baseline 18 passed / mutated 1 failed,
+# 17 passed on test_every_ddb_writing_entrypoint_is_enrolled_in_the_family / reverted 18
+# passed); STRUCTURAL_PROOFS records it. So live UNPROVEN does not move (537 -> 537) and
+# BASELINE_UNPROVEN_GATES / UNPROVEN_RESIDUE are untouched.
+#
+# The COMMITTED number below does NOT move, and that is the honest reading rather than a free
+# pass: it was set to 597 on 2026-09-05 while main at this branch's merge-base measures 596, so
+# the ceiling was carrying exactly one unit of accidental headroom and this entrant occupies it.
+# The inventory is now flush with the ceiling — the NEXT entrant has to bump it.
 BASELINE_TOTAL_GATES = 597  # +1 2026-09-05 (#3503's repo-wide AlarmTypes sweep, PROVEN by the family-5 harness), atop 596 (#3564's subscriber-promise cadence check, atop 595, atop 594)
 
 # ══════════════════════════════════════════════════════════════════════════════

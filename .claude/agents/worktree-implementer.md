@@ -71,8 +71,12 @@ write surface is your own worktree and your own branch.
    WAITING gated-deployment check distinctly. It NEVER merges — read its printed
    verdict, then run the merge as your own separate, deliberate command.
 9. **PR:** title in conventional-commit style, body explains what/why + post-merge ops
-   steps (which lambdas/site need deploying), contains `Fixes #<N>`, and ends with the
-   attribution footer the driver brief supplies.
+   steps (which lambdas/site need deploying), declares `**Closure class:** instrument|product
+   — <reason>`, and ends with the attribution footer the driver brief supplies. `Fixes #<N>`
+   is for a product/config/doc fix a live curl can prove after deploy; for an INSTRUMENT — an
+   alarm, gate, sweep, judge, ledger, scheduled job or fail-soft write — write `Refs #<N>` and
+   NAME the first live output the issue will be closed on, because `Fixes` closes at merge,
+   before the deploy (#3595; the closure contract's `no-live-proof` code is armed BLOCK).
 
 ## Report back (your final message)
 

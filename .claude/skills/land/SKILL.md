@@ -113,6 +113,13 @@ Per ADR-099, the session that merges owns the closing comment:
 **Partial acceptance is not a close** — merge the PR, reopen the issue, name the unmet
 boxes.
 
+**An INSTRUMENT closes on its first live output, not on the merge (#3595).** If the work is
+an alarm, gate, sweep, judge, ledger, scheduled job or fail-soft write, the PR carries `Refs
+#N` (never `Fixes #N`), and the close waits for a comment carrying `**Live proof:** <UTC
+instant> — <where>` — the first non-degraded output, pasted. `Fixes #N` is for a
+product/config/doc fix a live curl proves after the deploy. Four instruments read CLOSED
+while dead for 21–49 days because the merge was the close.
+
 The full definition-of-done for a close is the registry `scripts/closure_contract.py`
 (#3318; rendered in `docs/CONVENTIONS.md` §4a2). Two of its rules bite here: a `partial` /
 `not-realized` verdict, or any residual the comment names, must be disposed to exactly one

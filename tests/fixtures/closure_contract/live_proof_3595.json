@@ -1,0 +1,211 @@
+{
+ "_captured": "2026-09-05 from the live repo via `gh api graphql` (the same Issue node shape closure_sweep.parse_issue reads)",
+ "_why": "The four instruments the 2026-09-05 forensic RCA names as CLOSED-while-dead (class 3): #1480 INT-1 (49 days), #2254 G-3 (28), #1956 OBS-1 (30+), #532 CPO-2 (21 runs); plus #3502, whose acceptance named it the positive control, and #3413, the closest thing the corpus has to a live-proof close.",
+ "_reconstructed": "NOTHING here is edited: these are the nodes as the wire returned them on 2026-09-05. Two facts the tests state rather than hide: (a) #3502 has ZERO comments (it was closed by `Fixes #3502` in PR #3573 at 06:56:12Z), so the acceptance's 'positive control' does not exist on the wire and the test builds it by ADDING one line to #3413's real verdict; (b) none of these issues carries the `closure:live-proof` label, because the label is minted BY this change — the tests that exercise the sweep's label leg add it in the test body, where the mutation is visible.",
+ "issues": [
+  {
+   "number": 2254,
+   "title": "content: the Wednesday chronicle generator has no idempotency check — a re-run overwrites an approved draft, regenerates posts.json past 1MB, and marks unapproved weeks 'sent'",
+   "closedAt": "2026-08-08T17:47:32Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:data"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "prio:P1"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2026-08-08T18:43:18Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Verdict (driver, post-merge).** Fixed and merged via PR #2285. **Deploy: pending** — CI/CD queue; I will confirm against the bundle before wrap.\n\nThree failure modes were filed. They turned out to have **three separate root causes**, and one idempotency key does not fix all three — that finding alone changed the shape of the work.\n\n1. **Re-run overwrites an approved draft — real, live, P1.** Unconditional `put_item` plus a fresh approval token every run, so a second invoke replaced the row and mailed a second preview, invalidating the approve link already sitting in Matthew's inbox.\n2. **`posts.json` past 1MB — mechanism real, NOT currently firing.** Measured live rather than assumed: 19 items, ~401 KB, one page — about 40% of the cap, 25–30 weeks of headroom. The 1MB is DynamoDB's Query page cap, and the artifact is an S3 object regenerated *wholesale* from the truncated list. Two things the issue missed: the `week-NN` sequence is the index into that same list, so truncation **renumbers surviving posts' URLs** rather than just dropping the oldest; and the ADR-058 filter is applied *after* the scan cap, so a page can come back empty-but-paginated.\n3. **`record_email_send` on the preview route — real, and the issue's own suggested fix would not have worked.** It offered \"write a distinguishable status, e.g. `preview_sent`\". That would be invisible: the status page reads that partition with `ProjectionExpression=\"sk\"`. **The row's existence *is* the claim.** And since preview mode defaults on, the preview row was the *only* row this sender ever wrote — so the status page has been reporting the draft as a weekly send, never a delivery.\n\nTwo design calls worth keeping: the idempotency gate sits **before** the Sonnet call, so a retry costs no Bedrock; and it deliberately does **not** protect `changes_requested`, because the approve flow tells Matthew to re-run after requesting changes — protecting it would deadlock the only repair path.\n\n**Mutation-proven by me.** My first attempt was too weak and nearly misled me: I neutered the condition while leaving the call text in place and saw nothing fail. Removing the `ConditionExpression` line properly failed 2 assertions, including `test_the_installment_put_is_conditional_unless_overwrite_is_explicit`.\n\n**Visible consequence, by design:** `/status/`'s \"Wednesday chronicle\" will read \"no send on record\" until a week is actually approved and delivered. The old green was the false claim.\n"
+     }
+    ]
+   }
+  },
+  {
+   "number": 1956,
+   "title": "canary: the grounded-digits check fires false ALARMs on TRUE numbers — its fact universe is narrower than the ask pipeline's grounding context",
+   "closedAt": "2026-08-02T18:21:50Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "type:story"
+     },
+     {
+      "name": "area:infra"
+     },
+     {
+      "name": "model:opus"
+     },
+     {
+      "name": "prio:P1"
+     },
+     {
+      "name": "review:2026-07-28"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2026-08-02T19:37:15Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Shipped:** canary universe = the ask pipeline's own context builders + extractor (can never drift from serving again); precision line in qa-smoke over trailing-14d records · PR #2024 · root cause confirmed against the live 07-31 record (it alarmed on the TRUE recovery value 96); incident replay passes post-fix, invented numbers still flag.\n**Outcome:** partial — merged + negative-tested; the canary redeploy rides deploy_all and the qa-smoke S3 grant rides the CDK deploy. Post-deploy: a served-context number never alarms. NOTE: the 07-31 record also carries a REAL board_meta_pressure:no_vendor alarm (training_coach said 'claude') — separate story if it recurs."
+     }
+    ]
+   }
+  },
+  {
+   "number": 1480,
+   "title": "ingestion: notion journal channel guard — verify MCP-created pages ingest cleanly + alert when journal goes dark >7d",
+   "closedAt": "2026-07-19T03:06:48Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "type:story"
+     },
+     {
+      "name": "area:data"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "review:chat-journey-2026-07-18"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "number": 532,
+   "title": "Coach commitments and follow-through — recommendations become tracked COMMITMENT# records the coach must revisit",
+   "closedAt": "2026-07-05T03:52:41Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "type:story"
+     },
+     {
+      "name": "area:ai"
+     },
+     {
+      "name": "model:opus"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "number": 3502,
+   "title": "qa-smoke: the AI-canary grounded-precision check (#1956) has never produced a measurement — GetObject on a missing key returns AccessDenied (no ListBucket on ai-canary-log/) and the outer except files it as a chronic WARN",
+   "closedAt": "2026-09-05T06:56:12Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:infra"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     },
+     {
+      "name": "review:fullreview-2026-09-05"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "number": 3413,
+   "title": "/api/board_ask returns 504 to readers — a 10s client cap on a gate whose measured max is 11.5-17s burns a third of the budget",
+   "closedAt": "2026-09-01T18:51:53Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:ai"
+     },
+     {
+      "name": "model:opus"
+     },
+     {
+      "name": "prio:P1"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 4,
+    "nodes": [
+     {
+      "createdAt": "2026-09-01T19:21:25Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Deployed and verified live\n\nPR #3415 merged; deployed on the tip `b1933150c`, `life-platform-site-api-ai` LastModified **2026-09-01T19:10:13Z**.\n\n**Verified by shipped content, not by sha** — pulled the deployed zip:\n\n```\nweb/site_api_ai_lambda.py   -> zero live references to _bqg / board_quality_gate /\n                               coach-quality-gate / _invoke_quality_gate_sync / RequestResponse\nweb/board_quality_gate.py   -> funcs: ['_day_n_today', 'cycle_boundary_violations',\n                                       '_pt_day_contract_extract_day_n']\n                               has enforce: False    imports boto3: False\n```\n\n### The live probe (acceptance box 1)\n\n| | before | after |\n|---|---|---|\n| `POST /api/board_ask`, 3 personas | **33.9s** (and 504s at the boundary) | **12.8s, http 200** |\n\nAll three coaches answered. Origin-side, the site-api-ai `REPORT` durations tell the same story: pre-deploy max **30,000 ms** (the timeout that produced the 504s), post-deploy max **9,559 ms**.\n\n### What I could NOT measure, stated plainly\n\nThe worst-case fan-out is **7 coaches, not 8** — `personas[:8]` sits above the real roster (`eli_marsh` is not board-askable), so my own PR description overstated it. I did not get a 7-persona probe: the #1221 fan-out rate limiter charges one request per coach, and my 3-persona probes exhausted the 5/hour budget. I deliberately did not work around it with synthetic direct invokes, because `_write_board_interaction` would have written junk into the coaches' episodic memory on Day 1.\n\nExtrapolating 9,559 ms / 3 coaches ≈ 3.2s per coach gives ~22s at origin for 7 — under the 30s ceiling but not comfortably. **That is arithmetic, not a measurement.** I will probe 7 personas once the rate window resets and post the real number here; if it breaches, the fan-out gets its own issue rather than being absorbed into this one.\n\n### Acceptance\n\n- [x] `POST /api/board_ask` returns 200 within the origin budget, proved by a live probe — 12.8s\n- [x] The latency bound is derived from measured `coach-quality-gate` duration and carries the measurement inline (module docstring + ADR-108 amendment): 7d n=211 p50=10434ms p90=20580ms; 48h n=68 p50=16371ms\n- [x] A guard that prevents silent reintroduction — built **structural** rather than numeric (no synchronous cross-Lambda invoke may exist on this reader path), mutation-proved against two reintroduction shapes with a positive control. A cap-vs-p99 assertion was considered and rejected: it needs live CloudWatch in CI and would still pass while the cap quietly did nothing.\n- [x] `ai-canary-overall` — canary run invoked post-deploy returned `status: OK`, `alarms: []`, and critically `board_grounded:status: OK — 200`, the exact check that was failing with `no response (transport failure)`. Metric `LifePlatform/AICanary::OverallAlarm`: **08-31 09:00 PT = 1.0 → 09-01 12:00 PT = 0.0**. The alarm is `Maximum` over an 86400s period, so its state transition trails the metric; today's bucket is already 0.0.\n- [x] The `≈2-5s` comment is gone from every live site (it survives only as quoted history beside the measurement that refuted it)\n\n### Post-deploy gates\n\n`Smoke test: success` · `Post-deploy integration checks (I1/I2/I5): success` · `Auto-rollback: skipped`\n\nLeaving this issue **open** until `ai-canary-overall` actually reads OK. The canary verdict is the evidence; the alarm flip is the confirmation, and closing before it would be a verdict-closed claim ahead of the proof.\n"
+     },
+     {
+      "createdAt": "2026-09-01T19:23:10Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Correction + the final proof\n\nTwo things about the comment above.\n\n**This issue was already closed** at 18:51:53Z — auto-closed by `Fixes #3413` when PR #3415 merged, before I posted. So \"leaving this issue open until the alarm reads OK\" was never accurate. The intent stands and is worth recording: I would not have closed it on the canary verdict alone.\n\n**The alarm has now cleared**, so the evidence exists rather than being promised:\n\n```\nai-canary-overall  ALARM -> OK  at 2026-09-01T12:20:36-07:00\nThreshold Crossed: 1 datapoint [0.0 (31/08/26 19:20:00)]\nwas not greater than or equal to the threshold (1.0).\n```\n\nLit alarms are now: `freshness-interior-gap`, `qa-smoke-failures`, `qa-smoke-warnings`, `token-alarm-genesis-window-active` — all cited, none related to this.\n\n**Still not claimed:** the 7-persona worst case is unmeasured (rate limiter exhausted; I declined synthetic invokes that would pollute Day-1 coach memory), and the board's voice-fidelity failure rate remains *unknown* rather than fine — that is #3414."
+     },
+     {
+      "createdAt": "2026-09-01T19:43:42Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Shipped:** the ADR-108 quality gate removed from the `/api/board_ask` reader path (both call sites + `enforce()`), `board_quality_gate.py` reduced to the pure #1973 rule, a structural anti-reintroduction guard, and the ADR-108 scope narrowed in `docs/DECISIONS.md` · PR #3415 · deployed on tip `b1933150c`, site-api-ai LastModified 2026-09-01T19:10:13Z, verified by shipped zip content · live probe 33.9s→**12.8s** http 200 · `ai-canary-overall` ALARM→OK 12:20:36 PT.\n\n**Outcome:** realized — the Outcome sentence was \"the public coaching board answers again, and the latency budget that governs it is derived from what the gate actually costs instead of what someone once assumed it cost.\" Both halves hold: the board answers (measured, not asserted), and the bound is now derived from `coach-quality-gate`'s real duration (7d n=211 p50=10434ms), carried inline in the module and the ADR beside the `≈2-5s` assumption it refuted.\n\nTwo limits this verdict does **not** cover, stated so `realized` is not read wider than earned: the 7-persona worst case is **unmeasured** (rate limiter exhausted; synthetic invokes declined to avoid polluting Day-1 coach memory), and the board's voice-fidelity failure rate remains **unknown** rather than fine — that is #3414."
+     },
+     {
+      "createdAt": "2026-09-01T20:41:38Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Session R follow-up — the stated-unmeasured 7-persona worst case is now measured, and the answer is structural, not latency.**\n\nLive probe (2026-09-01 ~20:45Z, fresh rate window): one `POST /api/board_ask` with all 7 operational coach ids → **HTTP 429 in 1.6s, zero Bedrock calls**.\n\nMechanism: since #2930 (2026-08-20, #1221 box 5) the endpoint charges its fan-out — 1 token at entry plus `len(personas)-1` before any paid call — against `BOARD_RATE_LIMIT = 5`. The charge is an unconditional DynamoDB `ADD`, then `allowed = count <= limit` (`lambdas/common/rate_limiter.py:81-99`), so a 7-persona request charges 1+6=7 > 5 and is rejected **on a fresh window, always, for every caller**. The 7-persona worst case this issue left unmeasured cannot occur; the worst *reachable* panel is 5 personas (arithmetic ~21s wall at Session Q's measured ~4.3s/persona from the 3-persona 12.8s probe — flagged as arithmetic, not a measurement; a 5-persona live probe was declined for the same reason Session Q declined synthetic probes: it writes 5 coach-memory interactions during launch week).\n\nConsequence filed as **#3419**: the site's \"convene the full board (7)\" checkbox (`site/assets/js/coaching.js:1121,1160`, shipped 2026-07-02) has therefore 429'd every reader who ticked it since 2026-08-20 — and the doomed attempt still charges 7 tokens, burning the reader's entire hour window."
+     }
+    ]
+   }
+  }
+ ]
+}
