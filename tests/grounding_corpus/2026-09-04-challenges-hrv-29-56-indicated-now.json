@@ -1,0 +1,24 @@
+{
+  "id": "2026-09-04-challenges-hrv-29-56-indicated-now",
+  "issue": "#3521",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md AIQ-5",
+  "captured_at": "2026-09-04",
+  "surface": "/api/challenges evidence_summary (config/challenges_catalog.json, board_recommender Dr. Nathan Reeves)",
+  "verbatim": true,
+  "status": "caught",
+  "gate": "composite",
+  "expect_type": "fabricated_number",
+  "specimen": "HRV 29.56 — this is indicated now.",
+  "control": "HRV 42 ms on the night of 2026-09-03 — this is indicated now.",
+  "inputs": {
+    "allowed": [
+      42,
+      2026,
+      9,
+      3
+    ],
+    "generation_date_iso": "2026-09-04",
+    "start_date_iso": "2026-09-04"
+  },
+  "why_it_passed_then": "Static config that no reset reaches and no gate reads: the catalog is served verbatim with no allow-list, as-of or cycle stamp (#3521 adds the stamp test)."
+}

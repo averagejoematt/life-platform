@@ -1,0 +1,22 @@
+{
+  "artifact": "tests/grounding_corpus/*.json",
+  "algorithm": "sha256",
+  "count": 8,
+  "caught": 5,
+  "open": 3,
+  "files": {
+    "2026-09-04-challenges-hrv-29-56-indicated-now.json": "d03157f476ffa64632eb3d68006dc7eaa3c1e86e113a3917f5a6c992a4ecc353",
+    "2026-09-04-coaching-dashboard-data-phase-established-on-day-0.json": "d6cf671f3628395a950d8c872e691ffc3080e85abdaf9fae0bcd6c9a056d27b7",
+    "2026-09-04-explain-day-0-restarted-2026-09-05.json": "9922c461ea272322df828379ad602b275a2623c970ea200d445811cbcd979a65",
+    "2026-09-04-nutrition-macrofactor-not-syncing-yet.json": "2631a5d8aa99448a0706062266a03bd64c6fb0085c6f8a786c9e34f2e535f8f6",
+    "2026-09-04-physical-8000-steps-shelf-protocol.json": "4c061989e4eec0ea6a34ca6998af6906c9ee90d9215ceefd84e5ccd7e7cbe9a0",
+    "2026-09-04-physical-garmin-not-syncing-yet.json": "dc881ed2fd0988658b90f3680c45766bb02d23d4ce33654ca017818a69b3f551",
+    "2026-09-04-physical-september-5th-reset-a.json": "3c0625e8d776aabcb45d9d30fbaf784392585ec1586f52b5930fb5d427b5fa51",
+    "2026-09-04-physical-september-5th-reset-b.json": "d2d696feb7f2f6d602ab87340853275b44b8119c431d2a065659557c721d86f5"
+  },
+  "corpus_sha256": "3e3b0193fe4fd3bc01fd50af60e6294c475063f2eb4ca82e56ee2d79aab4d458",
+  "first_stamped_at": "2026-09-06T06:01:32.232340+00:00",
+  "stamped_at": "2026-09-06T06:01:32.232340+00:00",
+  "amended": [],
+  "verify": "python3 scripts/grounding_corpus_stamp.py verify"
+}

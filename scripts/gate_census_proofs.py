@@ -585,6 +585,43 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    # #3518: the plan-figure grounding class. Family 2 by NAME (`*_gate.py`) and by the
+    # bool-verdict API the classifier saw (`plan_figure_findings` returns the findings the
+    # caller HOLDS on). Not a synthetic plant — the mutation IS the live R4 specimen the
+    # class exists to catch, and the widened-plan control is what turns the verdict OFF.
+    "guard::lambdas/ai/plan_facts_gate.py": {
+        "gate_name": "lambdas/ai/plan_facts_gate.py",
+        "command": (
+            "python3 -m pytest tests/test_plan_facts_gate_3518.py tests/test_grounding_corpus_3614.py -q   # 42 + 24 tests; "
+            "the specimen row is tests/grounding_corpus/2026-09-04-physical-8000-steps-shelf-protocol.json"
+        ),
+        "mutation": (
+            "The live 2026-09-04 physical position_summary, verbatim — 'Garmin step data isn't syncing to my dashboard "
+            "yet, which blocks meaningful tracking of his 8,000+ steps/day protocol' — graded against the plan block "
+            "derived from config/user_goals.json (daily_steps_range [6000, 7000]); then the same sentence pushed through "
+            "the REAL coach_state_updater._gate_derived_prose with the regen returning the same condensation; then the "
+            "control: the identical specimen against a plan whose range is widened to [6000, 9000]."
+        ),
+        "observed": (
+            "RED: plan_figure_findings returns one `plan_figure_contradiction` (quantity steps, claimed 8000.0, plan "
+            "[6000.0, 7000.0]); through _gate_derived_prose the derived set is HELD (derived_prose_held True, "
+            "public_summary None) after the one regen fails to remove it. GREEN: the '6,000-step floor' control and the "
+            "narrative's own 6,000-7,000 range return []; the widened plan returns [] for the specimen "
+            "(test_a_specimen_that_stops_failing_is_visible), so the verdict is the plan's, not the sentence's. "
+            "Both files pass on the merged tree: 42 passed + 24 passed."
+        ),
+        "scope": (
+            "FRAMING-SCOPED: only a figure with plan framing (protocol/floor/target/goal/minimum/prescribed/...) in its "
+            "own clause is graded, bound to the NEAREST number, so an observation ('walked 4,312 steps') is never a "
+            "finding here — the numbers class owns it. The derived-prose seam grades steps and calories ONLY "
+            "(DERIVED_PROSE_QUANTITIES): protein/fiber have a second configured source (the profile target the "
+            "AUTHORITATIVE FACTS block hands every coach) that seam does not hold; a caller passing `observed` grades "
+            "all four. DISARMED (returns [], one WARNING per container) when the plan cannot load from the repo file "
+            "or S3 — never a guess. Armed on one surface (coach_state_updater), not registered as a GATE_CLASSES "
+            "member in tests/grounding_wiring.py, so the other 31 surfaces are not covered by this verdict."
+        ),
+        "proved_on": "2026-09-06",
+    },
 }
 
 
@@ -735,4 +772,80 @@ QA_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-05",
     },
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REGISTRY_PROOFS — census family "registry" (#3544). The eight entries of
+# `tests/test_token_contrast.py::RECEDE_TEXT_RULES`: one per CSS rule in the site's
+# "recede" state grammar, each measured as ink-token-over-background composited at the
+# opacity PARSED from the live sheet, in all three palette blocks.
+#
+# The bar is `gate_census.PROVEN_CAN_FAIL`'s bar and it is met PER ENTRY, not once for
+# the set: `test_recede_guard_reds_when_the_shipped_opacity_comes_back` is parametrised
+# over all eight, and each parameter restores THAT rule's own pre-#3544 opacity into a
+# copy of the live sheet and requires the evaluator to name that selector under-AA. A
+# ninth entry added with no control row reds `test_every_measured_rule_has_a_negative_
+# control`, so the set cannot grow unproven — which is the failure mode #3544 itself was
+# (five dim-the-card rules accumulated to ~230 axe nodes with no composite guard at all).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RECEDE_COMMAND = (
+    "python3 -m pytest tests/test_token_contrast.py -q   "
+    "# 21 tests; the 8 parametrised cases of "
+    "test_recede_guard_reds_when_the_shipped_opacity_comes_back are the per-entry controls"
+)
+_RECEDE_SCOPE = (
+    "A verdict on the ARITHMETIC and on the CSS parse, offline — not on the rendered page. It composites "
+    "each rule's ink tokens over --page and --surface at the opacity parsed from the sheet; it does not know "
+    "which background a given instance actually lands on, does not see a wash/image ground (the .ch-state "
+    "class, guarded separately by test_ch_state_grounds_on_a_ramp_step_not_an_accent_wash), and does not see "
+    "inline styles or JS-set colours. The live arbiter stays tests/visual_qa.py's axe sweep. Also scoped: the "
+    "companion set-completeness check test_every_opacity_declaration_is_classified sweeps evidence.css ONLY — "
+    "tokens.css's ~40 further opacity declarations are deliberately unclassified rather than asserted "
+    "text-free on inspection this change did not do."
+)
+
+
+def _recede_proof(selector: str, alpha: float, observed: str) -> dict:
+    return {
+        "gate_name": f"RECEDE_TEXT_RULES[{selector}]",
+        "command": _RECEDE_COMMAND,
+        "mutation": (
+            f"Restored `{selector}`'s own pre-#3544 declaration — `opacity: {alpha}` — into a copy of the live "
+            "sheet, leaving the other seven rules fixed, and re-ran the same _recede_failures() evaluator the "
+            "shipping test calls."
+        ),
+        "observed": observed,
+        "scope": _RECEDE_SCOPE,
+        "proved_on": "2026-09-05",
+    }
+
+
+_RECEDE_OBSERVED = {
+    # selector: (alpha, n failures produced, worst ratio per palette block)
+    ".ch-rung.is-locked": (0.55, 16, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+    ".ch-fx": (0.75, 11, "dark 3.70:1 / @media-light 3.03:1 / data-theme-light 3.03:1"),
+    ".ch-fx.is-inert": (0.55, 16, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+    ".ch-badge": (0.55, 10, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+    ".ch-tl li.ch-tl-muted": (0.75, 11, "dark 3.70:1 / @media-light 3.03:1 / data-theme-light 3.03:1"),
+    ".ev-intro__note": (0.8, 4, "@media-light 3.35:1 / data-theme-light 3.35:1 — dark held 5.13:1 and did NOT fail"),
+    ".rdg-abandoned .rdg-face": (0.72, 6, "dark 3.52:1 / @media-light 2.87:1 / data-theme-light 2.87:1"),
+    ".vg-off": (0.55, 12, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
+}
+
+REGISTRY_PROOFS: dict[str, dict[str, Any]] = {
+    f"registry::tests/test_token_contrast.py::RECEDE_TEXT_RULES::{selector}": _recede_proof(
+        selector,
+        alpha,
+        (
+            f"2026-09-05, watched in both directions. CLEAN sheets: 0 failures, pytest exit 0 (21 passed). "
+            f"MUTATED: {n} AA failures naming `{selector} @ opacity {alpha}` — worst per block {worst}. "
+            "REVERTED: 0 failures, exit 0. The whole-file control run "
+            "(`.ch-rung.is-locked` restored in the real working tree, not a copy) was watched separately "
+            "at exit 1 with the same numbers, and `.ev-intro__note`'s light-only scope is asserted "
+            "explicitly by the control rather than assumed."
+        ),
+    )
+    for selector, (alpha, n, worst) in _RECEDE_OBSERVED.items()
 }

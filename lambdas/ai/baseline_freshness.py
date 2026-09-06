@@ -135,6 +135,89 @@ def _is_day_reference(text: str, start: int) -> bool:
     return bool(_DAY_REFERENCE_ANCHOR_RE.search(text[max(0, start - _DAY_ANCHOR_LOOKBACK) : start]))
 
 
+# ── #3614: a RESET/genesis DATE that is not the cycle's genesis ───────────────
+# The 2026-09-05 review's two most-cited specimens were the physical coach's "No weight
+# reading has arrived since the September 5th reset" (cycle-16 genesis 2026-09-04) and
+# /api/explain's "Experiment day 0 (restarted 2026-09-05)". Neither class above could see
+# them: `stale_phase` reads "Day N" tokens and the #1242 date gate reads only FULL dates
+# with a year, so a month-day reset date walked through every gate. This is the same
+# self-location question as stale_phase asked of the genesis date: a reset/restart/
+# genesis FRAMED date must equal `start_date_iso`. Framing-scoped like everything in
+# this module — a bare "September 5th" with no reset framing is never graded.
+_MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")
+_DATE_TOKEN = (
+    r"(?P<iso>\d{4}-\d{2}-\d{2})|" r"(?P<month>" + "|".join(_MONTHS) + r")\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(?P<year>\d{4}))?"
+)
+_RESET_WORDS = r"(?:reset|restart(?:ed)?|relaunch(?:ed)?|genesis|re-?anchor(?:ed)?)"
+_RESET_DATE_RES = (
+    # "since the September 5th reset" / "after the 2026-09-05 restart" / "the September 5 genesis"
+    re.compile(
+        r"\b(?:the|this|our|my|a)\s+(?:" + _DATE_TOKEN + r")(?:'s)?\s+(?:experiment\s+|cycle\s+)?" + _RESET_WORDS + r"\b", re.IGNORECASE
+    ),
+    # "restarted 2026-09-05" / "reset on September 5th" / "genesis of September 5, 2026"
+    re.compile(r"\b" + _RESET_WORDS + r"\s+(?:on|of|at|from|to)?\s*(?:the\s+)?(?:" + _DATE_TOKEN + r")", re.IGNORECASE),
+)
+
+
+def _resolve_reset_token(m, generation_date_iso: str):
+    """The ISO date a reset-date match names, or None when it cannot be resolved."""
+    gd = m.groupdict()
+    if gd.get("iso"):
+        try:
+            return _dt.date.fromisoformat(gd["iso"]).isoformat()
+        except ValueError:
+            return None
+    try:
+        gen = _dt.date.fromisoformat(generation_date_iso)
+        month = _MONTHS.index(gd["month"].lower()) + 1
+        year = int(gd["year"]) if gd.get("year") else gen.year
+        d = _dt.date(year, month, int(gd["day"]))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    # A year-less month-day more than half a year AHEAD of the generation date is last
+    # year's reset ("the December 30th reset" narrated on January 2nd).
+    if not gd.get("year") and (d - gen).days > 183:
+        d = _dt.date(year - 1, month, int(gd["day"]))
+    return d.isoformat()
+
+
+def stale_reset_date_findings(text: str, *, generation_date_iso: str, start_date_iso: str) -> list:
+    """A reset/restart/genesis-framed date that is not the cycle's genesis (#3614).
+
+    Returns ``[{"type": "stale_reset_date", "claimed": iso, "expected": iso, "detail"}]``.
+    One finding per distinct claimed date. Armed by the same two anchors as the other
+    freshness classes, so every surface that spreads ``cycle_gate_params()`` gets it.
+    """
+    text = text or ""
+    if not generation_date_iso or not start_date_iso:
+        return []
+    try:  # a malformed anchor DISARMS the class — a weekly cron must never die on a constant
+        _dt.date.fromisoformat(str(start_date_iso))
+        _dt.date.fromisoformat(str(generation_date_iso))
+    except (TypeError, ValueError):
+        return []
+    findings = []
+    seen = set()
+    for rx in _RESET_DATE_RES:
+        for m in rx.finditer(text):
+            claimed = _resolve_reset_token(m, generation_date_iso)
+            if claimed is None or claimed == start_date_iso or claimed in seen:
+                continue
+            seen.add(claimed)
+            findings.append(
+                {
+                    "type": "stale_reset_date",
+                    "claimed": claimed,
+                    "expected": start_date_iso,
+                    "detail": (
+                        f"the narrative frames \"{m.group(0).strip()}\" as the experiment's reset, but this cycle's "
+                        f"genesis is {start_date_iso} — a reset dated {claimed} did not happen"
+                    ),
+                }
+            )
+    return findings
+
+
 # ── #3517: the pre-start temporal-direction rule ─────────────────────────────
 #
 # A direction word, then up to one clause of object text. `obj` is what
@@ -147,9 +230,8 @@ _PRE_START_DIRECTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# The month names a narrative uses for the genesis date. Built once; the DATE is supplied
-# per call, so a re-anchor needs no edit here.
-_MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")
+# The month names a narrative uses for the genesis date: `_MONTHS` above (shared with the
+# #3614 reset-date member). The DATE is supplied per call, so a re-anchor needs no edit here.
 
 # The genesis EVENT nouns. Deliberately not a mood list: these are the words that name
 # the cycle boundary itself, and pre-start there is nothing on the far side of it.
@@ -389,6 +471,8 @@ def baseline_freshness_findings(
       phase of `generation_date_iso`. If pre_start (gen < start): ANY "Day N" (N>=1)
       is a finding — correct framing is the pre-start countdown. If in-experiment:
       a cited N != the real day (day_n(gen)) is a finding.
+    - "stale_reset_date" (#3614): a reset/restart/genesis-framed date ("since the
+      September 5th reset", "restarted 2026-09-05") that is not `start_date_iso`.
 
     Same ``{"type": ..., "detail": ...}`` shape as the other grounded_generation
     finding classes, so it composes with grounding_findings()/correction_prompt().
@@ -520,4 +604,6 @@ def baseline_freshness_findings(
                     ),
                 }
             )
+    # ── stale_reset_date (#3614) ──────────────────────────────────────────────
+    findings.extend(stale_reset_date_findings(text, generation_date_iso=generation_date_iso, start_date_iso=start_date_iso))
     return findings

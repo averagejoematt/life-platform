@@ -1,0 +1,20 @@
+{
+  "id": "2026-09-04-physical-garmin-not-syncing-yet",
+  "issue": "#3516",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md AIQ-4 / NARR-3 / R4 (paused half)",
+  "captured_at": "2026-09-04T17:04:56Z",
+  "surface": "/api/coach_analysis?domain=physical",
+  "verbatim": true,
+  "status": "open",
+  "closes_with": "#3516",
+  "gate": "composite",
+  "expect_type": null,
+  "specimen": "Garmin step data isn't syncing to my dashboard yet, which blocks meaningful tracking.",
+  "control": "Garmin is paused (ADR-074) and cannot report steps; that is not a sync problem.",
+  "inputs": {
+    "allowed": [],
+    "generation_date_iso": "2026-09-04",
+    "start_date_iso": "2026-09-04"
+  },
+  "why_open": "A paused source narrated as a sync failure. absence_sourcing (#3252/#3268) is structural and takes no text; the coach brief's inventory line collapses paused to 'not available' (#3516). No text class exists yet — when one lands, flip status to caught and set expect_type."
+}

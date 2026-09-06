@@ -347,8 +347,15 @@ Two sanctioned extensions, same clause structure as `--coach` (§8.2):
 - **`--pillar-*` tokens** (`tokens.css`): seven desaturated identity hues, one per pillar
   (sleep · movement · nutrition · metabolic · mind · relationships · consistency). They color
   **pillar-identity encodings only** — ring segments, radar vertices, stat-bar fills, heatmap
-  row accents, sparkline strokes — never buttons, text, alerts, or non-pillar data. Ember stays
-  the "earned/up" accent; down stays muted ink, never red.
+  row accents, sparkline strokes, **and the pillar's own NAME** (`.ch-cal-p`, `.ch-comp-n`, the
+  decay/calibration `<strong>`s) — never buttons, alerts, or non-pillar data. Ember stays
+  the "earned/up" accent; down stays muted ink, never red. Because a pillar name is TEXT, each
+  token is declared in the §1 dark palette **and** overridden in both light blocks (#3545): the
+  light leg holds the same OKLCH hue and chroma and lowers only L, so the identity survives the
+  theme while every pillar clears WCAG AA on `--page`/`--surface` in both. Declaring a text
+  token in the dark block alone is the bug this rule exists to prevent — it silently keeps its
+  dark value under light mode (the #1222 `--alert` and #2919/#3057 coach-accent class);
+  `tests/test_token_contrast.py` fails the build on it.
 - **`--tier-accent`** (set via `data-tier` on the sheet's section root): used only on the tier
   emblem + hero frame. The **tier emblem** (`sigils.js tierEmblem()`) is the character's identity
   device — stroke-only, currentColor, no gradients — and its shape evolves with the tier

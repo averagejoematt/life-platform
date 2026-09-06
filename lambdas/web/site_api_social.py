@@ -550,7 +550,8 @@ def _handle_experiment_suggest(event: dict) -> dict:
 # "ask the board" only CAPTURES a question — the answer reuses the already-gated
 # /api/board_ask. The predict-week DDB writes need no IAM change (the site_api role
 # already writes the table unconditionally); the board-question S3 write needs
-# generated/board_questions/* added to the role (one additive line).
+# reader_input/board_questions/* on the role (#3559 — it was generated/board_questions/*
+# until SEC-1 found that prefix anonymously readable; see web/site_api_capture_store).
 # ─────────────────────────────────────────────────────────────────────────────
 
 _PREDICT_CHOICES = {"up", "down", "flat"}

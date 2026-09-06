@@ -1,0 +1,25 @@
+{
+  "id": "2026-09-04-explain-day-0-restarted-2026-09-05",
+  "issue": "#3519",
+  "review": "docs/reviews/FULLREVIEW_2026-09-05.md AIQ-6",
+  "captured_at": "2026-09-04",
+  "surface": "/api/explain context line (site_api_ai_lambda day_ctx)",
+  "verbatim": true,
+  "status": "caught",
+  "gate": "composite",
+  "expect_type": "stale_reset_date",
+  "specimen": "Experiment day 0 (restarted 2026-09-05) — a young record is short by design.",
+  "control": "PRE-START: the experiment has NOT begun; genesis 2026-09-04 is 0 day(s) away.",
+  "inputs": {
+    "allowed": [],
+    "allowed_dates": [
+      "2026-09-04"
+    ],
+    "generation_date_iso": "2026-09-04",
+    "start_date_iso": "2026-09-04"
+  },
+  "also_caught_by": [
+    "fabricated_date"
+  ],
+  "why_it_passed_then": "The explain door built its own phase line beside the shared block and ran no date allow-list against it; #3519 derives the line from build_experiment_phase_context."
+}
