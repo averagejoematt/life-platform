@@ -355,6 +355,51 @@ def compare_deletion_promise() -> list[str]:
     return findings
 
 
+_AFFILIATE_SCOPE_WORDS = re.compile(r"\bemail|newsletter|inbox\b", re.I)
+
+
+def compare_subscribe_affiliate_scope() -> list[str]:
+    """CLAIM (site/subscribe/index.html): "no affiliate links" / "no ads" describes
+    the subscriber EMAILS, not the whole site — /gear/ is a real affiliate page
+    (its own disclosure block) linked from every page's footer, so an UNSCOPED
+    "no affiliate links" sentence contradicts a page a reader is one click from.
+
+    READS   site/subscribe/index.html (the claim sentences) and site/gear/index.html
+            (the disclosure that makes /gear/ a real affiliate page — the fact an
+            unscoped claim would contradict).
+    COMPARES each sentence containing "no affiliate links" or "no ads" against an
+            email/newsletter/inbox scope word in the SAME sentence, and confirms the
+            scoped claim links to /gear/'s own disclosure rather than leaving the
+            contradiction implicit.
+    """
+    findings: list[str] = []
+    gear = _read("site/gear/index.html")
+    if "affiliate" not in gear.lower():
+        findings.append(
+            "site/gear/index.html no longer mentions affiliate links — the scoping this claim exists to police "
+            "may be moot; re-check whether the claim (and this comparator) is still needed"
+        )
+        return findings
+
+    subscribe = _read("site/subscribe/index.html")
+    sentences = re.split(r"(?<=[.!?])\s+", re.sub(r"<[^>]+>", " ", subscribe))
+    unscoped = [s.strip() for s in sentences if re.search(r"no affiliate links|no ads\b", s, re.I) and not _AFFILIATE_SCOPE_WORDS.search(s)]
+    if unscoped:
+        findings.append(
+            "site/subscribe/index.html states "
+            + " / ".join(repr(s) for s in unscoped)
+            + " with no email/newsletter/inbox scope word — read unscoped this contradicts /gear/, a real "
+            "affiliate page linked from every page's footer"
+        )
+
+    if "affiliate-disclosure" not in subscribe:
+        findings.append(
+            "site/subscribe/index.html's affiliate-scoping sentence no longer links to /gear/#affiliate-disclosure "
+            "— the scoped claim should point at the real disclosure it is distinguishing itself from"
+        )
+    return findings
+
+
 def _sweep_cadence_days() -> int | None:
     """The subscriber-retention backstop sweep's cadence, in days, from the CDK rule.
 
@@ -468,6 +513,25 @@ CLAIMS: dict[str, dict] = {
             "sentence a broken promise rather than a documentation defect. The section is hand-authored and sits "
             "OUTSIDE the generated permanence-terms markers on the same page, so #1400's generator gives it no "
             "cover — and #3044 rewrote the signed policy underneath it on 2026-08-23."
+        ),
+    },
+    "subscribe_affiliate_scope": {
+        "subject": 'the subscriber-emails-only scope of /subscribe/\'s "no affiliate links" / "no ads" promise',
+        "stated": ("site/subscribe/index.html",),
+        "phrases": (
+            r"no affiliate links",
+            r"no ads\b",
+        ),
+        "derived_from": ("site/gear/index.html (the affiliate disclosure block that makes /gear/ a real affiliate page)",),
+        "comparator": "compare_subscribe_affiliate_scope",
+        "runtime": False,
+        "reason": (
+            "#3619 ROW6 (growth): /subscribe/ stated 'No filter, no highlight reel, no affiliate links' and "
+            "'No ads, no affiliate links' twice with no scope, while /gear/ is a real affiliate page (its own "
+            "disclosure block) linked from every page's footer. The claim is true of the newsletter and false of "
+            "the site — a reader one click away from /gear/ would find the unscoped sentence contradicted. Phrase"
+            "-scoped rather than a single fixed string: 'no ads'/'no affiliate links' recur independently and "
+            "either one, unscoped, makes the same false claim."
         ),
     },
 }

@@ -271,6 +271,62 @@ def parse_cf_log(text: str):
     return out
 
 
+# ── Subscribe-funnel ATTEMPT stage (#3619 ROW1) ───────────────────────────────
+# `aggregate_subscriber_funnel` (below) counts by DDB `status` — rows that already
+# exist. An attempt that never became a row (rate-limited at 60/5min/IP,
+# malformed, a duplicate the handler silently 200s) is invisible to it. The
+# CloudFront logs this Lambda ALREADY fetches and parses in the same invocation
+# carry that missing stage: /subscribe/ page views and POST /api/subscribe
+# outcomes. `parse_cf_log` above deliberately excludes `/api/*` (built for "pages
+# a person read", not funnel attempts) and this is a second, narrow scan of the
+# SAME raw log text — no new S3 fetch, no new log format, FREE per the finding.
+_SUBSCRIBE_PAGE = "/subscribe/"
+
+
+def parse_subscribe_attempts(text: str) -> dict:
+    """One CF log file's text -> {page_views, attempts, successes} for the
+    subscribe funnel's attempt stage. Pure function, mirrors `parse_cf_log`'s
+    header-driven column parsing so it survives the same format changes."""
+    page_views = attempts = successes = 0
+    fields = None
+    for line in text.splitlines():
+        if line.startswith("#Fields:"):
+            fields = line.split(":", 1)[1].strip().split()
+            continue
+        if line.startswith("#") or not line.strip():
+            continue
+        if not fields:
+            continue
+        parts = line.split("\t")
+        if len(parts) < len(fields):
+            continue
+        row = dict(zip(fields, parts))
+        method = row.get("cs-method", "")
+        status = row.get("sc-status", "")
+        uri = urllib.parse.unquote(row.get("cs-uri-stem", ""))
+        ua = urllib.parse.unquote(row.get("cs(User-Agent)", row.get("cs-user-agent", "")))
+        if _is_bot(ua):
+            continue
+        if method == "GET" and status in ("200", "304") and _norm_page(uri) == _SUBSCRIBE_PAGE:
+            page_views += 1
+        elif method == "POST" and uri == "/api/subscribe":
+            attempts += 1
+            if status.startswith("2"):
+                successes += 1
+    return {"page_views": page_views, "attempts": attempts, "successes": successes}
+
+
+def aggregate_subscribe_attempts(texts) -> dict:
+    """Sum `parse_subscribe_attempts` over every fetched log file — the same
+    `texts` list the page-view aggregation already holds in memory."""
+    totals = {"page_views": 0, "attempts": 0, "successes": 0}
+    for text in texts or []:
+        one = parse_subscribe_attempts(text)
+        for k in totals:
+            totals[k] += one[k]
+    return totals
+
+
 def aggregate(records):
     """Pure aggregation over parsed page requests → digest dict. No raw IPs retained."""
     pages = Counter()
@@ -420,6 +476,19 @@ def build_subscriber_funnel_html(funnel):
         rows = '<tr><td colspan="2" style="color:#888;padding:6px 0">No subscribers yet.</td></tr>'
     parts.append(f'<table style="width:100%;border-collapse:collapse">{rows}</table>')
     window = funnel.get("window_days") or DAYS
+    # #3619 ROW1: the attempt stage, from the CF-log scan merged into `funnel` in
+    # the handler. Absent (older callers, or a fail-soft aggregation error) simply
+    # omits the line — never a crash, never a fabricated zero.
+    if "subscribe_page_views_7d" in funnel:
+        views = funnel.get("subscribe_page_views_7d") or 0
+        attempts = funnel.get("subscribe_attempts_7d") or 0
+        successes = funnel.get("subscribe_successes_7d") or 0
+        confirmed_7d = funnel.get("new_confirmed_7d") or 0
+        parts.append(
+            f'<p style="margin:6px 0;font-size:13px">/subscribe/ views <strong>{views}</strong> &rarr; '
+            f"POST /api/subscribe 2xx <strong>{successes}</strong> of <strong>{attempts}</strong> attempts &rarr; "
+            f"confirmed <strong>{confirmed_7d}</strong> (last {window} days)</p>"
+        )
     parts.append(
         f'<p style="margin:6px 0;font-size:13px"><strong>{funnel.get("new_pending_7d") or 0}</strong> new pending · '
         f'<strong>{funnel.get("new_confirmed_7d") or 0}</strong> new confirmed in the last {window} days</p>'
@@ -930,6 +999,17 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning("subscriber funnel failed (fail-soft, #1954): %s", e)
             funnel = {"error": f"funnel collector error (fail-soft): {str(e)[:120]}"}
+
+        # #3619 ROW1: the attempt stage, from the SAME log texts (below) — computed
+        # after `_load_logs` returns them, merged into `funnel` so one HTML builder
+        # renders the whole ladder. Fail-soft: an attempt-stage bug must not drop
+        # the DDB-derived funnel section it's merged into.
+        try:
+            attempt_stage = aggregate_subscribe_attempts(texts)
+            if isinstance(funnel, dict) and not funnel.get("error"):
+                funnel = {**funnel, **{f"subscribe_{k}_7d": v for k, v in attempt_stage.items()}}
+        except Exception as e:
+            logger.warning("subscribe attempt-stage aggregation failed (fail-soft, #3619): %s", e)
 
         # #2835: the folded ops-report sections — the reconciliation and
         # pip-audit reports now deliver as S3 artifacts this pack embeds

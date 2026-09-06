@@ -365,6 +365,22 @@ def test_funnel_aggregate_counts_by_status_and_window():
     assert f["oldest_pending_days"] == 31  # the 2026-07-03 pendings, visible at last
 
 
+def test_funnel_aggregate_counts_expired_separately_and_excludes_from_oldest_pending():
+    """#3566: a pending row whose token expired past the sweep's grace window
+    transitions to status="expired" (lambdas/content/subscriber_retention.py) —
+    the funnel must count it in its own bucket, not as a live pending, and
+    `oldest_pending_days` must be derived only from rows STILL pending."""
+    fixture = [
+        {"sk": "EMAIL#aaa", "status": "confirmed", "created_at": "2026-03-28T10:00:00+00:00", "confirmed_at": "2026-03-28T10:05:00+00:00"},
+        # the two dead 2026-07-03 rows, now transitioned by the sweep — no longer "pending"
+        {"sk": "EMAIL#bbb", "status": "expired", "created_at": "2026-07-03T09:00:00+00:00", "expired_at": "2026-08-01T00:00:00+00:00"},
+        {"sk": "EMAIL#ccc", "status": "expired", "created_at": "2026-07-03T11:00:00+00:00", "expired_at": "2026-08-01T00:00:00+00:00"},
+    ]
+    f = td.aggregate_subscriber_funnel(fixture, now=FUNNEL_NOW)
+    assert dict(f["by_status"]) == {"confirmed": 1, "expired": 2}
+    assert f["oldest_pending_days"] is None  # 0 live pendings — both former pendings are terminal
+
+
 def test_funnel_aggregate_empty_partition_is_a_valid_reading():
     f = td.aggregate_subscriber_funnel([], now=FUNNEL_NOW)
     assert f["by_status"] == []
@@ -390,6 +406,64 @@ def test_build_html_renders_funnel_section_from_fixture_partition():
     assert "1 synthetic canary row" in html
     # the dead-pending state is visible: oldest pending age is surfaced
     assert "31 days" in html
+
+
+# ── Subscribe-funnel ATTEMPT stage (#3619 ROW1) — from the SAME CF log text ────
+
+ATTEMPT_SAMPLE = HEADER + "\n".join(
+    [
+        _row("2026-08-01", "1.1.1.1", "GET", "/subscribe/", "200", "-", "Mozilla/5.0 (Mac)"),
+        _row("2026-08-01", "2.2.2.2", "GET", "/subscribe/", "200", "-", "Mozilla/5.0 (iPhone)"),
+        _row("2026-08-01", "9.9.9.9", "GET", "/subscribe/", "200", "-", "Googlebot/2.1"),  # bot — excluded
+        _row("2026-08-01", "1.1.1.1", "POST", "/api/subscribe", "200", "-", "Mozilla/5.0 (Mac)"),  # success
+        _row("2026-08-01", "2.2.2.2", "POST", "/api/subscribe", "429", "-", "Mozilla/5.0 (iPhone)"),  # rate-limited — attempt, not success
+        _row("2026-08-01", "3.3.3.3", "POST", "/api/subscribe", "500", "-", "Mozilla/5.0"),  # server error — attempt, not success
+        _row("2026-08-01", "4.4.4.4", "GET", "/cockpit/", "200", "-", "Mozilla/5.0"),  # unrelated page — excluded
+    ]
+)
+
+
+def test_parse_subscribe_attempts_counts_views_and_outcomes():
+    result = td.parse_subscribe_attempts(ATTEMPT_SAMPLE)
+    assert result == {"page_views": 2, "attempts": 3, "successes": 1}
+
+
+def test_parse_subscribe_attempts_ignores_unrelated_traffic():
+    unrelated = HEADER + _row("2026-08-01", "1.1.1.1", "GET", "/data/", "200", "-", "Mozilla/5.0")
+    assert td.parse_subscribe_attempts(unrelated) == {"page_views": 0, "attempts": 0, "successes": 0}
+
+
+def test_aggregate_subscribe_attempts_sums_across_log_files():
+    totals = td.aggregate_subscribe_attempts([ATTEMPT_SAMPLE, ATTEMPT_SAMPLE])
+    assert totals == {"page_views": 4, "attempts": 6, "successes": 2}
+
+
+def test_aggregate_subscribe_attempts_empty_is_a_valid_reading():
+    assert td.aggregate_subscribe_attempts([]) == {"page_views": 0, "attempts": 0, "successes": 0}
+
+
+def test_build_html_renders_the_attempt_stage_when_present():
+    """The regression guard for #3619 ROW1: the funnel used to show two stages
+    (by-status, new-pending/confirmed); merging the attempt-stage keys onto
+    `funnel` (as the handler now does) must render a three-stage line."""
+    funnel = td.aggregate_subscriber_funnel(SUBSCRIBER_FIXTURE, now=FUNNEL_NOW)
+    funnel["subscribe_page_views_7d"] = 42
+    funnel["subscribe_attempts_7d"] = 6
+    funnel["subscribe_successes_7d"] = 5
+    agg = td.aggregate([])
+    html = td.build_html(agg, "Jul 27", "Aug 03", funnel=funnel)
+    assert "/subscribe/ views <strong>42</strong>" in html
+    assert "2xx <strong>5</strong> of <strong>6</strong> attempts" in html
+
+
+def test_build_html_omits_the_attempt_stage_when_absent():
+    """No fabricated zero when the attempt-stage aggregation fails soft — the
+    line simply doesn't render (an older/error-shaped funnel dict must still
+    render its other two stages without crashing)."""
+    funnel = td.aggregate_subscriber_funnel(SUBSCRIBER_FIXTURE, now=FUNNEL_NOW)
+    agg = td.aggregate([])
+    html = td.build_html(agg, "Jul 27", "Aug 03", funnel=funnel)
+    assert "/subscribe/ views" not in html
 
 
 def test_build_html_funnel_fail_soft_renders_not_collected():
