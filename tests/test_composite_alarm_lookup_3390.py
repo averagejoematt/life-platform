@@ -366,16 +366,27 @@ def _by_construction_registry():
 
 
 def test_by_construction_flag_alarms_exist_in_the_monitoring_stack():
-    """The registry names REAL alarms. A rename in monitoring_stack.py must red here
-    rather than leave an orphan entry silently exempting nothing."""
+    """The registry names REAL alarms. A rename in CDK must red here rather than leave an
+    orphan entry silently exempting nothing.
+
+    #3505 widened this from `open("cdk/stacks/monitoring_stack.py")` to the whole stacks
+    tree: the genesis-window gauge moved to the cohesive sibling
+    cdk/stacks/monitoring_token_alarms.py under the module-size ratchet, and a guard that
+    reads one named file cannot follow its subject through an extraction — it keeps
+    passing on whatever half it can still see (#2703, tests/cdk_alarm_pins.py's rule)."""
     registry = _by_construction_registry()
     assert registry, "the by-construction flag registry is empty — the genesis gauge entry vanished"
-    with open(os.path.join(_REPO, "cdk", "stacks", "monitoring_stack.py"), encoding="utf-8") as fh:
-        stack_src = fh.read()
+    stacks_dir = os.path.join(_REPO, "cdk", "stacks")
+    stack_src = ""
+    for entry in sorted(os.listdir(stacks_dir)):
+        if entry.endswith(".py"):
+            with open(os.path.join(stacks_dir, entry), encoding="utf-8") as fh:
+                stack_src += fh.read()
+    assert stack_src, "no cdk/stacks sources readable — the sweep went blind, not the registry stale"
     for name, meta in registry.items():
         assert f'alarm_name="{name}"' in stack_src, (
-            f"BY_CONSTRUCTION_FLAG_ALARMS names {name!r}, which is not an alarm_name= literal in "
-            "cdk/stacks/monitoring_stack.py — the registry is exempting an alarm that no longer exists (#3503)"
+            f"BY_CONSTRUCTION_FLAG_ALARMS names {name!r}, which is not an alarm_name= literal anywhere "
+            "under cdk/stacks/ — the registry is exempting an alarm that no longer exists (#3503)"
         )
         assert meta.get("reason"), f"{name} carries no reason — an exemption without a stated reason is a mute button"
         assert meta.get("since"), f"{name} carries no date — an exemption without a date can never be re-reviewed"

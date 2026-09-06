@@ -136,14 +136,11 @@ _**118** CloudWatch alarms are defined in `cdk/stacks/*.py` and AST-discovered b
 - `recall-index-failed-wednesday-chronicle`
 - `telegram-coach-hold`
 
-**`monitoring_stack.py`** (59)
+**`monitoring_stack.py`** (55)
 
 - `ai-canary-blind`
 - `ai-canary-heartbeat`
 - `ai-canary-overall`
-- `ai-daily-spend-high`
-- `ai-tokens-daily-brief-daily`
-- `ai-tokens-platform-daily-total`
 - `budget-tier-hardstop`
 - `budget-tier-sustained-7d`
 - `coherence-heartbeat`
@@ -196,6 +193,12 @@ _**118** CloudWatch alarms are defined in `cdk/stacks/*.py` and AST-discovered b
 - `slo-ai-coaching-success`
 - `slo-daily-brief-delivery`
 - `slo-source-freshness`
+
+**`monitoring_token_alarms.py`** (4)
+
+- `ai-daily-spend-high`
+- `ai-tokens-daily-brief-runaway`
+- `ai-tokens-platform-daily-total`
 - `token-alarm-genesis-window-active`
 
 **`operational_stack.py`** (23)

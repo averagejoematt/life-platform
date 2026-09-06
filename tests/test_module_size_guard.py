@@ -272,14 +272,14 @@ BASELINE = {
     # zero headroom — and #3473's missing REL-01 heartbeat needed ~11 lines. Extracted
     # rather than raised, per the FULL-file rule. The COMPUTE-pipeline liveness pairs
     # (compute-pipeline-stale + its new heartbeat, compute-outputs-missing +
-    # compute-outputs-heartbeat) are one concern — a daily compute detector watched by a
-    # problem alarm AND an absence heartbeat — and now live in
-    # cdk/stacks/monitoring_compute_alarms.py. 51 lines came out for a 5-line call site +
-    # import; measured 1290, of which 10 (a fifth of the 51 extracted — the #2610
-    # earned-headroom rule) are banked so the file does not land straight back at zero.
-    # The three moved alarms keep their construct ids, so the synthesized template shows
-    # exactly one alarm added and nothing replaced.
-    "cdk/stacks/monitoring_stack.py": 1300,
+    # PRUNED 2026-09-05 (#3505). The terminal cure, not another raise: the AI token +
+    # spend alarm family (2 raw token alarms, the AI-spend ceiling, the genesis-window
+    # gauge and its four composites) moved to the cohesive sibling
+    # cdk/stacks/monitoring_token_alarms.py, taking the file 1290 -> 1165 — under the
+    # 1200 hard ceiling for the first time since this registry was written, so the entry
+    # is DELETED rather than re-banked with headroom ("an entry is debt, not a home").
+    # From here the file is governed by the ceiling itself: it may not cross 1200 again
+    # without either another extraction or a registered top-of-file exception.
     # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the

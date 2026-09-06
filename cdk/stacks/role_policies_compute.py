@@ -471,7 +471,7 @@ def compute_coach_state_updater() -> list[iam.PolicyStatement]:
     Reentry sweep (2026-05-03 v6.8.10): added cloudwatch:PutMetricData. Lambda emits
     AnthropicInputTokens / AnthropicOutputTokens per coach for cost tracking. Pre-fix
     every emit failed with AccessDenied (non-fatal — caught as WARNING) which made
-    downstream alarms (ai-tokens-daily-brief-daily) inaccurate.
+    downstream alarms (ai-tokens-daily-brief-runaway) inaccurate.
 
     Shared with coach-quality-gate (same permissions — see compute_stack.py).
 

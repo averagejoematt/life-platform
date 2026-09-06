@@ -210,7 +210,13 @@ def test_alarm_routing_known_truths():
     a = MODEL["alarms"]
     assert a["life-platform-canary-ddb-failure"]["routing"] == "digest+paging"  # _canary_alarm(page=True)
     assert a["life-platform-canary-ddb-failure"]["via"] == "factory:_canary_alarm"
-    assert a["ai-daily-spend-high"]["routing"] == "urgent"  # _alarm(to_digest default False)
+    # #3505: the spend ceiling routes THROUGH the genesis composite pair now (the same
+    # shape #2116 gave the platform token total), so the raw alarm carries no routing of
+    # its own and the paging half is the `-urgent` composite.
+    assert a["ai-daily-spend-high"]["routing"] == "via-composite"
+    assert set(a["ai-daily-spend-high"]["composites"]) == {"ai-daily-spend-high-urgent", "ai-daily-spend-high-genesis-window"}
+    assert a["ai-daily-spend-high-urgent"]["routing"] == "urgent"
+    assert a["ai-daily-spend-high-genesis-window"]["routing"] == "digest"
     assert a["ingest-liveness-heartbeat"]["routing"] == "digest"  # _heartbeat_alarm → digest
     assert a["email-subscriber-errors"]["via"] == "helper:add_web_alarms"
     assert a["ai-tokens-platform-daily-total"]["routing"] == "via-composite"
