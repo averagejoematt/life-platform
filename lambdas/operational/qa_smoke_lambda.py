@@ -77,6 +77,7 @@ from operational.qa_check import (  # noqa: E402,F401
     PARTITIONS,
     QA_SMOKE_EMF_NAMESPACE,
     Check,
+    cause_line,  # #3501: the machine-readable "which check ids is this run red on" line
     detail_log_lines,  # #2620: the overflow log lines for a check that had to truncate
     emf_summary_line,
     run_isolated,
@@ -1097,6 +1098,19 @@ def lambda_handler(event, context):
         # and a passing check must never look alike again.
         for c in paused:
             print(f"[QA] PAUSE [{c.partition}] {c.category} / {c.name}: {c.message}")
+
+        # #3501: CAUSE IDENTITY, on every run including a clean one. FailCount is a
+        # COUNT, so an alarm on it cannot transition when the cause CHANGES: qa-smoke-
+        # failures was lit 09-03 on `cross_surface:weight` and from 09-04 on
+        # `reader_truth:frozen_artifacts` in one unbroken episode, and its citation went
+        # on saying "CURED and PROVEN LIVE" about the first while the /wrap gate matched
+        # by alarm NAME and passed. These two lines are what
+        # scripts/check_alarm_citations.py compares a citation's `cause` field against.
+        # Emitted for BOTH sides (failures and the alarmed warns) because both have an
+        # alarm; chronic warns are excluded for the same reason they are excluded from
+        # WarnCount (#1958) — nothing alarms on them.
+        print(cause_line("fail", fails))
+        print(cause_line("warn", warns_alarmed))
 
         # #1445: emit the EMF summary on EVERY run — including all-green — so
         # the nightly QA layer has a heartbeat and its warnings/failures are

@@ -1071,3 +1071,213 @@ def test_main_wires_audience_into_uncited_long_reds(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "ai-canary-overall" in out
     assert seen_audience == {"ai-canary-overall": "reader"}, "main() must pass load_alarm_audience()'s result into uncited_long_reds"
+
+
+# ── #3501: cause identity — a citation matches a NAME, not a DEFECT ────────────
+#
+# The measured specimen, replayed below: qa-smoke-failures went ALARM 2026-09-03
+# 11:31 PT and its registry entry (written 2026-09-01) said "CURED and PROVEN LIVE"
+# about a cause cured two days earlier, while the live failure was first
+# `cross_surface:weight` and then `reader_truth:frozen_artifacts`. FailCount is a
+# COUNT, so no transition ever announced the change and this gate — which asked only
+# "does an entry exist for this NAME?" — passed on both nights.
+
+
+def _lit_episode(name, transitioned_iso, hours_old=100):
+    """A lit alarm carrying an explicit episode start (#3501's new field)."""
+    now = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    return {"name": name, "updated": (now - timedelta(hours=hours_old)).isoformat(), "transitioned": transitioned_iso}
+
+
+def test_replay_a_citation_written_before_the_episode_is_flagged():
+    """THE SPECIMEN. Entry written 09-01; this ALARM episode began 09-03."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "CURED and PROVEN LIVE", "added": "2026-09-01"}}
+    assert cac.stale_episode_citations(alarms, citations) == [("qa-smoke-failures", "2026-09-01", "2026-09-03")]
+
+
+def test_a_citation_written_the_same_day_as_the_transition_is_not_flagged():
+    """The normal, honest case — an operator citing an alarm the day it goes red.
+    Flagging it would train reflexive --decoded, which is the failure mode."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "#1", "added": "2026-09-03"}}
+    assert cac.stale_episode_citations(alarms, citations) == []
+
+
+def test_cause_observed_re_derivation_clears_a_stale_added_date():
+    """An entry may be re-derived against the new episode without being re-created —
+    `cause_observed` is the date the claim was last CHECKED and wins over `added`."""
+    alarms = [_lit_episode("freshness-interior-gap", "2026-08-31T08:02:44-07:00")]
+    citations = {"freshness-interior-gap": {"citation": "#3504", "added": "2026-08-25", "cause_observed": "2026-09-05"}}
+    assert cac.stale_episode_citations(alarms, citations) == []
+    # ...and without the re-derivation stamp, the same entry IS flagged.
+    stale = {"freshness-interior-gap": {"citation": "#3504", "added": "2026-08-25"}}
+    assert [n for n, _, _ in cac.stale_episode_citations(alarms, stale)] == ["freshness-interior-gap"]
+
+
+def test_an_entry_with_no_date_at_all_is_unknown_never_flagged():
+    """The deliberate under-catch: a doc lint may fail to flag a sloppy entry, it may
+    never manufacture a red out of a missing field."""
+    alarms = [_lit_episode("some-alarm", "2026-09-03T11:31:55-07:00")]
+    assert cac.stale_episode_citations(alarms, {"some-alarm": {"citation": "prose only"}}) == []
+
+
+def test_a_by_construction_flag_alarm_is_exempt_from_the_episode_check():
+    alarms = [dict(_lit_episode("token-alarm-genesis-window-active", "2026-09-03T00:00:00-07:00"), by_construction=True)]
+    citations = {"token-alarm-genesis-window-active": {"citation": "dated window", "added": "2026-09-01"}}
+    assert cac.stale_episode_citations(alarms, citations) == []
+
+
+def test_an_unparseable_transition_stamp_never_manufactures_a_flag():
+    alarms = [{"name": "x", "updated": "", "transitioned": "not-a-timestamp"}]
+    assert cac.stale_episode_citations(alarms, {"x": {"citation": "c", "added": "2026-01-01"}}) == []
+
+
+# ── cause_mismatches ──────────────────────────────────────────────────────────
+
+
+def test_a_cited_cause_the_live_run_contradicts_is_flagged():
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "#3598", "cause": "cross_surface:weight"}}
+    live = {"qa-smoke-failures": ["reader_truth:frozen_artifacts"]}
+    assert cac.cause_mismatches(alarms, citations, live) == [("qa-smoke-failures", "cross_surface:weight", "reader_truth:frozen_artifacts")]
+
+
+def test_a_matching_cause_is_clean_and_order_does_not_matter():
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "#3598", "cause": "b:two,a:one"}}
+    assert cac.cause_mismatches(alarms, citations, {"qa-smoke-failures": ["a:one", "b:two"]}) == []
+
+
+def test_a_citation_with_no_cause_field_is_never_flagged():
+    """Prose citations stay valid — #3501 adds a facet, it does not deprecate the old shape."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "dated, self-clearing"}}
+    assert cac.cause_mismatches(alarms, citations, {"qa-smoke-failures": ["anything:at-all"]}) == []
+
+
+def test_an_alarm_with_no_live_cause_reading_is_unknown_never_mismatched():
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "#3598", "cause": "cross_surface:weight"}}
+    assert cac.cause_mismatches(alarms, citations, {}) == []
+
+
+def test_a_run_that_went_clean_while_the_alarm_is_still_lit_is_a_mismatch():
+    """An empty live cause set is a READING, not an absence: the alarm is lit and the
+    latest run found nothing, so the citation no longer explains the live state."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "#3598", "cause": "reader_truth:frozen_artifacts"}}
+    assert cac.cause_mismatches(alarms, citations, {"qa-smoke-failures": []}) == [
+        ("qa-smoke-failures", "reader_truth:frozen_artifacts", "-")
+    ]
+
+
+# ── the cause channel is the REAL emitter's wire format, not a copy of it ──────
+
+
+def _qa_check():
+    path = os.path.join(REPO, "lambdas", "operational", "qa_check.py")
+    spec = importlib.util.spec_from_file_location("_qa_check_wire", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class _FakeCheck:
+    def __init__(self, name):
+        self.name = name
+
+
+def test_the_gate_parses_the_real_emitters_output():
+    """FIXTURE MUST BE THE WIRE. The line is built by qa_check.cause_line() — the same
+    function qa_smoke_lambda prints — and parsed by the gate's own reader. A hand-typed
+    fixture here would let the two drift and still pass."""
+    qa = _qa_check()
+    line = qa.cause_line("fail", [_FakeCheck("reader_truth:frozen_artifacts"), _FakeCheck("cross_surface:weight")])
+    parsed = cac.parse_cause_events([line], qa.parse_cause_line)
+    assert parsed == {"qa-smoke-failures": ["cross_surface:weight", "reader_truth:frozen_artifacts"]}
+
+
+def test_the_gate_reads_the_MOST_RECENT_line_per_alarm():
+    """filter_log_events returns oldest-first; a stale earlier run must never win."""
+    qa = _qa_check()
+    old = qa.cause_line("fail", [_FakeCheck("cross_surface:weight")])
+    new = qa.cause_line("fail", [_FakeCheck("reader_truth:frozen_artifacts")])
+    assert cac.parse_cause_events([old, new], qa.parse_cause_line) == {"qa-smoke-failures": ["reader_truth:frozen_artifacts"]}
+
+
+def test_the_warn_channel_maps_to_the_warnings_alarm():
+    qa = _qa_check()
+    lines = [qa.cause_line("fail", []), qa.cause_line("warn", [_FakeCheck("mcp:get_todoist_snapshot")])]
+    assert cac.parse_cause_events(lines, qa.parse_cause_line) == {
+        "qa-smoke-failures": [],
+        "qa-smoke-warnings": ["mcp:get_todoist_snapshot"],
+    }
+
+
+def test_a_cloudwatch_framed_line_still_parses():
+    """CloudWatch prefixes each event with a timestamp/request id and can embed a tab."""
+    qa = _qa_check()
+    framed = "2026-09-05T01:37:12.004Z\t8f0b-req-id\t" + qa.cause_line("fail", [_FakeCheck("a:b")]) + "\n"
+    assert cac.parse_cause_events([framed], qa.parse_cause_line) == {"qa-smoke-failures": ["a:b"]}
+
+
+def test_an_unrelated_log_line_is_absent_not_clean():
+    qa = _qa_check()
+    assert cac.parse_cause_events(["[QA] FAIL [content_truth] something / else: msg"], qa.parse_cause_line) == {}
+
+
+def test_fetch_qa_smoke_causes_degrades_when_aws_is_unreachable(monkeypatch):
+    """Same degrade-honestly contract as the two CloudWatch reads: never crash, never
+    report a clean cause off a failed read."""
+
+    class _Boom:
+        def client(self, *a, **k):
+            raise RuntimeError("no creds")
+
+    monkeypatch.setitem(sys.modules, "boto3", _Boom())
+    causes, err = cac.fetch_qa_smoke_causes()
+    assert causes == {} and "no creds" in err
+
+
+def test_render_reports_the_cause_read_failure_on_an_otherwise_clean_board():
+    code, message = cac.render([], None, cause_error="throttled")
+    assert code == 0
+    assert "cause-identity" in message and "UNVERIFIED" in message
+
+
+def test_render_prints_both_new_findings_and_exits_1():
+    code, message = cac.render(
+        [],
+        None,
+        stale_episodes=[("qa-smoke-failures", "2026-09-01", "2026-09-03")],
+        mismatched=[("qa-smoke-failures", "cross_surface:weight", "reader_truth:frozen_artifacts")],
+    )
+    assert code == 1
+    assert "predates the current episode" in message.lower() or "PREDATES" in message
+    assert "reader_truth:frozen_artifacts" in message
+
+
+def test_main_wires_the_two_new_checks(monkeypatch, capsys):
+    """END TO END on the replayed specimen, with every live read stubbed."""
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")], None))
+    monkeypatch.setattr(
+        cac, "load_citations", lambda: {"qa-smoke-failures": {"citation": "#1", "added": "2026-09-01", "cause": "old:cause"}}
+    )
+    monkeypatch.setattr(cac, "load_alarm_audience", lambda: {})
+    monkeypatch.setattr(cac, "fetch_alarm_history", lambda *a, **k: ([], None))
+    monkeypatch.setattr(cac, "fetch_issue_states", lambda refs: ({}, None))
+    monkeypatch.setattr(cac, "fetch_qa_smoke_causes", lambda *a, **k: ({"qa-smoke-failures": ["new:cause"]}, None))
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 1
+    out = capsys.readouterr().out
+    assert "2026-09-01" in out and "2026-09-03" in out
+    assert "new:cause" in out
+
+
+def test_the_live_registry_stamps_every_entry_it_needs_to():
+    """The committed registry must carry a date on every entry that declares a `cause`
+    — a cause with no observation date cannot be checked against an episode."""
+    registry = cac.load_citations()
+    undated = [name for name, e in registry.items() if isinstance(e, dict) and e.get("cause") and not cac._citation_written_on(e)]
+    assert not undated, f"entries declaring a `cause` with no `cause_observed`/`added` date: {undated}"

@@ -314,6 +314,94 @@ def split_warns(checks):
     return [c for c in warned if not c.chronic], [c for c in warned if c.chronic]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #3501 — CAUSE IDENTITY: which check ids a run is red on, in the LOG, every run
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# `qa-smoke-failures` alarms on Maximum(FailCount) >= 1 over 86400s. A COUNT is
+# blind to identity: the alarm was lit 2026-09-03 on `cross_surface:weight`, then
+# on `reader_truth:frozen_artifacts` from 09-04 — two different defects, one
+# unbroken ALARM episode, and no transition for anything downstream to notice. So
+# `docs/alarm_citations.json['qa-smoke-failures']` went on reading "CURED and
+# PROVEN LIVE" about a cause that had been replaced, and the /wrap citation gate
+# passed on 09-03 and 09-04 because it matches alarm NAME to registry entry and
+# never cause to cause.
+#
+# The fix is to make the cause a FIRST-CLASS, machine-readable output of every
+# run, not a line a human greps out of an email: one `[QA] CAUSE` line per side
+# (fail / warn) on EVERY run including a clean one, carrying the sorted check ids
+# and a short fingerprint of the set. `scripts/check_alarm_citations.py` reads the
+# most recent one out of the log group and compares it against the citation's own
+# `cause` field.
+#
+# LOG LINE, not a metric dimension, and that is deliberate: check ids are
+# unbounded cardinality (every new check mints a new value), and a dimensioned
+# metric would bill per unique combination forever. A log line costs the same
+# fraction of a cent as the `[QA] FAIL` lines beside it, is queryable by Logs
+# Insights, and — unlike a metric — carries the full set rather than one value.
+#
+# The FORMAT lives here, with the Check class it describes, and so does its
+# parser: two hand-written copies of a wire format is the drift this file's own
+# header warns about. `tests/test_qa_smoke_cause_identity_3501.py` feeds
+# `cause_line()`'s real output into `parse_cause_line()` and into the gate's
+# reader (fixture-must-be-the-wire), so neither side can drift alone.
+CAUSE_LINE_PREFIX = "[QA] CAUSE"
+CAUSE_KINDS = ("fail", "warn")
+_CAUSE_NONE = "-"
+
+
+def cause_fingerprint(check_ids) -> str:
+    """Stable 8-char fingerprint of a SET of check ids ('none' when empty).
+
+    Sorted + deduped before hashing, so the same failing set fingerprints the
+    same however the checks were ordered by a run's fault-isolated accumulation.
+    """
+    ids = sorted(set(check_ids))
+    if not ids:
+        return "none"
+    return hashlib.sha256("|".join(ids).encode("utf-8")).hexdigest()[:8]
+
+
+def cause_line(kind: str, checks) -> str:
+    """The one `[QA] CAUSE <kind> <fingerprint> <id,id,...>` line for `checks`.
+
+    `kind` is 'fail' or 'warn'. `checks` is the already-partitioned list (the
+    run's failures, or its ALARMED warns — never the chronic ones, which no alarm
+    watches). An empty list emits fingerprint 'none' and a `-` id list: a clean
+    run states its cleanliness explicitly, because "no CAUSE line" and "the log
+    read failed" must never look the same to the reader (#1920's rule applied to
+    the cause channel).
+    """
+    if kind not in CAUSE_KINDS:
+        raise ValueError(f"cause_line kind must be one of {CAUSE_KINDS}, got {kind!r}")
+    ids = sorted({c.name for c in checks})
+    return f"{CAUSE_LINE_PREFIX} {kind} {cause_fingerprint(ids)} {','.join(ids) if ids else _CAUSE_NONE}"
+
+
+def parse_cause_line(line):
+    """(kind, fingerprint, [check ids]) for a `[QA] CAUSE` line, or None.
+
+    Tolerant of CloudWatch's log framing (a timestamp/request-id prefix, trailing
+    whitespace, an embedded tab from a multi-line event) and returns None for any
+    line that is not one of ours — a malformed line must read as ABSENT, never as
+    a clean cause set.
+    """
+    if not isinstance(line, str):
+        return None
+    idx = line.find(CAUSE_LINE_PREFIX)
+    if idx == -1:
+        return None
+    parts = line[idx + len(CAUSE_LINE_PREFIX) :].split()
+    if len(parts) < 2:
+        return None
+    kind, fingerprint = parts[0], parts[1]
+    if kind not in CAUSE_KINDS:
+        return None
+    raw_ids = parts[2] if len(parts) > 2 else _CAUSE_NONE
+    ids = [] if raw_ids == _CAUSE_NONE else [i for i in raw_ids.split(",") if i]
+    return kind, fingerprint, sorted(set(ids))
+
+
 def emf_summary_line(
     *,
     passed: int,
