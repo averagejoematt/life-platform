@@ -57,11 +57,22 @@ public platform's stated postures*," not "A for a 50-engineer org."
 - **Finish the packaging.** New modules go into the domain subpackage they belong to
   (`lambdas/<domain>/`), not the flat root. Shared helpers go to a single `common/` (or `core/`),
   not the root pile.
-- **Module-size ceiling: ~800 lines.** A source file over ~800 lines is a smell; over ~1,200 is
-  a finding. Split into cohesive helper modules behind the same public entrypoint (no contract
-  change). **Escape hatch:** a generated file, or a registry/dispatch table where splitting hurts
-  legibility, may exceed the ceiling *if it carries a top-of-file comment naming the exception* —
-  which registers it with the module-size guard.
+- **Module-size ceiling: ~650 LOGICAL lines (smell) / 1,000 (finding).**
+  **The unit is logical lines, not `wc -l` (#3537).** A logical line is a physical line
+  carrying at least one Python token that is not a comment and not blank; a multi-line
+  statement counts every line it spans, and a docstring counts (it is a string expression,
+  not a comment). **Comments and blank lines are not charged against the ceiling.**
+  Until 2026-09-05 the guard measured `len(splitlines())` and §2 named no unit at all, so
+  the tax landed on the next documentation line rather than the next function — on
+  2026-09-04 it forced deleting the explanatory comments of a fix (`eb777b5b5`: "Both size
+  failures were caused by COMMENTS I wrote explaining the fix"), which rule 1 below
+  forbids in spirit. The 1,000 was re-derived when the unit changed, from the largest
+  module compliant on the day (965 logical): carrying 1,200 across to a smaller measure
+  would have been a silent ~25% loosening. Split into cohesive helper modules behind the
+  same public entrypoint (no contract change). **Escape hatch:** a generated file, or a
+  registry/dispatch table where splitting hurts legibility, may exceed the ceiling *if it
+  carries a top-of-file comment naming the exception* — which registers it with the
+  module-size guard.
 - Enforced by the **module-size ratchet guard** (below).
 - **Accepted debt has a per-file number, and headroom is EARNED, never granted (#2610).**
   Files already over the ceiling carry a maximum line count in
@@ -70,13 +81,14 @@ public platform's stated postures*," not "A for a 50-engineer org."
   never to raise a baseline, so the next person to touch the file refactors it for everyone
   who touched it before. That is not hypothetical: **#1677** hit `role_policies.py` at
   3291/3291 and reverted three IAM policies and a feature rather than refactor a file it had
-  not come to work on; **#2612** hit `restart_pipeline.py` at 1193/1200 mid-change. The
+  not come to work on; **#2612** hit `restart_pipeline.py` at 1193/1200 mid-change (both
+  numbers are pre-#3537 physical lines). The
   policy, decided in #2610:
   1. **No blanket re-baseline with headroom.** Raising every number at once is "raise the
      baseline" with extra steps and spends the ratchet's credibility in one commit.
   2. **Extract worst-first**, on the seams the codebase already recognises — facade plus
      cohesive siblings (#1400, #1654, #2604, #2221). The **terminal cure is dropping back
-     under the 1,200 ceiling** so the entry is pruned outright. A baseline entry is debt,
+     under the ceiling** so the entry is pruned outright. A baseline entry is debt,
      not a home.
   3. **A PR that extracts N lines from a baselined file may bank up to N/5 as headroom** and
      must hand the rest back by lowering the number. Nothing else may raise a number. This

@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -42,34 +42,8 @@ except ImportError:
     logger = logging.getLogger("whoop")
     logger.setLevel(logging.INFO)
 
-try:
-    from common.http_retry import urlopen_with_retry
-except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def urlopen_with_retry(req, timeout=30, max_attempts=None):
-            # The fallback must accept max_attempts — the token POST passes it (#2196).
-            return urllib.request.urlopen(req, timeout=timeout)
-
-
-try:
-    from common.auth_breaker import check_breaker, looks_like_auth_failure, mark_as_auth_failure, mark_failure
-except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def mark_as_auth_failure(exc):
-            return exc
-
-        def check_breaker(table, source_name, user_id, logger):
-            return None
-
-        def mark_failure(table, source_name, user_id, error_msg, logger):
-            return None
-
-        def looks_like_auth_failure(exc):
-            return False
-
-
+from common.auth_breaker import check_breaker, looks_like_auth_failure, mark_as_auth_failure, mark_failure
+from common.http_retry import urlopen_with_retry
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion

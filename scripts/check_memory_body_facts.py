@@ -58,6 +58,35 @@ HISTORICAL = re.compile(r"\b(was|formerly|historical|obsolete|superseded|retired
 # a "never use <old date>" line stays true forever and isn't the drift class this guards).
 GENESIS_DIRECTIVE = re.compile(r"\balways use\b\D{0,10}(\d{4}-\d{2}-\d{2})", re.I)
 
+# ── #3539: the STATE tokens, not the imperative ──────────────────────────────────────
+#
+# GENESIS_DIRECTIVE above matches exactly one phrasing — "always use <date>". That is a
+# phrase-keyed detector (#2959/#3003/#3199), and the memory surface does not write its
+# genesis that way any more: it writes STATE. On 2026-09-05 the index said
+# "cycle 16 LIVE, genesis 2026-09-04" (twice) against EXPERIMENT_START_DATE=2026-09-05,
+# and a topic file still said "CURRENT: cycle 13 LIVE, genesis 2026-08-10" — three cycles
+# stale. Neither line contains "always use", so neither was reachable by any rule here,
+# and `_scan_memory_files` excluded MEMORY.md outright on the grounds that the index was
+# "already-guarded" — nothing guarded it.
+#
+# So: a `genesis <YYYY-MM-DD>` token, or a `cycle <N> LIVE|CURRENT` token, is a claim
+# about the LIVE state and must equal the live constants. A line framed as history
+# (HISTORICAL above — "was", "retired", "superseded", a dated past-tense row) is exempt,
+# because the memory files are partly a diary and a dated record of a past cycle is true.
+GENESIS_STATE = re.compile(r"\bgenesis\s+(\d{4}-\d{2}-\d{2})", re.I)
+CYCLE_STATE = re.compile(r"\bcycle[\s-]+(\d+)\s*(?:\w+\s+)?(?:LIVE|CURRENT)\b|\b(?:LIVE|CURRENT)[^\n]{0,24}?\bcycle[\s-]+(\d+)\b")
+
+# THE DISCRIMINATOR, and the reason this rule can exist at all. These files are half
+# ledger and half DIARY: "Cycle-5 reset executed early ... (genesis 2026-07-12)" and
+# "the cycle-15 reset with future genesis 2026-09-01" are true records of a past cycle
+# and must never red. Sweeping every `genesis <date>` token returned 17 hits of which 12
+# were history. What distinguishes a CLAIM from a RECORD is a currentness marker on the
+# same line — the SHOUTED `LIVE` / `CURRENT` this corpus uses for exactly that purpose
+# ("**cycle 16 LIVE, genesis 2026-09-04**", "CURRENT: cycle 13 LIVE, genesis
+# 2026-08-10"). Case-sensitive on purpose: lowercase "live"/"current" run all through the
+# prose, the upper-case forms are the state vocabulary.
+_CURRENTNESS = re.compile(r"\b(?:LIVE|CURRENT)\b|\bcurrently\b")
+
 # Known-retired literal ownership claims: compiled pattern -> why it's stale.
 STALE_STACK_CLAIMS = {
     re.compile(r"operational_stack\.py\)?\s+owns\s+the\s+infrastructure", re.I): (
@@ -66,16 +95,61 @@ STALE_STACK_CLAIMS = {
 }
 
 
+_TRUTH_CACHE: dict = {}
+
+
+def _doc_facts_truth() -> dict:
+    """check_doc_facts.py's own discoverer, resolved ONCE (it re-derives the whole
+    platform census and prints as it goes; calling it twice doubles the noise)."""
+    if not _TRUTH_CACHE:
+        spec = importlib.util.spec_from_file_location("_docfacts_1342", ROOT / "scripts" / "check_doc_facts.py")
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        _TRUTH_CACHE.update(m._ground_truth())
+    return _TRUTH_CACHE
+
+
 def _ground_truth_genesis() -> str:
     """The live EXPERIMENT_START_DATE, via check_doc_facts.py's own discoverer (ONE source)."""
-    spec = importlib.util.spec_from_file_location("_docfacts_1342", ROOT / "scripts" / "check_doc_facts.py")
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    truth = m._ground_truth()
-    genesis = truth.get("experiment_genesis")
+    genesis = _doc_facts_truth().get("experiment_genesis")
     if not genesis:
         raise RuntimeError("could not resolve experiment_genesis from check_doc_facts._ground_truth()")
     return genesis
+
+
+def _ground_truth_cycle() -> str:
+    """The live experiment cycle number, from check_doc_facts._ground_truth() — the SAME
+    single discoverer `_ground_truth_genesis` uses, which derives it as the highest key of
+    CYCLE_GENESES. Returns "" if it cannot be resolved, so the cycle rule simply does not
+    fire rather than inventing a number to compare against."""
+    truth = _doc_facts_truth()
+    return str(truth.get("experiment_cycle") or "")
+
+
+def _state_hits(files, genesis: str, cycle: str) -> list:
+    """#3539: `genesis <date>` / `cycle <N> LIVE` state tokens that disagree with the
+    live constants. Exposed separately from `_body_hits` so the regression test can
+    plant the exact 2026-09-05 lines and prove the rule bites."""
+    hits = []
+    for f in files:
+        for lineno, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if HISTORICAL.search(line) or not _CURRENTNESS.search(line):
+                continue
+            for mo in GENESIS_STATE.finditer(line):
+                if mo.group(1) != genesis:
+                    hits.append(
+                        f"{f.name}:{lineno}: stale genesis state 'genesis {mo.group(1)}' "
+                        f"(live EXPERIMENT_START_DATE={genesis})\n      | {line.strip()[:120]}"
+                    )
+            if cycle:
+                for mo in CYCLE_STATE.finditer(line):
+                    claimed = mo.group(1) or mo.group(2)
+                    if claimed != cycle:
+                        hits.append(
+                            f"{f.name}:{lineno}: stale cycle state '{mo.group(0).strip()}' "
+                            f"(live cycle={cycle})\n      | {line.strip()[:120]}"
+                        )
+    return hits
 
 
 def _body_hits(files, genesis: str) -> list:
@@ -105,9 +179,13 @@ def _body_hits(files, genesis: str) -> list:
 
 
 def _scan_memory_files(memory_dir: Path) -> list:
-    """Every topic-file body under `memory_dir`, excluding the MEMORY.md index itself
-    (the index is a separate, already-guarded surface — this gate is about the bodies)."""
-    return sorted(p for p in memory_dir.glob("*.md") if p.name != "MEMORY.md")
+    """Every markdown file under `memory_dir`, INCLUDING the MEMORY.md index.
+
+    #3539: this used to exclude MEMORY.md, and the docstring's reason — "the index is a
+    separate, already-guarded surface" — was simply false. Nothing guarded it. The index
+    carried "cycle 16 LIVE, genesis 2026-09-04" twice while the live anchor was
+    2026-09-05, which is the one file a session reads FIRST."""
+    return sorted(memory_dir.glob("*.md"))
 
 
 def main() -> int:
@@ -121,8 +199,9 @@ def main() -> int:
         return 0
 
     genesis = _ground_truth_genesis()
+    cycle = _ground_truth_cycle()
     files = _scan_memory_files(mem_dir)
-    hits = _body_hits(files, genesis)
+    hits = _body_hits(files, genesis) + _state_hits(files, genesis, cycle)
     if hits:
         print(f"STALE memory-body facts found ({len(hits)}) — fix the body, not just the MEMORY.md index line:")
         for h in hits:

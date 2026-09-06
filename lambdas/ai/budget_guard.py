@@ -383,11 +383,6 @@ def allow(feature: str) -> bool:
     return tier < cutoff
 
 
-def hard_stopped() -> bool:
-    """True when all Bedrock calls must be refused (Tier 3)."""
-    return current_tier() >= _HARD_STOP_TIER
-
-
 def paused_features(tier=None):
     """The features currently disabled at `tier` (default: the live tier).
 
