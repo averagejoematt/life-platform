@@ -128,6 +128,7 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))  # #2612: importable when loaded b
 # sits against the 1200-line ceiling); re-exported so the public entrypoint never moved.
 from experiment import phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
 from restart_hooks import build_post_verify_hooks  # noqa: E402,F401
+from restart_work_contract import work_contract_rc  # noqa: E402 — #3598: per-step work contract (input>0 ∧ acted==0, unnamed → red)
 
 REGION = "us-west-2"
 TABLE = "life-platform"
@@ -747,8 +748,7 @@ def build_sub_scripts(
 def run_step(name: str, cmd: list[str], apply: bool, log: list[str]) -> int:
     print(f"\n──[ {name} ]──")
     print(f"    $ {' '.join(cmd)}")
-    if not apply:
-        # Inject --dry-run / drop --apply for sub-scripts
+    if not apply:  # drop --apply for sub-scripts (dry-run)
         cmd = [c for c in cmd if c != "--apply"]
     proc = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True)
     log.append(f"=== {name} === (exit {proc.returncode})")
@@ -756,7 +756,7 @@ def run_step(name: str, cmd: list[str], apply: bool, log: list[str]) -> int:
     if proc.returncode != 0:
         log.append(f"STDERR: {proc.stderr[-800:]}")
     print(proc.stdout[-400:] if proc.stdout else "(no stdout)")
-    return proc.returncode
+    return proc.returncode or work_contract_rc(name, proc.stdout, log)  # #3598: a 0-exit step that hid zero work is red
 
 
 def main():
