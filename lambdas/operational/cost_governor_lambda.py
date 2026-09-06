@@ -109,7 +109,16 @@ except ImportError:
 from common.token_alarm_window import is_within_token_alarm_window
 
 # #3554: the premise guard on the word "episodic" — rule, bar and measurement.
-from operational import episodic_premise as _episodic
+from operational import cost_governor_surge, episodic_premise as _episodic
+from operational.cost_governor_surge import (  # noqa: F401 — the historic addresses
+    SURGE_BASELINE_MIN_READINGS,
+    SURGE_BASELINE_WEEKS,
+    SURGE_DISENGAGE_RATIO,
+    SURGE_FLIPS_30D_ALARM,
+    SURGE_SIGMA_K,
+    SURGE_UNIQUES_THRESHOLD,
+    surge_threshold_from_baseline,
+)
 
 try:
     from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASSES, PRICES as _BEDROCK_PRICES
@@ -190,7 +199,15 @@ MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "215"))
 # observed 2026-06-29..2026-07-06) — see ADR-133 for the exact derivation.
 # Both are env-overridable so the numbers are a one-line adjustment, never a
 # code change.
-SURGE_UNIQUES_THRESHOLD = int(os.environ.get("SURGE_UNIQUES_THRESHOLD", "900"))
+# #3510: the surge ENGAGE RULE and its constants live in the extracted sibling
+# `cost_governor_surge` (#1665 — this module is against the 1,000-line ceiling and the
+# standing rule is extraction, never a baseline raise). Re-exported under the historic
+# names so every reader — tests, scripts/v4_build_stack_manifest.py, the stack manifest
+# drift test — keeps one address. `SURGE_UNIQUES_THRESHOLD` is now the FLOOR: the live
+# bar is `surge_threshold_from_baseline(...)`, re-derived on every run, which is the
+# carrier ADR-133's own "revisit the threshold as the baseline traffic grows" clause
+# never had (the baseline grew 3-4x and 900 ended up at its MEAN — five surge flips in
+# seven weeks, each a 17% swing in the effective ceiling).
 # $252 moves WITH the base at the established ratio (~1.173: 85→100, 115→135,
 # 150→176, 200→235). It has to — _effective_ceiling returns the surge ceiling
 # unconditionally, so a surge ceiling below the base would tighten the guard at
@@ -547,7 +564,28 @@ def _active_ceiling_window():
     }
 
 
-def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
+def _weekly_uniques_baseline(now: datetime) -> list:
+    """The trailing `SURGE_BASELINE_WEEKS` weekly UniqueVisitors7d readings, oldest
+    first. traffic_digest_lambda emits ONE datapoint per week, so a daily-period
+    Maximum query returns one point per emitting day — the weekly series itself.
+    Empty on any read error (the caller falls back to the floor and says so)."""
+    try:
+        resp = _cw.get_metric_statistics(
+            Namespace="LifePlatform/Traffic",
+            MetricName="UniqueVisitors7d",
+            StartTime=now - timedelta(days=7 * SURGE_BASELINE_WEEKS),
+            EndTime=now,
+            Period=86400,
+            Statistics=["Maximum"],
+        )
+        points = sorted(resp.get("Datapoints", []), key=lambda d: d["Timestamp"])
+        return [int(p["Maximum"]) for p in points]
+    except Exception as e:
+        logger.warning(f"surge baseline read failed (falls back to the {SURGE_UNIQUES_THRESHOLD} floor): {e}")
+        return []
+
+
+def _effective_ceiling(recent_uniques, threshold: int | None = None, prev_surge_active: bool = False) -> tuple[float, bool]:
     """(ceiling, surge_active) from the trailing 7-day unique-visitor count.
 
     Surge is a pure function of reader traffic — never of spend — so it can
@@ -557,6 +595,13 @@ def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
     the metric hasn't been read yet (e.g. transient CloudWatch error) — fails
     closed to the base ceiling, never the surge one.
 
+    #3510: `threshold` is the DERIVED bar (`surge_threshold_from_baseline`), defaulting
+    to the floor constant when the caller has no baseline. Engagement is hysteretic —
+    engage at >= T, and once engaged hold until traffic falls below
+    ``SURGE_DISENGAGE_RATIO * T`` — so a series sitting on the bar cannot mint an
+    unbounded run of edges (five in seven weeks, each an owner email, is what the
+    un-hysteretic form actually produced).
+
     Surge is floored at the base: surging must never LOWER the ceiling. Without
     the max() a base above SURGE_CEILING_USD would invert the whole mechanism —
     reader arrival would tighten the guard at the moment surge exists to loosen
@@ -564,9 +609,71 @@ def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
     """
     base, surge = _active_ceilings()
     surge = max(surge, base)
-    if recent_uniques is not None and recent_uniques >= SURGE_UNIQUES_THRESHOLD:
-        return surge, True
-    return base, False
+    return (surge, True) if cost_governor_surge.engaged(recent_uniques, threshold, prev_surge_active) else (base, False)
+
+
+def _surge_flips_30d(now: datetime) -> int | None:
+    """Count of surge engage/disengage edges in the trailing 30 days, from the
+    governor's own `LifePlatform/Budget::SurgeFlip` series. None when the series
+    cannot be read — an unknown flip count must never render as a calm zero."""
+    try:
+        resp = _cw.get_metric_statistics(
+            Namespace="LifePlatform/Budget",
+            MetricName="SurgeFlip",
+            StartTime=now - timedelta(days=30),
+            EndTime=now,
+            Period=86400,
+            Statistics=["Sum"],
+        )
+        return int(sum(p["Sum"] for p in resp.get("Datapoints", [])))
+    except Exception as e:
+        logger.warning(f"SurgeFlip series read failed: {e}")
+        return None
+
+
+def _emit_surge_flip() -> None:
+    """One datapoint per edge — the series `_surge_flips_30d` and monthly_close read."""
+    try:
+        _cw.put_metric_data(Namespace="LifePlatform/Budget", MetricData=[{"MetricName": "SurgeFlip", "Value": 1, "Unit": "Count"}])
+    except Exception as e:
+        logger.warning(f"SurgeFlip PutMetricData failed: {e}")
+
+
+def _emit_surge_flip_gauge(flips_30d: int | None) -> None:
+    """Publish the trailing-30d flip count as a gauge on every enforcement run, so the
+    series exists between edges (a metric that only appears when it is already bad is a
+    dashboard nobody can read). None means the count could not be measured — nothing is
+    emitted, which keeps `SurgeFlips30d` free of a fabricated zero."""
+    if flips_30d is None:
+        return
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/Budget",
+            MetricData=[{"MetricName": "SurgeFlips30d", "Value": float(flips_30d), "Unit": "Count"}],
+        )
+    except Exception as e:
+        logger.warning(f"SurgeFlips30d PutMetricData failed: {e}")
+
+
+def _alert_surge_flapping(flips_30d: int, threshold: int, rule: str, recent_uniques) -> None:
+    """#3510: two flips in 30 days is itself a finding — the threshold is inside the
+    baseline's noise, not above it. Sent on an EDGE only (a flip is what increments the
+    count), so it is rate-limited by construction rather than by a suppression window."""
+    subj = f"Surge mode flapping — {flips_30d} flips in 30d"
+    body = (
+        f"Surge mode has flipped {flips_30d} time(s) in the last 30 days, at or above the "
+        f"{SURGE_FLIPS_30D_ALARM}-flip bar (#3510).\n\n"
+        f"Effective threshold: {threshold} trailing-7d uniques — {rule}.\n"
+        f"Latest reading:      {recent_uniques}\n\n"
+        f"A threshold inside the baseline's own noise band flips on the noise: each edge moves "
+        f"the effective ceiling and all three tier bands. Re-read the derivation above against "
+        f"the last 8 weekly readings before treating any single flip as a traffic event."
+    )
+    try:
+        _sns.publish(TopicArn=ALERTS_TOPIC, Subject=subj[:99], Message=body)
+        logger.warning(f"Surge-flapping alert sent: flips_30d={flips_30d}")
+    except Exception as e:
+        logger.warning(f"Surge-flapping SNS publish failed: {e}")
 
 
 def _decide_tier(projected: float, mtd: float, elapsed_days: float, ceiling: float = None) -> int:
@@ -692,6 +799,9 @@ def _write_breakdown(
     ceiling: float = None,
     surge_active: bool = False,
     recent_uniques=None,
+    surge_threshold: int | None = None,
+    surge_threshold_rule: str | None = None,
+    surge_flips_30d: int | None = None,
     ai_class_split: dict | None = None,
     prod_class_share=None,
     projected_all_classes: float | None = None,
@@ -732,7 +842,13 @@ def _write_breakdown(
         "computed_at": now.isoformat(),
         "surge_active": bool(surge_active),
         "recent_uniques": recent_uniques,
-        "surge_threshold": SURGE_UNIQUES_THRESHOLD,
+        # #3510: the EFFECTIVE (derived) bar, not the floor constant — /api/receipts
+        # serves this field, and publishing a 900 the governor no longer decides on
+        # would be the same un-carried claim ADR-133's revisit clause already was.
+        "surge_threshold": SURGE_UNIQUES_THRESHOLD if surge_threshold is None else int(surge_threshold),
+        "surge_threshold_rule": surge_threshold_rule,
+        "surge_threshold_floor": SURGE_UNIQUES_THRESHOLD,
+        "surge_flips_30d": surge_flips_30d,
         "base_ceiling": base_ceiling,
         # Floored at the base exactly as _effective_ceiling() floors it, so the
         # payload can never advertise a surge ceiling BELOW the base — a pair the
@@ -804,7 +920,7 @@ def _alert(prev: int, new: int, mtd: float, projected: float, ceiling: float = N
         logger.warning(f"SNS publish failed: {e}")
 
 
-def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float) -> None:
+def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float, threshold: int | None = None, rule: str | None = None) -> None:
     """Edge-triggered alert when surge mode engages or disengages (#739 scope
     item 2: "alert Matthew when surge mode engages"). Reuses the same alerts
     topic as the tier-change alert.
@@ -818,11 +934,15 @@ def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float) -> 
     duration of the window (#1998).
     """
     base, surge = _active_ceilings()
+    # #3510: quote the DERIVED bar and its derivation, never the floor constant — the
+    # same reason #1998 made the dollars read from _active_ceilings().
+    bar = SURGE_UNIQUES_THRESHOLD if threshold is None else int(threshold)
+    derivation = f" [{rule}]" if rule else ""
     if active:
         subj = f"🚀 Surge mode ENGAGED — ceiling ${base:.0f} → ${surge:.0f}"
         body = (
             f"Trailing 7-day unique visitors ({recent_uniques}) crossed the surge "
-            f"threshold ({SURGE_UNIQUES_THRESHOLD}).\n\n"
+            f"threshold ({bar}){derivation}.\n\n"
             f"Effective monthly ceiling floated: ${base:.0f} → ${surge:.0f} (ADR-133).\n"
             f"Month-to-date estimated total: ${mtd:.2f}\n"
             f"Projected month-end:           ${projected:.2f}\n\n"
@@ -835,7 +955,7 @@ def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float) -> 
         subj = f"Surge mode ended — ceiling back to ${base:.0f}"
         body = (
             f"Trailing 7-day unique visitors ({recent_uniques}) dropped back below "
-            f"the surge threshold ({SURGE_UNIQUES_THRESHOLD}).\n\n"
+            f"{SURGE_DISENGAGE_RATIO:g}x the surge threshold ({bar}){derivation}.\n\n"
             f"Effective monthly ceiling reverted: ${surge:.0f} → ${base:.0f}."
         )
     try:
@@ -1078,7 +1198,13 @@ def lambda_handler(event, context):
         # spike. Computed BEFORE _decide_tier so the effective ceiling — not
         # always MONTHLY_CEILING — is what tiers are measured against.
         recent_uniques = _recent_unique_visitors(now)
-        effective_ceiling, surge_active = _effective_ceiling(recent_uniques)
+        # #3510: the bar is DERIVED from the trailing weekly baseline on every run
+        # (ADR-133's revisit clause, carried), and engagement is hysteretic against the
+        # PREVIOUSLY persisted state — read here rather than at the alert site below so
+        # both the decision and the edge detection see the same prior.
+        surge_threshold, surge_threshold_rule = surge_threshold_from_baseline(_weekly_uniques_baseline(now))
+        prev_surge_active = _read_surge_active()
+        effective_ceiling, surge_active = _effective_ceiling(recent_uniques, surge_threshold, prev_surge_active)
 
         # Projection escalates at most ONE tier above actual mtd spend (and not at
         # all in the early-month window) — see _decide_tier for the two failure
@@ -1093,6 +1219,7 @@ def lambda_handler(event, context):
             f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE} "
             f"self_reported_mtd=${self_reported:.2f} recent_uniques={recent_uniques} "
             f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f} "
+            f"surge_threshold={surge_threshold} [{surge_threshold_rule}] "
             f"prod_class_share={prod_class_share} ai_class_split={ai_class_split} "
             f"ai_dev_ci ~${ai_dev_ci_daily:.2f}/day projected_all_classes=${projected_all_classes:.2f}"
         )
@@ -1124,6 +1251,8 @@ def lambda_handler(event, context):
                         "ceiling": effective_ceiling,
                         "surge_active": surge_active,
                         "recent_uniques": recent_uniques,
+                        "surge_threshold": surge_threshold,
+                        "surge_threshold_rule": surge_threshold_rule,
                     }
                 ),
             }
@@ -1140,11 +1269,18 @@ def lambda_handler(event, context):
 
         # Edge-triggered surge alert (#739 scope item 2) — fires only on the
         # engage/disengage transition, not every run, same pattern as the tier
-        # alert above.
-        prev_surge_active = _read_surge_active()
+        # alert above. `prev_surge_active` was read above, before the decision, because
+        # since #3510 the decision itself depends on it (hysteresis).
+        surge_flips_30d = _surge_flips_30d(now)
         if surge_active != prev_surge_active:
             _write_surge_active(surge_active)
-            _alert_surge(surge_active, recent_uniques, mtd, projected)
+            _emit_surge_flip()
+            # This edge is part of the count the operator is being told about.
+            surge_flips_30d = None if surge_flips_30d is None else surge_flips_30d + 1
+            _alert_surge(surge_active, recent_uniques, mtd, projected, surge_threshold, surge_threshold_rule)
+            if surge_flips_30d is not None and surge_flips_30d >= SURGE_FLIPS_30D_ALARM:
+                _alert_surge_flapping(surge_flips_30d, surge_threshold, surge_threshold_rule, recent_uniques)
+        _emit_surge_flip_gauge(surge_flips_30d)
 
         # #822: persist the projection breakdown EVERY enforcement run (not just
         # on tier change) so the daily brief's headroom line reads THIS run's
@@ -1161,6 +1297,9 @@ def lambda_handler(event, context):
             effective_ceiling,
             surge_active,
             recent_uniques,
+            surge_threshold=surge_threshold,
+            surge_threshold_rule=surge_threshold_rule,
+            surge_flips_30d=surge_flips_30d,
             ai_class_split=ai_class_split,
             prod_class_share=prod_class_share,
             projected_all_classes=projected_all_classes,

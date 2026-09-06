@@ -27,7 +27,9 @@ a changed archive source means the edits need re-review, not silent skips):
     dates, months, seasons, holidays — the reset re-dates the record every cycle.
   - PRIVACY: no named vices, no genome specifics, no real public figures
     (tests/test_no_real_names_in_chronicle.py; the Board passage is recast onto
-    the fictional roster: Reyes/Nakamura/Webb/Park), no named private persons,
+    the LIVE fictional roster: Reyes/Brandt/Webb/Park — #3520: it used to recast
+    onto "Dr. Nakamura", a non-operational persona, so the repair replaced one
+    off-cast name with another and republished it to readers), no named private persons,
     no exact chronological age (PhenoAge Option A keeps it off the live site).
 
 Idempotent: a record whose content is already real prose (not a pointer) is
@@ -121,7 +123,7 @@ REPAIRS = {
                 "Walker is gentle but firm about sleep debt.",
                 "He has a simulated Board of Directors — fictional AI advisor personas, each configured deep into a "
                 "single domain — who review his data and provide commentary. Dr. Reyes is precise and slightly "
-                "intimidating. Dr. Nakamura is enthusiastic and occasionally tangential. Dr. Webb is blunt. "
+                "intimidating. Dr. Brandt is enthusiastic and occasionally tangential. Dr. Webb is blunt. "
                 "Dr. Park is gentle but firm about sleep debt.",
             ),
         ],

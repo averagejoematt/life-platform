@@ -57,6 +57,14 @@ NAME_FIELDS = {
     # endpoints serving two different casts for three weeks, so it stays.
     "config/challenges_catalog.json": "board_recommender",
     "config/character_sheet.json": "owner",
+    # #3520: `/api/supplements` serves the registry VERBATIM and the front-end renders
+    # `src: {board}` under every supplement card (evidence_body.js). Three off-roster
+    # names shipped there for months — Kai Nakamura x7, Victor Reyes x9, Sarah Chen x5 —
+    # while /api/coaches served none of them. Both copies are listed for the same
+    # belt-and-braces reason as the challenges catalog: `config/` is the twin the Lambda
+    # reads from S3, `site/config/` is the one the static site publishes.
+    "config/supplement_registry.json": "board",
+    "site/config/supplement_registry.json": "board",
 }
 
 # Non-person values legitimately allowed in an owner-ish field. IMPORTED from the
@@ -134,6 +142,42 @@ def test_challenges_catalog_specifically_is_clean():
     assert not bad, f"off-roster recommender(s) back on the discovery cards: {sorted(set(bad))}"
 
 
+def test_supplement_registry_attributions_are_all_operational():
+    """The #3520 instance, named so a regression reads as itself in CI output.
+
+    `/api/supplements` serves this registry verbatim and the front-end prints
+    `src: {board}` on every card. It carried Dr. Kai Nakamura x7, Dr. Victor Reyes x9 and
+    Dr. Sarah Chen x5 — three names `/api/coaches` does not serve, one of them a coach
+    retired at the cycle-13 genesis.
+    """
+    roster = _roster()
+    for path in ("config/supplement_registry.json", "site/config/supplement_registry.json"):
+        bad = [(v, w) for v, w in _values(path, "board") if v not in roster]
+        assert not bad, f"{path}: off-roster supplement attribution(s) {sorted({v for v, _ in bad})}"
+
+
+def test_supplement_registry_twins_carry_the_same_attributions():
+    """`config/` is the copy the Lambda reads from S3; `site/config/` is the copy the
+    static site publishes. Two casts on two endpoints is the #2084 shape."""
+    root = [v for v, _ in _values("config/supplement_registry.json", "board")]
+    site = [v for v, _ in _values("site/config/supplement_registry.json", "board")]
+    assert root == site and root, "the supplement registry twins disagree about who recommends what"
+
+
+def test_supplement_guard_would_reject_a_retired_attribution():
+    """Must-fail control for the new field: the predicate actually rejects.
+
+    Written against the SAME `_roster()`/membership predicate the parametrised guard
+    uses, with the three real pre-#3520 values — not a synthetic name — so a change that
+    made the predicate permissive fails here first.
+    """
+    roster = _roster()
+    for retired in ("Dr. Kai Nakamura", "Dr. Victor Reyes", "Dr. Sarah Chen"):
+        assert retired not in roster, f"{retired} is back on the live roster — this control is now inert"
+        offenders = [(v, "l_threonate") for v in (retired,) if v not in roster and v not in ROLE_LABELS]
+        assert offenders, f"the guard's predicate accepts {retired!r} in a supplement `board` field"
+
+
 def test_marcus_webb_prefix_is_normalised():
     """One entry read `Marcus Webb` where every other use carries the `Dr.` prefix."""
     vals = {v for v, _ in _values("site/config/challenges_catalog.json", "board_recommender")}
@@ -198,7 +242,14 @@ def test_guard_would_fail_on_an_injected_off_roster_name():
 # integrator_prompts.py documents the Nakamura byline incident) and a docstring
 # never reaches a reader. Comments are invisible to the AST already.
 
-PROMPT_LITERAL_DIRS = ("lambdas/emails", "lambdas/intelligence")
+# #3520: `deploy/` joined the scan set. `deploy/seed_genesis_preregistration.py`
+# hand-typed a `COACHES` roster naming `Dr. Sarah Chen` (retired at the cycle-13 genesis)
+# and `Dr. Victor Reyes` (a byline the live cast does not use) — and that list is the
+# input to the FROZEN, content-hash-sealed pre-registration, i.e. the one reader-bound
+# artifact that can never be corrected after the fact. It sat outside the guard purely
+# because the guard's scan set was "prompt-building lambdas" rather than "code that puts a
+# coach's name in front of a reader". deploy/ is the third such place.
+PROMPT_LITERAL_DIRS = ("lambdas/emails", "lambdas/intelligence", "deploy")
 
 # Names that shipped on a surface but exist in NO registry (so they cannot be
 # derived). "On the LIVE roster", never "absent from the retired list" — same
@@ -226,6 +277,24 @@ PROMPT_LITERAL_ALLOWLIST = {
     # also still stages for these features.
     "lambdas/emails/weekly_digest_lambda.py": {"Coach Maya Rodriguez"},
     "lambdas/emails/monthly_digest_lambda.py": {"Coach Maya Rodriguez"},
+    # ── deploy/ (#3520) ──────────────────────────────────────────────────────
+    # The privacy REPAIR script. Its edit table pairs a DEFECT string with its
+    # replacement, and the defect string is a pre-launch chronicle passage naming the
+    # three real experts the fictional board was modelled on — the script cannot find
+    # what it exists to remove without quoting it, and the same three names are entries
+    # in its `privacy absolutes` deny vocabulary. The REPLACEMENT half is not
+    # allowlisted and is checked like any other literal: it named "Dr. Nakamura" until
+    # #3520 and now names the live cast, which is what this guard is for.
+    "deploy/restart_leadin_repair.py": {"Peter Attia", "Andrew Huberman", "Layne Norton"},
+    # Frozen one-time scripts under deploy/archive/. These cite real researchers and
+    # podcasts as SOURCES ("Šrámek et al., 2000; Huberman Lab", a podcast watchlist) —
+    # a literature citation, never a staff byline, which is the distinction #1891's harm
+    # class turns on. They are listed FILE BY FILE rather than by excluding the archive
+    # directory: a blanket exclusion would also swallow a real byline the day someone
+    # archives a script that has one.
+    "deploy/archive/onetime/add_experiments.py": {"Andrew Huberman", "Peter Attia"},
+    "deploy/archive/onetime/patch_deficit_ceiling.py": {"Layne Norton", "Peter Attia"},
+    "deploy/archive/onetime/prepend_changelog.py": {"Andrew Huberman", "Peter Attia", "Rhonda Patrick", "Layne Norton"},
 }
 
 
@@ -326,8 +395,20 @@ def test_prompt_literal_scan_set_is_not_empty():
     assert len(modules) >= 30, f"only {len(modules)} modules discovered — the scan set collapsed"
     names = {p.name for p in modules}
     # the incident files this guard exists for must be inside the derived set
-    for known in ("wednesday_chronicle_lambda.py", "chronicle_email_sender_lambda.py", "monday_compass_lambda.py"):
+    for known in (
+        "wednesday_chronicle_lambda.py",
+        "chronicle_email_sender_lambda.py",
+        "monday_compass_lambda.py",
+        # #3520's own incident file: the seeder whose hand-typed COACHES froze a retired
+        # coach into a content-hash-sealed pre-registration.
+        "seed_genesis_preregistration.py",
+        "restart_leadin_repair.py",
+    ):
         assert known in names, f"{known} left the scan set — the guard no longer covers its own incident"
+    # deploy/ must actually be reached, not just listed — a typo'd dir would silently
+    # contribute zero modules and every deploy-side assertion here would be vacuous.
+    deploy_modules = [m for m in modules if "/deploy/" in m.as_posix()]
+    assert len(deploy_modules) >= 20, f"only {len(deploy_modules)} deploy/ modules discovered — the #3520 widening is inert"
     roots = _forbidden_roots()
     assert len(roots) >= 8, f"forbidden set collapsed to {sorted(roots)}"
     for expected in ("Dr. Kai Nakamura", "Coach Maya Rodriguez", "Andrew Huberman", "Dr. Elena Rodriguez"):

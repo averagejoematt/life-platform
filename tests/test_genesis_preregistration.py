@@ -12,7 +12,7 @@ Pins the contracts that make the pre-registration moment trustworthy:
      (the presentation rule), references the frozen claims, links the grading
      ledger, and is dated genesis − 1.
   5. The deterministic fallback predictions themselves pass the seeder's validator
-     (they are the guarantee that all 8 coaches can go on the record).
+     (they are the guarantee that every operational coach can go on the record).
 """
 
 from __future__ import annotations
@@ -41,6 +41,11 @@ def _load(module_name: str, rel_path: str):
     return mod
 
 
+# #3552: build_hypotheses now derives min_effect from a trailing DDB series at freeze
+# time. Tests inject the offline stand-in — a suite that reaches AWS fails differently on
+# every machine.
+from prereg_fixture_series import fixture_series as _fixture_series  # noqa: E402
+
 seeder = _load("seed_genesis_preregistration", "deploy/seed_genesis_preregistration.py")
 publisher = _load("publish_genesis_preregistration", "deploy/publish_genesis_preregistration.py")
 
@@ -55,7 +60,9 @@ def _fixture_frozen():
         "genesis": seeder.EXPERIMENT_START_DATE,
         "generated_at": "2026-07-11T18:00:00+00:00",
         "coaches": coaches,
-        "hypotheses": seeder.build_hypotheses(json.loads((REPO_ROOT / "config" / "user_goals.json").read_text())),
+        "hypotheses": seeder.build_hypotheses(
+            json.loads((REPO_ROOT / "config" / "user_goals.json").read_text()), series_reader=_fixture_series
+        ),
     }
 
 
@@ -78,8 +85,14 @@ GENESIS_MINUS_1 = (_date.fromisoformat(seeder.EXPERIMENT_START_DATE) - _timedelt
 
 def test_prediction_records_match_api_read_shape():
     records = seeder.build_prediction_records(FROZEN)
-    # all 8 coaches on the record, roster ids exactly as the API maps them
-    api_coach_pks = {f"COACH#{c}_coach" for c in ("sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer")}
+    # Every OPERATIONAL coach on the record, roster ids exactly as the API maps them.
+    # #3520: derived from persona_registry, not restated — the hand-typed list here used
+    # to include `training`, a seat retired at the cycle-13 genesis, which is the same
+    # stale-roster defect the seeder itself carried.
+    from coach import persona_registry
+
+    api_coach_pks = {f"COACH#{pid}" for pid in persona_registry.OPERATIONAL_COACH_IDS}
+    assert api_coach_pks, "the operational roster resolved empty — this assertion would be vacuous"
     assert {r["pk"] for r in records} == api_coach_pks
 
     for rec in records:
@@ -149,7 +162,7 @@ def test_fallback_predictions_pass_the_validator_and_presentation_rule():
 def test_hypotheses_pass_engine_validation():
     from hypothesis_engine_lambda import validate_hypothesis  # flat import — one module identity suite-wide
 
-    hyps = seeder.build_hypotheses(GOALS)
+    hyps = seeder.build_hypotheses(GOALS, series_reader=_fixture_series)
     assert len(hyps) >= 1
     for hyp in hyps:
         ok, issues = validate_hypothesis(hyp)
