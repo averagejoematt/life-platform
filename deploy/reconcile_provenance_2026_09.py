@@ -72,10 +72,22 @@ Every group's selector is falsified by its own write:
 So a second dry-run after ``--apply`` prints 0 planned rows in all three groups.
 ``tests/test_provenance_reconcile_2026_09.py`` proves that against a fake table.
 
+Reset survivability
+-------------------
+A reset can land between the plan and the apply, and a planned row the reset is
+about to rewrite anyway is not the same kind of fix as one nothing will ever
+touch. Every planned row therefore carries a DERIVED disposition —
+``reset-durable`` / ``writer-restamped`` / ``reset-superseded``, see
+``disposition_of()`` — printed per row, summarised at the end, and selectable
+with ``--disposition``. The durable leg (CROSS_PHASE rows carrying a CLOSED
+cycle's provenance) is the one worth applying at any time; the other two are
+owed to the reset pipeline and to the code halves of the three issues.
+
 Usage
 -----
     python3 deploy/reconcile_provenance_2026_09.py                 # dry-run (reads only)
     python3 deploy/reconcile_provenance_2026_09.py --only 3514     # one issue
+    python3 deploy/reconcile_provenance_2026_09.py --disposition reset-durable
     python3 deploy/reconcile_provenance_2026_09.py --apply         # commit (owner-gated)
 
 Report → docs/restart/_provenance_reconcile_2026_09.txt (gitignored).
@@ -118,6 +130,46 @@ PROVENANCE_PREFIXES = ("tombstoned_",)
 
 INSIGHTS_PK = f"{wipe.USER_PK_PREFIX}insights"
 
+# ── reset survivability: which planned rows an upcoming reset would redo ──────
+#
+# This exists because a reset was ordered for the day AFTER this reconcile was
+# written, and "85 rows" is a misleading number if some of them are about to be
+# rewritten by the pipeline anyway. Each disposition is DERIVED from the class
+# registry and the row's own cycle stamp — never from a hand list of keys:
+#
+#   RESET_SUPERSEDED   the row is EXPERIMENT_SCOPED, which is by DEFINITION
+#                      exactly the class the next reset's tagger tags and its
+#                      wipe archives (taxonomy.is_taggable / is_wipeable). The
+#                      pipeline will stamp it; applying first is at best
+#                      redundant and at worst fights the tagger mid-run.
+#   WRITER_RESTAMPED   the row is CROSS_PHASE (invisible to the phase machinery,
+#                      so no reset will ever repair it) but its stamp names the
+#                      CURRENT cycle — i.e. a LIVE writer put it there this
+#                      cycle and will put it back on its next run. Stripping is
+#                      correct and immediately undone; the durable fix is the
+#                      code half (gate the stamp on should_phase_stamp()).
+#   RESET_DURABLE      the row is CROSS_PHASE and its stamp names a CLOSED
+#                      cycle. Nothing in the platform rewrites it: no reset
+#                      touches CROSS_PHASE, and no live writer has touched this
+#                      row since that cycle ended. This is the leg that is worth
+#                      applying, and the only leg whose effect survives a reset.
+RESET_DURABLE = "reset-durable"
+WRITER_RESTAMPED = "writer-restamped"
+RESET_SUPERSEDED = "reset-superseded"
+DISPOSITIONS = (RESET_DURABLE, WRITER_RESTAMPED, RESET_SUPERSEDED)
+
+
+def disposition_of(cls: str, item: dict, current_cycle: int | None) -> str:
+    """Which of the three dispositions above this row's fix has. Pure."""
+    if cls != taxonomy.CROSS_PHASE:
+        # EXPERIMENT_SCOPED (and anything else routed to a stamping group) is
+        # the reset's own surface, by the registry's own definition.
+        return RESET_SUPERSEDED
+    stamped_cycle = item.get("cycle")
+    if stamped_cycle is not None and current_cycle is not None and int(stamped_cycle) >= int(current_cycle):
+        return WRITER_RESTAMPED
+    return RESET_DURABLE
+
 
 def provenance_attrs_on(item: dict) -> list[str]:
     """The provenance attributes present on this row (sorted, deterministic)."""
@@ -138,6 +190,7 @@ class Action:
     after: dict
     note: str
     update: tuple = field(default_factory=tuple)  # (UpdateExpression, names, values)
+    disposition: str = RESET_SUPERSEDED
 
     @property
     def issue(self) -> int:
@@ -158,7 +211,7 @@ def build_strip_update(attrs: list[str]):
     return ("REMOVE " + ", ".join(sorted(names)), names, {})
 
 
-def plan_group_a(rows: list[tuple[str, str, dict]]) -> list[Action]:
+def plan_group_a(rows: list[tuple[str, str, dict]], current_cycle: int | None = None) -> list[Action]:
     actions: list[Action] = []
     for pk, sk, item in rows:
         cls = taxonomy.classify(pk, sk, category=item.get("category"), memory_type=item.get("memory_type"))
@@ -177,6 +230,7 @@ def plan_group_a(rows: list[tuple[str, str, dict]]) -> list[Action]:
                 after={a: "(removed)" for a in attrs},
                 note="CROSS_PHASE row carrying scoped provenance",
                 update=build_strip_update(attrs),
+                disposition=disposition_of(cls, item, current_cycle),
             )
         )
     return actions
@@ -305,7 +359,13 @@ def unclassified_rows(rows: list[tuple[str, str, dict]]) -> list[tuple[str, str,
     return bad
 
 
-def plan(table, now_iso: str, closing_cycle: int, only: set[int] | None = None) -> dict:
+def plan(
+    table,
+    now_iso: str,
+    closing_cycle: int,
+    only: set[int] | None = None,
+    dispositions: set[str] | None = None,
+) -> dict:
     """Read everything, classify once, route to the three groups. READS ONLY."""
     rows = scan(table, scanned_partitions())
     items_by_key = {f"{pk}::{sk}": item for pk, sk, item in rows}
@@ -318,7 +378,7 @@ def plan(table, now_iso: str, closing_cycle: int, only: set[int] | None = None) 
     sweep_result: dict | None = None
 
     if not unclassified:
-        actions += plan_group_a(rows)
+        actions += plan_group_a(rows, current_cycle=closing_cycle + 1)
         b_actions, undatable = plan_group_b(rows, closing_cycle)
         actions += b_actions
         # The sweep reads the WHOLE scoped estate (every partition the wipe
@@ -332,6 +392,8 @@ def plan(table, now_iso: str, closing_cycle: int, only: set[int] | None = None) 
 
     if only:
         actions = [a for a in actions if a.issue in only]
+    if dispositions:
+        actions = [a for a in actions if a.disposition in dispositions]
 
     return {
         "rows_scanned": len(rows),
@@ -356,6 +418,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--apply", action="store_true", help="WRITE the mutations (default: dry-run, read-only)")
     ap.add_argument("--only", type=int, action="append", choices=sorted(ISSUE_OF_GROUP.values()), help="restrict to one issue (repeatable)")
     ap.add_argument("--closing-cycle", type=int, help="cycle stamp for pre-genesis rows. Default: SSM cycle - 1.")
+    ap.add_argument(
+        "--disposition",
+        action="append",
+        choices=list(DISPOSITIONS),
+        help="restrict to rows with this reset-survivability disposition (repeatable). "
+        f"`--disposition {RESET_DURABLE}` is the leg no reset will redo.",
+    )
     args = ap.parse_args(argv)
 
     import boto3
@@ -378,7 +447,13 @@ def main(argv: list[str] | None = None) -> int:
     emit("╚═══════════════════════════════════════════╝")
     emit()
 
-    result = plan(table, now_iso, closing_cycle, only=set(args.only) if args.only else None)
+    result = plan(
+        table,
+        now_iso,
+        closing_cycle,
+        only=set(args.only) if args.only else None,
+        dispositions=set(args.disposition) if args.disposition else None,
+    )
 
     if result["unclassified"]:
         emit("REFUSING TO RUN — the taxonomy does not classify these rows:")
@@ -401,13 +476,28 @@ def main(argv: list[str] | None = None) -> int:
         kinds = Counter((a.sk or "").split("#", 1)[0] for a in acts)
         if kinds:
             emit("   sk kinds: " + ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
-        for a in sorted(acts, key=lambda x: (x.pk, x.sk)):
-            emit(f"  {'WOULD ' if not args.apply else ''}{'CHANGE':7s} {a.pk} / {a.sk}  [{a.cls}; {a.note}]")
+        disp = Counter(a.disposition for a in acts)
+        if disp:
+            emit("   disposition: " + ", ".join(f"{k}={v}" for k, v in sorted(disp.items())))
+        for a in sorted(acts, key=lambda x: (x.disposition, x.pk, x.sk)):
+            emit(f"  {'WOULD ' if not args.apply else ''}{'CHANGE':7s} {a.pk} / {a.sk}  [{a.cls}; {a.disposition}; {a.note}]")
             emit(f"      BEFORE {_fmt(a.before)}")
             emit(f"      AFTER  {_fmt(a.after)}")
         if not acts:
             emit("   (nothing to do — already reconciled)")
         emit()
+
+    # The reset-survivability split. A reset was ordered for the day after this
+    # tool was written, so "N rows" without this breakdown would be misleading.
+    by_disposition = Counter(a.disposition for a in result["actions"])
+    emit("── reset survivability (derived: class registry + the row's own cycle stamp) ──")
+    for d in DISPOSITIONS:
+        emit(f"  {d:18s} {by_disposition.get(d, 0):4d}")
+    emit(f"  {RESET_DURABLE}: nothing in the platform rewrites these — the only leg whose effect outlives a reset.")
+    emit(f"  {WRITER_RESTAMPED}: correct, but a live writer puts the stamp back on its next run (the code half).")
+    emit(f"  {RESET_SUPERSEDED}: EXPERIMENT_SCOPED — the next reset's tagger/wipe owns these rows by definition.")
+    emit(f"  Apply just the durable leg with:  --disposition {RESET_DURABLE} --apply")
+    emit()
 
     if result["misrouted"]:
         emit(f"── NOT WRITTEN: {len(result['misrouted'])} #1947 escapee(s) whose own class is not EXPERIMENT_SCOPED ──")

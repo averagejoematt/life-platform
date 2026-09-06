@@ -1,7 +1,7 @@
 """tests/test_provenance_reconcile_2026_09.py — contract for the one-shot live
 provenance reconcile (#3511, #3513, #3514).
 
-The script mutates LIVE rows, so the two properties that make that safe are
+The script mutates LIVE rows, so the three properties that make that safe are
 pinned here against a fake table, offline:
 
   CLASSIFICATION — every row is routed by ``phase_taxonomy.classify()``, once.
@@ -16,6 +16,13 @@ pinned here against a fake table, offline:
     plan is recomputed. Every group must come back empty. A reconcile that is
     not idempotent cannot be re-run to PROVE it landed, which is the only way
     the live apply is verifiable at all.
+
+  RESET SURVIVABILITY — a reset was ordered for the day after this tool was
+    written, so each planned row carries a DERIVED disposition: the reset's own
+    surface (EXPERIMENT_SCOPED, by the registry's definition), a stamp a live
+    writer will put straight back (CROSS_PHASE carrying THIS cycle), or the
+    durable leg nothing rewrites (CROSS_PHASE carrying a CLOSED cycle). "85
+    rows" without that split would overstate what applying achieves.
 
 Plus the one-line #3514 sweep fix this reconcile depends on: the countdown-gap
 sweep passed no ``pk`` to ``wipe.should_tombstone``, so the ADR-153 carve-out
@@ -322,3 +329,52 @@ def test_the_plan_is_empty_after_its_own_writes_are_applied():
 
     second = plan(table)
     assert second["actions"] == [], [f"{a.group} {a.pk}/{a.sk}" for a in second["actions"]]
+
+
+# ── reset survivability: which planned rows an upcoming reset would redo ──────
+
+
+def test_a_stale_closed_cycle_stamp_on_a_cross_phase_row_is_reset_durable():
+    """No reset touches CROSS_PHASE and no live writer has touched this row since
+    cycle 12 closed — so stripping it is the one fix that outlives a reset."""
+    row = {"pk": COACH_PK, "sk": "CHAT#2026-08-09#abc", "tombstone": True, "phase": "pilot", "cycle": 12}
+    acts = actions_of(plan(make_table([wipe_evidence_row(), row])), recon.GROUP_A)
+    assert [a.disposition for a in acts] == [recon.RESET_DURABLE]
+
+
+def test_a_current_cycle_stamp_on_a_cross_phase_row_is_writer_restamped():
+    """RELATIONSHIP#state carries THIS cycle's stamp: coach_state_updater put it
+    there and will put it back. Correct to strip, immediately undone — the
+    durable fix is the code half."""
+    row = {"pk": COACH_PK, "sk": "RELATIONSHIP#state", "phase": "experiment", "cycle": CLOSING_CYCLE + 1}
+    acts = actions_of(plan(make_table([wipe_evidence_row(), row])), recon.GROUP_A)
+    assert [a.disposition for a in acts] == [recon.WRITER_RESTAMPED]
+
+
+def test_every_experiment_scoped_fix_is_reset_superseded():
+    """EXPERIMENT_SCOPED is BY DEFINITION what the next reset's tagger tags and
+    its wipe archives, so groups B and C are the reset's own surface."""
+    rows = [
+        wipe_evidence_row(),
+        {"pk": INSIGHTS_PK, "sk": f"INSIGHT#{DAY_BEFORE_GENESIS}#daily_brief#tldr"},
+        {"pk": COACH_PK, "sk": "VOICE#state", "phase": "experiment", "updated_at": IN_WINDOW.isoformat()},
+    ]
+    result = plan(make_table(rows))
+    scoped = actions_of(result, recon.GROUP_B) + actions_of(result, recon.GROUP_C)
+    assert len(scoped) == 2
+    assert {a.disposition for a in scoped} == {recon.RESET_SUPERSEDED}
+
+
+def test_the_disposition_filter_selects_only_the_durable_leg():
+    """`--disposition reset-durable` must be able to isolate the leg that is safe
+    to apply on either side of a reset."""
+    rows = [
+        wipe_evidence_row(),
+        {"pk": COACH_PK, "sk": "CHAT#2026-08-09#abc", "tombstone": True, "cycle": 12},
+        {"pk": COACH_PK, "sk": "RELATIONSHIP#state", "phase": "experiment", "cycle": CLOSING_CYCLE + 1},
+        {"pk": INSIGHTS_PK, "sk": f"INSIGHT#{DAY_BEFORE_GENESIS}#daily_brief#tldr"},
+    ]
+    table = make_table(rows)
+    assert len(plan(table)["actions"]) == 3
+    durable = plan(table, dispositions={recon.RESET_DURABLE})["actions"]
+    assert [(a.sk, a.disposition) for a in durable] == [("CHAT#2026-08-09#abc", recon.RESET_DURABLE)]
