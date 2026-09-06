@@ -166,10 +166,21 @@ class TestPodcastStaysAtItsCap:
         """#2430's sanctioned outcome was ZERO net lines and no raised baseline. The size
         guard would catch growth; this catches the OTHER half — a baseline moved to make
         room, which the guard cannot see because it only compares against whatever the
-        baseline currently says."""
+        baseline currently says.
+
+        The pinned number moved ONCE, at #3537, and not because room was made: that PR
+        changed the UNIT the ceiling measures from physical lines to logical ones (comments
+        and blanks are no longer charged), so every baseline in the registry was re-derived
+        at the new measure in the same commit. 1904 physical -> 1508 logical is the SAME
+        file, unchanged; the guard's property is intact, because the assertion is still an
+        exact pin and still reds on any raise."""
         from grounding_wiring import REPO
         from test_module_size_guard import BASELINE
 
-        assert BASELINE[PODCAST] == 1904, "the podcast baseline must not move for #2430 — the exemption exists so it does not have to"
+        assert BASELINE[PODCAST] == 1508, (
+            "the podcast baseline must not move for #2430 — the exemption exists so it does not have to. "
+            "(The one sanctioned move was #3537's unit change, 1904 physical -> 1508 logical, re-derived "
+            "for every entry at once. Any OTHER move is room being made.)"
+        )
         with open(os.path.join(REPO, PODCAST), encoding="utf-8") as fh:
             assert sum(1 for _ in fh) <= 1904

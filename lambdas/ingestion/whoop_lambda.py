@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -42,34 +42,8 @@ except ImportError:
     logger = logging.getLogger("whoop")
     logger.setLevel(logging.INFO)
 
-try:
-    from common.http_retry import urlopen_with_retry
-except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def urlopen_with_retry(req, timeout=30, max_attempts=None):
-            # The fallback must accept max_attempts — the token POST passes it (#2196).
-            return urllib.request.urlopen(req, timeout=timeout)
-
-
-try:
-    from common.auth_breaker import check_breaker, looks_like_auth_failure, mark_as_auth_failure, mark_failure
-except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
-    if not TYPE_CHECKING:  # mypy sees ONE signature (the import); runtime unchanged (#1656)
-
-        def mark_as_auth_failure(exc):
-            return exc
-
-        def check_breaker(table, source_name, user_id, logger):
-            return None
-
-        def mark_failure(table, source_name, user_id, error_msg, logger):
-            return None
-
-        def looks_like_auth_failure(exc):
-            return False
-
-
+from common.auth_breaker import check_breaker, looks_like_auth_failure, mark_as_auth_failure, mark_failure
+from common.http_retry import urlopen_with_retry
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC, never runner-local)
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
@@ -843,6 +817,20 @@ _config = IngestionConfig(
     # sub-records (keyed by id, idempotent) and picks up the late arrival. 2 days covers
     # the band's continuous-sync latency with buffer.
     refresh_trailing_days=2,
+    # #3504 (PR #2877's own body called this fast-follow "not done here", and it was
+    # never ticketed until the 2026-09-05 review found it): Whoop is in
+    # freshness_checker_lambda.DAILY_SOURCES with behavioral=False, so a day with no
+    # record is never a normal lapse — it is either a pipeline miss or a measured
+    # vendor absence, and the interior-gap alarm (Maximum(InteriorGapCount) >= 1 over a
+    # 14-day lookback) holds red until the day ages out of the window with no way to
+    # self-clear. #2643's marker is what closes it honestly: on the LAST run that will
+    # ever look at a date (the oldest day in the gap-fill window), a still-empty fetch
+    # writes an explicit `absent: True` record instead of letting the hole vanish.
+    # Eight Sleep has carried this since #2643; whoop and habitify are the two other
+    # framework-based DAILY_SOURCES members and now do too —
+    # tests/test_source_enumeration_drift.py asserts the SET, so a fourth one cannot
+    # enter without it.
+    record_gap_exhausted_absence=True,
 )
 
 

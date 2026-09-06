@@ -23,8 +23,12 @@ Four assertions over the engineering wiki (docs/README.md is the home page):
 
 5. SOURCE-NEWER-THAN-VERIFY (#973 — BLOCKING by default since #1965; advisory only
    under --advisory) — for each
-   engine doc (docs/engines/*.md), the git last-commit date of every declared
-   `Sources of truth` file is compared against the doc's Verified date. Calendar
+   engine doc (docs/engines/*.md), the last-CHANGE date of every declared
+   `Sources of truth` file is compared against the doc's Verified date. Last-change is
+   the UNION of the git last-commit date and the working tree (#3534): a source with
+   uncommitted changes is dated today, so the gate can judge the tree it is about to
+   commit and not only the tree already committed — which is what made the reset's own
+   rewrite of `config/character_sheet.json` structurally invisible to it. Calendar
    freshness alone (gate 3) misses the real staleness signal: a doc verified
    yesterday against an engine rewritten today stays "fresh" for months. A source
    committed strictly AFTER the verify date flags the doc for re-verification.
@@ -52,7 +56,9 @@ Local == CI (#1965): Docs CI runs `--strict`, which is now the bare command's be
 so a locally-green run cannot red CI on engine-doc source drift (the 2026-07-27 incident:
 two main pushes redded on drift the flagless local run never surfaced). Caveat: gate 5
 reads per-file git dates, so it SKIPS (loudly) on a shallow clone — a full local clone
-behaves exactly like Docs CI's fetch-depth: 0 checkout.
+behaves exactly like Docs CI's fetch-depth: 0 checkout. The #3534 working-tree leg rides
+INSIDE that skip deliberately: CI's checkout is never dirty, so the leg only ever adds
+signal locally, and preserving the shallow-clone skip keeps local == CI.
 """
 
 import re
@@ -120,6 +126,10 @@ HEADROOM_WARN_DAYS = 0
 _DRIFT_REMEDIATION = """
 🔧 Clearing engine-doc source drift (#973) — the `Verified:` stamp is a CLAIM, not a date field:
    1. READ the change:  git log --since=<verified-date> -p -- <drifted source>
+      (if the line above says "uncommitted working-tree change", the change is not in the
+      log yet — read it with `git diff -- <drifted source>`. This is the reset's own case:
+      #3534 made the pre-commit tree visible to this gate so the CHARACTER.md re-verify
+      reds here instead of being a hand-remembered step carried in the handover.)
    2. DECIDE material or not: did any formula, weight, threshold, roster, state machine
       or contract the doc DOCUMENTS actually move? Say which, either way.
    3. RE-DERIVE every line citation the doc makes into the drifted files — spans shift
@@ -174,6 +184,67 @@ def _git_last_commit_date(rel_path: str) -> date | None:
         return None
 
 
+def _working_tree_changed_paths(root=None) -> frozenset:
+    """Repo-relative paths with UNCOMMITTED changes, from `git status --porcelain` (#3534).
+
+    WHY THIS EXISTS
+      Gate 5 dated every declared source by `git log -1` — COMMIT dates only. The reset
+      pipeline (`deploy/restart_pipeline.py`) never commits: it leaves that to the operator
+      (:1184) and runs its gate sweep LAST, on a tree full of uncommitted rewrites. So
+      `config/character_sheet.json` — git-tracked, rewritten by every reset — was
+      structurally invisible to this gate at the exact moment the gate was being asked
+      whether the tree was safe to commit. The consequence was a standing lesson instead of
+      a gate: HANDOVER_LATEST.md carried "re-verify docs/engines/CHARACTER.md by hand" for
+      the NEXT reset, every reset.
+
+      A gate must be able to judge the tree it is about to commit, not only the tree
+      already committed.
+
+    Renames are recorded under BOTH names (`R  old -> new`), untracked files count, and a
+    git failure returns the empty set rather than raising — this widens the gate, so being
+    unable to read it must never NARROW a verdict silently... which is why the caller still
+    has the commit-date leg underneath it.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=root or ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception:
+        return frozenset()
+    if out.returncode != 0:
+        return frozenset()
+    paths = set()
+    for line in out.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        rest = line[3:].strip()
+        for part in rest.split(" -> "):
+            part = part.strip().strip('"')
+            if part:
+                paths.add(part)
+    return frozenset(paths)
+
+
+def _source_change_date(rel_path: str) -> date | None:
+    """The date a declared source LAST CHANGED — committed OR still in the working tree.
+
+    #3534: the union is the whole point. `git log -1` answers "when was this last
+    committed"; the question gate 5 actually asks is "has this moved since the doc was
+    verified", and an uncommitted rewrite has moved it. A dirty source is dated TODAY (or
+    its commit date, if that is somehow later), so a reset's own pre-commit sweep reds on
+    the engine doc whose source it just rewrote.
+    """
+    committed = _git_last_commit_date(rel_path)
+    if rel_path not in _working_tree_changed_paths():
+        return committed
+    today = date.today()
+    return today if committed is None or today > committed else committed
+
+
 def _is_shallow_repository() -> bool:
     try:
         out = subprocess.run(
@@ -188,7 +259,7 @@ def _is_shallow_repository() -> bool:
         return False
 
 
-def check_engine_source_freshness(git_date_fn=_git_last_commit_date):
+def check_engine_source_freshness(git_date_fn=_source_change_date):
     """The source-newer-than-verify gate (#973).
 
     For each docs/engines/*.md: parse its `Sources of truth` paths and `Verified:`
@@ -291,7 +362,7 @@ def check_engine_doc_coverage():
     return problems, exemptions
 
 
-def engine_doc_headroom(git_date_fn=_git_last_commit_date):
+def engine_doc_headroom(git_date_fn=_source_change_date):
     """Days of headroom each GATED engine doc has before gate 5 reds (#2619).
 
     headroom = Verified date − newest declared source's last-commit date. ≤0 means the
@@ -408,8 +479,15 @@ def main():
         by_doc: dict[tuple[str, str], list[tuple[str, str]]] = {}
         for doc_rel, source_rel, committed, verified in flagged:
             by_doc.setdefault((doc_rel, verified), []).append((source_rel, committed))
+        dirty = _working_tree_changed_paths()
         for (doc_rel, verified), srcs in sorted(by_doc.items()):
-            detail = ", ".join(f"{s} (committed {c})" for s, c in sorted(srcs))
+            # #3534: say WHICH leg flagged it. "committed 2026-09-05" on a file that is
+            # still sitting uncommitted in the tree reads as a lie and sends the operator
+            # to `git log`; "uncommitted working-tree change" sends them to `git status`,
+            # which is where the change actually is.
+            detail = ", ".join(
+                f"{s} ({'uncommitted working-tree change, ' + c if s in dirty else 'committed ' + c})" for s, c in sorted(srcs)
+            )
             problems.append(
                 f"engine-doc source drift (strict): {doc_rel} — verified {verified}, but {len(srcs)} declared source(s) moved since: {detail}"
             )

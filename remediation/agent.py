@@ -44,12 +44,24 @@ LOG_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(ROOT, "model", "platform_model.json")
 
+# #3503: the by-construction flag-alarm registry lives with the CDK constants (the
+# SECURITY_TIER_LOG_FUNCTIONS precedent) so the stack and every sweep read ONE list.
+sys.path.insert(0, os.path.join(ROOT, "cdk"))
+try:
+    from stacks.constants import is_by_construction_flag  # noqa: E402
+except Exception:  # pragma: no cover — a checkout without cdk/ must not kill triage
+
+    def is_by_construction_flag(_name):  # type: ignore[misc]
+        return False
+
+
 _ssm = boto3.client("ssm", region_name=REGION)
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _logs = boto3.client("logs", region_name=REGION)
 _sqs = boto3.client("sqs", region_name=REGION)
 _ses = boto3.client("sesv2", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
+_cfn = boto3.client("cloudformation", region_name=REGION)
 
 
 def _param(name, default):
@@ -206,6 +218,11 @@ def ack_ratchet_escalations(signals, ledger, now=None):
     out = []
     for a in signals.get("alarms", []) or []:
         name = a.get("name", "")
+        if a.get("by_construction") or is_by_construction_flag(name):
+            # #3503: this ratchet exists to ask "is the stored conclusion still true?".
+            # For a by-construction gauge the answer is permanently "it is red on purpose",
+            # so the ratchet only manufactured renewals — 7 of them on the genesis gauge.
+            continue
         entry = ledger.get(name)
         if not name or not entry or not ack_is_exhausted(entry):
             continue
@@ -393,6 +410,8 @@ def aged_alarm_escalations(signals, now=None, audience=None):
     for a in signals.get("alarms", []) or []:
         if a.get("acked"):
             continue
+        if a.get("by_construction") or is_by_construction_flag(a.get("name", "")):
+            continue  # #3503: a gauge whose ALARM state is its designed normal is not an aged incident
         age = _alarm_age_hours(a, now_dt)
         name = a.get("name", "?")
         is_reader = audience.get(name) == "reader"
@@ -552,17 +571,30 @@ def gather_signals(event_payload):
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     signals = {"alarms": [], "ci_failures": [], "dlq": [], "coherence": None, "drift": None, "urgent": None, "secrets_stale": []}
 
-    # CloudWatch alarms currently in ALARM + recent transitions
+    # CloudWatch alarms currently in ALARM + recent transitions.
+    # #3503: `describe_alarms` returns METRIC ALARMS ONLY unless AlarmTypes is passed, so
+    # this sweep was structurally blind to composite alarms. That mattered here more than
+    # anywhere: `ai-tokens-platform-daily-total` carries AlarmActions=[] and its entire
+    # routing is the two composites — `-urgent` was ALARM 2026-08-30 10:07 -> 08-31 10:03 PT
+    # and again 08-31 13:43 -> 15:54 PT, and this agent never saw either.
     try:
-        alarms = _cw.describe_alarms(StateValue="ALARM", MaxRecords=100).get("MetricAlarms", [])
+        page = _cw.describe_alarms(StateValue="ALARM", MaxRecords=100, AlarmTypes=["CompositeAlarm", "MetricAlarm"])
+        alarms = list(page.get("MetricAlarms", [])) + list(page.get("CompositeAlarms", []))
         for a in alarms:
+            name = a["AlarmName"]
             signals["alarms"].append(
                 {
-                    "name": a["AlarmName"],
+                    "name": name,
                     "reason": a.get("StateReason", "")[:300],
                     "metric": a.get("MetricName"),
                     "namespace": a.get("Namespace"),
                     "updated": str(a.get("StateUpdatedTimestamp", "")),
+                    # A composite has no MetricName/Namespace; label it so triage does not
+                    # read the two Nones as a broken metric alarm.
+                    "composite": "AlarmRule" in a,
+                    # #3503: a gauge whose ALARM state IS its designed normal. Labelled, not
+                    # triaged — the agent acked the genesis-window gauge 7 times as an incident.
+                    "by_construction": is_by_construction_flag(name),
                 }
             )
     except Exception as e:
@@ -609,7 +641,10 @@ def gather_signals(event_payload):
     # Weekly drift sentinel findings (live infra vs. code — the "console-edited / orphan /
     # loosened-policy" class). Only surfaces as actionable when there is real drift; the
     # clean/degraded status still renders on the report via drift_report.status_html.
-    signals["drift"] = drift_report.as_signal(drift_report.read_latest(_s3, LOG_BUCKET))
+    # #3508: the cfn client lets a drift section a LATER deploy already answered be
+    # dropped instead of handed to a human as current (the 09-04 report cited six
+    # stacks redeployed 75 minutes earlier).
+    signals["drift"] = drift_report.as_signal(drift_report.read_latest(_s3, LOG_BUCKET), cfn_client=_cfn)
 
     # Manual-rotation secret staleness (#1329) — replaces the raw daily SNS the
     # freshness-checker used to publish; deterministic backstop below (main()) turns
@@ -851,7 +886,7 @@ def email_report(report, mode):
         + ("<p><i>No actionable signals.</i></p>" if not (af or prs or nh or unt) else "")
         # Weekly drift sentinel status — always rendered when a record exists so a clean
         # week reports explicitly clean (never silent about infra drift). AC4 of #394.
-        + drift_report.status_html(_drift_record)
+        + drift_report.status_html(_drift_record, cfn_client=_cfn)
         # GitHub Actions quota/billing glance — always rendered alongside it (#1334, #1453).
         + drift_report.quota_html(_drift_record)
     )

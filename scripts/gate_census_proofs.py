@@ -551,4 +551,188 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-08-30",
     },
+    # #3515: the "as of" freshness guard sync_site_to_s3.sh runs right after the PII
+    # guard. Not a synthetic plant — the mutation IS the real historical defect: a
+    # `git archive origin/main@c0122242` snapshot taken before this fix still carried
+    # v4_build_evidence.py's 33-day-stale bake (v4_build_evidence.py was never in the
+    # deploy path's builder list). Watching the guard fire on the real specimen is a
+    # stronger proof than a synthetic one — the exact defect it exists to catch.
+    "guard::scripts/check_proof_freshness.py": {
+        "gate_name": "scripts/check_proof_freshness.py",
+        "command": "python3 scripts/check_proof_freshness.py --root <tree>   # tests/test_check_proof_freshness_3515.py covers it as pure logic",
+        "mutation": (
+            "a full snapshot of origin/main@c0122242 (git archive, before #3515's fix): "
+            "site/data/index.html and site/protocols/index.html both still carry the baked "
+            "'as of 2026-08-02' stamp because v4_build_evidence.py was never in "
+            "deploy/sync_site_to_s3.sh's builder list."
+        ),
+        "observed": (
+            "MUTATED (--root pointed at the origin/main@c0122242 snapshot): exit 1 — "
+            "\"2 stale baked 'as of' stamp(s): site/data/index.html: 'as of 2026-08-02' is "
+            "34d old (> 7d) — rebuild before publish; site/protocols/index.html: 'as of "
+            "2026-08-02' is 34d old (> 7d) — rebuild before publish\". REVERTED (this "
+            'branch, the fix applied): exit 0 — "all baked proof pages carry a fresh '
+            "'as of' stamp\". Both watched 2026-09-06. Positive control also carried in "
+            "tests/test_check_proof_freshness_3515.py "
+            "(test_positive_control_stale_stamp_fails, "
+            "test_main_exits_nonzero_on_stale_and_zero_when_clean, 7 cases total)."
+        ),
+        "scope": (
+            "Watches only the six named proof pages' baked 'as of <date>' stamps against a "
+            "fixed 7-day ceiling — a staleness class with no 'as of' literal at all (a wrong "
+            "number stamped with a fresh date) is invisible to it by construction; that class "
+            "is the doc-sync literal gate's job (sync_doc_metadata.py), not this one's."
+        ),
+        "proved_on": "2026-09-06",
+    },
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STRUCTURAL_HAND_PROOFS — census family 5 (structural-test) records that don't fit
+# `gate_census_mutations.MUTATION_SPECS`' auto-rerunnable harness (which requires a
+# brand-new, never-tracked plant file — #2999's `_dirty()` precondition): this gate's
+# real assertions read a COMMITTED build artifact (site/sitemap.xml, site/subscribe.html)
+# and the LIVE page registry, not "does any new file in the tree carry a defect". Same
+# hand-performed-and-watched bar as gate_census.py's own structural PROVEN_CAN_FAIL
+# records (e.g. test_fixture_frame_pairing_3222.py) — extracted here only because
+# gate_census.py sits at its 1,200-line ceiling (#1665).
+# ─────────────────────────────────────────────────────────────────────────────
+
+STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_v4_build_sitemap_3567.py": {
+        "gate_name": "test_v4_build_sitemap_3567.py",
+        "command": "python3 -m pytest tests/test_v4_build_sitemap_3567.py -q -p no:cacheprovider",
+        "mutation": (
+            "the gate's own test file, copied into a `git archive origin/main@c0122242` "
+            "snapshot (before #3567's fix) and run there against the OLD "
+            "scripts/v4_build_sitemap.py + the OLD site/sitemap.xml + site/subscribe.html — "
+            "the real pre-fix specimens, not a synthetic plant."
+        ),
+        "observed": (
+            "MUTATED (origin/main@c0122242 snapshot): 5 of 6 FAILED. Two AttributeErrors "
+            "(`module 'v4_build_sitemap' has no attribute 'registry_urls'` / "
+            "`'file_for_path'` — the old module lacks the registry-derivation functions "
+            "entirely) and, functionally, "
+            "test_real_repo_sitemap_has_no_dead_fragment_or_duplicate_subscribe_url FAILED "
+            "with 'the dead extensionless fragment URL is back' "
+            "(https://averagejoematt.com/journal/essays/org-chart-of-one/body present in "
+            "the OLD sitemap.xml), and "
+            "test_real_repo_subscribe_html_stub_is_noindex_with_a_matching_canonical FAILED "
+            "on the OLD subscribe.html (no noindex). REVERTED (this branch, the fix "
+            "applied): 6 passed. Both watched 2026-09-06."
+        ),
+        "scope": (
+            "Three of its six cases (the tmp_path-fixtured registry-derivation tests) are "
+            "pure-logic and were unaffected by the tree snapshot either way; only the three "
+            "real-repo cases are what this mutation proves. `test_every_indexable_registry_"
+            "page_has_a_self_matching_canonical` reads the LIVE `qa_manifest.MANIFEST`, so it "
+            "proves canonical presence/agreement only for pages the registry already knows "
+            "about — a wholly new, unregistered page is outside its reach by the same "
+            "registry-scoping #3567 itself argues for."
+        ),
+        "proved_on": "2026-09-06",
+    },
+}
+
+# ── #3529/#3534: the reset sweep's two declared-exemption registries ──────────────────
+# Both entered the inventory 2026-09-05 with the one derivation that closed #3529/#3531/#3534,
+# and both arrive with a verdict rather than joining the unproven pile: each is a DECLARED
+# EXCEPTION to a rule, and an exception nobody has watched failing is indistinguishable from
+# a rule that was never enforced.
+GUARD_PROOFS.update(
+    {
+        "registry::deploy/restart_verify_gates.py::MULTILINE_RUN_EXEMPT::Install census dependency (PyYAML)": {
+            "gate_name": "MULTILINE_RUN_EXEMPT[Install census dependency (PyYAML)]",
+            "command": (
+                "cp .github/workflows/docs-ci.yml /tmp/nc/docs-ci.yml; "
+                "printf '      - name: A thirteenth gate hiding in a block scalar\\n        if: always()\\n"
+                "        run: |\\n          python3 scripts/check_doc_links.py\\n' >> /tmp/nc/docs-ci.yml; "
+                "python3 -c \"import sys,pathlib; sys.path.insert(0,'deploy'); import restart_verify_gates as r; "
+                "r.WORKFLOW=pathlib.Path('/tmp/nc/docs-ci.yml'); sys.argv=['x','--skip-js','--skip-pytest']; "
+                "print('EXIT', r.main())\""
+            ),
+            "mutation": (
+                "appended a REAL gate (`python3 scripts/check_doc_links.py`) to a scratch copy of the live "
+                "docs-ci.yml in `run: |` block-scalar form — the one shape the sweep's line parser cannot see, "
+                "and therefore the one shape that would be derived silently as nothing."
+            ),
+            "observed": (
+                "ARMED: exit 2, `UNEVALUABLE (not a pass): docs-ci.yml has \\`run: |\\` step(s) invoking python3 "
+                "that this sweep cannot derive: · A thirteenth gate hiding in a block scalar`. Unmutated control "
+                "on the same scratch copy: exit 0, the exempted PyYAML bootstrap NOT reported. Both directions "
+                "watched 2026-09-05."
+            ),
+            "scope": (
+                "Detection is textual: a python3 invocation reached indirectly (a shell variable, a `bash -c`, a "
+                "composite action) is not seen. The exemption itself is name-keyed, so a step RENAME would strand "
+                "it — `test_multiline_exemptions_still_name_live_workflow_steps` is the guard for that, and it is "
+                "a static assertion, not a mutation proof."
+            ),
+            "proved_on": "2026-09-05",
+        },
+        "registry::deploy/restart_verify_gates.py::MUTATING_GATES::scripts/skill_lint.py --self-test": {
+            "gate_name": "MUTATING_GATES[scripts/skill_lint.py --self-test]",
+            "command": (
+                "python3 -m pytest tests/test_restart_verify_gates_3477.py -q -k "
+                "'read_only_by_effect or CAUGHT_by_effect or DOES_NOT_RESTORE'"
+            ),
+            "mutation": (
+                "two, because the entry has two failure directions. (A) a fixture gate OUTSIDE the exemption that "
+                "creates a file inside the repo — the read-only-by-EFFECT measurement must catch it. (B) a fixture "
+                "gate INSIDE the exemption that writes and never restores — the exemption's own restoration "
+                "assertion must catch that. (B) is the direction that matters: `skill_lint.py --self-test` restores "
+                "its victim on a good day, so without (B) the entry would be a declaration with no teeth."
+            ),
+            "observed": (
+                "ARMED (A): exit 1, `READ-ONLY VIOLATION` + `MUTATED the working tree`. ARMED (B): exit 1, "
+                "`DID NOT RESTORE THE TREE`. CONTROL: the same sweep over a no-op fixture gate exits 0 with "
+                "`git status --porcelain` byte-identical before and after. Live full sweep 2026-09-05 ran the real "
+                "`scripts/skill_lint.py --self-test` LAST and reported no restoration failure."
+            ),
+            "scope": (
+                "The measurement is `git status --porcelain` on the repo root, so a gate that writes OUTSIDE the "
+                "repo, or writes and restores within one gate's own runtime, is invisible to it. It also does not "
+                "cover the pytest or JS legs — only the derived docs-ci gates are measured, because those are the "
+                "ones contracted to be `--check` forms."
+            ),
+            "proved_on": "2026-09-05",
+        },
+    }
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
+# GUARD_PROOFS above, only because `gate_census.py` sits at its 1,200-line ceiling
+# (#1665) and the standing rule is extraction, never a baseline raise.
+# ─────────────────────────────────────────────────────────────────────────────
+
+QA_PROOFS: dict[str, dict[str, Any]] = {
+    "qa::lambdas/operational/qa_check_subscriber_promise.py::check_subscriber_promise_cadence": {
+        "gate_name": "check_subscriber_promise_cadence",
+        "command": (
+            'cd lambdas && python3 -c "from operational import qa_check_subscriber_promise as q; '
+            'print(q.check_subscriber_promise_cadence())"'
+        ),
+        "mutation": (
+            "none needed — the defect was live. The check fetches the real /subscribe/ and compares "
+            "it against the promise rendered from the senders' own crons "
+            "(common/subscriber_cadence.promise_sentence). Production still serves the #3564 copy, so "
+            "the first run of this gate was a real FAIL on a real defect rather than a synthetic one "
+            "(the 'fail-closed paths need a live proof' bar)."
+        ),
+        "observed": (
+            "ARMED 2026-09-05: passed=False, message 'the page states [one] emails a week instead' — it "
+            "named the stale count AND the expected sentence. Positive control (a page carrying the "
+            "derived sentence) returns ok, and a page carrying BOTH the new sentence and a leftover "
+            "'One email a week' fails as a contradiction: tests/test_subscriber_cadence_promise_3564.py, "
+            "3 assessor cases."
+        ),
+        "scope": (
+            "Fail-soft on fetch errors by design (a transient blip must not red the nightly), so its green "
+            "is only load-bearing while /subscribe/ is reachable. It reads the PAGE, not the senders' live "
+            "schedules — the mirror-vs-CDK half is the pytest gate."
+        ),
+        "proved_on": "2026-09-05",
+    },
 }

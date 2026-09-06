@@ -173,6 +173,9 @@ def _hermetic(monkeypatch):
     monkeypatch.setattr(su, "s3", FakeS3(body={}))
     monkeypatch.setattr(su, "_cw", FakeCloudWatch())
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 12)
+    from experiment import phase_taxonomy
+
+    monkeypatch.setattr(phase_taxonomy, "_cycle_geneses", lambda: None)  # #3598: SSM is the fallback; pin the registry away
     monkeypatch.setattr(su, "datetime", _FrozenDatetime)
 
 

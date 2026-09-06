@@ -77,6 +77,47 @@ def security_tier_log_group_names() -> dict[str, str]:
     return out
 
 
+# ── #3503: alarms that are RED BY CONSTRUCTION, not by incident ───────────────
+# A handful of CloudWatch alarms in `monitoring_stack.py` are gauges, not incidents:
+# their ALARM state IS the normal encoding of a fact ("we are inside the genesis
+# window"), and they exist only to be a term in a composite alarm rule. Every
+# `describe_alarms(StateValue="ALARM")` sweep on the platform reads them as a live
+# incident, because a sweep has no way to tell a gauge from a failure.
+#
+# The observed cost (2026-09-05 full review, OBS-4): the remediation agent renewed
+# `token-alarm-genesis-window-active` in its ack ledger SEVEN times and concluded
+# "genesis window now closed" while `lambdas/ai/token_alarm_window.py` stamped
+# ('2026-09-04','2026-09-12') and the gauge was still 1. Seven triage cycles spent on
+# a working instrument reporting exactly what it was built to report.
+#
+# This is the ONE declared registry. Consumers (`remediation/agent.py`,
+# `scripts/check_alarm_citations.py`) label these rather than triage them;
+# `tests/test_composite_alarm_lookup_3390.py` asserts every name here is a live
+# `alarm_name=` literal in `cdk/stacks/monitoring_stack.py`, so a rename or a deletion
+# in the stack reds the registry instead of silently orphaning it. Adding a name here
+# is a deliberate act with a reason and a date — an alarm is an incident by default.
+BY_CONSTRUCTION_FLAG_ALARMS = {
+    "token-alarm-genesis-window-active": {
+        "reason": (
+            "a gauge, not a failure: ALARM == 'the daily-token ceiling is inside its post-reset "
+            "genesis window', the sole purpose of which is to be the NOT() term in the "
+            "ai-tokens-platform-daily-total-urgent composite and the AND term in the "
+            "-genesis-window composite. It is red for the whole window by design."
+        ),
+        "since": "2026-09-05",
+        "composites": (
+            "ai-tokens-platform-daily-total-urgent",
+            "ai-tokens-platform-daily-total-genesis-window",
+        ),
+    },
+}
+
+
+def is_by_construction_flag(alarm_name: str) -> bool:
+    """True when an ALARM state on this alarm is its designed normal, not an incident."""
+    return alarm_name in BY_CONSTRUCTION_FLAG_ALARMS
+
+
 # ── DIL-027: the isolated backup of the irreplaceable zone ────────────────────
 # `raw/` is the ONLY unrecomputable data on the platform (original wearable/API
 # captures; every DDB metric, every derived artifact and the whole site can be

@@ -304,3 +304,157 @@ def score_pairs(pairs, n_bins=10):
         "label": label,
         "score": score,
     }
+
+
+# ── #3550: a pooled card scored against a STRATIFIED base rate ──────────────────
+#
+# THE LIVE DEFECT (2026-09-05, /review full QS-3): `platform.lifetime` read
+# `skilled=true (Brier skill 0.17) / well-calibrated / reliable` while BOTH of its
+# constituent strata were unskilled — the coaches' 37 calls (stated ~0.5, observed
+# 0.22: skill ≈ -0.47 against their OWN base rate) and the 137 interval forecasts
+# (stated 0.8, observed 0.79: skill ≈ -0.001). Pooling them and scoring against ONE
+# pooled base rate (116/174 = 0.667 → reference Brier 0.222) manufactured a skill no
+# stratum had: the pooled reference is worse than either stratum's own, so merely
+# knowing which stratum a call came from beats "always say 0.667" — and that is the
+# information the pooled skill was crediting to the forecasters. The n-weighted
+# reliability gap did the same in the other direction: 137 forecasts at a 0.01 gap
+# diluted the coaches' 0.28 gap to 0.069, under the 0.15 over-confidence trip.
+#
+# THE FIX: score the pooled card with a reference Brier that is the n-weighted mean
+# of each stratum's OWN climatology, so pooled skill > 0 is arithmetically
+# impossible unless at least one stratum beats its own base rate (if every stratum
+# has bs_i >= ref_i then Σ n_i·bs_i >= Σ n_i·ref_i). The over/under-confidence trip
+# is driven by the WORST stratum's gap (among strata with a verdict-eligible n), and
+# every stratum's own numbers ride on the card so no pooled figure can hide them.
+# `score_pairs` is untouched — it is the correct scorer for a single stratum, and
+# the OSS/JS parity fixture pins it.
+
+_MIN_N_FOR_VERDICT = 5  # the same floor score_pairs applies before it names a verdict
+
+
+def _stratum_reference_brier(pairs):
+    """(n, Brier, reference Brier, base rate) of ONE stratum against its OWN climatology.
+    None-safe: returns (0, None, None, None) when nothing is scorable."""
+    clean = stats_core._clean_forecast_pairs(pairs)
+    n = len(clean)
+    if not n:
+        return 0, None, None, None
+    base_rate = sum(y for _, y in clean) / n
+    bs = sum((p - y) ** 2 for p, y in clean) / n
+    bs_ref = sum((base_rate - y) ** 2 for _, y in clean) / n
+    return n, bs, bs_ref, base_rate
+
+
+def _reliability_gap(pairs, n_bins=10):
+    """The n-weighted mean (stated confidence - observed rate) over the reliability
+    bins — positive = over-confident. Unrounded; None when there are no bins."""
+    bins = stats_core.reliability_bins(pairs, n_bins=n_bins)
+    if not bins:
+        return None
+    total = sum(b["n"] for b in bins)
+    return sum(b["n"] * (b["mean_confidence"] - b["observed_rate"]) for b in bins) / total
+
+
+def score_strata(strata, n_bins=10):
+    """Score named strata of (confidence, outcome) pairs into ONE pooled calibration
+    card whose skill and verdict cannot claim a property no stratum has (#3550).
+
+    `strata` maps a stratum name → its pairs (insertion order is the served order).
+    The result carries every `score_pairs` field for the pooled pairs (n, confirmed,
+    brier, reliability_bins, accuracy_pct, accuracy_ci95, …) with these differences:
+
+      * `brier_skill` / `skilled` are scored against the STRATIFIED reference — the
+        n-weighted mean of each stratum's own base-rate Brier — and
+        `skill_reference` says so ("stratified"; "pooled" is what score_pairs does).
+      * `calibration` (over/under-confident) is tripped by the worst stratum's
+        reliability gap among strata with n >= 5, never by the n-weighted pool.
+      * `strata` carries each stratum's own n, Brier, skill, verdict, gap and base
+        rate, so the card is legible per stratum; `reliability_gap` is the pooled
+        n-weighted gap and `worst_stratum_gap` names the stratum that drove the trip.
+      * `skilled` is additionally forced False whenever no stratum is itself
+        skilled — arithmetically implied by the stratified reference, asserted
+        explicitly so the invariant is on the record, not in a proof.
+
+    Pure and deterministic; every rounding matches score_pairs so surfaces render
+    identically.
+    """
+    named = list((strata or {}).items())
+    pooled_pairs = [pr for _, pairs in named for pr in (pairs or [])]
+    summary = score_pairs(pooled_pairs, n_bins=n_bins)
+    n = summary["n"]
+
+    per = {}
+    bs_sum = 0.0
+    ref_sum = 0.0
+    any_skilled = False
+    worst = None  # (abs gap, name, gap)
+    for name, pairs in named:
+        s = score_pairs(pairs, n_bins=n_bins)
+        s_n, bs, bs_ref, base_rate = _stratum_reference_brier(pairs)
+        gap = _reliability_gap(pairs, n_bins=n_bins)
+        if s_n:
+            bs_sum += bs * s_n
+            ref_sum += bs_ref * s_n
+        if s["skilled"] is True:
+            any_skilled = True
+        if gap is not None and s_n >= _MIN_N_FOR_VERDICT and (worst is None or abs(gap) > worst[0]):
+            worst = (abs(gap), name, gap)
+        per[name] = {
+            "n": s["n"],
+            "confirmed": s["confirmed"],
+            "brier": s["brier"],
+            "brier_skill": s["brier_skill"],
+            "skilled": s["skilled"],
+            "calibration": s["calibration"],
+            "reliability_gap": round(gap, 3) if gap is not None else None,
+            "base_rate": round(base_rate, 3) if base_rate is not None else None,
+        }
+
+    # Stratified skill: 1 - Σ n_i·bs_i / Σ n_i·ref_i. Undefined (None) when every
+    # stratum's reference is degenerate (all outcomes identical) or n < 2 — unknown,
+    # never punished as unskilled, exactly as score_pairs treats it.
+    skill = None
+    if n >= 2 and ref_sum > 0:
+        skill = 1.0 - bs_sum / ref_sum
+    skilled = None if skill is None else bool(skill > 0)
+    if skilled is True and not any_skilled:
+        skilled = False  # the explicit invariant: a pooled card never claims what no stratum has
+
+    pooled_gap = _reliability_gap(pooled_pairs, n_bins=n_bins)
+    bins = summary["reliability_bins"]
+    calibration = "insufficient_data"
+    if n >= _MIN_N_FOR_VERDICT and bins:
+        driver = worst[2] if worst is not None else pooled_gap
+        if driver is not None and driver > 0.15:
+            calibration = "over-confident"
+        elif driver is not None and driver < -0.15:
+            calibration = "under-confident"
+        elif skilled is False:
+            calibration = "not_yet_skillful"
+        else:
+            calibration = "well-calibrated"
+
+    brier = summary["brier"]
+    if n < 3:
+        label, score = "nascent", 30
+    elif skilled is False:
+        label, score = "not_yet_skillful", 45
+    elif brier is not None and brier <= 0.15 and n >= 12:
+        label, score = "authoritative", 90
+    elif brier is not None and brier <= 0.20:
+        label, score = "reliable", 70
+    else:
+        label, score = "developing", 50
+
+    return {
+        **summary,
+        "brier_skill": round(skill, 4) if skill is not None else None,
+        "skilled": skilled,
+        "skill_reference": "stratified",
+        "reliability_gap": round(pooled_gap, 3) if pooled_gap is not None else None,
+        "worst_stratum_gap": {"stratum": worst[1], "gap": round(worst[2], 3)} if worst is not None else None,
+        "calibration": calibration,
+        "label": label,
+        "score": score,
+        "strata": per,
+    }

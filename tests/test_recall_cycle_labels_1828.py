@@ -142,7 +142,6 @@ def test_unresolvable_precedent_is_still_dropped():
     table = _Table([_row("2026-02-28", cycle=10)], {})
     assert sr.retrieve(table, [1.0, 0.0]) == []
     assert sr.reconcile_precedent(table, {"artifact_pk": CHRONICLE_PK, "artifact_sk": "DATE#nope"}) is None
-    assert sr.resolve_precedent(table, {"artifact_pk": CHRONICLE_PK, "artifact_sk": "DATE#nope"}) is False
 
 
 def test_reconciliation_is_fail_closed_on_a_read_error():

@@ -383,11 +383,6 @@ def allow(feature: str) -> bool:
     return tier < cutoff
 
 
-def hard_stopped() -> bool:
-    """True when all Bedrock calls must be refused (Tier 3)."""
-    return current_tier() >= _HARD_STOP_TIER
-
-
 def paused_features(tier=None):
     """The features currently disabled at `tier` (default: the live tier).
 
@@ -459,7 +454,7 @@ def read_breakdown(max_age_s: int = _BREAKDOWN_MAX_AGE_S):
 # so /api/receipts, /api/status and the daily brief cannot describe the same
 # quantity three different ways. Pure and fail-soft: a garbled payload costs the
 # scope, never the caller.
-_SCOPE_ALL_CLASSES = "all spend classes"
+_SCOPE_ALL_LABEL = "all spend classes"
 
 
 def projection_scope(breakdown) -> dict:
@@ -511,7 +506,7 @@ def projection_scope(breakdown) -> dict:
 
         narrowed = breakdown.get("prod_class_share") is not None and bool(out["episodic_classes"])
         if not narrowed:
-            out["scope_label"] = _SCOPE_ALL_CLASSES
+            out["scope_label"] = _SCOPE_ALL_LABEL
             out["scope_sentence"] = (
                 "This month-end projection covers all spend classes — the governor has no "
                 "caller-class attribution for this run, so nothing is excluded from it."
@@ -580,7 +575,7 @@ def format_headroom_line(breakdown) -> str:
         # empty by construction when the governor made no narrowing claim this run.
         scope = projection_scope(breakdown)
         scope_clause = ""
-        if scope["scope_label"] and scope["scope_label"] != _SCOPE_ALL_CLASSES:
+        if scope["scope_label"] and scope["scope_label"] != _SCOPE_ALL_LABEL:
             scope_clause = " (recurring classes only"
             if scope["projected_all_classes_usd"] is not None:
                 scope_clause += f", ${scope['projected_all_classes_usd']:.0f} all classes"

@@ -1858,6 +1858,12 @@ Write your {domain_label} coaching section now."""
         # figure ("stop citing 315 lbs as current") must never license that number.
         user_message_full = user_message + (("\n\n" + corrections_block) if corrections_block else "")
 
+        # The ONE corrective-regeneration callable every gate below shares (#3516 folded
+        # three byte-identical copies into it). #2888: `system_prompt` rides the SYSTEM slot;
+        # the note stays in the dynamic USER turn, never the cached prefix. max_tokens #3190.
+        def _regen_fn(_note):
+            return call_anthropic(user_message_full + "\n\n" + _note, api_key, max_tokens=1000, system=system_prompt)
+
         # Step 4.5 (#738 / ADR-126): hash-and-reuse — the DOWNSTREAM gate, now the second
         # of two. It is retained exactly as it was (it is the fallback whenever the
         # upstream digest is unavailable, and #3073's sibling surfaces share its
@@ -1935,9 +1941,7 @@ Write your {domain_label} coaching section now."""
                 output, _left, _corrected = _gg_mod.regen_once(
                     output,
                     _findings_fn,
-                    # #2888: system in the system slot; the correction stays in the
-                    # user turn (dynamic — it must never enter the cached prefix). max_tokens=1000, not 600 (#3190).
-                    lambda _corr: call_anthropic(user_message_full + "\n\n" + _corr, api_key, max_tokens=1000, system=system_prompt),
+                    _regen_fn,
                     surface=f"coach_v2:{coach_id}",
                 )
                 if _corrected:
@@ -1955,13 +1959,9 @@ Write your {domain_label} coaching section now."""
         # is keyed off `passed`, not a re-tuned score cutoff. See ADR-107.
         # Runs BEFORE the state updater so a regenerated draft (not a discarded
         # one) is what gets recorded and published.
+        # `brief_with_grounding` (#2573) supplies the deterministic grounding context.
         output, _quality_report = _enforce_quality_gate(
-            lambda_client,
-            coach_id,
-            output,
-            brief_with_grounding(generation_brief, _canon_facts, _allowed),  # #2573: deterministic grounding context
-            # #2888: system in the system slot; the gate note stays user-side (dynamic). max_tokens=1000, not 600 (#3190).
-            regenerate_fn=lambda _note: call_anthropic(user_message_full + "\n\n" + _note, api_key, max_tokens=1000, system=system_prompt),
+            lambda_client, coach_id, output, brief_with_grounding(generation_brief, _canon_facts, _allowed), regenerate_fn=_regen_fn
         )
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
@@ -1979,12 +1979,7 @@ Write your {domain_label} coaching section now."""
 
             _psig = brief.get("engagement_signal") if isinstance(brief, dict) else None
             if _psig and output and _ec.presence_ack_required(_psig):
-                output, _ack_finding = _ec.enforce_presence_acknowledgment(
-                    output,
-                    _psig,
-                    # #2888: system slot; gate note stays user-side (dynamic). max_tokens=1000, not 600 (#3190).
-                    regenerate_fn=lambda n: call_anthropic(user_message_full + "\n\n" + n, api_key, max_tokens=1000, system=system_prompt),
-                )
+                output, _ack_finding = _ec.enforce_presence_acknowledgment(output, _psig, regenerate_fn=_regen_fn)
                 if _ack_finding:
                     print(f"[COACH-V2:{coach_id}] presence-ack gate fired: {_ack_finding.get('detail')}")
                 if output is None:
@@ -1993,6 +1988,15 @@ Write your {domain_label} coaching section now."""
                     return CoachHold(coach_id, "presence_ack")
         except Exception as _ack_e:
             print(f"[COACH-V2:{coach_id}] presence-ack gate failed (non-blocking): {_ack_e}")
+
+        # Step 6.3 (#3516): a paused / lag-by-design MISATTRIBUTION is regenerated once
+        # and then HELD. The trigger is the source registry's OWN facet, so only a source
+        # that genuinely cannot report (Garmin, ADR-074) or is behind by design
+        # (MacroFactor) can fire it — see coach_brief_input_gate for what is structural.
+        output, _facet_finding = _in_gate.enforce_source_facet_attribution(output, data, _regen_fn)
+        if output is None:
+            print(f"[COACH-V2:{coach_id}] Held by source-facet gate (#3516): {(_facet_finding or {}).get('detail')}")
+            return CoachHold(coach_id, "source_facet_misattribution")
 
         # #952 (ai-content-6, belt-and-braces): any gate's corrective regeneration
         # (grounding regen_once, quality gate, presence-ack) also goes through
@@ -2124,13 +2128,7 @@ Write your {domain_label} coaching section now."""
             _sgv_findings = _gg_sgv.self_graded_verdict_findings(output or "", evaluated_predictions=_eval_n)
             if _sgv_findings:
                 print(f"[COACH-V2:{coach_id}] self-graded-verdict gate fired: " + "; ".join(f.get("detail", "") for f in _sgv_findings))
-                # #2888: system in the system slot; the correction stays user-side. max_tokens=1000, not 600 (#3190).
-                _regen = call_anthropic(
-                    user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
-                    api_key,
-                    max_tokens=1000,
-                    system=system_prompt,
-                )
+                _regen = _regen_fn(_gg_sgv.correction_prompt(_sgv_findings))
                 if _regen and not _is_ai_unavailable(_regen):
                     _still = _gg_sgv.self_graded_verdict_findings(_regen, evaluated_predictions=_eval_n)
                     if _still:

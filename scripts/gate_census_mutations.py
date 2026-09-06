@@ -283,7 +283,46 @@ def _drift_probe_plant() -> tuple[str, str]:
     return ("tests/fixtures/_census_probe_2999_api_schema_drift.json", body)
 
 
+# #3503: a first-party module that sweeps CloudWatch alarms and omits `AlarmTypes`, so
+# the API's metric-alarms-only default silently hides every composite. This is the exact
+# shape the guard exists to catch — six real call sites carried it, and the #3390 fix had
+# pinned only one file. Assembled, not written verbatim: the guard sweeps deploy/ and this
+# module's own tracked text is not in that scope, but the plant path is.
+_BLIND_ALARM_SWEEP_PY = (
+    '"""Census probe (#3503) — a whole-estate alarm sweep that states no AlarmTypes."""\n\n'
+    "import boto3\n\n\n"
+    "def read_reds():\n"
+    '    cw = boto3.client("cloudwatch", region_name="us-west-2")\n'
+    '    return cw.describe_alarms(StateValue="ALARM", MaxRecords=100).get("MetricAlarms", [])\n'
+)
+
+
+# Assembled: tests/test_email_sender_identity_3568.py AST-scans every module under
+# lambdas/ for an EMAIL_SENDER default and checks its domain against the committed
+# SES-verified set. A .invalid TLD can never be a real identity (RFC 2606).
+_UNVERIFIED_SENDER_PY = "# probe\n" "import os\n" "\n" 'SENDER = os.environ.get("EMAIL_SENDER", "reader@census-probe-3568.invalid")\n'
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_email_sender_identity_3568.py": MutationSpec(
+        gate_id="structural::test_email_sender_identity_3568.py",
+        target="tests/test_email_sender_identity_3568.py",
+        detects=(
+            "a sender default on a domain SES has not verified for sending — the shape that let "
+            "between_chronicle default to an identity that did not exist while every test stayed green (#3568)"
+        ),
+        plants=(("lambdas/common/_census_probe_3568.py", _UNVERIFIED_SENDER_PY),),
+        track=False,  # the guard rglobs lambdas/ on disk, not the git index
+    ),
+    "structural::test_composite_alarm_lookup_3390.py": MutationSpec(
+        gate_id="structural::test_composite_alarm_lookup_3390.py",
+        target="tests/test_composite_alarm_lookup_3390.py",
+        detects=(
+            "a CloudWatch alarm sweep that omits AlarmTypes, so the API's metric-alarms-only "
+            "default makes every composite invisible to it (#3390 fixed one file; #3503 the other five)"
+        ),
+        plants=(("deploy/_census_probe_3503.py", _BLIND_ALARM_SWEEP_PY),),
+        track=False,  # the guard walks the filesystem (os.walk), not the git index
+    ),
     "structural::test_no_conflict_markers.py": MutationSpec(
         gate_id="structural::test_no_conflict_markers.py",
         target="tests/test_no_conflict_markers.py",
@@ -497,6 +536,35 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_email_sender_identity_3568.py": _proof(
+        "structural::test_email_sender_identity_3568.py",
+        "baseline: 9 passed | mutated: 1 failed, 8 passed :: test_every_code_default_is_on_a_verified_domain | reverted: 9 passed",
+        "lambdas/ on disk (.rglob, .py only) for code defaults and cdk/stacks/*.py for CDK literals, so an "
+        "UNTRACKED sender is in scope and deploy/archive/ deliberately is not — its senders are dead code kept "
+        'for history. It reads the AST for two shapes: `os.environ.get("EMAIL_SENDER", <default>)` and a bare '
+        '`SENDER = "..."`; a module that builds its From address any other way (an f-string, a helper call, a '
+        "value read from SSM at runtime) is invisible to it — those are gaps, not passes. It judges the SOURCE "
+        "against a COMMITTED list of verified domains, never SES itself: whether an identity is still verified "
+        "in the account is a live fact no offline gate can assert, so the list is re-derived by the "
+        "list-email-identities command recorded in lambdas/common/email_identity.py. The reader-facing "
+        "assertions additionally pin the From to the site domain, which is the half that would still red if "
+        "every domain in the set were verified but reader mail drifted back to the personal one.",
+        proved_on="2026-09-06",
+    ),
+    "structural::test_composite_alarm_lookup_3390.py": _proof(
+        "structural::test_composite_alarm_lookup_3390.py",
+        "baseline: 11 passed | mutated: 1 failed, 10 passed :: test_every_alarm_read_states_its_alarm_types | reverted: 11 passed",
+        "remediation/ scripts/ lambdas/ deploy/ cdk/ mcp/ on disk (os.walk, .py only), so an UNTRACKED "
+        "caller is in scope and `tests/` deliberately is not — its describe_alarms definitions are FAKES "
+        "implementing the wire, not callers of it. The rule reads the AST: an alarm read counts as covered "
+        "when `AlarmTypes` reaches the call, following a `**kw` spread into dict literals and "
+        '`kw["AlarmTypes"] = ...` assignments in the same module. A caller that builds its kwargs '
+        "somewhere this resolver cannot follow (a helper function, a dict returned by another call) is "
+        "invisible to it — the resolver covers the six shapes the repo actually uses, and a new shape is a "
+        "gap, not a pass. It judges the CALL, never the live response: whether AWS actually returns a "
+        "composite is an API behaviour no offline gate can assert.",
+        proved_on="2026-09-05",
+    ),
     "structural::test_iam_twin_free_3336.py": _proof(
         "structural::test_iam_twin_free_3336.py",
         "baseline: 16 passed | mutated: 1 failed, 15 passed :: test_no_deploy_script_embeds_a_policy_document_for_a_governed_role | reverted: 16 passed",

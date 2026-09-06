@@ -147,9 +147,21 @@ test("weeklyAsOf: past the weekly cadence (>8d) — 'next refresh pending'", () 
 });
 
 test("weeklyAsOf: dates render Pacific (site convention)", () => {
-  // Fixed instant; only the date part is asserted — the staleness suffix is
-  // wall-clock-relative by design (reference_golden_tests_wallclock).
-  assert.match(weeklyAsOf("2026-07-27T14:00:00Z"), /^as of Jul 27/);
+  // #3535. This case used to read `assert.match(weeklyAsOf("2026-07-27T14:00:00Z"),
+  // /^as of Jul 27/)`, and it was wrong twice over.
+  //
+  //  1. It did not test what it claims. 14:00Z on Jul 27 is 07:00 PDT on Jul 27 — the
+  //     SAME calendar day in both frames — so a UTC render would have passed it too.
+  //  2. It was #3479's exact surviving shape: `^`-anchored, no `$`. Once the record
+  //     aged past WEEKLY_STALE_HOURS the "— next refresh pending" suffix appeared and
+  //     the prefix match kept passing off input its strict-equality sibling had already
+  //     failed on. A green nobody earned.
+  //
+  // 03:00Z on Jul 28 is 20:00 PDT on Jul 27, so the two frames disagree and only a
+  // Pacific render says "Jul 27". The instant is permanently past the 8-day cadence
+  // window and staleness is monotonic, so the whole string — suffix included — is
+  // deterministic forever and the assertion can be TOTAL rather than a prefix.
+  assert.equal(weeklyAsOf("2026-07-28T03:00:00Z"), "as of Jul 27 — next refresh pending");
 });
 
 test("weeklyAsOf: no/invalid date renders nothing — never a fabricated stamp", () => {

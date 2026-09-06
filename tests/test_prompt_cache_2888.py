@@ -189,15 +189,30 @@ def test_coach_v2_never_concatenates_the_system_prompt_into_the_user_turn():
 
 
 def test_every_coach_v2_generation_call_passes_system_explicitly():
-    """All five coach-v2 call sites (base + 4 regens) must hand `system_prompt` to
-    the `system=` parameter, which is what `cache_system=True` then wraps."""
+    """Every coach-v2 call site must hand `system_prompt` to the `system=` parameter,
+    which is what `cache_system=True` then wraps.
+
+    #3516: this asserted FIVE sites (base + 4 regens), each carrying its own copy of the
+    kwargs. The four regen arms now share one `_regen_fn` closure, so the property became
+    structural — a gate cannot grow a third site that forgets `system=` without
+    introducing an inline `call_anthropic`, which
+    `test_ai_calls_coach_v2_max_tokens_3190.py::test_every_regen_arm_routes_through_the_one_shared_callable`
+    fails on. What is asserted here is the property rather than the old shape: every
+    coach-v2 user-turn call names `system=system_prompt`, and there is more than one.
+    """
     src = _AI_CALLS.read_text()
     # The regen paths keep their correction/note in the user turn; every one of
     # them still has to name system_prompt as the system argument.
-    assert src.count("system=system_prompt") == 5, (
-        "expected exactly 5 coach-v2 call sites passing system=system_prompt "
-        "(base generation + grounding, quality-gate, presence-ack and self-graded-verdict regens)"
+    assert src.count("system=system_prompt") >= 2, (
+        "expected at least 2 coach-v2 call sites passing system=system_prompt "
+        "(base generation + the shared corrective-regeneration callable)"
     )
+    # No coach-v2 site may omit it: every call that reads `user_message_full` IS a
+    # coach-v2 generation by construction, and each one must name the system slot.
+    user_turn_sites = re.findall(r"call_anthropic\(\s*user_message_full[^)]*\)", src, re.DOTALL)
+    assert user_turn_sites, "no coach-v2 call site reads user_message_full — this guard would be measuring nothing"
+    for site in user_turn_sites:
+        assert "system=system_prompt" in site, f"a coach-v2 call site does not name system=system_prompt: {site[:160]}"
 
 
 def test_corrections_stay_outside_the_cached_prefix():

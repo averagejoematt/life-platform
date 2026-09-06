@@ -251,15 +251,6 @@ def load_entry(table, coach_id: str, output_type: str):
         return None
 
 
-def check_reuse(table, coach_id: str, output_type: str, fingerprint: str):
-    """If the last successful generation used a byte-identical semantic brief,
-    return (stored_output, unchanged_since_date). Else (None, None)."""
-    entry = load_entry(table, coach_id, output_type)
-    if entry and entry.get("brief_hash") == fingerprint and entry.get("output"):
-        return entry["output"], entry.get("first_generated")
-    return None, None
-
-
 def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output: str, today: str, parts: dict | None = None) -> bool:
     """Persist a freshly generated, gate-passed output under its brief fingerprint.
     Reached only on a cache MISS, so `first_generated` resets the unchanged-since

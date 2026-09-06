@@ -101,6 +101,17 @@ def board(monkeypatch):
     monkeypatch.setattr(ai, "_get_anthropic_key", lambda: "test-key")
     monkeypatch.setattr(ai, "_ask_fetch_context", lambda *a, **k: {})
     monkeypatch.setattr(ai, "_write_board_interaction", lambda *a, **k: None)
+    # #3560 moved the budget pause and the shared board_ask token INTO
+    # `_handle_board_followup` (below its own hazard gate) — the opening path no longer
+    # applies them on the follow-up's behalf, because that put money ahead of safety.
+    # This fixture calls the follow-up handler DIRECTLY, so it has to open both: on
+    # FAKE credentials the budget read fails CLOSED (#3059) and the DDB limiter fails
+    # closed, and every assertion below would land on a "paused" card or a 429 instead
+    # of the replay behaviour it names. Same reason (and same shape) as the autouse
+    # fixture in tests/test_ai_door_type_guards_2688.py.
+    monkeypatch.setattr(ai, "_ai_paused_response", lambda: None)
+    monkeypatch.setattr(ai, "_RATE_LIMITER_READY", False)
+    monkeypatch.setattr(ai, "_board_rate_store", {})
 
     class _B(_FakeBedrock):
         pass

@@ -77,17 +77,24 @@ SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "ingestion" / "source_registry.py"
 OG_SOURCE_COUNT = re.compile(r"(?<![\w.])(\d+)\s+data sources?\b")
 
 
-def _registry_source_count() -> int | None:
-    """Top-level key count of SOURCE_REGISTRY in lambdas/ingestion/source_registry.py, AST-parsed.
+def _dict_key_count(path: Path, name: str, depth: int = 0) -> int | None:
+    """AST key count of the dict literal assigned to `name` in `path`, resolving
+    `**SPLICE` entries against the sibling modules they come from. None = not found.
 
-    Read as TEXT + AST (never imported) so the gate stays import-free and can't drag in a
-    lambda's runtime deps. This is the ONE source of truth for the reader-facing card count.
+    #3565: this used to count only the Constant keys and drop every `**SPLICE`
+    silently, which is how it returned 19 for a registry whose runtime `len()` is 22
+    (the three closed-social entries live in source_registry_closed_social.py, #1677).
+    A gate whose ground truth is smaller than the thing it polices cannot fire on the
+    class it exists for: a card hardcoding the UNDER-count passed, while the card that
+    correctly derives `len(SOURCE_REGISTRY)` printed a different number. An
+    unresolvable splice now returns None — the caller exits 2 and says so — rather than
+    quietly counting low.
     """
-    if not SOURCE_REGISTRY_PATH.exists():
+    if depth > 3 or not path.exists():
         return None
     try:
-        tree = ast.parse(SOURCE_REGISTRY_PATH.read_text(encoding="utf-8"))
-    except SyntaxError:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (SyntaxError, OSError):
         return None
     for node in ast.walk(tree):
         # Both forms: `X = {...}` is ast.Assign, `X: T = {...}` is ast.AnnAssign.
@@ -100,14 +107,67 @@ def _registry_source_count() -> int | None:
         else:
             continue
         for tgt in tgts:
-            if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
-                # A `**SPLICE` entry contributes a None key; count real string keys only.
-                return sum(1 for k in node.value.keys if isinstance(k, ast.Constant))
+            if not (isinstance(tgt, ast.Name) and tgt.id == name and isinstance(node.value, ast.Dict)):
+                continue
+            total = 0
+            for key, value in zip(node.value.keys, node.value.values):
+                if isinstance(key, ast.Constant):
+                    total += 1
+                    continue
+                if key is None and isinstance(value, ast.Name):  # `**SPLICE`
+                    spliced = _resolve_splice(value.id, path.parent, depth)
+                    if spliced is None:
+                        return None  # fail loud, never count low
+                    total += spliced
+                    continue
+                return None  # an unrecognised key form — do not guess
+            return total
     return None
+
+
+def _resolve_splice(name: str, search_dir: Path, depth: int) -> int | None:
+    """Key count of a spliced dict, found in a sibling module of the registry."""
+    for sibling in sorted(search_dir.glob("*.py")):
+        found = _dict_key_count(sibling, name, depth + 1)
+        if found is not None:
+            return found
+    return None
+
+
+def _registry_source_count() -> int | None:
+    """Top-level key count of SOURCE_REGISTRY in lambdas/ingestion/source_registry.py,
+    AST-parsed INCLUDING its spliced sections — i.e. the number a runtime
+    `len(SOURCE_REGISTRY)` produces, which is what the og cards actually print.
+
+    Read as TEXT + AST (never imported) so the gate stays import-free and can't drag in a
+    lambda's runtime deps. This is the ONE source of truth for the reader-facing count.
+    """
+    return _dict_key_count(SOURCE_REGISTRY_PATH, "SOURCE_REGISTRY")
 
 
 def _scan_og_files() -> list[Path]:
     return sorted(OG_DIR.glob("og_*.py")) if OG_DIR.exists() else []
+
+
+# #3565: the same rule, one surface out. The confirmation email a new subscriber
+# receives said "real biometric data from 19 sources" for months — a reader-facing
+# source-count claim in exactly the #1260 class, invisible to the gate because the
+# scan globbed og_*.py only. These templates are reader-facing text emitted by a
+# lambda, so they belong in the SAME scan set against the SAME registry truth.
+# (Add a file here whenever a new subscriber-facing template names a source count.)
+SOURCE_COUNT_TEMPLATES = (
+    ROOT / "lambdas" / "web" / "email_subscriber_lambda.py",
+    ROOT / "lambdas" / "web" / "subscriber_onboarding_lambda.py",
+    ROOT / "lambdas" / "compute" / "weekly_signal_lambda.py",
+    ROOT / "lambdas" / "emails" / "chronicle_email_sender_lambda.py",
+    ROOT / "lambdas" / "emails" / "between_chronicle_lambda.py",
+)
+
+
+def _scan_source_count_files() -> list[Path]:
+    """Every file the reader-facing "N data sources" rule polices: the og cards plus
+    the subscriber-facing email templates (#1260 + #3565)."""
+    return _scan_og_files() + [p for p in SOURCE_COUNT_TEMPLATES if p.exists()]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -411,7 +411,11 @@ def test_dedupe_refuses_a_guard_with_a_different_threshold():
         [
             _alarm("ai-tokens-platform-daily-total", "AnthropicOutputTokens", threshold=250000.0, **common),
             _alarm(
-                "ai-tokens-daily-brief-daily", "AnthropicOutputTokens", dims={"LambdaFunction": "daily-brief"}, threshold=30000.0, **common
+                "ai-tokens-daily-brief-runaway",
+                "AnthropicOutputTokens",
+                dims={"LambdaFunction": "daily-brief"},
+                threshold=35000.0,
+                **common,
             ),
         ]
     )

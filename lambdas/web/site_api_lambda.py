@@ -793,13 +793,29 @@ def _dispatch_route(event, path, method):
             # 3. Coach thread summaries + predictions
             _cd_coaches = []
             _cd_predictions = []
+            # #3519 (AIQ-8): data_phase used to be a hand-typed constant, so a
+            # Day-0 coach whose draft was HELD still shipped "established" — an
+            # ADR-104 mislabel. Derived from the SAME shared phase context every
+            # other narrative surface grounds on (ai.ai_context, #1086):
+            # pre-start genesis -> "pre_start"; inside the cannot-exist-yet
+            # window (build_experiment_phase_context's own `early_phase` flag,
+            # <=14 days in) -> "early"; otherwise -> "established".
+            from ai.ai_context import build_experiment_phase_context as _cd_build_pctx
+
+            _cd_pctx = _cd_build_pctx()
+            if _cd_pctx.get("pre_start"):
+                _cd_data_phase = "pre_start"
+            elif _cd_pctx.get("early_phase"):
+                _cd_data_phase = "early"
+            else:
+                _cd_data_phase = "established"
             for _cd_domain, _cd_info in _cd_coach_display.items():
                 _cd_coach_pk = f"COACH#{_cd_coach_id_map[_cd_domain]}"
                 coach_entry = dict(_cd_info)
                 coach_entry["position_summary"] = ""
                 coach_entry["emotional_investment"] = "neutral"
                 coach_entry["prediction_count"] = 0
-                coach_entry["data_phase"] = "established"
+                coach_entry["data_phase"] = _cd_data_phase
                 # #1226 (recurrence of #787): stamp each digest read with its OWN
                 # as-of date so the "EACH COACH'S READ" cards can't present a stale
                 # Day-1 vitals quote tense-free next to a cockpit showing fresh values.
@@ -1073,7 +1089,26 @@ def lambda_handler(event, context):
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
-    # /api/healthz — lightweight health check (no auth, no PII)
+    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
+    #
+    # #3561: NOTHING that touches data may run above this block. `/api/healthz` used
+    # to — it answered a DynamoDB `get_item` + an S3 `get_object` + a version string
+    # to any caller of the committed Function URL (auth_type NONE, so the invocation
+    # itself is unpreventable in-handler; what was preventable is the two data-plane
+    # calls and the ~30x billed duration each direct hit bought). Every other route
+    # 403'd. The health check's real consumers all arrive through CloudFront —
+    # `deploy/deploy_convergence.py` polls `{site}/api/healthz` for `checks.lambda_warm`
+    # and the smoke suite fetches the site domain — so they carry the header and are
+    # unaffected; a direct Function-URL hit now costs a 403 and nothing else.
+    if SITE_API_ORIGIN_SECRET:
+        req_headers = event.get("headers") or {}
+        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
+        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
+            return _error(403, "Forbidden")
+
+    # /api/healthz — lightweight health check (no PII). Handled here rather than in
+    # `_dispatch_route` because it emits its own route metric; see #2876's sanctioned
+    # exception. It sits BELOW the SEC-04 gate (#3561), not above it.
     if path == "/api/healthz" and method == "GET":
         try:
             ddb_start = _time.time()
@@ -1102,13 +1137,6 @@ def lambda_handler(event, context):
         }
         _emit_route_log(200)
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
-
-    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
-    if SITE_API_ORIGIN_SECRET:
-        req_headers = event.get("headers") or {}
-        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
-        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
-            return _error(403, "Forbidden")
 
     try:
         result = _dispatch_route(event, path, method)

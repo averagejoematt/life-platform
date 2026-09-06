@@ -175,15 +175,6 @@ def test_ordinary_data_dates_not_flagged_as_precedents():
     assert sr.precedent_citation_findings(text, resolved) == []
 
 
-def test_resolve_precedent_true_and_false():
-    # a resolvable artifact is seeded into the store; an unresolvable one is not
-    art = {"pk": "USER#matthew#SOURCE#chronicle", "sk": "DATE#2026-04-06", "title": "real"}
-    table = FakeDdbTable(rows=[art])
-    assert sr.resolve_precedent(table, {"artifact_pk": art["pk"], "artifact_sk": art["sk"]}) is True
-    assert sr.resolve_precedent(table, {"artifact_pk": "GONE", "artifact_sk": "GONE"}) is False
-    assert sr.resolve_precedent(table, {}) is False  # no ref → does not resolve
-
-
 def test_retrieve_drops_unresolvable_precedents():
     # corpus has two similar docs; only one artifact exists in the store
     rows = [
@@ -216,10 +207,6 @@ def test_recall_block_lists_precedents_with_scores():
     # the block's RULES intentionally instruct the model to never claim cause
     assert "hypothesis" in block
     assert sr.recall_block([]) == ""  # no precedents → no block
-
-
-def test_resolved_precedent_dates():
-    assert sr.resolved_precedent_dates([{"date": "2026-04-06"}, {"date": "2026-05-01"}, {}]) == {"2026-04-06", "2026-05-01"}
 
 
 # ── grounded_generation composition (AC2 end-to-end shape) ───────────────────
