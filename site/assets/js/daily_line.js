@@ -63,3 +63,68 @@ export function heroProofLine(journey, dayN, now = Date.now()) {
   const one = lwLabel ? ` — one weigh-in so far, ${lwLabel}` : " so far";
   return `${dir} since the start${one}. The shape of it, every day, just below.`;
 }
+
+/* ── #3524 · the home hub + the stat row ─────────────────────────────────────
+   Two more Day-1-only branches, extracted here for the same reason as the two
+   above: they are only WRONG in a window nobody browses (launch eve, and the
+   morning of Day 1 before the first weigh-in), so nothing ever pinned them.
+
+   dialCopy() — the dial hub renders THREE glyphs (eyebrow / number / caption)
+   and only two of them were ever bound. The eyebrow shipped static as "day" in
+   site/index.html, so on T−1 the hub read DAY / 1 / DAY TO GO — the same three
+   glyphs that mean "Day 1, the experiment is running" the very next morning.
+   Composing all three together is the fix: the eyebrow can no longer be left
+   behind by a branch, because there is no branch that returns only two.
+
+   journeyFigures() — the "where it started · where it is" row. The pre-start
+   branch rewrote `lost` and `progress` to "—" but wrote `current` only when a
+   weigh-in existed, so the HTML's own static shimmer survived into the rendered
+   page and the row read "— / ··· / —": three placeholder vocabularies in one
+   row, the middle one indistinguishable from a widget that failed to load.
+   This returns a decision for ALL THREE figures in every state, so a figure
+   with no number behind it is always the SAME deliberate absence glyph.       */
+
+// ADR-104's honest-absence glyph for a figure with no measurement behind it.
+// One glyph, everywhere in this row — never a second placeholder.
+export const ABSENT_FIGURE = "—";
+
+export function dialCopy(pre, dayN, weekN) {
+  if (pre) {
+    const n = Number(pre.daysUntil);
+    const label = pre.startLabel;
+    // The eyebrow NAMES the frame in every pre-start branch, so the number under
+    // it can never be misread as a day-of-experiment count.
+    if (n >= 2) return { eyebrow: "until day 1", num: String(n), cap: `days to go — the experiment begins ${label}` };
+    if (n === 1) return { eyebrow: "until day 1", num: "1", cap: `day to go — the experiment begins tomorrow, ${label}` };
+    return { eyebrow: "until day 1", num: "0", cap: "the experiment begins today, with the first weigh-in" };
+  }
+  if (!(Number(dayN) >= 1)) return null;  // no genesis frame yet — leave the shimmer
+  const d = Number(dayN);
+  return {
+    eyebrow: "day",
+    num: String(d),
+    cap: d === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`,
+  };
+}
+
+export function journeyFigures(journey, pre) {
+  const j = journey || {};
+  const absent = (cap) => ({ present: false, text: ABSENT_FIGURE, cap });
+  const present = () => ({ present: true, text: null, cap: null });
+  const cur = j.current_weight_lbs != null ? present() : null;
+  if (pre) {
+    return {
+      // Pre-start there is no baseline delta and no progress by definition — the
+      // record has not started. A weigh-in banked before genesis is still real, so
+      // `current` keeps its live branch when one exists.
+      lost: absent("lbs — counts from Day 1"),
+      current: cur || absent(`lbs — first weigh-in ${pre.startLabel}`),
+      progress: absent("to goal — counts from Day 1"),
+    };
+  }
+  return {
+    lost: j.lost_lbs != null ? present() : absent("lbs — counts from the first weigh-in"),
+    current: cur || absent("lbs — awaiting the first weigh-in"),
+    progress: j.progress_pct != null ? present() : absent("to goal — counts from the first weigh-in"),
+  };
+}

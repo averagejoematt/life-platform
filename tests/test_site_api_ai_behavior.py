@@ -598,6 +598,21 @@ def test_a_payload_that_is_not_an_envelope_is_passed_through_whole(monkeypatch):
 # ══════════════════════════════════════════════════════════════════════════
 
 
+def _open_the_spend_gates(monkeypatch, ai):
+    """#3560 moved the budget pause and the shared `board_ask` rate token INTO
+    `_handle_board_followup`, below its own hazard gate — the opening path no longer
+    applies them on the follow-up's behalf, because doing so put money ahead of safety.
+
+    A test that calls the follow-up handler DIRECTLY and asserts on what happens after
+    those gates therefore has to open them, for the same reason
+    tests/test_ai_door_type_guards_2688.py's autouse fixture does: on FAKE credentials
+    the budget read fails CLOSED (#3059) and the DDB limiter fails closed, so the
+    assertion would land on a 'paused' card / a 429 instead of the guard it names."""
+    monkeypatch.setattr(ai, "_ai_paused_response", lambda: None)
+    monkeypatch.setattr(ai, "_RATE_LIMITER_READY", False)
+    monkeypatch.setattr(ai, "_board_rate_store", {})
+
+
 def _seed_session(table, token, ip_hash="iphash-a", persona="sleep_coach", ttl_delta=3000, used=0):
     table.store[(f"BOARDSESS#{token}", "SESSION")] = {
         "pk": f"BOARDSESS#{token}",
@@ -672,6 +687,7 @@ def test_an_expired_thread_cannot_be_resumed(monkeypatch):
     ai = _ai()
     tbl = _table()
     monkeypatch.setattr(ai, "table", tbl)
+    _open_the_spend_gates(monkeypatch, ai)
     _seed_session(tbl, "e" * 24, ttl_delta=-60)
     resp = ai._handle_board_followup({"session_token": "e" * 24, "persona": "sleep_coach", "question": "what about REM?"}, "iphash-a")
     assert resp["statusCode"] == 404
@@ -682,6 +698,7 @@ def test_a_leaked_session_token_cannot_be_replayed_from_another_network(monkeypa
     ai = _ai()
     tbl = _table()
     monkeypatch.setattr(ai, "table", tbl)
+    _open_the_spend_gates(monkeypatch, ai)
     _seed_session(tbl, "b" * 24, ip_hash="iphash-owner")
     fake = _wire_bedrock(monkeypatch)
     resp = ai._handle_board_followup(
@@ -696,6 +713,7 @@ def test_the_fourth_followup_is_refused_before_the_model_is_called(monkeypatch):
     ai = _ai()
     tbl = _table()
     monkeypatch.setattr(ai, "table", tbl)
+    _open_the_spend_gates(monkeypatch, ai)
     _seed_session(tbl, "c" * 24, used=3)
     fake = _wire_bedrock(monkeypatch)
     resp = ai._handle_board_followup(
@@ -711,6 +729,7 @@ def test_a_followup_to_a_coach_who_was_not_in_the_thread_is_refused(monkeypatch)
     ai = _ai()
     tbl = _table()
     monkeypatch.setattr(ai, "table", tbl)
+    _open_the_spend_gates(monkeypatch, ai)
     _seed_session(tbl, "d" * 24, persona="sleep_coach")
     fake = _wire_bedrock(monkeypatch)
     resp = ai._handle_board_followup(

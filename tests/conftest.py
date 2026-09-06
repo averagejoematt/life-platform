@@ -213,6 +213,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
+        "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
@@ -611,3 +612,24 @@ def pytest_runtest_logreport(report):
 def pytest_sessionfinish(session, exitstatus):
     for line in slow_test_warning_lines(_SLOW_TESTS):
         print(f"\n{line}")
+
+
+@pytest.fixture(autouse=True)
+def _write_day_is_genesis_day(monkeypatch):
+    """#3598: the provenance stamp derives phase + cycle from the WRITE'S DATE
+    (experiment_stamp / tag_record's undated path read `phase_taxonomy._write_date`).
+    Every writer test in this suite was written under the pre-#3598 assumption that
+    a write is "the experiment", and a future-genesis reset (the sanctioned eve
+    reset, #931) would otherwise turn all of them pilot for a day — and the #3477
+    sweep runs CI's gates INSIDE the reset, so that day is reset day. So the suite's
+    write day is GENESIS DAY unless a test says otherwise: pass `as_of=` (or re-pin
+    `_write_date`) to exercise the countdown window — tests/test_reset_writer_contract_3598.py
+    does, in both directions."""
+    try:
+        from common.constants import EXPERIMENT_START_DATE
+        from experiment import phase_taxonomy
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    monkeypatch.setattr(phase_taxonomy, "_write_date", lambda: EXPERIMENT_START_DATE)
+    yield

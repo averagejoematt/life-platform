@@ -56,8 +56,8 @@ WINDOW_DAYS_BEFORE = 1
 WINDOW_DAYS_AFTER = 7
 
 # [start, end) ISO dates, inclusive start / exclusive end.
-# Stamped for genesis 2026-09-05 by restart_pipeline.py.
-TOKEN_ALARM_GENESIS_WINDOW = ("2026-09-04", "2026-09-12")
+# Stamped for genesis 2026-09-06 by restart_pipeline.py.
+TOKEN_ALARM_GENESIS_WINDOW = ("2026-09-05", "2026-09-13")
 
 
 def is_within_token_alarm_window(check_date: date | None = None) -> bool:

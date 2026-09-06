@@ -203,11 +203,29 @@ def read_alarms() -> list | None:
 
         client = boto3.client("cloudwatch", region_name=REGION)
         out, token = [], None
+        _composites_seen: list[str] = []
         while True:
-            page = client.describe_alarms(**({"NextToken": token} if token else {}))
+            # #3503: ask for the WHOLE estate — a sweep that cannot see composites is not
+            # a sweep — then drop them here, where the reason is legible. This census keys
+            # every alarm on (namespace, metric, statistic, comparison, threshold,
+            # dimensions) to find a dimensionless SET guard that already covers a
+            # per-instance alarm; a composite has none of those fields (it has an
+            # AlarmRule over other alarms), so it cannot participate in the analysis. The
+            # exclusion is a property of the analysis, not of what the sweep can see.
+            kw = {"AlarmTypes": ["CompositeAlarm", "MetricAlarm"]}
+            if token:
+                kw["NextToken"] = token
+            page = client.describe_alarms(**kw)
             out.extend(page.get("MetricAlarms", []))
+            _composites_seen.extend(a.get("AlarmName", "?") for a in page.get("CompositeAlarms", []))
             token = page.get("NextToken")
             if not token:
+                if _composites_seen:
+                    print(
+                        f"  (excluded {len(_composites_seen)} composite alarm(s) from the dedupe analysis: "
+                        f"{', '.join(sorted(_composites_seen))} — no metric/statistic/threshold to key on)",
+                        file=sys.stderr,
+                    )
                 return out
     except Exception as exc:  # noqa: BLE001
         print(f"{SKIP_BANNER}\n        reason: {type(exc).__name__}: {exc}", file=sys.stderr)

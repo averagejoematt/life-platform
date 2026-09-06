@@ -122,6 +122,7 @@ CYCLE_GENESES = {
     # 1-day phantom cycle enters this registry (which prereg_seal_gate.py iterates — a
     # closed-unsealed cycle 16 would have needed a permanent grandfather record).
     16: "2026-09-05",
+    17: "2026-09-06",  # appended by restart_pipeline --close-cycle
 }
 
 # #1066: container cache for the training-phase registry (read by the routine handler
