@@ -58,3 +58,11 @@ auto_earn_marker	retired 2026-08-30 (#2833) — there is no auto-earn path; shad
 earn_or_shadow_check	retired 2026-08-30 (#2833) — there is no auto-earn path; shadow is permanent
 10[- ]consecutive[- ]clean[- ]run	the ADR-129 re-promotion bar was retired 2026-08-30 (#2833) — shadow is permanent, there is nothing to re-promote to
 off\s*\|\s*shadow\s*\|\s*auto	`auto` is a retired remediation-mode value (#2833, 2026-08-30) — the kill-switch is `off | shadow`
+# #3539 (2026-09-05): there has never been a `deploy.md` in this repo. CLAUDE.md's
+# Commands block sent every reader to one for the function->source mapping table, and
+# check_doc_links.py could not see it because the line sits inside a fenced block
+# (_FENCE_RE strips fences before the link scan). The live table is GENERATED into
+# .claude/skills/deploy/SKILL.md from ci/lambda_map.json by deploy/sync_deploy_doc_map.py.
+# The lookbehind keeps the rule off memory filenames that merely END in _deploy.md
+# (reference_gate_registration_before_deploy.md and friends in the knowledge ledger).
+(?<![\w-])deploy\.md	there is no deploy.md — the deploy playbook is .claude/skills/deploy/SKILL.md, whose function->source table is generated from ci/lambda_map.json (#3539)

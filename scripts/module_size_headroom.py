@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """scripts/module_size_headroom.py — the live module-size headroom table (#2610).
 
-``tests/test_module_size_guard.py``'s ``BASELINE`` records a maximum line count per
-accepted-debt file. What it does NOT show at a glance is **headroom** — how many lines a
+``tests/test_module_size_guard.py``'s ``BASELINE`` records a maximum LOGICAL line count
+per accepted-debt file (#3537 — comments and blank lines are not charged; see
+docs/ENGINEERING_STANDARDS.md §2 for the unit). What it does NOT show at a glance is **headroom** — how many lines a
 file can still take before the ratchet reds. When that number is 0, any addition to that
 file fails CI, and the standing rule is never to raise a baseline; the next person to touch
 the file has to refactor it first, for everyone who touched it before.
 
 That has real cost. #1677 hit ``role_policies.py`` at 3291/3291 and reverted three IAM
 policies (and a feature) rather than refactor a file it had not come to work on; #2612 hit
-``restart_pipeline.py`` at 1193/1200 and had to split it mid-change.
+``restart_pipeline.py`` at 1193/1200 and had to split it mid-change. (Both of those numbers
+are physical lines — the measure before #3537.)
 
 This prints the table from source so the worst-first extraction queue is a command, not a
 stale markdown block. Report only — it never fails, never edits the registry, and is not
-a gate. The gates are ``test_module_size_guard.py`` (1,200 ceiling + the per-file ratchet)
+a gate. The gates are ``test_module_size_guard.py`` (the logical-line ceiling — printed in
+the header below, never typed here — plus the per-file ratchet)
 and ``test_lambda_size_gate.py`` (2,000 for ``*_lambda.py``).
 
     python3 scripts/module_size_headroom.py           # the table

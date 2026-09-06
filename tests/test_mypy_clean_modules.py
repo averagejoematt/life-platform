@@ -178,3 +178,30 @@ def test_mypy_clean_on_first_party_surface() -> None:
         f"stdout:\n{result.stdout}\n"
         f"stderr:\n{result.stderr}"
     )
+
+
+def test_this_docstring_names_no_error_codes() -> None:
+    """#3539: tests/mypy_clean_set.py's docstring may not ENUMERATE mypy.ini's disabled
+    codes — it may only point at them.
+
+    It used to say "four structural codes — assignment / arg-type / return-value /
+    operator". `return-value` was re-enabled on 2026-08-15 (#2745), leaving three; the
+    docstring was edited on 2026-08-23 and the sentence survived unchanged, alongside a
+    "#2638, open" that had also closed. Nothing could catch it, because a prose list of a
+    config value is a fact with no owner and no comparison. The remedy is not to correct
+    the copy — a corrected copy rots the same way on the next tranche — it is to forbid
+    the copy.
+    """
+    import mypy_clean_set
+
+    doc = mypy_clean_set.__doc__ or ""
+    codes = _mypy_global_disabled_codes()
+    named = sorted(c for c in codes if c in doc)
+    assert not named, (
+        f"tests/mypy_clean_set.py's docstring names mypy.ini disabled code(s) {named}. "
+        "Do not restate the list — point at mypy.ini's `disable_error_code` and at this "
+        "file's ratchet, which read it. A prose copy is what drifted at #3539."
+    )
+    # Non-vacuity: the scan must be able to find a code at all.
+    assert codes, "mypy.ini disables nothing — this guard has no subject and would pass vacuously"
+    assert any(c in f"a docstring mentioning {c} here" for c in codes)

@@ -42,15 +42,8 @@ from ai.behavior_logs import available_logs_from_presence  # #2056 — the #1699
 from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings  # ADR-104 gate
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
+from common.numeric import decimals_to_float
 from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
-
-try:
-    from common.numeric import decimals_to_float
-except ImportError:  # pragma: no cover — numeric is always bundled in prod
-
-    def decimals_to_float(x):
-        return x
-
 
 try:
     from common.platform_logger import get_logger

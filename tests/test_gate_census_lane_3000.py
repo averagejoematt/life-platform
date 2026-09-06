@@ -40,6 +40,25 @@ acceptance box asks for: it plants a gate that entered with no verdict using SYN
 integers (no repo dependency at all) and shows the decision function reds. The live check
 below is the second, separate half — it runs the rule against the real, current inventory.
 
+THE PER-ENTRANT RULE (#3536, 2026-09-05 — the forensic RCA's class 4, "prove one, mint one")
+-----------------------------------------------------------------------------------
+A count ceiling has two holes. With 541 committed over 536–538 live, sixteen new guards
+could enter unproven with nothing said (the #3536 finding: 35 of 101 source-scanning guards
+since 08-21 carry no must-fail control, and the ratchet never spoke). And at ZERO headroom
+a PR that proves one old gate can still mint one new unproven gate for free — the count
+does not move. So the rule is now keyed by gate: every live `unproven` gate must be a line
+in `tests/gate_census_unproven_residue.py`, the dated, shrink-only ledger of the installed
+base at the seal (`check_unproven_entrants` below). A gate that is not there arrives with a
+verdict or it does not land, and the only other green path is a NEW LINE in the ledger —
+in the diff, dated, with a reason. `BASELINE_UNPROVEN_GATES` is now DERIVED from the
+ledger's size (one source of truth; the count rule stays as the coarse layer and the
+pure-integer mutation proofs still pin it), `UNPROVEN_CEILING_HIGH_WATER` holds the
+ledger's count down-only, and `RATCHET_DOWN_SLACK` is 0: a ledger line whose gate is no
+longer live-unproven is printed BY NAME every run (non-fatal, #3329) so the delete that
+records the progress is never a surprise. CI-step ids are positional, so the ledger keys
+that family on workflow + `<job> / <step label>` (`stable_key`) — an inserted step is not a
+false entrant; a relabelled one is a real decision on the PR that relabels it.
+
 WHY THIS FILE DOES NOT CALL `gate_census.build_census()` A SECOND TIME
 -----------------------------------------------------------------------------------
 `tests/test_gate_census_error_bars_2639.py` already computes the full-repo census (all 5
@@ -60,13 +79,16 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
+from collections.abc import Iterable, Mapping
 
 import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (_REPO, os.path.join(_REPO, "scripts")):
+for _p in (_REPO, os.path.join(_REPO, "scripts"), os.path.join(_REPO, "tests")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
+
+from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 
 # ══════════════════════════════════════════════════════════════════════════════
 # THE RATCHET. `unproven` may only ever FALL without a deliberate, reasoned bump.
@@ -480,7 +502,17 @@ BASELINE_TOTAL_GATES = 597  # +1 2026-09-05 (#3503's repo-wide AlarmTypes sweep,
 # as well, so a raise cannot be a one-token edit made at 2am to get a lane green. The
 # sanctioned move is the opposite one — lower BOTH to the live count whenever the
 # measurement allows, which is the progress record the epic asks for.
-UNPROVEN_CEILING_HIGH_WATER = 541
+# 541 -> 540 (2026-09-05, #3536): the per-entrant rule lands. NOT a raise and not a
+# re-baseline — the ceiling is now the SIZE of the ledger in
+# tests/gate_census_unproven_residue.py: 538 live `unproven` gates measured on main at
+# ea41f094b (597 total, 50 proven) plus TWO entrants named by PR that were already open
+# and measured on their own branch exports at the seal (PR #3588's
+# structural::test_no_dead_shared_defs_3538.py and PR #3583's
+# registry::lambdas/ai/budget_guard.py::_SCOPE_ALL_CLASSES). Their merge is those lines'
+# exit; until then the live advisory below prints them by name as ratchet-down available,
+# which is the honest state, not a defect. The 16 of slack the count carried is gone —
+# the third entrant from here needs a verdict or a dated ledger line, never a bump.
+UNPROVEN_CEILING_HIGH_WATER = 540
 # 596 -> 597 (2026-09-05, #3503): ONE real gate —
 #   structural::test_composite_alarm_lookup_3390.py
 # The #3390 guard was a two-test, one-file pin on `deploy/restart_verify.py`; #3503 widened
@@ -496,14 +528,65 @@ UNPROVEN_CEILING_HIGH_WATER = 541
 # not move (538 -> 538) and BASELINE_UNPROVEN_GATES stays where its owner set it.
 # Measured by id-set diff with the tree git-added, per the warning above: exactly one id
 # enters and none leaves.
-BASELINE_UNPROVEN_GATES = 541
+# DERIVED since #3536: the ceiling IS the ledger. Lowering it means deleting a ledger
+# line (the gate was proven, attempted, ruled not-applicable, or retired); it cannot be
+# edited here at all, which is the point — there is no number to bump at 2am.
+BASELINE_UNPROVEN_GATES = len(UNPROVEN_RESIDUE)
 
 # The gap this ceiling is allowed to carry before the census says "you can ratchet down".
-# Set from the measurement it describes: 541 committed vs 525–528 live across the last
-# six lanes (528 on 2026-08-31, after #2834), i.e. 16 of headroom, deliberately kept so a lane that
-# legitimately adds one unproven gate does not have to touch this file. More than that
-# and the ceiling has stopped describing the pile — non-fatal, reported, actionable.
-RATCHET_DOWN_SLACK = 16
+# 16 from 2026-08-24 to #3536 (541 committed vs 525–538 live), kept "so a lane that
+# legitimately adds one unproven gate does not have to touch this file" — which is exactly
+# the silent entry the #3536 finding measured (35 guards, no must-fail control, no ratchet
+# line). ZERO since 2026-09-05: a lane that adds an unproven gate DOES touch a file, by
+# design, and the file is the ledger. Non-fatal, reported by name, actionable.
+RATCHET_DOWN_SLACK = 0
+
+_CENSUS_FAMILIES = ("ci", "guard", "registry", "qa", "structural", "sentinel")
+
+
+def stable_key(gate: dict) -> str:
+    """The ledger key for one census gate row.
+
+    Every family's id is content-keyed (a path, a registry name, a check function) except
+    `ci`, whose id is positional — `ci::<wf>::<job>::<index>` — so inserting one step
+    slides every later id (gate_census.py's own docstring; the reason #3000 ratcheted a
+    COUNT). A CI step is keyed on its workflow path + the census's `<job> / <label>` name,
+    which survives insertion and changes only on a relabel.
+    """
+    if gate["id"].startswith("ci::"):
+        return f"ci::{gate['source']}::{gate['name']}"
+    return gate["id"]
+
+
+def check_unproven_entrants(unproven_keys: Iterable[str], residue: Mapping[str, str] = UNPROVEN_RESIDUE) -> tuple[bool, str]:
+    """THE per-entrant rule (#3536). Pure — keys in, verdict out, no repo read.
+
+    Every key the live census reports `unproven` must be in the ledger. A key that is not
+    is a gate that entered with no verdict, and the count rule below cannot see it once
+    another gate was proven in the same PR ("prove one, mint one").
+    """
+    keys = list(unproven_keys)
+    entrants = sorted(k for k in keys if k not in residue)
+    if entrants:
+        return False, (
+            f"{len(entrants)} gate(s) entered the platform with no verdict and no ledger line (#3536):\n  "
+            + "\n  ".join(entrants)
+            + "\nA new gate arrives PROVEN (a MutationSpec in scripts/gate_census_mutations.py or a record in "
+            "scripts/gate_census_proofs.py), ATTEMPTED with the reason (gate_census.ATTEMPTED_UNPROVEN), or "
+            "`not-applicable` with a reason (gate_census_enforcement.NOT_APPLICABLE_REASONS). If it truly must "
+            "enter unproven, that is a dated line in tests/gate_census_unproven_residue.py with the reason — "
+            "in the diff, never absorbed. If it is a registry-name phantom (#3315: a module-level name matching "
+            "gate_census._REGISTRY_NAME), rename the constant."
+        )
+    return True, f"every live unproven gate ({len(keys)}) is in the ledger."
+
+
+def ratchet_down_entries(unproven_keys: Iterable[str], residue: Mapping[str, str] = UNPROVEN_RESIDUE) -> list[str]:
+    """Ledger lines whose gate is no longer live-unproven: proven, attempted, ruled
+    not-applicable, retired, or (for the two in-flight seal entries) not yet merged. Each is
+    a delete waiting to be made — the progress record the epic asks for, by name."""
+    live = set(unproven_keys)
+    return sorted(k for k in residue if k not in live)
 
 
 def check_unproven_ceiling(total_gates: int, unproven_gates: int) -> tuple[bool, str]:
@@ -517,7 +600,8 @@ def check_unproven_ceiling(total_gates: int, unproven_gates: int) -> tuple[bool,
             "ATTEMPTED_UNPROVEN in scripts/gate_census.py), or — if nothing in it can fail "
             "— a `not-applicable` reason in gate_census_enforcement.NOT_APPLICABLE_REASONS. "
             "BASELINE_UNPROVEN_GATES is DOWN-ONLY since the 2026-08-31 owner decision on "
-            "#3329 (option B): it is not raised to absorb a new unproven gate (#3000)."
+            "#3329 (option B) and since #3536 it is the SIZE of tests/gate_census_unproven_residue.py: "
+            "there is no number to raise here; the entrant is named by check_unproven_entrants."
         )
     if total_gates > BASELINE_TOTAL_GATES:
         return False, (
@@ -595,9 +679,72 @@ def test_the_unproven_ceiling_is_down_only():
         f"recorded high water {UNPROVEN_CEILING_HIGH_WATER}. Under the 2026-08-31 owner "
         "decision on #3329 (option B) this ceiling is DOWN-ONLY: a new gate arrives with a "
         "verdict (proven / attempted / not-applicable-with-a-reason) rather than widening "
-        "the pile. If a raise is genuinely right, that is an owner call and it re-dates "
-        "the decision — it is not a lane's edit."
+        "the pile. Since #3536 the ceiling is the ledger's size, so this red means a line was "
+        "ADDED to tests/gate_census_unproven_residue.py without a matching delete. If a raise "
+        "is genuinely right, that is an owner call and it re-dates the decision — it is not "
+        "a lane's edit."
     )
+    assert len(UNPROVEN_RESIDUE) == BASELINE_UNPROVEN_GATES  # the ceiling IS the ledger (#3536)
+
+
+# ── THE PER-ENTRANT RULE (#3536) — mutation proofs on synthetic keys ───────────────────
+
+_SYNTHETIC_LEDGER = {
+    "guard::scripts/check_old_3536.py": "seal",
+    "ci::.github/workflows/x.yml::job / Old step": "seal",
+}
+
+
+def test_entrant_rule_passes_when_every_unproven_gate_is_in_the_ledger():
+    ok, msg = check_unproven_entrants(list(_SYNTHETIC_LEDGER), _SYNTHETIC_LEDGER)
+    assert ok, msg
+
+
+def test_entrant_rule_reds_on_one_unproven_gate_not_in_the_ledger():
+    """THE mutation: one synthetic gate enters unproven and is not a ledger line."""
+    ok, msg = check_unproven_entrants(list(_SYNTHETIC_LEDGER) + ["structural::test_new_3536.py"], _SYNTHETIC_LEDGER)
+    assert not ok
+    assert "structural::test_new_3536.py" in msg and "no verdict and no ledger line" in msg
+
+
+def test_entrant_rule_closes_prove_one_mint_one():
+    """The hole the count rule has and this one does not (forensic RCA class 4): one old
+    gate leaves the unproven pile, one new gate joins it, the COUNT is unchanged — and the
+    per-entrant rule still reds on the newcomer by name."""
+    old = list(_SYNTHETIC_LEDGER)
+    swapped = old[1:] + ["guard::scripts/check_new_3536.py"]
+    assert len(swapped) == len(old)
+    ok_count, _ = check_unproven_ceiling(BASELINE_TOTAL_GATES, BASELINE_UNPROVEN_GATES)  # the count rule cannot see it
+    assert ok_count
+    ok, msg = check_unproven_entrants(swapped, _SYNTHETIC_LEDGER)
+    assert not ok and "guard::scripts/check_new_3536.py" in msg
+
+
+def test_ratchet_down_entries_names_the_stale_ledger_line():
+    stale = ratchet_down_entries(["guard::scripts/check_old_3536.py"], _SYNTHETIC_LEDGER)
+    assert stale == ["ci::.github/workflows/x.yml::job / Old step"]
+    assert ratchet_down_entries(list(_SYNTHETIC_LEDGER), _SYNTHETIC_LEDGER) == []
+
+
+def test_stable_key_survives_a_ci_step_insertion_but_not_a_relabel():
+    """The positional-id problem, on the census's own row shape (gate_census.Gate)."""
+    row = {"id": "ci::ci-cd.yml::lint::3", "source": ".github/workflows/ci-cd.yml", "name": "lint / Run flake8"}
+    slid = dict(row, id="ci::ci-cd.yml::lint::4")  # a step inserted ahead of it
+    relabelled = dict(row, name="lint / Run flake8 (strict)")
+    assert stable_key(row) == stable_key(slid) == "ci::.github/workflows/ci-cd.yml::lint / Run flake8"
+    assert stable_key(relabelled) != stable_key(row)
+    assert stable_key({"id": "guard::scripts/x.py", "source": "scripts/x.py", "name": "scripts/x.py"}) == "guard::scripts/x.py"
+
+
+def test_the_ledger_is_well_formed():
+    """Every key names a census family, no key carries a positional CI index, and every
+    value is a dated reason — the ledger is a record, not a set."""
+    for key, note in UNPROVEN_RESIDUE.items():
+        family = key.split("::", 1)[0]
+        assert family in _CENSUS_FAMILIES, key
+        if family == "ci":
+            assert not key.rsplit("::", 1)[-1].isdigit(), f"positional CI id in the ledger: {key}"
+        assert note[:4].isdigit() and note[4] == "-", f"undated ledger line: {key} -> {note!r}"
 
 
 def test_ratchet_down_is_reported_when_the_gap_exceeds_the_slack():
@@ -651,15 +798,35 @@ def test_live_unproven_gate_count_is_within_the_committed_ceiling():
     assert ok, msg
 
 
+def test_live_unproven_gates_are_all_in_the_ledger():
+    """THE per-entrant guard (#3536). Every gate the real census reports `unproven` is a
+    dated line in tests/gate_census_unproven_residue.py. This is the check that reds the
+    first PR to add a guard with no proof and no ledger line — by the gate's name."""
+    census = _live_census()
+    keys = [stable_key(g) for g in census["gates"] if g["verdict"] == "unproven"]
+    assert len(keys) == len(set(keys)), "stable_key collided on the live census — two gates share a ledger key"
+    ok, msg = check_unproven_entrants(keys)
+    assert ok, msg
+
+
 def test_the_live_ratchet_down_verdict_is_printed_whichever_way_it_falls(capsys):
     """The visible direction of travel (#3329's Outcome). Non-fatal, so its whole value
     is being SAID every run — a silent advisory is the shape this platform keeps finding
     behind a green board, so the test asserts it printed, not that it passed."""
     census = _live_census()
-    unproven = sum(1 for g in census["gates"] if g["verdict"] == "unproven")
+    gates = census["gates"]
+    unproven = sum(1 for g in gates if g["verdict"] == "unproven")
+    proven = sum(1 for g in gates if g["verdict"] == "can-fail (proven)")
     available, msg = ratchet_down_available(unproven)
-    print(f"[#3329] {msg}")
+    stale = ratchet_down_entries(stable_key(g) for g in gates if g["verdict"] == "unproven")
+    # #3536 acceptance: the proven count is the ratchet's NUMERATOR, printed every run.
+    print(f"[#3329] proven {proven}/{len(gates)} · unproven {unproven} · ledger {len(UNPROVEN_RESIDUE)} · {msg}")
+    if stale:
+        print(
+            "[#3536] ledger lines whose gate is no longer live-unproven — delete them (the ratchet counts down):\n  " + "\n  ".join(stale)
+        )
     assert msg.strip()
     assert str(unproven) in msg
     assert ("RATCHET DOWN AVAILABLE" in msg) is available
+    assert available is bool(stale), "the count advisory and the by-name list must agree (slack is 0)"
     assert capsys.readouterr().out.strip(), "the direction-of-travel line must reach the run's output"
