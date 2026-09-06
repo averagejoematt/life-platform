@@ -38,6 +38,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from common.pacific_time import parse_iso_utc  # #3609: the canonical ISO-8601 parser
+
 logger = logging.getLogger()
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -145,7 +147,10 @@ def fetch(surface, since_days=35, limit=200):
     out = []
     for item in resp.get("Items", []):
         try:
-            created = datetime.fromisoformat(item["created_at"]).timestamp()
+            created_dt = parse_iso_utc(item["created_at"])  # #3609: the canonical parser — naive-as-UTC, never raises
+            if created_dt is None:
+                raise ValueError(f"unparseable created_at: {item.get('created_at')!r}")
+            created = created_dt.timestamp()
             if created < cutoff:
                 continue
             payload = json.loads(item["payload_json"])
