@@ -314,7 +314,32 @@ _PUBLIC_PREFIX_DOOR_PY = (
 # SES-verified set. A .invalid TLD can never be a real identity (RFC 2606).
 _UNVERIFIED_SENDER_PY = "# probe\n" "import os\n" "\n" 'SENDER = os.environ.get("EMAIL_SENDER", "reader@census-probe-3568.invalid")\n'
 
+_UNENROLLED_WRITING_LAMBDA_PY = (
+    '"""A Lambda entrypoint that writes DynamoDB and that no CDK stack wires to a role."""\n'
+    "\n"
+    "import boto3\n"
+    "\n"
+    "table = boto3.resource('dynamodb').Table('life-platform')\n"
+    "\n"
+    "\n"
+    "def lambda_handler(event, context):\n"
+    "    table.put_item(Item={'pk': 'USER#matthew#SOURCE#census_probe', 'sk': 'DATE#2026-09-06'})\n"
+    "    return {'ok': True}\n"
+)
+
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_role_family_write_scope.py": MutationSpec(
+        gate_id="structural::test_role_family_write_scope.py",
+        target="tests/test_role_family_write_scope.py",
+        detects=(
+            "a Lambda entrypoint that writes DynamoDB while no create_platform_lambda call maps it to a "
+            "role — so nothing checks whether its write is granted, which is how #3563's two writes were "
+            "denied for 28 and 49 days behind a FakeDdbTable that cannot deny a put_item"
+        ),
+        plants=(("lambdas/operational/_census_probe_3596_lambda.py", _UNENROLLED_WRITING_LAMBDA_PY),),
+        track=False,  # the guard walks lambdas/ on disk (os.walk), so an untracked module is in scope
+    ),
     "structural::test_email_sender_identity_3568.py": MutationSpec(
         gate_id="structural::test_email_sender_identity_3568.py",
         target="tests/test_email_sender_identity_3568.py",
@@ -560,6 +585,19 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_role_family_write_scope.py": _proof(
+        "structural::test_role_family_write_scope.py",
+        "baseline: 18 passed | mutated: 1 failed, 17 passed :: test_every_ddb_writing_entrypoint_is_enrolled_in_the_family | reverted: 18 passed",
+        "lambdas/ on disk (os.walk, .py only), so an UNTRACKED entrypoint is in scope, and "
+        "cdk/stacks/*_stack.py + cdk/stacks/role_policies*.py by AST — the role<->module mapping is read "
+        "from the create_platform_lambda construction site, never hand-listed. In scope: the entrypoint "
+        "module a stack names, its DynamoDB write verbs, and any pk statically resolvable from a literal, "
+        "an f-string or a local bound to one. OUT of scope, stated and asserted: 48 SHARED modules that "
+        "write under whichever role imports them; a pk built from data (reported as unresolvable, never as "
+        "covered); and whether the deployed role matches the checked-in document, which is the "
+        "@integration live leg and skips loudly without credentials.",
+        proved_on="2026-09-06",
+    ),
     "structural::test_email_sender_identity_3568.py": _proof(
         "structural::test_email_sender_identity_3568.py",
         "baseline: 9 passed | mutated: 1 failed, 8 passed :: test_every_code_default_is_on_a_verified_domain | reverted: 9 passed",

@@ -53,6 +53,13 @@ ARMING POSTURE (ADR-108 / #1872 discipline: flip on a measurement, never the cal
   `CLOSURE_CONTRACT_MODE=block` arms a single run without editing this file (the hook
   layer's HOOK_MODE shape, scripts/hooks/_hooklib.py).
 
+  ONE code is exempt from that bar and armed BLOCK from day one: `no-live-proof` (#3595,
+  the forensic RCA's class 3). It lives in `BLOCK_CODES`; `arming_for()` returns `block`
+  for it whatever the ambient mode says, so `CLOSURE_CONTRACT_MODE=warn` cannot disarm it.
+  A code whose false positive is a REOPENED issue does not need a 25-merge flip bar, and
+  what warn-mode bought was four instruments reading CLOSED while dead (INT-1 49 days,
+  G-3 28, OBS-1 30+, CPO-2 21 runs). The other six requirements are unchanged.
+
 USAGE
   python3 scripts/closure_contract.py --render   # the docs/CONVENTIONS.md block, verbatim
   python3 scripts/closure_contract.py --mode     # the effective arming posture
@@ -60,6 +67,7 @@ USAGE
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import re
@@ -95,10 +103,24 @@ FLIP_BAR = {
 }
 
 
+# Codes armed BLOCK from day one, independent of DEFAULT_MODE and of the env override
+# (#3595). See the docstring: the flip bar governs the six rules whose false positive is
+# noise; it does not govern the one rule whose false positive is a reopened issue.
+BLOCK_CODES = frozenset({"no-live-proof"})
+
+
 def mode() -> str:
     """The effective posture: the env override if it names a known mode, else DEFAULT_MODE."""
     value = os.environ.get(MODE_ENV, "").strip().lower()
     return value if value in MODES else DEFAULT_MODE
+
+
+def arming_for(code: str, ambient: str | None = None) -> str:
+    """The posture for ONE finding code. `BLOCK_CODES` always block; everything else rides
+    the ambient posture (the caller's mode, or `mode()`)."""
+    if code in BLOCK_CODES:
+        return "block"
+    return ambient if ambient in MODES else mode()
 
 
 # ── the requirements ─────────────────────────────────────────────────────────────────────
@@ -108,6 +130,11 @@ class Requirement:
     rule: str
     detector: str  # which script/gate makes this requirement fail
     finding_codes: tuple  # the finding codes that script emits for it (the wire vocabulary)
+    also_detected_by: tuple = ()  # a second detector emitting the SAME codes on a different surface
+
+    @property
+    def detectors(self) -> tuple:
+        return (self.detector, *self.also_detected_by)
 
 
 CLOSURE_CONTRACT: tuple = (
@@ -168,6 +195,20 @@ CLOSURE_CONTRACT: tuple = (
             "github-parse-disagree",
             "epic-in-closing-set",
         ),
+    ),
+    Requirement(
+        id="live-proof-before-close",
+        rule=(
+            "An INSTRUMENT — an alarm, gate, sweep, judge, ledger, scheduled job or fail-soft write — "
+            "closes on its first non-degraded LIVE output, never on the merge. Its PR carries `Refs #N`, "
+            "not `Fixes #N`, and names the output it will be closed on; the closing comment carries "
+            "`**Live proof:** <UTC instant> — <where>`. `Fixes #N` is for product/config/doc fixes a live "
+            "curl can prove after deploy. Class 3 of the 2026-09-05 forensic RCA: INT-1 (49 days), G-3 (28), "
+            "OBS-1 (30+), CPO-2 (21 runs) all read CLOSED while non-functional."
+        ),
+        detector="scripts/closure_sweep.py",
+        also_detected_by=("scripts/check_pr_closing_set.py",),
+        finding_codes=("no-live-proof",),
     ),
     Requirement(
         id="partial-is-not-a-close",
@@ -250,6 +291,125 @@ RESIDUAL_NEGATION_RE = re.compile(r"\b(?:none|nothing|no|zero|without|not|never)
 # `PR #2940` / `(#3210)` sha-context cites are not homes — strip before looking for a carrier.
 PR_REF_RE = re.compile(r"\bPRs?\s*#\d+", re.I)
 BOT_LOGIN_RE = re.compile(r"\[bot\]$|^github-actions$|^dependabot", re.I)
+
+
+# ── the instrument class + its live proof (#3595) ────────────────────────────────────────
+# The class is derived from STRUCTURE, never from a title phrase (the #2959/#3003/#3199
+# family: every phrase-matched suppressor in this repo has failed in the field). Three legs,
+# in precedence order, each with its own arming:
+#   1. DECLARED   `**Closure class:** instrument|product — <reason>` in the PR body. An
+#      explicit act by the author; `instrument` BLOCKS a closing keyword, `product` (with a
+#      reason of at least PRODUCT_REASON_MIN chars) overrides the label + AST legs.
+#   2. LABELLED   the issue carries `closure:live-proof`. Also decisive → BLOCK. This is the
+#      leg detector A (the close itself) has: a sweep sees labels, never a diff.
+#   3. DERIVED    AST instrument sites in the PR's changed files. ADVISORY (warn): the
+#      inference is sound about the code and silent about intent — a product fix that
+#      happens to touch a fail-soft write is a real false positive, and its answer is one
+#      declaration line, not a blocked merge.
+INSTRUMENT_LABEL = "closure:live-proof"
+CLOSURE_CLASS_NAMES = ("instrument", "product")
+CLOSURE_CLASS_RE = re.compile(r"^\s*\*\*Closure class:\*\*\s*(?P<kind>instrument|product)\b(?P<rest>.*)$", re.I | re.M)
+PRODUCT_REASON_MIN = 20  # a `product` override says WHY in the body, or it does not override
+
+# The closing comment's live-proof line. Structural: the marker, an instant, and a where.
+LIVE_PROOF_MARKER = re.compile(r"\*\*\s*(?:Live proof|First live output)\s*:?\s*\*\*:?", re.I)
+LIVE_PROOF_INSTANT = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?"
+)  # date AND time: "shipped on the 6th" is not an observation
+LIVE_PROOF_WHERE_MIN = 8  # chars of "where" after the instant — a bare timestamp names nothing
+# Going-forward-only, the CONTRACT_SINCE shape (ADR-099): closes before this date carry no
+# live-proof obligation. Reconstructing one for an older close would be AI guesswork on record.
+LIVE_PROOF_SINCE = "2026-09-06"
+
+# The DERIVED leg's vocabulary — what makes a changed file an instrument, by AST.
+INSTRUMENT_WRITE_CALLS = ("put_item", "update_item", "delete_item", "put_object", "publish", "send_email", "send_raw_email")
+INSTRUMENT_EMF_CALLS = ("put_metric_data", "emit_skip_metric")
+
+
+def declared_closure_class(body: str) -> tuple:
+    """(kind, reason) from the PR body's `**Closure class:**` marker, or (None, "")."""
+    m = CLOSURE_CLASS_RE.search(body or "")
+    if not m:
+        return (None, "")
+    return (m.group("kind").lower(), (m.group("rest") or "").strip(" -—–:"))
+
+
+def product_class_declared(body: str) -> bool:
+    """A `product` declaration only overrides when it says WHY (PRODUCT_REASON_MIN chars)."""
+    kind, reason = declared_closure_class(body)
+    return kind == "product" and len(reason) >= PRODUCT_REASON_MIN
+
+
+def names_live_proof(text: str) -> bool:
+    """True when a closing comment carries `**Live proof:** <instant> — <where>`.
+
+    Structural on all three parts. A marker with no instant is a promise; an instant with
+    nothing after it names no output. Neither is the thing the four dead instruments lacked."""
+    for line in (text or "").splitlines():
+        if not LIVE_PROOF_MARKER.search(line):
+            continue
+        m = LIVE_PROOF_INSTANT.search(line)
+        if m and len(line[m.end() :].strip(" -—–:·")) >= LIVE_PROOF_WHERE_MIN:
+            return True
+    return False
+
+
+def _handler_swallows(handler: ast.ExceptHandler) -> bool:
+    """An `except` body that logs and continues — no `raise`, no `sys.exit`, anywhere in it."""
+    for n in ast.walk(handler):
+        if isinstance(n, ast.Raise):
+            return False
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "exit":
+            return False
+    return True
+
+
+def _call_name(node: ast.Call) -> str:
+    f = node.func
+    if isinstance(f, ast.Attribute):
+        return f.attr
+    if isinstance(f, ast.Name):
+        return f.id
+    return ""
+
+
+def instrument_sites(source: str, path: str = "") -> list:
+    """[(kind, lineno, detail)] — the AST evidence that a changed file IS an instrument.
+
+    The four shapes the RCA names as detectable (report Part 2): a boto3 write inside a
+    try/except that logs and continues; a chronic/skip-class check result; an EMF emitter;
+    a CloudWatch alarm construct. Plus the scheduled job, whose first output is by
+    definition not the merge. Syntactic and therefore wrong in both directions — which is
+    exactly why this leg advises and the declared/labelled legs block."""
+    try:
+        tree = ast.parse(source or "")
+    except SyntaxError:
+        return []
+    sites: list = []
+    swallowed: set = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and any(_handler_swallows(h) for h in node.handlers):
+            for stmt in node.body:
+                for n in ast.walk(stmt):
+                    if isinstance(n, ast.Call) and _call_name(n) in INSTRUMENT_WRITE_CALLS:
+                        swallowed.add((n.lineno, _call_name(n)))
+    for lineno, name in sorted(swallowed):
+        sites.append(("fail-soft-write", lineno, f"{name}() inside a try/except that logs and continues"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _call_name(node)
+            if name in INSTRUMENT_EMF_CALLS:
+                sites.append(("emf-emitter", node.lineno, f"{name}()"))
+            elif name.endswith("Alarm"):
+                sites.append(("cw-alarm", node.lineno, f"{name}(...)"))
+            for kw in node.keywords:
+                if kw.arg == "schedule" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                    sites.append(("scheduled-job", node.lineno, f"schedule={kw.value.value!r}"))
+                elif kw.arg == "chronic" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                    sites.append(("chronic-check", node.lineno, "chronic=True check result"))
+    if path:
+        sites = [(k, ln, f"{path}:{ln} {d}") for (k, ln, d) in sites]
+    return sorted(sites, key=lambda t: (t[1], t[0]))
 
 
 @dataclass(frozen=True)
@@ -391,20 +551,31 @@ RENDER_END = "<!-- END GENERATED: closure-contract -->"
 def render_conventions_block() -> str:
     """The docs/CONVENTIONS.md §4a2 body — derived from CLOSURE_CONTRACT, never a second copy."""
     lines = [RENDER_BEGIN, ""]
+    blocked = ", ".join(f"`{c}`" for c in sorted(BLOCK_CODES))
     lines.append(
         "A close is valid when ALL of these hold (registry: `scripts/closure_contract.py`; "
-        f"posture: **{DEFAULT_MODE}** — see the flip bar in the registry docstring):"
+        f"posture: **{DEFAULT_MODE}** — see the flip bar in the registry docstring — except "
+        f"{blocked}, armed **block** from day one and not disarmable by the env override):"
     )
     lines.append("")
     for i, r in enumerate(CLOSURE_CONTRACT, 1):
         codes = ", ".join(f"`{c}`" for c in r.finding_codes)
-        lines.append(f"{i}. **`{r.id}`** — {r.rule} *Detector:* `{r.detector}` → {codes}.")
+        detectors = " + ".join(f"`{d}`" for d in r.detectors)
+        lines.append(f"{i}. **`{r.id}`** — {r.rule} *Detector:* {detectors} → {codes}.")
     lines.append("")
     lines.append(
         f"Structural window: a non-verdict comment more than **{POST_CLOSE_GRACE_MINUTES} min** after `closedAt` is a finding; "
         f"the verdict comment is recognised by its `**Outcome:**` marker, never by timing. "
         f"Dispositioned escapes are the dated ledger `DISPOSITIONED_ESCAPES` ({len(DISPOSITIONED_ESCAPES)} entries) — "
         "an entry needs a date and a reason, and comes OUT when the issue is properly re-closed."
+    )
+    lines.append("")
+    lines.append(
+        f"The instrument class is derived STRUCTURALLY, never from a title phrase: a `**Closure class:** "
+        f"instrument|product — <reason>` line in the PR body, or the `{INSTRUMENT_LABEL}` label on the issue "
+        "(both decisive → block), or AST instrument sites in the PR's changed files — a fail-soft write, an "
+        "EMF emitter, a CloudWatch alarm, a scheduled job, a `chronic=True` check result — which advise only. "
+        f"Live-proof obligations are going-forward-only from **{LIVE_PROOF_SINCE}**, the ADR-099 CONTRACT_SINCE shape."
     )
     lines.append("")
     lines.append(RENDER_END)

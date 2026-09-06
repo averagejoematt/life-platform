@@ -442,8 +442,13 @@ copied); this step applies them to THIS session's closures only — no new stand
   the issue was still being worked after it closed — reopen it or disposition it (a dated
   `DISPOSITIONED_ESCAPES` entry in the registry, with a reason); `epic-children-open` means
   an epic closed over an open child — reopen the epic or re-home the child.
-- Posture is **advisory** (`warn`: the sweep exits 0 whatever it finds) until the flip bar
-  in the registry docstring is met on real wraps; a printed hit on an issue this session
+- **One code is not advisory:** `no-live-proof` (#3595) exits 1 in either posture. It fires
+  on an issue labelled `closure:live-proof` — an instrument, whose shipping PR should have
+  carried `Refs #N` rather than `Fixes #N` — closed with no comment carrying `**Live proof:**
+  <UTC instant> — <where>`. The fix is to paste the first non-degraded output and close on
+  that, or to reopen: a merge is not an observation.
+- Posture is **advisory** (`warn`: the sweep exits 0 whatever it finds) for the other six
+  codes until the flip bar in the registry docstring is met on real wraps; a printed hit on an issue this session
   closed may still not be left undispositioned — the exit code is not the contract, the
   line is.
 - The sweep's verdict rides the (e8) line above rather than adding a thirteenth marker: after

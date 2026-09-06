@@ -347,6 +347,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_alarm_emission_dimension_3260.py",
         "test_csp_hardening_3048.py",  # #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge
         "test_grant_enumeration_drift.py",  # #2824: consumer⊆granted across cdk/stacks + lambdas/ + .github/workflows + infra/iam — a new fail-closed consumer (or a role that drops a grant) must red BEFORE the merge, not after the channel is already stranded
+        # #3596: IAM write-scope parity as a ROLE FAMILY — every create_platform_lambda's
+        # module AST-read for DynamoDB write verbs and pk literals, checked against the
+        # role_policies* statement its stack wires to it. Pure repo shape (~3s, the live leg is
+        # @integration and deselected here). Pre-merge because the PR that ADDS the write is the
+        # only moment the grant is a decision: after it, a FakeDdbTable cannot deny the call and
+        # the denial is invisible for weeks (#3563 — 49 days on the notion pk, 28 on the
+        # chronicle sender's PutItem, both behind green tests).
+        "test_role_family_write_scope.py",
         "test_iam_twin_free_3336.py",  # #3336: deploy/ tree sweep — no apply script may embed an IAM policy document for a role with a checked-in infra/iam/*.json; the JSON pair is the only apply source
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
