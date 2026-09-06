@@ -134,15 +134,32 @@ async function boot() {
   const byN = {};
   for (const c of (cc && cc.cycles) || []) byN[c.cycle] = c;
 
+  // #3549: the odds figure is served ONLY once a prior attempt has actually been
+  // observed at the horizon. Until then the API serves null and the counts that
+  // explain it — "none of 15 attempts reached day 30" is the honest hero, not a
+  // percentage manufactured from attempts re-anchored on day 1. Every number in
+  // the label is a payload field, so the figure and the log beneath it cannot
+  // disagree.
+  const horizon = n(sv.horizon_days || 30);
+  const oddsFig = sv.p_reach_30_pct != null
+    ? `<span class="att-fig-n num">${n(sv.p_reach_30_pct)}%</span>` +
+      `<span class="label">odds of day ${horizon} (model's own line · ${n(sv.reached_horizon_n)} of ${n(sv.n_prior_cycles)} attempts reached it` +
+      `${Array.isArray(sv.p_reach_30_ci95_pct) ? ` · 95% CI ${n(sv.p_reach_30_ci95_pct[0])}–${n(sv.p_reach_30_ci95_pct[1])}%` : ""})</span>`
+    : `<span class="att-fig-n num">—</span>` +
+      `<span class="label">odds of day ${horizon} · ${sv.n_prior_cycles != null ? `none of ${n(sv.n_prior_cycles)} attempts reached it — no odds served` : "not yet handicapped"}</span>`;
+
   $("[data-att-figs]").innerHTML =
     `<div class="att-fig"><span class="att-fig-n num">${n(attemptNo)}</span><span class="label">attempt${staged ? ` · arms ${esc(cc.start_date || "")}` : live ? ` · day ${n(live.window_days)}` : ""}</span></div>` +
     `<div class="att-fig"><span class="att-fig-n num">${n(prevBest)}</span><span class="label">previous best, days</span></div>` +
-    `<div class="att-fig"><span class="att-fig-n num">${sv.p_reach_30_pct != null ? n(sv.p_reach_30_pct) + "%" : "—"}</span><span class="label">odds of day ${n(sv.horizon_days || 30)} (model's own line)</span></div>`;
+    `<div class="att-fig">${oddsFig}</div>`;
 
   $("[data-att-overlay]").innerHTML = overlaySVG(cycles);
   $("[data-att-log]").innerHTML = logCards(cycles, byN, sv.collapse_definition);
   const method = $("[data-att-method]");
-  if (method) method.textContent = `${sv.method || ""} Collapse = ${sv.collapse_definition || ""}.`;
+  // #3549: the method AND the confidence line (n, reached) ride together — the
+  // method names how censored attempts are treated, the confidence line carries
+  // the n the hero figure was computed from.
+  if (method) method.textContent = `${sv.method || ""} ${sv.confidence ? sv.confidence + ". " : ""}Collapse = ${sv.collapse_definition || ""}.`;
   mount.hidden = false;
 }
 

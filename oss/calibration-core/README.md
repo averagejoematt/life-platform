@@ -159,6 +159,27 @@ reliability is allowed to dress that up as "well-calibrated". It reads
 A skill ≤ 0 forecaster can never reach the flattering rungs, however low its
 Brier score happens to be.
 
+### Scoring strata — a pooled card that cannot claim what no stratum has
+
+`score_strata({name: pairs, ...})` / `scoreStrata({...})` score several
+forecaster groups (say, a coach's calls beside interval forecasts) into ONE card.
+Pooling groups with different base rates and scoring the pool against a single
+pooled base rate can **manufacture skill neither group has**: the pooled reference
+is worse than either group's own, so merely knowing which group a call came from
+beats it — and that information gets credited to the forecasters. So:
+
+```
+bs_ref_stratified = Σ nᵢ · bs_refᵢ / Σ nᵢ       (each group's OWN base-rate Brier)
+skill             = 1 − brier_pooled / bs_ref_stratified
+```
+
+Pooled `skill > 0` is then arithmetically impossible unless at least one group
+beats its own base rate. The over/under-confidence verdict is tripped by the
+**worst** group's reliability gap (among groups with `n ≥ 5`), never by the
+n-weighted pool, and every group's own numbers ride on the card under `strata`.
+`skill_reference: "stratified"` marks the card; `score_pairs` (single group) is
+unchanged.
+
 ### Reproducing a scorecard by hand
 
 Everything above is arithmetic on two columns. To check this library rather than
@@ -191,6 +212,11 @@ committed alongside it. If they disagree, the library is wrong — open an issue
 ```
 
 (Those are the real numbers for `demo/worked_example.json`.)
+
+`score_strata()` / `scoreStrata()` return the same fields for the pooled pairs plus
+`skill_reference` (`"stratified"`), `reliability_gap`, `worst_stratum_gap`
+(`{stratum, gap}` or `null`) and `strata` — a per-group map of
+`{n, confirmed, brier, brier_skill, skilled, calibration, reliability_gap, base_rate}`.
 
 ---
 
@@ -246,8 +272,8 @@ implementations must reproduce **exactly** — not within a tolerance:
 3. the browser port (`js/calibration-core.js`), which is vendored byte-for-byte
    into the site that hosts the paste tool.
 
-`core_cases`, `confidence_cases`, `outcome_cases` and `record_cases` are the
-three-way surface. `adapter_cases` (the paste-a-ledger parser and the rounding
+`core_cases`, `strata_cases`, `confidence_cases`, `outcome_cases` and
+`record_cases` are the three-way surface. `adapter_cases` (the paste-a-ledger parser and the rounding
 helper) are two-way, Python ↔ JS, because the platform reads structured records
 from a database and never parses free text.
 

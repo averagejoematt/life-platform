@@ -466,3 +466,165 @@ def test_missing_pr_number_and_missing_fixture_both_print_usage_and_exit_nonzero
     assert p.returncode != 0
     assert "usage:" in (p.stdout + p.stderr).lower()
     assert "GH_WAS_CALLED" not in p.stderr
+
+
+# ── #3532: the expected set is DERIVED from the workflow YAML ────────────────
+#
+# THE DEFECT. `derive_expected_checks` carried two hand-written regexes restating
+# v4-gate.yml's and docs-ci.yml's `pull_request.paths` filters. Both had drifted (the v4
+# one missed `tests/js/**`, `package.json` and the two JS-graph scripts; the docs-ci one
+# missed `.github/workflows/**` and six named gate scripts), and `surface-drift.yml` — a
+# THIRD path-filtered PR workflow — was absent entirely. The four example paths the old
+# tests checked all happened to be on the covered side of the drift, so the guard was
+# green the whole time. These tests replace example-checking with SET parity: every glob
+# in every live PR path filter must attract its workflow's check names.
+
+_WORKFLOW_DIR = os.path.join(_REPO, ".github", "workflows")
+
+
+def _wpc():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("workflow_path_checks", os.path.join(_REPO, "deploy", "workflow_path_checks.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _glob_example(glob):
+    """A concrete repo-relative path that a GitHub `paths:` glob must match."""
+    if glob.endswith("/**"):
+        return glob[:-3] + "/synthesized_example_3532.txt"
+    if glob == "**":
+        return "anything.txt"
+    if "*" in glob:
+        # `scripts/check_doc_*.py` / `scripts/v4_*.py` — fill the star in place.
+        return glob.replace("*", "synth3532")
+    return glob
+
+
+def test_every_pr_path_filter_glob_attracts_its_checks():
+    """SET parity, not examples: for EVERY glob in EVERY PR-triggered workflow's
+    `paths:` filter, a synthesized matching path must derive that workflow's check
+    names out of the shell function the watcher actually calls."""
+    wpc = _wpc()
+    themap = wpc.pr_path_conditional_checks()
+    assert themap, "no path-conditional PR workflows discovered — the derivation is dark"
+    by_glob = {}
+    for check, globs in themap.items():
+        for g in globs:
+            by_glob.setdefault(g, set()).add(check)
+    missing = []
+    for glob, checks in sorted(by_glob.items()):
+        example = _glob_example(glob)
+        p = _derive(example)
+        for check in sorted(checks):
+            if check not in p.stdout:
+                missing.append(f"{glob} -> {example}: expected {check!r}, got {p.stdout.strip()!r}")
+    assert not missing, "path filters whose check never derives:\n" + "\n".join(missing)
+
+
+def test_the_four_paths_the_issue_named_now_derive_their_checks():
+    """#3532's own reproduction, pinned. Each of these printed ONLY the six baseline
+    names before the YAML derivation landed."""
+    for path, expected in (
+        ("tests/js/coach_asof.test.mjs", "Migration coverage + HTML well-formedness"),
+        ("package.json", "Render + accuracy gate (local render)"),
+        (".github/workflows/docs-ci.yml", "Wiki drift gates"),
+        ("scripts/skill_lint.py", "Wiki drift gates"),
+        ("scripts/gate_census.py", "Wiki drift gates"),
+        ("deploy/doc_platform_counts.py", "Wiki drift gates"),
+        # Never in the old regexes at all — surface-drift.yml was invisible to the watcher.
+        ("lambdas/web/site_api_coach.py", "Surface-drift gate (new pages/routes/crons/JS land registered)"),
+        ("tests/api_schemas/anything.json", "Surface-drift gate (new pages/routes/crons/JS land registered)"),
+    ):
+        p = _derive(path)
+        assert expected in p.stdout, f"{path} must derive {expected!r}; got:\n{p.stdout}{p.stderr}"
+
+
+def test_negative_control_a_path_in_no_pr_filter_gets_only_the_baseline():
+    # This very file plus the watcher itself: `deploy/**` is a PUSH filter, never a
+    # pull_request one. If this ever fails, the derivation has gone permissive.
+    p = _derive("deploy/wait_pr_green.sh\\ndeploy/workflow_path_checks.py")
+    assert p.stdout.strip().split("\n") == _BASELINE, p.stdout + p.stderr
+
+
+def test_glob_semantics_star_does_not_cross_a_slash():
+    wpc = _wpc()
+    assert wpc.path_matches_glob("scripts/v4_build_rss.py", "scripts/v4_*.py")
+    assert not wpc.path_matches_glob("scripts/sub/v4_build_rss.py", "scripts/v4_*.py")
+    assert wpc.path_matches_glob("site/a/b/c.html", "site/**")
+    # The dotfile filters docs-ci.yml actually uses — a naive lstrip("./") eats the dot.
+    assert wpc.path_matches_glob(".github/workflows/docs-ci.yml", ".github/workflows/**")
+    assert wpc.path_matches_glob(".claude/skills/deploy/SKILL.md", ".claude/skills/**")
+
+
+def test_the_stdlib_fallback_parser_agrees_with_pyyaml_on_every_workflow():
+    """`.github/actions/setup-ci` installs NO packages (#3234), so the derivation must
+    not hard-depend on PyYAML. The fallback is only trustworthy if it agrees with the
+    real parser on the live corpus — asserted file by file, not on a sample."""
+    yaml = __import__("pytest").importorskip("yaml")
+    assert yaml  # the guard is the import itself
+    wpc = _wpc()
+    mismatches = []
+    for fn in sorted(os.listdir(_WORKFLOW_DIR)):
+        if not fn.endswith((".yml", ".yaml")):
+            continue
+        with open(os.path.join(_WORKFLOW_DIR, fn), encoding="utf-8") as f:
+            text = f.read()
+        a = wpc._parse_with_yaml(text)
+        b = wpc._parse_without_yaml(text)
+        if a != b:
+            mismatches.append(f"{fn}:\n  yaml    : {a}\n  fallback: {b}")
+    assert not mismatches, "fallback parser disagrees with PyYAML:\n" + "\n\n".join(mismatches)
+
+
+def test_a_failed_derivation_refuses_to_watch_rather_than_truncating():
+    """Fail-closed: if the derivation cannot run, the watcher aborts. The old shape
+    (`done < <(derive_expected_checks …)`) discarded the exit status, so a broken
+    derivation read as 'no path-conditional checks' — a silently truncated set."""
+    path = _write_fixture(_all_green_checks())
+    env = dict(os.environ)
+    env["WAIT_PR_GREEN_DERIVE_CMD"] = "false"
+    env["PATH"] = _no_gh_path()
+    p = subprocess.run(["bash", _SCRIPT, "--fixture", path], capture_output=True, text=True, timeout=30, env=env)
+    assert p.returncode != 0, p.stdout + p.stderr
+    assert "refusing to watch a truncated set" in (p.stdout + p.stderr)
+
+
+# ── #3532: an ATTACHED red is a red, expected or not ─────────────────────────
+
+
+def test_an_unexpected_attached_red_fails_the_verdict():
+    checks = _all_green_checks([_check("Some gate the derivation missed", "FAILURE", "fail")])
+    path = _write_fixture(checks)
+    p = _run(["--fixture", path, "--no-derive"], path_override=_no_gh_path())
+    assert p.returncode == 1, p.stdout + p.stderr
+    assert "NONGREEN Some gate the derivation missed" in p.stdout
+    assert "VERDICT FAIL" in p.stdout
+
+
+def test_an_unexpected_SKIPPED_check_is_not_a_red_positive_control():
+    """The negative control that keeps the sweep from crying wolf: `skipping` is the
+    NORMAL outcome for a path-conditional job on a PR that misses its paths, and
+    `cancel` is what `cancel-in-progress` concurrency produces. Neither may fail a
+    watch it was never asserted in."""
+    checks = _all_green_checks(
+        [
+            _check("A path-conditional gate that legitimately skipped", "SKIPPED", "skipping"),
+            _check("A superseded run cancelled by concurrency", "CANCELLED", "cancel"),
+        ]
+    )
+    path = _write_fixture(checks)
+    p = _run(["--fixture", path, "--no-derive"], path_override=_no_gh_path())
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert "VERDICT SUCCESS" in p.stdout
+
+
+def test_an_expected_check_keeps_its_stricter_treatment():
+    # A SKIPPED check that we asserted BY NAME is still a hard red — unchanged by #3532.
+    checks = _all_green_checks([_check("Wiki drift gates", "SKIPPED", "skipping")])
+    path = _write_fixture(checks)
+    p = _run(["--fixture", path, "--no-derive", "--expect", "Wiki drift gates"], path_override=_no_gh_path())
+    assert p.returncode == 1, p.stdout + p.stderr
+    assert "NONGREEN Wiki drift gates" in p.stdout

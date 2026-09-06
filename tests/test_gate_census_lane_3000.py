@@ -488,13 +488,14 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
-# 596 -> 597 (2026-09-06, #3596): ONE real gate — `structural::test_role_family_write_scope.py`,
+# 601 -> 602 (2026-09-06, #3596): ONE real gate — `structural::test_role_family_write_scope.py`,
 # IAM write-scope parity as a ROLE FAMILY (every create_platform_lambda's module AST-read for
 # DynamoDB write verbs and pk literals against the role_policies* statements its stack wires to
 # it). Registered in tests/conftest.py's _PREMERGE_EXTRA_FILES in the same PR. Verified by
 # id-set diff, not count delta: each tree ran its OWN scripts/gate_census.py --json with the
-# branch fully `git add`ed (main from a `git archive` export at this branch's merge-base
-# 4139da139 = 596, branch = 597); ADDED exactly {structural::test_role_family_write_scope.py},
+# branch fully `git add`ed, RE-MEASURED on the merged tree after main moved (main from a
+# `git archive` export at origin/main = 601, branch = 602); ADDED exactly
+# {structural::test_role_family_write_scope.py},
 # REMOVED {}.
 #
 # It arrives PROVEN, not unproven: `python3 scripts/gate_census_mutations.py --run --gate
@@ -505,11 +506,10 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # passed); STRUCTURAL_PROOFS records it. So live UNPROVEN does not move (537 -> 537) and
 # BASELINE_UNPROVEN_GATES / UNPROVEN_RESIDUE are untouched.
 #
-# The COMMITTED number below does NOT move, and that is the honest reading rather than a free
-# pass: it was set to 597 on 2026-09-05 while main at this branch's merge-base measures 596, so
-# the ceiling was carrying exactly one unit of accidental headroom and this entrant occupies it.
-# The inventory is now flush with the ceiling — the NEXT entrant has to bump it.
-BASELINE_TOTAL_GATES = 597  # +1 2026-09-05 (#3503's repo-wide AlarmTypes sweep, PROVEN by the family-5 harness), atop 596 (#3564's subscriber-promise cadence check, atop 595, atop 594)
+# The committed ceiling moves 601 -> 602, by exactly the measured delta: on the merged tree main
+# is 601 (== the committed 601, no headroom to absorb) and this branch is 602. Proven count moves
+# 55 -> 56 with it, which is the band raised in tests/test_gate_census_2578.py.
+BASELINE_TOTAL_GATES = 602  # +1 2026-09-06 (#3596's role-family IAM write-scope parity, PROVEN by the family-5 harness), atop 601 (+2 2026-09-06 (#3515/#3567's check_proof_freshness guard + the sitemap structural test, both PROVEN via STRUCTURAL_HAND_PROOFS — re-measured on the merged tree by scripts/gate_census.py), atop 599 +1 2026-09-06 (#3529/#3531/#3534's two derived mirror registries, PROVEN, net of #3568's +1 — re-measured on the merged tree by scripts/gate_census.py, not by arithmetic), atop 598 +1 2026-09-06 (#3568's sending-vocabulary census, PROVEN — 4 real-tree mutations each red their own assertion), atop 597 (#3503's repo-wide AlarmTypes sweep, atop 596, atop 595, atop 594))
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was

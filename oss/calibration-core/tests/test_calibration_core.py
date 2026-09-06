@@ -55,6 +55,21 @@ def test_score_pairs_matches_vectors(case):
     _exact(got, case["expected"], case["id"])
 
 
+@pytest.mark.parametrize("case", VECTORS["strata_cases"], ids=lambda c: c["id"])
+def test_score_strata_matches_vectors(case):
+    strata = {k: [tuple(p) for p in v] for k, v in case["strata"].items()}
+    got = cc.score_strata(strata, n_bins=case["n_bins"])
+    _exact(got, case["expected"], case["id"])
+
+
+def test_pooling_unskilled_strata_cannot_manufacture_skill():
+    coaches = [(0.5, 1)] * 8 + [(0.5, 0)] * 29
+    forecasts = [(0.8, 1)] * 108 + [(0.8, 0)] * 29
+    assert cc.score_pairs(coaches + forecasts)["skilled"] is True  # the pooled-base-rate trap
+    card = cc.score_strata({"coaches": coaches, "forecasts": forecasts})
+    assert card["skilled"] is False and card["calibration"] == "over-confident"
+
+
 @pytest.mark.parametrize("case", VECTORS["confidence_cases"], ids=lambda c: repr(c["input"]))
 def test_normalize_confidence_matches_vectors(case):
     _exact(cc.normalize_confidence(case["input"]), case["expected"], repr(case["input"]))

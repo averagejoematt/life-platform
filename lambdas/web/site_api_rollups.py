@@ -4,6 +4,8 @@ observatory_week / cycle_compare / survival. Reads facade state via `_g`."""
 
 from datetime import datetime, timedelta, timezone
 
+from common import stats_core  # #3549: the ONE sanctioned interval for a served proportion (ADR-105)
+
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     PLATFORM_STATS,
@@ -23,6 +25,89 @@ _COLLAPSE_GAP = 4
 
 
 _SURVIVAL_HORIZON = 30
+
+
+def _alive_days(collapse_day, window):
+    """Days a prior cycle is KNOWN to have stayed engaged: a collapsed cycle died ON
+    collapse_day (it lived collapse_day - 1 full days); a censored cycle (re-anchored
+    while still engaged) is known alive only for its own window. Mirrors
+    story_attempts.js aliveDays — one definition on both sides of the wire."""
+    if collapse_day:
+        return max(0, collapse_day - 1)
+    return window or 0
+
+
+def survival_odds(priors, horizon=_SURVIVAL_HORIZON):
+    """The odds-of-reaching-the-horizon block for /api/survival (#3549) — pure.
+
+    `priors` is a list of (collapse_day | None, window_days) for every CLOSED cycle.
+    Every number served here is reproducible from the per-cycle log by the `method`
+    string served beside it (ADR-105), and no string carries a literal the payload's
+    numeric fields do not also carry.
+
+    THE DEFECT THIS REPLACES: `survivors = cd is None or cd > horizon` counted a
+    cycle re-anchored on day 1 while still engaged as having reached day 30 — seven
+    censored 1–7-day cycles became seven "survivors" and the page served "47% odds of
+    day 30" over a record in which no cycle had ever been observed at day 30.
+
+    THE RULE: a prior cycle counts as reaching the horizon ONLY if it is known to
+    have stayed engaged through day `horizon` (alive days >= horizon). A censored
+    cycle shorter than the horizon stays in n and never counts as a survivor, so
+    the Laplace estimate (reached+1)/(n+2) can only UNDERSTATE the odds, never
+    inflate them — and it is served only once at least one cycle has actually been
+    observed at the horizon. Until then `p_reach_pct` is None: the formula's residue
+    at reached=0 is 1/(n+2), which is the prior talking, not the record, so it is
+    served as `p_reach_ceiling_pct` and named as such.
+
+    Returns a dict of numeric fields plus the derived `method` / `confidence` strings.
+    """
+    n = len(priors)
+    reached = sum(1 for cd, w in priors if _alive_days(cd, w) >= horizon)
+    collapsed_before = sum(1 for cd, w in priors if cd is not None and _alive_days(cd, w) < horizon)
+    censored_before = n - reached - collapsed_before
+    longest_run = max((_alive_days(cd, w) for cd, w in priors), default=0)
+
+    treatment = (
+        f"A prior cycle counts as reaching day {horizon} only if it stayed engaged through day {horizon}; "
+        f"a cycle re-anchored before day {horizon} while still engaged (censored) stays in n and never counts "
+        "as a survivor, so the estimate can only understate the odds, never inflate them."
+    )
+    p_pct = None
+    ci95 = None
+    ceiling_pct = None
+    if n == 0:
+        method = f"No prior cycles yet — there is nothing to handicap. {treatment}"
+    elif reached == 0:
+        ceiling_pct = round(100 / (n + 2))
+        method = (
+            f"No odds served: 0 of {n} prior cycles has been observed at day {horizon} "
+            f"(longest run {longest_run} days; {collapsed_before} collapsed before day {horizon}, "
+            f"{censored_before} re-anchored before it while still engaged). "
+            f"The Laplace formula (reached+1)/(n+2) would print (0+1)/({n}+2) = {ceiling_pct}%, and that number is "
+            "the prior's residue, not evidence — so it is served as a ceiling, never as odds. " + treatment
+        )
+    else:
+        p_pct = round((reached + 1) / (n + 2) * 100)
+        wilson = stats_core.wilson_interval(reached, n)
+        if wilson is not None:
+            ci95 = [round(100 * wilson[0]), round(100 * wilson[1])]
+        method = (
+            f"Laplace-smoothed over {n} prior cycles: (reached+1)/(n+2) = ({reached}+1)/({n}+2) = {p_pct}%; "
+            f"95% Wilson interval on {reached}/{n}. " + treatment
+        )
+    confidence = f"n={n} prior cycles · {reached} reached day {horizon} · a mirror, not a forecast"
+    return {
+        "p_reach_pct": p_pct,
+        "p_reach_ci95_pct": ci95,
+        "p_reach_ceiling_pct": ceiling_pct,
+        "n_prior_cycles": n,
+        "reached_horizon_n": reached,
+        "collapsed_before_horizon_n": collapsed_before,
+        "censored_before_horizon_n": censored_before,
+        "longest_run_days": longest_run,
+        "method": method,
+        "confidence": confidence,
+    }
 
 
 def tools_baseline(*, _g) -> dict:
@@ -706,11 +791,10 @@ def survival(*, _g) -> dict:
             if not is_current:
                 priors.append((collapse_day, window))
 
-        # Laplace-smoothed survival-to-30 from prior cycles: a cycle counts as a
-        # survivor if it stayed engaged through day 30 OR was reset while still
-        # engaged before 30 (censored — treated optimistically, and we say so).
-        survivors = sum(1 for cd, w in priors if cd is None or cd > _SURVIVAL_HORIZON)
-        p30 = round((survivors + 1) / (len(priors) + 2) * 100)
+        # #3549: the odds block is pure and horizon-checked — see survival_odds.
+        # (The old line here counted a cycle re-anchored on day 1 as a day-30
+        # survivor and served "47%" over a record no cycle had reached.)
+        odds = survival_odds(priors, _SURVIVAL_HORIZON)
 
         cur = next((c for c in cycles if c["is_current"]), None)
         cur_strip = str(cur["strip"]) if cur else ""
@@ -732,13 +816,24 @@ def survival(*, _g) -> dict:
         return _ok(
             {
                 "horizon_days": _SURVIVAL_HORIZON,
-                "p_reach_30_pct": p30,
-                "method": f"Laplace-smoothed over {len(priors)} prior cycles: (survivors+1)/(n+2). n=2 is narrative, not statistics.",
+                # #3549: None until a prior cycle has actually been observed at the
+                # horizon — a percentage here is never manufactured from censored cycles.
+                "p_reach_30_pct": odds["p_reach_pct"],
+                "p_reach_30_ci95_pct": odds["p_reach_ci95_pct"],
+                "p_reach_30_ceiling_pct": odds["p_reach_ceiling_pct"],
+                "n_prior_cycles": odds["n_prior_cycles"],
+                "reached_horizon_n": odds["reached_horizon_n"],
+                "collapsed_before_horizon_n": odds["collapsed_before_horizon_n"],
+                "censored_before_horizon_n": odds["censored_before_horizon_n"],
+                "longest_run_days": odds["longest_run_days"],
+                "method": odds["method"],
                 "current_silent_days": silent_now,
                 "collapse_definition": f"{_COLLAPSE_GAP}+ consecutive days with no weigh-in, food log, or journal entry",
                 "cycles": cycles,
                 "in_progress_note": in_progress_note,
-                "confidence": "preliminary pattern · n=2 cycles",
+                # #3549: derived from the same counts served above — a literal
+                # "n=2" outlived the two-prior era it was written in by 13 cycles.
+                "confidence": odds["confidence"],
                 "note": (
                     "The model handicapping its own human. Engagement counts only deliberate "
                     "acts — weigh-ins, food logs, journal entries — never passive wearable data. "

@@ -28,6 +28,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _s3,
     _secret_arn,
+    _ses_reader_resources,
 )
 
 
@@ -999,7 +1000,7 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+            resources=_ses_reader_resources(),  # #3568: + the site identity — subscribe/confirm is reader mail
         ),
         iam.PolicyStatement(
             sid="DLQ",

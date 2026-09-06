@@ -466,7 +466,7 @@ def test_the_two_incidents_3563_measured_are_the_ledger_today():
 
 
 def test_every_ledger_line_is_dated_and_says_what_clears_it():
-    for key, reason in KNOWN_GAPS.items():
+    for key, reason in {**KNOWN_GAPS, **KNOWN_LIVE_DRIFT}.items():
         assert reason.strip()[:4].isdigit() and reason.strip()[4] == "-", f"{key}: undated ledger line"
         assert len(reason) >= 120, f"{key}: a reason this short is a label, not a disposition"
         assert "CLEARS WHEN" in reason or "NOT field-verified" in reason, f"{key}: says nothing about what clears it"
@@ -638,6 +638,21 @@ def test_MUTATION_the_enrolment_leg_reds_on_a_planted_unmapped_writer():
 # The roles whose deployed state is in question right now. Scoped rather than family-wide:
 # 103 roles would be ~400 IAM calls in a lane that is supposed to be fast, and the question
 # "did the merge reach production" is only open where a policy recently changed.
+# The dated ledger for the OTHER direction: a checked-in statement that is merged and NOT yet
+# deployed. Same shrink-only shape as KNOWN_GAPS, and the same two-way ratchet — a line whose
+# drift is gone reds and asks to be deleted, which is what makes the owner's deploy visible here
+# instead of being assumed.
+KNOWN_LIVE_DRIFT = {
+    "chronicle-email-sender::SES": (
+        "2026-09-06 (#3568, merged on main and not yet deployed) — `role_policies_base.SES_IDENTITY` moved to the "
+        "site-domain identity `arn:aws:ses:us-west-2:205930651321:identity/averagejoematt.com` so reader mail "
+        "stops leaving the personal domain; the deployed ChronicleEmailSenderRole still carries only the previous "
+        "identity, so the SES statement's resource set is behind the repo. Found by this leg on its first run "
+        "against the merged tree — a merge is not a deploy, which is the whole reason the leg exists. "
+        "CLEARS WHEN: `bash deploy/cdk_deploy.sh LifePlatformEmail` runs. Delete this line then."
+    ),
+}
+
 LIVE_PARITY_WATCH = (
     ("life-platform-qa-smoke", "operational_qa_smoke", "#3573 added ai-canary-log/* to the S3List prefix condition"),
     ("chronicle-email-sender", "email_chronicle_sender", "#3563's PutItem grant lands here"),
@@ -646,7 +661,8 @@ LIVE_PARITY_WATCH = (
 
 
 def compare_to_live(statements, live_by_sid: dict, label: str = "") -> list:
-    """Pure: which checked-in statements are NOT present on the deployed role.
+    """Pure: which checked-in statements are NOT present on the deployed role, as
+    [(sid, detail)] so a caller can key a dated ledger on the sid.
 
     Statements CDK adds on its own (logs, X-Ray, the DLQ) are out of scope — the question is
     whether every statement THIS REPO declares is deployed, not whether live is minimal."""
@@ -654,7 +670,7 @@ def compare_to_live(statements, live_by_sid: dict, label: str = "") -> list:
     for statement in statements:
         deployed = live_by_sid.get(statement.sid)
         if not deployed:
-            drift.append(f"{label}sid {statement.sid!r} is in role_policies and NOT on the live role")
+            drift.append((statement.sid, f"{label}sid {statement.sid!r} is in role_policies and NOT on the live role"))
             continue
         actions: set = set()
         resources: set = set()
@@ -668,8 +684,11 @@ def compare_to_live(statements, live_by_sid: dict, label: str = "") -> list:
         missing_resources = sorted(set(statement.resources) - resources)
         if missing_actions or missing_resources or conditions != (statement.conditions or {}):
             drift.append(
-                f"{label}sid={statement.sid}: actions missing live={missing_actions} "
-                f"resources missing live={missing_resources} condition_live={conditions} condition_repo={statement.conditions}"
+                (
+                    statement.sid,
+                    f"{label}sid={statement.sid}: actions missing live={missing_actions} "
+                    f"resources missing live={missing_resources} condition_live={conditions} condition_repo={statement.conditions}",
+                )
             )
     return drift
 
@@ -691,11 +710,11 @@ def test_MUTATION_the_live_comparison_reds_on_a_planted_undeployed_grant():
             }
         ]
     }
-    (hit,) = compare_to_live([s3list], predeploy, "qa-smoke ")
-    assert "S3List" in hit and "ai-canary-log/*" in hit and "condition_repo" in hit
+    ((sid, hit),) = compare_to_live([s3list], predeploy, "qa-smoke ")
+    assert sid == "S3List" and "ai-canary-log/*" in hit and "condition_repo" in hit
     ok = {"S3List": [{"Sid": "S3List", "Action": list(s3list.actions), "Resource": list(s3list.resources), "Condition": s3list.conditions}]}
     assert compare_to_live([s3list], ok, "qa-smoke ") == [], "negative control: the deployed document must read clean"
-    assert compare_to_live([s3list], {}, "qa-smoke ") == ["qa-smoke sid 'S3List' is in role_policies and NOT on the live role"]
+    assert compare_to_live([s3list], {}, "qa-smoke ") == [("S3List", "qa-smoke sid 'S3List' is in role_policies and NOT on the live role")]
 
 
 _UNMEASURED = (
@@ -753,7 +772,7 @@ def test_live_role_policies_match_the_checked_in_documents():
 
     lam = boto3.client("lambda", region_name="us-west-2")
     iam = boto3.client("iam")
-    drift = []
+    drift: dict = {}
     for function_name, policy_fn, why in LIVE_PARITY_WATCH:
         try:
             role_arn = lam.get_function_configuration(FunctionName=function_name)["Role"]
@@ -769,7 +788,15 @@ def test_live_role_policies_match_the_checked_in_documents():
             for statement in document.get("Statement", []):
                 if statement.get("Sid"):
                     live.setdefault(statement["Sid"], []).append(statement)
-        drift += [f"{d} ({why})" for d in compare_to_live(policy_statements(policy_fn), live, f"{function_name} ")]
-    assert not drift, "the deployed role does not carry the checked-in document — a merge is not a deploy:\n" + "\n".join(
-        f"  {d}" for d in drift
+        for sid, detail in compare_to_live(policy_statements(policy_fn), live, f"{function_name} "):
+            drift[f"{function_name}::{sid}"] = f"{detail} ({why})"
+    unledgered = {k: v for k, v in drift.items() if k not in KNOWN_LIVE_DRIFT}
+    assert not unledgered, (
+        "the deployed role does not carry the checked-in document — a merge is not a deploy:\n"
+        + "\n".join(f"  {k}\n      {v}" for k, v in sorted(unledgered.items()))
+        + ("\n\nEither the owner deploys the stack, or this is a dated line in KNOWN_LIVE_DRIFT saying what clears it.")
+    )
+    stale = sorted(k for k in KNOWN_LIVE_DRIFT if k not in drift)
+    assert not stale, "these KNOWN_LIVE_DRIFT lines no longer describe live drift — the deploy landed; delete them:\n" + "\n".join(
+        f"  {k}" for k in stale
     )

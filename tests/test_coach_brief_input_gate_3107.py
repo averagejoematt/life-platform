@@ -410,11 +410,23 @@ def test_the_prompt_sources_are_the_modules_the_hit_actually_skips():
 
 
 def test_the_extracted_data_inventory_is_byte_identical_to_the_prompt_it_feeds():
-    """Extracting this loop out of `ai_calls` must not have changed one byte: the
-    string is BOTH a fingerprint part and a live prompt fragment, and a drift between
-    them would bust the cache every day while looking fine."""
+    """The string is BOTH a fingerprint part and a live prompt fragment, so the ROWS and
+    their order stay pinned — a drift between the two copies would bust the cache every
+    day while looking fine.
+
+    #3516 changed what each row SAYS (a paused / lag-by-design source now carries the
+    registry's reason, because coaches were inventing a sync failure to fill the silence)
+    and appended the rule that reads the inventory. What stays pinned here is the part
+    the #3107 extraction had to preserve: the row set, its order, and its AVAILABLE /
+    not-available verdicts. The caveat clause is asserted to BE the registry's sentence
+    rather than re-typed — a second copy of that sentence is exactly the drift this file
+    exists to catch.
+    """
+    from ingestion import source_registry as sr
+
     out = gate.data_inventory({"whoop": {"recovery": 61}, "labs": [], "garmin": {"steps": 9000}})
-    assert out.splitlines() == [
+    rows = [ln for ln in out.splitlines() if ln.startswith("  - ")]
+    assert [ln.split(" — ")[0] for ln in rows] == [
         "  - DEXA body composition: not available",
         "  - Lab bloodwork: not available",
         "  - Body measurements: not available",
@@ -425,6 +437,8 @@ def test_the_extracted_data_inventory_is_byte_identical_to_the_prompt_it_feeds()
         "  - Eight Sleep bed temp: not available",
         "  - CGM glucose: not available",
     ]
+    assert sr.availability_facet("garmin")["caveat"] in out, "the caveat must be the registry's sentence, not a local literal"
+    assert gate.INVENTORY_RULE in out, "the rule that reads the inventory rides the same bytes as the inventory"
     assert gate.data_inventory(None) == gate.data_inventory({})
 
 

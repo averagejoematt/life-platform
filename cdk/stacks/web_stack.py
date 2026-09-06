@@ -25,6 +25,9 @@ Since CDK cannot fully reconstruct L2 CloudFront from attributes alone (L2 impor
 is not supported for CloudFront), we use L1 CfnDistribution for import.
 """
 
+import sys
+from pathlib import Path
+
 import aws_cdk as cdk
 from aws_cdk import (
     Duration,
@@ -59,6 +62,10 @@ from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
 from stacks.web_alarms import add_web_alarms  # #2829: the us-east-1 alarm estate, extracted sibling
 from stacks.web_cloudfront_policies import build_api_policies  # #1221: /api cache + origin-request policies
+
+# ── #3568: reader-facing From address from the ONE registry (see email_stack.py). ──
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
+from common.email_identity import TRANSACTIONAL_SENDER  # noqa: E402
 
 BUCKET = _CONSTANTS_BUCKET
 
@@ -327,7 +334,7 @@ class WebStack(Stack):
                 "USER_ID": "matthew",
                 "TABLE_NAME": TABLE_NAME,
                 "S3_BUCKET": BUCKET,
-                "EMAIL_SENDER": "lifeplatform@mattsusername.com",
+                "EMAIL_SENDER": TRANSACTIONAL_SENDER,  # #3568 — subscribe/confirm mail is From the site domain
                 "SITE_URL": "https://averagejoematt.com",
                 "DYNAMODB_REGION": "us-west-2",  # DDB table is in us-west-2; Lambda runs in us-east-1
                 "SES_REGION": "us-west-2",  # SES verified identity is in us-west-2
