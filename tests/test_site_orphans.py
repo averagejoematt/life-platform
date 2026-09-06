@@ -83,6 +83,28 @@ def _linked_and_flagged() -> tuple[set[str], set[str]]:
     return linked, flagged
 
 
+def _linked_by_some_other_page(url: str) -> bool:
+    """Is `url` referenced by any page/JS file OTHER than the page `url` itself
+    serves? #3567 added a `<link rel="canonical">` to `/subscribe/confirm/`
+    (and `/cockpit/`) — a page's own self-referencing href is real SEO metadata,
+    never evidence that it's reachable FROM somewhere else, so the
+    allowlist-honesty check below must exclude it (`_linked_and_flagged()`
+    itself stays exactly as before — it correctly still finds every OTHER page
+    "linked", self-canonical included, for the broader orphan sweep)."""
+    own_file = SITE / "index.html" if url == "/" else SITE / url.strip("/") / "index.html"
+    for p in SITE.rglob("*.html"):
+        if "legacy" in p.relative_to(SITE).parts or p == own_file:
+            continue
+        for m in HREF.finditer(p.read_text(encoding="utf-8")):
+            if _norm(m.group(1)) == url:
+                return True
+    for p in (SITE / "assets" / "js").glob("*.js"):
+        for m in JSPATH.finditer(p.read_text(encoding="utf-8")):
+            if m.group(1) == url:
+                return True
+    return False
+
+
 def test_every_page_is_linked_or_explicitly_unlisted():
     linked, flagged = _linked_and_flagged()
     orphans = sorted(_pages() - linked - flagged - set(UNLISTED_PAGES))
@@ -94,12 +116,13 @@ def test_every_page_is_linked_or_explicitly_unlisted():
 
 
 def test_unlisted_allowlist_stays_honest():
-    """An UNLISTED_PAGES entry must exist and must still be unlinked — else prune it."""
+    """An UNLISTED_PAGES entry must exist and must still be unlinked (by
+    something OTHER than its own self-referencing href, e.g. a `<link
+    rel="canonical">` — #3567) — else prune it."""
     pages = _pages()
-    linked, _ = _linked_and_flagged()
     for url, reason in UNLISTED_PAGES.items():
         assert url in pages, f"UNLISTED_PAGES has a dead entry {url} ({reason}) — the page is gone, prune it"
-        assert url not in linked, f"UNLISTED_PAGES entry {url} is now linked — the flag is stale, prune it"
+        assert not _linked_by_some_other_page(url), f"UNLISTED_PAGES entry {url} is now linked — the flag is stale, prune it"
 
 
 def test_this_prs_ia_moves_are_live():

@@ -2,12 +2,27 @@
 """
 v4_build_sitemap.py — regenerate sitemap.xml for the v4 indexable surface.
 
-After the cutover the old sitemap listed pre-cutover URLs that now 301. This
-emits only what should be indexed: the Story (/), the Evidence index + topic
-pages, and root System pages — EXCLUDING anything noindex (the Cockpit /cockpit and
-the entire /legacy tree) plus assets/api/config/data and the 404.
+#3567: this used to enumerate `site/**/*.html` directly and filter with a
+hand-maintained SKIP_TOP set — a SECOND, drifting vocabulary of "what's a
+page" alongside `tests/qa_manifest.py` (the charter's ONE page registry,
+#1426). Two concrete defects fell out of that duplication: `body.html` (the
+essay permalink's verbatim prose FRAGMENT, `v4_build_journal.py`'s authoring
+include — never a page in its own right) qualified as a real URL, and because
+it's a non-index file, `url_for()` stripped its `.html` suffix into an
+extensionless URL CloudFront 301s straight to a 404; and `/subscribe.html`
+(the legacy meta-refresh stub) had no noindex, so both it and its target
+`/subscribe/` shipped as separate sitemap entries.
 
-Scans the real site/ tree, so it self-maintains as Evidence topics are added.
+Now: candidate URLs are exactly the paths in `tests/qa_manifest.MANIFEST` —
+the registry every other QA surface already derives from — resolved to their
+real file under site/, then filtered by the SAME live noindex check as
+before (a page is indexable unless its own HTML asserts
+`noindex`). A page absent from the registry (an authoring fragment, a
+never-a-page artifact) is structurally never a candidate, regardless of what
+exists on disk. Self-maintaining: add a page to the registry (or its own
+generator, for the Evidence/essay facets the registry derives FROM) and it's
+sitemap-eligible; nothing here needs a second edit.
+
 Also fetches live /journal/posts.json and adds each published post URL (priority
 0.8); these pages live in S3 generated/ and are absent from site/, so sitemap is
 the only way search engines discover them. As a side-effect, injects a <noscript>
@@ -25,32 +40,42 @@ from datetime import date
 from pathlib import Path
 from urllib.request import urlopen
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
 SITE = Path("site")
 BASE = "https://averagejoematt.com"
 POSTS_URL = f"{BASE}/journal/posts.json"
 CHRONICLE_HUB = SITE / "story" / "chronicle" / "index.html"
 
-# NB: "data" is NOT skipped — it's now the Data pillar (HTML pages). The JSON data
-# files under /data/ aren't *.html so they're never picked up regardless.
-SKIP_TOP = {"legacy", "cockpit", "assets", "api", "config", "404"}
-
 _NOSCRIPT_START = "<!-- noscript-posts:start -->"
 _NOSCRIPT_END = "<!-- noscript-posts:end -->"
 
 
-def url_for(p: Path) -> str:
-    rel = p.relative_to(SITE)
-    if rel.name == "index.html":
-        parent = rel.parent.as_posix()
-        return f"{BASE}/" if parent == "." else f"{BASE}/{parent}/"
-    return f"{BASE}/{rel.with_suffix('').as_posix()}"
+def _page_registry():
+    """tests/qa_manifest.MANIFEST — the ONE page registry (#1426/#3567)."""
+    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    import qa_manifest  # noqa: E402 — local import, path just inserted
+
+    return qa_manifest.MANIFEST
+
+
+def file_for_path(path: str) -> Path:
+    """A registry `path` ("/x/y/" or a bare file like "/404.html") -> its real
+    file under site/. Registry paths are always root-relative with a leading
+    slash; a trailing slash means a directory index."""
+    rel = path.strip("/")
+    if not rel or path.endswith("/"):
+        return SITE / rel / "index.html" if rel else SITE / "index.html"
+    return SITE / rel
+
+
+def url_for_path(path: str) -> str:
+    return f"{BASE}{path}"
 
 
 def indexable(p: Path) -> bool:
-    rel = p.relative_to(SITE)
-    top = rel.parts[0] if len(rel.parts) > 1 else rel.name
-    if top in SKIP_TOP or rel.name == "404.html":
-        return False
+    """A registered page is indexable unless its OWN HTML asserts noindex —
+    the live source of truth (cockpit/mind/subscribe-confirm/404 all bake
+    this in already; #3567 adds it to the subscribe.html stub too)."""
     try:
         html = p.read_text(encoding="utf-8")
     except OSError:
@@ -93,12 +118,28 @@ def _update_chronicle_noscript(posts: list[dict]) -> None:
     CHRONICLE_HUB.write_text(html, encoding="utf-8")
 
 
+def registry_urls() -> list[str]:
+    """Every indexable URL in the page registry — the #3567 derivation. A path
+    the registry doesn't know about (a fragment, an off-tree artifact) is
+    structurally never a candidate; a path whose real file is missing (an
+    offline/partial build) is skipped, never fabricated."""
+    urls = []
+    for p in _page_registry():
+        f = file_for_path(p["path"])
+        if not f.exists():
+            continue
+        if not indexable(f):
+            continue
+        urls.append(url_for_path(p["path"]))
+    return sorted(set(urls))
+
+
 def main() -> int:
     if not (SITE / "index.html").exists():
         print("error: run from repo root.", file=sys.stderr)
         return 2
     today = date.today().isoformat()
-    urls = sorted({url_for(p) for p in SITE.rglob("*.html") if indexable(p)})
+    urls = registry_urls()
     # Story root first, then the rest.
     urls.sort(key=lambda u: (u != f"{BASE}/", u))
 
@@ -114,8 +155,8 @@ def main() -> int:
     lines.append("</urlset>")
     (SITE / "sitemap.xml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(
-        f"wrote site/sitemap.xml — {len(urls)} static URL(s) + {len(post_urls)} post URL(s) "
-        f"(Story + Evidence + system; /cockpit and /legacy excluded as noindex)."
+        f"wrote site/sitemap.xml — {len(urls)} registry URL(s) + {len(post_urls)} post URL(s) "
+        f"(derived from tests/qa_manifest.MANIFEST, #3567; noindex pages excluded live)."
     )
 
     _update_chronicle_noscript(posts)

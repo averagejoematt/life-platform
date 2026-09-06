@@ -80,6 +80,14 @@ if [ "${1:-}" != "--dry-run" ]; then
   # week-gap note + any pending-installment disclosure (a held week must say why
   # instead of going silent). Best-effort — keeps the existing shells if offline.
   python3 "$(dirname "$0")/../scripts/v4_build_dispatches.py" || echo "  ⚠️  dispatches build skipped (offline?) — keeping existing story shells"
+  # #3515: regenerate the Data + Protocols pillar hubs so their #1395 baked
+  # <noscript> core + data-driven OG tags carry the CURRENT date, same as the
+  # home/coaching/story proof steps above. This generator was previously
+  # MISSING from this list — the two hubs' crawler/unfurl/no-JS view sat 33
+  # days (two experiment resets) stale. Best-effort — load_data_sources()/
+  # load_protocols() fall back to the committed proof_snapshot.json when the
+  # live API is unreachable.
+  python3 "$(dirname "$0")/../scripts/v4_build_evidence.py" || echo "  ⚠️  evidence pillars build skipped (offline?) — keeping existing data/protocols shells"
   # #1566: render the "In my own words" essay permalink pages from site/journal/blog.json +
   # each essay's body fragment (kills the hand-HTML step). --write is REQUIRED — the generator
   # is dry-run by default so a bare invocation never publishes Matt's words; this deploy step,
@@ -139,6 +147,18 @@ fi
 echo "→ PII surface guard — repo-hygiene arm (#2370)…"
 if ! python3 "$(dirname "$0")/pii_surface_guard.py" --tracked --require-vice; then
   echo "❌ Repo-hygiene arm FAILED — a tracked JSON file carries a blocked-category keyword. Publish blocked." >&2
+  exit 1
+fi
+
+# #3515 — proof-page freshness guard (FAIL-CLOSED). Home/Cockpit/Coaching/Story/
+# Data/Protocols each bake an "as of <date>" stamp into a static <noscript> core +
+# OG tags. The generator that stamps Data/Protocols was missing from the builder
+# list above for 33 days across two experiment resets — this catches the NEXT
+# time a builder silently drops out (or a generator's offline fallback goes
+# stale for longer than is honest) before it publishes.
+echo "→ proof-page freshness guard (#3515)…"
+if ! python3 "$(dirname "$0")/../scripts/check_proof_freshness.py" --root "$(dirname "$0")/.."; then
+  echo "❌ Proof freshness guard FAILED — a baked 'as of' stamp is stale. Publish blocked." >&2
   exit 1
 fi
 

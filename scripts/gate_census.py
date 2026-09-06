@@ -479,11 +479,11 @@ from gate_census_mutations import STRUCTURAL_PROOFS  # noqa: E402
 
 PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in STRUCTURAL_PROOFS.items()})
 
-# Family 2 (guard-script) records that did not fit above — this module is ~1,175 of its
-# 1,200-line ceiling (#1665) and the rule is extraction, never a baseline raise (#2610).
-from gate_census_proofs import GUARD_PROOFS, QA_PROOFS  # noqa: E402 — family 2 + family 3 (qa-smoke, #3564)
+# Family 2 (guard-script) + family 5 hand-records that did not fit above — this module
+# sits at its 1,200-line ceiling (#1665) and the rule is extraction, never a raise (#2610).
+from gate_census_proofs import GUARD_PROOFS, QA_PROOFS, STRUCTURAL_HAND_PROOFS  # noqa: E402 — families 2, 3, 5 (#3567)
 
-for _extracted in (GUARD_PROOFS, QA_PROOFS):
+for _extracted in (GUARD_PROOFS, QA_PROOFS, STRUCTURAL_HAND_PROOFS):
     PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in _extracted.items()})
 
 
