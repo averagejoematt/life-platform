@@ -119,6 +119,14 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         "projected_all_classes": None,
         "projected_classes": list(gov.PROJECTED_CALLER_CLASSES),
         "episodic_classes": list(gov.EPISODIC_CALLER_CLASSES),
+        # #3554: the premise the #2892 narrowing rests on, measured every run. Empty
+        # here because this call site passes no measurement — and empty means "no
+        # violation recorded", never "checked and held", which is why
+        # _billing_days_by_class records None (not 0) for a failed read.
+        "episodic_billing_days": {},
+        "episodic_premise_window_days": gov._episodic.EPISODIC_PREMISE_WINDOW_DAYS,
+        "episodic_premise_bar_days": gov._episodic.EPISODIC_PREMISE_BAR_DAYS,
+        "episodic_premise_violations": [],
     }
 
 
@@ -386,3 +394,96 @@ def test_brief_footer_omits_line_by_default():
     assert "Budget: tier" not in html
     # and the goldens stay stable: default None renders nothing new
     assert "near-zero slack" not in html
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3554 — projection_scope: ONE place turns a breakdown into scope facts + prose
+#
+# Before this, /api/receipts, /api/status and this headroom line each read the
+# breakdown's `projected` and printed it under a scope-free label. The brief said
+# "projected $84 vs $252 ceiling" while the same payload's all-class projection was
+# $103 — the reader could not tell which question the number answered.
+# ══════════════════════════════════════════════════════════════════════════════
+# The live payload from 2026-09-05T00:00:11Z, which is what the issue reproduced. The
+# effective ceiling is DERIVED from the governor (#2898 — no consumer, tests included,
+# hand-types a member of the ceiling family); on the day this was captured it was the
+# surge ceiling, reader traffic being 1,011 uniques/7d against the 900 threshold.
+_SURGE_CEILING = importlib.import_module("operational.cost_governor_lambda").SURGE_CEILING_USD
+_LIVE_SCOPED = {
+    "tier": 0,
+    "mtd": 13.8,
+    "projected": 83.7,
+    "ceiling": _SURGE_CEILING,
+    "ai_daily": 2.5,
+    "non_ai_daily": 0.95,
+    "computed_at": _NOW.isoformat(),
+    "surge_active": True,
+    "recent_uniques": 1011,
+    "prod_class_share": 0.6956,
+    "projected_all_classes": 103.49,
+    "projected_classes": ["prod-cron", "remediation"],
+    "episodic_classes": ["ci", "dev-session"],
+}
+
+
+def test_projection_scope_names_both_figures_and_the_exclusion():
+    s = budget_guard.projection_scope(_LIVE_SCOPED)
+    assert s["projected_usd"] == 83.7
+    assert s["projected_all_classes_usd"] == 103.49
+    assert s["scope_label"] == "recurring classes only (prod-cron, remediation)"
+    assert "ci, dev-session" in s["scope_sentence"]
+    assert "$103.49" in s["scope_sentence"]
+
+
+def test_projection_scope_states_all_classes_when_no_attribution_was_made():
+    """`prod_class_share is None` is the governor's own no-signal marker; `projected` is
+    then the all-class figure by construction. Claiming a narrowing that did not happen
+    would be this issue's defect with the sign flipped."""
+    s = budget_guard.projection_scope(dict(_LIVE_SCOPED, prod_class_share=None))
+    assert s["scope_label"] == "all spend classes"
+    assert "nothing is excluded" in s["scope_sentence"]
+
+
+def test_projection_scope_never_raises_on_garbage():
+    for bad in (None, [], "x", {"projected": "abc"}, {"projected_classes": 3}):
+        s = budget_guard.projection_scope(bad)
+        assert set(s) >= {"scope_label", "scope_sentence", "projected_all_classes_usd"}
+
+
+def test_headroom_line_carries_the_scope_and_the_all_class_figure():
+    line = budget_guard.format_headroom_line(_LIVE_SCOPED)
+    assert f"projected $84 (recurring classes only, $103 all classes) vs ${_SURGE_CEILING:.0f} ceiling" in line
+
+
+def test_headroom_line_adds_no_scope_clause_when_none_was_claimed():
+    """Negative control: without this, a clause appended unconditionally would look
+    identical to one that tracks the governor's actual attribution state."""
+    line = budget_guard.format_headroom_line(dict(_LIVE_SCOPED, prod_class_share=None))
+    assert "recurring classes only" not in line
+    assert f"projected $84 vs ${_SURGE_CEILING:.0f} ceiling" in line
+
+
+def test_headroom_line_reports_a_broken_episodic_premise():
+    line = budget_guard.format_headroom_line(
+        dict(
+            _LIVE_SCOPED,
+            episodic_billing_days={"ci": 28, "dev-session": 3},
+            episodic_premise_window_days=30,
+            episodic_premise_bar_days=25,
+            episodic_premise_violations=["ci"],
+        )
+    )
+    assert "episodic premise BROKEN (ci 28/30d)" in line
+
+
+def test_headroom_line_stays_quiet_when_the_premise_holds():
+    line = budget_guard.format_headroom_line(
+        dict(
+            _LIVE_SCOPED,
+            episodic_billing_days={"ci": 6, "dev-session": 3},
+            episodic_premise_window_days=30,
+            episodic_premise_bar_days=25,
+            episodic_premise_violations=[],
+        )
+    )
+    assert "premise" not in line.lower()

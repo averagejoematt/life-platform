@@ -28,6 +28,35 @@
       "as_of": {
         "type": "string"
       },
+      "attribution": {
+        "keys": {
+          "drift_bar": {
+            "type": "number"
+          },
+          "features_est_cost_usd": {
+            "type": "number"
+          },
+          "models_est_cost_usd": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "reconciliation_ratio": {
+            "type": "number"
+          },
+          "unattributed_label": {
+            "type": "string"
+          },
+          "unattributed_usd": {
+            "type": "number"
+          },
+          "unpriced_features": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "budget_base_ceiling_usd": {
         "type": "number"
       },
@@ -75,6 +104,9 @@
             "lambda": {
               "type": "string"
             },
+            "month_est_cost_usd": {
+              "type": "number"
+            },
             "month_input_tokens": {
               "type": "integer"
             },
@@ -84,7 +116,7 @@
           },
           "type": "object"
         },
-        "length_sample": 26,
+        "length_sample": 19,
         "type": "array"
       },
       "models": {

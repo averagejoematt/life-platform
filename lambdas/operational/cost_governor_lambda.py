@@ -108,6 +108,9 @@ except ImportError:
 
 from common.token_alarm_window import is_within_token_alarm_window
 
+# #3554: the premise guard on the word "episodic" — rule, bar and measurement.
+from operational import episodic_premise as _episodic
+
 try:
     from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASSES, PRICES as _BEDROCK_PRICES
 except ImportError:  # pragma: no cover - packaging drift; the class split degrades to "no signal"
@@ -692,6 +695,7 @@ def _write_breakdown(
     ai_class_split: dict | None = None,
     prod_class_share=None,
     projected_all_classes: float | None = None,
+    active_days_by_class: dict | None = None,
 ) -> None:
     """Persist the projection breakdown alongside the tier (#822).
 
@@ -752,6 +756,8 @@ def _write_breakdown(
         "projected_all_classes": None if projected_all_classes is None else round(projected_all_classes, 2),
         "projected_classes": list(PROJECTED_CALLER_CLASSES),
         "episodic_classes": list(EPISODIC_CALLER_CLASSES),
+        # #3554: those two say WHAT the narrowing is; these say whether its premise holds.
+        **_episodic.premise_fields(active_days_by_class or {}, EPISODIC_CALLER_CLASSES),
     }
     try:
         _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
@@ -1062,6 +1068,9 @@ def lambda_handler(event, context):
         # The pre-#2892 projection, kept as a published series so the change in what
         # ProjectedMonthlySpend means is auditable instead of silent.
         projected_all_classes = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
+        # #3554: measure the premise the narrowing rests on. Reports; never re-scopes.
+        active_days_by_class = _episodic.active_days_by_class(_cw, CALLER_CLASSES, CALLER_CLASS_DIMENSION, now)
+        premise_broken = _episodic.report(active_days_by_class, EPISODIC_CALLER_CLASSES, projected, projected_all_classes)
 
         # ADR-133 (#739): surge-mode ceiling. Pure function of reader traffic
         # (trailing 7d uniques) — never of spend — so it floats the ceiling up
@@ -1155,6 +1164,7 @@ def lambda_handler(event, context):
             ai_class_split=ai_class_split,
             prod_class_share=prod_class_share,
             projected_all_classes=projected_all_classes,
+            active_days_by_class=active_days_by_class,
         )
 
         return {
@@ -1169,6 +1179,7 @@ def lambda_handler(event, context):
                     "projected": round(projected, 2),
                     "projected_all_classes": round(projected_all_classes, 2),
                     "prod_class_share": None if prod_class_share is None else round(prod_class_share, 4),
+                    "episodic_premise_violations": premise_broken,
                     "ai_dev_ci_per_day": round(ai_dev_ci_daily, 2),
                     "tier": tier,
                     "prev_tier": prev,
