@@ -235,3 +235,24 @@ def test_only_a_workflow_dispatch_can_inject_a_synthetic_failure():
     # The input lives under workflow_dispatch, never under `on.push`.
     push_block = text.split("  push:", 1)[1].split("  workflow_dispatch:", 1)[0]
     assert "qa_inject_failure" not in push_block
+
+
+def test_every_declining_surface_can_actually_be_fired_by_the_live_proof_lever():
+    """#3652. `visual_qa_verdict.py` decides which surfaces DECLINE the rollback; this
+    dispatch input is the only way to watch one decline for real. A surface the
+    classifier knows and the lever cannot fire is a fail-closed path with green unit
+    tests and no live proof — the #3200 shape, which is the reason box 3 exists at all.
+    So the two lists must be equal, not merely overlapping."""
+    import sys
+
+    sys.path.insert(0, os.path.join(_REPO, "tests"))
+    import visual_qa_verdict
+
+    text = _read(_SITE_DEPLOY)
+    m = re.search(r"qa_inject_failure:.*?options: \[(.*?)\]", text, re.DOTALL)
+    assert m, "the qa_inject_failure input no longer declares an `options: [...]` list"
+    declared = [c.strip() for c in m.group(1).split(",")]
+    assert declared == visual_qa_verdict.injection_choices(), (
+        f"the workflow offers {declared} but the classifier knows {visual_qa_verdict.injection_choices()} — "
+        f"a surface missing from the dispatch input can never be watched declining on a real run (#3652)"
+    )

@@ -239,7 +239,9 @@ def test_injection_is_a_closed_choice_set():
     assert V.injected_result("none") is None
     assert V.injected_result("") is None
     assert V.injected_result("site-shell") is None, "injecting a REACHABLE surface would prove nothing"
-    assert V.injection_choices() == ["none", V.API, V.DEPLOY_SCRIPT]
+    # #3652 added the third choice: the AI oracle returning no judgement is now its own
+    # declining surface, and a decline path with no way to fire it has no live proof.
+    assert V.injection_choices() == ["none", V.AI_UNEVALUATED, V.API, V.DEPLOY_SCRIPT]
 
 
 # ── the CLI contract the workflow depends on ─────────────────────────────────────

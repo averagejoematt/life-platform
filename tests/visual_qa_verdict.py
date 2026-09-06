@@ -27,7 +27,7 @@ floor. This module is the scope check: a pure function over the sweep's own
 ``report.json`` that names the surface and answers ONE question — *is this defect
 `site/**`-reachable?*
 
-THE FOUR SURFACES
+THE FIVE SURFACES
 -----------------
 ``deploy-script``  The page SHELL is not HTML (Content-Type says so), or the
                    no-title/no-lang/no-viewport + ``js_bytes 0`` cluster appears across
@@ -44,10 +44,36 @@ THE FOUR SURFACES
 ``api``            Broken `/api/*` calls, stale or empty data-bound text, reader-truth
                    findings about served prose, an accuracy-audit red. All of it is
                    DynamoDB/site-api content. NOT reachable — this is the Session G case.
+``ai-unevaluated`` The AI oracle did not RETURN A JUDGEMENT for this page — the reply
+                   carried no readable verdict, was cut off at ``max_tokens``, or the
+                   call could not be made at all (``AI-vision UNEVALUATED (#2973/#3540)``,
+                   ``Reader-truth UNEVALUATED (#3540)``). NOT reachable, and for a
+                   different reason than the other three: this page's bytes were never
+                   judged, so there is no defect to revert TOWARD. Reverting on it is a
+                   coin-flip dressed as a remediation — see #3652 below.
 ``site-shell``     Everything else: a11y regressions, horizontal overflow, a missing
                    viewport meta on a real HTML shell, a missing selector, JS code
                    errors. REACHABLE — the bytes came out of `site/` and the previous
                    build's bytes are the fix.
+
+WHY ``ai-unevaluated`` EXISTS (#3652, 2026-09-06)
+--------------------------------------------------
+#3540 (2026-09-05) correctly stopped a truncated judge reply from being scored as a
+clean ``{"severity": "ok", "renders_ok": true}`` pass: the page becomes an explicit
+UNEVALUATED FAIL. That fix had an unintended second-order effect HERE. The string it
+appends — ``AI-vision UNEVALUATED (#3540): …`` — matched no marker in this module, so it
+fell through the negative control to ``site-shell`` → REACHABLE → the rollback ran. The
+result: every `site/**` merge deployed and was immediately reverted (runs 34056404335 and
+34057051481, 2026-09-06), because `/coaching/`'s verdict — 7 `undated_ai_band` issues, one
+per operational coach — did not fit its 700-token budget.
+
+The negative control is intact and unchanged: an UNRECOGNISED string still classifies as
+``site-shell`` and still rolls back. What changed is that this shape is no longer
+unrecognised. It is not a "we haven't thought about it" default any more; it is a named
+class with a named ruling, and the ruling is the honest one — nobody looked at the page,
+so nobody can say a revert would help. The gate still FAILS (that is #3540's half, and
+this module cannot and does not weaken it); only the automatic REVERT declines, and it
+declines out loud, filing the #1447 tracked issue by surface name.
 
 THE NEGATIVE CONTROL, AND WHY IT POINTS WHERE IT DOES
 -----------------------------------------------------
@@ -61,7 +87,7 @@ paying for. ``test_visual_qa_verdict_3352.py`` pins the control.
 PRECEDENCE WITHIN ONE PAGE
 --------------------------
 A page usually fails for several reasons at once. Its surface is the LEAST reachable of
-its matches (``deploy-script`` > ``api`` > ``hashed-asset`` > ``site-shell``) and the
+its matches (``deploy-script`` > ``api`` > ``ai-unevaluated`` > ``hashed-asset`` > ``site-shell``) and the
 reason string names every match. This is the honest direction: if a page carries both an
 a11y regression and a broken API call, a `site/**` revert cannot make that page pass, so
 the answer is "alert a human", not "revert and hope". The reason string is what tells the
@@ -92,15 +118,19 @@ import sys
 
 # Bump when a classification RULE changes (not when prose changes) so a verdict.json
 # pulled from an old run artifact can be read against the rules that produced it.
-RULE_VERSION = "3352.1"
+RULE_VERSION = "3652.1"
 
 DEPLOY_SCRIPT = "deploy-script"
 HASHED_ASSET = "hashed-asset"
 API = "api"
+AI_UNEVALUATED = "ai-unevaluated"
 SITE_SHELL = "site-shell"
 
-# Least-reachable first — this IS the per-page precedence order.
-SURFACE_PRECEDENCE = (DEPLOY_SCRIPT, API, HASHED_ASSET, SITE_SHELL)
+# Least-reachable first — this IS the per-page precedence order. `ai-unevaluated` sits
+# ABOVE hashed-asset/site-shell on purpose: a page carrying both a real rendering defect
+# and an unreturned verdict has still not been judged as a whole, so "revert and hope" is
+# not available for it; the reason string still names the site-shell half for the human.
+SURFACE_PRECEDENCE = (DEPLOY_SCRIPT, API, AI_UNEVALUATED, HASHED_ASSET, SITE_SHELL)
 
 #: The surfaces a `site/**` revert can actually change. Everything else must alert.
 REACHABLE_SURFACES = frozenset({SITE_SHELL, HASHED_ASSET})
@@ -123,6 +153,22 @@ _API_MARKERS = (
     "empty section:",  # visual_qa.py ~988 — a whole data section came back blank
     "reader-truth (",  # visual_ai_qa.py ~842 — the prose judge, on stored narrative
 )
+#: The AI oracle answered with NOTHING JUDGEABLE (#3652). Matched as substrings so the
+#: single entry covers every issue-number suffix the two call sites use today
+#: (`AI-vision UNEVALUATED (#2973)` — could not call/see the page at all;
+#: `AI-vision UNEVALUATED (#3540)` — the reply carried no readable verdict) and any
+#: future one, because the ISSUE NUMBER is not the classification. The reader-truth
+#: judge's spelling is here too: it is the identical class by construction (both use
+#: `UNEVALUATED_KINDS` — no_verdict/unparseable/truncated), and listing only one of the
+#: two would make the ruling depend on which judge happened to go quiet. Note the
+#: reader-truth entry has no live effect on the deploy path — #3251 removed
+#: `--reader-truth` from the per-deploy copies — so it is vocabulary parity, not a
+#: widening of what declines today.
+_UNEVALUATED_MARKERS = (
+    "ai-vision unevaluated (",  # visual_ai_qa.py ~655 (#2973) and ~675 (#3540)
+    "reader-truth unevaluated (",  # visual_ai_qa.py ~914 (#3540) — daily standalone only
+)
+
 # The accuracy gate (`tests/accuracy_audit.py --live`) is a SEPARATE workflow step with no
 # entry in report.json, so it is folded in from its step outcome — see classify_report's
 # `accuracy_audit_failed`. It is not in the marker list above because no issue string
@@ -173,19 +219,27 @@ def page_matches(result):
 
     # Per ISSUE, not per page: a page that fails for two reasons must record BOTH, or
     # the verdict a human reads would hide the half the rollback could have fixed.
-    api_hits, asset_hits, unexplained = [], [], []
+    api_hits, asset_hits, uneval_hits, unexplained = [], [], [], []
     for text in _text(result):
-        hits = [m for m in _API_MARKERS if m in text.lower()]
+        lowered = text.lower()
+        hits = [m for m in _API_MARKERS if m in lowered]
+        uneval = [m for m in _UNEVALUATED_MARKERS if m in lowered]
         is_asset = bool(_MIME_REFUSAL_RE.search(text) or _HASHED_ASSET_RE.search(text))
         api_hits.extend(hits)
+        if uneval:
+            uneval_hits.append(text)
         if is_asset:
             asset_hits.append(text)
-        if not hits and not is_asset:
+        if not hits and not uneval and not is_asset:
             unexplained.append(text)
 
     if api_hits:
         matched.append(API)
         reasons[API] = "data-bound failure (" + ", ".join(sorted(set(api_hits))) + ")"
+
+    if uneval_hits:
+        matched.append(AI_UNEVALUATED)
+        reasons[AI_UNEVALUATED] = f"the AI oracle returned no judgement for this page: {uneval_hits[0][:120]}"
 
     if asset_hits:
         matched.append(HASHED_ASSET)
@@ -200,6 +254,17 @@ def page_matches(result):
 
     ordered = [s for s in SURFACE_PRECEDENCE if s in matched]
     return ordered, reasons
+
+
+#: Why each unreachable surface declines — one clause per surface, so the note a human
+#: reads names THIS run's reason rather than a fixed sentence listing every incident.
+#: (Before #3652 the note always cited both the P1 and the Session G cases, which read as
+#: boilerplate the moment a third unreachable class existed.)
+_UNREACHABLE_WHY = {
+    DEPLOY_SCRIPT: "re-running the deploy re-runs the defect (2026-08-31 P1)",
+    API: "reverting reverts an innocent build while the real defect stays live (2026-08-27 Session G)",
+    AI_UNEVALUATED: "the page was never judged, so there is no defect to revert toward (#3652) — the gate still FAILS, only the automatic revert declines",
+}
 
 
 def classify_report(report, *, accuracy_audit_failed=False):
@@ -278,7 +343,9 @@ def classify_report(report, *, accuracy_audit_failed=False):
         note = (
             "A site/** revert cannot reach "
             + ",".join(unreachable)
-            + " — re-running the deploy re-runs it (2026-08-31 P1) or reverts an innocent build (2026-08-27 Session G)."
+            + " — "
+            + "; ".join(_UNREACHABLE_WHY.get(s, "a site/** revert cannot change it") for s in unreachable)
+            + "."
         )
 
     return {
@@ -313,6 +380,17 @@ _INJECTED_SURFACES = {
         "path": "(injected — VISUAL_QA_INJECT_SURFACE=deploy-script)",
         "issues": ["[INJECTED #3352 live proof — not a real defect] page shell Content-Type is application/json"],
         "shell_content_type": "application/json",
+    },
+    # #3652's own lever. The issue text is the REAL string visual_ai_qa.py appends on a
+    # truncated verdict (prefixed with the [INJECTED] label), so firing this choice
+    # exercises the production marker rule — not a bypass and not a paraphrase.
+    AI_UNEVALUATED: {
+        "page": "[INJECTED] live-proof probe",
+        "path": "(injected — VISUAL_QA_INJECT_SURFACE=ai-unevaluated)",
+        "issues": [
+            "[INJECTED #3652 live proof — not a real defect] AI-vision UNEVALUATED (#3540): the judge "
+            "returned no readable verdict (truncated) — this page was NOT assessed"
+        ],
     },
 }
 
