@@ -42,9 +42,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "deploy"))
 
 import check_handover_lines  # noqa: E402  (same directory; the ONE marker derivation, #3006)
 import check_main_green  # noqa: E402  (same directory; the ONE head-coverage state vocabulary, #3212)
+import restart_verify_gates  # noqa: E402  (deploy/; the ONE docs-ci.yml derivation, #3477/#3531)
 
 TIMEOUT = 300  # seconds per gate; the whole battery is ~10s in practice
 
@@ -67,6 +69,58 @@ def _hooks_ok(rc, out):
     return rc == 0 and "🔴" not in out
 
 
+# ── the doc leg: DERIVED from docs-ci.yml, never restated here (#3531) ───────────────
+#
+# THIS BATTERY USED TO HAND-LIST FOUR OF DOCS CI'S TWELVE doc gates — doc-links,
+# doc-tombstones, doc-index (without `--strict`, while CI runs it WITH), adr-index. The
+# wrap commit touches docs/**, CLAUDE.md and .claude/**, which is exactly Docs CI's push
+# trigger, so the wrap battery could report GREEN over eight gates the very next push
+# would fail on: sync_doc_metadata --check, check_doc_facts, incident_log_patterns
+# --check, generate_mcp_tool_catalog --check, operating_calendar --check, skill_lint
+# --offline, generate_platform_model --check. SKILL.md even described check_doc_facts as
+# guarding the doc surface while the battery never ran it.
+#
+# "A check that executes a subset of another check can promise nothing about it" (#3479).
+# So the list is now DERIVED from the same file Docs CI is defined in, through the same
+# one function `deploy/restart_verify_gates.py` uses for the reset sweep. A thirteenth
+# gate in docs-ci.yml joins this battery with no edit here.
+#
+# THE ONE DECLARED OMISSION, so a reader can see what is not covered rather than infer it
+# from silence: `restart_verify_gates.MUTATING_GATES` — today just `skill_lint.py
+# --self-test`. It edits a TRACKED SKILL.md in place and restores it in a `finally`. This
+# battery runs its gates in PARALLEL and immediately before the wrap commit, so running it
+# here would (a) let a sibling gate observe the corpus mid-mutation and (b) risk committing
+# the planted defect if the 300s timeout SIGKILLs it past its restore. Its detection scope
+# is covered here by `skill_lint --offline`, which is the same lint over the same corpus;
+# what is NOT covered is the mutation proof itself, and that is the cost, stated.
+
+
+def _gate_name(cmd) -> str:
+    """A stable short id for a derived gate: `scripts/check_doc_links.py` -> `doc-links`.
+
+    Keeps the four historical names (doc-links, doc-tombstones, doc-index, adr-index)
+    stable across this change, and disambiguates two invocations of one script by flag.
+    """
+    stem = Path(cmd[1]).stem
+    for prefix in ("check_", "generate_"):
+        if stem.startswith(prefix):
+            stem = stem[len(prefix) :]
+            break
+    name = stem.replace("_", "-")
+    flags = [a for a in cmd[2:] if a.startswith("--") and a not in ("--check", "--strict")]
+    return f"{name}{''.join(f' {f}' for f in flags)}" if flags else name
+
+
+def derived_doc_gates() -> list:
+    """Docs CI's python gates, minus the declared mutating ones, as Gate objects."""
+    gates = []
+    for cmd in restart_verify_gates.docs_ci_gate_commands():
+        if " ".join(cmd[1:]) in restart_verify_gates.MUTATING_GATES:
+            continue
+        gates.append(Gate(_gate_name(cmd), "e", cmd))
+    return gates
+
+
 # ── the gather battery: every gate that does not read the finished handover ──────────
 GATHER = [
     Gate("main-green", "e2", ["python3", "scripts/check_main_green.py"], marker="Main"),
@@ -75,10 +129,7 @@ GATHER = [
     Gate("backlog-hygiene", "e7", ["python3", "scripts/check_backlog_hygiene.py"]),
     Gate("alarm-citations", "e10", ["python3", "scripts/check_alarm_citations.py"], marker="Alarms"),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),
-    Gate("doc-links", "e", ["python3", "scripts/check_doc_links.py"]),
-    Gate("doc-tombstones", "e", ["python3", "scripts/check_doc_tombstones.py"]),
-    Gate("doc-index", "e", ["python3", "scripts/check_doc_index.py"]),
-    Gate("adr-index", "e", ["python3", "scripts/generate_adr_index.py", "--check"]),
+    *derived_doc_gates(),  # #3531: every Docs CI python gate, derived from docs-ci.yml
     # #3318: detector A of the closure contract over THIS session's closures (closed since
     # today 00:00 UTC — the same window (e8) lists). In the gather phase every issue closed
     # today still lacks its (e8) verdict, so `no-outcome-verdict` here IS the (e8) to-do list;

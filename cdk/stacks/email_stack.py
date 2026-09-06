@@ -15,6 +15,9 @@ Lambdas (11):
 
 """
 
+import sys
+from pathlib import Path
+
 import aws_cdk as cdk
 from aws_cdk import (
     Duration,
@@ -34,6 +37,14 @@ from constructs import Construct
 from stacks import role_policies as rp
 from stacks.constants import ACCT, CF_DIST_ID, LAMEENC_LAYER_ARN, REGION, TABLE_NAME
 from stacks.lambda_helpers import create_platform_lambda
+
+# ── #3568: the reader-facing From addresses, read at synth time from the ONE
+# registry (lambdas/common/email_identity.py) rather than hand-typed here.
+# Same sys.path pattern ingestion_stack.py uses for source_registry. The
+# hand-typed literal is what let the code default and the CDK value disagree
+# with each other and with SES; there is now one home for both.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
+from common.email_identity import CHRONICLE_SENDER, SIGNAL_SENDER, TRANSACTIONAL_SENDER  # noqa: E402
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE = TABLE_NAME
@@ -420,6 +431,7 @@ class EmailStack(Stack):
                 "SITE_URL": "https://averagejoematt.com",
                 "SEND_RATE_PER_SEC": "14.0",
                 "EXTERNAL_EMAILS_ENABLED": "true",  # lifted 2026-08-03 — owner decision on #1951: make the weekly promise true
+                "EMAIL_SENDER": SIGNAL_SENDER,  # #3568 — reader mail is From the site domain, not the personal one
             },
             custom_policies=rp.email_weekly_signal(),
             **shared,
@@ -444,6 +456,7 @@ class EmailStack(Stack):
                 "SITE_URL": "https://averagejoematt.com",
                 "SEND_RATE_PER_SEC": "14.0",
                 "EXTERNAL_EMAILS_ENABLED": "true",  # lifted 2026-08-03 — owner decision on #1951: make the weekly promise true
+                "EMAIL_SENDER": CHRONICLE_SENDER,  # #3568 — reader mail is From the site domain, not the personal one
             },
             custom_policies=rp.email_chronicle_sender(),
             **shared,
@@ -538,6 +551,7 @@ class EmailStack(Stack):
                 "SITE_URL": "https://averagejoematt.com",
                 "SEND_RATE_PER_SEC": "14.0",
                 "EXTERNAL_EMAILS_ENABLED": "true",  # lifted 2026-08-03 with the other two subscriber senders (#1951)
+                "EMAIL_SENDER": CHRONICLE_SENDER,  # #3568 — reader mail is From the site domain, not the personal one
             },
             custom_policies=rp.email_between_chronicle(),
             **shared,
@@ -612,7 +626,8 @@ class EmailStack(Stack):
             schedule="cron(5 17 * * ? *)",  # 10:05 AM PT daily (staggered from daily-brief)
             timeout_seconds=120,
             memory_mb=256,
-            environment=_email_env,
+            # #3568: onboarding is reader mail — From the site domain.
+            environment={**_email_env, "EMAIL_SENDER": TRANSACTIONAL_SENDER},
             custom_policies=rp.subscriber_onboarding(),
             **shared,
         )

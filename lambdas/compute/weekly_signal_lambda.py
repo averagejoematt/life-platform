@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common.email_identity import SIGNAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -38,7 +39,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
+SENDER = os.environ.get("EMAIL_SENDER", SIGNAL_SENDER)
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 SEND_RATE = float(os.environ.get("SEND_RATE_PER_SEC", "1.0"))
 
