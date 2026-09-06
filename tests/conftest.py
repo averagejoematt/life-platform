@@ -613,3 +613,24 @@ def pytest_runtest_logreport(report):
 def pytest_sessionfinish(session, exitstatus):
     for line in slow_test_warning_lines(_SLOW_TESTS):
         print(f"\n{line}")
+
+
+@pytest.fixture(autouse=True)
+def _write_day_is_genesis_day(monkeypatch):
+    """#3598: the provenance stamp derives phase + cycle from the WRITE'S DATE
+    (experiment_stamp / tag_record's undated path read `phase_taxonomy._write_date`).
+    Every writer test in this suite was written under the pre-#3598 assumption that
+    a write is "the experiment", and a future-genesis reset (the sanctioned eve
+    reset, #931) would otherwise turn all of them pilot for a day — and the #3477
+    sweep runs CI's gates INSIDE the reset, so that day is reset day. So the suite's
+    write day is GENESIS DAY unless a test says otherwise: pass `as_of=` (or re-pin
+    `_write_date`) to exercise the countdown window — tests/test_reset_writer_contract_3598.py
+    does, in both directions."""
+    try:
+        from common.constants import EXPERIMENT_START_DATE
+        from experiment import phase_taxonomy
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    monkeypatch.setattr(phase_taxonomy, "_write_date", lambda: EXPERIMENT_START_DATE)
+    yield

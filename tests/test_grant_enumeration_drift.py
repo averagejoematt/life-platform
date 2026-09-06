@@ -623,14 +623,9 @@ def test_live_oidc_role_grants_cover_the_derived_consumer_set():
 #: entry's apply HAS landed, so the queue cannot become a graveyard. The driver deletes
 #: the entry in the same commit as the apply.
 _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
-    "github-actions-remediation-role": (
-        "2026-09-05 (#3562): SES scoped to the one identity + a ses:FromAddress condition, "
-        "logs:GetLogEvents/FilterLogEvents scoped to the /aws/lambda + /aws/apigateway log groups, "
-        "cloudformation drift scoped to the LifePlatform* stacks, events:ListTargetsByRule to rule/*. "
-        "Apply: aws iam put-role-policy --role-name github-actions-remediation-role "
-        "--policy-name remediation-permissions --policy-document "
-        "file://infra/iam/github-actions-remediation-role.permissions.json"
-    ),
+    # 2026-09-05: the #3562 remediation-role entry was applied live via
+    # deploy/setup_remediation_role.sh (post-apply verifier: 15/15 CLEAN) and removed
+    # here the same day, per the #2824 rule that this queue stays a queue.
 }
 
 

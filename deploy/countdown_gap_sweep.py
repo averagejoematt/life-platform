@@ -274,7 +274,16 @@ def classify_item(
     if "phase" in item and item.get("phase") != EXPERIMENT_PHASE_CURRENT:
         # Fails PHASE_FILTER_EXPRESSION / singleton_visible today — not leaking.
         return ALREADY_HIDDEN
-    if not wipe.should_tombstone(item, mode):
+    # `pk` is load-bearing (#3514): should_tombstone's ADR-153 carve-out — the one
+    # that stops the wipe archiving Matthew's CROSS_PHASE CHAT#/RELATIONSHIP# rows
+    # on an otherwise experiment-scoped COACH#* partition — is guarded by
+    # `pk.startswith("COACH#")`, so passing the default "" made it inert HERE while
+    # the wipe itself (restart_intelligence_wipe.main) passes pk and is correct.
+    # Measured live 2026-09-05: the sweep reported 3 CROSS_PHASE RELATIONSHIP#state
+    # rows as escapees and 44 CHAT# rows as flag_pre_window — an --apply of
+    # reconcile_countdown_gap.py would have tombstoned the coach relationship state
+    # ADR-153 exists to protect, and would have undone the #3514 reconcile.
+    if not wipe.should_tombstone(item, mode, pk=str(item.get("pk", ""))):
         return MODE_SKIP
     if sanctioned_reason(item, genesis_date_str, current_cycle) is not None:
         return SANCTIONED

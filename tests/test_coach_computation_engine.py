@@ -82,6 +82,9 @@ def _no_ssm(monkeypatch):
     import coach.coach_checkin as coach_checkin
 
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 12)
+    from experiment import phase_taxonomy
+
+    monkeypatch.setattr(phase_taxonomy, "_cycle_geneses", lambda: None)  # #3598: SSM is the fallback; pin the registry away
 
 
 # ── record builders ──────────────────────────────────────────────────────────

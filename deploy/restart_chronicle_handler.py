@@ -47,6 +47,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import journal_archive_notice  # noqa: E402 — sibling deploy module (#3512), imported by leaf name like restart_media_reset does
+from restart_work_contract import work_report  # noqa: E402 — #3598: the per-step work contract
 
 from lambdas.common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
 
@@ -140,12 +141,21 @@ def unregister_journal_permalink_redirects(apply: bool) -> list[str]:
     return removed
 
 
-# Each entry: (prefix, archive_prefix, index_key). index_key=None → no index page
+# Each entry: (prefix, archive_root, index_key). index_key=None → no index page
 # to rewrite for that prefix (the archive step still runs).
+#
+# #3598: the second column is the archive ROOT, not a destination. `archive_one`
+# keys the destination on (slug, cycle) beneath it — `blog/archive/cycle-16/<slug>`
+# — the same rule journal_archive_notice.archive_prefix_for uses for the journal
+# permalinks (#3512). The old constant `archive/pilot/` destinations are what made
+# every reset since cycle 4 report `html_files_archived=0` as success: a reused slug
+# collided with the 2026-07-10 archival and "already archived" was the whole story.
+# The legacy `archive/pilot/` subtrees stay where they are (history) and are excluded
+# from the live listing by root.
 CHRONICLE_PREFIXES = [
-    ("blog/", "blog/archive/pilot/", "blog/index.html"),
-    ("dashboard/chronicle/posts/", "dashboard/chronicle/archive/pilot/posts/", "dashboard/chronicle/index.html"),
-    ("site/chronicle/", "site/chronicle/archive/pilot/", "site/chronicle/index.html"),
+    ("blog/", "blog/archive/", "blog/index.html"),
+    ("dashboard/chronicle/posts/", "dashboard/chronicle/archive/", "dashboard/chronicle/index.html"),
+    ("site/chronicle/", "site/chronicle/archive/", "site/chronicle/index.html"),
     # NB the v4 article pages (generated/journal/posts/week-NN/index.html, served at
     # /journal/posts/week-NN/) were a member of this list until #3512 and now have
     # their OWN step — see step [1b] in main(). Two reasons they could not stay here:
@@ -253,29 +263,68 @@ def list_chronicle_html(s3, prefix: str, archive_prefix: str, index_key: str) ->
     return out
 
 
-def s3_exists(s3, key: str) -> bool:
+def s3_head(s3, key: str) -> dict | None:
+    """head_object, or None when the key is absent (any other error propagates)."""
     try:
-        s3.head_object(Bucket=S3_BUCKET, Key=key)
-        return True
+        return s3.head_object(Bucket=S3_BUCKET, Key=key)
     except ClientError as e:
         if e.response["Error"]["Code"] in ("404", "NoSuchKey", "NotFound"):
-            return False
+            return None
         raise
 
 
-def archive_one(s3, src_key: str, prefix: str, archive_prefix: str, apply: bool, now_iso: str) -> tuple[str, bool]:
-    """Archive one chronicle HTML file. Returns (archive_key, did_archive)."""
+def s3_exists(s3, key: str) -> bool:
+    return s3_head(s3, key) is not None
+
+
+def cycle_archive_prefix(archive_root: str, cycle: int | None, genesis: str) -> str:
+    """The (cycle)-keyed archive prefix under `archive_root` — `blog/archive/cycle-16/`,
+    or `blog/archive/genesis-<date>/` when the cycle is unreadable (dry-run / no SSM).
+    Same rule as journal_archive_notice.archive_prefix_for (#3512): the segment is
+    unique per reset, which is the whole collision fix; it never falls back to the
+    constant `pilot/` that archived nothing for two months."""
+    seg = f"cycle-{cycle}" if cycle is not None else f"genesis-{genesis}"
+    return f"{archive_root}{seg}/"
+
+
+def archive_one(
+    s3,
+    src_key: str,
+    prefix: str,
+    archive_root: str,
+    apply: bool,
+    now_iso: str,
+    *,
+    cycle: int | None = None,
+    genesis: str = EXPERIMENT_START_DATE,
+) -> tuple[str, bool, str | None]:
+    """Archive one chronicle HTML file under (slug, cycle). Returns
+    ``(archive_key, did_archive, skip_reason)`` — `skip_reason` is None when it
+    archived, else the NAMED reason it did not (#3598 work contract).
+
+    Two named skips, both computed, never assumed:
+      * the source is already a tombstone stub (a prior reset's JSON overwrite) —
+        there is no page to archive;
+      * the destination for THIS cycle already exists with THIS genesis's reason —
+        the idempotent re-run. A destination from a different genesis under the
+        same cycle number (the 2026-09-04 in-place re-anchor) is overwritten.
+    """
     base = src_key[len(prefix) :]
-    dest_key = f"{archive_prefix}{base}"
-    if s3_exists(s3, dest_key):
-        return dest_key, False
+    reason = f"experiment_restart_{genesis}"
+    dest_key = f"{cycle_archive_prefix(archive_root, cycle, genesis)}{base}"
+    src_head = s3_head(s3, src_key)
+    if src_head is not None and str(src_head.get("ContentType") or "").startswith("application/json"):
+        return dest_key, False, "source is a tombstone stub left by a prior reset (no page to archive)"
+    dest_head = s3_head(s3, dest_key)
+    if dest_head is not None and (dest_head.get("Metadata") or {}).get("tombstoned_reason") == reason:
+        return dest_key, False, f"already archived under {dest_key.rsplit(base, 1)[0]} for this genesis (re-run)"
     if apply:
         s3.copy_object(
             Bucket=S3_BUCKET,
             Key=dest_key,
             CopySource={"Bucket": S3_BUCKET, "Key": src_key},
             MetadataDirective="REPLACE",
-            Metadata={"tombstoned_at": now_iso, "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}"},
+            Metadata={"tombstoned_at": now_iso, "tombstoned_reason": reason},
         )
         # Tombstone-overwrite the original (IAM denies DeleteObject).
         s3.put_object(
@@ -286,12 +335,34 @@ def archive_one(s3, src_key: str, prefix: str, archive_prefix: str, apply: bool,
                     "tombstone": True,
                     "tombstoned_at": now_iso,
                     "archived_to": dest_key,
-                    "tombstoned_reason": f"experiment_restart_{EXPERIMENT_START_DATE}",
+                    "tombstoned_reason": reason,
                 }
             ).encode(),
             ContentType="application/json",
         )
-    return dest_key, True
+    return dest_key, True, None
+
+
+def html_work_contract(total_html: int, archived: int, skip_reasons: dict) -> dict:
+    """#3598 work contract for step [1]: zero archives on non-zero input passes ONLY on
+    the named, computed skip reasons `archive_one` returned (tombstone stubs / this
+    genesis's own re-run) — never on "already archived" alone, which is what the
+    2026-09-04 report said about 29 pages it had not touched."""
+    skipped = sum(int(n) for n in skip_reasons.values())
+    reason = "; ".join(f"{n}× {r}" for r, n in sorted(skip_reasons.items())) if (total_html and not archived) else None
+    return {"input_count": int(total_html), "acted_count": int(archived), "skipped_count": skipped, "reason": reason or None}
+
+
+def journal_work_contract(stats: dict) -> dict:
+    """#3598 work contract for step [1b]: input = orphaned article pages; acted =
+    archived or annotated; the only named zero is "every page already carries the
+    current notice" — the re-run, computed from the sweep's own counters."""
+    j_input = int(stats["scanned"]) - int(stats["kept_live"]) - int(stats["not_html"])
+    j_acted = int(stats["archived"]) + int(stats["annotated"])
+    reason = None
+    if j_input > 0 and j_acted == 0 and int(stats["already_current"]) == j_input:
+        reason = f"every orphaned permalink ({j_input}) already carries the current archive notice + cycle archive (re-run)"
+    return {"input_count": j_input, "acted_count": j_acted, "skipped_count": int(stats["already_current"]), "reason": reason}
 
 
 def _build_chronicle_placeholder() -> str:
@@ -517,22 +588,27 @@ def main():
     # ── 1. Archive all chronicle HTML across every chronicle prefix ──
     archived_count = 0
     skipped_count = 0
+    skip_reasons: dict[str, int] = {}
     total_html = 0
     print(f"\n[1/3] Archiving chronicle HTML across {len(CHRONICLE_PREFIXES)} prefix(es):")
-    for prefix, archive_prefix, _ in CHRONICLE_PREFIXES:
-        html_keys = list_chronicle_html(s3, prefix, archive_prefix, _)
+    for prefix, archive_root, _ in CHRONICLE_PREFIXES:
+        html_keys = list_chronicle_html(s3, prefix, archive_root, _)
         total_html += len(html_keys)
         if not html_keys:
             print(f"  [{prefix}] no files")
             continue
         print(f"  [{prefix}] {len(html_keys)} file(s):")
         for src in html_keys:
-            dest, did = archive_one(s3, src, prefix, archive_prefix, args.apply, now_iso)
+            dest, did, why = archive_one(s3, src, prefix, archive_root, args.apply, now_iso, cycle=current_cycle)
             if did:
                 archived_count += 1
                 print(f"    {('would archive' if not args.apply else 'archived')}: {src} → {dest}")
             else:
                 skipped_count += 1
+                skip_reasons[str(why)] = skip_reasons.get(str(why), 0) + 1
+                print(f"    skip: {src} — {why}")
+    html_contract = html_work_contract(total_html, archived_count, skip_reasons)
+    work_report("restart_chronicle_handler:html_archive", **html_contract)
 
     # ── 1b. Journal permalinks: cycle-keyed archive + editor's-note banner (#3512) ──
     #
@@ -565,6 +641,7 @@ def main():
         f"annotated={journal_stats['annotated']} already_current={journal_stats['already_current']} "
         f"not_html={journal_stats['not_html']} no_anchor={journal_stats['no_anchor']}"
     )
+    work_report("restart_chronicle_handler:journal_permalinks", **journal_work_contract(journal_stats))
 
     # ── 2. Rewrite each index (prefixes with index_key=None have no hub page) ──
     print("\n[2/3] Rewriting chronicle index pages:")
@@ -620,7 +697,8 @@ def main():
         f"generated={now_iso}\n\n"
         f"html_files_total       = {total_html}\n"
         f"html_files_archived    = {archived_count}\n"
-        f"html_files_already_archived = {skipped_count}\n"
+        f"html_files_skipped     = {skipped_count}\n"
+        f"html_files_skip_reasons = {html_contract['reason'] or '-'}\n"
         # #3512: the journal permalinks report SEPARATELY. Folding them into the
         # counters above is how `html_files_archived=0` read as "nothing to do" for
         # two months while three cycle-14/15 articles sat live at their permalinks.

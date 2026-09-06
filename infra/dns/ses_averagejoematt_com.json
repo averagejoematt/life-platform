@@ -1,0 +1,10 @@
+{
+  "Comment": "SES identity for averagejoematt.com (#3606 item 17 / #3568): Easy DKIM CNAMEs + custom MAIL FROM mail.averagejoematt.com. Apex MX/SPF (SimpleLogin) untouched; DMARC is strict-aligned, DKIM on the domain carries alignment.",
+  "Changes": [
+    {"Action": "UPSERT", "ResourceRecordSet": {"Name": "jme5bvtad6odrq3pn544sxcxtbenudlb._domainkey.averagejoematt.com.", "Type": "CNAME", "TTL": 1800, "ResourceRecords": [{"Value": "jme5bvtad6odrq3pn544sxcxtbenudlb.dkim.amazonses.com"}]}},
+    {"Action": "UPSERT", "ResourceRecordSet": {"Name": "tpo42fblnnztoluq6zvwpxst2ww62atw._domainkey.averagejoematt.com.", "Type": "CNAME", "TTL": 1800, "ResourceRecords": [{"Value": "tpo42fblnnztoluq6zvwpxst2ww62atw.dkim.amazonses.com"}]}},
+    {"Action": "UPSERT", "ResourceRecordSet": {"Name": "7nvpq7zirfac2cqzrdtmeepgtipojsqz._domainkey.averagejoematt.com.", "Type": "CNAME", "TTL": 1800, "ResourceRecords": [{"Value": "7nvpq7zirfac2cqzrdtmeepgtipojsqz.dkim.amazonses.com"}]}},
+    {"Action": "UPSERT", "ResourceRecordSet": {"Name": "mail.averagejoematt.com.", "Type": "MX", "TTL": 1800, "ResourceRecords": [{"Value": "10 feedback-smtp.us-west-2.amazonses.com"}]}},
+    {"Action": "UPSERT", "ResourceRecordSet": {"Name": "mail.averagejoematt.com.", "Type": "TXT", "TTL": 1800, "ResourceRecords": [{"Value": "\"v=spf1 include:amazonses.com ~all\""}]}}
+  ]
+}
