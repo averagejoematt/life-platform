@@ -52,6 +52,8 @@ def _load(module_name: str, rel_path: str):
     return mod
 
 
+from prereg_fixture_series import fixture_series  # noqa: E402
+
 seeder = _load("seed_genesis_preregistration", "deploy/seed_genesis_preregistration.py")
 publisher = _load("publish_genesis_preregistration", "deploy/publish_genesis_preregistration.py")
 predict_builder = _load("build_genesis_predict_week", "deploy/build_genesis_predict_week.py")
@@ -71,7 +73,9 @@ def _fixture_frozen():
         "genesis": seeder.EXPERIMENT_START_DATE,
         "generated_at": "2026-07-11T18:00:00+00:00",
         "coaches": coaches,
-        "hypotheses": seeder.build_hypotheses(GOALS),
+        # #3552: min_effect is derived from a trailing DDB series at freeze time; the
+        # offline stand-in keeps this fixture from reaching AWS.
+        "hypotheses": seeder.build_hypotheses(GOALS, series_reader=fixture_series),
     }
 
 

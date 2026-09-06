@@ -197,6 +197,13 @@ TEXT_ARGS: dict[str, tuple[tuple[int, ...], tuple[str, ...]]] = {
     "card_engine.draw_title": ((1,), ("text",)),
     "card_engine.draw_uncertainty": ((3, 4), ("value", "label")),
     "card_engine.draw_brand_mark": ((), ()),
+    # #3527: the gated-body drawer. Argument 1 is the `web.og_card_copy` body dict whose
+    # `lines` and `tiles` become the card text, so it is declared as a text position —
+    # the rule then reads any literal passed there. The copy itself lives in
+    # `og_card_copy.DATA_CLAIMS`, which is separately forbidden from containing a digit
+    # at all (tests/test_og_card_truth_3527.py::test_no_gated_card_claim_carries_a_number):
+    # every number on those cards must come from public_stats, never from the copy.
+    "_draw_gated_body": ((1,), ("body",)),
 }
 
 # A callee that LOOKS like drawing. Anything matching this and absent from TEXT_ARGS is a

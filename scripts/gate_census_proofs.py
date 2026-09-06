@@ -886,3 +886,76 @@ REGISTRY_PROOFS: dict[str, dict[str, Any]] = {
     )
     for selector, (alpha, n, worst) in _RECEDE_OBSERVED.items()
 }
+
+
+# ── #3520: deploy/ joins the cast guard's scan set, with four declared exceptions ──────
+#
+# `tests/test_cast_roster_consistency.PROMPT_LITERAL_DIRS` grew `deploy/` because
+# `deploy/seed_genesis_preregistration.py` hand-typed a coach roster naming a coach
+# retired at the cycle-13 genesis, and that roster is the input to the content-hash
+# SEALED pre-registration — the one reader-bound artifact that can never be corrected.
+# Widening the set brought four files with legitimate real-expert mentions into scope,
+# each of which gets an allowlist ENTRY, and each entry is a census gate of its own.
+#
+# An exception nobody has watched failing is indistinguishable from a rule that was never
+# enforced, so each entry is proved in BOTH directions:
+#   (a) LOAD-BEARING — delete the entry and the guard reds, naming that file. If it did
+#       not, the entry would be decoration over a file that never had a finding.
+#   (b) NOT A BLANKET EXEMPTION — plant an off-cast name the entry does NOT cover into
+#       the same file and the guard still reds. This is the direction that matters: a
+#       per-file allowlist that swallowed everything in its file would have re-opened
+#       exactly the hole #2384 closed.
+_CAST_ALLOWLIST_SUITE = (
+    "python3 -m pytest tests/test_cast_roster_consistency.py -q -p no:cacheprovider -k prompt_literals_name_only_the_live_cast"
+)
+
+_CAST_ALLOWLIST_ENTRANTS = {
+    "deploy/restart_leadin_repair.py": (
+        "the privacy repair table's DEFECT strings — the pre-launch chronicle passage naming the three "
+        "real experts the fictional board was modelled on, which the script cannot find in order to "
+        "remove without quoting, plus the same three names in its `privacy absolutes` deny vocabulary",
+        '`PLANT_3520 = "Dr. Nakamura is enthusiastic and occasionally tangential."` — the retired short '
+        "form this very file used to emit as its REPLACEMENT text before #3520",
+    ),
+    "deploy/archive/onetime/add_experiments.py": (
+        'literature citations in a frozen one-time script ("Šrámek et al., 2000; Huberman Lab")',
+        '`PLANT_3520 = "Coach Maya Rodriguez reviews the stack."`',
+    ),
+    "deploy/archive/onetime/patch_deficit_ceiling.py": (
+        "a frozen one-time script's section labels citing the real experts a threshold was sourced from",
+        '`PLANT_3520 = "Dr. Kai Nakamura signs off on the ceiling."`',
+    ),
+    "deploy/archive/onetime/prepend_changelog.py": (
+        "a changelog entry listing the seven PODCASTS on config/podcast_watchlist.json",
+        '`PLANT_3520 = "Dr. Kai Nakamura writes the changelog."`',
+    ),
+}
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/test_cast_roster_consistency.py::PROMPT_LITERAL_ALLOWLIST::{path}": {
+            "gate_name": f"PROMPT_LITERAL_ALLOWLIST[{path}]",
+            "command": _CAST_ALLOWLIST_SUITE,
+            "mutation": (
+                f"(a) the entry's own line deleted from PROMPT_LITERAL_ALLOWLIST, leaving {what} unexcused. "
+                f"(b) the entry left in place and {plant} appended to the real file — an off-cast name the "
+                "entry does not cover."
+            ),
+            "observed": (
+                f"ARMED (a): exit 1, `FAILED ...::test_prompt_literals_name_only_the_live_cast[{path}]`, "
+                "1 failed / 232 passed. ARMED (b): exit 1, the SAME test id fails on the planted name while "
+                "the allowlisted ones stay excused. REVERTED after each: the full file passes, 254 passed, "
+                "exit 0. All six runs watched 2026-09-06 on this branch."
+            ),
+            "scope": (
+                "Detection is AST string literals with docstrings excluded, so a name assembled at runtime "
+                "(an f-string join, a name read from config) is invisible to it — the same reach the "
+                "#2384 half of this guard has always had. The entry is keyed by PATH, so a file RENAME "
+                "strands it; `test_prompt_allowlist_entries_are_real_and_in_use` is the guard for that, "
+                "and it is a static assertion rather than a mutation proof."
+            ),
+            "proved_on": "2026-09-06",
+        }
+        for path, (what, plant) in _CAST_ALLOWLIST_ENTRANTS.items()
+    }
+)

@@ -91,6 +91,16 @@ def hypotheses(*, _g) -> dict:
                 # criterion predates the data that graded it (ADR-105). Null on
                 # v1-era records (they age out within 30 days).
                 "test_spec": it.get("test_spec"),
+                # #3552: the projection DROPPED these two, so `/api/hypotheses` served
+                # `confirmation_criteria: null` for every hypothesis even though the
+                # seeder and the engine both write one. A pre-registration whose
+                # confirmation criterion is invisible on the public artifact is not
+                # pre-registered in any way a reader can check — and since #3552 the
+                # criterion is also where the derived effect bar (SD, n, window) and the
+                # per-arm n floor are stated in words.
+                "confirmation_criteria": it.get("confirmation_criteria"),
+                "monitoring_window_days": it.get("monitoring_window_days"),
+                "actionable_if_confirmed": it.get("actionable_if_confirmed"),
                 "pre_registered_at": it.get("pre_registered_at") or it.get("created_at"),
                 "deterministic_verdict": it.get("deterministic_verdict"),
                 "effect_size": it.get("effect_size"),

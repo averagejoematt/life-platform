@@ -488,28 +488,7 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
-# 612 -> 613 (2026-09-06, #3596): ONE real gate — `structural::test_role_family_write_scope.py`,
-# IAM write-scope parity as a ROLE FAMILY (every create_platform_lambda's module AST-read for
-# DynamoDB write verbs and pk literals against the role_policies* statements its stack wires to
-# it). Registered in tests/conftest.py's _PREMERGE_EXTRA_FILES in the same PR. Verified by
-# id-set diff, not count delta: each tree ran its OWN scripts/gate_census.py --json with the
-# branch fully `git add`ed, RE-MEASURED on the merged tree after main moved (main from a
-# `git archive` export at origin/main = 612, branch = 613); ADDED exactly
-# {structural::test_role_family_write_scope.py},
-# REMOVED {}.
-#
-# It arrives PROVEN, not unproven: `python3 scripts/gate_census_mutations.py --run --gate
-# test_role_family_write_scope.py` plants an untracked
-# `lambdas/operational/_census_probe_3596_lambda.py` — a Lambda entrypoint that writes DynamoDB
-# and that no stack maps to a role — and reports ARMED (baseline 18 passed / mutated 1 failed,
-# 17 passed on test_every_ddb_writing_entrypoint_is_enrolled_in_the_family / reverted 18
-# passed); STRUCTURAL_PROOFS records it. So live UNPROVEN does not move (537 -> 537) and
-# BASELINE_UNPROVEN_GATES / UNPROVEN_RESIDUE are untouched.
-#
-# The committed ceiling moves 612 -> 613, by exactly the measured delta: on the merged
-# tree main is 612 (== the committed 612, no headroom to absorb) and this branch is 613.
-# The proven count moves with it, which is the band raised in tests/test_gate_census_2578.py.
-BASELINE_TOTAL_GATES = 613  # +1 2026-09-06 (#3596's role-family IAM write-scope parity, PROVEN by the family-5 harness), atop 612  # +1 2026-09-06 (#3570's scripts/check_raw_zone_drift.py — a new guard-family script, measured on the tree with `git add -A` applied by scripts/gate_census.py; PROVEN via GUARD_PROOFS against the REAL pre-fix origin/main registry, watched red then clean live against S3), atop 611 (re-measured 2026-09-06 on the merged tree: main after #3637 + the #3639 tip + this PR's eight proven RECEDE_TEXT_RULES entrants), +2 2026-09-06 (#3559/#3518's two entrants, both PROVEN — structural::test_reader_input_prefix_3559.py via a MutationSpec ARMED 1/1, guard::lambdas/ai/plan_facts_gate.py via a GUARD_PROOFS record; re-measured on the merged tree by scripts/gate_census.py: 603 / 57 proven / 537 unproven), atop 601 +2 2026-09-06 (#3515/#3567's check_proof_freshness guard + the sitemap structural test, both PROVEN via STRUCTURAL_HAND_PROOFS — re-measured on the merged tree by scripts/gate_census.py), atop 599 +1 2026-09-06 (#3529/#3531/#3534's two derived mirror registries, PROVEN, net of #3568's +1 — re-measured on the merged tree by scripts/gate_census.py, not by arithmetic), atop 598 +1 2026-09-06 (#3568's sending-vocabulary census, PROVEN — 4 real-tree mutations each red their own assertion), atop 597 (#3503's repo-wide AlarmTypes sweep, atop 596, atop 595, atop 594)
+BASELINE_TOTAL_GATES = 616  # +4 2026-09-06 (#3520: `deploy/` joins tests/test_cast_roster_consistency's PROMPT_LITERAL_DIRS, and the four PROMPT_LITERAL_ALLOWLIST entries that widening required each enter as a registry gate — ALL FOUR PROVEN in both directions via REGISTRY_PROOFS in scripts/gate_census_proofs.py (delete the entry -> the guard reds naming that file; plant a non-allowlisted off-cast name in the same file -> it still reds), so live UNPROVEN does not move, 537 -> 537. Measured by id-set diff with the tree `git add`-ed: exactly four ids enter and none leaves), atop 612 +1 2026-09-06 (#3570's scripts/check_raw_zone_drift.py — a new guard-family script, measured on the tree with `git add -A` applied by scripts/gate_census.py; PROVEN via GUARD_PROOFS against the REAL pre-fix origin/main registry, watched red then clean live against S3), atop 611 (re-measured 2026-09-06 on the merged tree: main after #3637 + the #3639 tip + this PR's eight proven RECEDE_TEXT_RULES entrants), +2 2026-09-06 (#3559/#3518's two entrants, both PROVEN — structural::test_reader_input_prefix_3559.py via a MutationSpec ARMED 1/1, guard::lambdas/ai/plan_facts_gate.py via a GUARD_PROOFS record; re-measured on the merged tree by scripts/gate_census.py: 603 / 57 proven / 537 unproven), atop 601 +2 2026-09-06 (#3515/#3567's check_proof_freshness guard + the sitemap structural test, both PROVEN via STRUCTURAL_HAND_PROOFS — re-measured on the merged tree by scripts/gate_census.py), atop 599 +1 2026-09-06 (#3529/#3531/#3534's two derived mirror registries, PROVEN, net of #3568's +1 — re-measured on the merged tree by scripts/gate_census.py, not by arithmetic), atop 598 +1 2026-09-06 (#3568's sending-vocabulary census, PROVEN — 4 real-tree mutations each red their own assertion), atop 597 (#3503's repo-wide AlarmTypes sweep, atop 596, atop 595, atop 594)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was

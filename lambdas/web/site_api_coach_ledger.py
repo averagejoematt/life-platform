@@ -221,9 +221,22 @@ def _current_cycle():
 # REGISTRY-DERIVED (coaching-team v2): these are career-backed history surfaces,
 # so retired coaches stay in the walk and their records keep their real byline
 # (Dr. Sarah Chen's predictions remain hers after the 2026-08-10 retirement).
-from coach.persona_registry import short_id_names as _short_id_names  # noqa: E402
+from coach.persona_registry import (
+    personas as _personas,  # noqa: E402
+    short_id_names as _short_id_names,  # noqa: E402
+)
 
 _CALIB_COACH_NAMES = _short_id_names(include_retired=True)
+
+# #3520: which of those short ids belong to a RETIRED seat. The walk deliberately
+# includes retired coaches — their career records are real and stay under their real
+# byline — but the surface said nothing about it, so /coaching/scorecard/ listed
+# "Dr. Sarah Chen  0 DECIDED" beside seven operational coaches with no way for a reader
+# to tell that one of them left at the cycle-13 genesis. Derived from the registry's own
+# `retired` flag, never a name list.
+_RETIRED_SHORT_IDS = frozenset(
+    p["short_id"] for p in _personas().values() if p.get("short_id") and p.get("retired") and not p.get("operational")
+)
 
 
 _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
@@ -454,7 +467,9 @@ def handle_calibration(event, *, _g):
             summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
             platform_pairs.extend(pairs)
             platform_career_pairs.extend(career_pairs)
-            per_coach.append({"coach_id": cid, "coach_name": name, **summary, "lifetime": career_summary})
+            per_coach.append(
+                {"coach_id": cid, "coach_name": name, "retired": cid in _RETIRED_SHORT_IDS, **summary, "lifetime": career_summary}
+            )
         hyp_rows_season = [r for r in hyp_rows if str(r.get("resolved_at") or "")[:10] >= EXPERIMENT_START]
 
         hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows_season)
@@ -727,6 +742,7 @@ def handle_predictions(event, *, _g):
                         {
                             "coach_id": cid,
                             "coach_name": _pred_coach_names[cid],
+                            "retired": cid in _RETIRED_SHORT_IDS,
                             "text": rec.get("claim_natural", ""),
                             "confidence": rec.get("confidence", "medium"),
                             "status": p_status,

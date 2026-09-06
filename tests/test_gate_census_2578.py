@@ -533,17 +533,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # sender default names a .invalid domain SES can never have verified).
         # BASELINE_TOTAL_GATES is deliberately NOT moved: #3588/#3629 net-removed one gate
         # in the same window, so the live total stays at the committed 597.
-        # Upper bound raised 66 -> 67 (2026-09-06, #3596): the 67th proof is
-        # `structural::test_role_family_write_scope.py` — IAM write-scope parity as a ROLE
-        # FAMILY (every create_platform_lambda's module AST-read for DynamoDB write verbs and
-        # pk literals against the role_policies* statements its stack wires to it). Mutation-
-        # backed via the re-runnable harness (`gate_census_mutations.py --run --gate
-        # test_role_family_write_scope.py`: ARMED 1/1, planting an untracked
-        # lambdas/operational/_census_probe_3596_lambda.py — a Lambda entrypoint that writes
-        # DynamoDB and that no CDK stack maps to a role).
         3
         <= len(proven)
-        <= 67  # 66 -> 67: #3596's role-family parity; 65 -> 66: #3570's raw-zone-drift guard proof (guard::scripts/check_raw_zone_drift.py), measured on the merged tree (2026-09-06), atop 65 (re-measured 2026-09-06 on the merged tree: #3580's eight proven entrants atop main)
+        <= 70  # 66 -> 70: #3520's four PROMPT_LITERAL_ALLOWLIST entrants, each proved in BOTH directions (REGISTRY_PROOFS in scripts/gate_census_proofs.py — delete the entry and the cast guard reds naming that file; plant a non-allowlisted off-cast name in the same file and it still reds), measured on the merged tree 2026-09-06. Atop 66: #3570's raw-zone-drift guard proof (guard::scripts/check_raw_zone_drift.py), measured on the merged tree (2026-09-06), atop 65 (re-measured 2026-09-06 on the merged tree: #3580's eight proven entrants atop main)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

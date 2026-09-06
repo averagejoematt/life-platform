@@ -40,7 +40,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -59,6 +59,7 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from experiment import prereg_effect  # noqa: E402  (#3552 — min_effect from personal variance)
 from experiment.measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
 
 REGION = "us-west-2"
@@ -71,17 +72,45 @@ FROZEN_PATH = REPO_ROOT / "deploy" / "generated" / "genesis_preregistration.json
 # generation (seeder) and publish (publisher) time.
 BANNED_CLAIM_TOKENS = ("cycle", "reset", "restart", "attempt", "last time", "previous experiment", "this time")
 
-# Roster — must match handle_predictions' _pred_coach_id_map (lambdas/web/site_api_coach.py).
-COACHES = [
-    ("sleep_coach", "Dr. Lisa Park", "sleep"),
-    ("nutrition_coach", "Dr. Marcus Webb", "nutrition"),
-    ("training_coach", "Dr. Sarah Chen", "training"),
-    ("mind_coach", "Dr. Nathan Reeves", "mind / behavior"),
-    ("physical_coach", "Dr. Victor Reyes", "physical / body composition"),
-    ("glucose_coach", "Dr. Amara Patel", "glucose / metabolic"),
-    ("labs_coach", "Dr. James Okafor", "labs / biomarkers"),
-    ("explorer_coach", "Dr. Henning Brandt", "exploration / N=1 statistics"),
-]
+
+# Roster — DERIVED from the persona registry (#3520), never hand-typed.
+#
+# It was hand-typed, with a comment claiming it mirrored handle_predictions'
+# `_pred_coach_id_map`. That map is built from IDS (`f"{short_id}_coach"`), so the NAMES
+# in this list had no derivation source at all — and they rotted: the freeze carried
+# `training_coach / "Dr. Sarah Chen"`, retired at the cycle-13 genesis (ADR-153, the
+# Performance seat absorbed training), and `physical_coach / "Dr. Victor Reyes"`, whose
+# real byline has been "Dr. Max Reyes" since the same change. `/api/coaches` served
+# neither name, and `/api/predictions` — which resolves names through the registry —
+# reported "Max Reyes" for the coach the frozen artifact called Victor: one seat with two
+# first names on two reader surfaces.
+#
+# The registry's `OPERATIONAL_COACH_IDS` is the same list `_pred_coach_id_map` keys off,
+# in the same display order, so the roster and the partitions the ledger reads are now
+# the same fact. `lens` supplies the domain sentence the generation prompt needs.
+def _operational_roster() -> list:
+    """[(persona_id, display name, domain lens)] for the operational coaches.
+
+    Ordered by `persona_registry.OPERATIONAL_COACH_IDS` (the registry's own display
+    order). Raises rather than returning a short list: a roster that silently loses a
+    coach would freeze a pre-registration with a missing seat, and the freeze is the one
+    artifact that can never be corrected afterwards (#1378 seals it by content hash).
+    """
+    from coach import persona_registry
+
+    roster = []
+    for pid in persona_registry.OPERATIONAL_COACH_IDS:
+        persona = persona_registry.resolve(pid) or {}
+        name, lens = persona.get("name"), persona.get("lens")
+        if not name or not lens:
+            raise SystemExit(f"persona {pid!r} has no name/lens in config/personas.json — cannot derive the prereg roster")
+        roster.append((pid, name, lens))
+    if not roster:
+        raise SystemExit("persona registry resolved an EMPTY operational roster — refusing to freeze a cast-less pre-registration")
+    return roster
+
+
+COACHES = _operational_roster()
 
 # Subdomain derivation — same substring scan coach_state_updater uses at the write
 # boundary, so seeded records bucket identically in the Bayesian confidence model.
@@ -432,7 +461,45 @@ def plan_facts(goals):
     return plan_facts_from_goals(goals)
 
 
+def assert_cast_is_operational(coaches_out) -> None:
+    """#3520: refuse to SEAL a pre-registration that credits a retired or
+    non-operational coach.
+
+    The freeze is content-hash sealed the instant it is written (#1378) and is never
+    edited afterwards — so the only place this can be caught is before the write. Two
+    cycles' artifacts (2026-09-04 and 2026-09-05) carry `Dr. Sarah Chen` (retired at the
+    cycle-13 genesis) and `Dr. Victor Reyes` (a name the live cast does not use), and both
+    are now permanent historical record. This check is what stops a third.
+
+    Checked against the SAME predicate the public roster uses —
+    `persona_registry.operational_personas()` — not against a list of known-retired names:
+    #1904's whole lesson is that off-roster names are not all retired ones.
+    """
+    from coach import persona_registry
+
+    live = {p.get("name") for p in persona_registry.operational_personas().values() if p.get("name")}
+    if len(live) < 7:
+        raise SystemExit(
+            f"persona registry resolved only {len(live)} operational name(s) — the cast check would be inert; refusing to freeze"
+        )
+    offenders = []
+    for coach_id, block in (coaches_out or {}).items():
+        name = (block or {}).get("coach_name")
+        if name not in live:
+            offenders.append(f"{coach_id}: {name!r}")
+    if offenders:
+        raise SystemExit(
+            "REFUSING TO FREEZE — the pre-registration credits coach(es) who are not operational (#3520):\n  "
+            + "\n  ".join(offenders)
+            + f"\n  Live operational cast: {sorted(live)}\n"
+            "  A frozen artifact is sealed by content hash and cannot be corrected afterwards."
+        )
+
+
 def freeze(coaches_out, hypotheses, goals=None):
+    # The seal is one-way (#1378) — everything that must be true of the artifact has to
+    # be true HERE, before the hash is written.
+    assert_cast_is_operational(coaches_out)
     frozen = {
         "genesis": EXPERIMENT_START_DATE,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -519,12 +586,101 @@ def build_prediction_records(frozen):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def build_hypotheses(goals):
+# #3552: the outcome metric of each genesis hypothesis, mapped to the DynamoDB partition
+# and attribute its trailing series lives in. `experiment.measurable_metrics.METRIC_SOURCES`
+# supplies the source for the SPEC name where it agrees; `recovery` is the spec vocabulary's
+# word for whoop's `recovery_score` attribute, so the attribute is named here rather than
+# guessed from the spec metric.
+HYPOTHESIS_OUTCOME_SERIES = {
+    "weight_lbs": {"source": "withings", "attribute": "weight_lbs", "unit": "lbs"},
+    "recovery": {"source": "whoop", "attribute": "recovery_score", "unit": "points"},
+}
+
+
+# The arm floor the deterministic checker actually applies
+# (hypothesis_engine_lambda: `if len(pairs) < 2 * MIN_DAYS_PER_ARM`). It lived only in
+# code, so the public artifact stated a threshold without stating how much data had to
+# exist before it could be applied. Read from the engine, never restated.
+def _min_days_per_arm() -> int:
+    from experiment import experiment_gates
+
+    return int(experiment_gates.HYPOTHESIS_MIN_DAYS_PER_ARM)
+
+
+def trailing_series(source: str, attribute: str, window_days: int) -> list:
+    """[(DATE# sk, value)] for a metric's trailing readings, oldest first (cross-phase:
+    raw timeseries survive a reset, ADR-077, so the variance estimate spans cycles)."""
+    import boto3
+    from boto3.dynamodb.conditions import Key
+
+    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+    end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = (datetime.now(timezone.utc) - timedelta(days=window_days)).strftime("%Y-%m-%d")
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{source}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}")
+    )
+    out = []
+    for item in sorted(resp.get("Items", []), key=lambda i: str(i.get("sk", ""))):
+        val = item.get(attribute)
+        if val is None:
+            continue
+        try:
+            out.append((str(item["sk"]), float(val)))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _derived_effect(metric: str, window_days: int, series_reader) -> dict:
+    """The `{min_effect, derived_from}` block for one hypothesis, or abort.
+
+    ADR-105: a pre-registered threshold carries the personal SD, n and window it was
+    derived from. If the series cannot support a variance estimate the freeze is REFUSED
+    — the artifact is content-hash sealed the moment it is written and can never be
+    corrected, so a literal smuggled in here would be permanent.
+    """
+    spec = HYPOTHESIS_OUTCOME_SERIES[metric]
+    rows = series_reader(spec["source"], spec["attribute"], window_days)
+    derived = prereg_effect.derive_min_effect([v for _, v in rows], metric=metric, window_days=window_days, unit=spec["unit"])
+    if derived is None:
+        raise SystemExit(
+            f"REFUSING TO FREEZE — cannot derive min_effect for {metric!r} from "
+            f"{len(rows)} reading(s) of {spec['source']}.{spec['attribute']} over {window_days}d "
+            f"(need at least {prereg_effect.MIN_PAIRS + 1}). A pre-registered threshold with no "
+            "derivation is exactly what #3552 removed; widen the window or fix the ingest, "
+            "do not substitute a literal."
+        )
+    return derived
+
+
+def measured_adherence(source: str, attribute: str, window_days: int, series_reader) -> str:
+    """ "logged on N of the last D days" — the MEASURED cadence, never the word 'daily'.
+
+    h1's evidence said "Withings logs daily weight" against 14 weigh-ins in 65 days. The
+    measurement plan of a pre-registration has to state what the data actually is."""
+    rows = series_reader(source, attribute, window_days)
+    return f"logged on {len({sk for sk, _ in rows})} of the last {window_days} days"
+
+
+def build_hypotheses(goals, series_reader=None):
     """The experiment's two core pre-registered hypotheses, grounded in the plan.
-    Shapes satisfy hypothesis_engine_lambda.validate_hypothesis (incl. #530 test_spec)."""
+    Shapes satisfy hypothesis_engine_lambda.validate_hypothesis (incl. #530 test_spec).
+
+    #3552: `min_effect` is DERIVED from the subject's own trailing variance at freeze
+    time (experiment/prereg_effect.py) and ships with the SD, n and window it came from;
+    the arm floor the checker applies rides in the same spec; and the measurement-plan
+    sentences state the MEASURED logging cadence rather than asserting 'daily'.
+    """
+    series_reader = series_reader or trailing_series
     kcal = goals["targets"]["nutrition"]["daily_calories_target"]
     steps_note = goals["targets"]["training"]["daily_movement_target"]
     sw = goals["timeline"]["start_weight_lbs"]  # ADR-104: grounded, never hardcoded (baseline moves per cycle)
+    window = prereg_effect.DEFAULT_WINDOW_DAYS
+    arm_floor = _min_days_per_arm()
+    h1_effect = _derived_effect("weight_lbs", window, series_reader)
+    h2_effect = _derived_effect("recovery", window, series_reader)
+    h1_adherence = measured_adherence("withings", "weight_lbs", window, series_reader)
+    h2_adherence = measured_adherence("whoop", "recovery_score", window, series_reader)
     return [
         {
             "hypothesis_id": "genesis_prereg_h1",
@@ -535,10 +691,13 @@ def build_hypotheses(goals):
             "domains": ["nutrition", "weight"],
             "evidence": (
                 f"Pre-registered at genesis from the plan itself: {kcal} kcal/day target from a "
-                f"{sw} lb start (config/user_goals.json); MacroFactor logs daily calories and "
-                "Withings logs daily weight, so both arms are directly measurable."
+                f"{sw} lb start (config/user_goals.json); MacroFactor logs calories and Withings "
+                f"weight was {h1_adherence} — the measured cadence, not an assumed daily one, "
+                "which is what the arm floor below is sized against."
             ),
-            "confirmation_criteria": ("Mean next-day weight at least 0.1 lbs lower on adherent days within 30 days, 95% CI excluding 0."),
+            "confirmation_criteria": prereg_effect.criteria_sentence(
+                h1_effect["min_effect"], "lbs", "lower", 30, h1_effect["derived_from"], arm_floor
+            ),
             "monitoring_window_days": 30,
             "confidence": "high",
             "actionable_if_confirmed": ("Hold the 1,500 kcal baseline through the Foundation phase; escalate only if the trend stalls."),
@@ -548,7 +707,9 @@ def build_hypotheses(goals):
                 "condition_threshold": kcal,
                 "outcome_metric": "weight_lbs",
                 "direction": "lower",
-                "min_effect": 0.1,
+                "min_effect": h1_effect["min_effect"],
+                "min_effect_derivation": h1_effect["derived_from"],
+                "min_days_per_arm": arm_floor,
                 "lag_days": 1,
             },
         },
@@ -561,9 +722,11 @@ def build_hypotheses(goals):
             "domains": ["movement", "recovery"],
             "evidence": (
                 f"Pre-registered at genesis from the plan itself: daily movement target '{steps_note}' "
-                "(config/user_goals.json); Apple Health logs steps and Whoop logs recovery daily."
+                f"(config/user_goals.json); Apple Health logs steps and Whoop recovery was {h2_adherence}."
             ),
-            "confirmation_criteria": ("Next-day recovery at least 3 points higher on 6,000+ step days within 30 days, 95% CI excluding 0."),
+            "confirmation_criteria": prereg_effect.criteria_sentence(
+                h2_effect["min_effect"], "points", "higher", 30, h2_effect["derived_from"], arm_floor
+            ),
             "monitoring_window_days": 30,
             "confidence": "medium",
             "actionable_if_confirmed": ("Protect the daily walk as a recovery lever, not just an energy-expenditure line."),
@@ -573,7 +736,9 @@ def build_hypotheses(goals):
                 "condition_threshold": 6000,
                 "outcome_metric": "recovery",
                 "direction": "higher",
-                "min_effect": 3,
+                "min_effect": h2_effect["min_effect"],
+                "min_effect_derivation": h2_effect["derived_from"],
+                "min_days_per_arm": arm_floor,
                 "lag_days": 1,
             },
         },

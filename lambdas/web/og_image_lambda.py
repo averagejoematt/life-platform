@@ -23,10 +23,14 @@ import boto3
 # it can never drift from the source of truth (source_registry.SOURCE_REGISTRY).
 from ingestion.source_registry import SOURCE_REGISTRY
 
-# #595 (ADR-114): the shared card engine is the single place brand cards are drawn.
-# The daily page cards delegate their chrome to it so every off-site card — daily,
-# moment (og_moments), character (#420), chronicle (#405) — shares one template.
-from web import card_engine
+# card_engine — #595 (ADR-114): the shared card engine is the single place brand cards
+#   are drawn. The daily page cards delegate their chrome to it so every off-site card —
+#   daily, moment (og_moments), character (#420), chronicle (#405) — shares one template.
+# og_card_copy — #3527: the claim/absence DECISION for the data-gated cards (glucose,
+#   nutrition). Pure stdlib and Pillow-free on purpose — it is the half of these cards
+#   that CI can test, since importing THIS module drags in PIL (see
+#   tests/test_og_card_coverage.py, which AST-parses this file for the same reason).
+from web import card_engine, og_card_copy
 
 # #3285: the sign of `journey.lost_lbs` decides the home card's caption AND its colour.
 # Shared with scripts/v4_proof.py (the home og:description) so the card and the meta
@@ -96,6 +100,26 @@ _DELTA_TILE: dict[str, tuple[str, tuple[int, int, int]]] = {
 }
 
 
+def _draw_gated_body(draw, body, subtitle_y=None):
+    """Render a `web.og_card_copy` body: its tiles, then its lines.
+
+    The card never decides WHAT to say here — only where to put it. `subtitle_y` draws
+    the first line up in the subtitle slot (the nutrition card's tagline position);
+    otherwise the lines sit under the tile row where the old placeholder text was.
+    """
+    lines = list(body.get("lines") or [])
+    if subtitle_y is not None and lines:
+        draw.text((48, subtitle_y), lines.pop(0), fill=MUTED, font=_font(FONT_MONO, 14))
+    x = 48
+    for value, label in body.get("tiles") or []:
+        _draw_metric(draw, x, 260, value, label)
+        x += 332
+    y = 380 if body.get("tiles") else 280
+    for line in lines:
+        draw.text((48, y), line, fill=FAINT, font=_font(FONT_MONO, 13))
+        y += 30
+
+
 def build_home(stats):
     img, draw = _base_image()
     _draw_header(draw, "The Measured Life")
@@ -146,15 +170,21 @@ def build_sleep(stats):
 
 
 def build_glucose(stats):
+    """#3527: the body is DECIDED by web.og_card_copy, never asserted here.
+
+    This card drew "Real CGM data. Updated daily." and "Time-in-range, variability, meal
+    responses." unconditionally, with no number, since inception — against an
+    `/api/glucose` serving `{"glucose": null}` and a `public_stats.vitals.glucose_avg` of
+    null. Every unfurl of /data/glucose/ presented a claim the page could not back.
+    The claim now ships only when `glucose_avg` is non-null; otherwise the card says so.
+    """
     img, draw = _base_image()
     _draw_header(draw, "Glucose Observatory")
 
     draw.text((48, 100), "GLUCOSE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
     draw.text((48, 180), "Continuous glucose monitoring. Dexcom Stelo.", fill=MUTED, font=_font(FONT_MONO, 14))
 
-    # Glucose-specific data may not be in public_stats — use placeholders
-    draw.text((48, 280), "Time-in-range, variability, meal responses.", fill=FAINT, font=_font(FONT_MONO, 13))
-    draw.text((48, 310), "Real CGM data. Updated daily.", fill=FAINT, font=_font(FONT_MONO, 13))
+    _draw_gated_body(draw, og_card_copy.glucose_card(stats))
 
     _draw_footer(draw, stats)
     return img
@@ -214,14 +244,21 @@ def build_character(stats):
 
 
 def build_nutrition(stats):
+    """#3527: draws the NUTRITION keys or the absence line — never a borrowed weight.
+
+    The card's only tile used to be `vitals.weight_lbs` under "CURRENT WEIGHT", which on
+    Day 0 rendered "325.0 lbs" while `/api/journey` withheld `current_weight_lbs`
+    (pre_start). A nutrition card asserting a body-composition number the journey surface
+    is deliberately not serving is the ADR-104 defect on the share surface; the tagline
+    above it ("Calories, protein, deficit status") named three things the card drew none
+    of. Both now come from web.og_card_copy, gated on the nutrition keys themselves.
+    """
     img, draw = _base_image()
     _draw_header(draw, "Nutrition Observatory")
 
     draw.text((48, 100), "NUTRITION", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "MacroFactor data. Calories, protein, deficit status.", fill=MUTED, font=_font(FONT_MONO, 14))
 
-    vitals = stats.get("vitals", {})
-    _draw_metric(draw, 48, 260, _fmt(vitals.get("weight_lbs"), 1, " lbs"), "CURRENT WEIGHT")
+    _draw_gated_body(draw, og_card_copy.nutrition_card(stats), subtitle_y=180)
 
     _draw_footer(draw, stats)
     return img
