@@ -28,6 +28,9 @@ def _offline_cycle_stamp(monkeypatch):
     """The ADR-077/#1233 cycle read is a fail-soft SSM call in production; pin it here
     so the suite stays hermetic (no live SSM, no connect timeout) and deterministic."""
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 11)
+    from experiment import phase_taxonomy
+
+    monkeypatch.setattr(phase_taxonomy, "_cycle_geneses", lambda: None)  # #3598: SSM is the fallback; pin the registry away
 
 
 _SECRET_BODY = "Relapsed after the fight with Dana. Smoked, then zzq until 3am. The debt terrifies me."

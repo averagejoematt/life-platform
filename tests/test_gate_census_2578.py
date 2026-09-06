@@ -509,7 +509,22 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # of tests/api_schemas/api_vitals.json's real shape with one key hand-removed,
         # never the live site — proving the #3324 nullable-aware diff_shape() rule still
         # catches a genuine key removal).
-        # Upper bound raised 48 -> 50 (2026-09-05, #3529/#3531/#3534): the 49th and 50th are
+        # Upper bound raised 48 -> 49 (2026-09-05, #3564): the 49th proof is
+        # `qa::lambdas/operational/qa_check_subscriber_promise.py::check_subscriber_promise_cadence`
+        # — and it needed no planted mutation, because its first run FAILED on the live
+        # production /subscribe/, naming the stale "one email a week" claim against the
+        # promise rendered from the senders' crons. Recorded in gate_census.PROVEN_CAN_FAIL
+        # with the re-runnable command; the pass side and the contradiction case are
+        # covered by tests/test_subscriber_cadence_promise_3564.py.
+        # Upper bound raised 49 -> 50 (2026-09-05, #3503): the 50th proof is
+        # `structural::test_composite_alarm_lookup_3390.py` — the #3390 one-file pin widened
+        # into a family-5 tree sweep requiring every describe_alarms/describe_alarm_history
+        # call in first-party source to state its AlarmTypes. Mutation-backed via the
+        # re-runnable harness (`gate_census_mutations.py --run --gate
+        # test_composite_alarm_lookup_3390.py`: ARMED 1/1, planting an untracked
+        # deploy/_census_probe_3503.py whose whole-estate sweep omits AlarmTypes).
+        # Upper bound raised 50 -> 52 (2026-09-05, #3529/#3531/#3534; rebased after #3564 took
+        # the 49th and #3503 the 50th): the 51st and 52nd are
         # the reset sweep's two declared-exemption registry entries, recorded in
         # gate_census_proofs.GUARD_PROOFS. `MULTILINE_RUN_EXEMPT[Install census dependency
         # (PyYAML)]` — planted a REAL gate in `run: |` block-scalar form on a scratch copy of
@@ -520,7 +535,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # `git status --porcelain` byte-identical before and after.
         3
         <= len(proven)
-        <= 50
+        <= 52
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

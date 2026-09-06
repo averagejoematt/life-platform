@@ -1073,7 +1073,26 @@ def lambda_handler(event, context):
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
-    # /api/healthz — lightweight health check (no auth, no PII)
+    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
+    #
+    # #3561: NOTHING that touches data may run above this block. `/api/healthz` used
+    # to — it answered a DynamoDB `get_item` + an S3 `get_object` + a version string
+    # to any caller of the committed Function URL (auth_type NONE, so the invocation
+    # itself is unpreventable in-handler; what was preventable is the two data-plane
+    # calls and the ~30x billed duration each direct hit bought). Every other route
+    # 403'd. The health check's real consumers all arrive through CloudFront —
+    # `deploy/deploy_convergence.py` polls `{site}/api/healthz` for `checks.lambda_warm`
+    # and the smoke suite fetches the site domain — so they carry the header and are
+    # unaffected; a direct Function-URL hit now costs a 403 and nothing else.
+    if SITE_API_ORIGIN_SECRET:
+        req_headers = event.get("headers") or {}
+        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
+        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
+            return _error(403, "Forbidden")
+
+    # /api/healthz — lightweight health check (no PII). Handled here rather than in
+    # `_dispatch_route` because it emits its own route metric; see #2876's sanctioned
+    # exception. It sits BELOW the SEC-04 gate (#3561), not above it.
     if path == "/api/healthz" and method == "GET":
         try:
             ddb_start = _time.time()
@@ -1102,13 +1121,6 @@ def lambda_handler(event, context):
         }
         _emit_route_log(200)
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
-
-    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
-    if SITE_API_ORIGIN_SECRET:
-        req_headers = event.get("headers") or {}
-        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
-        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
-            return _error(403, "Forbidden")
 
     try:
         result = _dispatch_route(event, path, method)

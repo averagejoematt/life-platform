@@ -563,7 +563,7 @@ def leg_ops(report, args):
     cw = boto3.client("cloudwatch", region_name=REGION)
     firing, token = [], None
     while True:
-        kw = {"StateValue": "ALARM", "MaxRecords": 100}
+        kw = {"StateValue": "ALARM", "MaxRecords": 100, "AlarmTypes": ["CompositeAlarm", "MetricAlarm"]}  # #3503
         if token:
             kw["NextToken"] = token
         page = cw.describe_alarms(**kw)

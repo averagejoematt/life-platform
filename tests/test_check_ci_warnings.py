@@ -12,7 +12,10 @@ Proves, with synthetic input, that:
   * the newest completed run NOT being green reads as "nothing to triage yet",
     not as an error — that's check_main_green.py's job;
   * cancelled/in-progress runs are skipped when picking the newest completed run
-    (mirrors check_main_green.py's latest_completed_run semantics);
+    (mirrors check_main_green.py's latest_completed_run semantics) — and, since
+    #3530, a `cancelled` run is skipped ONLY when its own jobs prove it a genuine
+    supersession. The cancelled cases here run off the SAME pinned live payloads
+    as tests/test_cancelled_not_superseded_3530.py;
   * the render()/main() contract matches check_main_green.py's decode shape
     (untriaged -> exit 1; --decoded -> exit 0 with an acknowledgement line);
   * GitHub-unreachable degrades honestly (never crashes, never reports a false
@@ -25,9 +28,16 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import check_ci_warnings as ccw  # noqa: E402
+import ci_run_verdicts as civ  # noqa: E402 — #3530: the shared cancelled-run predicate
 from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# #3530: the two LIVE specimens, pinned verbatim from
+# `gh api repos/averagejoematt/life-platform/actions/runs/<id>/jobs?per_page=100`.
+_FIXTURES = os.path.join(REPO, "tests", "fixtures", "cancelled_runs")
+CARRIES_FAILURE_JOBS = civ.load_fixture_jobs(os.path.join(_FIXTURES, "run_33843742114_cancelled_carries_failure.json"))
+SUPERSEDED_JOBS = civ.load_fixture_jobs(os.path.join(_FIXTURES, "run_33937903965_cancelled_superseded.json"))
 
 
 def _run(id_, name, annotations_count):
@@ -86,22 +96,71 @@ def test_mixed_runs_flags_only_the_warning_annotations():
 # ── latest_green_main_info() semantics (mirrors check_main_green.py) ───────
 
 
-def test_latest_green_main_info_skips_cancelled_and_in_progress(monkeypatch):
+def _gh_stub(runs, jobs_by_run=None):
+    """A `_gh_json` fake that answers BOTH calls the gate makes: the run list and
+    (#3530) each cancelled run's own jobs. `jobs_by_run` maps run id -> jobs list;
+    a run id absent from it answers as an unreadable job list (INDETERMINATE)."""
+    jobs_by_run = jobs_by_run or {}
+
+    def _call(args):
+        if args and args[0] == "run":
+            return runs
+        # ["api", "repos/<repo>/actions/runs/<id>/jobs?per_page=100"]
+        run_id = int(args[1].split("/actions/runs/")[1].split("/")[0])
+        if run_id not in jobs_by_run:
+            raise RuntimeError("HTTP 404")
+        return {"total_count": len(jobs_by_run[run_id]), "jobs": jobs_by_run[run_id]}
+
+    return _call
+
+
+def test_latest_green_main_info_skips_a_genuinely_superseded_cancel(monkeypatch):
+    """#3530: a cancelled run whose OWN jobs carry no failure is skipped — the
+    pre-existing behaviour, now derived from the jobs rather than the rollup."""
     runs = [
-        {"status": "completed", "conclusion": "cancelled", "headSha": "aaa111"},
-        {"status": "in_progress", "conclusion": "", "headSha": "bbb222"},
-        {"status": "completed", "conclusion": "success", "headSha": "ccc333"},
+        {"status": "completed", "conclusion": "cancelled", "headSha": "aaa111", "databaseId": 1},
+        {"status": "in_progress", "conclusion": "", "headSha": "bbb222", "databaseId": 2},
+        {"status": "completed", "conclusion": "success", "headSha": "ccc333", "databaseId": 3},
     ]
-    monkeypatch.setattr(ccw, "_gh_json", lambda args: runs)
-    sha, err = ccw.latest_green_main_info()
+    monkeypatch.setattr(ccw, "_gh_json", _gh_stub(runs, {1: SUPERSEDED_JOBS}))
+    sha, err, notes = ccw.latest_green_main_info()
     assert (sha, err) == ("ccc333", None)
+    assert any("genuine supersession" in n for n in notes)
+
+
+def test_latest_green_main_info_does_not_skip_a_cancel_carrying_a_failure(monkeypatch):
+    """#3530, the live 2026-09-04 shape (run 33843742114): a `cancelled` rollup
+    whose `test / Unit Tests` job FAILED must become the verdict — never be
+    walked past to the older green."""
+    runs = [
+        {"status": "completed", "conclusion": "cancelled", "headSha": "aaa111", "databaseId": 33843742114},
+        {"status": "completed", "conclusion": "success", "headSha": "ccc333", "databaseId": 3},
+    ]
+    monkeypatch.setattr(ccw, "_gh_json", _gh_stub(runs, {33843742114: CARRIES_FAILURE_JOBS}))
+    sha, err, notes = ccw.latest_green_main_info()
+    assert sha is None, "the older green must NOT be reported as the latest verdict"
+    assert err is None
+    assert any("NOT superseded" in n and "test / Unit Tests" in n for n in notes)
+
+
+def test_latest_green_main_info_unreadable_jobs_is_not_a_skip(monkeypatch):
+    """An unreadable job list is INDETERMINATE: not provably superseded, so the
+    run is not walked past and the older green is not reported."""
+    runs = [
+        {"status": "completed", "conclusion": "cancelled", "headSha": "aaa111", "databaseId": 1},
+        {"status": "completed", "conclusion": "success", "headSha": "ccc333", "databaseId": 3},
+    ]
+    monkeypatch.setattr(ccw, "_gh_json", _gh_stub(runs, {}))  # every jobs read 404s
+    sha, err, notes = ccw.latest_green_main_info()
+    assert sha is None
+    assert any("could NOT be read" in n for n in notes)
 
 
 def test_latest_green_main_info_not_green_reads_as_no_sha_no_error(monkeypatch):
-    runs = [{"status": "completed", "conclusion": "failure", "headSha": "ddd444"}]
-    monkeypatch.setattr(ccw, "_gh_json", lambda args: runs)
-    sha, err = ccw.latest_green_main_info()
-    assert (sha, err) == (None, None)
+    runs = [{"status": "completed", "conclusion": "failure", "headSha": "ddd444", "databaseId": 9}]
+    monkeypatch.setattr(ccw, "_gh_json", _gh_stub(runs))
+    sha, err, notes = ccw.latest_green_main_info()
+    assert (sha, err, notes) == (None, None, [])
 
 
 def test_latest_green_main_info_gh_failure_degrades_to_error(monkeypatch):
@@ -109,8 +168,9 @@ def test_latest_green_main_info_gh_failure_degrades_to_error(monkeypatch):
         raise RuntimeError("gh: command not found")
 
     monkeypatch.setattr(ccw, "_gh_json", _boom)
-    sha, err = ccw.latest_green_main_info()
+    sha, err, notes = ccw.latest_green_main_info()
     assert sha is None
+    assert notes == []
     assert err is not None and "command not found" in err
 
 
@@ -147,7 +207,7 @@ def test_render_unreachable_degrades_honestly_not_a_false_clean():
 
 
 def test_main_exits_nonzero_on_untriaged_and_zero_with_decoded(monkeypatch, capsys):
-    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: ("abcd1234", None))
+    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: ("abcd1234", None, []))
     monkeypatch.setattr(ccw, "fetch_warnings_for_sha", lambda sha: ([("test / Unit Tests", "t", "649s over 480s")], None))
 
     monkeypatch.setattr(sys, "argv", ["check_ci_warnings.py"])
@@ -162,14 +222,14 @@ def test_main_exits_nonzero_on_untriaged_and_zero_with_decoded(monkeypatch, caps
 
 
 def test_main_clean_board_exits_zero(monkeypatch):
-    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: ("abcd1234", None))
+    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: ("abcd1234", None, []))
     monkeypatch.setattr(ccw, "fetch_warnings_for_sha", lambda sha: ([], None))
     monkeypatch.setattr(sys, "argv", ["check_ci_warnings.py"])
     assert ccw.main() == 0
 
 
 def test_main_not_green_yet_exits_zero_without_fetching_warnings(monkeypatch):
-    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: (None, None))
+    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: (None, None, []))
 
     def _should_not_be_called(sha):
         raise AssertionError("fetch_warnings_for_sha must not be called when main isn't green")
@@ -180,7 +240,7 @@ def test_main_not_green_yet_exits_zero_without_fetching_warnings(monkeypatch):
 
 
 def test_main_gh_unreachable_never_crashes_and_exits_zero(monkeypatch):
-    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: (None, "gh: not authenticated"))
+    monkeypatch.setattr(ccw, "latest_green_main_info", lambda: (None, "gh: not authenticated", []))
     monkeypatch.setattr(sys, "argv", ["check_ci_warnings.py"])
     assert ccw.main() == 0
 

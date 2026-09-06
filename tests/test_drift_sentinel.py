@@ -503,6 +503,97 @@ def test_as_signal_only_on_real_drift():
     assert "bucket_policy" not in sig["flagging"]
 
 
+# ── #3508 box 2: a drift section a later deploy already answered ─────────────
+# The 2026-09-04 17:49Z remediation report carried the 09-02 sentinel record verbatim:
+# "6 stack(s) drifted: LifePlatformIngestion, LifePlatformCompute, …" — while all six had
+# been redeployed at 16:32–16:36Z that morning. Under the Mon-only sentinel guard the
+# freshest available record was always up to two days old, so this was structural, not
+# bad luck.
+_SUPERSEDED_RECORD = {
+    "status": "drift",
+    "date": "2026-09-02",
+    "summary": "6 stack(s) drifted",
+    "checks": {
+        "cfn_drift": {
+            "status": "drift",
+            "stacks": {
+                "LifePlatformCore": {"status": "clean"},
+                "LifePlatformIngestion": {"status": "drift", "drifted": [{"logical_id": "X"}]},
+                "LifePlatformCompute": {"status": "drift", "drifted": [{"logical_id": "Y"}]},
+            },
+        }
+    },
+}
+
+
+class _FakeSupersedeCfn:
+    """describe_stacks on the wire: LastUpdatedTime is a datetime, and a stack CFN has
+    never updated carries only CreationTime."""
+
+    def __init__(self, updated):
+        self._updated = updated
+
+    def describe_stacks(self, StackName):  # noqa: N803 — boto3 kwarg casing
+        if StackName not in self._updated:
+            raise RuntimeError(f"planted: Stack with id {StackName} does not exist")
+        return {"Stacks": [{"StackName": StackName, "LastUpdatedTime": self._updated[StackName]}]}
+
+
+def _sup_at(day, hour=16):
+    return datetime(2026, 9, day, hour, 30, tzinfo=timezone.utc)
+
+
+def test_a_fully_redeployed_cfn_section_is_dropped_from_the_signal():
+    cfn = _FakeSupersedeCfn({"LifePlatformIngestion": _sup_at(4), "LifePlatformCompute": _sup_at(4)})
+    assert drift_report.superseded_cfn_stacks(_SUPERSEDED_RECORD, cfn) == {
+        "LifePlatformIngestion": _sup_at(4).isoformat(),
+        "LifePlatformCompute": _sup_at(4).isoformat(),
+    }
+    sig = drift_report.as_signal(_SUPERSEDED_RECORD, cfn_client=cfn)
+    assert sig is None, "a drift record whose only finding was already redeployed is not a needs-human signal"
+
+
+def test_one_un_redeployed_stack_keeps_the_whole_section():
+    """A PARTIALLY answered finding is still a finding — suppressing on 'most of them'
+    would be the tolerant-branch shape these issues are about."""
+    cfn = _FakeSupersedeCfn({"LifePlatformIngestion": _sup_at(4), "LifePlatformCompute": _sup_at(1)})
+    sig = drift_report.as_signal(_SUPERSEDED_RECORD, cfn_client=cfn)
+    assert sig is not None and "cfn_drift" in sig["flagging"]
+    assert sig["superseded_stacks"] == {"LifePlatformIngestion": _sup_at(4).isoformat()}
+    assert sig["record_date"] == "2026-09-02"
+
+
+def test_an_unreadable_stack_is_never_treated_as_superseded():
+    """NEGATIVE CONTROL: describe_stacks raising must not manufacture a suppression —
+    'couldn't check' is not 'already fixed'."""
+    cfn = _FakeSupersedeCfn({"LifePlatformIngestion": _sup_at(4)})  # Compute raises
+    sig = drift_report.as_signal(_SUPERSEDED_RECORD, cfn_client=cfn)
+    assert sig is not None and "cfn_drift" in sig["flagging"]
+    assert "LifePlatformCompute" not in sig["superseded_stacks"]
+
+
+def test_a_same_day_redeploy_is_not_counted_as_superseding():
+    """Conservative by design: a deploy on the record's own day is not provably after the
+    drift read, so it does not silence the finding."""
+    cfn = _FakeSupersedeCfn({"LifePlatformIngestion": _sup_at(2), "LifePlatformCompute": _sup_at(2, 23)})
+    assert drift_report.superseded_cfn_stacks(_SUPERSEDED_RECORD, cfn) == {}
+
+
+def test_without_a_cfn_client_the_signal_is_exactly_what_it_always_was():
+    """The suppression is opt-in — every existing caller keeps its behaviour."""
+    sig = drift_report.as_signal(_SUPERSEDED_RECORD)
+    assert sig is not None and "cfn_drift" in sig["flagging"]
+    assert sig["superseded_stacks"] == {}
+
+
+def test_status_html_names_the_superseded_stacks_and_the_record_date():
+    cfn = _FakeSupersedeCfn({"LifePlatformIngestion": _sup_at(4), "LifePlatformCompute": _sup_at(4)})
+    html = drift_report.status_html(_SUPERSEDED_RECORD, cfn_client=cfn)
+    assert "already superseded" in html
+    assert "LifePlatformIngestion" in html and "LifePlatformCompute" in html
+    assert "2026-09-02" in html
+
+
 def test_status_html_is_loud_for_every_state():
     assert drift_report.status_html(None) == ""
     clean = drift_report.status_html({"status": "clean", "date": "d", "summary": "All clear"})
@@ -2032,15 +2123,112 @@ def test_sentinel_cadence_paginates_list_objects_v2():
     assert fake._calls == 2
 
 
-def test_sentinel_cadence_expected_weekdays_matches_the_workflow_cron():
-    # .github/workflows/remediation-agent.yml: cron "45 14 * * 1,3,5" (Mon,Wed,Fri in
-    # cron's 0=Sun numbering). Python's datetime.weekday() is 0=Mon..6=Sun, so the
-    # equivalent set is {0, 2, 4}. This test is the tripwire if either encoding drifts.
-    workflow_path = os.path.join(_ROOT, ".github", "workflows", "remediation-agent.yml")
-    with open(workflow_path, encoding="utf-8") as f:
-        workflow_text = f.read()
-    assert 'cron: "45 14 * * 1,3,5"' in workflow_text
-    assert scad.EXPECTED_WEEKDAYS == frozenset({0, 2, 4})
+# ── #3508: the cadence fact has ONE writer ────────────────────────────────────
+# The old version of this test asserted the literal string `cron: "45 14 * * 1,3,5"` and
+# `EXPECTED_WEEKDAYS == {0, 2, 4}` — and passed for weeks while the workflow's own run
+# guard said `date -u +%u == 1` (Mondays only). It pinned two of the three encodings and
+# was blind to the one that decided behaviour. These tests derive instead of pinning.
+_WORKFLOW = os.path.join(_ROOT, ".github", "workflows", "remediation-agent.yml")
+
+
+def _workflow_text():
+    with open(_WORKFLOW, encoding="utf-8") as f:
+        return f.read()
+
+
+def test_expected_weekdays_is_derived_from_the_workflow_cron():
+    """The module PARSES the schedule cron rather than mirroring it by hand."""
+    assert scad.CADENCE_SOURCE_ERROR is None, f"the workflow schedule could not be parsed: {scad.CADENCE_SOURCE_ERROR}"
+    assert scad.EXPECTED_WEEKDAYS == scad.workflow_cron_weekdays(_WORKFLOW)
+    assert scad.EXPECTED_WEEKDAYS == frozenset({0, 2, 4}), "today's cron is 1,3,5 = Mon/Wed/Fri; this is a sanity anchor, not the source"
+
+
+def test_changing_the_cron_moves_the_expectation(tmp_path):
+    """NEGATIVE CONTROL: mutate the cron and the derived set MUST move. A test that only
+    asserted the constant would pass unchanged here — which is how #3508 survived."""
+    text = _workflow_text()
+    assert 'cron: "45 14 * * 1,3,5"' in text, "the cron literal moved — re-point this control"
+    mondays_only = tmp_path / "mondays.yml"
+    mondays_only.write_text(text.replace('cron: "45 14 * * 1,3,5"', 'cron: "45 14 * * 1"'), encoding="utf-8")
+    assert scad.workflow_cron_weekdays(str(mondays_only)) == frozenset({0})
+    assert scad.workflow_cron_weekdays(str(mondays_only)) != scad.EXPECTED_WEEKDAYS
+
+    weekdays = tmp_path / "weekdays.yml"
+    weekdays.write_text(text.replace('cron: "45 14 * * 1,3,5"', 'cron: "45 14 * * 1-5"'), encoding="utf-8")
+    assert scad.workflow_cron_weekdays(str(weekdays)) == frozenset({0, 1, 2, 3, 4})
+
+
+def test_cron_sunday_is_both_zero_and_seven():
+    """cron's day-of-week is 0=Sun..6=Sat with 7 also Sunday; Python's is 0=Mon..6=Sun.
+    Getting this conversion wrong by one is precisely the kind of silent mirror #3508 is
+    about, so it is asserted rather than assumed."""
+    assert scad._cron_dow_to_python("0") == frozenset({6})
+    assert scad._cron_dow_to_python("7") == frozenset({6})
+    assert scad._cron_dow_to_python("1") == frozenset({0})
+    assert scad._cron_dow_to_python("*") == frozenset(range(7))
+
+
+def test_the_workflow_guard_asks_the_module_and_carries_no_weekday_literal():
+    """The workflow's run guard reads the SAME source. The hardcoded `date -u +%u = 1`
+    Monday test is gone — with it present, the declared cadence and the real one could
+    (and did) disagree permanently."""
+    text = _workflow_text()
+    assert "deploy/sentinel_cadence.py --should-run-today" in text, "the workflow no longer derives its run day from the cadence module"
+    # Comments are stripped first: the prose ABOVE the guard quotes the old `date -u +%u`
+    # literal to explain why it is gone, and a phrase-matched guard would red on its own
+    # explanation. The rule is about what EXECUTES.
+    executable = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+    assert "date -u +%u" not in executable, "the workflow still hardcodes a weekday — that is the #3508 defect, restored"
+    assert "not Monday" not in executable
+
+
+def test_the_workflow_step_gate_does_not_re_state_the_cron():
+    """A THIRD copy of the cadence. The step's `if:` used to read
+    `github.event.schedule == '45 14 * * 1,3,5'` — editing the cron would have silently
+    disabled the sentinel step entirely, with no test and no log line to say so."""
+    text = _workflow_text()
+    step = text[text.index("- name: Infra drift sentinel") :]
+    step = step[: step.index("- name: Run remediation agent")]
+    executable = "\n".join(ln for ln in step.splitlines() if not ln.lstrip().startswith("#"))
+    assert "github.event.schedule" not in executable, "the step gate re-states the cron literal (#3508)"
+    assert "if: github.event_name != 'repository_dispatch'" in executable
+
+
+def test_the_remediation_role_can_read_the_stacks_it_now_checks():
+    """#3508's supersession check calls `cloudformation:DescribeStacks`. Without the grant
+    it would fail on every stack, log a warning and suppress nothing — a feature that is
+    dark by construction, which is the class this batch is about."""
+    policy_path = os.path.join(_ROOT, "infra", "iam", "github-actions-remediation-role.permissions.json")
+    with open(policy_path, encoding="utf-8") as f:
+        policy = json.load(f)
+    actions = set()
+    for stmt in policy.get("Statement", []):
+        act = stmt.get("Action")
+        actions.update([act] if isinstance(act, str) else act or [])
+    assert "cloudformation:DescribeStacks" in actions, (
+        "drift_report.superseded_cfn_stacks needs cloudformation:DescribeStacks on "
+        "github-actions-remediation-role; without it the suppression can never fire (#3508)"
+    )
+
+
+def test_should_run_today_agrees_with_the_expectation():
+    """The predicate the workflow calls and the set the check grades against are the same
+    fact, evaluated on every day of one week."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+    for day in range(31, 38):  # 2026-08-31 (Mon) .. 2026-09-06 (Sun)
+        d = _dt(2026, 8, 1, 12, tzinfo=_tz.utc) + _td(days=day - 1)
+        assert scad.should_run_today(d) == (d.weekday() in scad.EXPECTED_WEEKDAYS)
+
+
+def test_an_unparseable_schedule_is_drift_not_a_silent_guess(monkeypatch):
+    """FAIL CLOSED: if the cadence source cannot be read, grading a cadence against the
+    fallback would be "verified nothing wrong" wearing "couldn't verify"'s clothes."""
+    monkeypatch.setattr(scad, "CADENCE_SOURCE_ERROR", "ValueError: no `- cron:` schedule found")
+    res = scad.check_sentinel_cadence(client_factory=lambda *a, **k: pytest.fail("must not reach S3"))
+    assert res["status"] == "drift"
+    assert res["reason"] == "unknown_cadence"
+    assert "cannot read the sentinel's own schedule" in res["detail"]
 
 
 def test_sweep_surfaces_sentinel_cadence_drift_in_summary(monkeypatch):

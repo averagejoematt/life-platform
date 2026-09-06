@@ -76,8 +76,29 @@ fact about a pipeline that is no longer able to ship.
     cancelled — it is REPORTED, with its sha and the rejection reason, so the
     operator sees the lease was actioned rather than the gate being blind.
 
-Cancelled runs are skipped (superseded pushes carry no signal); the newest
-run that actually finished is the completed-run verdict.
+#3530 corrects the oldest assumption in this file — that a `cancelled` rollup is
+a superseded push and therefore carries no signal:
+
+  * **Cancelled-carrying-a-real-failure** — since #2009 the WORKFLOW-level
+    concurrency group carries `${{ github.run_id }}` (`ci-cd.yml:129`), so it is
+    unique per run and NOTHING supersedes a CI/CD run any more. The one canceller
+    left is the `deploy` job's own group `ci-cd-deploy-<ref>` (`ci-cd.yml:861`):
+    GitHub allows one pending entry per group, so a newer run's Deploy EVICTS the
+    older run's still-pending Deploy, the evicted job concludes `cancelled`, and
+    the whole run rolls up `cancelled` — regardless of what the validation jobs
+    above it already concluded. Live 2026-09-04: runs 33843452894 and 33843742114
+    both rolled up `cancelled` with `test / Unit Tests` FAILED (the ADR-080
+    coverage gate) and this gate walked past both to an older `success`.
+    The verdict comes from the run's own JOBS, never the rollup —
+    `scripts/ci_run_verdicts.py` owns that predicate and BOTH readers import it
+    (`check_ci_warnings.py` is the other). It is deliberately not restated here:
+    #3212 happened because a classification lived inside one consumer and the
+    other could not reach it.
+
+A cancelled run is skipped ONLY when its own jobs prove it superseded; a
+cancelled run whose jobs could not be read is INDETERMINATE and is not skipped
+either ("could not verify" must never read as "no verdict here"). The newest
+run that actually finished AND carries a verdict is the completed-run verdict.
 
 #2826 gives `head_coverage()` (above) a SCHEDULED consumer, because #2762 only
 ever ran it inside a session's `/wrap` gate — an unattended merge (dependabot-
@@ -150,6 +171,16 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+# The #3530 cancelled-run predicate lives in ONE module both readers import.
+# `scripts/` is on sys.path when this file is run as a script, but NOT when a
+# test loads it via importlib.spec_from_file_location (which several do), so the
+# directory is put there explicitly rather than relying on the caller's cwd.
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+import ci_run_verdicts as civ  # noqa: E402 — must follow the sys.path insert above
+
 # A run parked at the production approval gate is normal right after a merge
 # (the approval is manual by design) — it becomes an incident when it ages.
 STRANDED_WAIT_HOURS = 2.0
@@ -159,6 +190,13 @@ STRANDED_WAIT_HOURS = 2.0
 # that rejects a run per merge stacks several in a row; an unbounded walk would
 # turn one gate check into dozens of API calls.
 REJECTION_PROBE_LIMIT = 8
+
+# #3530: how many leading `cancelled` runs to probe for their real job verdict
+# before giving up. Same reasoning as REJECTION_PROBE_LIMIT — a merge train can
+# stack several evicted-Deploy cancels in a row, but the walk stops at the first
+# run that carries a verdict, so this is a bound on a pathological history, not
+# the normal cost (2026-09-04's worst real case was 2).
+CANCELLED_PROBE_LIMIT = 8
 
 # Repo root, for reading ci-cd.yml's own `paths:` filter (#2826) — never guess
 # a relative path from the caller's cwd.
@@ -189,24 +227,74 @@ def _age_hours(run: dict, now: datetime) -> float | None:
     return (now - created).total_seconds() / 3600.0
 
 
-def latest_completed_run(runs: list[dict], rejected_ids: object = None) -> dict | None:
-    """Newest non-cancelled, non-rejected completed run (the completed-run verdict).
+def latest_completed_run(runs: list[dict], rejected_ids: object = None, cancelled_verdicts: dict | None = None) -> dict | None:
+    """Newest completed run that actually carries a verdict.
 
     Pure — unit-tested offline. `runs` is newest-first, as `gh run list`
-    returns them. Cancelled runs are superseded pushes, not verdicts; skip.
+    returns them.
+
     `rejected_ids` (#2590) is the set of run ids whose `failure` is a REJECTED
-    production deployment rather than a broken pipeline — also not a verdict.
+    production deployment rather than a broken pipeline — not a verdict.
+
+    `cancelled_verdicts` (#3530) maps a run id to one of
+    `ci_run_verdicts.CANCELLED_*`. A `cancelled` run is skipped ONLY when its
+    entry says SUPERSEDED; CARRIES_FAILURE and INDETERMINATE both stop the walk,
+    because the first is a red and the second is unproven. An id ABSENT from the
+    map means nobody probed that run, which preserves the pre-#3530 skip for pure
+    callers that supply no job data — every live caller here probes, and
+    `tests/test_cancelled_not_superseded_3530.py` pins that it does.
     """
     skip = set(rejected_ids or ())
+    verdicts = cancelled_verdicts or {}
     for r in runs:
         if r.get("status") != "completed":
             continue
-        if r.get("conclusion") == "cancelled":
+        if r.get("conclusion") == "cancelled" and civ.cancelled_is_skippable(verdicts.get(r.get("databaseId"))):
             continue
         if r.get("databaseId") in skip:
             continue
         return r
     return None
+
+
+def scan_cancelled(runs: list[dict], probe_jobs, max_probes: int = CANCELLED_PROBE_LIMIT) -> tuple[dict, list[dict]]:
+    """#3530: classify every leading `cancelled` run from its OWN jobs.
+
+    Pure by injection — `probe_jobs(run) -> jobs | None` is the only impure part
+    and is faked in tests. Returns `(verdicts, notes)` where `verdicts` maps run
+    id → a `ci_run_verdicts.CANCELLED_*` constant (feed it to
+    `latest_completed_run` / `classify_pipeline`) and `notes` is a
+    newest-first list of `{"run", "verdict", "failing"}` for reporting — every
+    cancelled run the gate saw is named, including the ones it skipped.
+
+    The walk stops at the first cancelled run that is NOT superseded (it is the
+    verdict; nothing older matters) and at the first non-`failure`,
+    non-`cancelled` completed run. `failure` runs are walked THROUGH rather than
+    stopped at, because `scan_rejections` may yet classify them as rejected
+    non-verdicts and land on an older cancelled run.
+    """
+    verdicts: dict = {}
+    notes: list[dict] = []
+    probes = 0
+    for r in runs:
+        if r.get("status") != "completed":
+            continue
+        conclusion = r.get("conclusion")
+        if conclusion == "cancelled":
+            if probes >= max_probes:
+                break
+            probes += 1
+            jobs = probe_jobs(r)
+            verdict = civ.classify_cancelled_run(jobs)
+            verdicts[r.get("databaseId")] = verdict
+            notes.append({"run": r, "verdict": verdict, "failing": civ.failing_job_names(jobs)})
+            if not civ.cancelled_is_skippable(verdict):
+                break
+            continue
+        if conclusion == "failure":
+            continue
+        break
+    return verdicts, notes
 
 
 def head_coverage(runs: list[dict], head_sha: str | None) -> dict:
@@ -488,7 +576,9 @@ def rejection_reason(approvals: list[dict] | None) -> str:
     return "no reason recorded"
 
 
-def scan_rejections(runs: list[dict], probe, max_probes: int = REJECTION_PROBE_LIMIT) -> tuple[list[dict], list[dict] | None]:
+def scan_rejections(
+    runs: list[dict], probe, max_probes: int = REJECTION_PROBE_LIMIT, cancelled_verdicts: dict | None = None
+) -> tuple[list[dict], list[dict] | None]:
     """Walk newest-first, classifying each `failure` run as rejected or real.
 
     Pure by injection — `probe(run) -> (jobs, approvals)` is the only impure
@@ -499,12 +589,22 @@ def scan_rejections(runs: list[dict], probe, max_probes: int = REJECTION_PROBE_L
 
     A probe that fails (returns `(None, None)`) yields `is_deploy_rejection`
     False — i.e. it degrades to "ordinary red", never to a false green.
+
+    `cancelled_verdicts` (#3530) comes from `scan_cancelled`. A cancelled run
+    that is NOT superseded ends the walk with `verdict_jobs = None` — it is the
+    verdict run, and its own shape is a cancelled rollup, never the R8-ST6
+    Plan-red shape `verdict_jobs` exists to detect.
     """
     rejected: list[dict] = []
+    verdicts = cancelled_verdicts or {}
     probes = 0
     for r in runs:
-        if r.get("status") != "completed" or r.get("conclusion") == "cancelled":
+        if r.get("status") != "completed":
             continue
+        if r.get("conclusion") == "cancelled":
+            if civ.cancelled_is_skippable(verdicts.get(r.get("databaseId"))):
+                continue
+            return rejected, None
         if r.get("conclusion") != "failure":
             return rejected, None
         if probes >= max_probes:
@@ -524,6 +624,8 @@ def classify_pipeline(
     now: datetime | None = None,
     deploy_wedge: dict | None = None,
     rejected: list[dict] | None = None,
+    cancelled_verdicts: dict | None = None,
+    cancelled_notes: list[dict] | None = None,
 ) -> dict:
     """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
@@ -551,7 +653,11 @@ def classify_pipeline(
     wedged = [v for v in (deploy_wedge or {}).get("verdicts", []) if v.get("kind") == "phantom-wedge"]
 
     rejected = rejected or []
-    completed = latest_completed_run(runs, rejected_ids={(e.get("run") or {}).get("databaseId") for e in rejected})
+    completed = latest_completed_run(
+        runs,
+        rejected_ids={(e.get("run") or {}).get("databaseId") for e in rejected},
+        cancelled_verdicts=cancelled_verdicts,
+    )
     if wedged:
         kind = STRANDED_DEPLOY_WEDGE
     elif overdue:
@@ -573,6 +679,8 @@ def classify_pipeline(
         "overdue_waiting": overdue,
         "wedged": wedged,
         "rejected": rejected,
+        # #3530: every cancelled run the walk saw, and what its OWN jobs said.
+        "cancelled_notes": cancelled_notes or [],
         # An ordinary red can STILL have a stranded deploy path (Plan red +
         # Deploy skipped alongside another failure, e.g. live 2026-08-02).
         "deploy_also_stranded": kind == RED and plan_failed and deploy_skipped,
@@ -602,13 +710,23 @@ def _rejection_notices(state: dict) -> list[str]:
     return lines
 
 
+def _cancelled_notices(state: dict) -> list[str]:
+    """#3530: name every cancelled run the walk classified — skipped or not.
+
+    Same discipline as `_rejection_notices`: a run the gate walks past has to be
+    visible, so "that cancel really was a supersession" can never be confused
+    with "the gate is blind to a red hiding behind a cancelled rollup".
+    """
+    return [civ.describe_cancelled(n.get("run") or {}, n.get("verdict"), n.get("failing")) for n in state.get("cancelled_notes") or []]
+
+
 def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
     """(exit_code, message) for a classified pipeline state. Pure."""
     now = now or datetime.now(timezone.utc)
     kind = state["kind"]
     sha8 = (state.get("sha") or "")[:8]
     lines: list[str] = []
-    notices = _rejection_notices(state)
+    notices = _rejection_notices(state) + _cancelled_notices(state)
 
     if kind == STRANDED_DEPLOY_WEDGE:
         lines.append("🛑 PHANTOM DEPLOY WEDGE (#2052 class) — main's deploy path is dead; a green completed run is a stale fact:")
@@ -701,6 +819,26 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
     else:
         concl = ((state.get("run") or {}).get("conclusion") or "red").upper()
         lines.append(f"❌ main is {concl} at {sha8}.")
+        if concl == "CANCELLED":
+            # #3530: the rollup is `cancelled`, but this run was NOT skipped, so
+            # its jobs said something. Say WHICH, or the operator reads the word
+            # "cancelled" and reaches for the old superseded-push reflex.
+            verdict_id = (state.get("run") or {}).get("databaseId")
+            note = next((n for n in state.get("cancelled_notes") or [] if (n.get("run") or {}).get("databaseId") == verdict_id), None)
+            failing = ", ".join((note or {}).get("failing") or []) or "unnamed job(s)"
+            if (note or {}).get("verdict") == civ.CANCELLED_INDETERMINATE:
+                lines.append(
+                    "   Its job list could NOT be read, so whether the cancel superseded a clean run or\n"
+                    "   hid a real failure is unproven — that is not a green, and it is not a skip either (#3530)."
+                )
+            else:
+                lines.append(
+                    f"   A `cancelled` rollup is NOT a superseded push on this repo (#3530): the run's own jobs\n"
+                    f"   carry a real failure — {failing}. Since #2009 the workflow concurrency group is unique\n"
+                    "   per run; the only canceller left is the `ci-cd-deploy-<ref>` group evicting a PENDING\n"
+                    "   Deploy, which cannot un-fail the validation jobs that already ran above it.\n"
+                    "   Fix the failing job — do not wait for it to be superseded away."
+                )
         if state.get("deploy_also_stranded"):
             lines.append(
                 "   ⚠️  AND the deploy path is stranded (#1901): `Plan deployments` failed and\n"
@@ -825,7 +963,14 @@ def main() -> int:
             print(f"⚠️  check_main_green: could not read approvals for run {run_id} ({e}) — treating as ordinary red")
         return jobs, approvals
 
-    rejected, jobs = scan_rejections(runs, _probe)
+    # #3530: a `cancelled` rollup is not a verdict-free supersession here — read
+    # each one's OWN jobs before deciding whether it can be walked past.
+    def _probe_jobs(run: dict) -> list[dict] | None:
+        return civ.fetch_run_jobs(_gh_json, REPO, run.get("databaseId"))
+
+    cancelled_verdicts, cancelled_notes = scan_cancelled(runs, _probe_jobs)
+
+    rejected, jobs = scan_rejections(runs, _probe, cancelled_verdicts=cancelled_verdicts)
 
     # #2052: the phantom deploy wedge needs per-run JOB state, which `gh run list`
     # does not carry. Best-effort — a detector failure must never turn a readable
@@ -841,7 +986,14 @@ def main() -> int:
             f"⚠️  check_main_green: deploy-wedge detection unavailable ({e}) — run scripts/check_deploy_wedge.py by hand if a deploy looks stuck."
         )
 
-    state = classify_pipeline(runs, latest_failure_jobs=jobs, deploy_wedge=wedge, rejected=rejected)
+    state = classify_pipeline(
+        runs,
+        latest_failure_jobs=jobs,
+        deploy_wedge=wedge,
+        rejected=rejected,
+        cancelled_verdicts=cancelled_verdicts,
+        cancelled_notes=cancelled_notes,
+    )
     # #2762: the verdict must vouch for the sha main actually points at — read the
     # REMOTE head (never the local checkout, which may be stale or on a branch).
     try:

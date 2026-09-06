@@ -59,6 +59,7 @@ from operational import (
     acwr_liveness_qa,  # noqa: E402
     canary_precision_qa,  # noqa: E402  (#3485 size-split)
     chronicle_manifest_qa,  # noqa: E402  (#3485)
+    nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
     qa_check_edge_429,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
@@ -693,7 +694,9 @@ from operational.qa_check_podcast_parity import (  # noqa: F401,E402
 # #1665/#1944/#1972/#1993); re-exported here so qa_smoke_lambda.check_subscriber_promise_truth
 # and .assess_subscriber_promise_truth are valid public entrypoints for tests and callers.
 from operational.qa_check_subscriber_promise import (  # noqa: F401,E402
+    assess_promise_cadence_agreement,
     assess_subscriber_promise_truth,
+    check_subscriber_promise_cadence,
     check_subscriber_promise_truth,
 )
 
@@ -954,6 +957,8 @@ def check_steps():
     return [
         ("ddb_freshness", check_ddb_freshness),
         ("acwr_liveness", lambda: acwr_liveness_qa.check_acwr_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now)),  # #3443 dead-man
+        # #3569 dead-man: a nudge reservation must reach a terminal status and every terminal row must have its NUDGE# record
+        ("nudge_ledger_liveness", lambda: nudge_ledger_qa.check_nudge_ledger_liveness(table, Check, CONTENT_TRUTH, pt_now)),
         ("hae_liveness_truth", check_hae_liveness_truth),  # #2001: dark HAE datatypes carry a numeric days_dark when findable
         ("s3_freshness", check_s3_freshness),
         # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)
@@ -972,6 +977,8 @@ def check_steps():
         ("content_cadence", check_content_cadence),
         # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
         ("subscriber_promise_truth", check_subscriber_promise_truth),
+        # #3564: and the promise must state the cadence the senders actually deliver
+        ("subscriber_promise_cadence", check_subscriber_promise_cadence),
         ("podcast_parity", check_podcast_parity),
         # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
         (

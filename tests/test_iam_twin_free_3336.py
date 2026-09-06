@@ -24,12 +24,20 @@ WHAT IS PROVED HERE (the derivation-guard primitive, docs/CHARTER.md)
      their inline policy name equals what the verifier reads back
   D. the incident's exact regression is pinned at the source: every governed role's trust
      subject is scoped to this repo and none is the any-ref wildcard
+  E. (#3562, 2026-09-05) `Resource: "*"` appears only for actions on a dated registry of
+     account-level ones. The remediation role granted `ses:SendEmail`/`sesv2:SendEmail`
+     and `logs:GetLogEvents`/`FilterLogEvents` on `*` — both scopeable — so a compromised
+     Mon/Wed/Fri workflow could send from any verified SES identity and read every
+     Lambda's logs. Contrast the 38 `resources=["*"]` statements in
+     `cdk/stacks/role_policies_*.py`, all on account-level actions: section E holds BOTH
+     sources to that one registry.
 
 All offline: the tests read repo files only; no AWS call.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -254,6 +262,214 @@ def test_no_governed_role_trusts_the_any_ref_wildcard(role):
     for sub in subs:
         assert sub.startswith("repo:averagejoematt/life-platform:"), (role, sub)
         assert not sub.endswith(":*"), f"{role}: {sub!r} is the any-ref subject the 2026-08-30 twin put live"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# E. Resource:"*" only where AWS gives no narrower handle (#3562)
+# ═════════════════════════════════════════════════════════════════════════════
+
+#: Actions allowed to carry `Resource: "*"`, each with WHY. Membership was probed
+#: on 2026-09-05 with `aws iam simulate-custom-policy` (read-only): granting the
+#: action on the narrowest plausible ARN and simulating the live request shape.
+#:
+#:   no-resource        the probe implicitDenies — the call carries no scopeable
+#:                      resource at all, so a narrower ARN denies it outright
+#:   account-wide-read  an enumerate-the-account read whose answer IS the account
+#:                      (the set the 38 CDK `resources=["*"]` statements satisfy)
+#:
+#: RATCHET: this registry may only SHRINK. Adding an action here widens every role
+#: that names it at once, so a new entry needs its own argument in its own PR.
+_WILDCARD_OK_ACTIONS = {
+    "ce:GetCostAndUsage": "no-resource",
+    "cloudformation:DescribeStackDriftDetectionStatus": "no-resource",  # takes a detection id
+    "cloudformation:ListStacks": "no-resource",
+    "cloudformation:ValidateTemplate": "no-resource",
+    "ec2:DescribeRegions": "no-resource",
+    "events:ListRules": "no-resource",
+    "lambda:ListFunctions": "no-resource",
+    "logs:DescribeLogGroups": "no-resource",
+    "secretsmanager:ListSecrets": "no-resource",
+    "xray:GetSamplingRules": "no-resource",
+    "xray:GetSamplingTargets": "no-resource",
+    "xray:PutTelemetryRecords": "no-resource",
+    "xray:PutTraceSegments": "no-resource",
+    "cloudwatch:DescribeAlarmHistory": "account-wide-read",
+    "cloudwatch:DescribeAlarms": "account-wide-read",
+    "cloudwatch:GetMetricData": "account-wide-read",
+    "cloudwatch:GetMetricStatistics": "account-wide-read",
+    "cloudwatch:ListMetrics": "account-wide-read",
+    # PutMetricData takes no resource at all — its ONLY handle is the namespace
+    # condition, which the stricter rule below requires of the OIDC identities.
+    "cloudwatch:PutMetricData": "no-resource",
+}
+
+#: A SECOND, stricter rule applied to the four OIDC identities only: their one
+#: resourceless write must still name the namespace it may write. All three of their
+#: PutMetricData statements already do (`LifePlatform/AI`, `LifePlatform/GoldenBrief`),
+#: so this is a ratchet holding a posture that is already met, not a new demand.
+#:
+#: The CDK Lambda fleet does NOT meet it — ~30 `role_policies_*` statements grant
+#: PutMetricData on `*` with no condition. That is a real, pre-existing difference
+#: between the two halves, out of #3562's scope (it is a fleet-wide deploy change),
+#: recorded here rather than silently folded into the registry.
+_WILDCARD_REQUIRES_CONDITION = {"cloudwatch:PutMetricData": "cloudwatch:namespace"}
+
+#: Wildcards on SCOPEABLE actions that are not narrowed yet. Dated, argued, and
+#: SHRINK-ONLY: `test_the_deferral_queue_only_shrinks` reds when an entry becomes
+#: stale, so this cannot quietly become a graveyard. #3562 narrowed the remediation
+#: role; the deploy role is deliberately NOT in this PR — its CloudFormation reads
+#: include the CDKToolkit bootstrap stack and whatever stack `cdk diff` resolves, so
+#: narrowing it is a deploy-path change that has to be argued (and rehearsed) on its
+#: own rather than ridden in on a security-boundary fix to a different identity.
+_WILDCARD_SCOPING_DEFERRED = {
+    ("github-actions-deploy-role", "EventBridge", "events:DescribeRule"): "2026-09-05 (#3562): deploy path, own issue",
+    ("github-actions-deploy-role", "EventBridge", "events:ListTargetsByRule"): "2026-09-05 (#3562): deploy path, own issue",
+    ("github-actions-deploy-role", "CloudFormationDiff", "cloudformation:DescribeStacks"): "2026-09-05 (#3562): reads CDKToolkit too",
+    (
+        "github-actions-deploy-role",
+        "CloudFormationDiff",
+        "cloudformation:DescribeStackResource",
+    ): "2026-09-05 (#3562): reads CDKToolkit too",
+    ("github-actions-deploy-role", "CloudFormationDiff", "cloudformation:GetTemplate"): "2026-09-05 (#3562): reads CDKToolkit too",
+    ("github-actions-deploy-role", "CloudFormationDiff", "cloudformation:ListStackResources"): "2026-09-05 (#3562): reads CDKToolkit too",
+    ("github-actions-deploy-role", "CloudFormationDiff", "cloudformation:DescribeStackEvents"): "2026-09-05 (#3562): reads CDKToolkit too",
+    ("github-actions-deploy-role", "CloudFormationDiff", "cloudformation:DescribeStackSet"): "2026-09-05 (#3562): stackset, own issue",
+}
+
+_DEFERRAL_DATE = re.compile(r"^\d{4}-\d{2}-\d{2} \(#\d+\): \S")
+
+
+def _as_list(v):
+    return v if isinstance(v, list) else [v]
+
+
+def wildcard_grants_in(doc: dict, role: str) -> list[tuple]:
+    """(role, Sid, action, has_condition, condition_keys) for every `Resource: "*"` action."""
+    out = []
+    for st in doc.get("Statement", []):
+        if "*" not in _as_list(st.get("Resource")):
+            continue
+        keys = set()
+        for _op, kv in (st.get("Condition") or {}).items():
+            keys |= set(kv)
+        for action in _as_list(st.get("Action")):
+            out.append((role, st.get("Sid"), action, bool(st.get("Condition")), keys))
+    return out
+
+
+def all_declared_wildcards() -> list[tuple]:
+    return [
+        g
+        for role, files in sorted(governed_roles().items())
+        for g in wildcard_grants_in(json.loads(files["permissions"].read_text(encoding="utf-8")), role)
+    ]
+
+
+def _offenders(grants, require_conditions: bool = True) -> list[str]:
+    """The rule itself, over a grant list — pure, so it can be positively controlled.
+
+    `require_conditions` turns on the stricter OIDC-identity half; the CDK fleet is
+    swept against the registry alone (see _WILDCARD_REQUIRES_CONDITION's note)."""
+    bad = []
+    for role, sid, action, has_cond, keys in grants:
+        if require_conditions and action in _WILDCARD_REQUIRES_CONDITION:
+            need = _WILDCARD_REQUIRES_CONDITION[action]
+            if not has_cond or need not in keys:
+                bad.append(f"{role}/{sid}: {action} on Resource:* without its required {need} condition")
+            continue
+        if action in _WILDCARD_OK_ACTIONS:
+            continue
+        if (role, sid, action) in _WILDCARD_SCOPING_DEFERRED:
+            continue
+        bad.append(f"{role}/{sid}: {action} on Resource:* — scopeable, and not on the account-level registry")
+    return bad
+
+
+def test_no_wildcard_resource_on_a_scopeable_action():
+    """#3562. The remediation role's `ses:SendEmail`/`sesv2:SendEmail` and
+    `logs:GetLogEvents`/`logs:FilterLogEvents` were the finding: both take a resource
+    (an SES identity ARN, a log-group ARN) and both were granted on `*`."""
+    grants = all_declared_wildcards()
+    assert grants, "no Resource:* statement found in any governed permissions doc — the sweep broke, not the docs"
+    assert not _offenders(grants), "wildcard resource on a scopeable action:\n  " + "\n  ".join(_offenders(grants))
+
+
+def test_the_remediation_role_ses_and_log_grants_name_what_they_need():
+    """The specific regressions, pinned by shape rather than only by the rule above —
+    a future edit that re-broadened them would otherwise only trip the generic message."""
+    doc = json.loads((IAM_DIR / "github-actions-remediation-role.permissions.json").read_text(encoding="utf-8"))
+    by_action: dict[str, list] = {}
+    for st in doc["Statement"]:
+        for a in _as_list(st.get("Action")):
+            by_action.setdefault(a, []).extend(_as_list(st.get("Resource")))
+            if a in ("ses:SendEmail", "sesv2:SendEmail"):
+                cond = (st.get("Condition") or {}).get("StringEquals", {})
+                assert "ses:FromAddress" in cond, f"{a}: SES grant must pin the From address, not just the identity"
+    for action in ("ses:SendEmail", "sesv2:SendEmail"):
+        assert by_action[action] == ["arn:aws:ses:us-west-2:205930651321:identity/mattsusername.com"], by_action[action]
+    for action in ("logs:GetLogEvents", "logs:FilterLogEvents"):
+        assert by_action[action] and all(r.startswith("arn:aws:logs:") and ":log-group:/aws/" in r for r in by_action[action]), by_action[
+            action
+        ]
+
+
+def _cdk_wildcard_actions() -> list[tuple]:
+    """The CDK half: every `resources=["*"]` PolicyStatement in the role-policy family."""
+    out = []
+    for src in sorted((ROOT / "cdk" / "stacks").glob("role_policies_*.py")) + [ROOT / "cdk" / "stacks" / "lambda_helpers.py"]:
+        tree = ast.parse(src.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            kw = {k.arg: k.value for k in node.keywords if k.arg}
+            res = kw.get("resources")
+            if not isinstance(res, ast.List) or [e.value for e in res.elts if isinstance(e, ast.Constant)] != ["*"]:
+                continue
+            actions = kw.get("actions")
+            names = [e.value for e in actions.elts if isinstance(e, ast.Constant)] if isinstance(actions, ast.List) else []
+            keys = set()
+            cond = kw.get("conditions")
+            if isinstance(cond, ast.Dict):
+                for v in cond.values:
+                    if isinstance(v, ast.Dict):
+                        keys |= {k.value for k in v.keys if isinstance(k, ast.Constant)}
+            for a in names:
+                out.append((f"cdk:{src.name}", f"line {node.lineno}", a, bool(keys), keys))
+    return out
+
+
+def test_the_cdk_role_policies_satisfy_the_same_registry():
+    """One registry, both sources. The CDK sweep was the review's own control ('all 38
+    are on non-scopeable actions'); if that is true it must pass the identical rule, and
+    if it stops being true this reds instead of the claim quietly rotting."""
+    grants = _cdk_wildcard_actions()
+    assert len(grants) >= 12, f"the CDK wildcard sweep found only {len(grants)} actions — the AST walk broke"
+    bad = _offenders(grants, require_conditions=False)
+    assert not bad, "CDK wildcard resource on a scopeable action:\n  " + "\n  ".join(bad)
+
+
+def test_the_deferral_queue_only_shrinks():
+    """Every deferred entry must still be a live wildcard in the docs. Once it is
+    narrowed, the entry must be deleted — a queue, not a graveyard (#2824's rule)."""
+    live = {(role, sid, action) for role, sid, action, _c, _k in all_declared_wildcards()}
+    stale = sorted(k for k in _WILDCARD_SCOPING_DEFERRED if k not in live)
+    assert not stale, "these deferrals are already narrowed — delete them:\n  " + "\n  ".join(map(str, stale))
+    for key, reason in _WILDCARD_SCOPING_DEFERRED.items():
+        assert _DEFERRAL_DATE.match(reason), f"{key}: deferral needs a `YYYY-MM-DD (#issue): reason` line, got {reason!r}"
+
+
+def test_the_wildcard_rule_reds_on_a_planted_grant():
+    """Positive control. The rule must FAIL on each of the three shapes it exists to
+    catch, and PASS on the narrowed real ones — otherwise it is a check that cannot."""
+    assert _offenders([("r", "SES", "sesv2:SendEmail", False, set())]), "a wildcard SES send would not be caught"
+    assert _offenders([("r", "Diagnose", "logs:GetLogEvents", False, set())]), "a wildcard log read would not be caught"
+    assert _offenders([("r", "Telem", "cloudwatch:PutMetricData", False, set())]), "an unconditioned OIDC PutMetricData would not be caught"
+    assert not _offenders([("r", "Telem", "cloudwatch:PutMetricData", True, {"cloudwatch:namespace"})])
+    assert not _offenders([("r", "DiagnoseAccountLevel", "logs:DescribeLogGroups", False, set())])
+    # …and the CDK half, which is swept against the registry alone, must NOT red on the
+    # fleet's unconditioned PutMetricData — otherwise the two halves silently disagree.
+    assert not _offenders([("cdk", "line 1", "cloudwatch:PutMetricData", False, set())], require_conditions=False)
+    assert _offenders([("cdk", "line 1", "ses:SendEmail", False, set())], require_conditions=False)
 
 
 def test_scanned_tree_is_the_deploy_dir_and_exists():

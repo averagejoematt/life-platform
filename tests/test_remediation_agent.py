@@ -414,7 +414,7 @@ def test_aged_alarm_over_72h_becomes_named_needs_human_line(monkeypatch):
     )
     monkeypatch.setattr(agent, "_coherence_findings", lambda: None)
     monkeypatch.setattr(agent.drift_report, "read_latest", lambda *a, **k: None)
-    monkeypatch.setattr(agent.drift_report, "as_signal", lambda x: None)
+    monkeypatch.setattr(agent.drift_report, "as_signal", lambda x, **kw: None)  # #3508: the agent now passes cfn_client=
     monkeypatch.setattr(agent._sqs, "get_queue_attributes", lambda **kw: (_ for _ in ()).throw(RuntimeError("no dlq")))
     monkeypatch.setattr(agent.subprocess, "run", lambda *a, **k: _Stub(returncode=1, stdout="[]"))
 

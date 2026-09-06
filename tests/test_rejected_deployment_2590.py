@@ -253,3 +253,59 @@ def test_classify_pipeline_without_the_rejected_kwarg_is_the_old_behaviour():
     runs = [_run(31527749522, "b177805f6")]
     state = g.classify_pipeline(runs, latest_failure_jobs=REJECTED_JOBS, now=NOW)
     assert state["kind"] == g.RED
+
+
+# ── 5. #3530: a REJECTED run stacked on a CANCELLED-carrying-a-failure one ───
+#
+# The #3530 acceptance box, in this file because it is the interaction that
+# matters: the two skip rules compose, and only one of the two runs below is a
+# non-verdict. Payload shape captured from run 33843742114 on 2026-09-04 —
+# CANCELLED rollup, `test / Unit Tests` = failure, `Deploy` = cancelled with ZERO
+# steps (evicted from the `ci-cd-deploy-<ref>` group by the next run's Deploy).
+# The full live payload is pinned at
+# tests/fixtures/cancelled_runs/run_33843742114_cancelled_carries_failure.json
+# and exercised end-to-end by tests/test_cancelled_not_superseded_3530.py.
+CANCELLED_WITH_UNIT_TEST_RED_JOBS = [
+    {"name": "Reconcile derived artifacts", "conclusion": "success"},
+    {"name": "lint / Lint + Syntax Check", "conclusion": "success"},
+    {"name": "Deploy-critical tests", "conclusion": "success"},
+    {"name": "test / Unit Tests", "conclusion": "failure"},
+    {"name": "Plan deployments", "conclusion": "success"},
+    {"name": "Deploy", "conclusion": "cancelled", "steps": []},
+    {"name": "Visual + AI-vision QA", "conclusion": "skipped"},
+    {"name": "Smoke test", "conclusion": "skipped"},
+    {"name": "Post-deploy integration checks (I1/I2/I5)", "conclusion": "skipped"},
+    {"name": "Auto-rollback (smoke failure)", "conclusion": "skipped"},
+    {"name": "Notify failure", "conclusion": "success"},
+]
+
+
+def test_a_cancelled_run_carrying_a_unit_test_red_is_the_verdict_not_a_skip():
+    """The rejected run above it IS a non-verdict; the cancelled one below it is
+    NOT. Pre-#3530 both were skipped and the gate reported the older green."""
+    g = _gate()
+    runs = [
+        _run(31527749522, "b177805f6"),  # rejected production deployment — not a verdict
+        _run(33843742114, "b248a70c1", conclusion="cancelled"),  # cancelled, carries a real red
+        _run(2, "0ld0ld0ld", conclusion="success"),
+    ]
+    cancelled_verdicts, notes = g.scan_cancelled(
+        runs, lambda r: CANCELLED_WITH_UNIT_TEST_RED_JOBS if r["databaseId"] == 33843742114 else None
+    )
+    rejected, jobs = g.scan_rejections(
+        runs, _probe_from({31527749522: (REJECTED_JOBS, REJECTED_APPROVALS)}), cancelled_verdicts=cancelled_verdicts
+    )
+    assert [e["run"]["databaseId"] for e in rejected] == [31527749522]
+
+    verdict = g.latest_completed_run(runs, rejected_ids={31527749522}, cancelled_verdicts=cancelled_verdicts)
+    assert verdict["databaseId"] == 33843742114, "the cancelled run carrying a red IS the verdict"
+
+    state = g.classify_pipeline(
+        runs, latest_failure_jobs=jobs, now=NOW, rejected=rejected, cancelled_verdicts=cancelled_verdicts, cancelled_notes=notes
+    )
+    assert state["kind"] == g.RED
+    code, msg = g.render(state, now=NOW)
+    assert code == 1
+    assert "main is CANCELLED at b248a70c" in msg
+    assert "test / Unit Tests" in msg
+    assert "b177805f6"[:8] in msg and "REJECTED" in msg

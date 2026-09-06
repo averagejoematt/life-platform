@@ -68,8 +68,16 @@ MONITORING = REPO / "cdk" / "stacks" / "monitoring_stack.py"
 #                           so the AST scan attributes its site to BOTH
 #                           enclosing functions — both entries are the same
 #                           two call sites, not four.)
-#   check_canary_precision — the fail-soft unreadable branch, pinned to the
-#                           filed grant gap #1956; un-chronic when it lands.
+#   check_canary_precision — REMOVED 2026-09-05 (#3502). This entry said
+#                           "un-chronic when it lands", and the grant landed:
+#                           s3:ListBucket on ai-canary-log/* now lets absence
+#                           answer 404 instead of 403, and the check classifies
+#                           a per-date denial instead of bailing. The chronic
+#                           flag was doing real damage while it stood — a muted
+#                           warn is excluded from the alarmed WarnCount, so the
+#                           sensor-on-the-sensor read green through 249
+#                           unreadable events and ZERO rate lines in 30 days.
+#                           An all-dates-denied result is now a LOUD warn.
 #   check_coach_ensemble_phase_stamp_coverage — the unstamped-rows warn,
 #                           pinned to the filed backfill gap #1970; the
 #                           errored branch stays alarmed.
@@ -78,7 +86,6 @@ SANCTIONED_CHRONIC_SITES = {
     ("qa_smoke_lambda.py", "check_mcp_tool_calls"),
     ("qa_check_outputs.py", "check_score_sanity"),
     ("qa_check_outputs.py", "_range_check"),
-    ("canary_precision_qa.py", "check_canary_precision"),
     ("qa_smoke_lambda.py", "check_coach_ensemble_phase_stamp_coverage"),
     # #2640, class (a) — a recurring TIMING condition on a healthy platform. The hero-weight
     # arithmetic check has nothing to reconcile until Matthew's first post-genesis weigh-in
@@ -338,14 +345,17 @@ class _CanaryS3Denied:
         raise RuntimeError("AccessDenied (simulated) — no s3:GetObject on ai-canary-log/*")
 
 
-def test_canary_unreadable_branch_is_chronic(monkeypatch):
-    """#2378: the fail-soft unreadable branch is pinned to the filed grant gap
-    #1956 and recurred nightly — chronic until the grant lands."""
+def test_canary_unreadable_branch_is_no_longer_muted(monkeypatch):
+    """#3502 (was #2378's chronic pin): the grant landed, so the unreadable branch is
+    no longer a sanctioned mute. It stays a WARN — a single unreadable night is not a
+    content-truth FAIL — but it must be an ALARMED warn, because the chronic flag is
+    exactly what let this sensor report green through 249 unreadable events and zero
+    measurements in 30 days."""
     monkeypatch.setattr(qa, "s3", _CanaryS3Denied())
     (c,) = qa.check_canary_precision()
     assert c.passed is None
-    assert c.chronic is True, "the #1956 unreadable branch must be chronic (#2378)"
-    assert "#1956" in c.message
+    assert getattr(c, "chronic", False) is False, "a muted warn is how #1956 stayed dark for 30 days (#3502)"
+    assert qa.CANARY_LOG_PREFIX in c.message
 
 
 class _UnstampedTable:

@@ -30,6 +30,16 @@ from coach import (
 from experiment import phase_taxonomy  # noqa: E402
 
 TODAY = "2026-08-14"  # a Friday
+
+
+@pytest.fixture(autouse=True)
+def _write_day_is_today(monkeypatch):
+    """#3598: phase_taxonomy derives the provenance stamp's phase from the Pacific write
+    day. Freeze that clock to THIS file's TODAY (#2376: the handler's clock derived from
+    the fixture constant, never the live one) so the dated rows and the stamp agree."""
+    monkeypatch.setattr(phase_taxonomy, "_write_date", lambda: TODAY)
+
+
 COACH_PK = "COACH#pattern_coach"
 
 

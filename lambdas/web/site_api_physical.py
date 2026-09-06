@@ -73,6 +73,7 @@ def weekly_physical_summary(*, _g) -> dict:
     """
     _query_source = _g["_query_source"]
     _experiment_date = _g["_experiment_date"]
+    genesis = str(_g.get("EXPERIMENT_START") or "")
     today = datetime.now(PT).strftime("%Y-%m-%d")
     d7 = _experiment_date(7)
 
@@ -124,13 +125,23 @@ def weekly_physical_summary(*, _g) -> dict:
         # phantom ~298 Garmin record — same fix as handle_training_overview, #8).
         _ah_steps = int(float(ah["steps"])) if ah.get("steps") and float(ah["steps"]) > 0 else None
         _gm_steps = int(float(garmin["steps"])) if garmin.get("steps") and float(garmin["steps"]) >= 1000 else None
+        # #3523 (ADR-104): the query window's lower bound is `_experiment_date(7)`, which
+        # CLAMPS to EXPERIMENT_START — so a calendar day before genesis was never asked
+        # about. Its activity total is therefore an absence, not "zero minutes of
+        # movement", and the row must read as absence in EVERY column. `steps` already
+        # rendered "—" (None, no record); `total_active_minutes` was the one column
+        # fabricating a numeric 0, so the same day encoded one absence two ways.
+        # `pre_genesis` is carried explicitly so the front end can caption the gap
+        # ("counts from Day 1") instead of inferring it from a null.
+        _pre_genesis = bool(genesis) and d < genesis
         days.append(
             {
                 "date": d,
                 "day_of_week": dow,
-                "steps": _ah_steps if _ah_steps is not None else _gm_steps,
-                "activities": activities,
-                "total_active_minutes": round(total_active_min),
+                "steps": None if _pre_genesis else (_ah_steps if _ah_steps is not None else _gm_steps),
+                "activities": [] if _pre_genesis else activities,
+                "total_active_minutes": None if _pre_genesis else round(total_active_min),
+                "pre_genesis": _pre_genesis,
             }
         )
 

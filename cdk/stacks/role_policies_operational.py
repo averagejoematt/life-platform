@@ -594,7 +594,18 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             #   raw/*) so a DDB-fresh/raw-dead source reds a check instead of
             #   printing into an unread log for five months. Fail-soft in the
             #   lambda — degrades to a WARN naming this grant until it deploys.
-            conditions={"StringLike": {"s3:prefix": ["dashboard/avatar/*", "blog/*", "raw/*"]}},
+            # + ai-canary-log/* (#3502): S3Read above already grants GetObject on
+            #   this prefix, but WITHOUT ListBucket S3 answers a *missing* key with
+            #   403 AccessDenied instead of 404 NoSuchKey (it will not confirm or
+            #   deny existence to a caller who cannot list). check_canary_precision
+            #   walks 14 trailing dates while the canary runs 3x/week, so 8+ of them
+            #   are legitimately absent — every one came back 403, the narrow
+            #   NoSuchKey catch missed it, and the whole check bailed to a chronic
+            #   warn. Measured: 249 "canary precision unreadable" events in 30d and
+            #   ZERO rate lines. The grant makes absence answer 404; the lambda-side
+            #   half (treat 403/404 per-date as "no record", never a bail) ships in
+            #   the same PR so neither half alone is a silent no-op.
+            conditions={"StringLike": {"s3:prefix": ["dashboard/avatar/*", "blog/*", "raw/*", "ai-canary-log/*"]}},
         ),
         iam.PolicyStatement(
             sid="SecretsGetMCP",

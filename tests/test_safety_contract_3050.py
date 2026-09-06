@@ -19,6 +19,7 @@ Deterministic, hermetic, offline: no AWS, no Bedrock, no network. The whole poin
 design is that it cannot be disabled by a budget tier or a transport failure.
 """
 
+import ast
 import json
 import os
 import sys
@@ -356,6 +357,103 @@ def test_the_hazard_check_precedes_the_privacy_filter_in_every_door():
         assert hazard_lines, f"{node.name} lost its hazard check"
         if privacy_lines:
             assert min(hazard_lines) < min(privacy_lines), f"{node.name}: the privacy filter runs before the hazard check"
+
+
+# ── #3560: the gate runs before the SPEND gates too, not just the privacy filter ──
+
+#: The three free-text AI doors. Same set the wiring guard above derives against.
+_DOORS = {"_handle_ask", "_handle_board_ask", "_handle_board_followup"}
+
+#: A call is a SPEND GATE if its name carries one of these markers. Matching on a
+#: marker rather than on a hand-listed set of three function names is deliberate:
+#: #3560's defect was a limiter the ordering test did not know about, and a rename
+#: (`_ask_rate_check` -> `_ask_rate_gate`) or a new door-local limiter must be caught
+#: by construction rather than by someone remembering to extend a list.
+_SPEND_GATE_MARKERS = ("rate_check", "rate_charge", "paused_response")
+
+
+def _ordering_violations(src: str) -> list:
+    """Return one string per door whose hazard gate does not precede EVERY spend gate.
+
+    Pure over source text so the rule itself can be positively controlled below —
+    a checker that cannot be shown failing is not evidence of anything (#3560 shipped
+    behind an ordering assertion that compared the wrong two things for eight weeks).
+    """
+    tree = ast.parse(src)
+    problems = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name not in _DOORS:
+            continue
+        hazard, spend = [], []
+        for c in ast.walk(node):
+            if not isinstance(c, ast.Call):
+                continue
+            if isinstance(c.func, ast.Attribute):
+                name, qualified = c.func.attr, f"{getattr(c.func.value, 'id', '')}.{c.func.attr}"
+            elif isinstance(c.func, ast.Name):
+                name = qualified = c.func.id
+            else:
+                continue
+            if qualified == "_req.hazard_gate":
+                hazard.append(c.lineno)
+            elif any(m in name for m in _SPEND_GATE_MARKERS):
+                spend.append((name, c.lineno))
+        if not hazard:
+            problems.append(f"{node.name}: no hazard gate at all")
+            continue
+        if not spend:
+            problems.append(f"{node.name}: no spend gate found — the door stopped metering, or the marker set went stale")
+            continue
+        first_hazard = min(hazard)
+        early = [f"{n}@{ln}" for n, ln in spend if ln < first_hazard]
+        if early:
+            problems.append(f"{node.name}: spend gate(s) {', '.join(early)} run before hazard_gate@{first_hazard}")
+    return problems
+
+
+def test_the_hazard_check_precedes_every_spend_gate():
+    """#3560: the hazard gate's docstring promised it ran BEFORE the rate limit and
+    the budget pause. At `/api/board_ask` that was false — the DDB token was charged
+    at the top of the handler and the tier-3 pause was the handler's first statement
+    on all three doors — so the 6th board question of an hour, or any question at
+    tier 3, got a 429 / a "paused" card instead of the crisis copy. The gate is $0
+    (a pure offline regex, no model call, no AWS call), so nothing is spent by
+    running it first.
+    """
+    problems = _ordering_violations(_ai_lambda_source())
+    assert not problems, "hazard gate no longer runs first on: " + "; ".join(problems)
+
+
+def test_the_ordering_rule_itself_catches_a_reordered_door():
+    """The positive control for the rule above. A rule that has never been shown
+    failing is indistinguishable from one that cannot fail."""
+    right = (
+        "def _handle_ask(event):\n"
+        "    hazard_hit = _req.hazard_gate(q, 'ask', 'answer', H)\n"
+        "    _paused = _ai_paused_response()\n"
+        "    allowed, remaining = _ask_rate_check(ip)\n"
+    )
+    assert _ordering_violations(right) == []
+
+    paused_first = (
+        "def _handle_ask(event):\n"
+        "    _paused = _ai_paused_response()\n"
+        "    hazard_hit = _req.hazard_gate(q, 'ask', 'answer', H)\n"
+        "    allowed, remaining = _ask_rate_check(ip)\n"
+    )
+    assert any("_ai_paused_response" in p for p in _ordering_violations(paused_first))
+
+    limiter_first = (
+        "def _handle_board_ask(event):\n"
+        "    limited = _board_rate_charge(ip)\n"
+        "    hazard_hit = _req.hazard_gate(q, 'board_ask', 'response', H)\n"
+    )
+    assert any("_board_rate_charge" in p for p in _ordering_violations(limiter_first))
+
+    # A door that lost its metering entirely must red too — otherwise "delete the
+    # rate limit" would read as a pass on the ordering rule.
+    unmetered = "def _handle_board_followup(body, ip):\n    hazard_hit = _req.hazard_gate(q, 'x', 'response', H)\n"
+    assert any("no spend gate" in p for p in _ordering_violations(unmetered))
 
 
 def test_mutation_widening_the_idiom_veto_is_caught(monkeypatch):

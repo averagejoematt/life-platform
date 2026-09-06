@@ -534,6 +534,10 @@ body { overflow-x: hidden; }
 .tl-x { display: inline-block; margin-top: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-label);
   letter-spacing: 0.03em; text-decoration: none; border-bottom: 1px solid var(--ember-line); }
 .tl-x:hover { border-color: var(--ember); }
+/* #3525 — "chronicle pending": a milestone no installment narrates yet. Reads as a
+   deliberate, quiet state (muted ink, no underline, not clickable), never as a link
+   that failed — and never as a link to some other week. */
+.tl-x-pending { color: var(--ink-faint); border-bottom: 0; cursor: default; }
 /* event-type dot colours — ember for the "up"/milestone moments, muted for the rest */
 .tl-lv .tl-dot, .tl-ms .tl-dot, .tl-wt .tl-dot { background: var(--ember); }
 /* visual P2 — node glyphs read by TYPE (same size, ink/ember only — no confetti):
