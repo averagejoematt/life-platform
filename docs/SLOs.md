@@ -128,7 +128,7 @@ The `life-platform-ops` dashboard includes an "SLO Health" section with:
 | SLO-1 Daily Brief | Likely BREACHED in current window | Daily-brief was AccessDenied for 2026-05-17 (V2 SES IAM regression) — error budget consumed for May. Recovered same day. |
 | SLO-2 Freshness | **BREACHED** | `slo-source-freshness` in ALARM — Garmin stale ~44 days (P2 incident, see INCIDENT_LOG.md). Expected to clear within 24h of OAuth refresh. |
 | SLO-3 MCP | OK | No alarms firing |
-| SLO-4 AI | At risk | `ai-tokens-daily-brief-daily` in ALARM (token budget exceeded) — investigate prompt size growth |
+| SLO-4 AI | At risk | `ai-tokens-daily-brief-runaway` in ALARM (one brief run burned >35k output tokens) — investigate prompt/retry-loop growth |
 
 Point-in-time ALARM snapshots drift (the 2026-05-19 snapshot that used to sit here named alarms that no longer exist). Get the live picture: `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --region us-west-2`.
 

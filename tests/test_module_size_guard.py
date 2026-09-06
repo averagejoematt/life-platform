@@ -308,6 +308,9 @@ BASELINE = {
     # under the 1000-line ceiling, so the entry is stale by the registry's own rule
     # (test_baseline_has_no_stale_entries). The ratchet tightened: this file is now
     # held to the ceiling like any other module, not to a private number.
+    # And by #3505 (Session W, same night): the AI token + spend alarm family moved to the
+    # cohesive sibling cdk/stacks/monitoring_token_alarms.py (1290 -> 1165 physical), so
+    # the file is under BOTH the old physical bank and the logical ceiling; no entry.
     # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the

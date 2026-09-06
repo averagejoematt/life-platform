@@ -82,6 +82,38 @@ READER-AUDIENCE ALARMS ESCALATE ON FIRST RED, NOT 72H (#3423)
   `aged_alarm_escalations` (the actual scheduled Mon/Wed/Fri needs-human email —
   see that module's #1204 section) — no new alarm, no new notification surface.
 
+CAUSE IDENTITY — A CITATION MATCHES A NAME, NOT A DEFECT (#3501)
+  Measured 2026-09-05: `qa-smoke-failures` had been ALARM since 09-03 11:31 PT on ONE
+  unbroken episode whose cause CHANGED underneath it — `cross_surface:weight` on 09-03,
+  then `reader_truth:frozen_artifacts` from 09-04 — while its registry entry read
+  "CURED and PROVEN LIVE" about a third, older cause cured on 09-01. This gate passed
+  both nights. It had to: every check above asks whether an ENTRY EXISTS for the alarm's
+  NAME. A count-aggregated alarm (FailCount, WarnCount, InteriorGapCount) never
+  transitions when its cause changes, so one stale citation covers an unbounded series
+  of different defects until the 14-day tenure bar.
+
+  Two checks close it, both pure and offline-testable:
+
+    * `stale_episode_citations` — a citation written BEFORE the alarm's current episode
+      began is flagged "citation predates the current episode — re-cite". Compares the
+      entry's own `cause_observed` (or `added`) DATE against the alarm's
+      StateTransitionedTimestamp, at day granularity and strictly: an entry written the
+      same day the alarm went red is fine, which is the overwhelmingly common case for
+      an honestly-cited episode. An entry with neither date is UNKNOWN, never flagged —
+      the same deliberate under-catch as the #3258 check, and the safe direction.
+    * `cause_mismatches` — an entry may declare the `cause` it explains (a qa-smoke
+      check id, e.g. `reader_truth:frozen_artifacts`). When the LIVE cause is readable
+      and differs from the cited one, the alarm reads as uncited-for-this-cause. The
+      live side comes from qa-smoke's own `[QA] CAUSE` log line (emitted every run since
+      #3501, format + parser owned by `lambdas/operational/qa_check.py`, never
+      re-implemented here), read through `fetch_qa_smoke_causes()`. Unreadable logs are
+      UNVERIFIED, never a clean cause.
+
+  Deliberately narrow in the same way as the #2996 check: an entry with no `cause` is
+  not flagged (prose citations stay valid), and an alarm with no live cause channel is
+  not flagged. This buys the qa-smoke family — the count-aggregated alarms where the
+  defect class actually occurred — without inventing a cause channel for 118 alarms.
+
 DEGRADE HONESTLY
   If CloudWatch can't be reached (no creds, offline, throttled) this prints a clear
   UNVERIFIED notice and exits 0 — a gate that can't measure anything must not claim
@@ -469,6 +501,163 @@ def unfalsifiable_negatives(citations):
     return out
 
 
+# #3501: the qa-smoke cause channel. The FORMAT and its PARSER are owned by
+# lambdas/operational/qa_check.py (the module that also defines the Check class the ids
+# come from) and imported here — a second hand-written copy of a wire format is the
+# drift `tests/test_qa_smoke_cause_identity_3501.py` exists to make impossible. Import
+# by path because `lambdas/` is packaged for a Lambda bundle, not installed; qa_check is
+# a stdlib-only leaf module, so this costs nothing and drags in no boto3.
+_QA_SMOKE_LOG_GROUP = "/aws/lambda/life-platform-qa-smoke"
+# Which alarm each `[QA] CAUSE <kind>` line is the cause channel FOR.
+QA_SMOKE_CAUSE_ALARMS = {"fail": "qa-smoke-failures", "warn": "qa-smoke-warnings"}
+# How far back to look for the most recent run. qa-smoke runs nightly, so 48h covers a
+# skipped night without ever picking up a cause older than the current episode's start
+# would plausibly be.
+QA_SMOKE_CAUSE_LOOKBACK_HOURS = 48
+
+
+def _qa_check_module():
+    """lambdas/operational/qa_check.py, loaded by path. None if unavailable (a checkout
+    without lambdas/, or an import error) — the caller then reports the cause check
+    UNVERIFIED rather than clean."""
+    import importlib.util
+
+    path = ROOT / "lambdas" / "operational" / "qa_check.py"
+    if not path.exists():
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location("_qa_check_for_citations", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
+        return module
+    except Exception:  # noqa: BLE001 — a broken import must degrade, not crash the gate
+        return None
+
+
+def parse_cause_events(messages, parse):
+    """{alarm_name: [check ids]} from the most recent `[QA] CAUSE` line per kind.
+
+    `messages` is in chronological order (oldest first, as filter_log_events returns
+    them) and `parse` is qa_check.parse_cause_line — injected, so this stays pure and
+    the regression test drives it with the REAL emitter's output.
+    """
+    latest = {}
+    for message in messages:
+        parsed = parse(message)
+        if parsed is None:
+            continue
+        kind, _fingerprint, ids = parsed
+        alarm = QA_SMOKE_CAUSE_ALARMS.get(kind)
+        if alarm:
+            latest[alarm] = ids
+    return latest
+
+
+def fetch_qa_smoke_causes(window_hours=QA_SMOKE_CAUSE_LOOKBACK_HOURS):
+    """Live `filter_log_events` on qa-smoke's `[QA] CAUSE` lines — read-only.
+
+    Returns ({alarm_name: [check ids]}, error) in the same degrade-honestly shape as the
+    two CloudWatch reads: on any failure the map is {} and `error` is a human string, and
+    the caller must report the cause check UNVERIFIED rather than as a clean cause.
+    """
+    qa_check = _qa_check_module()
+    if qa_check is None:
+        return {}, "lambdas/operational/qa_check.py unreadable — cause format/parser unavailable"
+    try:
+        import boto3
+
+        logs = boto3.client("logs", region_name=REGION)
+        start_ms = int((datetime.now(timezone.utc).timestamp() - window_hours * 3600) * 1000)
+        resp = logs.filter_log_events(
+            logGroupName=_QA_SMOKE_LOG_GROUP,
+            startTime=start_ms,
+            filterPattern=f'"{qa_check.CAUSE_LINE_PREFIX}"',
+            limit=200,
+        )
+        messages = [e.get("message", "") for e in resp.get("events", [])]
+    except Exception as e:  # noqa: BLE001 — any AWS/boto3 failure must degrade, not crash
+        return {}, str(e)
+    return parse_cause_events(messages, qa_check.parse_cause_line), None
+
+
+def cause_mismatches(alarms, citations, live_causes):
+    """(alarm_name, cited_cause, live_cause) for every lit alarm whose citation declares
+    a `cause` that the live cause channel contradicts (#3501).
+
+    Deliberately narrow, so it cannot manufacture a red:
+      * an entry with no `cause` is never flagged — prose citations stay valid, and the
+        two age bars already force those to be answered;
+      * an alarm with no live cause reading is UNKNOWN, never mismatched (a cause channel
+        that went dark is the caller's UNVERIFIED line, not this function's red);
+      * comparison is on the SET of ids, order- and duplicate-insensitive, because the
+        emitter sorts and the citation is written by hand.
+
+    Pure and deterministic — `live_causes` is injected, exactly like `issue_states`.
+    """
+    out = []
+    for a in alarms:
+        name = a.get("name") or "?"
+        if a.get("by_construction"):
+            continue
+        entry = citations.get(name) or {}
+        cited = entry.get("cause")
+        if not cited:
+            continue
+        cited_set = {c.strip() for c in (cited if isinstance(cited, list) else str(cited).split(",")) if str(c).strip()}
+        live = live_causes.get(name)
+        if live is None:
+            continue
+        if set(live) != cited_set:
+            out.append((name, ",".join(sorted(cited_set)) or "-", ",".join(sorted(live)) or "-"))
+    return out
+
+
+def _citation_written_on(entry):
+    """The date an entry's CLAIM was made, as YYYY-MM-DD, or None.
+
+    `cause_observed` wins over `added` when both exist: an entry may be legitimately
+    re-derived against a new episode without being re-created, and the date that matters
+    is when its cause was last CHECKED, not when the line first appeared.
+    """
+    for field in ("cause_observed", "added"):
+        value = str((entry or {}).get(field) or "").strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            return value
+    return None
+
+
+def stale_episode_citations(alarms, citations):
+    """(alarm_name, written_on, episode_start) for every lit alarm whose citation was
+    written on a calendar day STRICTLY BEFORE the alarm's current episode began (#3501).
+
+    The count-aggregated alarms never transition when their cause changes, so "the entry
+    predates this episode" is the one structural signal that a citation may be explaining
+    a defect that has already been replaced. Day granularity and a strict comparison, on
+    purpose: an entry written the same day the alarm went red is the normal, honest case
+    and must never be flagged.
+
+    An entry carrying neither `cause_observed` nor `added` is UNKNOWN, never flagged —
+    the deliberate under-catch (a doc lint may fail to flag a sloppy entry; it may never
+    suppress a real signal). Pure and deterministic, mirroring the sibling checks.
+    """
+    out = []
+    for a in alarms:
+        name = a.get("name") or "?"
+        if a.get("by_construction"):
+            continue
+        entry = citations.get(name) or {}
+        written_on = _citation_written_on(entry)
+        if not written_on:
+            continue
+        transitioned = _parse_ts(a.get("transitioned") or a.get("updated"))
+        if transitioned is None:
+            continue
+        episode_start = transitioned.date().isoformat()
+        if written_on < episode_start:
+            out.append((name, written_on, episode_start))
+    return out
+
+
 def fetch_issue_states(refs):
     """Live `gh issue view N --json state` per ref — read-only. Returns
     (states, error) in the same degrade-honestly shape as fetch_alarms(): on any
@@ -518,6 +707,11 @@ def fetch_alarms():
         {
             "name": a.get("AlarmName", "?"),
             "updated": str(a.get("StateUpdatedTimestamp", "")),
+            # #3501: the CURRENT episode's start. describe_alarms carries
+            # StateTransitionedTimestamp for metric and composite alarms alike; falling
+            # back to StateUpdatedTimestamp keeps an older/partial response readable
+            # (they are equal for an alarm whose last update WAS its transition).
+            "transitioned": str(a.get("StateTransitionedTimestamp", "") or a.get("StateUpdatedTimestamp", "")),
             "composite": "AlarmRule" in a,
             # #3503: a gauge whose ALARM state IS its designed normal (registry:
             # cdk/stacks/constants.BY_CONSTRUCTION_FLAG_ALARMS). Not an uncited incident.
@@ -577,7 +771,19 @@ def fetch_alarm_history(window_hours=FLAP_WINDOW_HOURS):
     return items, None
 
 
-def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=None, dead=(), issue_error=None, audience=None):
+def render(
+    uncited,
+    unreachable_error,
+    ancient=(),
+    flapped=(),
+    history_error=None,
+    dead=(),
+    issue_error=None,
+    audience=None,
+    stale_episodes=(),
+    mismatched=(),
+    cause_error=None,
+):
     """(exit_code, message) for a computed result. Pure — unit-tested offline.
 
     #3423: `audience` (optional {alarm_name: "reader"}) only ANNOTATES which
@@ -591,13 +797,14 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
             "alarm citations UNVERIFIED this run. Note that explicitly in the handover "
             "(`**Alarms:** unverified — AWS unreachable`) rather than claiming a clean board."
         )
-    if not uncited and not ancient and not flapped and not dead:
+    if not uncited and not ancient and not flapped and not dead and not stale_episodes and not mismatched:
         message = (
             "✅ every alarm in ALARM state >72h cites an incident row or issue (reader-audience alarms "
             "cite on FIRST red instead, #3423), and every one red "
             f">{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
             f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912). "
-            "Every lit alarm's cited `#N` is OPEN (#2996)."
+            "Every lit alarm's cited `#N` is OPEN (#2996), and no citation predates its "
+            "alarm's current episode or names a cause the live run contradicts (#3501)."
         )
         if history_error is not None:
             message += (
@@ -610,6 +817,12 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
                 f"\n⚠️  BUT the cited-issue state read failed ({issue_error}) — the dead-citation "
                 "check (#2996) is UNVERIFIED this run. Note that explicitly in the handover rather "
                 "than claiming every citation still has an owner."
+            )
+        if cause_error is not None:
+            message += (
+                f"\n⚠️  BUT the qa-smoke cause read failed ({cause_error}) — the cause-identity "
+                "check (#3501) is UNVERIFIED this run. Note that explicitly rather than claiming "
+                "every citation still explains the live cause."
             )
         return 0, message
     lines = []
@@ -659,6 +872,25 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
             "or — if the alarm is correct on a dated, self-clearing state — replace the `#N` with prose "
             "naming the window and its expiry."
         )
+    if stale_episodes:
+        lines.append(
+            f"❌ {len(stale_episodes)} lit alarm(s) whose citation PREDATES the current episode (#3501) — "
+            "the entry may be explaining a defect that has already been replaced:"
+        )
+        for name, written_on, episode_start in sorted(stale_episodes):
+            lines.append(f"   - {name}  (citation written {written_on}; this ALARM episode began {episode_start})")
+        lines.append(
+            "   A count-aggregated alarm (FailCount / WarnCount / InteriorGapCount) does not transition when its "
+            "CAUSE changes, so a stale entry covers a new defect silently. Re-derive the live cause, rewrite the "
+            "entry, and stamp it with `cause_observed` (or `added`) — or say so in the handover and --decoded."
+        )
+    if mismatched:
+        lines.append(f"❌ {len(mismatched)} lit alarm(s) whose citation names a cause the LIVE run contradicts (#3501):")
+        for name, cited, live in sorted(mismatched):
+            lines.append(f"   - {name}  (cited cause: {cited} · live cause: {live})")
+        lines.append(
+            "   Re-cite against the cause that is actually firing, or fix it — the alarm is red for a reason nobody has written down."
+        )
     if history_error is not None:
         lines.append(
             f"⚠️  Alarm-history read failed ({history_error}) — the fired-and-cleared check is UNVERIFIED "
@@ -668,6 +900,11 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
         lines.append(
             f"⚠️  Cited-issue state read failed ({issue_error}) — the dead-citation check (#2996) is "
             "UNVERIFIED this run; note that explicitly rather than claiming every citation has an owner."
+        )
+    if cause_error is not None:
+        lines.append(
+            f"⚠️  qa-smoke cause read failed ({cause_error}) — the cause-identity check (#3501) is "
+            "UNVERIFIED this run; note that explicitly rather than claiming every citation explains the live cause."
         )
     return 1, "\n".join(lines)
 
@@ -679,16 +916,30 @@ def main():
     audience = load_alarm_audience()  # #3423 — offline model read, independent of the AWS reads
     uncited = [] if err else uncited_long_reds(alarms, citations, audience=audience)
     ancient = [] if err else issueless_ancient_reds(alarms, citations)
+    stale_episodes = [] if err else stale_episode_citations(alarms, citations)
     if err:
         history, history_err, flapped = [], None, []  # whole board already UNVERIFIED
         issue_err, dead = None, []
+        cause_err, mismatched = None, []
     else:
         history, history_err = fetch_alarm_history()
         flapped = [] if history_err else flapped_uncited(history, citations)
         issue_states, issue_err = fetch_issue_states(cited_issue_refs(alarms, citations))
         dead = [] if issue_err else dead_citations(alarms, citations, issue_states)
+        live_causes, cause_err = fetch_qa_smoke_causes()
+        mismatched = [] if cause_err else cause_mismatches(alarms, citations, live_causes)
     code, message = render(
-        uncited, err, ancient=ancient, flapped=flapped, history_error=history_err, dead=dead, issue_error=issue_err, audience=audience
+        uncited,
+        err,
+        ancient=ancient,
+        flapped=flapped,
+        history_error=history_err,
+        dead=dead,
+        issue_error=issue_err,
+        audience=audience,
+        stale_episodes=stale_episodes,
+        mismatched=mismatched,
+        cause_error=cause_err,
     )
     print(message)
     if code == 0:

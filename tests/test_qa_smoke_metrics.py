@@ -258,3 +258,101 @@ def test_qa_smoke_failures_and_warnings_alarms_declared():
     assert (
         warns["to_digest"] is True
     ), "qa-smoke-warnings must route to the digest topic, not urgent (#1445 AC4: 'not a full alert, but visible')"
+
+
+# ---------------------------------------------------------------------------
+# 4. #3501 — the CAUSE line: which check ids the run is red on, every run
+# ---------------------------------------------------------------------------
+#
+# FailCount is a count, so `qa-smoke-failures` cannot transition when the CAUSE
+# changes: it was lit 2026-09-03 on `cross_surface:weight` and from 09-04 on
+# `reader_truth:frozen_artifacts` in ONE unbroken episode, under a citation that
+# said "CURED and PROVEN LIVE" about a third, older cause. The identity of the
+# failure has to leave the Lambda on every run, in a form a gate can read.
+
+
+# The cause format's owner is qa_check (the module that defines the Check class the ids
+# come from); qa_smoke_lambda re-exports only what it calls. Import the pure functions
+# from their home rather than adding unused re-exports for a test's convenience.
+from operational.qa_check import cause_fingerprint, cause_line, parse_cause_line  # noqa: E402
+
+
+class _StubCheck:
+    def __init__(self, name):
+        self.name = name
+
+
+def test_cause_line_carries_the_sorted_ids_and_a_stable_fingerprint():
+    line = cause_line("fail", [_StubCheck("b:two"), _StubCheck("a:one")])
+    kind, fingerprint, ids = parse_cause_line(line)
+    assert (kind, ids) == ("fail", ["a:one", "b:two"])
+    assert fingerprint == cause_fingerprint(["a:one", "b:two"]) != "none"
+    # Order-independent: the same SET fingerprints identically however the run
+    # accumulated it (fault-isolated steps do not run in a fixed order).
+    assert cause_line("fail", [_StubCheck("a:one"), _StubCheck("b:two")]) == line
+
+
+def test_a_clean_run_states_its_cleanliness_explicitly():
+    """#1920's rule applied to the cause channel: 'no CAUSE line' and 'the log read
+    failed' must never look the same to the reader."""
+    line = cause_line("fail", [])
+    assert parse_cause_line(line) == ("fail", "none", [])
+
+
+def test_a_different_failing_set_fingerprints_differently():
+    assert cause_fingerprint(["a:one"]) != cause_fingerprint(["b:two"])
+
+
+def test_parse_rejects_a_line_that_is_not_ours():
+    assert parse_cause_line("[QA] FAIL [content_truth] Reader Truth / x: y") is None
+    assert parse_cause_line("[QA] CAUSE sideways abc123 a:b") is None, "an unknown kind must read as ABSENT, never as a clean set"
+    assert parse_cause_line(None) is None
+
+
+def test_lambda_handler_emits_both_cause_lines_before_the_fail_gate():
+    """Same shape as the #1445 EMF proof above: statically prove BOTH cause lines are
+    printed at the top level of the handler's try-block and BEFORE `if not fails:`, so
+    a clean run emits them too. A cause channel that only speaks on failure is exactly
+    the pre-#1445 defect, one layer in."""
+    src = inspect.getsource(qa.lambda_handler)
+    func = ast.parse(src).body[0]
+    try_node = next(n for n in func.body if isinstance(n, ast.Try))
+
+    kinds_seen = {}
+    fail_gate_index = None
+    for i, stmt in enumerate(try_node.body):
+        if (
+            fail_gate_index is None
+            and isinstance(stmt, ast.If)
+            and isinstance(stmt.test, ast.UnaryOp)
+            and isinstance(stmt.test.op, ast.Not)
+            and isinstance(stmt.test.operand, ast.Name)
+            and stmt.test.operand.id == "fails"
+        ):
+            fail_gate_index = i
+        if not isinstance(stmt, ast.Expr):
+            continue
+        for sub in ast.walk(stmt):
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name) and sub.func.id == "cause_line":
+                kind = sub.args[0].value if sub.args and isinstance(sub.args[0], ast.Constant) else None
+                kinds_seen.setdefault(kind, i)
+
+    assert set(kinds_seen) == {"fail", "warn"}, f"lambda_handler must emit a cause line for BOTH alarmed sides, saw {sorted(kinds_seen)}"
+    assert fail_gate_index is not None, "lambda_handler's `if not fails:` gate not found — parser broke, investigate"
+    for kind, index in kinds_seen.items():
+        assert index < fail_gate_index, f"the {kind!r} cause line is emitted after the `if not fails:` gate — a clean run must emit it too"
+
+
+def test_the_warn_cause_line_uses_the_alarmed_warns_not_every_warn():
+    """`qa-smoke-warnings` fires on WarnCount, which is the ALARMED warns only (#1958).
+    A cause line built from every warn would name chronic ids no alarm watches."""
+    src = inspect.getsource(qa.lambda_handler)
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "cause_line":
+            if node.args and isinstance(node.args[0], ast.Constant) and node.args[0].value == "warn":
+                assert isinstance(node.args[1], ast.Name) and node.args[1].id == "warns_alarmed", (
+                    "the warn cause line must be built from `warns_alarmed` (qa_check.split_warns' alarmed side), "
+                    "not from every warn — WarnCount excludes chronic warns (#1958)"
+                )
+                return
+    raise AssertionError("no cause_line('warn', ...) call found in lambda_handler")

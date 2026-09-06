@@ -89,6 +89,51 @@ def _walk_no_nested_func(body):
 
 
 def _extract_alarm_routing():
+    """Returns {alarm_name_or_static_prefix: "urgent"|"digest"} for every alarm the
+    monitoring stack declares — including the ones declared for it by an extraction
+    sibling (see `_extract_sibling_routing`)."""
+    routing = _extract_stack_routing()
+    for module, fn_name in _EXTRACTION_SIBLINGS:
+        routing.update(_extract_sibling_routing(module, fn_name))
+    return routing
+
+
+# ── #3505: the extraction siblings ───────────────────────────────────────────────
+#
+# monitoring_stack.py sits at the module-size ratchet, so alarm surface lands in
+# cohesive siblings (`monitoring_token_alarms.py`, `monitoring_budget_alarms.py`, …)
+# invoked from the same scope. This derivation used to parse ONE named file, so the
+# moment the AI token/spend family moved, "ai-daily-spend" and "ai-tokens-platform"
+# would have matched zero urgent alarms and the reconciliation this file exists to
+# perform would have been silently over a smaller board (#2703: a guard reading a file
+# that no longer holds its subject still runs and still passes on the half it can see).
+#
+# A sibling takes its SNS topics as PARAMETERS rather than building them from an ARN, so
+# each entry names the function and its topic parameters are classified by position via
+# the module's own signature: `(scope, topic, digest)` -> topic=urgent, digest=digest.
+# `test_the_sibling_derivation_sees_its_subject` asserts the sweep is not empty.
+_EXTRACTION_SIBLINGS = (("monitoring_token_alarms", "add_token_alarms"),)
+_SIBLING_TOPIC_PARAM_CLASS = {"topic": "urgent", "digest": "digest"}
+
+
+def _extract_sibling_routing(module: str, fn_name: str):
+    """{alarm_name: "urgent"|"digest"} for an extraction sibling's declaring function.
+
+    Same three shapes as the in-stack derivation below, with the topic variables
+    resolved from the function's own parameter names instead of from
+    `sns.Topic.from_topic_arn(...)` assignments.
+    """
+    path = os.path.join(os.path.dirname(__file__), "..", "cdk", "stacks", f"{module}.py")
+    assert os.path.isfile(path), f"extraction sibling {module}.py is gone — update _EXTRACTION_SIBLINGS or the extraction moved again"
+    tree = _tree(path)
+    fn = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == fn_name), None)
+    assert fn is not None, f"{module}.{fn_name} not found — the sibling's entrypoint was renamed"
+    topic_class = {a.arg: _SIBLING_TOPIC_PARAM_CLASS[a.arg] for a in fn.args.args if a.arg in _SIBLING_TOPIC_PARAM_CLASS}
+    assert topic_class, f"{module}.{fn_name} takes neither a `topic` nor a `digest` parameter — cannot classify its routing"
+    return _routing_from_body(fn.body, topic_class)
+
+
+def _extract_stack_routing():
     """Returns {alarm_name_or_static_prefix: "urgent"|"digest"} derived from
     monitoring_stack.py's MonitoringStack.__init__."""
     tree = _tree(MONITORING)
@@ -113,7 +158,16 @@ def _extract_alarm_routing():
                 elif arn_name == "DIGEST_TOPIC_ARN":
                     topic_class[var] = "digest"
     assert topic_class, "no sns.Topic.from_topic_arn(...) assignments found — parser broke, investigate"
+    return _routing_from_body(init.body, topic_class)
 
+
+def _routing_from_body(body, topic_class):
+    """{alarm_name: "urgent"|"digest"} for one declaring body, given its topic vars.
+
+    Split out of `_extract_stack_routing` by #3505 so the identical three shapes are
+    derived for an extraction sibling as for the stack itself — one implementation, so
+    the two can never disagree about what "routed urgent" means.
+    """
     routing = {}
 
     # Step 2 + 3: alarms built directly with cloudwatch.Alarm(...) OR
@@ -121,7 +175,7 @@ def _extract_alarm_routing():
     # composite) assigned to a variable, then routed via
     # <var>.add_alarm_action(cw_actions.SnsAction(<topic-var>)).
     var_to_alarm_name = {}
-    for stmt in _walk_no_nested_func(init.body):
+    for stmt in _walk_no_nested_func(body):
         if (
             isinstance(stmt, ast.Assign)
             and isinstance(stmt.value, ast.Call)
@@ -133,7 +187,7 @@ def _extract_alarm_routing():
             if name_val:
                 var_to_alarm_name[stmt.targets[0].id] = name_val
 
-    for stmt in _walk_no_nested_func(init.body):
+    for stmt in _walk_no_nested_func(body):
         if (
             isinstance(stmt, ast.Expr)
             and isinstance(stmt.value, ast.Call)
@@ -148,22 +202,26 @@ def _extract_alarm_routing():
                 alarm_name = var_to_alarm_name[stmt.value.func.value.id]
                 routing[alarm_name] = topic_class.get(topic_var, "unknown")
 
-    # Step 4: direct _alarm(...) / _heartbeat_alarm(...) helper calls (including
-    # inside the whoop/withings/strava/eightsleep/hevy for-loop).
-    for stmt in _walk_no_nested_func(init.body):
+    # Step 4: single-alarm factory calls — `_alarm(...)` / `_heartbeat_alarm(...)` in the
+    # stack, `_token_alarm(...)` in the #3505 sibling (including the whoop/withings/
+    # strava/eightsleep/hevy for-loop). Matched on the `*_alarm` SHAPE rather than on one
+    # hardcoded name: the sibling's helper had to be renamed to keep factory names unique
+    # across modules (tests/test_boot_contract_3314.py::test_stack_helper_names_are_unique),
+    # and a name-matched rule would have gone blind on exactly that rename.
+    for stmt in _walk_no_nested_func(body):
         if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
             call = stmt.value
             fname = getattr(call.func, "id", None)
-            if fname == "_alarm":
+            if fname == "_heartbeat_alarm":
+                name_val = _render_name(call.args[1]) if len(call.args) >= 2 else _render_name(_kw(call, "alarm_name"))
+                if name_val:
+                    routing[name_val] = "digest"  # _heartbeat_alarm always routes digest
+            elif fname and fname.endswith("_alarm"):
                 name_val = _render_name(call.args[1]) if len(call.args) >= 2 else _render_name(_kw(call, "alarm_name"))
                 to_digest_node = _kw(call, "to_digest")
                 to_digest = bool(to_digest_node.value) if isinstance(to_digest_node, ast.Constant) else False
                 if name_val:
                     routing[name_val] = "digest" if to_digest else "urgent"
-            elif fname == "_heartbeat_alarm":
-                name_val = _render_name(call.args[1]) if len(call.args) >= 2 else _render_name(_kw(call, "alarm_name"))
-                if name_val:
-                    routing[name_val] = "digest"  # _heartbeat_alarm always routes digest
 
     return routing
 
@@ -227,6 +285,22 @@ def test_high_severity_urgent_alarm_classes_are_covered():
         assert any(
             p in expected_name_fragment or expected_name_fragment.startswith(p) for p in patterns
         ), f"no URGENT_PATTERN covers the {expected_name_fragment!r} alarm class"
+
+
+def test_the_sibling_derivation_sees_its_subject():
+    """FLOOR (#3505). `_extract_sibling_routing` returning {} would make every assertion
+    above pass over a smaller board without saying so — the vacuous-empty shape. So assert
+    the sibling sweep actually resolves the alarms it was widened for, by name, and that
+    the composite pair's two sides land on the two different topics."""
+    for module, fn_name in _EXTRACTION_SIBLINGS:
+        sibling = _extract_sibling_routing(module, fn_name)
+        assert sibling, f"{module}.{fn_name} resolved ZERO alarms — the derivation went blind, not the module empty"
+    combined = _extract_alarm_routing()
+    assert combined.get("ai-daily-spend-high-urgent") == "urgent", "the paging half of the #3505 spend composite pair is not urgent-routed"
+    assert combined.get("ai-daily-spend-high-genesis-window") == "digest", "the in-window half must record to the digest"
+    assert combined.get("ai-tokens-platform-daily-total-urgent") == "urgent"
+    assert combined.get("ai-tokens-daily-brief-runaway") == "digest"
+    assert "ai-daily-spend-high" not in combined, "the raw spend alarm must carry no routing of its own (#3505) — only its composites route"
 
 
 def test_alerts_topic_has_an_iac_email_subscription():

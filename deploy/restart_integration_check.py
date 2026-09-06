@@ -517,7 +517,8 @@ def leg_serving(report, args):
 
         # a full generation runs 7.5-15+ min (fn timeout 900) and costs one brief's Bedrock
         # tokens — deliberate, once per reset, never casually (the first execution tripped
-        # the ai-tokens-daily-brief-daily alarm on repeated runs).
+        # the ai-tokens-daily-brief-daily alarm on repeated runs; #3505 reshaped that
+        # alarm to a per-run window, so repeated regens no longer accumulate into it).
         brief_lam = boto3.client("lambda", region_name=REGION, config=Config(read_timeout=910, retries={"max_attempts": 1}))
         ok, detail = _invoke(brief_lam, "daily-brief", {"dry_run": True})
         report.add("serving", "daily-brief dry-run (no-send, full generation)", PASS if ok else FAIL, detail)

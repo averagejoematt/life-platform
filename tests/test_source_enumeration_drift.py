@@ -178,3 +178,102 @@ def test_weather_joined_freshness_surfaces_470():
     assert "weather" not in reg.behavioral_source_keys()
     # default threshold — no bespoke stale_hours override
     assert "weather" not in reg.stale_hours_overrides()
+
+
+# ── #3504: the absence marker is a property of the SET, not of Eight Sleep ─────
+#
+# #2643 gave `eightsleep` `record_gap_exhausted_absence=True` so a vendor-absent
+# night (Matthew slept downstairs) closes the interior-gap alarm honestly instead of
+# holding it red for the full 14-day lookback with no way to self-clear. PR #2877's
+# own body called whoop and habitify a fast-follow that was "not done here", and it
+# was never ticketed — so for ~3 weeks the mechanism existed on ONE of the three
+# framework-based daily sources and a vendor-absent whoop or habitify day would have
+# pinned the same alarm red permanently. Owner ruling 2026-09-05 (#3606 item 7):
+# "land the absence marker, keep the alarm honest."
+#
+# This asserts the SET: every framework-based member of the freshness checker's
+# DAILY_SOURCES opts in. Derived from the checker's own constant and from each
+# lambda's own IngestionConfig — never from a hand-list here.
+
+_DAILY_SOURCE_LAMBDAS = {
+    "whoop": "whoop_lambda.py",
+    "eightsleep": "eightsleep_lambda.py",
+    "habitify": "habitify_lambda.py",
+    # apple_health has no ingestion lambda of its own: it is the HAE WEBHOOK partition
+    # (near-real-time push, no gap-fill window to exhaust), so there is no
+    # IngestionConfig to opt in and nothing to assert. Stated, not silently omitted.
+}
+
+
+def _daily_sources():
+    """freshness_checker_lambda.DAILY_SOURCES, read from its own source text.
+
+    Text extraction rather than import: the checker pulls in the AWS/email surface at
+    import time, and this file's other CDK/JSON pins use the same technique for the
+    same reason.
+    """
+    src = open(os.path.join(ROOT, "lambdas", "emails", "freshness_checker_lambda.py")).read()
+    match = re.search(r"^DAILY_SOURCES\s*=\s*\{([^}]*)\}", src, re.M)
+    assert match, "DAILY_SOURCES no longer parses out of freshness_checker_lambda.py — the pin went blind"
+    return {token.strip().strip('"').strip("'") for token in match.group(1).split(",") if token.strip()}
+
+
+def _records_absence(source_key):
+    """Whether `source_key`'s ingestion lambda opts into the #2643 absence marker."""
+    filename = _DAILY_SOURCE_LAMBDAS[source_key]
+    src = open(os.path.join(ROOT, "lambdas", "ingestion", filename)).read()
+    return re.search(r"record_gap_exhausted_absence\s*=\s*True", src) is not None
+
+
+def daily_sources_missing_the_absence_marker(records_absence=None):
+    """Sorted framework-based DAILY_SOURCES members with no #2643 opt-in.
+
+    ONE implementation, used by the live assertion and by its positive control — a
+    control that re-types the rule proves the copy, not the rule.
+    """
+    records_absence = _records_absence if records_absence is None else records_absence
+    daily = _daily_sources()
+    assert daily, "DAILY_SOURCES read empty — the extraction broke, not the set"
+    return sorted(k for k in daily if k in _DAILY_SOURCE_LAMBDAS and not records_absence(k))
+
+
+def test_every_framework_daily_source_records_gap_exhausted_absence():
+    """#3504. The set, not the instance."""
+    missing = daily_sources_missing_the_absence_marker()
+    assert not missing, (
+        f"framework-based DAILY_SOURCES member(s) {missing} do not set record_gap_exhausted_absence=True — "
+        "a vendor-absent day on that source pins freshness-interior-gap red with no way to self-clear (#3504/#2643)"
+    )
+
+
+def test_every_daily_source_is_either_framework_based_or_stated():
+    """The rule's own escape hatch, closed: a DAILY_SOURCES member this file has no
+    lambda mapping for is UNJUDGED, and an unjudged member is how whoop and habitify sat
+    outside the guarded set for three weeks. Every one must be either mapped (and
+    therefore asserted above) or listed in the webhook exemption with its reason."""
+    unmapped = sorted(_daily_sources() - set(_DAILY_SOURCE_LAMBDAS) - {"apple_health"})
+    assert not unmapped, (
+        f"DAILY_SOURCES member(s) {unmapped} are neither mapped to an ingestion lambda in _DAILY_SOURCE_LAMBDAS "
+        "nor the known webhook partition — map them (so the absence-marker rule covers them) or state why not"
+    )
+
+
+def test_the_positive_control_the_rule_reds_on_a_missing_opt_in():
+    """POSITIVE CONTROL: with eightsleep's opt-in removed, the sweep must name it.
+    Without this the assertion above is indistinguishable from one that matched
+    nothing (#3212). Runs the SAME function, with one source's answer flipped."""
+    flipped = daily_sources_missing_the_absence_marker(lambda k: False if k == "eightsleep" else _records_absence(k))
+    assert flipped == ["eightsleep"]
+    # NEGATIVE CONTROL: unflipped, the same call is clean.
+    assert daily_sources_missing_the_absence_marker(_records_absence) == []
+
+
+def test_the_absence_marker_is_written_on_the_last_run_that_looks_at_a_date():
+    """The mechanism, pinned where the citation for freshness-interior-gap depends on it.
+    The marker lands when the date is the OLDEST day in the gap-fill window
+    (today - lookback_days) — its last scheduled retry — so a day still legitimately
+    delayed by vendor-side processing gets its full lookback_days of retries first. The
+    freshness citation predicts a self-clear date from exactly this arithmetic."""
+    src = open(os.path.join(ROOT, "lambdas", "ingestion", "ingestion_framework.py")).read()
+    assert "timedelta(days=config.lookback_days)" in src
+    assert "date_str == _absence_boundary_date" in src, "the absence marker is no longer keyed to the gap-fill window's boundary day"

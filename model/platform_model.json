@@ -25,16 +25,40 @@
       "via": "factory:_alarm"
     },
     "ai-daily-spend-high": {
+      "composites": [
+        "ai-daily-spend-high-urgent",
+        "ai-daily-spend-high-genesis-window"
+      ],
       "kind": "metric",
-      "routing": "urgent",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
+      "routing": "via-composite",
+      "stack": "monitoring_token_alarms",
+      "via": "declaration"
     },
-    "ai-tokens-daily-brief-daily": {
+    "ai-daily-spend-high-genesis-window": {
+      "kind": "composite",
+      "members": [
+        "ai-daily-spend-high",
+        "token-alarm-genesis-window-active"
+      ],
+      "routing": "digest",
+      "stack": "monitoring_token_alarms",
+      "via": "declaration"
+    },
+    "ai-daily-spend-high-urgent": {
+      "kind": "composite",
+      "members": [
+        "ai-daily-spend-high",
+        "token-alarm-genesis-window-active"
+      ],
+      "routing": "urgent",
+      "stack": "monitoring_token_alarms",
+      "via": "declaration"
+    },
+    "ai-tokens-daily-brief-runaway": {
       "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
+      "stack": "monitoring_token_alarms",
+      "via": "factory:_token_alarm"
     },
     "ai-tokens-platform-daily-total": {
       "composites": [
@@ -43,7 +67,7 @@
       ],
       "kind": "metric",
       "routing": "via-composite",
-      "stack": "monitoring_stack",
+      "stack": "monitoring_token_alarms",
       "via": "declaration"
     },
     "ai-tokens-platform-daily-total-genesis-window": {
@@ -53,7 +77,7 @@
         "token-alarm-genesis-window-active"
       ],
       "routing": "digest",
-      "stack": "monitoring_stack",
+      "stack": "monitoring_token_alarms",
       "via": "declaration"
     },
     "ai-tokens-platform-daily-total-urgent": {
@@ -63,7 +87,7 @@
         "token-alarm-genesis-window-active"
       ],
       "routing": "urgent",
-      "stack": "monitoring_stack",
+      "stack": "monitoring_token_alarms",
       "via": "declaration"
     },
     "between-chronicle-scrub-failed-closed": {
@@ -745,11 +769,13 @@
     "token-alarm-genesis-window-active": {
       "composites": [
         "ai-tokens-platform-daily-total-urgent",
-        "ai-tokens-platform-daily-total-genesis-window"
+        "ai-tokens-platform-daily-total-genesis-window",
+        "ai-daily-spend-high-urgent",
+        "ai-daily-spend-high-genesis-window"
       ],
       "kind": "metric",
       "routing": "via-composite",
-      "stack": "monitoring_stack",
+      "stack": "monitoring_token_alarms",
       "via": "declaration"
     },
     "weekly-signal-delivery-heartbeat": {
@@ -843,7 +869,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 120,
+    "alarms": 122,
     "emf_namespaces": 31,
     "schedules": 88,
     "secrets": 28
@@ -6902,15 +6928,15 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 120,
+      "alarms": 122,
       "alarms_by_routing": {
-        "digest": 89,
+        "digest": 90,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,
-        "via-composite": 2
+        "via-composite": 3
       },
-      "alarms_composite": 2,
+      "alarms_composite": 4,
       "contracts": 8,
       "contracts_enrolled": 8,
       "contracts_known": 8,
