@@ -24,6 +24,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _s3,
     _secret_arn,
+    _ses_reader_resources,
 )
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -482,7 +483,7 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+            resources=_ses_reader_resources(),  # #3568: + the site identity — reader mail is From averagejoematt.com
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -534,7 +535,7 @@ def email_between_chronicle() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+            resources=_ses_reader_resources(),  # #3568: + the site identity — reader mail is From averagejoematt.com
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -592,7 +593,7 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+            resources=_ses_reader_resources(),  # #3568: + the site identity — reader mail is From averagejoematt.com
         ),
         iam.PolicyStatement(
             sid="DLQ",
