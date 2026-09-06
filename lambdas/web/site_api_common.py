@@ -30,7 +30,12 @@ from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for down
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
 from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
-from common.pacific_time import PACIFIC, pacific_date_of, pacific_day_n  # #1964/#1955 — the canonical frame, parse and day-index
+from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, parse and day-index
+    PACIFIC,
+    pacific_date_of,
+    pacific_day_n,
+    parse_iso_utc,
+)
 from experiment.phase_filter import with_phase_filter
 
 from web.platform_counts import DISCOVERED_COUNTS
@@ -435,14 +440,9 @@ def content_vintage(*timestamps) -> "str | None":
         text = raw.strip()
         if not text:
             continue
-        try:
-            probe = text[:-1] + "+00:00" if text.endswith("Z") else text
-            parsed = datetime.fromisoformat(probe)
-        except (ValueError, TypeError):
+        parsed = parse_iso_utc(text)  # #3609: the canonical parser — Z/offset/naive(==UTC), never raises
+        if parsed is None:
             continue
-        if parsed.tzinfo is None:
-            # Writers emit UTC; a value that lost its suffix must not become local.
-            parsed = parsed.replace(tzinfo=timezone.utc)
         if best is None or parsed < best[0]:
             best = (parsed, text)
     return best[1] if best else None

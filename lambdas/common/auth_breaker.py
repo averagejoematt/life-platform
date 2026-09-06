@@ -42,6 +42,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from common.pacific_time import parse_iso_utc  # #3609: the canonical ISO-8601 parser
+
 _AUTH_FAIL_SK = "AUTH_FAILURE"
 _AUTH_FAIL_TTL_SECONDS = 24 * 3600  # 24 hours
 
@@ -184,9 +186,8 @@ def check_breaker(table, source_name: str, user_id: str, logger) -> dict | None:
     marked_at_iso = item.get("marked_at")
     if not marked_at_iso:
         return None
-    try:
-        marked_at = datetime.fromisoformat(marked_at_iso)
-    except ValueError:
+    marked_at = parse_iso_utc(marked_at_iso)  # #3609: the canonical parser — naive-as-UTC, never raises
+    if marked_at is None:
         return None
     age = (datetime.now(timezone.utc) - marked_at).total_seconds()
     if age >= _AUTH_FAIL_TTL_SECONDS:
