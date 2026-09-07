@@ -265,6 +265,26 @@ _is_reconcile_owned_path() {
   return 1
 }
 
+# _cancel_diagnosis_line <check-name> <startedAt> <completedAt>
+#   #3678: a `cancel`-bucket check reads as "superseded" everywhere in this script
+#   (and everywhere else) even when it is really a job that hit its OWN
+#   `timeout-minutes` ceiling — the cures are opposite (ignore vs. raise/split),
+#   so a driver needs the two told apart. `gh pr checks --json` already carries
+#   `startedAt`/`completedAt` for every check, which is the SAME timing data
+#   `ci_job_timeouts.py` + `ci_run_verdicts.py`'s discriminator need — so this
+#   makes ZERO `gh`/network calls (only a local read of this repo's own
+#   `.github/workflows/*.yml`), which is why it is safe to call from inside
+#   `evaluate_checks_json`, the function the fixture-mode tests prove never
+#   shells out to `gh`. Prints one `CANCEL-DIAGNOSIS` line, or nothing at all if
+#   python3 is unavailable or the call errors (best-effort enrichment — it never
+#   changes a verdict, so a failure here must never look like a failure there).
+_cancel_diagnosis_line() {
+  local name="$1" started="$2" completed="$3" line
+  line=$(python3 "${_WAIT_PR_GREEN_DIR}/../scripts/ci_run_verdicts.py" diagnose-check "${name}" "${started}" "${completed}" 2>&1 >/dev/null)
+  [[ -n "${line}" ]] && echo "${line}"
+  return 0
+}
+
 # _extract_wiki_drift_files <raw log text on stdin>
 #   Pulls the file list out of sync_doc_metadata.py --check's own
 #   "❌ CHECK FAILED — N stale literal(s) across M file(s):" block — one
@@ -570,6 +590,16 @@ evaluate_checks_json() {
       if [[ "${classified}" -eq 0 ]]; then
         echo "NONGREEN ${exp} ${state:-${bucket}}"
         any_nongreen=1
+        # #3678: `cancel` alone never says whether this was a genuine timeout (a
+        # defect: raise/split the ceiling) or a `cancel-in-progress` supersession
+        # (a non-event). Enrichment only — the NONGREEN line and any_nongreen
+        # above are unchanged either way.
+        if [[ "${bucket}" == "cancel" ]]; then
+          local started completed
+          started=$(jq -r '.startedAt // empty' <<<"${entry}" 2>/dev/null)
+          completed=$(jq -r '.completedAt // empty' <<<"${entry}" 2>/dev/null)
+          _cancel_diagnosis_line "${exp}" "${started}" "${completed}"
+        fi
       fi
     fi
   done

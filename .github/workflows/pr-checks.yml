@@ -54,13 +54,18 @@ jobs:
   fast-lane:
     name: Collect + deploy-critical + format
     runs-on: ubuntu-latest
-    # 10 -> 15 (2026-08-24, Session A): the lane crossed its 10m ceiling and GitHub
-    # reported the timeout as `cancelled`, which reads as an external cancellation
-    # rather than a budget breach (3 PRs hit it in one evening: 9m27s pass earlier
-    # that day, then 10m0s kills). Same headroom idiom as the #3134 suite-budget
-    # re-derivation: observed max ~10m x 1.23 + the session's own test growth -> 15m.
-    # Re-measure before trusting this number again; do not bump silently.
-    timeout-minutes: 15
+    # 10 -> 15 (2026-08-24, Session A) -> 18 (2026-09-07, #3678). The 15m ceiling sat
+    # INSIDE its own noise band (observed 13m57s-15m22s across four lanes) and started
+    # killing healthy runs — a timeout renders `cancelled`, which reads as a supersession,
+    # not a defect. Re-measured live 2026-09-07 (`python3 scripts/check_job_timeout_headroom.py
+    # --job "Collect + deploy-critical + format"`): p95 of the trailing 30 completed runs'
+    # GENUINE (non-timed-out) durations = 14.87min (n=21 of 28; 7 were themselves timeout
+    # casualties, excluded as censored — see that script's module docstring), x the stated
+    # 1.2 headroom multiplier -> 17.84min required. 18m is the ceiling from that measurement,
+    # not a round number. scripts/check_job_timeout_headroom.py enumerates every job with
+    # timeout-minutes across .github/workflows/*.yml and reds when any sits below this same
+    # bound — re-run it before trusting this number again; do not bump by hand.
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -193,7 +198,15 @@ jobs:
     # for this class.
     name: Full unit suite (pre-merge, issue 3025)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # 35 -> 39 (2026-09-07, #3678). #3678's own re-measurement of the `fast-lane` job
+    # above found this job ALSO inside its own noise band: 30m08s observed against this
+    # 35m cap on 2026-09-07 (86%), and `python3 scripts/check_job_timeout_headroom.py
+    # --job "Full unit suite (pre-merge, issue 3025)"` puts the trailing-30-run genuine
+    # p95 at 32.11min (n=24 of 28) x the same 1.2 headroom multiplier -> 38.53min
+    # required. 39m is that measurement, not a round number — the second Set member
+    # #3678 enumerated, fixed in the same PR rather than filed as a third stale-budget
+    # instance. Re-measure before trusting this number again; do not bump by hand.
+    timeout-minutes: 39
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

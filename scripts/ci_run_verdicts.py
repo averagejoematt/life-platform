@@ -29,11 +29,25 @@ THE RULE, STATED ONCE
 The rollup conclusion is not the verdict. The run's own JOBS are:
 
   cancelled-superseded      no job concluded `failure` and no step inside any job
-                            concluded `failure` — nothing had gone wrong when the
-                            cancel landed. Safe to skip: it carries no verdict.
+                            concluded `failure`, and no job's own duration reached
+                            its configured `timeout-minutes` ceiling — nothing had
+                            gone wrong when the cancel landed. Safe to skip: it
+                            carries no verdict.
   cancelled-carries-failure some job concluded `failure`, OR some step concluded
                             `failure` inside a job that was later cancelled (the
                             failure happened BEFORE the cancel). This is a RED.
+  cancelled-timeout         (#3678) no job failed, but some job's OWN duration sat
+                            at or past its declared `timeout-minutes` ceiling —
+                            GitHub's wall clock killed a job that was still green,
+                            not a newer push evicting it. This is DISTINCT from a
+                            supersession precisely because the cures are opposite:
+                            a supersession is ignored (a re-run needs nothing), a
+                            timeout means the ceiling itself is wrong (raise it or
+                            split the job) and re-running spends the same minutes
+                            to re-prove a green that already existed. Only
+                            reachable when the caller supplies `timeouts_by_job_name`
+                            (`ci_job_timeouts.py`) — without it this class collapses
+                            into `cancelled-superseded`, same as before #3678.
   cancelled-indeterminate   the job list could not be read. Never skippable —
                             "could not verify" must not read as "superseded".
 
@@ -46,25 +60,79 @@ JOB PAYLOAD SHAPE
 `jobs` is the `jobs` array of `GET /repos/{owner}/{repo}/actions/runs/{id}/jobs`
 (pinned verbatim in `tests/fixtures/cancelled_runs/`). `gh run view <id> --json
 jobs` returns the same three fields these predicates read — `name`,
-`conclusion`, `steps[].conclusion` — so either source works.
+`conclusion`, `steps[].conclusion` — plus (#3678) `started_at`/`completed_at`,
+which `job_hit_its_own_timeout()` reads to tell a genuine timeout from an
+eviction.
 """
 
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
-# The three things a `cancelled` rollup can mean. Module constants so both
+# The four things a `cancelled` rollup can mean. Module constants so both
 # readers (and their tests) share ONE vocabulary rather than each matching on a
 # phrase — the #3199 lesson: every phrase-matched classifier in this repo has
 # failed in the field.
 CANCELLED_SUPERSEDED = "cancelled-superseded"
 CANCELLED_CARRIES_FAILURE = "cancelled-carries-failure"
+CANCELLED_TIMEOUT = "cancelled-timeout"
 CANCELLED_INDETERMINATE = "cancelled-indeterminate"
 
 # The states that let a reader skip the run without looking further. Deliberately
 # a one-element set rather than "not CARRIES_FAILURE": an INDETERMINATE read must
-# fall on the NOT-skippable side, so a `gh` hiccup can never manufacture a green.
+# fall on the NOT-skippable side, so a `gh` hiccup can never manufacture a green —
+# and CANCELLED_TIMEOUT is deliberately NOT here either (#3678): a job hitting its
+# own ceiling is a defect to surface, not a non-verdict to walk past.
 CANCELLED_SKIPPABLE = frozenset({CANCELLED_SUPERSEDED})
+
+# #3678: how much of the ceiling a job's observed duration must reach before this
+# module calls it a genuine timeout rather than an early eviction. GitHub's own
+# kill lands a little past the exact `timeout-minutes*60` mark (teardown/reporting
+# lag — the pr-checks fast-lane job was observed killed at 15m22s against a 15m0s
+# ceiling, 22s over), so the window is symmetric: `[ceiling - slack, +inf)`. An
+# eviction from a `cancel-in-progress` concurrency group typically lands seconds
+# after the job starts (or before it starts at all), nowhere near a multi-minute
+# ceiling, so 45s of slack cannot confuse the two on any observed case.
+TIMEOUT_DETECTION_SLACK_SECONDS = 45.0
+
+_TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def job_duration_seconds(job: dict) -> float | None:
+    """Wall-clock seconds between a job's `started_at` and `completed_at`. Pure.
+
+    `None` when either timestamp is missing/unparseable — never a false zero.
+    """
+    if not isinstance(job, dict):
+        return None
+    started, completed = job.get("started_at"), job.get("completed_at")
+    if not started or not completed:
+        return None
+    try:
+        return (datetime.strptime(completed, _TS_FMT) - datetime.strptime(started, _TS_FMT)).total_seconds()
+    except (ValueError, TypeError):
+        return None
+
+
+def job_hit_its_own_timeout(
+    job: dict, timeout_minutes: float | None, slack_seconds: float = TIMEOUT_DETECTION_SLACK_SECONDS
+) -> bool | None:
+    """Did THIS job's own cancellation happen at its configured ceiling? Pure.
+
+    Returns `None` (unproven, never treated as True) when the job's own
+    conclusion is not `cancelled`, when no ceiling is known for it, or when its
+    duration cannot be computed — the same "unproven is not superseded" posture
+    `cancelled_is_skippable()` already holds for the run level.
+    """
+    if not isinstance(job, dict) or job.get("conclusion") != "cancelled":
+        return False if isinstance(job, dict) else None
+    if timeout_minutes is None:
+        return None
+    duration = job_duration_seconds(job)
+    if duration is None:
+        return None
+    return duration >= (float(timeout_minutes) * 60.0) - slack_seconds
 
 
 def failing_job_names(jobs: list[dict] | None) -> list[str]:
@@ -93,17 +161,83 @@ def failing_job_names(jobs: list[dict] | None) -> list[str]:
     return out
 
 
-def classify_cancelled_run(jobs: list[dict] | None) -> str:
-    """One of the three CANCELLED_* constants for a run whose rollup is `cancelled`.
+def classify_cancelled_run(jobs: list[dict] | None, timeouts_by_job_name: dict[str, float] | None = None) -> str:
+    """One of the four CANCELLED_* constants for a run whose rollup is `cancelled`.
 
     `jobs is None` means the job list could not be read — INDETERMINATE, never
     SUPERSEDED. An EMPTY list is different and is treated the same way: a
     completed run always has jobs, so zero of them means the read told us
     nothing.
+
+    `timeouts_by_job_name` (#3678, `ci_job_timeouts.timeout_minutes_by_job_name()`)
+    is optional and additive: when a caller supplies it and no job carries a real
+    failure, every job is checked against its own declared ceiling
+    (`job_hit_its_own_timeout`) before falling back to SUPERSEDED. Omitting it
+    reproduces the pre-#3678 behaviour exactly — no existing caller's verdicts
+    change just by upgrading this module.
     """
     if not jobs:
         return CANCELLED_INDETERMINATE
-    return CANCELLED_CARRIES_FAILURE if failing_job_names(jobs) else CANCELLED_SUPERSEDED
+    if failing_job_names(jobs):
+        return CANCELLED_CARRIES_FAILURE
+    if timeouts_by_job_name:
+        for job in jobs:
+            if not isinstance(job, dict):
+                continue
+            if job_hit_its_own_timeout(job, timeouts_by_job_name.get(job.get("name"))):
+                return CANCELLED_TIMEOUT
+    return CANCELLED_SUPERSEDED
+
+
+def classify_cancelled_check(
+    check_name: str,
+    started_at: str | None,
+    completed_at: str | None,
+    timeouts_by_job_name: dict[str, float] | None = None,
+    slack_seconds: float = TIMEOUT_DETECTION_SLACK_SECONDS,
+) -> str:
+    """`classify_cancelled_run`'s sibling for a SINGLE PR check (#3678).
+
+    `deploy/wait_pr_green.sh` never sees a run's `jobs` array — `gh pr checks
+    --json` gives it one row per check with `startedAt`/`completedAt` already
+    attached (the SAME two timestamps `job_hit_its_own_timeout` reads), so this
+    needs no extra `gh` call: the pure evaluator stays pure. Returns
+    CANCELLED_TIMEOUT, CANCELLED_SUPERSEDED, or CANCELLED_INDETERMINATE — never
+    CANCELLED_CARRIES_FAILURE, because an attached `failure` bucket is already a
+    hard red by name; this function only exists to explain a `cancel` bucket.
+    """
+    timeouts_by_job_name = timeouts_by_job_name or {}
+    timeout_minutes = timeouts_by_job_name.get(check_name)
+    if timeout_minutes is None:
+        return CANCELLED_INDETERMINATE
+    duration = job_duration_seconds({"started_at": started_at, "completed_at": completed_at})
+    if duration is None:
+        return CANCELLED_INDETERMINATE
+    hit = duration >= (float(timeout_minutes) * 60.0) - slack_seconds
+    return CANCELLED_TIMEOUT if hit else CANCELLED_SUPERSEDED
+
+
+def describe_cancelled_check(check_name: str, verdict: str) -> str:
+    """One operator-readable line for a `cancel`-bucket PR check (#3678).
+
+    Companion to `describe_cancelled` (run-level, #3530) at check-level — printed
+    by `deploy/wait_pr_green.sh` next to its existing `NONGREEN <name> <state>`
+    line, never replacing it."""
+    if verdict == CANCELLED_TIMEOUT:
+        return (
+            f"CANCEL-DIAGNOSIS {check_name}: TIMEOUT — this check's own duration reached its "
+            "configured timeout-minutes ceiling (#3678). Not a supersession: raise or split the "
+            "ceiling, a re-run will not fix it."
+        )
+    if verdict == CANCELLED_SUPERSEDED:
+        return (
+            f"CANCEL-DIAGNOSIS {check_name}: SUPERSEDED — cancelled well before its own ceiling, "
+            "consistent with a `cancel-in-progress` concurrency eviction (a newer push), not a defect."
+        )
+    return (
+        f"CANCEL-DIAGNOSIS {check_name}: INDETERMINATE — no declared ceiling or timing was available "
+        "for this check name; superseded vs. timeout is unproven (#3678)."
+    )
 
 
 def cancelled_is_skippable(verdict: str | None) -> bool:
@@ -132,6 +266,13 @@ def describe_cancelled(run: dict, verdict: str, failing: list[str] | None = None
         return (
             f"🛑 run {run_id} sha {sha8} concluded `cancelled` but is NOT superseded (#3530) — "
             f"its own jobs carry a real failure: {names}."
+        )
+    if verdict == CANCELLED_TIMEOUT:
+        return (
+            f"⏱️  run {run_id} sha {sha8} concluded `cancelled` but is NOT a supersession (#3678) — "
+            "a job's OWN duration reached its configured `timeout-minutes` ceiling while every step "
+            "that ran was green. Cure is raising or splitting that ceiling, never a re-run: a re-run "
+            "spends the same minutes re-proving a green that already existed."
         )
     if verdict == CANCELLED_INDETERMINATE:
         return (
@@ -174,3 +315,27 @@ def load_fixture_jobs(path: str) -> list[dict]:
     """The `jobs` array from a pinned `…/actions/runs/{id}/jobs` payload on disk."""
     with open(path) as fh:
         return json.load(fh)["jobs"]
+
+
+if __name__ == "__main__":  # pragma: no cover - manual/debug CLI, and wait_pr_green.sh's
+    # #3678 wiring: `diagnose-check <name> <startedAt> <completedAt>` needs the timeout
+    # registry but must make ZERO `gh` calls (the pure-evaluator contract
+    # `deploy/wait_pr_green.sh` and its tests hold this module to) — `ci_job_timeouts.py`
+    # only reads local workflow YAML, never the network, so this stays safe to call from
+    # inside `evaluate_checks_json`'s cancel branch.
+    import os
+    import sys
+
+    if len(sys.argv) >= 4 and sys.argv[1] == "diagnose-check":
+        _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+        if _SCRIPTS_DIR not in sys.path:
+            sys.path.insert(0, _SCRIPTS_DIR)
+        import ci_job_timeouts  # noqa: E402 - after sys.path fix-up
+
+        check_name, started_at, completed_at = sys.argv[2], sys.argv[3] or None, sys.argv[4] if len(sys.argv) > 4 else None
+        timeouts = ci_job_timeouts.timeout_minutes_by_job_name()
+        verdict = classify_cancelled_check(check_name, started_at, completed_at, timeouts)
+        print(verdict)
+        print(describe_cancelled_check(check_name, verdict), file=sys.stderr)
+        sys.exit(0)
+    print(__doc__)

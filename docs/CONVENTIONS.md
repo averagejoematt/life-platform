@@ -180,7 +180,14 @@ never the rollup** — `scripts/ci_run_verdicts.py` owns that predicate and both
 import it. Reading one by hand is the same move:
 `gh run view <id> --json jobs --jq '.jobs[] | "\(.conclusion)\t\(.name)"'`. (Distinct from,
 and additional to, the `timeout-minutes` kill GitHub *also* renders as `cancelled`, whose
-tell is the job annotation — `reference_job_timeout_renders_as_cancelled`.)
+tell is the job annotation — `reference_job_timeout_renders_as_cancelled`. #3678 gave that
+tell a `CANCELLED_TIMEOUT` verdict of its own in the same module — `job_hit_its_own_timeout`
+compares a job's own duration to its declared ceiling from `ci_job_timeouts.py` — wired into
+both `classify_cancelled_run` (fed with `timeouts_by_job_name`) and, for the PR-checks lane
+which never carries a `jobs` array, the check-level `classify_cancelled_check`/
+`deploy/wait_pr_green.sh`'s `CANCEL-DIAGNOSIS` line. Re-derive the `timeout-minutes` ceiling
+itself with `python3 scripts/check_job_timeout_headroom.py` — it reds when any job's cap
+sits below its own measured p95 x headroom.)
 
 **The doc/wiki gates are NOT in this job — they live in `Docs CI` (#1908).**
 `sync_doc_metadata --check`, `check_doc_links`, `check_doc_tombstones`, `check_doc_facts`,
