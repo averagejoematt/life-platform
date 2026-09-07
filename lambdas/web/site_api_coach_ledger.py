@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from boto3.dynamodb.conditions import Key
 from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
+    commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
@@ -325,6 +326,58 @@ def _query_partition(pk, sk_prefix, projection_fields=None, paginate=False, *, _
             items.extend(resp.get("Items", []))
             pages += 1
     return [_decimal_to_float(r) for r in items]
+
+
+# #3553: the follow-through ledger's projection. Same two-query-free shape as the
+# prediction one — ONE unfiltered fetch per coach, career; season is derived from it by
+# `singleton_visible`, so the two views can never double-count against each other.
+_COMMITMENT_PROJECTION_FIELDS = (
+    "status",
+    "outcome",
+    "tombstone",
+    "phase",
+    "created_date",
+    "due_date",
+    "action_check",
+    "outcome_date",
+)
+
+
+def _fetch_commitment_partition(coach_pk, *, _g):
+    """ONE unfiltered fetch of a coach's whole COMMITMENT# partition (#3553)."""
+    _query_partition = _g["_query_partition"]
+    return _query_partition(coach_pk, "COMMITMENT#", _COMMITMENT_PROJECTION_FIELDS, True)
+
+
+#: Job key for a coach's COMMITMENT# partition inside the shared `_parallel_fetch` map.
+_COMMIT_JOB = "commitments:{cid}"
+
+
+def _commitment_block(scan_coaches, fetched, *, _g):
+    """The public follow-through numbers for /api/predictions (#3553).
+
+    Served in the SAME payload as the prediction scorecard because they answer the two
+    halves of one reader question — "does the board's advice hold up" (predictions) and
+    "does the advice get followed" (commitments) — and because a reader looking at a
+    commitment ledger with no kept/broken number reasonably concludes it is being
+    scored. It was not: 503 records, 0 verdicts, for the instrument's whole life.
+
+    Career and season, both honest and both carrying their n. Every rate ships with its
+    95% Wilson interval (ADR-105) and `ungradeable_by_metric` NAMES what could not be
+    graded rather than shrinking the denominator to flatter the number — the whole point
+    of #3553 is that a labelled absence is honest and a hidden one is not.
+
+    `fetched` is the SAME `_parallel_fetch` result the prediction scorecard rides on —
+    one round of concurrency for the whole handler, not two (#1527: two sequential
+    fan-outs would double the origin latency this endpoint was rescued from).
+    """
+    career, season = [], []
+    for cid in scan_coaches:
+        for rec in fetched.get(_COMMIT_JOB.format(cid=cid), []):
+            career.append(rec)
+            if singleton_visible(rec):
+                season.append(rec)
+    return {"lifetime": commitment_grading.tally(career), "season": commitment_grading.tally(season)}
 
 
 def _fetch_prediction_partition(coach_pk, *, _g):
@@ -651,10 +704,25 @@ def handle_predictions(event, *, _g):
         # #1527: fetch every scanned coach's partition concurrently up front —
         # the loop below stays purely computational.
         _fetch_failures: list = []
-        fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches},
-            failures=_fetch_failures,
+        _fetch_commitment_partition = _g["_fetch_commitment_partition"]
+        _jobs = {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+        # #3553: the COMMITMENT# partitions ride the SAME concurrent round — a second
+        # sequential fan-out would re-open the #1527 origin-latency regression.
+        _jobs.update(
+            {
+                _COMMIT_JOB.format(cid=cid): (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_commitment_partition(pk))
+                for cid in scan_coaches
+            }
         )
+        fetched = _parallel_fetch(_jobs, failures=_fetch_failures)
+        # The prediction half owns the all-failed check below; a commitment-only
+        # outage must not turn the scorecard into a 500, so it is split out here.
+        _commit_failures = [f for f in _fetch_failures if str(f).startswith("commitments:")]
+        _fetch_failures = [f for f in _fetch_failures if f not in _commit_failures]
+        if _commit_failures:
+            logger.error(
+                f"[/api/predictions] commitments degraded — {len(_commit_failures)} partition(s) failed: {sorted(_commit_failures)}"
+            )
         # #2658: `_parallel_fetch` catches each partition error individually, so a total
         # outage never reached the handler-wide guard below — it produced a fully zeroed
         # scorecard at HTTP 200, which is the exact "absence rendered as zero" this issue
@@ -837,6 +905,9 @@ def handle_predictions(event, *, _g):
                 },
                 "by_coach": by_coach,
                 "predictions": all_predictions,
+                # #3553: the follow-through half of the same record. Fail-soft — the
+                # prediction scorecard must not go dark because the commitment read did.
+                "commitments": _commitment_block_safe(scan_coaches, fetched, _commit_failures, _g=_g),
                 "cycle": _current_cycle(),
                 "prereg_seal": seal,
             },
@@ -853,3 +924,23 @@ def handle_predictions(event, *, _g):
         # either one being given up.
         logger.error(f"[/api/predictions] {_e}", exc_info=True)
         return _error(500, "Prediction ledger temporarily unavailable", prereg_seal=seal)
+
+
+def _commitment_block_safe(scan_coaches, fetched, failures=(), *, _g):
+    """`_commitment_block`, but any failure serves an explicit null rather than either
+    sinking the scorecard or serving zeros.
+
+    Two failure modes, one answer. A raised exception is obvious. The quieter one is
+    EVERY commitment partition read failing: `_parallel_fetch` degrades each to [], so
+    the tally would come back all-zero at HTTP 200 — "the coaches have made no
+    commitments" — which is #2658's absence-rendered-as-zero in the surface #3553 exists
+    to make honest. The page renders nothing for a null block; it never renders a zero
+    it did not measure."""
+    try:
+        if failures and len(failures) >= len(scan_coaches):
+            logger.error(f"[/api/predictions] every commitment partition read failed ({sorted(failures)}) — serving null, not zeros")
+            return None
+        return _g["_commitment_block"](scan_coaches, fetched)
+    except Exception as _ce:  # noqa: BLE001
+        logger.error(f"[/api/predictions] commitment block failed: {_ce}")
+        return None

@@ -2444,7 +2444,7 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `THREAD#{date}` | Daily analysis thread (one per generation cycle) | coach-narrative-orchestrator |
 | `LEARNING#{date}` | What the coach learned from this cycle | coach-state-updater |
 | `PREDICTION#{date}` | Forward predictions with confidence | coach-narrative-orchestrator |
-| `COMMITMENT#{id}` | Recommendations the coach must revisit; graded kept/broken (#532) | coach-state-updater (write) / coach-prediction-evaluator (grade) |
+| `COMMITMENT#{id}` | Recommendations the coach must revisit; graded kept/broken (#532). **Statuses (#3553):** `pending` → `kept`/`broken` (the metric moved the committed way, or did not), `unresolved` (no machine-checkable action, window elapsed with no coach follow-up), `ungradeable` (there was never a grading path — the metric had fewer readings than the EWMA floor inside the commitment's own window, or the record was born against a dark/paused source and says so in `outcome_notes`). `ungradeable` is deliberately NOT `unresolved`: one is an absence of evidence, the other a lapse (ADR-104). A metric-backed check carries `action_check.gradeable: false` when it was refused at birth | coach-state-updater (write) / coach-prediction-evaluator (grade, via `coach/commitment_grading.py`) |
 | `VOICE#state` | Persistent voice calibration state | coach-state-updater |
 | `RELATIONSHIP#state` | Coach-user relationship state (rapport, trust, context) | coach-state-updater (deterministic, #536) |
 | `CONFIDENCE#{subdomain}` | Per-subdomain confidence scores | coach-state-updater |

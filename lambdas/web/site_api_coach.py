@@ -320,6 +320,16 @@ def _fetch_prediction_partition(coach_pk):
     return _ledger._fetch_prediction_partition(coach_pk, _g=globals())
 
 
+def _fetch_commitment_partition(coach_pk):
+    """Delegated to web.site_api_coach_ledger._fetch_commitment_partition (#3553)."""
+    return _ledger._fetch_commitment_partition(coach_pk, _g=globals())
+
+
+def _commitment_block(scan_coaches, fetched):
+    """Delegated to web.site_api_coach_ledger._commitment_block (#3553)."""
+    return _ledger._commitment_block(scan_coaches, fetched, _g=globals())
+
+
 def _prefetch_calibration_partitions(cids):
     """Delegated to web.site_api_coach_ledger._prefetch_calibration_partitions."""
     return _ledger._prefetch_calibration_partitions(cids, _g=globals())

@@ -389,8 +389,14 @@ def apply_corrections(entries: list, corrections: list):
 
 def commitment_counts(entries: list) -> dict:
     """Deterministic status tally over the PUBLIC commitment entries — the honest
-    zero-state numbers ('has held 0 commitments this cycle') come from here."""
-    counts = {"held": 0, "kept": 0, "broken": 0, "pending": 0, "unresolved": 0}
+    zero-state numbers ('has held 0 commitments this cycle') come from here.
+
+    #3553: `ungradeable` is its own bucket. It used to fall through to `pending`
+    (`counts[st if st in counts else "pending"]`), which said the evaluator would
+    return a verdict on a record whose metric was never observed. A reader is owed the
+    difference between "not yet" and "never was".
+    """
+    counts = {"held": 0, "kept": 0, "broken": 0, "pending": 0, "unresolved": 0, "ungradeable": 0}
     for e in entries or []:
         counts["held"] += 1
         st = str(e.get("status") or "pending")

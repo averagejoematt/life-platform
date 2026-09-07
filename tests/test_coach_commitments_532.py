@@ -82,7 +82,9 @@ class TestCommitmentGrading:
         monkeypatch.setattr(ev, "_update_commitment_status", lambda c, s, r, t: updates.append((c["commitment_id"], s)))
 
         # Force the directional evaluator's verdict so the mapping is what's under test.
-        def fake_directional(pred, spec, cache, today):
+        def fake_directional(pred, spec, cache, end_date, include_pilot=False):
+            # #3553: `end_date` is the commitment's DUE date and the read is cross-phase.
+            assert end_date == "2026-06-08" and include_pilot is True
             return {"status": {"resting_heart_rate": "confirmed", "total_protein_g": "refuted"}[spec["metric"]], "reason": "x"}
 
         monkeypatch.setattr(ev, "_evaluate_directional", fake_directional)

@@ -234,7 +234,10 @@ function coachDossierHTML(coach) {
   if (!commits.length) {
     h += `<p class="dx-prose">${esc(first)} has held ${esc(cc.held || 0)} commitments this cycle.</p>`;
   } else {
-    h += `<p class="cd-count label">${esc(cc.held || commits.length)} held · ${esc(cc.kept || 0)} kept · ${esc(cc.broken || 0)} broken · ${esc((cc.pending || 0) + (cc.unresolved || 0))} open</p><ul class="ce-trail">`;
+    // #3553: "not gradeable" is its own count. Folding it into "open" told the reader
+    // a verdict was still coming on a record whose metric was never observed.
+    const notGradeable = cc.ungradeable || 0;
+    h += `<p class="cd-count label">${esc(cc.held || commits.length)} held · ${esc(cc.kept || 0)} kept · ${esc(cc.broken || 0)} broken · ${esc((cc.pending || 0) + (cc.unresolved || 0))} open${notGradeable ? ` · ${esc(notGradeable)} not gradeable` : ""}</p><ul class="ce-trail">`;
     for (const c of commits.slice(0, 8)) {
       const st = c.status && c.status !== "pending" ? esc(c.status) : (c.due_date ? `due ${esc(c.due_date)}` : "open");
       h += `<li class="ce-item">${dateLine(c.date, st)}<p class="ce-say">${esc(c.text)}</p>${c.check ? `<p class="label cd-check">graded on ${esc(c.check.metric)} ${esc(c.check.direction)}${evLink(c)}</p>` : ""}${corrNotes(c)}</li>`;
@@ -1301,6 +1304,8 @@ async function renderScorecard(read, id) {
         `<div class="sc-tile"><span class="sc-n">${life.pending || 0}</span><span class="sc-l label">still open</span></div>` +
         `</div>`;
     }
+    // #3553: the follow-through ledger, beside the hit rate it belongs next to.
+    h += commitmentLedgerHTML(data.commitments);
     // Per-coach rows — include a coach with ONLY a career record (fresh slate
     // this season) so its track record never disappears from the list (#1376).
     const rows = Object.keys(byc)
@@ -1388,6 +1393,49 @@ async function renderScorecard(read, id) {
   read.innerHTML = h;
   read.querySelectorAll("[data-coach]").forEach((b) => b.addEventListener("click", () => selectEntry(BYKEY.scorecard, b.dataset.coach)));
   enhanceCoachNames(read);
+}
+// ── #3553 THE FOLLOW-THROUGH LEDGER — kept/broken with its n, and what could not
+// be graded, said out loud ────────────────────────────────────────────────────
+// The platform published a commitment ledger for four months and never scored a
+// commitment: 503 records, 0 kept, 0 broken. A reader looking at a ledger reasonably
+// concludes the commitments are being graded. Now they are — and the records that
+// CANNOT be graded are labelled with their count and their reason rather than being
+// filtered out of view, because hiding them would make the symptom disappear and the
+// credibility problem worse.
+function commitmentLedgerHTML(cm) {
+  if (!cm) return ""; // API served no block (or the read failed) — invent nothing
+  const life = cm.lifetime || {};
+  const season = cm.season || {};
+  if (!life.total) return "";
+  const n = life.graded || 0;
+  const ci = Array.isArray(life.follow_through_ci95) ? life.follow_through_ci95 : null;
+  const rateLabel = n
+    ? `kept · n=${n}${ci ? ` · 95% CI ${ci[0]}–${ci[1]}%` : ""}`
+    : "kept · nothing graded yet";
+  let h = `<p class="dx-kicker label sc-sub">follow-through · every cycle</p>`;
+  h += `<p class="dx-prose">A commitment is a concrete action a coach pushed Matthew to take. Where it maps to a measurable metric, the same deterministic evaluator that grades the calls above grades the follow-through — kept or broken, against the data of the commitment's own window. <span class="label">Self-scored on Matthew's own data, n=1.</span></p>`;
+  h += `<div class="sc-tiles">` +
+    `<div class="sc-tile"><span class="sc-n">${n ? `${esc(life.follow_through_pct)}%` : "—"}</span><span class="sc-l label">${esc(rateLabel)}</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${esc(life.kept || 0)}</span><span class="sc-l label">kept</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${esc(life.broken || 0)}</span><span class="sc-l label">broken</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${esc(life.ungradeable || 0)}</span><span class="sc-l label">not gradeable</span></div>` +
+    `</div>`;
+  if (life.ungradeable) {
+    const by = life.ungradeable_by_metric || {};
+    const named = Object.keys(by).slice(0, 3).map((m) => `${esc(m)} (${esc(by[m])})`).join(", ");
+    h += `<p class="dx-prose sc-note sc-obs label">${esc(life.ungradeable)} of the ${esc(life.checkable)} commitments carrying a deterministic check could not be graded: the metric each binds to had too few readings inside the commitment's own window to show a trend at all${named ? ` — ${named}` : ""}. That is an absence of evidence, not a verdict on Matthew. They stay on the record, labelled and counted here; none are dropped to flatter the rate above.</p>`;
+  }
+  const qualitative = Math.max(0, (life.total || 0) - (life.checkable || 0));
+  const openBits = [
+    life.pending ? `${life.pending} still inside their window` : "",
+    life.unresolved ? `${life.unresolved} expired with no coach follow-up` : "",
+    qualitative ? `${qualitative} carry no machine-checkable action — the coach owns those` : "",
+  ].filter(Boolean).join(" · ");
+  if (openBits) h += `<p class="sc-note label">${esc(openBits)}.</p>`;
+  h += season.graded
+    ? `<p class="sc-note label">This cycle: ${esc(season.kept || 0)} kept · ${esc(season.broken || 0)} broken (n=${esc(season.graded)}).</p>`
+    : `<p class="sc-note label">Nothing has been graded yet this cycle — commitments grade when their own window closes.</p>`;
+  return h;
 }
 function _scCallHTML(p, shareUrl) {
   const st = p.status || "pending";

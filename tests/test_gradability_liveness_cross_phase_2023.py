@@ -266,11 +266,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
         "to experiment start'), so the filter is redundant with the genesis date clamp the "
         "taxonomy prescribes — a deliberate current-cycle computation."
     ),
-    "lambdas/coach/coach_prediction_evaluator.py::_fetch_range": (
-        "Grades PREDICTION# rows, which are EXPERIMENT_SCOPED and wiped at reset — every "
-        "prediction under evaluation was made in-cycle, so its comparison windows are in-cycle "
-        "by construction; pre-genesis rows are out of scope for grading a current-cycle call."
-    ),
     "lambdas/ai/platform_memory.py::_query_conversation_records": (
         "SOURCE#platform_memory is split BY CATEGORY, not by phase: the durable categories are "
         "CROSS_PHASE and never tagged (filter is a no-op), the rest are EXPERIMENT_SCOPED and "
@@ -445,6 +440,19 @@ _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
 # per call or per source rather than fixed at the site. Recording them here is a
 # claim that the deciding expression is sound — cite where that soundness is pinned.
 _PER_SOURCE_READS: dict[str, str] = {
+    "lambdas/coach/coach_prediction_evaluator.py::_fetch_range": (
+        "include_pilot is a PER-CALLER decision in this module (#3553), and the two callers want "
+        "opposite things. PREDICTION# grading stays phase-filtered for the reason this entry "
+        "carried while it lived in _SANCTIONED_CURRENT_CYCLE_VIEWS: predictions are "
+        "EXPERIMENT_SCOPED and wiped at reset, so every call under evaluation was made in-cycle "
+        "and its comparison window is in-cycle by construction. COMMITMENT# grading passes "
+        "include_pilot=True, because a commitment is graded on the window it was MADE for and "
+        "resets tombstone commitments long before their 7-90 day windows close — that phase "
+        "filter is precisely why the follow-through ledger returned 0 kept / 0 broken for its "
+        "entire life. The metric rows either read are RAW_TIMESERIES/CROSS_PHASE by taxonomy and "
+        "survive a reset by design, so the cross-phase read sees real data, not resurrected "
+        "experiment state. Pinned by tests/test_commitment_grading_3553.py."
+    ),
     "lambdas/emails/daily_brief_lambda.py::fetch_range": (
         "include_pilot=_source_reads_cross_phase(source) — taxonomy-derived per source (#2089/"
         "#2092): cross-phase for never-hidden sources, filtered for EXPERIMENT_SCOPED "

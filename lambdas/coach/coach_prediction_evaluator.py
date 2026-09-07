@@ -110,6 +110,7 @@ EWMA_DECAY = 0.87
 # + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
+from coach import commitment_grading  # noqa: E402  (#3553 — the follow-through ledger's semantics + its dead-man)
 from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observation floor + the provisional-grade rules, reasoned out there
     EWMA_MIN_OBSERVATIONS,
     EWMA_MIN_PRIOR_POINTS,
@@ -197,8 +198,13 @@ def _slugify(text):
 # =============================================================================
 
 
-def _fetch_range(source, start_date, end_date):
-    """Paginated DynamoDB query for source records in a date range."""
+def _fetch_range(source, start_date, end_date, include_pilot=False):
+    """Paginated DynamoDB query for source records in a date range.
+
+    `include_pilot` is the #2023 read: raw source timeseries is RAW_TIMESERIES /
+    CROSS_PHASE by the phase taxonomy and survives a reset by design, so a caller
+    grading a window that predates the current genesis (a #3553 commitment) must ask
+    for it. Prediction grading is unchanged — it still reads the current phase only."""
     try:
         records = []
         kwargs = {
@@ -210,7 +216,7 @@ def _fetch_range(source, start_date, end_date):
             },
         }
         while True:
-            r = table.query(**with_phase_filter(kwargs))
+            r = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
             records.extend(_decimal_to_float(i) for i in r.get("Items", []))
             if "LastEvaluatedKey" not in r:
                 break
@@ -347,113 +353,48 @@ def _retire_ungradeable(ungradeable, today_str):
 
 
 def _fetch_commitments():
-    """Fetch pending COMMITMENT# records across all coaches (#532).
-
-    Commitments are the concrete actions a coach pushed the subject to take. The
-    metric-backed ones (action_check set) are graded kept/broken here; the rest
-    are left for the coach to ask about, but expire to 'unresolved' past 2x window.
-    """
-    commitments = []
-    for coach_id in COACH_IDS:
-        try:
-            kwargs = {
-                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-                "ExpressionAttributeValues": {
-                    ":pk": f"COACH#{coach_id}",
-                    ":prefix": "COMMITMENT#",
-                },
-            }
-            while True:
-                resp = table.query(**with_phase_filter(kwargs))
-                for item in (_decimal_to_float(i) for i in resp.get("Items", [])):
-                    if item.get("status", "") == "pending":
-                        commitments.append(item)
-                if "LastEvaluatedKey" not in resp:
-                    break
-                kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-        except Exception as e:
-            logger.warning("Failed to fetch commitments for %s: %s", coach_id, e)
-    logger.info("Total pending commitments fetched: %d", len(commitments))
-    return commitments
+    """Pending COMMITMENT# records across all coaches — CROSS-PHASE by explicit rule
+    (#3553; the reasoning, and the census that forced it, live in commitment_grading)."""
+    return commitment_grading.fetch_pending(table, COACH_IDS, with_phase_filter, _decimal_to_float, logger)
 
 
 def _update_commitment_status(commitment, status, reason, today_str):
-    """Write a commitment's follow-through outcome (kept/broken/unresolved)."""
-    try:
-        pk = commitment.get("pk") or f"COACH#{commitment.get('coach_id', '')}"
-        sk = commitment.get("sk") or f"COMMITMENT#{commitment.get('commitment_id', '')}"
-        notes = json.dumps({"reason": reason, "algo_version": ALGO_VERSION})
-        table.update_item(
-            Key={"pk": pk, "sk": sk},
-            UpdateExpression="SET #status = :status, outcome = :outcome, outcome_date = :odate, outcome_notes = :notes",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={":status": status, ":outcome": status, ":odate": today_str, ":notes": notes},
-        )
-        logger.info("Commitment %s -> %s", commitment.get("commitment_id", "?"), status)
-    except Exception as e:
-        logger.error("Failed to update commitment %s: %s", commitment.get("commitment_id", "?"), e)
+    """Write a commitment's outcome (kept/broken/unresolved/ungradeable)."""
+    commitment_grading.write_status(table, commitment, status, reason, today_str, ALGO_VERSION, logger)
+
+
+def _commitment_observations(metric, data_cache, end_date):
+    """Readings of `metric` in the 30 days ending `end_date` — the n that makes an
+    `ungradeable` verdict a measurement rather than a shrug (ADR-105)."""
+    key = metric
+    source = METRIC_SOURCES.get(key)
+    if not source:
+        for suffix in ("_7day_avg", "_14day_avg", "_30day_avg"):
+            if metric.endswith(suffix):
+                key = metric[: -len(suffix)]
+                source = METRIC_SOURCES.get(key)
+                break
+    if not source:
+        return 0
+    return len(_extract_metric_series(_get_source_data(source, data_cache, end_date, 30, True), key))
 
 
 def _evaluate_commitments(commitments, today_str, data_cache):
-    """Grade due commitments' follow-through against the data (#532).
-
-    Metric-backed commitments reuse the directional evaluator: the action_check
-    metric moving in the committed direction is evidence the subject followed
-    through (kept); moving the opposite way OR staying flat is broken (#801 —
-    "nothing happened" is evidence against the commitment, not a non-result);
-    genuinely missing data is unresolved once past expiry, else left pending.
-    Metric-less commitments can't be auto-graded — they expire to 'unresolved'
-    past 2x window so the coach stops carrying them.
-    """
-    today = datetime.strptime(today_str, "%Y-%m-%d")
-    stats = {"kept": 0, "broken": 0, "unresolved": 0, "pending": 0}
-    for c in commitments:
-        created_date = c.get("created_date")
-        window_days = int(c.get("window_days") or 7)
-        try:
-            created_dt = datetime.strptime(created_date, "%Y-%m-%d")
-        except (ValueError, TypeError):
-            continue
-        due = created_dt + timedelta(days=window_days)
-        if today < due:
-            stats["pending"] += 1
-            continue  # not due yet
-
-        expired = (today - created_dt).days > window_days * EXPIRY_MULTIPLIER
-        action_check = c.get("action_check")
-        if action_check and action_check.get("metric") and action_check.get("direction"):
-            eval_spec = {"type": "directional", "metric": action_check["metric"], "condition": action_check["direction"]}
-            result = _evaluate_directional({}, eval_spec, data_cache, today_str) or {}
-            r_status = result.get("status", "inconclusive")
-            if r_status == "confirmed":
-                status = "kept"
-            elif r_status == "refuted":
-                status = "broken"
-            elif expired:
-                status = "unresolved"
-            else:
-                stats["pending"] += 1
-                continue
-            _update_commitment_status(c, status, result.get("reason", ""), today_str)
-            stats[status] += 1
-        else:
-            # No machine check — the coach owns following up. Expire stale ones so
-            # they don't accumulate as forever-open.
-            if expired:
-                _update_commitment_status(
-                    c, "unresolved", "No machine-checkable action; window elapsed without coach follow-up.", today_str
-                )
-                stats["unresolved"] += 1
-            else:
-                stats["pending"] += 1
-    logger.info(
-        "Commitment stats: kept=%d broken=%d unresolved=%d pending=%d",
-        stats["kept"],
-        stats["broken"],
-        stats["unresolved"],
-        stats["pending"],
+    """Grade due commitments' follow-through (#532). The loop lives in
+    coach.commitment_grading (#3553); the three I/O legs are passed in, so this
+    module's own `_evaluate_directional` / `_update_commitment_status` stay the live
+    patch points the suite drives."""
+    return commitment_grading.evaluate(
+        commitments,
+        today_str,
+        data_cache,
+        directional=lambda spec, cache, end: _evaluate_directional({}, spec, cache, end, True),
+        observations=lambda metric, cache, end: _commitment_observations(metric, cache, end),
+        update_status=lambda c, s, r, t: _update_commitment_status(c, s, r, t),
+        min_observations=EWMA_MIN_OBSERVATIONS,
+        expiry_multiplier=EXPIRY_MULTIPLIER,
+        logger=logger,
     )
-    return stats
 
 
 # =============================================================================
@@ -521,12 +462,25 @@ def _compute_metric_average(base_metric, data_cache, end_date, days):
     return sum(recent) / len(recent)
 
 
-def _get_source_data(source, data_cache, end_date, lookback_days=30):
+def source_cache_key(source, end_date, lookback_days=30, include_pilot=False):
+    """The `data_cache` slot a (source, window) read occupies.
+
+    #3553: the key used to be `{source}:{lookback_days}` with no date component — a
+    documented trap (the #534 audit) that was survivable only while every caller passed
+    today. The commitment grader anchors on each record's OWN due date, so a date-blind
+    key would have served the first commitment's window to every later one. Exported
+    because three test files hand-typed the old string; a key that can be derived is a
+    key that cannot drift out from under its pre-warmers.
+    """
+    return f"{source}:{end_date}:{lookback_days}:{int(bool(include_pilot))}"
+
+
+def _get_source_data(source, data_cache, end_date, lookback_days=30, include_pilot=False):
     """
     Fetch source data with caching. Avoids re-querying the same source
-    if data for a sufficient range is already loaded.
+    if data for a sufficient range is already loaded. The slot is `source_cache_key`.
     """
-    cache_key = f"{source}:{lookback_days}"
+    cache_key = source_cache_key(source, end_date, lookback_days, include_pilot)
     if cache_key in data_cache:
         return data_cache[cache_key]
 
@@ -534,7 +488,7 @@ def _get_source_data(source, data_cache, end_date, lookback_days=30):
     start_dt = end_dt - timedelta(days=lookback_days)
     start_str = start_dt.strftime("%Y-%m-%d")
 
-    records = _fetch_range(source, start_str, end_date)
+    records = _fetch_range(source, start_str, end_date, include_pilot)
     data_cache[cache_key] = records
     return records
 
@@ -554,7 +508,7 @@ def _compute_ewma(values, decay):
     return sum(w * v for w, v in zip(weights, values)) / weight_sum
 
 
-def _get_ewma_trend(metric_key, data_cache, end_date):
+def _get_ewma_trend(metric_key, data_cache, end_date, include_pilot=False):
     """
     Compute EWMA trend direction and slope for a metric.
 
@@ -573,7 +527,7 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
     if not source:
         return None, None
 
-    records = _get_source_data(source, data_cache, end_date, lookback_days=30)
+    records = _get_source_data(source, data_cache, end_date, 30, include_pilot)
     base_metric = metric_key
     for suffix in ["_7day_avg", "_14day_avg", "_30day_avg"]:
         if base_metric.endswith(suffix):
@@ -716,7 +670,7 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
     }
 
 
-def _evaluate_directional(pred, eval_spec, data_cache, today_str):
+def _evaluate_directional(pred, eval_spec, data_cache, today_str, include_pilot=False):
     """
     Directional evaluation: metric moves in predicted direction.
 
@@ -732,7 +686,7 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
     if not metric_key or not predicted_direction:
         return None
 
-    actual_direction, slope = _get_ewma_trend(metric_key, data_cache, today_str)
+    actual_direction, slope = _get_ewma_trend(metric_key, data_cache, today_str, include_pilot)
 
     if actual_direction is None:
         return {
@@ -1571,13 +1525,27 @@ def lambda_handler(event: dict, context) -> dict:
         # #532: grade coach commitments' follow-through in the same lane (shares the
         # metric cache; deterministic, zero AI). Fail-soft — a commitment error must
         # never sink the prediction evaluation.
-        commitment_stats = {}
+        commitment_stats: dict = {}
+        commitment_pass_completed = False
         try:
             commitments = _fetch_commitments()
-            if commitments:
-                commitment_stats = _evaluate_commitments(commitments, today_str, {})
+            commitment_stats = _evaluate_commitments(commitments, today_str, {}) if commitments else {}
+            commitment_pass_completed = True
         except Exception as e:
             logger.error("Commitment evaluation failed (non-fatal): %s", e)
+        # #3553 dead-man. Emit on every COMPLETED pass, including a wholly empty one —
+        # an alarm with no daily datapoint cannot tell healthy from dead. But stay
+        # SILENT when the pass itself failed: this lane is fail-soft, so a crash raises
+        # nothing a Lambda Errors alarm would see, and a comforting due=0 would read as
+        # "nothing was due" — the exact absence-as-zero this issue is about. Silence is
+        # the honest signal, and the alarm treats missing data as breaching to hear it.
+        if commitment_pass_completed:
+            try:
+                commitment_stats["liveness"] = commitment_grading.emit_liveness(_cw, commitment_stats, logger)
+            except Exception as e:
+                logger.error("Commitment liveness emit failed (non-fatal): %s", e)
+        else:
+            logger.error("[liveness] commitment pass FAILED — emitting no gauge, so the dead-man's missing-data breach can see it")
 
         # #534: deterministic significant-event detection -> mid-week STANCE#
         # refresh for the affected coach only. Fail-soft — a detection/invoke

@@ -272,7 +272,7 @@ BASELINE = {
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
     "lambdas/intelligence/intelligence_common.py": 1350,
     "lambdas/coach/coach_history_summarizer.py": 1264,
-    "lambdas/coach/coach_prediction_evaluator.py": 1218,
+    "lambdas/coach/coach_prediction_evaluator.py": 1178,  # #3553: 1218 -> 1178, the commitment ledger extracted to coach/commitment_grading.py
     # 2026-08-13 (#2610): 1623 → 1382. This file was at 1623/1623 — zero headroom — and
     # adding an alarm is the most routine change it ever takes, so it was the next
     # role_policies.py. Both CloudWatch DASHBOARDS (311 lines, pure composition, not one

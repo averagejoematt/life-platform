@@ -132,6 +132,12 @@
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
     },
+    "commitments-ungraded": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_prediction_alarms",
+      "via": "declaration"
+    },
     "compute-outputs-heartbeat": {
       "kind": "metric",
       "routing": "digest",
@@ -869,7 +875,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 122,
+    "alarms": 123,
     "emf_namespaces": 31,
     "schedules": 88,
     "secrets": 28
@@ -6928,9 +6934,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 122,
+      "alarms": 123,
       "alarms_by_routing": {
-        "digest": 90,
+        "digest": 91,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,
