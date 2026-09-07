@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 399** — feedback 22 · reference 222 · security 1 · project 151 · user 1 · index 2
+**Files in the memory index snapshot: 410** — feedback 24 · reference 228 · security 1 · project 154 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 245** — homed-here 58 · already-homed 166 · superseded 7 · narrative 12 · off-repo 2
+**Rule-class files (feedback + reference + security): 253** — homed-here 61 · already-homed 168 · superseded 7 · narrative 15 · off-repo 2
 
-**Program/session files (project): 151** — already-homed 14 · superseded 1 · narrative 133 · off-repo 2 · index 1
+**Program/session files (project): 154** — already-homed 14 · superseded 1 · narrative 136 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
+## Snapshot of the memory index — 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -78,8 +78,10 @@ feedback_garmin_rate_limit.md
 feedback_hae_water_dedup.md
 feedback_heartbeat_progress.md
 feedback_ideation_include_offsite_channels.md
+feedback_pacific_time_in_messages.md
 feedback_partial_acceptance_is_not_a_close.md
 feedback_prod_deploy_authorization.md
+feedback_reader_credibility_first.md
 feedback_rest_and_params_multifactor.md
 feedback_review_ritual_model_identity.md
 feedback_sensitive_content.md
@@ -218,6 +220,9 @@ project_session_r_2026_09_01.md
 project_session_s_2026_09_02.md
 project_session_t_2026_09_02.md
 project_session_u_2026_09_03.md
+project_session_v_2026_09_05.md
+project_session_w_2026_09_06.md
+project_session_x_2026_09_07.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -254,13 +259,16 @@ reference_a_derived_artifact_needs_its_lane.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
+reference_a_piped_exit_code_is_not_a_test_result.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
+reference_a_repo_side_fix_to_an_s3_read_config.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
 reference_a_sweep_one_import_away.md
 reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
+reference_a_writer_that_ignores_the_wipe_tombstone.md
 reference_absence_read_as_success.md
 reference_absent_check_invisible_to_fail_filter.md
 reference_accuracy_gate_signed_metrics.md
@@ -342,6 +350,7 @@ reference_ffmpeg_slim_brew_and_ass_units.md
 reference_fixture_must_be_the_wire.md
 reference_freshness_window_writer_cadence.md
 reference_frozen_artifact_supersede_annotation.md
+reference_frozen_prereg_is_stamped_fix_the_test.md
 reference_future_genesis_breaks_rules_not_just_tests.md
 reference_gate_prose_is_a_parsed_interface.md
 reference_gate_registration_before_deploy.md
@@ -396,6 +405,7 @@ reference_new_site_page_registries.md
 reference_no_tool_attribution_trailers.md
 reference_node_check_lazy_parse.md
 reference_og_card_fonts_tofu.md
+reference_one_cause_two_red_workflows.md
 reference_orphan_gate_inline_writer_literal.md
 reference_package_import_breaks_sys_modules_stubs.md
 reference_partition_scoped_sweep_rots_when_partition_gains_classes.md
@@ -430,6 +440,7 @@ reference_s3_first_config_invalidates_local_measurement.md
 reference_saturated_alarm_hides_its_own_findings.md
 reference_scratchpad_is_shared_across_concurrent_agents.md
 reference_security_docs_never_via_hand_twin.md
+reference_session_limit_window_and_workflow_resume.md
 reference_shallow_clone_git_gates.md
 reference_shared_scratchpad_clobbers_pr_bodies.md
 reference_ship_the_mechanism_print_the_residual.md
@@ -884,6 +895,17 @@ carries an operating rule.
 | memory file | type | home | status |
 |---|---|---|---|
 | `INDEX_review_discipline.md` | index | — the memory index itself | index |
+| `project_session_v_2026_09_05.md` | project | — narrative: a session record (the `/review full` baseline + the forensic RCA), not a rule | narrative |
+| `project_session_w_2026_09_06.md` | project | — narrative: a session record (the gate-census chain, cycle-17 Day 1), not a rule | narrative |
+| `project_session_x_2026_09_07.md` | project | — narrative: a session record (the fixture privacy leak + the owner's ingestion audit), not a rule; its three extracted rules are the reference rows below | narrative |
+| `reference_a_repo_side_fix_to_an_s3_read_config.md` | reference | `docs/CONVENTIONS.md` §7 (a config the runtime reads from S3 is not fixed by editing the repo copy — check `build_bundle.bundled_extra_paths()`, read the live object, and prefer deleting the second copy to synchronising it) | homed-here |
+| `reference_one_cause_two_red_workflows.md` | reference | `docs/CONVENTIONS.md` §7 (a red `lint` SKIPS CI/CD's `test`/`Plan`/`Deploy` — a skipped test job is not a passing one; two workflows red together usually share one cause; read the boot brief's main line at session START) | homed-here |
+| `reference_a_piped_exit_code_is_not_a_test_result.md` | reference | `docs/CONVENTIONS.md` §7 (`pytest --timeout` is not installed here — the flag errors and a piped shell still reports exit 0; read the `N passed` summary line, never the exit code) | homed-here |
+| `feedback_pacific_time_in_messages.md` | feedback | — off-repo: an audience convention for prose addressed to the owner, not a code or CI rule; the repo's own timestamps stay UTC by design | narrative |
+| `feedback_reader_credibility_first.md` | feedback | — off-repo: a backlog PRIORITISATION ruling by the owner; ADR-099 owns the filing contract, but the ordering across its ranked output is the owner's call and belongs with him, not in a gate | narrative |
+| `reference_a_writer_that_ignores_the_wipe_tombstone.md` | reference | `docs/PHASE_TAXONOMY.md` (ADR-077 has a reader half and needed a writer half — an archived row is `status: draft` plus a tombstone, and every WRITER must check the tombstone, not just readers) | already-homed |
+| `reference_frozen_prereg_is_stamped_fix_the_test.md` | reference | `docs/CONVENTIONS.md` §7 (a SEALED pre-registration is never edited to make a test pass — the test is what is wrong; supersede by annotation) | already-homed |
+| `reference_session_limit_window_and_workflow_resume.md` | reference | — narrative: a dated observation about model usage windows and workflow resume behaviour, not a repo rule | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
 | `user_who_is_matthew.md` | user | — out of scope: who the owner is stays in memory | user |
 
