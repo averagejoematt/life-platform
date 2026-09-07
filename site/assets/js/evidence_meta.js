@@ -463,3 +463,243 @@ export function renderPipeline(d) {
   return figs([fig(sm.fresh ?? "—", "flowing"), fig(sm.paused ?? "—", "paused"), fig(sm.total ?? src.length, "live-monitored")]) + secs +
     `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made, dark Nd = a manual source quiet that many days.${carriedNote}${frameNote}</p>`;
 }
+
+/* ── /method/state/ — "The build" (#3691) ────────────────────────────────────────
+   The owner-as-builder read: how the BUILDING of this platform is going, as opposed
+   to how the experiment is going. Everything here is derived at build time by
+   scripts/build_platform_state.py from the repo, GitHub and the public cost API —
+   this renderer computes nothing, it only arranges.
+
+   ADR-104 throughout: a section whose generator could not reach its source arrives as
+   {error: "...", data: null} and is rendered AS an absence with the reason shown. The
+   one thing this page must never do is present a stale number as a current one — it
+   exists to be trusted at a glance, so a wrong number here is worse than a gap. */
+
+// A section that failed to compute. Named, not hidden — the reason is the content.
+const stErr = (s, label) => `<p class="correlative">${esc(label)} — not computed this run: ${esc(String(s.error))}</p>`;
+
+const stAgo = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d.getTime())) return "";
+  const h = (Date.now() - d.getTime()) / 36e5;
+  if (h < 1) return "just now";
+  if (h < 48) return `${Math.round(h)}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+};
+
+export function renderState(d) {
+  // NOT isBad(d). isBad is a SCALAR placeholder detector — String(anyObject) is
+  // "[object Object]", which matches its /^\[.*\]$/ test, so isBad(payload) is
+  // unconditionally true and this page rendered its empty state on every load with
+  // ZERO console errors. Every other call site in this family passes a string FIELD;
+  // passing the payload was a novel misuse and it failed silently, which is the only
+  // reason it survived a first render. Guard on the payload's own shape instead.
+  if (!d || typeof d !== "object" || !d.board) return empty("The build readout has not been generated yet.");
+  const out = [];
+
+  // ── the headline: what actually warrants worry ──
+  // The whole reason this page exists. A raw open-issue count reads as an emergency;
+  // the decomposition reads as a workload. Both are the same fact.
+  const b = d.board;
+  if (b.error) {
+    out.push(sec("The board", stErr(b, "Backlog")));
+  } else {
+    const c = b.cohorts || {};
+    out.push(figs([
+      fig(b.actionable, "actionable"),
+      fig(b.by_prio && b.by_prio.P1 ? b.by_prio.P1 : 0, "P1 open"),
+      fig(b.reader_facing, "reader-facing"),
+      fig(b.from_review_total, "from audits"),
+    ]));
+    out.push(sec("What the open count is actually made of",
+      `<table class="rd-tbl"><thead><tr><th>cohort</th><th>n</th><th>what it means</th></tr></thead><tbody>` +
+      `<tr><td class="rd-name">epics</td><td class="num">${c.epic ?? "—"}</td><td>containers for other issues, not work themselves</td></tr>` +
+      `<tr><td class="rd-name">roadmap (parked)</td><td class="num">${c.roadmap_parked ?? "—"}</td><td>product vision, deliberately outside the debt count (ADR-099)</td></tr>` +
+      `<tr><td class="rd-name">gated</td><td class="num">${c.gated ?? "—"}</td><td>blocked on an owner decision or an upstream</td></tr>` +
+      `<tr><td class="rd-name">actionable</td><td class="num">${b.actionable ?? "—"}</td><td>the real queue</td></tr>` +
+      `</tbody></table>` +
+      `<p class="correlative">${b.total_open} open in total. Of the ${b.actionable} actionable, <strong>${b.from_review_total}</strong> arrived from commissioned audits rather than accumulated neglect, and <strong>${b.reader_facing}</strong> touch anything a visitor sees. The rest is the platform maintaining its own tooling.</p>`));
+    if (b.by_area) {
+      // Rendered explicitly rather than through kvtable(): its ttl() helper splits on
+      // hyphens and title-cases, which turns the LABELS THEMSELVES into different words
+      // ("ai" -> "Ai", "site-ux" -> "Site Ux"). These are label slugs, not prose.
+      const areaRows = Object.entries(b.by_area)
+        .map(([k, v]) => `<tr><td class="rd-name">${esc(k)}</td><td class="num">${esc(String(v))}</td></tr>`).join("");
+      // WHICH audit produced the pile is the actual answer to "why are there so many".
+      // A single aggregate ("N from reviews") still leaves the reader wondering whether
+      // that is one deliberate sweep or five years of sediment.
+      if (b.from_review && Object.keys(b.from_review).length) {
+        const revRows = Object.entries(b.from_review)
+          .map(([k, v]) => `<tr><td class="rd-name">${esc(k)}</td><td class="num">${esc(String(v))}</td></tr>`).join("");
+        out.push(sec("Which audit filed them",
+          `<table class="rd-tbl"><thead><tr><th>review</th><th>still open</th></tr></thead><tbody>${revRows}</tbody></table>` +
+          `<p class="correlative">Findings we commissioned, not defects that accumulated. A large number here is a sweep that ran, and the honest question is whether its findings were worth filing — not whether the platform is decaying.</p>`));
+      }
+      out.push(sec("Actionable, by area",
+        `<table class="rd-tbl"><thead><tr><th>area</th><th>n</th></tr></thead><tbody>${areaRows}</tbody></table>`));
+    }
+  }
+
+  // ── delivery ──
+  const dl = d.delivery;
+  if (dl && !dl.error) {
+    const cy = dl.cycle_hours || {};
+    out.push(sec("Delivery — trailing " + dl.window_days + " days",
+      figs([
+        fig(cy.median != null ? cy.median + "h" : "—", "median cycle time"),
+        fig(cy.p90 != null ? cy.p90 + "h" : "—", "p90"),
+        fig(dl.closed ?? "—", "issues closed"),
+        fig(dl.prs_merged ?? "—", "PRs merged"),
+      ]) +
+      `<table class="rd-tbl"><thead><tr><th>cohort</th><th>n</th><th>median</th></tr></thead><tbody>` +
+      `<tr><td class="rd-name">found organically</td><td class="num">${cy.n_organic ?? "—"}</td><td class="num">${cy.median_organic != null ? cy.median_organic + "h" : "—"}</td></tr>` +
+      `<tr><td class="rd-name">found by an audit</td><td class="num">${cy.n_review_sourced ?? "—"}</td><td class="num">${cy.median_review_sourced != null ? cy.median_review_sourced + "h" : "—"}</td></tr>` +
+      `</tbody></table>` +
+      `<p class="correlative">Split deliberately: a single median hides that audit-sourced work is the slower population, which is the opposite of the obvious objection that batch-filed issues flatter the number. ${dl.closed_within_24h ?? "—"} closed inside a day; ${dl.over_7_days ?? "—"} took longer than a week.${dl.sampled ? ` <strong>Sampled</strong> — ${dl.n_sampled} of ${dl.closed}; the medians are over the sample.` : ""}</p>`));
+  } else if (dl) {
+    out.push(sec("Delivery", stErr(dl, "Cycle time")));
+  }
+
+  // ── what is improving vs not ──
+  const g = d.grades;
+  if (g && !g.error) {
+    const moved = (g.lenses || []).filter((x) => x.prior && x.moved);
+    const rows = (g.lenses || []).map((x) =>
+      `<tr><td class="rd-name">${esc(x.title || x.lens)}</td><td class="num">${esc(x.prior || "—")}</td><td class="num">${esc(x.grade || "—")}</td></tr>`).join("");
+    out.push(sec("Graded, prior → now",
+      `<table class="rd-tbl"><thead><tr><th>lens</th><th>prior</th><th>now</th></tr></thead><tbody>${rows}</tbody></table>` +
+      `<p class="correlative">${g.n_lenses} lenses graded on ${esc(g.review_date || "")}; ${moved.length} moved from their prior grade; ${g.n_at_A} sit at A. Grades are a panel's judgement against a written rubric, not a measurement.</p>`));
+  } else if (g) {
+    out.push(sec("Graded", stErr(g, "Review grades")));
+  }
+
+  // ── the jury ──
+  const j = d.jury_out;
+  if (j && !j.error) {
+    const lst = (arr) => arr && arr.length
+      ? `<ul class="rd-list">${arr.slice(0, 12).map((x) => `<li>#${x.number} — ${esc(x.title)}</li>`).join("")}</ul>`
+      : `<p class="correlative">None.</p>`;
+    out.push(sec("The jury is out on",
+      `<p class="correlative"><strong>${j.n_awaiting}</strong> shipped changes are merged and deployed but have not yet been observed producing their named live output. That is the honest definition of "we think it works and have not watched it work".</p>` +
+      lst(j.awaiting_live_proof) +
+      // An issue can be BOTH awaiting live proof and a P1 — #3511 was, and appeared
+      // twice within ten lines, which reads as a data error rather than as two true
+      // facts about one issue. The second list states the overlap instead of repeating.
+      `<p class="correlative"><strong>${j.n_p1}</strong> open P1${
+        (() => {
+          const seen = new Set((j.awaiting_live_proof || []).map((x) => x.number));
+          const dup = (j.open_p1 || []).filter((x) => seen.has(x.number)).length;
+          return dup ? ` (${dup} of them already listed above)` : "";
+        })()
+      }.</p>` + lst((j.open_p1 || []).filter((x) => !(j.awaiting_live_proof || []).some((y) => y.number === x.number)))));
+  } else if (j) {
+    out.push(sec("The jury is out on", stErr(j, "Open P1 + awaiting-live-proof")));
+  }
+
+  // ── bets ──
+  const bt = d.bets;
+  if (bt && !bt.error) {
+    out.push(sec("What we're betting on",
+      `<p class="correlative">${bt.n_epics} open epics (the standing bets) and ${bt.n_roadmap} parked Roadmap items (vision, deliberately outside the debt count — one promotion per cycle).</p>` +
+      `<ul class="rd-list">${(bt.epics || []).slice(0, 20).map((x) => `<li>#${x.number} — ${esc(x.title)}</li>`).join("")}</ul>`));
+  } else if (bt) {
+    out.push(sec("What we're betting on", stErr(bt, "Epics + Roadmap")));
+  }
+
+  // ── incidents ──
+  const inc = d.incidents;
+  if (inc && !inc.error) {
+    // Months are rendered explicitly for the same reason as the areas above: ttl()
+    // would print "2026-03" as "2026 03". And the sub-block is a plain table rather
+    // than a nested sec() — a section inside a section gets full top-level chrome and
+    // reads as a peer of "Incidents" rather than part of it.
+    const sevRows = Object.entries(inc.by_severity || {})
+      .map(([k, v]) => `<tr><td class="rd-name">${esc(k)}</td><td class="num">${esc(String(v))}</td></tr>`).join("");
+    const monRows = Object.entries(inc.by_month_recent || {})
+      .map(([k, v]) => `<tr><td class="rd-name">${esc(k)}</td><td class="num">${esc(String(v))}</td></tr>`).join("");
+    out.push(sec("Incidents",
+      figs([fig(inc.total_rows ?? "—", "logged, all time")]) +
+      (sevRows ? `<table class="rd-tbl"><thead><tr><th>severity</th><th>n</th></tr></thead><tbody>${sevRows}</tbody></table>` : "") +
+      (monRows ? `<h3 class="rd-sub">Recent months</h3><table class="rd-tbl"><thead><tr><th>month</th><th>n</th></tr></thead><tbody>${monRows}</tbody></table>` : "") +
+      // The note is labelled. Unlabelled it began "not computed — TTD/TTR are free
+      // prose…" with nothing on the page naming the metric it is declining to report.
+      `<p class="correlative"><strong>Mean time to detect / recover:</strong> ${esc(inc.mttr_note || "")}</p>`));
+  } else if (inc) {
+    out.push(sec("Incidents", stErr(inc, "Incident log")));
+  }
+
+  // ── testing / guards ──
+  const q = d.quality;
+  if (q && !q.error) {
+    out.push(sec("Testing & the guards",
+      figs([
+        fig(q.test_functions ?? "—", "test functions"),
+        fig(q.gates_total ?? "—", "declared gates"),
+        fig(q.gates_proven_can_fail ?? "—", "proven able to fail"),
+        fig(q.proven_fraction_pct != null ? q.proven_fraction_pct + "%" : "—", "proven fraction"),
+      ]) +
+      `<p class="correlative">A gate that has never been watched failing is a gate nobody has shown to work — ${q.gates_unproven} of ${q.gates_total} are in that state. The proven fraction is the number that should go up; it is tracked deliberately rather than assumed, because this platform has repeatedly shipped guards that could not fail.</p>`));
+  } else if (q) {
+    out.push(sec("Testing & the guards", stErr(q, "Gate census")));
+  }
+
+  // ── autonomy ──
+  const a = d.autonomy;
+  if (a && !a.error) {
+    out.push(sec("Autonomy & alerting",
+      figs([fig(a.lambdas ?? "—", "lambdas"), fig(a.scheduled ?? "—", "scheduled"), fig(a.alarms ?? "—", "alarms")]) +
+      (a.alarms_by_routing ? kvtable(a.alarms_by_routing) : "") +
+      // The source string is prose written for a repo reader and carries markdown
+      // backticks; esc() correctly escapes them into visible ` characters. Strip them
+      // rather than ship markup punctuation onto a rendered page.
+      `<p class="correlative">Remediation agent: ${esc(String(a.remediation_mode || "").replace(/`/g, ""))}</p>`));
+  } else if (a) {
+    out.push(sec("Autonomy & alerting", stErr(a, "Fleet + alarm routing")));
+  }
+
+  // ── cost ──
+  const c2 = d.cost;
+  if (c2 && !c2.error && c2.receipts) {
+    // Rendered explicitly, NOT through kvtable(), for two reasons — one cosmetic and
+    // one an honesty defect. Cosmetic: ttl() prints `ceiling_usd` as "Ceiling Usd".
+    // Honest: kvtable routes numbers through fmt(), which is toFixed(1), so a
+    // projection of $85.06 rendered as "85.1" — a dollar figure silently rounded on
+    // the one page whose subject is whether the numbers can be trusted. Money is shown
+    // at the precision the governor reported it, with its unit attached.
+    const MONEY = /(_usd|^mtd$|^ai_usd$|^non_ai_usd$)/;
+    const label = (k) => k.replace(/_usd$/, "").replace(/_/g, " ");
+    const costRows = Object.entries(c2.receipts).map(([k, v]) => {
+      const money = MONEY.test(k) && typeof v === "number";
+      const shown = money ? `$${v.toFixed(2)}`
+        : v == null ? "—"
+        : typeof v === "boolean" ? (v ? "yes" : "no")
+        : typeof v === "number" ? String(v)
+        : String(v);
+      return `<tr><td class="rd-name">${esc(label(k))}</td><td class="num">${esc(shown)}</td></tr>`;
+    }).join("");
+    // #3554: the projection extrapolates only the recurring spend classes. Quoting the
+    // figure without the governor's own scope sentence would be quoting a number without
+    // the caveat that makes it true — which is the defect that issue fixed on the
+    // receipts page, and it would be re-created here by omission.
+    const scope = c2.projected_scope ? `<p class="correlative">Projection scope: ${esc(String(c2.projected_scope))}.</p>` : "";
+    const surge = c2.receipts.surge_active === true
+      ? `<p class="correlative">Surge mode is <strong>active</strong> — the effective ceiling is the surge figure, not the base.</p>`
+      : "";
+    out.push(sec("Spend",
+      `<table class="rd-tbl"><thead><tr><th>measure</th><th>value</th></tr></thead><tbody>${costRows}</tbody></table>` +
+      surge + scope +
+      `<p class="correlative">Read live from the budget governor's own output via /api/receipts — the same payload <a href="/method/receipts/">the receipts page</a> renders. Nothing recomputed here.</p>`));
+  } else if (c2) {
+    out.push(sec("Spend", stErr(c2, "Budget governor")));
+  }
+
+  // ── provenance + the dead-man ──
+  // The generation stamp is rendered, always. A page like this earns trust by being
+  // current; if it silently stopped regenerating it would keep looking authoritative.
+  const degraded = (d.degraded_sections || []).length;
+  out.push(`<p class="correlative">Generated ${esc(d.generated_at || "—")} (${stAgo(d.generated_at)}) by <code>scripts/build_platform_state.py</code>, on every site deploy. ` +
+    (degraded ? `<strong>${degraded} section(s) could not be computed this run</strong> and are shown as gaps above, never as stale values.` : `All sections computed.`) +
+    ` This page is unlisted, not private — the repository is public and every figure here is already derivable from it.</p>`);
+
+  return out.join("");
+}

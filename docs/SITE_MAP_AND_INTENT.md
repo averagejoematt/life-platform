@@ -91,6 +91,17 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
   biology, post-mortems, survival curve, **The Mirror**, the wrong page, results), *The machine*
   (board, build/architecture, intelligence, platform, data sources, pipeline, tools, cost, inference,
   explorer, ask), *The reset log* (cycles).
+- **The Build** (`/method/state/`, #3691) — **unlisted**, and the only page on the site whose
+  audience is Matthew-as-builder rather than any of the four the north star names. The joined
+  owner-facing read of how the *building* is going: the open-issue count decomposed into cohorts
+  (the number that turns "108 open" into a workload rather than an emergency), delivery rate and
+  cycle time split organic-vs-audit, graded lenses prior→now, what is awaiting live proof, incident
+  classes, gate-census health, and spend read live from `/api/receipts`. Generated wholly at build
+  time by `scripts/build_platform_state.py` into `site/data/platform_state.json` — repo + `gh` +
+  public HTTPS only, no IAM. Every section carries its own `as_of`; a section that cannot be
+  computed renders as a stated gap, never a stale value. Unlisted is **not** private (the S3
+  website endpoint serves `site/*` publicly — see #1905); nothing on it is secret, since the repo
+  is public and the cost figures already ship on `/method/receipts/`.
 - **The Mirror** (`/method/mirror/`, #1392 — upgraded 2026-08-02 from the type-three-numbers widget):
   a reader's Whoop CSV export scored **in the browser** on the deployed instruments and overlaid on
   Matthew's published year (`site/data/mirror_distributions.json`, regenerate attended via

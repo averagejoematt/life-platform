@@ -103,6 +103,15 @@ if [ "${1:-}" != "--dry-run" ]; then
   python3 "$(dirname "$0")/../scripts/v4_build_stack_manifest.py" || echo "  ⚠️  stack manifest build skipped — keeping existing site/data/stack.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_methods.py" || echo "  ⚠️  methods registry build skipped — keeping existing site/method/registry/index.html"
+  # #3691: platform_state.json is the joined owner-facing read of the BUILD, GENERATED
+  # from the repo + `gh` + the public /api/receipts. Deliberately NOT wrapped in the
+  # `|| echo "skipped"` idiom its neighbours use: that idiom is exactly the #3681 defect
+  # (an IAM AccessDenied reported as "offline?" while the previous artifact shipped on),
+  # and this page's entire value is that its numbers are current. The generator already
+  # degrades per-section internally — an unreachable source becomes `{"error": ...,
+  # "data": null}` rendered AS a gap — so a NON-ZERO exit here means the generator itself
+  # broke, which must stop the sync rather than ship yesterday's board silently.
+  python3 "$(dirname "$0")/../scripts/build_platform_state.py"
   # #1823: theme_river.json + /story/theme-river/ are GENERATED from the live journal
   # enrichment partition (lambdas/theme_river.py) — previously a hand-run script wired
   # into NO deploy path, so the artifact could go stale for an entire experiment cycle

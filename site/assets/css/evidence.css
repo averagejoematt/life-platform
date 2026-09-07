@@ -144,6 +144,15 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   border-top: var(--border-hair); padding-top: var(--sp-3); margin-bottom: var(--sp-3); }
 .rd-grouphead .rd-h { border-top: 0; padding-top: 0; margin-bottom: var(--sp-1); }
 .rd-desc { color: var(--ink-muted); max-width: var(--measure); margin-bottom: var(--sp-4); }
+/* #3691: a SUB-heading inside a readout section. Without a rule it fell to the base
+   h3 style — Fraunces ~20px/500 — which rendered LOUDER than the .rd-h it sits under
+   (mono 11px uppercase), so a child block read as a peer of its own parent. Same family
+   as .rd-h, one step quieter: no hairline (it is not a new section), and top space so it
+   does not butt against the table above it. */
+.rd-sub { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--ink-faint); font-weight: var(--weight-reg);
+  border-top: 0; margin-top: var(--sp-4); margin-bottom: var(--sp-2); }
+
 
 /* #1119 — /data/physical/ tier heads: the fluid (daily) block vs the checkpoint block,
    each labeled with its cadence. The chips carry metadata-derived cadence strings from

@@ -336,6 +336,21 @@ ARTIFACTS: dict[str, dict] = {
         step="manual, with gen_mirror_vectors / gen_mirror_distributions",
         reason="Builds the mirror page and its distribution data from a generated vector set. Regenerated with the vectors, not per merge.",
     ),
+    "scripts/build_platform_state.py": _builder(
+        "scripts/build_platform_state.py",
+        step="deploy/sync_site_to_s3.sh (every site deploy)",
+        reason=(
+            "Joins the owner-facing read of the build (backlog cohorts, delivery rate, gate census, "
+            "incidents, spend, graded lenses) into site/data/platform_state.json for /method/state/. "
+            "BUILDER, not DERIVED, and the distinction is the point: every value is LIVE (a GitHub "
+            "count, a clock, the budget governor's projection), so a drift contract against the "
+            "committed copy would red on the passage of time and be trained away within a week. The "
+            "committed copy is a seed for local render/QA; the deployed copy is regenerated on every "
+            "sync and never committed back — the same posture as v4_build_theme_river.py. Staleness "
+            "is owned by the deploy step, and the artifact states its own generated_at so a reader "
+            "can see the answer rather than infer it."
+        ),
+    ),
     "scripts/v4_build_theme_river.py": _builder(
         "scripts/v4_build_theme_river.py",
         step="manual, per corpus pass",
