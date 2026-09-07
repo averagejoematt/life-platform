@@ -39,14 +39,20 @@ known tokens.
    what caught the live off-palette accents #0ea5e9 (lead-coach sky) and #16a34a
    (vice-hold green) that bypassed the ember channel.
 
-4. BREAKPOINTS (#1212) — DESIGN_SYSTEM_V5 §10.1: the site has no CSS build step, so
-   `@media` breakpoints are documented NAMED CONSTANTS. Every `(max|min)-width: Npx`
-   across site/assets/css/** must be one of the nine sanctioned numbers — the six
+4. BREAKPOINTS (#1212, extended to JS by #3542) — DESIGN_SYSTEM_V5 §10.1: the site
+   has no CSS build step, so `@media` breakpoints are documented NAMED CONSTANTS.
+   Every `(max|min)-width: Npx` across site/assets/css/** **and every media-query
+   literal in site/assets/js/*.js** (`matchMedia("(max-width: 820px)")` — JS reads the
+   same boundaries the sheets switch on) must be one of the nine sanctioned numbers — the six
    canonical `max-width` boundaries 360/480/600/760/820 plus the `min-width` token+1
    pairs 601/761/821/901 (so a min/max pair straddling a boundary never both fire at
    the same pixel). A tenth value is a rogue breakpoint (the story.css:582
    `(max-width: 520px)` class). The grep in §10.1 — the "(max|min)-width: Npx" sweep
    that returns only those nine numbers — is turned into this assertion.
+   The JS half is #3542's: evidence.js gated its mobile-only scroll behaviour on
+   `matchMedia("(max-width: 819px)")` — one below the 820 token every evidence.css
+   layout rule uses, a rogue breakpoint living in the one place this sweep could not
+   see. A boundary duplicated in JS is still a boundary; it drifts the same way.
 
 5. GENERATED INLINE `<style>` (#1974) — checks 1 and 4 again, over the page-scoped
    `<style>` blocks the v4 page generators emit, and over the built pages themselves.
@@ -100,6 +106,10 @@ from typing import Dict, List, Optional, Set, Tuple
 REPO = Path(__file__).resolve().parent.parent
 REPO_SLUG = "averagejoematt/life-platform"
 CSS_DIR = REPO / "site" / "assets" / "css"
+# (#3542) The JS half of the §10.1 breakpoint surface — the site's ES modules read the
+# same boundaries the sheets switch on, via matchMedia(). Swept for breakpoints ONLY
+# (the type-scale / hex / undefined-token checks are CSS grammar and do not apply).
+JS_DIR = REPO / "site" / "assets" / "js"
 TOKENS = CSS_DIR / "tokens.css"
 # The CONSUMER sheets — swept for hex / font-size / undefined-var. tokens.css is the
 # definitions/allowlist source (never swept — it *is* where the scale and palette live).
@@ -385,6 +395,49 @@ def breakpoint_findings_in(name: str, text: str) -> list:
     return findings
 
 
+# (#3542) JS comment forms — blanked (line numbers preserved) before the breakpoint
+# scan so a boundary discussed in a comment is not read as a live query. The `//` rule
+# deliberately declines to fire after a `:` so a `https://…` inside a string literal
+# cannot swallow the rest of the line (and with it a real breakpoint).
+_JS_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+_JS_LINE_COMMENT = re.compile(r"(?<!:)//[^\n]*")
+
+
+def js_code_lines(text: str) -> list:
+    """`text` with every JS comment blanked and line numbers preserved."""
+    blanked = _JS_BLOCK_COMMENT.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    blanked = _JS_LINE_COMMENT.sub("", blanked)
+    return blanked.splitlines()
+
+
+def js_breakpoint_findings(name: str, text: str) -> list:
+    """(#3542) §10.1 over a JS module: every `(max|min)-width: Npx` literal — the
+    matchMedia() strings the site's ES modules branch on — must be one of the nine
+    sanctioned breakpoints, exactly as the stylesheets' own literals must.
+
+    Why this half exists: evidence.js branched its mobile-only scroll behaviour on
+    `(max-width: 819px)` while every evidence.css layout rule for the same boundary
+    used the 820 token. The CSS sweep reported clean the entire time — the rogue
+    literal simply lived in the one file family it never opened."""
+    findings = []
+    for i, line in enumerate(js_code_lines(text), 1):
+        for m in BP_MEDIA.finditer(line):
+            val = int(m.group(1))
+            if val not in SANCTIONED_BREAKPOINTS:
+                findings.append(
+                    f"{name}:{i}: rogue breakpoint `{val}px` in JS — DESIGN_SYSTEM_V5 §10.1 sanctions only "
+                    f"{sorted(SANCTIONED_BREAKPOINTS)}; a matchMedia() boundary must be the SAME token the "
+                    "stylesheets switch on (#3542)"
+                )
+    return findings
+
+
+def js_sources() -> list:
+    """(#3542) The swept JS surface, DERIVED not enumerated — every module under
+    site/assets/js/. Returned as (repo-relative label, path)."""
+    return [(str(p.relative_to(REPO)), p) for p in sorted(JS_DIR.glob("*.js"))]
+
+
 def style_block_mask(text: str) -> str:
     """(#1974) `text` with everything OUTSIDE a `<style>…</style>` body blanked, line
     numbers preserved. Feeding this to the existing per-line checks makes them scan the
@@ -456,6 +509,10 @@ def check() -> list:
     # inline <style> blocks the v4 generators emit, plus the built pages they write.
     for label, path in generated_style_sources():
         findings.extend(inline_style_findings(label, path.read_text(errors="replace")))
+    # (#3542) …and across the JS surface it never reached either: a matchMedia()
+    # boundary is a §10.1 breakpoint that happens to be spelled in JavaScript.
+    for label, path in js_sources():
+        findings.extend(js_breakpoint_findings(label, path.read_text(errors="replace")))
     return findings
 
 
