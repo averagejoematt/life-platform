@@ -2,7 +2,7 @@
  "_source": "LIVE Habitify API, captured 2026-09-06 ~20:30 PT for #3666 (read-only GETs).",
  "_journal_query": "GET /journal?target_date=2026-09-06T00:00:00+00:00",
  "_logs_query": "GET /logs/{habit_id}?from=2026-08-31T00:00:00+00:00&to=2026-09-08T00:00:00+00:00",
- "_privacy": "One habit NAME is substituted ('Vice Habit (name withheld)') under the never-public content rule. Every timestamp, id, status, goal and value is verbatim wire.",
+ "_privacy": "Two habit NAMES are substituted ('Vice Habit (name withheld)', 'Vice Habit 2 (name withheld)') under the never-public content rule — in BOTH the journal entry and the logs key, which is keyed by habit name. Every timestamp, id, status, goal and value is verbatim wire.",
  "area_map": {
   "-P-Bq7K_2mUXjwtetrQp": "Core",
   "-P-Bq87ujL_d3KDcrA8b": "Optimize",
@@ -1271,7 +1271,7 @@
   },
   {
    "id": "892AFAF7-BFF1-4878-937F-711E2C785ADE",
-   "name": "No porn",
+   "name": "Vice Habit 2 (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -1531,6 +1531,6 @@
   "Body Skincare": [],
   "Evening Journal": [],
   "Evening Breathwork": [],
-  "No porn": []
+  "Vice Habit 2 (name withheld)": []
  }
 }
