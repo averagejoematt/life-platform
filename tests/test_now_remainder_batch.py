@@ -24,7 +24,7 @@ import json
 import os
 import sys
 import urllib.error
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "ingestion"))
 
 import habitify_lambda as hab  # noqa: E402
 import measurements_ingestion_lambda as meas  # noqa: E402
+from common.pacific_time import pacific_now  # noqa: E402  (#3666: DATE# keys are Pacific days)
 from fakes import FakeDdbTable  # noqa: E402
 from ingestion import (
     ingestion_framework as fw,  # noqa: E402
@@ -61,23 +62,31 @@ def test_habitify_refreshes_trailing_day():
 def test_habitify_past_day_pending_resolves_failed():
     """Replay the frozen 2026-06-20 record: 31 pending on a past day. On a
     re-transform, in_progress on a PAST day is failed — pending_count 0 and the
-    completion pct strict."""
+    completion pct strict.
+
+    #3666: `yesterday` is a PACIFIC day. It was a UTC one, and for the seven-to-eight
+    evening PT hours that are already tomorrow in UTC that made "UTC yesterday" the
+    Pacific day still in progress — so this test asserted the phantom failure it was
+    written to catch, and passed only because the code under test shared its mistake.
+    """
     journal = [
         {"name": "Walk", "status": "completed", "progress": {}, "area": {"id": "a1"}},
         {"name": "Journal", "status": "in_progress", "progress": {}, "area": {"id": "a1"}},
     ]
     raw = {"area_map": {"a1": "Discipline"}, "journal": journal, "moods": []}
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
     rec = hab.transform(raw, yesterday)[0]
     assert rec["pending_count"] == 0
     assert rec["habit_statuses"]["Journal"]["status"] == "failed"
+    # …and it records that the PLATFORM resolved it, not that anyone reported a miss.
+    assert rec["habit_statuses"]["Journal"]["miss_source"] == "platform"
     assert rec["completion_pct"] == Decimal("0.5")
 
 
 def test_habitify_today_pending_stays_pending():
     journal = [{"name": "Journal", "status": "in_progress", "progress": {}, "area": None}]
     raw = {"area_map": {}, "journal": journal, "moods": []}
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_now().strftime("%Y-%m-%d")
     rec = hab.transform(raw, today)[0]
     assert rec["pending_count"] == 1
     assert rec["habit_statuses"]["Journal"]["status"] == "pending"
