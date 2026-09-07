@@ -691,21 +691,44 @@ TEXT_EVIDENCE_PROPS = (
     "color",
 )
 
-# The derived text-bearing rules that are NOT held to AA, each with the reason WCAG 1.4.3
-# does not reach it. Text-free marks, aria-hidden decoration and inactive UI components
-# only — a rule that wraps informational prose does not belong here, it belongs in the
-# measured set, and the fix is a colour step (see --recede-ink above).
+# The derived text-bearing rules that are NOT held to AA. WCAG 1.4.3's exceptions are
+# NARROW, so each row must say WHICH ONE it rests on — a reason that just asserts
+# "decorative" is the shape a later reader has to trust instead of audit. Three tags, and
+# `test_every_derived_exemption_names_its_wcag_limb` below refuses any row without one:
+#
+#   non-text:          the element renders NO text node — an SVG/graphic wrapper. 1.4.3 is
+#                      about text and does not reach it at all.
+#   pure-decoration:   it DOES render a text glyph, but the glyph is decorative and
+#                      aria-hidden — 1.4.3's "Incidental / pure decoration" exception. This
+#                      tag is the honest one for the wayfinder and loop-ribbon arrows and
+#                      separators: `&rarr;` and `&middot;` ARE text. They carry nothing the
+#                      DOM order and the nav's own aria-label do not, they are hidden from
+#                      assistive tech, and tokens.css `display: none`s them below 600px on
+#                      exactly that reasoning.
+#   inactive-control:  1.4.3's "inactive user interface component" exception. One row only.
+#
+# A rule that wraps informational prose belongs in none of these — it belongs in the
+# measured set, fixed with a colour step (see --recede-ink above).
 DERIVED_OPACITY_EXEMPT = {
-    ".wall-cell": "the attempt fingerprint SVG wrapper — evidence_wall.js puts only ${d.svg} inside, no text node",
-    ".imark-rail": 'the instrument mark — <div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>, an SVG glyph',
-    ".wf-arrow": 'the wayfinder connector — <span class="wf-arrow" aria-hidden="true">&rarr;</span>, decorative, hidden below 600px',
-    ".wf-sep": 'the wayfinder separator — <span class="wf-sep" aria-hidden="true">&middot;</span>, decorative',
-    ".loop-ribbon .lr-arrow": 'the loop-ribbon connector — <span class="lr-arrow" aria-hidden="true">&rarr;</span>, decorative',
-    ".loop-ribbon .lr-sep": 'the loop-ribbon separator — <span class="lr-sep" aria-hidden="true">&middot;</span>, decorative',
-    ".portrait .pt-hatch": "the coach portrait's hatch layer — SVG strokes in var(--coach), no text node (portraits.js, ADR-106)",
-    ".art-band": 'the code-drawn editorial texture band — <div class="art-band" aria-hidden="true">, inert (tokens.css §13)',
-    ".predict-btn:disabled": "a disabled control — WCAG 1.4.3 exempts inactive UI components",
+    ".wall-cell": (
+        "non-text: the attempt fingerprint wrapper — evidence_wall.js:42 puts only ${d.svg} inside "
+        "(the date is a `title` tooltip, not a rendered text node)"
+    ),
+    ".imark-rail": 'non-text: <div class="imark-rail" aria-hidden="true">${instrumentMark()}</div> — an SVG glyph, dispatches.js/coaching.js',
+    ".art-band": 'non-text: <div class="art-band" aria-hidden="true"> wrapping ruleBand()/seasonBand() SVG — the editorial texture band, tokens.css §13',
+    ".portrait .pt-hatch": 'non-text: the coach portrait\'s engraved shading LAYER — SVG strokes in var(--coach), inside <svg class="portrait"> (portraits.js, ADR-106)',
+    ".wf-arrow": 'pure-decoration: <span class="wf-arrow" aria-hidden="true">&rarr;</span> — a text glyph, but decorative; tokens.css display:none\'s it below 600px for that reason',
+    ".wf-sep": 'pure-decoration: <span class="wf-sep" aria-hidden="true">&middot;</span> — a decorative text glyph between two labelled wayfinder stops',
+    ".loop-ribbon .lr-arrow": 'pure-decoration: <span class="lr-arrow" aria-hidden="true">&rarr;</span> — a decorative text glyph in the loop ribbon',
+    ".loop-ribbon .lr-sep": 'pure-decoration: <span class="lr-sep" aria-hidden="true">&middot;</span> — a decorative text glyph in the loop ribbon',
+    ".predict-btn:disabled": "inactive-control: cockpit.js sets `b.disabled = true` after a cast — WCAG 1.4.3 exempts an inactive UI component",
 }
+
+# The three limbs a row may rest on, in the order 1.4.3 reaches them. Named for the
+# spec's own 'Incidental' heading rather than *_EXEMPT — it is a VOCABULARY, not an
+# exemption registry, and the gate census expands every `*_EXEMPT*` binding entry by
+# entry into gates that would each then need a verdict they cannot have.
+WCAG_INCIDENTAL_LIMBS = ("non-text:", "pure-decoration:", "inactive-control:")
 
 
 def _sheet_rules(path):
@@ -995,6 +1018,28 @@ def test_flagged_row_names_the_ndots_parent_not_three_of_its_four_states():
     wash = _composite("#A34E13", "#F4EFE4", 0.09)
     assert wash == "#EDE1D1"  # the background live axe reported
     assert round(_contrast("#A34E13", wash), 2) == 4.46 and _contrast("#A34E13", wash) < AA_NORMAL  # axe rounds down to 4.45
+
+
+def test_every_derived_exemption_names_its_wcag_limb():
+    """An exemption is a WCAG judgement, and a judgement a reader cannot audit is a shrug.
+
+    WCAG 1.4.3's exceptions are narrow — incidental text (inactive UI component, pure
+    decoration, invisible, or part of a picture with significant other content) and
+    logotypes. Every row must name WHICH limb it rests on, in the vocabulary above, so a
+    later reader can check the claim against the emitting markup instead of trusting the
+    word "decorative". Four of these nine DO render a text glyph (the wayfinder and
+    loop-ribbon arrows and separators); saying so out loud is the point."""
+    unlabelled = [
+        f"{sel}: {reason[:70]}" for sel, reason in sorted(DERIVED_OPACITY_EXEMPT.items()) if not reason.startswith(WCAG_INCIDENTAL_LIMBS)
+    ]
+    assert not unlabelled, (
+        "an exemption row does not name its WCAG 1.4.3 limb. Prefix the reason with one of "
+        f"{list(WCAG_INCIDENTAL_LIMBS)} and cite the emitting markup:\n" + "\n".join(unlabelled)
+    )
+    # ...and the vocabulary itself must stay non-vacuous: a limb nobody uses is a limb
+    # nobody checked, and a limb that matched everything would label nothing.
+    used = {limb for limb in WCAG_INCIDENTAL_LIMBS for r in DERIVED_OPACITY_EXEMPT.values() if r.startswith(limb)}
+    assert used == set(WCAG_INCIDENTAL_LIMBS), f"unused limb(s) in WCAG_INCIDENTAL_LIMBS: {sorted(set(WCAG_INCIDENTAL_LIMBS) - used)}"
 
 
 @pytest.mark.parametrize("selector", sorted(DERIVED_OPACITY_EXEMPT))
