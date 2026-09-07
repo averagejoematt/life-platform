@@ -113,7 +113,7 @@ def add_commitment_alarms(scope, digest) -> None:
     So this alarm reads the two numbers together. `CommitmentsDueCheckable` is the
     denominator (there was gradeable work) and `CommitmentsGraded` is the numerator (a
     verdict came out). ALARM when there was work and no verdict, for DEADMAN_DAYS
-    consecutive daily periods.
+    consecutive daily periods (7 — CloudWatch's own ceiling, see below).
 
     Neither half alone would have caught this. `graded == 0` on its own fires on a
     legitimately quiet fortnight — the ledger is allowed to have nothing due. `due > 0`
@@ -131,8 +131,16 @@ def add_commitment_alarms(scope, digest) -> None:
     alarm and the Python predicate `deadman_breached()` cannot drift into meaning
     different things — tests/test_commitment_grading_3553.py drives BOTH against one
     truth table.
+
+    #3685: the window is SEVEN days, not the fourteen this first shipped with, and the
+    period comes from the same module as the count. CloudWatch rejects any alarm whose
+    EvaluationPeriods x Period exceeds 604800s once Period is >= 3600s, so 14 x 86400
+    was uncreatable — the alarm CREATE_FAILED, this stack rolled back, and the dead-man
+    never existed in AWS. `cdk synth` renders the oversized window happily; the ceiling
+    is enforced service-side at CREATE. tests/test_alarm_evaluation_window_3685.py is
+    the guard that now catches it here, by resolving these very constants.
     """
-    period = Duration.seconds(86400)
+    period = Duration.seconds(commitment_grading.DEADMAN_PERIOD_SECONDS)
     ungraded = cloudwatch.Alarm(
         scope,
         "CommitmentsUngraded",

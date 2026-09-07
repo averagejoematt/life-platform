@@ -85,7 +85,7 @@ COUNT_KEYS = (STATUS_KEPT, STATUS_BROKEN, STATUS_UNRESOLVED, STATUS_UNGRADEABLE,
 #                             copy. The numerator: "a verdict came out".
 #
 # ALARM when there was work and no verdict came out, sustained for DEADMAN_DAYS daily
-# periods. Both halves matter: `graded == 0` alone fires on a legitimately quiet week,
+# periods (7 — see the constant's own note; CloudWatch cannot express more). Both halves matter: `graded == 0` alone fires on a legitimately quiet week,
 # and `due > 0` alone fires on a healthy backlog. Missing data BREACHES — a grader that
 # stops running emits neither metric, and silence is the exact failure this catches.
 #
@@ -96,7 +96,22 @@ DEADMAN_NAMESPACE = "LifePlatform/Predictions"
 DEADMAN_METRIC_DUE = "CommitmentsDueCheckable"
 DEADMAN_METRIC_GRADED = "CommitmentsGraded"
 DEADMAN_ALARM_NAME = "commitments-ungraded"
-DEADMAN_DAYS = 14
+#: The alarm's daily evaluation period, in seconds. Held here rather than as a literal in
+#: the CDK so the WHOLE window — period and count — derives from this one module (#3685).
+DEADMAN_PERIOD_SECONDS = 86400
+#: 7, not the 14 this shipped as (#3553), and the correction is a DESIGN one rather than a
+#: typo: CloudWatch refuses to create any alarm whose EvaluationPeriods x Period exceeds
+#: 604800s (7 days) once Period is >= 3600s, so 14 x 86400 = 1,209,600s was uncreatable —
+#: `CREATE_FAILED ... "Metrics cannot be checked across more than a week"`, which took
+#: LifePlatformMonitoring to UPDATE_ROLLBACK_COMPLETE and left the dead-man non-existent in
+#: AWS for its whole life (#3685). A 14-day NATIVE window is not reachable at any period at
+#: or above an hour — the ceiling is 7 days of wall clock however the periods are
+#: subdivided — so the choice was 7 days or moving the count into the Lambda's own state.
+#: 7 was taken: it detects SOONER, and it costs nothing in false alarms, because the
+#: expression's denominator (`due > 0`) already excludes a legitimately quiet week — all 7
+#: consecutive days must carry gradeable work AND produce no verdict. tests/
+#: test_alarm_evaluation_window_3685.py enforces the ceiling over every alarm in cdk/stacks.
+DEADMAN_DAYS = 7
 DEADMAN_EXPRESSION = "IF(due > 0 AND graded < 1, 1, 0)"
 
 
