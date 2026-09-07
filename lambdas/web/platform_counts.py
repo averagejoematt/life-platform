@@ -50,5 +50,5 @@ DISCOVERED_COUNTS = {
     "alarms": 121,
     "cdk_stacks": 10,
     "adrs": 153,
-    "test_count": 19935,
+    "test_count": 19945,
 }
