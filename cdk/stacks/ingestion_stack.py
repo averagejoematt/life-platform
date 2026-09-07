@@ -663,7 +663,11 @@ class IngestionStack(Stack):
         # All integration paths blocked by Smartsheet IT policy or macOS restrictions.
         # Lambda + EventBridge rule removed. See docs/DECISIONS.md ADR-030.
 
-        # ── 17. Food Delivery — S3 trigger on uploads/food_delivery/
+        # ── 17. Food Delivery — S3 trigger on imports/food_delivery/*.csv
+        # (#3563: this comment said `uploads/` for two years. The LIVE bucket
+        # notification filters `imports/food_delivery/` + `.csv`, `uploads/` has never
+        # held an object, and the role's S3Read grant had followed the comment rather
+        # than the trigger — see role_policies_serve.food_delivery_ingestion.)
         food_delivery = create_platform_lambda(
             self,
             "FoodDeliveryIngestion",

@@ -22,6 +22,8 @@ swallowed failure, so they have no twin constant to pin.
     recall-index-failed-chronicle-approve    RECALL-INDEX-FAILED                    (#2977)
     recall-index-failed-wednesday-chronicle  RECALL-INDEX-FAILED                    (#2977)
     telegram-coach-hold                      TELEGRAM-COACH-HOLD                    (#2823)
+    chronicle-status-write-failed            CHRONICLE-STATUS-WRITE-FAILED          (#3563)
+    freshness-sentinel-write-failed          FRESHNESS-SENTINEL-WRITE-FAILED        (#3563)
 
 #2823's ONE DELIBERATE DEVIATION — THRESHOLD, NOT SHAPE. Every alarm above is
 threshold=1 over 5 minutes: those tokens mean "this should never happen." A held
@@ -264,3 +266,85 @@ def add_silence_alarms(scope, digest) -> None:
         treat_missing_data=NB,
     )
     tg_hold_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
+    # ══════════════════════════════════════════════════════════════
+    # #3563: a DynamoDB write DENIED by IAM, swallowed by design.
+    # The two writes below fail soft because they must — a status row
+    # must not fail a delivered email, and a checker that cannot persist
+    # its sentinel must still finish its run. Both were denied by IAM for
+    # WEEKS with no signal any instrument could see: the chronicle status
+    # write on 3/3 sends from 2026-08-08 (the public /api/status row read
+    # red / "46d ago" for the flagship weekly product while it shipped),
+    # the notion alert-state write on 155/155 runs from 2026-08-06 (the
+    # #1480 episode dedup never worked, and every run re-opened it into
+    # the digest). The grants are fixed in the same PR; these alarms are
+    # what makes the NEXT one news within a day rather than a quarter.
+    # Both functions' only alarm is AWS/Lambda Errors, which needs a
+    # raised exception — a swallowed denial is invisible to it by
+    # construction, which is the whole reason this file exists.
+    #
+    # NOT THE SHAPE THE RCA REJECTED, and the difference is the whole cost.
+    # docs/reviews/FORENSIC_RCA_2026-09-05.md's rent register carries a REJECT
+    # line: "4 ERROR MetricFilters + digest alarms, $1.50-2.90/mo" (#3596 repeats
+    # it as an acceptance bullet). That proposal filtered on `level=ERROR` for
+    # four functions — it SATURATES ON DAY ONE, because these Lambdas log ERROR
+    # routinely, so it pays the always-on custom-metric charge four times over to
+    # report mostly noise. These two are the #2654 shape instead: a literal token
+    # that means "this should never happen", on the two write paths #3563 measured.
+    #
+    # Rent (ADR-103): MetricFilters themselves are free and publish NO datapoint
+    # while healthy, so the custom-metric line is $0 in the steady state and $0.30
+    # per metric only in a month one actually fires. Two alarms at $0.10/mo =
+    # $0.20/mo standing, worst case $0.80 in a month both fire — the month in
+    # which they are worth far more than that. Demote trigger: if either fires
+    # zero times in 12 months AND the IAM-parity ratchet in
+    # tests/test_role_family_write_scope.py is still green, delete it.
+    # ══════════════════════════════════════════════════════════════
+    cs_write_lg = logs.LogGroup.from_log_group_name(scope, "StatusWriteFailLgChronicleSender", "/aws/lambda/chronicle-email-sender")
+    cs_write_mf = logs.MetricFilter(
+        scope,
+        "StatusWriteFailFilterChronicleSender",
+        log_group=cs_write_lg,
+        filter_pattern=logs.FilterPattern.literal('"CHRONICLE-STATUS-WRITE-FAILED"'),
+        metric_name="ChronicleStatusWriteFailed",
+        metric_namespace="LifePlatform/Email",
+        metric_value="1",
+    )
+    cs_write_alarm = cloudwatch.Alarm(
+        scope,
+        "StatusWriteFailAlarmChronicleSender",
+        alarm_name="chronicle-status-write-failed",
+        metric=cs_write_mf.metric(period=Duration.seconds(300), statistic="Sum"),
+        evaluation_periods=1,
+        threshold=1,
+        comparison_operator=GTE,
+        treat_missing_data=NB,
+    )
+    cs_write_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
+    # The checker's three sentinel writes (HAE liveness, apple_health
+    # ALERTSTATE, notion ALERTSTATE) share ONE token: a sentinel this
+    # Lambda cannot persist is the same failure whichever partition it is
+    # on, and the log line itself names which. threshold=1 like the rest —
+    # after the #3563 grants these writes have no expected failure mode.
+    fc_write_lg = logs.LogGroup.from_log_group_name(scope, "SentinelWriteFailLgFreshness", "/aws/lambda/life-platform-freshness-checker")
+    fc_write_mf = logs.MetricFilter(
+        scope,
+        "SentinelWriteFailFilterFreshness",
+        log_group=fc_write_lg,
+        filter_pattern=logs.FilterPattern.literal('"FRESHNESS-SENTINEL-WRITE-FAILED"'),
+        metric_name="FreshnessSentinelWriteFailed",
+        metric_namespace="LifePlatform/Freshness",
+        metric_value="1",
+    )
+    fc_write_alarm = cloudwatch.Alarm(
+        scope,
+        "SentinelWriteFailAlarmFreshness",
+        alarm_name="freshness-sentinel-write-failed",
+        metric=fc_write_mf.metric(period=Duration.seconds(300), statistic="Sum"),
+        evaluation_periods=1,
+        threshold=1,
+        comparison_operator=GTE,
+        treat_missing_data=NB,
+    )
+    fc_write_alarm.add_alarm_action(cw_actions.SnsAction(digest))

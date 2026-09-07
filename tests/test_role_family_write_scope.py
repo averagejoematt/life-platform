@@ -9,12 +9,12 @@ THE CLASS (forensic RCA 2026-09-05, class 3 — the real-wire half)
 
     * G-3   `chronicle-email-sender` calls `_record_email_send` -> `table.put_item(...)` on
             `USER#matthew#SOURCE#email_log#wednesday_chronicle`; `email_chronicle_sender()`
-            grants GetItem/Query/UpdateItem and no PutItem. 3 sends, 3 swallowed
+            granted GetItem/Query/UpdateItem and no PutItem. 3 sends, 3 swallowed
             AccessDeniedExceptions, and `/api/status` read "44d ago" for four weeks.
     * INT-1 `life-platform-freshness-checker` calls `put_item` on
             `USER#matthew#SOURCE#notion`; the PutItem grant's `dynamodb:LeadingKeys`
-            condition allows `USER#matthew#SOURCE#apple_health` only. 155 denials in 14
-            days, and the journal-dark dedup (#1480) has never once worked.
+            condition allowed `USER#matthew#SOURCE#apple_health` only. 155 denials in 14
+            days, and the journal-dark dedup (#1480) had never once worked.
 
   Both writes are inside `try/except` blocks that log and continue, so the only symptom was
   silence. That is the whole point of this file: a denial that nothing can see.
@@ -34,13 +34,22 @@ WHAT IT DERIVES (nothing is hand-listed except the dated gap ledger)
      SET, in both directions.
 
 WHY A DATED LEDGER AND NOT A RED SUITE
-  This test is RED on main the day it lands — that is its positive control, and #3563 is the
-  fix. A test that simply fails would red main for every other lane until an owner-run
-  `cdk deploy` cleared it, so the two live gaps are recorded BY NAME, dated, with the exact
-  change that clears each. The ratchet runs both ways: an unledgered gap fails
+  This test was RED on main the day it landed — that was its positive control. A test that
+  simply fails would red main for every other lane until an owner-run `cdk deploy` cleared
+  it, so the live gaps were recorded BY NAME, dated, with the exact change that clears each.
+  The ratchet runs both ways: an unledgered gap fails
   (`test_no_write_scope_gap_is_unledgered`), and a ledger line whose gap is GONE also fails
-  (`test_the_gap_ledger_has_no_stale_line`) — so #3563's fix cannot land without deleting
-  its line, which is how "green after the fix" is enforced rather than hoped for.
+  (`test_the_gap_ledger_has_no_stale_line`) — so #3563's fix could not land without deleting
+  its lines, which is how "green after the fix" is enforced rather than hoped for.
+
+  #3563 LANDED 2026-09-06 and the ledger is now EMPTY (see `KNOWN_GAPS`): the sender got a
+  LeadingKeys-scoped `DynamoDBWriteEmailLog` PutItem statement, the checker a second scoped
+  `DynamoDBWriteNotionAlertState` PutItem statement, and food-delivery `BatchWriteItem`. Two
+  things that were RE-POINTED rather than deleted in that PR, because both were controls on a
+  state that can only exist once: `test_the_grant_side_reads_real_statements` now reads the
+  REPAIRED statements by sid, and the incident pin now asserts neither gap RETURNS. The
+  IAM-side repair is a repo change; the live proof is the deploy — which the `integration`
+  leg at the bottom of this file is what measures.
 
 STATED BLIND SPOTS (asserted below, not left to the reader)
   * Shared modules (`lambdas/common/rate_limiter.py`, `lambdas/coach/*`, ...) write through
@@ -372,26 +381,29 @@ GAPS = find_gaps()
 # THE DATED GAP LEDGER (charter primitive 3). Shrink-only: a line comes OUT when its fix
 # lands, and `test_the_gap_ledger_has_no_stale_line` is what forces the deletion.
 # ══════════════════════════════════════════════════════════════════════════════════════════
-KNOWN_GAPS = {
-    "chronicle-email-sender::verb::dynamodb:PutItem": (
-        "2026-09-05 (#3563, finding G-3) — `_record_email_send`'s status write has been denied on every send "
-        "since 2026-08-08; /api/status read the Wednesday chronicle as '44d ago' while three issues shipped. "
-        "CLEARS WHEN: email_chronicle_sender() gains dynamodb:PutItem on the email_log partition AND "
-        "`bash deploy/cdk_deploy.sh LifePlatformEmail` runs. Delete this line in that PR."
-    ),
-    "life-platform-freshness-checker::pk::dynamodb:PutItem::USER#*#SOURCE#notion": (
-        "2026-09-05 (#3563, finding INT-1) — the #1480 journal-dark dedup writes ALERTSTATE on the notion "
-        "partition while DynamoDBWriteApHealthSentinels' LeadingKeys allows apple_health only; 155 denials in "
-        "14 days and every run re-opens the episode. CLEARS WHEN: the LeadingKeys allowlist gains "
-        "USER#matthew#SOURCE#notion AND `bash deploy/cdk_deploy.sh LifePlatformOperational` runs."
-    ),
-    "food-delivery-ingestion::verb::dynamodb:BatchWriteItem": (
-        "2026-09-05 (#3596, derived — NOT field-verified) — food_delivery_lambda.py:161 writes through "
-        "`table.batch_writer()`, which issues BatchWriteItem; food_delivery_ingestion() grants "
-        "PutItem/GetItem/Query only, and PutItem does not imply BatchWriteItem. The Lambda is S3-triggered on "
-        "uploads/food_delivery/, so it may not have run since the grant was written — this is a LEAD for the "
-        "#3563 fix lane to confirm against CloudWatch before changing IAM, not a measured incident."
-    ),
+KNOWN_GAPS: dict = {
+    # EMPTY, and that is the RESULT of #3563 rather than a default — this file landed on
+    # 2026-09-05 carrying three lines and all three came out in the fix PR, which is the
+    # ratchet's shrink-only contract doing exactly what it was written for:
+    #
+    #   chronicle-email-sender::verb::dynamodb:PutItem   (G-3)   -> role_policies_email.py
+    #       sid="DynamoDBWriteEmailLog", PutItem scoped by LeadingKeys to
+    #       USER#matthew#SOURCE#email_log#wednesday_chronicle.
+    #   life-platform-freshness-checker::pk::…::SOURCE#notion  (INT-1) ->
+    #       role_policies_operational.py sid="DynamoDBWriteNotionAlertState", a SECOND
+    #       PutItem statement scoped to USER#matthew#SOURCE#notion (a widened condition on
+    #       the existing apple_health statement would read as a narrowing to #2834's gate).
+    #   food-delivery-ingestion::verb::dynamodb:BatchWriteItem (#3596's derived lead) ->
+    #       role_policies_serve.py sid="DynamoDB" gains BatchWriteItem. The CloudWatch
+    #       verdict the ledger line asked for: NO live denial evidence exists and none can
+    #       — the function's log group holds ONE stream (2026-03-28, events aged out of the
+    #       30d retention) and AWS/Lambda Invocations has no datapoint in 90 days; that run
+    #       predates the 2026-03-30 CDK adoption of the role. Fixed as a correctness matter
+    #       with that caveat stated, not as a measured incident.
+    #
+    # A new entry is a dated line naming what clears it (asserted by
+    # test_every_ledger_line_is_dated_and_says_what_clears_it), and it comes back out in
+    # the PR that closes it — test_the_gap_ledger_has_no_stale_line is what forces that.
 }
 
 
@@ -421,10 +433,22 @@ def test_the_write_extractor_reads_the_two_incident_modules():
 
 
 def test_the_grant_side_reads_real_statements():
+    """Non-vacuity on the GRANT side, pinned to #3563's fix rather than to its bug.
+
+    Until 2026-09-06 this asserted the BROKEN state (`PutItem not in sender`, the checker's
+    PutItem scoped to apple_health alone) as the positive control that the reader really was
+    reading live statements. That control could only be right once. It is now pinned to the
+    repaired shape by SID, which is a stronger reading of the same thing: if the extractor
+    went blind, `granted_actions` returns an empty set and `leading_keys_for` an empty list,
+    and every assertion below fails.
+    """
     sender = granted_actions(RP.email_chronicle_sender())
-    assert "dynamodb:UpdateItem" in sender and "dynamodb:PutItem" not in sender, sorted(sender)
+    assert {"dynamodb:UpdateItem", "dynamodb:PutItem"} <= sender, sorted(sender)
+    sender_put = leading_keys_for(RP.email_chronicle_sender(), "dynamodb:PutItem")
+    assert sender_put == [["USER#matthew#SOURCE#email_log#wednesday_chronicle"]], sender_put
     scopes = leading_keys_for(RP.operational_freshness_checker(), "dynamodb:PutItem")
-    assert scopes == [["USER#matthew#SOURCE#apple_health"]], scopes
+    assert sorted(scopes) == [["USER#matthew#SOURCE#apple_health"], ["USER#matthew#SOURCE#notion"]], scopes
+    assert "dynamodb:BatchWriteItem" in granted_actions(RP.food_delivery_ingestion())
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════
@@ -456,13 +480,20 @@ def test_the_gap_ledger_has_no_stale_line():
     )
 
 
-def test_the_two_incidents_3563_measured_are_the_ledger_today():
-    """The positive control on the real repo: both #3563 findings are present, by name, RIGHT
-    NOW. If this list ever shrinks by itself, the extractor went blind rather than the bug
-    getting fixed — the stale-line test above is what distinguishes the two."""
+def test_the_two_incidents_3563_measured_are_closed_and_stay_closed():
+    """The #3563 regression pin, on the real repo.
+
+    Its ancestor asserted both findings were PRESENT — the positive control that made the
+    derivation credible on the day it landed. Once the grants shipped that assertion had to
+    invert, so what it guards now is the reverse: neither gap may come back, by key, and
+    "it went away because the extractor went blind" is excluded by the two non-vacuity tests
+    above (the write sites are still SEEN in both modules, the grants are still READ by sid).
+    A regression here means someone removed a grant, or moved the write to a partition the
+    role cannot reach — the exact edit that started this."""
     keys = {g.key for g in GAPS}
-    assert "chronicle-email-sender::verb::dynamodb:PutItem" in keys, "G-3's denied PutItem vanished from the derivation"
-    assert "life-platform-freshness-checker::pk::dynamodb:PutItem::USER#*#SOURCE#notion" in keys, "INT-1's pk gap vanished"
+    assert "chronicle-email-sender::verb::dynamodb:PutItem" not in keys, "G-3's PutItem grant regressed"
+    assert "life-platform-freshness-checker::pk::dynamodb:PutItem::USER#*#SOURCE#notion" not in keys, "INT-1's notion scope regressed"
+    assert "food-delivery-ingestion::verb::dynamodb:BatchWriteItem" not in keys, "the batch_writer grant regressed"
 
 
 def test_every_ledger_line_is_dated_and_says_what_clears_it():
@@ -659,12 +690,23 @@ KNOWN_LIVE_DRIFT: dict = {
     #           arn:aws:ses:us-west-2:205930651321:identity/averagejoematt.com in sid=SES.
     #
     # A new entry is a dated line saying what clears it, exactly like KNOWN_GAPS above.
+    #
+    # #3563 (2026-09-06) DELIBERATELY DID NOT OPEN ONE for its own two statements
+    # (DynamoDBWriteEmailLog, DynamoDBWriteNotionAlertState), and the reason is a design
+    # choice worth stating rather than a slip. Ledgering them would make this leg GREEN in
+    # the merge->deploy window (when a deploy is owed) and RED after the deploy (when only
+    # bookkeeping is owed) — failure exactly where no action is required. Left unledgered it
+    # is red for whoever runs it with credentials in the window, saying the true and
+    # actionable thing ("merged, not deployed: run `bash deploy/cdk_deploy.sh
+    # LifePlatformEmail LifePlatformOperational`"), and it self-clears on the deploy with no
+    # follow-up commit. The #3568 line above was the other case — a lane DISCOVERING
+    # pre-existing drift it could not itself clear — and that is what this ledger is for.
 }
 
 LIVE_PARITY_WATCH = (
     ("life-platform-qa-smoke", "operational_qa_smoke", "#3573 added ai-canary-log/* to the S3List prefix condition"),
-    ("chronicle-email-sender", "email_chronicle_sender", "#3563's PutItem grant lands here"),
-    ("life-platform-freshness-checker", "operational_freshness_checker", "#3563's notion LeadingKeys lands here"),
+    ("chronicle-email-sender", "email_chronicle_sender", "#3563's DynamoDBWriteEmailLog PutItem statement lands here"),
+    ("life-platform-freshness-checker", "operational_freshness_checker", "#3563's DynamoDBWriteNotionAlertState lands here"),
 )
 
 

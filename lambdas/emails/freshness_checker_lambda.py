@@ -92,6 +92,20 @@ _HAE_DEEP_SCAN_MAX_PAGES = 25
 _HAE_LIVENESS_SK = "DATATYPE_LIVENESS"  # sentinel SK on the apple_health partition (sorts before DATE#)
 _AH_ALERT_STATE_SK = "ALERTSTATE#ah_activity_degraded"  # DI-1.6 episode sentinel
 
+# ── #3563: the fail-soft SILENCE token (the #2654 shape) ─────────────────────
+# All three sentinel writes below are fail-soft by design — a checker that cannot
+# store its own state must still finish its run and still alert. That contract is
+# right and it is also silent: the notion ALERTSTATE write AccessDenied'd on every
+# invocation from 2026-08-06 (155 denials in 14 days) because #1480 added the write
+# without widening the #468 LeadingKeys allowlist, so the journal-dark episode dedup
+# NEVER worked and every run re-opened the episode into the digest. It logged at
+# ERROR the whole time and nothing could see it: the only alarm on this function is
+# AWS/Lambda Errors, which needs a raised exception. One token on all three sites,
+# one MetricFilter, one alarm (cdk/stacks/monitoring_silence_alarms.py) — a sentinel
+# this Lambda cannot persist is the same failure whichever partition it is on.
+# Twin-pinned to the CDK filter pattern by tests/test_denied_write_silence_3563.py.
+SENTINEL_WRITE_FAILED_TOKEN = "FRESHNESS-SENTINEL-WRITE-FAILED"  # noqa: S105 — a log token, not a credential
+
 
 def check_apple_health_activity(table, now, sick_suppress):
     """Detect a silent Apple Health activity-stream failure (the HAE 413 blind spot).
@@ -1029,7 +1043,7 @@ def lambda_handler(event, context):
             )
             logger.info("HAE datatype liveness stored: %d dark of %d", sum(1 for d in _dt_liveness if d["dark"]), len(_dt_liveness))
     except Exception as _dl_e:
-        logger.error("HAE datatype liveness compute/store failed (non-fatal): %s", _dl_e)
+        logger.error("%s HAE datatype liveness compute/store failed (non-fatal): %s", SENTINEL_WRITE_FAILED_TOKEN, _dl_e)
 
     # ── DI-1.6: Apple Health activity-integrity guard (the silent-413 blind spot) ──
     ah_degraded = False
@@ -1052,7 +1066,7 @@ def lambda_handler(event, context):
         try:
             table.put_item(Item={"pk": _ah_pk, "sk": _AH_ALERT_STATE_SK, **_new_state})
         except Exception as _we:
-            logger.error("alert-state write failed (non-fatal): %s", _we)
+            logger.error("%s apple_health alert-state write failed (non-fatal): %s", SENTINEL_WRITE_FAILED_TOKEN, _we)
         if ah_alert and _should_send:
             try:
                 _subj = "⚠️ Life Platform: Apple Health activity-stream gap"
@@ -1102,7 +1116,7 @@ def lambda_handler(event, context):
         try:
             table.put_item(Item={"pk": _notion_pk, "sk": _NOTION_ALERT_STATE_SK, **_n_new_state})
         except Exception as _we:
-            logger.error("notion alert-state write failed (non-fatal): %s", _we)
+            logger.error("%s notion alert-state write failed (non-fatal): %s", SENTINEL_WRITE_FAILED_TOKEN, _we)
         if notion_alert and _n_should_send:
             try:
                 _subj = f"⚠️ Life Platform: Journal channel dark >{NOTION_JOURNAL_DARK_ALERT_DAYS} days"
