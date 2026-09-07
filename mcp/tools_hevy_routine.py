@@ -9,7 +9,7 @@ One tool, ten actions:
   commit        — push a draft IR to Hevy via the compiler (write tool)
   list          — list ROUTINE# items in a date range
   get           — return one IR by routine_id
-  archive       — rename + folder-move (Hevy has no DELETE)
+  archive       — RENAME only (Hevy has no DELETE, and folder_id is create-only)
   floor         — generate floor variant explicitly
   re_entry      — force re-entry mode regardless of last-workout date
   adherence     — programmed-vs-performed report for a routine_id
