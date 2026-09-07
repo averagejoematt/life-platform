@@ -74,6 +74,7 @@ untiered --ai-qa on Sundays/manual — see that workflow's header for the split.
 
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -476,6 +477,179 @@ def _stuck_reveals(page, sel):
     }""",
         sel,
     )
+
+
+# ── Mobile FIRST-LOAD contract (#3542 / DES-1 + DES-3) ────────────────────────
+# Everything above measures the mobile viewport by RESIZING a page that has already
+# been loaded and scrolled at the desktop context. That is a structurally different
+# event from a phone visitor's first paint, and it is exactly why the DES-1 class was
+# invisible to every gate for months: evidence.js called `main.scrollIntoView()` on
+# its INITIAL render whenever `matchMedia("(max-width: 819px)")` matched, so every
+# archive shell (/data/*, /protocols/*, /method/*) scrolled itself past its own hero,
+# intro card and topic tabs with no user input at all — measured live at 390x844,
+# /data/physical/ scrollY = [0, 1297, 1297, 1297] at 200/800/1500/3000ms — while the
+# page's own orientation copy promised "no page jumps". Desktop was always 0.
+#
+# So this is a SEPARATE, FRESH navigation at 390x844: a new page in the same context,
+# viewport set BEFORE goto, and nothing touches it afterwards. Two invariants:
+#   (1) the page does not scroll itself (scrollY stays 0 at every sample), and the
+#       .page-hero — where the page has one — lies inside the FIRST viewport, so what
+#       a phone visitor sees first is what the page was designed to open on;
+#   (2) DES-3: wherever a sticky top bar's computed backdrop-filter is `none`, its
+#       computed background must be fully opaque. An 82%-alpha bar is legible only
+#       because the blur behind it destroys the text underneath; the @media (max-width:
+#       600px) block stripped the blur (it traps position:fixed children — #1007) and
+#       left the alpha, shipping the bar as tinted cellophane with page prose reading
+#       straight through it.
+MOBILE_FIRST_LOAD_VIEWPORT = {"width": 390, "height": 844}
+# Sample instants (ms after load). Mirrors the issue's own probe_scroll.py so the gate
+# measures the window the defect was measured in — the live jump landed between 200
+# and 800ms (it fires after the readout's async fetch resolves, and smooth-scrolls).
+MOBILE_FIRST_LOAD_SAMPLES_MS = (250, 800, 1600, 2600)
+# 1px of sub-pixel/anchor slop. The defect was three orders of magnitude larger.
+MOBILE_FIRST_LOAD_SCROLL_TOLERANCE_PX = 2
+# The three sticky top bars normalized onto one rule in tokens.css @layer chrome-base.
+TOP_BAR_SEL = ".story-top, .ev-top, .cockpit-top"
+
+_MOBILE_FIRST_LOAD_PROBE_JS = r"""(sel) => {
+    const hero = document.querySelector('.page-hero');
+    let heroTop = null, heroBottom = null;
+    if (hero) {
+        const r = hero.getBoundingClientRect();
+        // DOCUMENT coordinates — independent of wherever the page currently sits, so
+        // "the hero is in the first screenful" is a layout fact, not a scroll fact.
+        heroTop = r.top + window.scrollY;
+        heroBottom = r.bottom + window.scrollY;
+    }
+    const bars = [];
+    document.querySelectorAll(sel).forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;          // not laid out → not a bar a reader sees
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        bars.push({
+            sel: (el.className || el.tagName).toString().trim().split(/\s+/)[0],
+            position: cs.position,
+            backdrop_filter: (cs.backdropFilter || cs.webkitBackdropFilter || 'none'),
+            background_color: cs.backgroundColor,
+        });
+    });
+    return {
+        scroll_y: Math.round(window.scrollY),
+        hero_present: !!hero,
+        hero_doc_top: heroTop,
+        hero_doc_bottom: heroBottom,
+        viewport_h: window.innerHeight,
+        top_bars: bars,
+    };
+}"""
+
+
+def _css_alpha(color):
+    """Alpha channel of a COMPUTED CSS colour string, 0.0–1.0 (1.0 when opaque/unparsable).
+
+    Computed backgrounds reach us in several syntaxes and the modern ones matter here:
+    the live bar computed as `oklch(0.15 0.008 75 / 0.82)` in Chromium, not `rgba(...)`,
+    because the declaration is a `color-mix(in oklch, …)`. Handles legacy
+    `rgba(r, g, b, a)` / `rgb(r g b / a)` and the `<fn>(… / a)` family
+    (oklch/oklab/lab/lch/hsl/color). Unknown syntax reads as OPAQUE deliberately — this
+    feeds a gate, and an unparsable colour must never invent a violation.
+    """
+    c = (color or "").strip().lower()
+    if not c:
+        return 1.0
+    if c in ("transparent", "rgba(0, 0, 0, 0)"):
+        return 0.0
+    m = re.match(r"^rgba?\((.*)\)$", c)
+    if m:
+        parts = [x for x in re.split(r"[\s,/]+", m.group(1)) if x]
+        if len(parts) >= 4:
+            return _alpha_value(parts[3])
+        return 1.0
+    m = re.search(r"/\s*([0-9.]+%?)\s*\)\s*$", c)
+    if m:
+        return _alpha_value(m.group(1))
+    return 1.0
+
+
+def _alpha_value(token):
+    try:
+        return float(token[:-1]) / 100.0 if token.endswith("%") else float(token)
+    except ValueError:
+        return 1.0
+
+
+def mobile_first_load_findings(path, samples, probe, tolerance_px=MOBILE_FIRST_LOAD_SCROLL_TOLERANCE_PX):
+    """PURE verdict over one fresh-mobile-load observation (#3542). Returns finding strings.
+
+    `samples` is [(t_ms, scroll_y), …] taken during the load with NO interaction;
+    `probe` is the final _MOBILE_FIRST_LOAD_PROBE_JS dict. Kept free of Playwright so
+    tests/test_visual_qa_units.py can drive it with the pre-fix observation directly —
+    a gate whose verdict logic can only be exercised by a browser is a gate nobody
+    proves can fail.
+    """
+    findings = []
+    jumped = [(t, y) for t, y in samples if y > tolerance_px]
+    if jumped:
+        trace = ", ".join(f"{t}ms={y}" for t, y in samples)
+        findings.append(
+            f"Page scrolled itself on FIRST LOAD at {MOBILE_FIRST_LOAD_VIEWPORT['width']}px with no interaction "
+            f"(#3542/DES-1): scrollY {trace} — expected 0 throughout"
+        )
+    vh = probe.get("viewport_h") or MOBILE_FIRST_LOAD_VIEWPORT["height"]
+    if probe.get("hero_present"):
+        top, bottom = probe.get("hero_doc_top"), probe.get("hero_doc_bottom")
+        if top is not None and bottom is not None and not (top < vh and bottom > 0):
+            findings.append(
+                f".page-hero does not intersect the first viewport at {MOBILE_FIRST_LOAD_VIEWPORT['width']}px "
+                f"(#3542/DES-1): hero spans {round(top)}–{round(bottom)}px in the document, first screen is 0–{vh}px"
+            )
+    for bar in probe.get("top_bars", []):
+        backdrop = (bar.get("backdrop_filter") or "none").strip().lower()
+        if backdrop not in ("none", ""):
+            continue  # a real blur is doing the work the alpha assumes
+        alpha = _css_alpha(bar.get("background_color"))
+        if alpha < 0.999:
+            findings.append(
+                f"Sticky top bar .{bar.get('sel')} is {alpha:.2f}-alpha with backdrop-filter: none at "
+                f"{MOBILE_FIRST_LOAD_VIEWPORT['width']}px (#3542/DES-3) — page text reads straight through it; "
+                f"computed background {bar.get('background_color')!r}"
+            )
+    return findings
+
+
+def mobile_first_load_check(context, url, path):
+    """Drive the #3542 fresh-mobile-load probe for `url` and return finding strings.
+
+    A NEW page in the caller's context, sized to 390x844 BEFORE navigation, left
+    completely untouched afterwards — the only shape in which "does this page scroll
+    itself with no user input?" is an honest question.
+    """
+    page = context.new_page()
+    try:
+        page.set_viewport_size(MOBILE_FIRST_LOAD_VIEWPORT)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        except Exception as e:  # noqa: BLE001 — a nav failure is already gated upstream
+            return [f"Mobile first-load probe could not load the page (#3542): {str(e)[:120]}"]
+        samples, probe = [], {}
+        last = 0
+        for t in MOBILE_FIRST_LOAD_SAMPLES_MS:
+            page.wait_for_timeout(max(0, t - last))
+            last = t
+            try:
+                probe = page.evaluate(_MOBILE_FIRST_LOAD_PROBE_JS, TOP_BAR_SEL) or {}
+            except Exception:
+                continue
+            samples.append((t, probe.get("scroll_y", 0)))
+        if not samples:
+            return ["Mobile first-load probe returned no samples (#3542) — treated as a failure, never a pass"]
+        return mobile_first_load_findings(path, samples, probe)
+    finally:
+        try:
+            page.close()
+        except Exception:
+            pass
 
 
 def _viewport_meta_ok(page):
@@ -929,7 +1103,15 @@ def _a11y_gate(page, path, a11y_baseline, theme, viewport, issues, warnings):
 
 
 def capture_page(
-    context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False, a11y_baseline=None, theme="dark", context_mobile=False
+    context,
+    page_def,
+    screenshot_dir,
+    save_screenshots=False,
+    capture_prose=False,
+    a11y_baseline=None,
+    theme="dark",
+    context_mobile=False,
+    mobile_first_load=True,
 ):
     """Drive one page def in an open browser context and return its result dict.
 
@@ -960,6 +1142,13 @@ def capture_page(
     lane compared a 390px DOM against the desktop ledger, which is precisely how
     it reported `scrollable-region-focusable` as a desktop-ledger NEW serious
     violation for six weeks. Defaults False (the 1440x900 contexts).
+
+    mobile_first_load (#3542): run the fresh-navigation mobile probe — a second,
+    untouched page at 390x844 that asserts the page does not scroll itself on first
+    paint (DES-1) and that a sticky top bar whose computed backdrop-filter is `none`
+    is fully opaque (DES-3). ON by default in every caller, including
+    tests/pr_render_gate.py, which drives this same function; False is the escape
+    hatch for a harness that cannot afford the extra navigation.
 
     Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
     can reuse identical capture without forking the gating visual-qa harness.
@@ -1196,6 +1385,17 @@ def capture_page(
             mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
             if _capture_full_page(page, mob, warnings):
                 shots.append({"kind": "mobile", "path": mob})
+        # ── mobile FIRST LOAD @ 390px (#3542) — a SEPARATE, FRESH navigation ──
+        # Everything above judges a page that was loaded at the desktop context and
+        # then resized + scrolled by us. This one is the phone visitor's actual first
+        # paint: new page, 390x844 set before goto, zero interaction afterwards. It is
+        # the only shape that can see a page that scrolls itself (DES-1) or a top bar
+        # whose alpha survived the loss of its blur (DES-3). Runs in BOTH harnesses,
+        # because pr_render_gate.py drives this same capture_page.
+        if mobile_first_load:
+            for f in mobile_first_load_check(context, f"{SITE_URL}{path}", path):
+                issues.append(f)
+
         # ── chrome @ 360px: the app-bar is tightest here (#1003 verified at 360) ──
         page.set_viewport_size({"width": 360, "height": 800})
         page.wait_for_timeout(200)
