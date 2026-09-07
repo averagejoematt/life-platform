@@ -7,11 +7,21 @@ is where new alarm surface lands. Both alarms watch the coach-prediction-
 evaluator's LifePlatform/Predictions namespace and route to the digest topic.
 """
 
+import sys
+from pathlib import Path
+
 from aws_cdk import (
     Duration,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
 )
+
+# #3553: the dead-man's name, metric names, expression and window come from the module
+# the Lambda emits with, not from four literals typed a second time here — the same
+# sys.path idiom ingestion_stack.py uses for source_registry. commitment_grading is
+# boto3-free by construction precisely so this import is cheap and safe at synth time.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
+from coach import commitment_grading  # noqa: E402
 
 _GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 _LT = cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD
@@ -88,3 +98,74 @@ def add_prediction_alarms(scope, digest) -> None:
         treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
     )
     share_low.add_alarm_action(cw_actions.SnsAction(digest))
+
+
+def add_commitment_alarms(scope, digest) -> None:
+    """#3553: the dead-man on the follow-through ledger.
+
+    The #532 commitment ledger ran for its ENTIRE LIFE — cycles 5 through 17, 503
+    records, 52 of them past a due date they had a deterministic check for — and
+    returned 0 kept / 0 broken. The evaluator logged `Commitment stats: kept=0
+    broken=0` on every run for 21 straight days and nothing read the line: no alarm, no
+    test, no page. That is the whole failure. The grading bugs were fixable in an
+    afternoon; the reason they lasted four months is that the instrument had no reader.
+
+    So this alarm reads the two numbers together. `CommitmentsDueCheckable` is the
+    denominator (there was gradeable work) and `CommitmentsGraded` is the numerator (a
+    verdict came out). ALARM when there was work and no verdict, for DEADMAN_DAYS
+    consecutive daily periods.
+
+    Neither half alone would have caught this. `graded == 0` on its own fires on a
+    legitimately quiet fortnight — the ledger is allowed to have nothing due. `due > 0`
+    on its own fires on a perfectly healthy backlog. It is the CONJUNCTION that says
+    "work arrived and the grader produced nothing", which is the sentence the live
+    defect would have set off on day 14 of 120.
+
+    treat_missing_data=BREACHING, deliberately: an evaluator that stops running emits
+    neither metric, and a dead grader is the failure this exists to catch — the same
+    posture as grading-stalled's gauge, and the opposite of prediction-gradable-share-
+    low (whose absence is already covered by that gauge). Digest-routed, not paging:
+    a stalled ledger is a next-morning problem.
+
+    The expression and the window are `commitment_grading`'s own constants, so the
+    alarm and the Python predicate `deadman_breached()` cannot drift into meaning
+    different things — tests/test_commitment_grading_3553.py drives BOTH against one
+    truth table.
+    """
+    period = Duration.seconds(86400)
+    ungraded = cloudwatch.Alarm(
+        scope,
+        "CommitmentsUngraded",
+        # A LITERAL, deliberately. `deploy/alarm_discovery.py` resolves alarm NAMES by
+        # static AST and an attribute reference is invisible to it, so an alarm declared
+        # by constant is COUNTED but never NAMED — and the name set silently diverges
+        # from the count (tests/test_sync_doc_metadata_check.py). The literal is held
+        # equal to commitment_grading.DEADMAN_ALARM_NAME by
+        # tests/test_commitment_grading_3553.py, so the two cannot drift.
+        alarm_name="commitments-ungraded",
+        metric=cloudwatch.MathExpression(
+            expression=commitment_grading.DEADMAN_EXPRESSION,
+            label="commitments due but ungraded",
+            using_metrics={
+                "due": cloudwatch.Metric(
+                    namespace=commitment_grading.DEADMAN_NAMESPACE,
+                    metric_name=commitment_grading.DEADMAN_METRIC_DUE,
+                    period=period,
+                    statistic="Maximum",
+                ),
+                "graded": cloudwatch.Metric(
+                    namespace=commitment_grading.DEADMAN_NAMESPACE,
+                    metric_name=commitment_grading.DEADMAN_METRIC_GRADED,
+                    period=period,
+                    statistic="Sum",
+                ),
+            },
+            period=period,
+        ),
+        evaluation_periods=commitment_grading.DEADMAN_DAYS,
+        datapoints_to_alarm=commitment_grading.DEADMAN_DAYS,
+        threshold=1,
+        comparison_operator=_GTE,
+        treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+    )
+    ungraded.add_alarm_action(cw_actions.SnsAction(digest))
