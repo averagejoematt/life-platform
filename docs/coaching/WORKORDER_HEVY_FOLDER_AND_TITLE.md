@@ -145,7 +145,7 @@ is wrong. The `manage_hevy_routine` description now says both are draft-time onl
 | | |
 |---|---|
 | `config/training_phases.json` `current_started` | `2026-06-16` (N anchor) |
-| `config/training_phases.json` `reset_epoch_date` | `2026-06-16` (Y anchor) |
+| `config/training_phases.json` `reset_epoch_date` | `2026-06-16` (Y anchor — field deleted 2026-09-07, #3671) |
 | `EXPERIMENT_START_DATE` | `2026-09-06` (cycle-17 genesis) |
 
 `deploy/restart_pipeline.py` never references this file, so both anchors survived eleven
@@ -157,12 +157,18 @@ anchor 2026-06-16: distinct performed=10 (Y=11)  push=2 (N=3)   <- the observed 
 anchor 2026-09-06: distinct performed=0  (Y=1)   push=0 (N=1)
 ```
 
-This PR hand re-anchors **`reset_epoch_date` only** to `2026-09-06`. `current`/`current_started`
+This PR hand re-anchored **`reset_epoch_date` only** to `2026-09-06`. `current`/`current_started`
 are deliberately untouched: the phase advances only when Matthew says so, and only the
 experiment counter Y zeroes on a reset. The next title therefore reads
-**`Foundation - Push - 3 - 1`**, not `- 1 - 1` — N stays anchored to the phase. **#3671** owns
-the durable fix (derive the anchor from `EXPERIMENT_START_DATE`, or give the reset ownership of
-the config anchors), and makes this hand edit unnecessary.
+**`Foundation - Push - 3 - 1`**, not `- 1 - 1` — N stays anchored to the phase.
+
+> **Superseded 2026-09-07 (#3671).** The hand edit above was **inert**: `build_bundle.py` does
+> not stage `training_phases.json`, so `load_phase_state()` falls through to the **S3** copy,
+> which still read `2026-06-16`. Editing the repo copy never moved the live counter. The Y
+> anchor is now DERIVED from `EXPERIMENT_START_DATE` and the `reset_epoch_date` field is
+> deleted from the config entirely — see the ADR-088 amendment in `docs/DECISIONS.md` and
+> `tests/test_routine_title_y_anchor_3671.py`. The lesson worth keeping: when a config is read
+> from S3 rather than the bundle, a repo-side "fix" verifies nothing.
 
 **Also corrected in passing:** `_action_archive` said it did a "rename + folder-move". Hevy's
 `folder_id` is create-only and `to_update_body` omits it, so the move never reached the wire.
