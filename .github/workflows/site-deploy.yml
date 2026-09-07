@@ -179,10 +179,16 @@ jobs:
       # ci_pins.py (CQ-01). The config-twin step below used to install boto3 for itself —
       # same pins, moved up so the whole build shares one declared set. Guarded by
       # scripts/ci_dark_flag_sweep.py.
-      - name: Install build-path dependencies (boto3, botocore, pillow)
+      - name: Install build-path dependencies (boto3, botocore, pillow, pyyaml)
         if: steps.supersede.outputs.superseded != 'true'
         run: |
-          PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow)
+          # pyyaml added #3691: scripts/build_platform_state.py runs gate_census.py for
+          # its `quality` section, and the census parses the workflow YAML. Without it
+          # the census produced no JSON and the section degraded to
+          # `JSONDecodeError` on the first real deploy. Other workflows carry this as a
+          # separate "Install census dependency (PyYAML)" step; folded into the existing
+          # pinned set here rather than adding a second install.
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow pyyaml)
           pip install --quiet $PINS
 
       # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
@@ -196,6 +202,14 @@ jobs:
 
       - name: Deploy public site (canonical path)
         if: steps.supersede.outputs.superseded != 'true'
+        env:
+          # #3691: `gh` refuses to run in Actions without a token — "To use GitHub CLI in
+          # a GitHub Actions workflow, set the GH_TOKEN environment variable". The build
+          # readout's board/delivery/bets/jury_out sections all read the backlog through
+          # `gh`, and on the first real deploy all four degraded to that message. Read-only
+          # scopes are all this needs: the default GITHUB_TOKEN can list issues and PRs in
+          # its own repo.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "═══ Deploying public site from merged main (${GITHUB_SHA:0:7}) ═══"
           # deploy_site.sh = validate → sync_site_to_s3.sh (clobber guard, shell

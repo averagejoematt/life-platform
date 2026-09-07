@@ -299,7 +299,7 @@ def build_quality() -> dict:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
             path = tmp.name
         try:
-            subprocess.run(
+            proc = subprocess.run(
                 [sys.executable, "scripts/gate_census.py", "--json", path],
                 cwd=ROOT,
                 capture_output=True,
@@ -307,6 +307,15 @@ def build_quality() -> dict:
                 timeout=600,
                 check=False,
             )
+            # Report the census's OWN failure, not the JSONDecodeError that follows it.
+            # On the first real deploy this section degraded to
+            # "JSONDecodeError: Expecting value: line 1 column 1" — true, useless, and
+            # three steps downstream of the actual cause (PyYAML absent in the site-deploy
+            # runner). An error that names the symptom instead of the cause is the same
+            # defect this whole artifact exists to avoid, one level down.
+            if proc.returncode != 0 or not os.path.getsize(path):
+                tail = ((proc.stderr or proc.stdout or "").strip().splitlines() or ["no output"])[-1]
+                raise RuntimeError(f"gate_census.py exited {proc.returncode}: {tail[:300]}")
             census = json.load(open(path))
         finally:
             os.unlink(path)
