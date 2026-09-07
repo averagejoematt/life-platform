@@ -577,6 +577,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_visual_ai_qa.py",
         "test_visual_qa_units.py",
         "test_webkit_weekly_qa.py",
+        # #3548: an os.walk sweep of site/**/*.html for the retired <article
+        # data-dx-read> tabpanel host (aria-allowed-role) plus a source-string
+        # check that the two generators (v4_build_coaching.py/v4_build_dispatches.py)
+        # never re-emit it. Pure repo shape, same idiom as test_no_tool_attribution_3005.py
+        # — a PR that reintroduces the pattern must red BEFORE merge, not after the
+        # site auto-deploys on it.
+        "test_a11y_ledger_3548.py",
     }
 )
 

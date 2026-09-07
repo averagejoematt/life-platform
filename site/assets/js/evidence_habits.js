@@ -267,7 +267,9 @@ export async function renderHabits(d) {
   if (habits.length) {
     const order = groups.length ? groups : [...new Set(habits.map((h) => h.group || "Other"))];
     const _perBy = {}; for (const ph of d.per_habit || []) _perBy[ph.name] = ph;
-    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="hb-dotcell">${habitDotStrip((_perBy[h.name] || {}).days)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
+    // #3548: h3, not h4 — this list sits directly under this section's own h2
+    // (sec() below), so an h4 here skipped a level (heading-order, moderate).
+    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h3 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h3><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="hb-dotcell">${habitDotStrip((_perBy[h.name] || {}).days)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
     const _dw = d.days_window || {};
     const _stripNote = _dw.n_days
       ? ` The dot strip is day-by-day over the cycle — up to 30 days, clamped to the cycle start (${_dw.n_days < 30 ? `${fmt(_dw.n_days)} day${_dw.n_days > 1 ? "s" : ""} so far — a short strip is the honest strip, never padded with pre-cycle days` : "the full 30-day window"}): ember dot = kept · ink dot = missed (never red) · outline = not scheduled · dash = no data captured.`

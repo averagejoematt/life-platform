@@ -963,6 +963,73 @@
         "label": "not_yet_skillful",
         "score": 45
       }
+    },
+    {
+      "id": "brier_skill_ulp_tie",
+      "description": "#3644: this Brier-skill sum lands on an exact 4-dp tie (-3.08625) where naive left-to-right float summation and math.fsum's correctly-rounded sum disagree by one ulp and round in OPPOSITE directions \u2014 a positive control pinned ON the tie, not moved off it. Both implementations must sum with the SAME rule (math.fsum / neumaierSum) to agree here.",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.2,
+          1
+        ],
+        [
+          0.2,
+          1
+        ],
+        [
+          0.3,
+          1
+        ],
+        [
+          0.2,
+          1
+        ],
+        [
+          0.25,
+          1
+        ],
+        [
+          0.3,
+          1
+        ],
+        [
+          0.2,
+          0
+        ]
+      ],
+      "expected": {
+        "n": 7,
+        "confirmed": 6,
+        "refuted": 1,
+        "accuracy_pct": 85.7,
+        "accuracy_ci95": [
+          48.7,
+          97.4
+        ],
+        "brier": 0.5004,
+        "brier_skill": -3.0863,
+        "skilled": false,
+        "reliability_bins": [
+          {
+            "lo": 0.2,
+            "hi": 0.3,
+            "n": 5,
+            "mean_confidence": 0.21,
+            "observed_rate": 0.8
+          },
+          {
+            "lo": 0.3,
+            "hi": 0.4,
+            "n": 2,
+            "mean_confidence": 0.3,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "under-confident",
+        "label": "not_yet_skillful",
+        "score": 45
+      }
     }
   ],
   "strata_cases": [
@@ -2152,7 +2219,7 @@
     },
     {
       "id": "under_confident_worst_stratum",
-      "description": "the worst-|gap| stratum is under-confident while the pool is not",
+      "description": "the worst-|gap| stratum is under-confident while the pool is not \u2014 [0.25, 1] in slot 5 lands the stratum's own skill on the #3644 4-dp tie (-3.08625), pinned here as a positive control now that both implementations share one summation rule",
       "n_bins": 10,
       "strata": {
         "hedgers": [
@@ -2173,7 +2240,7 @@
             1
           ],
           [
-            0.2,
+            0.25,
             1
           ],
           [
@@ -2349,15 +2416,15 @@
           66.2,
           89.1
         ],
-        "brier": 0.22,
-        "brier_skill": -0.3802,
+        "brier": 0.2183,
+        "brier_skill": -0.3694,
         "skilled": false,
         "reliability_bins": [
           {
             "lo": 0.2,
             "hi": 0.3,
             "n": 5,
-            "mean_confidence": 0.2,
+            "mean_confidence": 0.21,
             "observed_rate": 0.8
           },
           {
@@ -2379,20 +2446,20 @@
         "label": "not_yet_skillful",
         "score": 45,
         "skill_reference": "stratified",
-        "reliability_gap": -0.089,
+        "reliability_gap": -0.088,
         "worst_stratum_gap": {
           "stratum": "hedgers",
-          "gap": -0.629
+          "gap": -0.621
         },
         "strata": {
           "hedgers": {
             "n": 7,
             "confirmed": 6,
-            "brier": 0.5114,
-            "brier_skill": -3.1767,
+            "brier": 0.5004,
+            "brier_skill": -3.0863,
             "skilled": false,
             "calibration": "under-confident",
-            "reliability_gap": -0.629,
+            "reliability_gap": -0.621,
             "base_rate": 0.857
           },
           "steady": {

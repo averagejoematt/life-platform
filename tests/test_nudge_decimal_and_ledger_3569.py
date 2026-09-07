@@ -324,11 +324,14 @@ class _Check:
 
 
 class _LedgerTable:
-    """Query answers the ledger partition; get_item answers the NUDGE# store."""
+    """Query answers the ledger partition; get_item answers the NUDGE# store;
+    put_item records the #3651 reap write (and can be told to fail it)."""
 
-    def __init__(self, ledger_rows, records=None):
+    def __init__(self, ledger_rows, records=None, fail_puts=False):
         self.ledger_rows = list(ledger_rows)
         self.records = {(r["pk"], r["sk"]): r for r in (records or [])}
+        self.fail_puts = fail_puts
+        self.puts = []
 
     def query(self, **kwargs):
         return {"Items": list(self.ledger_rows)}
@@ -336,6 +339,11 @@ class _LedgerTable:
     def get_item(self, Key):  # noqa: N803
         item = self.records.get((Key["pk"], Key["sk"]))
         return {"Item": item} if item else {}
+
+    def put_item(self, Item):  # noqa: N803
+        if self.fail_puts:
+            raise RuntimeError("ProvisionedThroughputExceededException")
+        self.puts.append(dict(Item))
 
 
 def _iso_z(dt):
@@ -364,22 +372,69 @@ def _run(table):
     return check
 
 
-def test_dead_man_reds_on_a_row_stuck_at_attempting(monkeypatch):
+def test_dead_man_reaps_a_row_stuck_at_attempting(monkeypatch):
+    """#3651: the must-fail-then-pass proof — a reservation stuck past the bar
+    is claimed by the reaper on the SAME run that finds it, not left red for a
+    human. Green with the reap named, and the ledger actually received the
+    expired-status write."""
     stuck = _row(2, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(2)}T15:10:29Z", graded=True)
-    check = _run(_LedgerTable([stuck]))
+    table = _LedgerTable([stuck])
+    check = _run(table)
+    assert check.passed is True, check.message
+    assert "reaped to 'expired'" in check.message
+    assert _day(2) in check.message
+    assert len(table.puts) == 1
+    put = table.puts[0]
+    assert put["pk"] == eng.LEDGER_PK and put["sk"] == f"{eng.LEDGER_SK_PREFIX}{_day(2)}"
+    assert put["status"] == eng.STATUS_EXPIRED
+    assert "#3651" in put["error"]
+    assert put["graded"] is True
+
+
+def test_dead_man_reaps_the_four_live_pre_fix_rows_with_no_explicit_timestamp():
+    """The exact live shape at filing time: reservations with NO explicit
+    `attempted_at`. The sk-date fallback still ages them (understated, never
+    overstated), so the reaper is not blind to the very rows that motivated the
+    original dead-man — and now claims them instead of only reporting them."""
+    rows = [_row(n, eng.STATUS_ATTEMPTING, graded=True) for n in (2, 3, 4)]
+    table = _LedgerTable(rows)
+    check = _run(table)
+    assert check.passed is True, check.message
+    assert "3 stuck reservation(s) reaped" in check.message
+    assert len(table.puts) == 3
+    assert all(p["status"] == eng.STATUS_EXPIRED for p in table.puts)
+
+
+def test_dead_man_does_not_reap_a_truly_undateable_row():
+    """Conservative by construction: a row whose sk day string itself cannot be
+    parsed returns age=None (genuine data corruption, not merely 'no stamp yet')
+    and must never be reaped on a guess — it stays reported as stuck."""
+    corrupt = {
+        "pk": eng.LEDGER_PK,
+        "sk": f"{eng.LEDGER_SK_PREFIX}not-a-date",
+        "record_type": "coach_nudge_ledger",
+        "status": eng.STATUS_ATTEMPTING,
+        "coach_id": "training_coach",
+        "graded": True,
+    }
+    table = _LedgerTable([corrupt])
+    check = _run(table)
+    assert check.passed is False
+    assert "undateable" in check.message
+    assert table.puts == []
+
+
+def test_dead_man_falls_back_to_reporting_when_the_reap_write_itself_fails():
+    """Reaping degrades to the pre-#3651 report, never to silence: if the
+    fail-soft put_item raises, the row must still surface as stuck, named, with
+    the reap failure visible in the message."""
+    stuck = _row(2, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(2)}T15:10:29Z", graded=True)
+    table = _LedgerTable([stuck], fail_puts=True)
+    check = _run(table)
     assert check.passed is False
     assert "stuck at 'attempting'" in check.message
+    assert "reap failed" in check.message
     assert _day(2) in check.message
-
-
-def test_dead_man_reds_on_the_four_live_undateable_pre_fix_rows():
-    """The exact live shape at filing time: reservations with NO timestamp at
-    all. The sk-date fallback still ages them, so the check is not blind to the
-    very rows that motivated it."""
-    rows = [_row(n, eng.STATUS_ATTEMPTING, graded=True) for n in (2, 3, 4)]
-    check = _run(_LedgerTable(rows))
-    assert check.passed is False
-    assert "3 reservation(s) stuck" in check.message
 
 
 def test_dead_man_reds_when_a_send_produced_no_nudge_record():

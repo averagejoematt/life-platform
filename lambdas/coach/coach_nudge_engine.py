@@ -64,12 +64,20 @@ STATUS_SENT = "sent"
 STATUS_BLOCKED = "blocked"  # failed a gate — audit-logged, never delivered
 # #3569: the day was reserved but the record could not be persisted. The shell's
 # `_reserve_day` stamps the reservation `attempting`, and it MUST end at one of
-# the three terminal statuses below — a row left at `attempting` is a silent
+# the four terminal statuses below — a row left at `attempting` is a silent
 # loss, which is exactly how three float rejections sat undetected for 25 days
 # while all four ledger days read "attempting" and zero NUDGE# rows existed.
 STATUS_FAILED = "failed"
 STATUS_ATTEMPTING = "attempting"
-TERMINAL_STATUSES = (STATUS_SENT, STATUS_BLOCKED, STATUS_FAILED)
+# #3651: the disposition a STUCK reservation (attempting past the dead-man's
+# STUCK_HOURS, with no `_finalize` ever having run) is reaped INTO — distinct
+# from `failed`, which means "a write raised and was caught". An `expired` row
+# was never told anything failed; the run that reserved the day simply never
+# came back. Reaping is what keeps `nudge_ledger_qa.check_nudge_ledger_liveness`
+# able to reach a clean board on its own: without a terminal disposition, a
+# stuck row is a permanent red only a human edit can clear (#3651's own filing).
+STATUS_EXPIRED = "expired"
+TERMINAL_STATUSES = (STATUS_SENT, STATUS_BLOCKED, STATUS_FAILED, STATUS_EXPIRED)
 # The two statuses that assert "a nudge record was written": the ledger points at
 # a NUDGE# item that must exist. `failed` deliberately does NOT — that row exists
 # precisely because the record could not be written.
@@ -544,6 +552,36 @@ def build_failed_ledger_item(date_pt: str, nudge_item: dict, error: str, now_utc
         "nudge_sk": nudge_item.get("sk"),
         "attempted_at": _iso_z(now_utc),
         "error": str(error)[:500],
+        "graded": True,  # nothing to grade — the record never landed
+    }
+
+
+def build_expired_ledger_item(row: dict, now_utc: datetime, stuck_hours: float, age_hours: Optional[float] = None) -> dict:
+    """#3651 — the ledger row a REAPED stuck reservation becomes.
+
+    `nudge_ledger_qa.check_nudge_ledger_liveness` finds this row already past
+    ``stuck_hours`` at ``status=attempting`` with no ``_finalize`` ever having
+    run (the run that reserved the day is gone — a crash, a timeout, a deploy
+    mid-invocation). Left alone that row is a PERMANENT red: `graded=True` means
+    the Pacific day it names can never be re-evaluated, and nothing but a human
+    DDB edit would ever move it off `attempting`. This overwrites it in place
+    (same pk/sk — an idempotent conditional-free put, safe to retry) with a
+    genuine fourth terminal status distinct from `failed`: this reservation was
+    never told anything failed, it simply never came back. `error` names the
+    reap explicitly so the episode stays legible in the row itself, not just in
+    a log line that ages out.
+    """
+    age_desc = "undateable" if age_hours is None else f"{age_hours:.0f}h"
+    return {
+        "pk": row["pk"],
+        "sk": row["sk"],
+        "record_type": "coach_nudge_ledger",
+        "status": STATUS_EXPIRED,
+        "trigger_type": row.get("trigger_type"),
+        "coach_id": row.get("coach_id"),
+        "attempted_at": row.get("attempted_at"),
+        "expired_at": _iso_z(now_utc),
+        "error": f"reaped: stuck at '{STATUS_ATTEMPTING}' {age_desc} (> {stuck_hours}h bar), no path to a terminal status (#3651)",
         "graded": True,  # nothing to grade — the record never landed
     }
 

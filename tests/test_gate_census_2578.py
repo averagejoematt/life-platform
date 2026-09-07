@@ -549,7 +549,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # `test_derived_scan_is_live_and_its_exemptions_are_not_stale` reds naming the selector. Two of the nine
         # were additionally watched as whole-file mutations of the real working tree (`.wf-arrow` direction a,
         # `.wf-sep` direction b), each red at exit 1 and reverted to 38 passed.
-        <= 88  # re-measured 2026-09-06 on the MERGED tree: 79 -> 88 proven, unproven unchanged at 537
+        # Upper bound raised 88 -> 89 (2026-09-07, #3548/#3676): the 89th proof is
+        # `structural::test_a11y_ledger_3548.py` — STRUCTURAL_HAND_PROOFS in
+        # scripts/gate_census_proofs.py, mutation-backed against a real historical specimen:
+        # site/coaching/read/index.html's `<div data-dx-read>` reverted in place to the
+        # pre-#3548 `<article data-dx-read>` (the retired tabpanel-host shape all 18 dx-read
+        # hosts carried). Watched RED: test_no_dx_read_panel_is_an_article failed naming the
+        # file. REVERTED: 11 passed.
+        <= 89  # re-measured 2026-09-07 on the MERGED tree: 88 -> 89 proven, unproven 537 -> 538 (one new gate ledgered by design, not proven — see tests/gate_census_unproven_residue.py)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
