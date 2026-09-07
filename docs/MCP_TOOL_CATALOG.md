@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-04
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-07
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-04 | **Total tools:** 76
+**Version:** v8.6.0 | **Last updated:** 2026-09-07 | **Total tools:** 81
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -16,7 +16,7 @@
 
 ---
 
-## All 76 Tools — by module
+## All 81 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -47,6 +47,8 @@
 | `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
+| `mcp/tools_surfaces.py` | 2 |
+| `mcp/tools_platform.py` | 3 |
 
 ### Training Notes (`mcp/tools_training_notes.py`)
 
@@ -258,6 +260,21 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_coach_correction` | item_number, correction, error_class= | #1690 (epic #1687): correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class, so the mistake compounds toward not recurring. Args: item_number (the #N, required), correction (what's wrong + what it should say, required), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. |
+
+### mcp.tools_surfaces (`mcp/tools_surfaces.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `describe_platform_surfaces` | keyword=, include_excluded=, detail=, limit= | THE INDEX — call this FIRST whenever you are about to say the platform does not hold something. Lists every platform surface (derived from the site API's own route table, so it is never stale) with, per surface: the plain-English question it answers, its parameters, an example phrasing, AND the rule it applies — the phase filter ('experiment-only' hides phase=pilot pre-genesis/prior-cycle rows; 'includes-pilot' does not), the date basis (Pacific day vs UTC), and whether row provenance (live capture vs backfill) is distinguished at all. Read default_filter BEFORE reporting an empty result: on an experiment-only surface, empty means EXCLUDED BY A RULE, not 'never recorded'. Reader-only surfaces are listed with the reason they are excluded, because 'exists but not for you' is a different answer from 'no such surface'. |
+| `get_platform_surface` | name, params=, question=, explain_against= | THE WAITER — fetch any surface named by describe_platform_surfaces (e.g. 'hypotheses', 'receipts', 'nutrition_overview', 'correlations', 'state_of_matthew', 'last_sync', 'phenoage'). Read-only. EVERY response carries `rule` — the phase filter, date basis and provenance rule that produced the payload — so a technically-correct answer can be INTERPRETED instead of guessed at. Pass explain_against='<other surface>' when two surfaces seem to contradict each other: it returns whether the difference is explained by their differing rules, or is a real disagreement. A request no surface can answer is recorded to the durable miss log and reported as 'no surface exposes this' — never as 'the platform does not hold it'. |
+
+### mcp.tools_platform (`mcp/tools_platform.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_experiment_cycle` | date= | Which experiment CYCLE is running, its genesis date, which DAY of it today is, and the phase (experiment vs pilot). This is the authoritative answer — it returns experiment_stamp()'s cycle (CYCLE_GENESES-derived), never a fresh derivation, and reports the SSM cross-check alongside it. Use for 'what cycle are we on?', 'what day of the experiment is it?', 'when did this cycle start?', and before quoting any cycle number from memory or from a document — cycle numbers move weekly and a correct-when-written number goes stale silently. |
+| `get_habit_completion` | include_registry= | How the habits are going: today's completion, per-habit streaks, and the DATE RULE behind both. Use for 'how are my habits going?', 'what streaks am I on?', 'did I hit my habits today?'. A zero here is annotated with the date basis and phase filter that produced it — habit rows written against the adjacent calendar day have read as '0 of 61 completed' before. |
+| `get_platform_cost` | skip_inference= | What the platform is costing: the budget envelope (ceiling, spend to date, projected month-end, budget tier) plus the AI inference receipt broken down by feature and model. Use for 'what is this costing me?', 'what did the AI spend go to?', 'are we near the ceiling?'. These are the platform's own accounting surfaces, not a live Cost Explorer query — the projection is a forecast. |
 
 ---
 

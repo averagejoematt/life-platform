@@ -64,7 +64,12 @@ from mcp.tools_memory import (
     tool_read_platform_memory,
     tool_write_platform_memory,
 )
+from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
+
+# #3668: the three hot-path named tools (cycle / habits / cost) over the same waiter
+# machinery the index uses — never a second copy of the rule declaration.
+from mcp.tools_platform import tool_get_experiment_cycle, tool_get_habit_completion, tool_get_platform_cost
 from mcp.tools_reading import (
     tool_archive_horizon,
     tool_curate_horizon,
@@ -81,9 +86,12 @@ from mcp.tools_reading import (
 from mcp.tools_sick_days import tool_manage_sick_days
 from mcp.tools_social import tool_get_social_dashboard
 from mcp.tools_social_connection import tool_get_social_connection_trend  # lifted out of tools_lifestyle by #2221
+from mcp.tools_strength import tool_get_muscle_volume
 
 # tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
-from mcp.tools_strength import tool_get_muscle_volume
+# #3668: the derived surface index + the waiter. Two tools, full coverage, and the
+# MCP_TOOL_AUDIT tool-count discipline preserved (59 endpoints, not 59 new tools).
+from mcp.tools_surfaces import tool_describe_platform_surfaces, tool_get_platform_surface
 from mcp.tools_todoist import close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
 from mcp.tools_training_notes import tool_get_exercise_notes
@@ -2353,68 +2361,124 @@ TOOLS = {
             },
         },
     },
+    # ── #3668: the surface index, the waiter, and the three hot-path named tools ──
+    "describe_platform_surfaces": {
+        "fn": tool_describe_platform_surfaces,
+        "schema": {
+            "name": "describe_platform_surfaces",
+            "description": (
+                "THE INDEX — call this FIRST whenever you are about to say the platform does not hold something. Lists every "
+                "platform surface (derived from the site API's own route table, so it is never stale) with, per surface: the "
+                "plain-English question it answers, its parameters, an example phrasing, AND the rule it applies — the phase "
+                "filter ('experiment-only' hides phase=pilot pre-genesis/prior-cycle rows; 'includes-pilot' does not), the date "
+                "basis (Pacific day vs UTC), and whether row provenance (live capture vs backfill) is distinguished at all. Read "
+                "default_filter BEFORE reporting an empty result: on an experiment-only surface, empty means EXCLUDED BY A RULE, "
+                "not 'never recorded'. Reader-only surfaces are listed with the reason they are excluded, because 'exists but not "
+                "for you' is a different answer from 'no such surface'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "description": "Substring filter over surface name / question / example phrasing."},
+                    "include_excluded": {"type": "boolean", "description": "Also list reader-only surfaces + their exclusion reasons."},
+                    "detail": {"type": "boolean", "description": "Include the derivation chain and phase-read counts behind each rule."},
+                    "limit": {"type": "integer", "description": "Max surfaces to return (default 200, cap 300)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_platform_surface": {
+        "fn": tool_get_platform_surface,
+        "schema": {
+            "name": "get_platform_surface",
+            "description": (
+                "THE WAITER — fetch any surface named by describe_platform_surfaces (e.g. 'hypotheses', 'receipts', "
+                "'nutrition_overview', 'correlations', 'state_of_matthew', 'last_sync', 'phenoage'). Read-only. EVERY response "
+                "carries `rule` — the phase filter, date basis and provenance rule that produced the payload — so a "
+                "technically-correct answer can be INTERPRETED instead of guessed at. Pass explain_against='<other surface>' when "
+                "two surfaces seem to contradict each other: it returns whether the difference is explained by their differing "
+                "rules, or is a real disagreement. A request no surface can answer is recorded to the durable miss log and "
+                "reported as 'no surface exposes this' — never as 'the platform does not hold it'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Surface name from describe_platform_surfaces ('/api/...' also accepted)."},
+                    "params": {"type": "object", "description": "Query parameters for the surface (see its `params` in the index)."},
+                    "question": {"type": "string", "description": "The question you are answering — recorded verbatim if this is a miss."},
+                    "explain_against": {"type": "string", "description": "A second surface name; reconciles the two surfaces' rules."},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    "get_experiment_cycle": {
+        "fn": tool_get_experiment_cycle,
+        "schema": {
+            "name": "get_experiment_cycle",
+            "description": (
+                "Which experiment CYCLE is running, its genesis date, which DAY of it today is, and the phase (experiment vs "
+                "pilot). This is the authoritative answer — it returns experiment_stamp()'s cycle (CYCLE_GENESES-derived), never "
+                "a fresh derivation, and reports the SSM cross-check alongside it. Use for 'what cycle are we on?', 'what day of "
+                "the experiment is it?', 'when did this cycle start?', and before quoting any cycle number from memory or from a "
+                "document — cycle numbers move weekly and a correct-when-written number goes stale silently."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "YYYY-MM-DD — which cycle a past date belonged to. Default: today (PT)."}
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_habit_completion": {
+        "fn": tool_get_habit_completion,
+        "schema": {
+            "name": "get_habit_completion",
+            "description": (
+                "How the habits are going: today's completion, per-habit streaks, and the DATE RULE behind both. Use for 'how are "
+                "my habits going?', 'what streaks am I on?', 'did I hit my habits today?'. A zero here is annotated with the date "
+                "basis and phase filter that produced it — habit rows written against the adjacent calendar day have read as "
+                "'0 of 61 completed' before."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"include_registry": {"type": "boolean", "description": "Also return the full tracked-habit registry."}},
+                "required": [],
+            },
+        },
+    },
+    "get_platform_cost": {
+        "fn": tool_get_platform_cost,
+        "schema": {
+            "name": "get_platform_cost",
+            "description": (
+                "What the platform is costing: the budget envelope (ceiling, spend to date, projected month-end, budget tier) "
+                "plus the AI inference receipt broken down by feature and model. Use for 'what is this costing me?', 'what did "
+                "the AI spend go to?', 'are we near the ceiling?'. These are the platform's own accounting surfaces, not a live "
+                "Cost Explorer query — the projection is a forecast."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "skip_inference": {"type": "boolean", "description": "Return only the budget envelope, skip the AI receipt."}
+                },
+                "required": [],
+            },
+        },
+    },
 }
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Phase 4.9 (2026-05-16): list_available_tools — meta-tool implementation
-# ═══════════════════════════════════════════════════════════════════════════
-
-
+# Phase 4.9 (2026-05-16): list_available_tools — meta-tool implementation.
+# #3668: the body moved to the cohesive sibling mcp/tools_meta.py (every other tool
+# implementation already lives in a tools_* module; this table is the dispatch table).
+# TOOLS is passed in rather than imported there, so there is no import cycle.
 def tool_list_available_tools(args=None):
-    """List MCP tools, optionally filtered by domain (module short-name) or
-    keyword (substring of tool name or description). Returns at most `limit`
-    items, ordered alphabetically.
-
-    #1477: like every other tool in this registry, this takes a single `args`
-    dict — mcp.handler.handle_tools_call dispatches ALL tools positionally
-    (`fn(arguments)`), so a function written with named kwargs instead of a
-    single dict parameter gets the whole arguments dict bound to its first
-    named parameter. This tool was the one place in the registry that broke
-    that convention; every other tool_* function takes `(args)` and reads its
-    fields via `args.get(...)`.
-    """
-    args = args or {}
-    domain = args.get("domain")
-    keyword = args.get("keyword")
-    limit = args.get("limit")
-    if limit is None or limit < 1:
-        limit = 100
-    if limit > 100:
-        limit = 100
-    matches = []
-    kw_lower = (keyword or "").lower().strip()
-    for tool_name, entry in TOOLS.items():
-        fn = entry.get("fn")
-        schema = entry.get("schema", {})
-        description = schema.get("description") or ""
-        module = getattr(fn, "__module__", "") if fn else ""
-        short_module = module.rsplit(".tools_", 1)[-1] if ".tools_" in module else module
-
-        if domain and short_module != domain:
-            continue
-        if kw_lower:
-            haystack = (tool_name + " " + description).lower()
-            if kw_lower not in haystack:
-                continue
-        matches.append(
-            {
-                "name": tool_name,
-                "domain": short_module,
-                "description": description[:200] + ("…" if len(description) > 200 else ""),
-            }
-        )
-
-    matches.sort(key=lambda m: m["name"])
-    return {
-        "total_matching": len(matches),
-        "total_registered": len(TOOLS),
-        "tools": matches[:limit],
-        # #1477: say so explicitly when `limit` cut the list short, so an
-        # honest partial listing never reads like the full inventory.
-        "truncated": len(matches) > limit,
-        "filter": {"domain": domain, "keyword": keyword, "limit": limit},
-    }
+    """List MCP tools by domain or keyword — see mcp/tools_meta.list_registered_tools."""
+    return list_registered_tools(TOOLS, args)
 
 
 # Rebind the placeholder string in the TOOLS dict to the real function now

@@ -266,6 +266,17 @@ def stage_mcp(out_dir):
         os.path.join(out_dir, "mcp"),
         ignore=_ignore,
     )
+    # #3668: mcp/surface_index.py derives its index from site_api_lambda's route tables
+    # using deploy/endpoint_registry.py — the SAME AST walk sync_doc_metadata and
+    # tests/test_api_schema_completeness.py already share (#1436's one-walk rule). Staging
+    # the module at the bundle root is what lets the runtime run that walk instead of a
+    # second copy of it; a duplicated walk is exactly the drift #1436 removed. stdlib-only
+    # (ast/dataclasses/pathlib), so it adds no dependency and passes verify_boot.
+    registry_src = os.path.join(REPO_ROOT, "deploy", "endpoint_registry.py")
+    if os.path.isfile(registry_src):
+        shutil.copy2(registry_src, os.path.join(out_dir, "endpoint_registry.py"))
+    else:
+        print("⚠️  deploy/endpoint_registry.py missing — describe_platform_surfaces will return an empty index", file=sys.stderr)
     return out_dir
 
 
