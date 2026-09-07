@@ -87,16 +87,22 @@ def test_why_note_floor_variant_is_explicit():
 # ── build_title_context: performed-derived N (per-phase) + Y (per reset epoch) ──
 # 2026-06-16 work order: supersedes the 2026-05-31 amendment. N counts PERFORMED
 # workouts of the type since current_started; Y counts distinct performed since
-# reset_epoch_date. Both honest (skipped/planned never inflate).
+# EXPERIMENT_START_DATE. Both honest (skipped/planned never inflate).
+#
+# #3671 (2026-09-07): the Y anchor is DERIVED from constants, not read from the
+# phase config. `reset` is kept as a parameter only so a caller can plant a stale
+# `reset_epoch_date` and prove it is ignored — see the negative control below.
 
 
-def _phase_state(current="Foundation", started="2026-06-16", reset="2026-06-16"):
-    return {
+def _phase_state(current="Foundation", started="2026-06-16", reset=None):
+    state = {
         "phases": ["Foundation", "Build", "Forge", "Sustain"],
         "current": current,
         "current_started": started,
-        "reset_epoch_date": reset,
     }
+    if reset is not None:
+        state["reset_epoch_date"] = reset
+    return state
 
 
 def test_build_context_n_and_y_from_performed():
@@ -113,7 +119,10 @@ def test_build_context_n_and_y_from_performed():
     assert ctx["type_count_in_phase"] == 2
     assert ctx["all_time_count"] == 2
     assert ctx["phase"] == "Foundation"
-    assert ctx["phase_started"] == "2026-06-16" and ctx["reset_epoch"] == "2026-06-16"
+    assert ctx["phase_started"] == "2026-06-16"
+    # Derived, not configured (#3671) — compare against the constant, never a literal,
+    # or this assertion becomes the twelfth thing a reset has to remember to edit.
+    assert ctx["reset_epoch"] == rt.EXPERIMENT_START_DATE
 
 
 def test_build_context_first_of_type_is_n1_but_y_tracks_total():
@@ -137,7 +146,7 @@ def test_build_context_n_resets_on_phase_advance():
     # phase started 2026-08-01; the only performed work is BEFORE that window, so
     # _query_performed(phase_started) returns nothing → N=1. Y uses reset epoch.
     with (
-        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build", started="2026-08-01", reset="2026-06-16")),
+        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build", started="2026-08-01")),
         patch.object(
             rt,
             "_query_performed",

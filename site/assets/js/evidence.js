@@ -233,7 +233,23 @@ const skeletonReadout = () =>
 
 let renderSeq = 0; // rapid topic taps race their async renders — only the latest may paint
 
-async function renderCenter() {
+/* The width below which the topic nav STACKS ABOVE the readout instead of sitting
+   beside it — the same boundary evidence.css switches .ev-layout on
+   (`@media (max-width: 820px)` / `@media (min-width: 821px)`). It is the
+   DESIGN_SYSTEM_V5 §10.1 token 820, spelled exactly: the old literal here was 819,
+   a rogue breakpoint that no CSS rule used and that scripts/check_css_tokens.py
+   could not see because its §10.1 sweep never read JS (#3542 extends it). */
+const NAV_STACKS_MQ = "(max-width: 820px)";
+
+/* #3542 (DES-1): `scrollToTop` is the USER-INITIATED flag. renderCenter used to pull
+   the viewport down to the readout on every mobile render — including the initial
+   route — so on a phone every archive shell scrolled itself past its own hero, intro
+   and tabs on FIRST PAINT with no input at all (measured: /data/physical/ scrollY
+   0 → 1297 between 200ms and 800ms at 390x844), while the page's own orientation copy
+   promised "no page jumps". Only select(slug, push=true) — a tap on a topic tile/tab —
+   passes true. Initial render and popstate never do (the browser owns history scroll
+   restoration). */
+async function renderCenter({ scrollToTop = false } = {}) {
   const my = ++renderSeq;
   const t = BYSLUG[current]; if (!t) return;
   const main = $("[data-main]");
@@ -258,7 +274,7 @@ async function renderCenter() {
   // content there). On desktop the readout sits beside the sticky nav, so a smooth
   // scroll-to-top just fights the user's own scrolling — the "freezing / pulling
   // up" bug. Respect reduced-motion.
-  if (matchMedia("(max-width: 819px)").matches) {
+  if (scrollToTop && matchMedia(NAV_STACKS_MQ).matches) {
     const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
     main.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
   }
@@ -269,7 +285,7 @@ function select(slug, push = true) {
   current = slug;
   if (push) history.pushState({ slug }, "", `${BASE}${slug}/`);
   document.title = `${BYSLUG[slug].title} — The ${DOORTITLE} — averagejoematt`;
-  buildTabs(); buildSide(); renderCenter();
+  buildTabs(); buildSide(); renderCenter({ scrollToTop: push === true });
 }
 window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || slugFromPath() || (LISTED[0] && LISTED[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
 

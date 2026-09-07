@@ -268,7 +268,8 @@ class TestPointTolerance:
 
 def _cache(values, start_day=1):
     recs = [{"date": f"2026-08-{start_day + i:02d}", "recovery_score": v} for i, v in enumerate(values)]
-    return {f"{ev.METRIC_SOURCES['recovery_score']}:{ev.POINT_LOOKBACK_DAYS}": recs}
+    # #3553: the slot is DERIVED (it now carries the end date), never hand-typed.
+    return {ev.source_cache_key(ev.METRIC_SOURCES["recovery_score"], "2026-08-30", ev.POINT_LOOKBACK_DAYS): recs}
 
 
 def _spec(target, tol, target_date):

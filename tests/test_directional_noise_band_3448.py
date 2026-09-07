@@ -38,7 +38,7 @@ def _trend_for(values):
     via a pre-warmed data cache — no DDB, no network."""
     records = [{"date": f"2026-08-{i + 1:02d}", "hrv": v} for i, v in enumerate(values)]
     source = ev.METRIC_SOURCES["hrv"]
-    cache = {f"{source}:30": records}
+    cache = {ev.source_cache_key(source, "2026-08-30", 30): records}  # #3553: derived, never hand-typed
     return ev._get_ewma_trend("hrv", cache, "2026-08-30")
 
 

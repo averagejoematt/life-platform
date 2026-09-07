@@ -102,6 +102,13 @@ class TestConcurrentPartitionFetch:
         assert len(body["by_coach"]) == 8
 
     def test_coach_filter_still_single_fetch(self, monkeypatch):
+        """One coach, one QUERY — still true after #3553.
+
+        That issue first added the seven COMMITMENT# partitions to this same concurrent
+        round, which doubled the fan-out to 16 queries against a 9-worker pool and made
+        THIS file's sibling assertion fail at 0.76s against the 0.70s budget. The fix was
+        not a bigger budget: the follow-through tally is now a daily rollup the grader
+        writes and this handler reads with one GetItem, so the Query count is unchanged."""
         fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": [_full_pred()]})
         monkeypatch.setattr(api, "table", fake)
         body = _body(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}}))

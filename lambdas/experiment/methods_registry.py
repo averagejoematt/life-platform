@@ -602,7 +602,13 @@ REGISTRY = {
         "can be absorbed as flat. Re-derive trigger: once a per-metric trailing-variance "
         "baseline exists over a clean cycle window (the September 2026 n\u226530 read is the "
         "first candidate), the band is derived from it as its own measured change.",
-        "a424d9ff0014",
+        # Re-recorded 2026-09-06 (#3553). The METHOD is unchanged and this prose was
+        # re-read against it: same EWMA formula, same ±2% band, same 9-observation
+        # floor. What moved is the plumbing around it — `_get_ewma_trend` gained an
+        # `include_pilot` pass-through so the commitment grader can read a window that
+        # predates the current genesis, and `_get_source_data`'s cache slot is now
+        # derived by `source_cache_key`. Neither touches the verdict.
+        "56173fb1224f",
         min_n=9,
         used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),

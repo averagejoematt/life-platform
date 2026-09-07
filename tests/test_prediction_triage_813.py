@@ -90,14 +90,14 @@ def _legacy_machine_pred(claim, metric="hrv"):
 
 class TestNullThresholdRescue:
     def test_directional_claim_confirms_on_matching_trend(self, monkeypatch):
-        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t: ("up", 0.05))
+        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t, p=False: ("up", 0.05))
         pred, spec = _legacy_machine_pred("HRV will track directionally upward over the window")
         r = ev._evaluate_machine(pred, spec, {}, "2026-07-08")
         assert r["status"] == "confirmed"
         assert "re-routed to directional" in r["reason"]
 
     def test_directional_claim_refutes_on_opposite_trend(self, monkeypatch):
-        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t: ("down", -0.05))
+        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t, p=False: ("down", -0.05))
         pred, spec = _legacy_machine_pred("recovery score should improve within two weeks", metric="recovery_score")
         r = ev._evaluate_machine(pred, spec, {}, "2026-07-08")
         assert r["status"] == "refuted"
@@ -109,7 +109,7 @@ class TestNullThresholdRescue:
         assert "no inferable direction" in r["reason"]
 
     def test_rescue_does_not_mutate_the_stored_spec(self, monkeypatch):
-        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t: ("up", 0.05))
+        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t, p=False: ("up", 0.05))
         pred, spec = _legacy_machine_pred("HRV should rise")
         ev._evaluate_machine(pred, spec, {}, "2026-07-08")
         assert spec["condition"] == "gt"  # original record untouched
@@ -185,7 +185,7 @@ class TestEvaluateAllEndToEnd:
             "evaluation": {"type": "machine", "metric": "hrv", "condition": "gt", "threshold": None, "evaluation_window_days": 14},
         }
         writes = []
-        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t: trend)
+        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t, p=False: trend)
         monkeypatch.setattr(ev, "_update_prediction_status", lambda p, e: writes.append(("status", e["status"])))
         monkeypatch.setattr(ev, "_update_bayesian_confidence", lambda c, s, u: writes.append(("bayes", u)))
         monkeypatch.setattr(ev, "_write_learning_record", lambda c, t, e: writes.append(("learning", e["status"])))
