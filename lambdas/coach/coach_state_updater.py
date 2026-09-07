@@ -83,9 +83,12 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 from experiment.measurable_metrics import (  # noqa: E402,F401
     MEASURABLE_METRICS,
     METRIC_SOURCES,  # noqa: E402
+    base_metric as _base_metric,  # noqa: E402  (#3553: aggregate suffix -> source lookup key)
     infer_direction as _infer_direction,  # noqa: E402  (#813: shared with the evaluator)
     normalize_metric_hint as _normalize_metric_hint,  # noqa: E402
 )
+
+from coach import commitment_grading  # noqa: E402  (#3553: the follow-through ledger's ONE vocabulary)
 
 
 def _parse_confidence(raw) -> float:
@@ -876,8 +879,12 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
     Returns (created_count, checkable_count).
     """
 
+    from ingestion import source_registry as _sr  # local, per the coach_brief_input_gate idiom
+
     created = 0
     checkable = 0
+    ungradeable = 0
+    liveness_cache: dict = {}
     for c in commitments_made or []:
         text = (c.get("commitment_natural") or "").strip()
         if not text:
@@ -886,11 +893,32 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
         metric = _normalize_metric_hint(raw_metric) or "" if raw_metric else ""
         direction = None
         action_check = None
+        birth_block = None
         if metric:
             direction = _infer_direction(c.get("direction"), text, metric)  # #3551: metric name excluded
             if direction in ("up", "down"):
                 action_check = {"metric": metric, "direction": direction}
-                checkable += 1
+                # #3553 (ADR-104, absence semantics AT BIRTH). A check whose metric is
+                # not being observed is not a check. 37 of the 58 checkable commitments
+                # in the 2026-09-06 census bound to total_protein_g, dark since
+                # 2026-06-24 — every one born "pending", a status that promises a
+                # verdict the evaluator could never return. The check is KEPT on the
+                # record (so the reader can see what it WOULD have been graded on) and
+                # the record is born labelled instead.
+                base = _base_metric(metric)
+                birth_block = commitment_grading.birth_block_reason(
+                    metric,
+                    METRIC_SOURCES.get(base),
+                    _sr.availability_facet(METRIC_SOURCES.get(base) or ""),
+                    _metric_has_recent_data(metric, liveness_cache),
+                    lookback_days=_LIVENESS_LOOKBACK_DAYS,
+                    min_points=_LIVENESS_MIN_POINTS,
+                )
+                if birth_block:
+                    action_check = {"metric": metric, "direction": direction, "gradeable": False}
+                    ungradeable += 1
+                else:
+                    checkable += 1
 
         window_days = _timeframe_to_window_days(c.get("timeframe_hint"))
         try:
@@ -911,16 +939,27 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
             "action_check": action_check,  # {metric, direction} or None (qualitative)
             "window_days": window_days,
             "due_date": due_date,
-            "status": "pending",  # pending -> kept | broken | unresolved
-            "outcome": None,
-            "outcome_date": None,
-            "outcome_notes": None,
+            # pending -> kept | broken | unresolved, unless it is born ungradeable
+            # (#3553): a terminal status at birth, because no data can ever decide it.
+            "status": (commitment_grading.STATUS_UNGRADEABLE if birth_block else commitment_grading.STATUS_PENDING),
+            "outcome": (commitment_grading.STATUS_UNGRADEABLE if birth_block else None),
+            "outcome_date": (generation_date if birth_block else None),
+            "outcome_notes": birth_block,
             "surfaced_to_subject": True,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         if _put_item(record):
             created += 1
-            logger.info("Created COMMITMENT# %s for %s (checkable=%s, due=%s)", commitment_id, coach_id, bool(action_check), due_date)
+            logger.info(
+                "Created COMMITMENT# %s for %s (checkable=%s, due=%s)%s",
+                commitment_id,
+                coach_id,
+                bool(action_check) and not birth_block,
+                due_date,
+                f" — {birth_block}" if birth_block else "",
+            )
+    if ungradeable:
+        logger.info("[#3553] %d commitment(s) born ungradeable this run — labelled, not dropped", ungradeable)
     return created, checkable
 
 

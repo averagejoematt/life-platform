@@ -518,7 +518,10 @@ def _gather_all_state(coach_id):
     due_commitments = [c for c in all_commitments if c.get("status") == "pending" and str(c.get("due_date") or "9999") <= _today_str]
     resolved_commitments = [c for c in all_commitments if c.get("status") in ("kept", "broken")][:5]
     # Follow-through tally — the coach's own kept/broken record (feeds the track record).
-    commitment_record = {"kept": 0, "broken": 0, "unresolved": 0}
+    # #3553: `ungradeable` is its own bucket — a check whose metric was never observed
+    # is an absence of evidence, and telling the coach it was "unresolved" invited it to
+    # narrate a lapse that the data cannot support (ADR-104).
+    commitment_record = {"kept": 0, "broken": 0, "unresolved": 0, "ungradeable": 0}
     for c in all_commitments:
         st = c.get("status")
         if st in commitment_record:
@@ -984,10 +987,19 @@ def _build_user_message(state, coach_id, today):
             )
         _cr = state.get("commitment_record") or {}
         if any(_cr.values()):
-            parts.append(
+            _line = (
                 "Follow-through record so far — "
                 f"kept: {_cr.get('kept', 0)}, broken: {_cr.get('broken', 0)}, unresolved: {_cr.get('unresolved', 0)}."
             )
+            if _cr.get("ungradeable"):
+                # #3553 / ADR-104: name the absence rather than let the coach read it as
+                # a lapse. These checks bound to a metric that was never observed.
+                _line += (
+                    f" A further {_cr['ungradeable']} could not be graded at all — the metric each one"
+                    " checked had no readings in its window. That is a gap in the record, not evidence"
+                    " about Matthew; do not narrate it as a failure to follow through."
+                )
+            parts.append(_line)
         parts.append("")
 
     # Coach memory (2026-06-13): the coach's own resolved track record, so it

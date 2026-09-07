@@ -375,13 +375,21 @@ def test_apply_corrections_retracts_the_relationship_singleton():
 
 def test_commitment_counts_zero_state_is_honest():
     counts = cd.commitment_counts([])
-    assert counts == {"held": 0, "kept": 0, "broken": 0, "pending": 0, "unresolved": 0}
+    assert counts == {"held": 0, "kept": 0, "broken": 0, "pending": 0, "unresolved": 0, "ungradeable": 0}
 
 
 def test_commitment_counts_tally():
     entries = [{"status": "kept"}, {"status": "broken"}, {"status": "pending"}, {"status": "kept"}]
     counts = cd.commitment_counts(entries)
     assert counts["held"] == 4 and counts["kept"] == 2 and counts["broken"] == 1 and counts["pending"] == 1
+
+
+def test_ungradeable_is_its_own_bucket_not_silently_pending():
+    """#3553: `ungradeable` used to fall through the `st if st in counts else "pending"`
+    default, so a record whose metric was never observed was rendered to the reader as a
+    verdict still coming. It never was."""
+    counts = cd.commitment_counts([{"status": "ungradeable"}, {"status": "pending"}])
+    assert counts["ungradeable"] == 1 and counts["pending"] == 1
 
 
 # ══════════════════════════════════════════════════════════════════════════════

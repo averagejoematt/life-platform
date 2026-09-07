@@ -682,16 +682,29 @@ class TestSourceCache:
         ev._get_source_data("whoop", cache, TODAY, lookback_days=7)
         assert len([q for q in table.queries if ":s" in q["ExpressionAttributeValues"]]) == 1
 
-    def test_the_cache_key_ignores_the_end_date_so_a_shared_cache_is_date_blind(self, table):
-        """Documented trap (#534 audit): the key is `{source}:{lookback}` with no
-        date component, so a cache reused across two as-of dates serves the first
-        date's window for both. `_detect_milestone_event` passes a fresh cache per
-        call precisely because of this; any new caller must do the same."""
+    def test_the_cache_key_carries_the_end_date_so_two_as_of_dates_cannot_collide(self, table):
+        """#3553 closes the #534-audit trap rather than documenting it.
+
+        The key used to be `{source}:{lookback}` with no date component, so a cache
+        reused across two as-of dates served the FIRST date's window for both. That
+        was survivable only while every caller passed today; the commitment grader
+        anchors on each record's own due date, so a date-blind key would have graded
+        every commitment in a run against the first one's window."""
         daily_series("hrv", [50.0], table=table)
         cache = {}
-        today_value = ev._resolve_metric_value("hrv", cache, TODAY)
-        yesterday_value = ev._resolve_metric_value("hrv", cache, days_before(9))
-        assert today_value == yesterday_value == 50.0
+        ev._get_source_data("whoop", cache, TODAY, 7)
+        ev._get_source_data("whoop", cache, days_before(9), 7)
+        assert len([q for q in table.queries if ":s" in q["ExpressionAttributeValues"]]) == 2
+
+    def test_the_cross_phase_flag_is_part_of_the_key_too(self, table):
+        """A phase-filtered window and a cross-phase one are different answers to the
+        same (source, date, lookback) question — sharing a slot would serve one for
+        the other."""
+        daily_series("hrv", [50.0], table=table)
+        cache = {}
+        ev._get_source_data("whoop", cache, TODAY, 7, False)
+        ev._get_source_data("whoop", cache, TODAY, 7, True)
+        assert len(cache) == 2
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1199,58 +1212,103 @@ def commitment(**extra):
 
 METRIC_CHECK = {"metric": "hrv", "direction": "up"}
 
+#: The stats dict `_evaluate_commitments` returns with nothing to say. `due_checkable`
+#: and `graded` are the dead-man's two numbers (#3553) and ride in the same dict.
+ZERO_COMMITMENT_STATS = {
+    "kept": 0,
+    "broken": 0,
+    "unresolved": 0,
+    "ungradeable": 0,
+    "pending": 0,
+    "due_checkable": 0,
+    "graded": 0,
+    # #3553: {sk: new status} for whatever this run terminalised — the rollup applies
+    # these over the in-memory corpus so the published tally is not a day stale.
+    "applied": {},
+}
+
+
+def due_series(table, values, days_late=23, field="hrv"):
+    """Seed `values` ending on the default commitment's DUE date (#3553: a commitment
+    is graded on its own window, so the fixture data has to live in that window)."""
+    return daily_series(field, values, end_date=days_before(days_late), table=table)
+
 
 class TestCommitments:
     def test_only_pending_commitments_are_collected(self, table):
         seed(table, commitment(), commitment(sk="COMMITMENT#c2", commitment_id="c2", status="kept"))
-        assert [c["commitment_id"] for c in ev._fetch_commitments()] == ["c1"]
+        pending, corpus = ev._fetch_commitments()
+        assert [c["commitment_id"] for c in pending] == ["c1"]
+        # #3553: the whole corpus rides along for the rollup — the loop already pages it.
+        assert sorted(c["commitment_id"] for c in corpus) == ["c1", "c2"]
 
-    def test_commitment_reads_exclude_other_experiment_cycles(self, table):
+    def test_commitment_reads_are_cross_phase_so_a_reset_cannot_hide_the_corpus(self, table):
+        """#3553, the inversion of the old pin. This read WAS phase-filtered, and that
+        one line is why the ledger graded nothing in its whole life: a reset tombstones
+        the open commitments (`phase=pilot`) and cycles 13-16 lasted 15/15/3/1 days, so
+        no 7-90 day window ever closed inside its own phase. The 2026-09-06 census found
+        all 58 checkable records at `phase=pilot` — a corpus the grader was forbidden to
+        read. A promise is graded on the window it was made for, whatever cycle it is
+        now."""
         ev._fetch_commitments()
-        assert all("FilterExpression" in q for q in table.queries)
+        assert table.queries and all("FilterExpression" not in q for q in table.queries)
 
     def test_an_unreadable_coach_partition_does_not_lose_the_others(self, table):
         table.error_pks.add("COACH#sleep_coach")
         seed(table, commitment())
-        assert len(ev._fetch_commitments()) == 1
+        assert len(ev._fetch_commitments()[0]) == 1
 
     def test_a_commitment_is_not_graded_before_its_window_closes(self, table):
         stats = ev._evaluate_commitments([commitment(created_date=days_before(3))], TODAY, {})
-        assert stats == {"kept": 0, "broken": 0, "unresolved": 0, "pending": 1}
+        assert stats == {**ZERO_COMMITMENT_STATS, "pending": 1}
         assert table.updates == []
 
     def test_a_metric_backed_commitment_the_data_supports_is_kept(self, table):
-        daily_series("hrv", TestEwmaTrend.RISING, table=table)
+        due_series(table, TestEwmaTrend.RISING)
         stats = ev._evaluate_commitments([commitment(action_check=METRIC_CHECK)], TODAY, {})
         assert stats["kept"] == 1
         assert table.items[("COACH#physical_coach", "COMMITMENT#c1")]["status"] == "kept"
 
     def test_a_metric_backed_commitment_the_data_contradicts_is_broken(self, table):
-        daily_series("hrv", TestEwmaTrend.FALLING, table=table)
+        due_series(table, TestEwmaTrend.FALLING)
         stats = ev._evaluate_commitments([commitment(action_check=METRIC_CHECK)], TODAY, {})
         assert stats["broken"] == 1
 
     def test_a_commitment_whose_metric_never_moved_is_broken_not_excused(self, table):
         """#801: 'nothing happened' is evidence against the commitment."""
-        daily_series("hrv", TestEwmaTrend.DRIFTING, table=table)
+        due_series(table, TestEwmaTrend.DRIFTING)
+        assert ev._evaluate_commitments([commitment(action_check=METRIC_CHECK)], TODAY, {})["broken"] == 1
+
+    def test_a_commitment_is_graded_on_its_own_window_not_on_today(self, table):
+        """#3553 cause 2. The metric FELL across the commitment's own window and rose
+        again afterwards. Grading on today would call an 'up' commitment kept; grading
+        on the window it was made for calls it broken, which is the truth about the
+        promise."""
+        due = days_before(23)
+        daily_series("hrv", TestEwmaTrend.FALLING, end_date=due, table=table)
+        daily_series("hrv", TestEwmaTrend.RISING, end_date=TODAY, table=table)
         assert ev._evaluate_commitments([commitment(action_check=METRIC_CHECK)], TODAY, {})["broken"] == 1
 
     def test_a_metric_backed_commitment_with_no_data_waits_until_its_expiry(self, table):
         stats = ev._evaluate_commitments([commitment(created_date=days_before(10), action_check=METRIC_CHECK)], TODAY, {})
-        assert stats == {"kept": 0, "broken": 0, "unresolved": 0, "pending": 1}
+        assert stats == {**ZERO_COMMITMENT_STATS, "pending": 1, "due_checkable": 1}
 
-    def test_a_metric_backed_commitment_with_no_data_is_unresolved_past_twice_its_window(self, table):
+    def test_a_metric_backed_commitment_with_no_data_is_ungradeable_past_twice_its_window(self, table):
+        """#3553: 'unresolved' said a lapse; the truth is that the evidence to grade it
+        never existed. The reason carries the observed n and the floor (ADR-105)."""
         stats = ev._evaluate_commitments([commitment(created_date=days_before(30), action_check=METRIC_CHECK)], TODAY, {})
-        assert stats["unresolved"] == 1
-        assert table.items[("COACH#physical_coach", "COMMITMENT#c1")]["outcome"] == "unresolved"
+        assert stats["ungradeable"] == 1 and stats["unresolved"] == 0
+        row = table.items[("COACH#physical_coach", "COMMITMENT#c1")]
+        assert row["outcome"] == "ungradeable"
+        reason = json.loads(row["outcome_notes"])["reason"]
+        assert "0 observation(s)" in reason and f"floor is {ev.EWMA_MIN_OBSERVATIONS}" in reason
 
     def test_a_commitment_with_no_machine_check_waits_for_the_coach_then_expires(self, table):
         assert ev._evaluate_commitments([commitment(created_date=days_before(10))], TODAY, {})["pending"] == 1
         assert ev._evaluate_commitments([commitment(created_date=days_before(30))], TODAY, {})["unresolved"] == 1
 
     def test_a_commitment_with_an_unparseable_creation_date_is_skipped_not_graded(self, table):
-        stats = ev._evaluate_commitments([commitment(created_date=None)], TODAY, {})
-        assert stats == {"kept": 0, "broken": 0, "unresolved": 0, "pending": 0}
+        assert ev._evaluate_commitments([commitment(created_date=None)], TODAY, {}) == ZERO_COMMITMENT_STATS
 
     def test_the_commitment_outcome_carries_the_algo_version(self, table):
         ev._update_commitment_status(commitment(), "kept", "because", TODAY)
@@ -1397,15 +1455,22 @@ class TestHandler:
         }
 
     def test_commitments_are_graded_even_on_a_day_with_no_open_predictions(self, table, quiet_docket):
-        daily_series("hrv", TestEwmaTrend.RISING, table=table)
+        due_series(table, TestEwmaTrend.RISING)
         seed(table, commitment(action_check=METRIC_CHECK))
-        assert ev.lambda_handler({}, None)["commitment_stats"]["kept"] == 1
+        out = ev.lambda_handler({}, None)["commitment_stats"]
+        assert out["kept"] == 1
+        assert out["liveness"] == {"due_checkable": 1, "graded": 1, "emitted": out["liveness"]["emitted"]}
 
-    def test_a_commitment_failure_does_not_sink_the_prediction_run(self, table, monkeypatch, quiet_docket):
+    def test_a_commitment_failure_does_not_sink_the_prediction_run(self, table, monkeypatch, quiet_docket, env):
         self._due_directional(table, TestEwmaTrend.RISING)
         monkeypatch.setattr(ev, "_fetch_commitments", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
         out = ev.lambda_handler({}, None)
         assert (out["statusCode"], out["predictions_evaluated"], out["commitment_stats"]) == (200, 1, {})
+        # #3553: a FAILED commitment pass emits NO gauge. The lane is fail-soft, so the
+        # crash raises nothing a Lambda Errors alarm would see; emitting a comforting
+        # due=0 would read as "nothing was due". Silence is what the dead-man hears
+        # (treat_missing_data=BREACHING).
+        assert not [m for c in env.cw.calls for m in c.get("MetricData", []) if m["MetricName"].startswith("Commitments")]
 
     def test_a_stance_detection_failure_does_not_sink_the_prediction_run(self, table, monkeypatch, quiet_docket):
         self._due_directional(table, TestEwmaTrend.RISING)
