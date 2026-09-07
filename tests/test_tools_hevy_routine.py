@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
@@ -373,3 +374,156 @@ def test_archive_local_only_when_never_pushed():
         result = t.tool_manage_hevy_routine({"action": "archive", "routine_id": "r-2"})
     folders_mock.assert_not_called()
     assert result["status"] == "archived_local_only"
+
+
+# ── #3670: a fail-soft folder write must surface in the commit RESULT ─────────
+#
+# The defect these guard: `_ensure_folder` caught a 400 from `list_folders`
+# (`page_size=50` against Hevy's cap of 10), logged a CloudWatch warning and
+# returned None, and `_action_commit` returned `{"status": "committed"}` with no
+# mention of it. Every routine was created in the Hevy account root for months
+# and the caller could not tell. Not blocking the commit is right; reporting an
+# unqualified success is not.
+
+
+def _push_ir(routine_id="r-folder"):
+    return RoutineSpec(
+        routine_id=routine_id,
+        target_date="2026-09-06",
+        archetype="push",
+        exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
+    )
+
+
+def _commit_patches(ir, **folders_kwargs):
+    """The offline patch set for a create-branch commit. Returned as a list so
+    callers can enter it through ExitStack alongside their own patches."""
+    return [
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.routine_repo.put_versioned"),
+        patch("training.routine_repo.upsert_id_map"),
+        patch("training.hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
+        patch("training.hevy_write_client.list_folders", **folders_kwargs),
+        patch(
+            "training.hevy_write_client.create_routine",
+            return_value={"routine": {"id": "new-id", "updated_at": "2026-09-06T12:00:00Z"}},
+        ),
+    ]
+
+
+def _commit(ir, extra=(), args=None, **folders_kwargs):
+    with ExitStack() as stack:
+        for cm in [*_commit_patches(ir, **folders_kwargs), *extra]:
+            stack.enter_context(cm)
+        return t.tool_manage_hevy_routine(args or {"action": "commit", "routine_id": ir.routine_id})
+
+
+def test_commit_result_names_the_failure_when_foldering_fails():
+    """THE guard (#3670). Force list_folders to fail; the commit must still
+    succeed AND the result must say the routine is unfoldered, naming why.
+
+    Mutation that must red this: restore the silent swallow — make
+    `_ensure_folder` return a bare None and drop the "folder" key from
+    `_action_commit`'s return. `result["folder"]` then KeyErrors (or no longer
+    carries the reason) while the commit still reports 'committed'.
+    """
+    ir = _push_ir()
+    boom = RuntimeError("HTTP Error 400: Bad Request")
+    result = _commit(
+        ir,
+        extra=[patch("training.hevy_write_client.create_folder", side_effect=boom)],
+        side_effect=boom,
+    )
+
+    # 1. Folder I/O never blocks the commit.
+    assert result["status"] == "committed", result
+    assert result["hevy_routine_id"] == "new-id"
+    # 2. ...but the caller can see the miss from the RESULT ALONE — no log needed.
+    folder = result["folder"]
+    assert folder.startswith("unfoldered: "), folder
+    # 3. ...and the reason names the failing call and the underlying error.
+    assert "list_folders" in folder, folder
+    assert "400" in folder, folder
+    # 4. The routine really did go up with no folder (the honest part of the report).
+    assert ir.hevy_folder_id is None
+
+
+def test_commit_reports_the_resolved_folder_title_on_success():
+    """The same key on the happy path — so `folder` is a report, not an error flag."""
+    ir = _push_ir("r-folder-ok")
+    with patch("training.hevy_write_client.create_folder") as create_folder_mock:
+        result = _commit(ir, return_value={"routine_folders": [{"id": 3087792, "title": "Push"}]})
+    assert result["status"] == "committed"
+    assert result["folder"] == "Push"
+    assert ir.hevy_folder_id == 3087792
+    create_folder_mock.assert_not_called()
+
+
+def test_ensure_folder_returns_reason_when_create_folder_fails():
+    """The second fail-soft branch: the folder is absent and creating it fails."""
+    with (
+        patch("training.hevy_write_client.list_folders", return_value={"routine_folders": []}),
+        patch("training.hevy_write_client.create_folder", side_effect=RuntimeError("HTTP Error 403")),
+    ):
+        folder_id, reason = t._ensure_folder("Push")
+    assert folder_id is None
+    assert reason is not None and "create_folder" in reason and "403" in reason
+
+
+def test_ensure_folder_returns_reason_when_created_folder_has_no_id():
+    """A 2xx that carries no id is a miss too — it must not read as success."""
+    with (
+        patch("training.hevy_write_client.list_folders", return_value={"routine_folders": []}),
+        patch("training.hevy_write_client.create_folder", return_value={"routine_folder": {}}),
+    ):
+        folder_id, reason = t._ensure_folder("Push")
+    assert folder_id is None
+    assert reason is not None and "no id" in reason
+
+
+def test_commit_warns_on_draft_only_title_args_instead_of_discarding_them():
+    """#3670 problem B: force_title/title on commit were dropped in silence while
+    the call returned 'committed', so the caller believed a rename landed."""
+    ir = _push_ir("r-title")
+    result = _commit(
+        ir,
+        args={"action": "commit", "routine_id": "r-title", "force_title": True, "title": "My Own Title"},
+        return_value={"routine_folders": [{"id": 1, "title": "Push"}]},
+    )
+    assert result["status"] == "committed"
+    joined = " ".join(result["warnings"])
+    assert "force_title" in joined and "title" in joined
+    assert "DRAFT-time" in joined
+    assert "draft_custom" in joined  # tells the caller the correct sequence
+
+
+def test_commit_without_title_args_carries_no_warnings_key():
+    ir = _push_ir("r-quiet")
+    result = _commit(ir, return_value={"routine_folders": [{"id": 1, "title": "Push"}]})
+    assert result["status"] == "committed"
+    assert "warnings" not in result
+
+
+def test_commit_update_branch_says_the_folder_cannot_change():
+    """folder_id is create-only in Hevy (to_update_body omits it). An update
+    commit must not imply a folder move it cannot perform."""
+    ir = _push_ir("r-update")
+    ir.hevy_routine_id = "existing-id"
+    ir.hevy_updated_at = "2026-09-06T10:00:00Z"
+    with (
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.routine_repo.put_versioned"),
+        patch("training.routine_repo.upsert_id_map"),
+        patch("training.hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
+        patch("training.hevy_write_client.list_folders") as folders_mock,
+        patch(
+            "training.hevy_write_client.update_routine_with_guard",
+            return_value={"routine": {"id": "existing-id", "updated_at": "2026-09-06T12:00:00Z"}},
+        ),
+    ):
+        result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-update"})
+    folders_mock.assert_not_called()
+    assert result["status"] == "committed"
+    assert "create-only" in result["folder"]

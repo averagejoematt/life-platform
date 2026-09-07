@@ -9,7 +9,7 @@ One tool, ten actions:
   commit        — push a draft IR to Hevy via the compiler (write tool)
   list          — list ROUTINE# items in a date range
   get           — return one IR by routine_id
-  archive       — rename + folder-move (Hevy has no DELETE)
+  archive       — RENAME only (Hevy has no DELETE, and folder_id is create-only)
   floor         — generate floor variant explicitly
   re_entry      — force re-entry mode regardless of last-workout date
   adherence     — programmed-vs-performed report for a routine_id
@@ -41,6 +41,15 @@ from typing import Any
 
 from common.pacific_time import pacific_date_of, pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 
+# #3670: everything the commit result must report honestly lives in its own module
+# (the module-size ratchet's own instruction: extract, don't raise the cap).
+# Re-exported under the historical private names so call sites and tests are unchanged.
+from mcp.hevy_routine_commit_report import (
+    UPDATE_FOLDER_NOTE as _UPDATE_FOLDER_NOTE,
+    discarded_commit_title_warnings as _discarded_commit_title_warnings,
+    ensure_folder as _ensure_folder,
+    folder_title_for as _folder_title_for,
+)
 from mcp.utils import mcp_error
 
 logger = logging.getLogger("tools_hevy_routine")
@@ -63,51 +72,6 @@ _LB_TO_KG = 0.45359237
 
 def _ts_now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-# Per-type Hevy folder routing (ADR-067 sibling). Mirrors the repo's
-# docs/coaching/routines/<type>/ layout: the Hevy folder is the session TYPE,
-# the phase lives in the title (Foundation - Push - 1 - 1). Hevy folders are a
-# FLAT list (no nesting) and folder_id is CREATE-ONLY (PUT omits it), so this is
-# applied once, on the create branch of commit. Edit the map to re-name folders.
-_FOLDER_BY_ARCHETYPE = {
-    "push": "Push",
-    "pull": "Pull",
-    "legs": "Legs",
-    "lower": "Legs",
-    "upper": "Upper",
-    "engine": "Engine",
-    "full_body": "Full Body",
-    "conditioning": "Engine",
-}
-
-
-def _folder_title_for(ir: Any) -> str:
-    arch = (getattr(ir, "archetype", "") or "custom").strip().lower()
-    return _FOLDER_BY_ARCHETYPE.get(arch, arch.title() or "Custom")
-
-
-def _ensure_folder(title: str) -> str | None:
-    """Find-or-create a Hevy routine folder by title; return its id (or None on
-    failure, so commit can proceed unfoldered rather than erroring). Hevy folders
-    are a flat list; folder_id is set-on-create only."""
-    from training import hevy_write_client as wc
-
-    try:
-        folders = wc.list_folders()
-    except Exception as e:  # noqa: BLE001 — never block a commit on folder I/O
-        logger.warning(f"list_folders failed; committing without folder: {e}")
-        return None
-    for f in folders.get("routine_folders") or folders.get("folders") or []:
-        if (f.get("title") or "").strip().lower() == title.strip().lower():
-            return f.get("id")
-    try:
-        created = wc.create_folder(title)
-        new_folder = created.get("routine_folder") or created
-        return new_folder.get("id")
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"create_folder({title!r}) failed; committing without folder: {e}")
-        return None
 
 
 def _make_resolver():
@@ -962,6 +926,12 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             "Refusing to commit — Hevy would reject these fields: " + "; ".join(_v["errors"]),
             error_code="HEVY_PRECHECK_FAILED",
         )
+    # #3670: title/force_title are DRAFT-time arguments. _resolve_title_inputs reads
+    # ir.inputs_snapshot and never the commit args, so passing either here has always
+    # been a no-op — and the call still returned "committed", so the caller believed a
+    # rename landed that never did. Warn by name rather than discard in silence.
+    warnings: list[str] = _discarded_commit_title_warnings(args, ir)
+    folder_note: str | None = None
     try:
         resolve = _make_resolver()
         title_ctx, why = _resolve_title_inputs(ir)
@@ -976,8 +946,12 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # File new routines into a per-type folder so the Hevy home page
             # doesn't accumulate every routine. folder_id is create-only in Hevy
             # (PUT omits it), so it must be set here, before to_create_body.
+            folder_title = _folder_title_for(ir)
             if not ir.hevy_folder_id:
-                ir.hevy_folder_id = _ensure_folder(_folder_title_for(ir))
+                ir.hevy_folder_id, folder_miss = _ensure_folder(folder_title)
+                folder_note = folder_title if ir.hevy_folder_id else f"unfoldered: {folder_miss}"
+            else:
+                folder_note = folder_title
             body = to_create_body(ir, resolve, title_context=title_ctx, why_note=why)
             resp = wc.create_routine(body)
         parsed = from_hevy_response(resp)
@@ -993,12 +967,19 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
                 upsert_id_map(ir.routine_id, ir.hevy_routine_id)
             except Exception:
                 logger.info(f"id-map already present for routine {ir.routine_id}")
-        return {
+        out: dict[str, Any] = {
             "status": "committed",
             "routine_id": ir.routine_id,
             "hevy_routine_id": ir.hevy_routine_id,
             "version": ir.version,
+            # #3670: the foldering outcome rides in the RESULT, never only in a log.
+            # "unfoldered: <reason>" is how a caller reading nothing but this dict
+            # learns the routine landed in the Hevy account root instead of its folder.
+            "folder": folder_note or _UPDATE_FOLDER_NOTE,
         }
+        if warnings:
+            out["warnings"] = warnings
+        return out
     except wc.HevyOrphanCreated as e:
         # Hevy returned 4xx but created the routine anyway. Link the id locally
         # so future updates target it (instead of POSTing a third copy).
@@ -1107,7 +1088,10 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
             "routine_id": ir.routine_id,
             "note": "Routine was never pushed to Hevy; nothing to rename.",
         }
-    # Ensure an Archive folder, then rename + folder-move in Hevy. Hevy has no DELETE.
+    # Ensure an Archive folder, then RENAME in Hevy. Hevy has no DELETE — and no
+    # folder move either: folder_id is create-only, to_update_body omits it, so the
+    # archive_folder_id below is resolved but never reaches the wire. The rename is
+    # what actually lands; the result says so rather than implying a move (#3670).
     folders = wc.list_folders()
     archive_folder_id = None
     for f in folders.get("routine_folders") or folders.get("folders") or []:
@@ -1129,7 +1113,13 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
     ir.parent_version = ir.version
     ir.version += 1
     put_versioned(ir)
-    return {"status": "archived", "routine_id": ir.routine_id, "archive_folder_id": archive_folder_id}
+    return {
+        "status": "archived",
+        "routine_id": ir.routine_id,
+        "archive_folder_id": archive_folder_id,
+        "folder": "unchanged — folder_id is create-only in Hevy; the routine was RENAMED, "
+        "not moved. Drag it into Archive in the app if you want it out of the list.",
+    }
 
 
 def _action_floor(args: dict[str, Any]) -> dict[str, Any]:

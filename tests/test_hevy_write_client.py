@@ -264,3 +264,50 @@ def test_get_still_retries_on_5xx_at_transport_level(monkeypatch):
     with _mock_secret(), patch("urllib.request.urlopen", side_effect=fake_transport):
         wc.list_routines()
     assert calls["n"] == 3  # retried up to the shared policy's 3 attempts
+
+
+# ── #3670: Hevy's pageSize cap is 10 on every collection endpoint but one ─────
+
+
+def test_list_folders_requests_no_more_than_the_hevy_page_cap():
+    """`list_folders` defaulted to pageSize=50 and 400'd on every call for months:
+
+        pageSize=10 -> 200
+        pageSize=11 -> 400 {"error":"pageSize must be less than or equal to 10"}
+
+    `_ensure_folder` swallowed the 400, so every routine was created in the Hevy
+    account root while the commit reported success. Assert the wire value, not
+    the constant — a default raised past the cap is the whole bug.
+    """
+    captured: dict = {}
+
+    def fake_request(method, path, query=None, **kw):
+        captured.update(method=method, path=path, query=query or {})
+        return {"routine_folders": []}
+
+    with patch("training.hevy_write_client._request", side_effect=fake_request):
+        wc.list_folders()
+
+    assert captured["path"] == "/v1/routine_folders"
+    assert captured["query"]["pageSize"] <= wc.HEVY_MAX_PAGE_SIZE == 10
+
+
+def test_collection_endpoints_respect_the_page_cap_except_exercise_templates():
+    """Guard the SET, not the instance. `/v1/exercise_templates` is a verified-live
+    exception (200 at pageSize=100); every other collection default must be <= 10."""
+    calls: list[tuple[str, dict]] = []
+
+    def fake_request(method, path, query=None, **kw):
+        calls.append((path, query or {}))
+        return {}
+
+    with patch("training.hevy_write_client._request", side_effect=fake_request):
+        wc.list_folders()
+        wc.list_routines()
+        wc.get_workouts()
+        wc.get_workout_events(since="2026-09-06T00:00:00Z")
+        wc.list_templates()
+
+    for path, query in calls:
+        cap = 100 if path == "/v1/exercise_templates" else wc.HEVY_MAX_PAGE_SIZE
+        assert query.get("pageSize", 0) <= cap, f"{path} requests pageSize={query.get('pageSize')} > {cap}"
