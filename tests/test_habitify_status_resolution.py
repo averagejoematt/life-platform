@@ -3,11 +3,18 @@
 Pure-Python unit tests on `transform()` from the ingestion Lambda. Covers
 the API-status → TD-11-status mapping, particularly the pending-vs-failed
 disambiguation that's the core of the phantom-failed-habits fix.
+
+#3666: `today`/`yesterday` here are PACIFIC days, not UTC ones. They were UTC, and
+that was the bug under test rather than a detail of the harness — `transform` files
+its record under a Pacific `DATE#` key, so a UTC "yesterday" IS Pacific today for the
+seven-to-eight evening PT hours, and `test_in_progress_past_day_resolves_to_failed`
+was asserting the phantom-failure it was written to prevent. It now fails on the
+pre-#3666 tree for the right reason and passes at every hour of the day.
 """
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 
 # Path setup — the Lambda imports `ingestion_framework` and `platform_logger`
@@ -24,6 +31,8 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas", "ingestion"))
 # the full suite runs in alphabetical order.
 import types
 
+from common.pacific_time import pacific_now  # noqa: E402  (path set up above)
+
 if "ingestion.ingestion_framework" not in sys.modules:
     fake = types.ModuleType("ingestion_framework")
     fake.IngestionConfig = lambda **kw: kw
@@ -31,6 +40,14 @@ if "ingestion.ingestion_framework" not in sys.modules:
     sys.modules["ingestion.ingestion_framework"] = fake
 
 from habitify_lambda import transform
+
+
+def _pacific_today():
+    return pacific_now().strftime("%Y-%m-%d")
+
+
+def _pacific_yesterday():
+    return (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 def _entry(name, status, current=0, target=1, periodicity="daily"):
@@ -58,7 +75,7 @@ def _raw(entries, date_str):
 
 
 def test_completed_resolves_to_completed():
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(_raw([_entry("Weigh In", "completed", current=1)], today), today)
     statuses = out[0]["habit_statuses"]
     assert statuses["Weigh In"]["status"] == "completed"
@@ -70,7 +87,7 @@ def test_completed_resolves_to_completed():
 
 def test_in_progress_today_resolves_to_pending():
     """The core TD-11 fix: today's in_progress is PENDING, not failed."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(_raw([_entry("Out Of Bed Before 5am", "in_progress")], today), today)
     statuses = out[0]["habit_statuses"]
     assert statuses["Out Of Bed Before 5am"]["status"] == "pending"
@@ -81,20 +98,20 @@ def test_in_progress_today_resolves_to_pending():
 def test_in_progress_past_day_resolves_to_failed():
     """Habitify normally flips in_progress→failed at end-of-UTC-day; carry-overs
     happen (the audit found 1-2 per day). For a past `date_str` they're failures."""
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = _pacific_yesterday()
     out = transform(_raw([_entry("Stretch", "in_progress")], yesterday), yesterday)
     statuses = out[0]["habit_statuses"]
     assert statuses["Stretch"]["status"] == "failed"
 
 
 def test_failed_passes_through():
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = _pacific_yesterday()
     out = transform(_raw([_entry("Cold Plunge", "failed")], yesterday), yesterday)
     assert out[0]["habit_statuses"]["Cold Plunge"]["status"] == "failed"
 
 
 def test_skipped_resolves_to_skipped_not_failed():
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(_raw([_entry("Sauna", "skipped")], today), today)
     statuses = out[0]["habit_statuses"]
     assert statuses["Sauna"]["status"] == "skipped"
@@ -104,7 +121,7 @@ def test_skipped_resolves_to_skipped_not_failed():
 
 def test_monthly_periodicity_preserved():
     """Sauna edge case from audit Sample D: daily recurrence + monthly goal."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(_raw([_entry("Sauna", "in_progress", periodicity="monthly")], today), today)
     statuses = out[0]["habit_statuses"]
     assert statuses["Sauna"]["periodicity"] == "monthly"
@@ -113,7 +130,7 @@ def test_monthly_periodicity_preserved():
 
 def test_unknown_status_passes_through_safely():
     """Defensive — Habitify could add a new status; don't crash."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(_raw([_entry("Future Status", "paused")], today), today)
     assert out[0]["habit_statuses"]["Future Status"]["status"] == "paused"
 
@@ -121,7 +138,7 @@ def test_unknown_status_passes_through_safely():
 def test_legacy_habits_field_still_present_and_correct():
     """Backward compat is the whole point of Phase 1 — readers of `habits`
     must continue to get 0/1 binary exactly as before."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(
         _raw(
             [
@@ -140,7 +157,7 @@ def test_legacy_habits_field_still_present_and_correct():
 
 def test_scheduled_today_is_true_for_current_registry():
     """Audit confirmed all habits are RRULE=DAILY currently — no BYDAY habits."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(_raw([_entry("Any Habit", "in_progress")], today), today)
     assert out[0]["habit_statuses"]["Any Habit"]["scheduled_today"] is True
 
@@ -152,7 +169,7 @@ def test_completion_pct_excludes_pending_today():
     """The phantom-fail fix: mid-day, pending habits do not pull completion_pct
     down. With 1 completed + 3 pending today, the pending-aware pct is 100%
     (1/1 resolved), while the strict legacy interpretation is 25% (1/4)."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(
         _raw(
             [
@@ -178,7 +195,7 @@ def test_completion_pct_past_day_unchanged():
     """Past-day records have no pending (Habitify flips at end-of-UTC-day),
     so pending-aware and strict interpretations agree — past-data behavior
     is identical to pre-fix."""
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = _pacific_yesterday()
     out = transform(
         _raw(
             [
@@ -201,7 +218,7 @@ def test_completion_pct_past_day_unchanged():
 def test_completion_pct_all_pending_today_returns_zero_not_nan():
     """Edge case: every habit pending today → 0 resolved → completion_pct must
     NOT divide by zero. Returns 0 to keep downstream code safe."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _pacific_today()
     out = transform(
         _raw(
             [

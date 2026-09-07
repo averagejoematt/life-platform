@@ -31,12 +31,73 @@ DDB shape (TD-11 Phase 1, 2026-05-29 — backward-compatible producer):
 The "pending" state (today's in_progress, deadline not yet passed) is the
 phantom-failed bug fix — scoring engine consumers can stop treating it as 0/miss.
 Consumer-side read changes are TD-11 Phase 2 (planned, not yet shipped).
+
+ATTRIBUTION (#3666, 2026-09-06) — THE LOG'S `created_date`, READ IN PACIFIC
+---------------------------------------------------------------------------
+`GET /journal?target_date=D` buckets by the **UTC date of the tick**, and this
+Lambda files the answer under a **Pacific** `DATE#` key. Those are different
+days for the 7-8 evening PT hours that are already tomorrow in UTC, so ONE
+Pacific day was split across TWO `DATE#` rows at 17:00 PT and neither was ever
+right. Measured 2026-09-06: `target_date=2026-09-06` returned 38 failed / 23
+in_progress / **0 completed** while `target_date=2026-09-07` returned the
+**15 completions the owner ticked at 19:11-19:13 PT on Sep 6**. The stored
+record for `DATE#2026-09-06` therefore read 0 completed on a 15-habit day.
+
+The `+00:00` offset in the request is IGNORED by the vendor — `...T00:00:00+00:00`
+and `...T00:00:00-07:00` return byte-identical payloads. Only the date part is read.
+
+The attribution key is `GET /logs/{habit_id}` -> `created_date`, converted to the
+Pacific calendar day. It is correct in BOTH real cases, verified on the wire:
+
+  same-day evening tick   "2026-09-07T02:11:22.363Z" -> Pacific 2026-09-06  (19:11:22 PT)
+  back-dated two days     "2026-09-04T07:00:00.000Z" -> Pacific 2026-09-04  (00:00:00 PDT)
+
+Habitify anchors a BACK-DATED completion at 00:00 *local* of the day it was
+marked for (exact midnight, zero sub-second, against millisecond precision on a
+real tap) — which also proves the account timezone is America/Los_Angeles and the
+UTC bucketing is a quirk of `/journal` alone. So a next-day catch-up needs no
+policy: `created_date` already carries the intent.
+
+`progress.reference_date` IS NOT INTENT AND IS DELIBERATELY UNUSED. It merely
+echoes whatever `target_date` was queried — the same monthly Sauna habit returns
+`reference_date` 09-04, 09-05, 09-06 and 09-07 for the four respective queries.
+Do not reach for it. `tests/test_habitify_pacific_attribution_3666.py` asserts it
+stays unread.
+
+The journal is still fetched, for the REGISTRY (habit names, areas, goal/periodicity,
+archived flag) and for the two statuses that have no log channel — `skipped` and
+`failed`. Its per-date `completed` is not per-day truth: a non-daily habit reports
+`completed` on every date inside its period (Sauna, `periodicity: monthly`).
+
+THREE STATES, NOT TWO (#3666's other half)
+------------------------------------------
+Habitify reports a MISS (`failed`) separately from an UNRESOLVED habit (`in_progress`).
+The retired line collapsed them, and that loss was the worse of the two: a mis-dated
+write can be re-derived from the vendor later, but a destroyed distinction cannot be
+recovered from the stored row at all — and a reported lapse is exactly the behavioural
+signal ADR-104 exists to protect. So `failed` passes through as `failed` (including on an
+open day — it is a statement about the day, not a deadline artefact), `pending` is
+reserved for `in_progress` and survives the whole Pacific day, and where this Lambda has
+to resolve an unfinished habit at day close it labels that inference in `miss_source`
+(`vendor` | `platform`) instead of hiding it inside the same word.
+
+THE SECOND PARTITION THIS RECORD FEEDS
+--------------------------------------
+`supplement_bridge` (the post-store hook) writes `USER#matthew#SOURCE#supplements` from
+THIS record's completions and nothing else. A day stored as 0 completed therefore
+produces an empty supplement day with no error anywhere — on 2026-09-06 the owner took
+and ticked Collagen, Creatine, Electrolytes and L Glutamine and the bridge wrote nothing.
+Roughly twenty other modules read this partition (see the enumeration in
+`tests/test_habitify_pacific_attribution_3666.py`); all of them read `habits` /
+`habit_statuses` / `completion_pct`, so all of them are fixed by fixing the record, and
+none of them had a check that would have noticed. `operational/habit_cross_source_qa.py`
+is that missing check.
 """
 
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError
@@ -52,6 +113,8 @@ try:
 except ImportError:
     logger = logging.getLogger("habitify")
     logger.setLevel(logging.INFO)
+
+from common.pacific_time import pacific_date_of, pacific_today
 
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
@@ -76,9 +139,30 @@ BASE_URL = "https://api.habitify.me"
 # the "why missed" reason (on a skipped/failed day). Fetching notes is one extra GET per
 # tracked habit per ingested day; toggleable without a deploy if it ever pressures the API.
 FETCH_NOTES = os.environ.get("HABITIFY_FETCH_NOTES", "1").strip().lower() not in ("0", "false", "no", "")
+LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
 NOTES_MAX_PER_HABIT = 5
 MOOD_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Excellent"}
+
+# #3666: the group registry is DERIVED from the live `/areas` response, not hand-stated.
+# P40_GROUPS is the 2026-05 area list and is now a FALLBACK only, used when `/areas`
+# comes back empty or unusable. It had silently drifted: the owner reorganised Habitify
+# into `Core` / `Optimize` / `Vice`, none of which is in this list, so `by_group` was
+# empty and `total_possible` was **0 for every stored day** — which pins `completion_pct`
+# at 0 no matter how the completions are attributed, and makes `ai_context._habit_block`
+# (gated on `total_possible > 0`) hand every narrative surface an empty habit context.
+# A registry that a rename can silently empty is exactly the shape the charter's
+# derivation guard exists to kill.
 P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
+
+# GET /logs/{habit_id} is one request per habit per INVOCATION (memoised across the dates
+# a single run ingests — see `_LOGS_CACHE`). The window is padded either side of the
+# ingest lookback so a back-dated tick inside the window is always visible.
+LOGS_WINDOW_PAD_DAYS = 2
+
+# Statuses that record a decision the owner actually made. Once one is stored for a
+# Pacific day, a later run of the same day may never replace it with a non-terminal
+# status (#3666's upgrade-only guard — the Lambda re-writes every day 24x/day).
+TERMINAL_STATUSES = ("completed", "skipped")
 
 # AWS clients used directly by the supplement bridge (post-store hook needs DDB
 # access independent of the framework's table reference).
@@ -148,9 +232,63 @@ def fetch_areas(api_key):
 
 
 def fetch_journal(api_key, target_date):
-    """Habits + status for a date."""
+    """The habit REGISTRY for a date (names, areas, goal/periodicity, archived flag).
+
+    #3666: this endpoint's per-date `status` is NOT the attribution key. It buckets by
+    the UTC date of the tick while our `DATE#` keys are Pacific days, and it reports a
+    non-daily habit `completed` on every date inside its period. Completions come from
+    `fetch_logs` + `created_date`; the journal supplies the registry and `skipped`.
+
+    The `+00:00` suffix is decoration — the vendor reads only the date part and returns
+    a byte-identical payload for `-07:00`. Kept for wire compatibility, not meaning.
+    """
     date_str = f"{target_date}T00:00:00+00:00"
     return api_get("/journal", api_key, {"target_date": date_str})
+
+
+def fetch_logs(api_key, habit_id, window_from, window_to):
+    """#3666: raw completion logs for one habit over a UTC instant window.
+
+    Wire shape (measured 2026-09-06, `GET /logs/{habit_id}?from=&to=`)::
+
+        {"id": "-P0tcawv9ZLsXVAg6fXE", "value": 1,
+         "created_date": "2026-09-07T02:11:22.363Z",
+         "unit_type": "rep", "habit_id": "61252250-..."}
+
+    `created_date` is the attribution key: a real tap carries the tap instant to the
+    millisecond; a back-dated completion carries 00:00:00.000 **local** of the day it was
+    marked for. `pacific_date_of` recovers the intended Pacific day in both cases.
+
+    Non-fatal by contract, and the fail-soft is VISIBLE rather than silent: a habit whose
+    logs could not be fetched is absent from the returned map, `transform` falls back to
+    the journal status for that habit alone, and the stored record's `attribution` field
+    says so. Losing one habit's precision beats losing the day's ingest.
+    """
+    params = {"from": window_from, "to": window_to}
+    return api_get(f"/logs/{habit_id}", api_key, params)
+
+
+def logs_window(anchor_date, lookback_days):
+    """UTC ISO bounds wide enough to contain every tick the run could attribute.
+
+    Anchored on the PACIFIC day (`anchor_date`), padded by the ingest lookback plus
+    LOGS_WINDOW_PAD_DAYS on each side. One window per invocation, so the per-habit GET
+    is memoised across every date the run ingests instead of repeating per date.
+    """
+    anchor = datetime.strptime(anchor_date, "%Y-%m-%d").date()
+    start = anchor - timedelta(days=lookback_days + LOGS_WINDOW_PAD_DAYS)
+    end = anchor + timedelta(days=LOGS_WINDOW_PAD_DAYS)
+    return f"{start.isoformat()}T00:00:00+00:00", f"{end.isoformat()}T00:00:00+00:00"
+
+
+# Per-invocation memo for fetch_logs, keyed (habit_id, window). Cleared by
+# lambda_handler before every run — a module-level dict survives a warm container and a
+# stale hit would freeze a day's completions at whatever the previous run saw.
+_LOGS_CACHE: dict[tuple, list] = {}
+
+
+def reset_logs_cache() -> None:
+    _LOGS_CACHE.clear()
 
 
 def fetch_moods(api_key, target_date):
@@ -238,40 +376,175 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
             if notes:
                 notes_by_name[entry.get("name", "Unknown")] = notes
 
+    # #3666: the completion logs — THE attribution channel. One GET per habit per
+    # invocation (memoised on the window, which is anchored on Pacific today, so the
+    # second and subsequent dates of a run are free). A habit missing from this map had
+    # its logs GET fail; `transform` degrades that habit alone to the journal status.
+    window = logs_window(pacific_today(), LOOKBACK_DAYS)
+    logs_by_name = {}
+    for entry in journal:
+        if entry.get("is_archived"):
+            continue
+        habit_id = entry.get("id")
+        if not habit_id:
+            continue
+        cache_key = (habit_id,) + window
+        if cache_key not in _LOGS_CACHE:
+            try:
+                _LOGS_CACHE[cache_key] = fetch_logs(api_key, habit_id, *window) or []
+            except Exception as e:
+                logger.warning("Logs fetch failed for habit %s (non-fatal, journal fallback): %s", habit_id, e)
+                continue
+        logs_by_name[entry.get("name", "Unknown")] = _LOGS_CACHE[cache_key]
+
     return {
         "date": date_str,
         "area_map": area_map,
         "journal": journal,
         "moods": moods,
         "notes": notes_by_name,
+        "logs": logs_by_name,
+    }
+
+
+def _decimal(value, default="0"):
+    """Best-effort Decimal — a malformed vendor number falls back, never raises."""
+    try:
+        return Decimal(str(value))
+    except (ArithmeticError, TypeError, ValueError):
+        return Decimal(default)
+
+
+def _goal_facets(entry: dict, progress: dict) -> tuple[str, Decimal]:
+    """(periodicity, target_value) preferring the habit's stable `goal` over `progress`.
+
+    `goal` is the habit definition and does not move with the queried date; `progress`
+    is the vendor's per-query aggregate. Falling back to `progress` keeps every
+    pre-#3666 fixture (which carries only `progress`) reading exactly as before.
+    """
+    goal = entry.get("goal") or {}
+    periodicity = goal.get("periodicity") or progress.get("periodicity") or "daily"
+    raw_target = goal.get("value")
+    if raw_target is None:
+        raw_target = progress.get("target_value", 1)
+    target = _decimal(raw_target, "1")
+    return periodicity, (target if target > 0 else Decimal("1"))
+
+
+def logs_on_pacific_day(logs, date_str: str) -> list[dict]:
+    """#3666: the log entries whose `created_date` lands on Pacific day `date_str`.
+
+    THE attribution rule, in one place. `pacific_date_of` is the platform's one ISO
+    parser + the one Pacific frame (#1964) — never a private `fromisoformat` fork.
+    """
+    out = []
+    for log in logs or []:
+        if not isinstance(log, dict):
+            continue
+        if pacific_date_of(log.get("created_date")) == date_str:
+            out.append(log)
+    return out
+
+
+def _aggregate(habit_statuses: dict, groups: set) -> dict:
+    """Derive every roll-up field from `habit_statuses`, so the two can never disagree.
+
+    Factored out of `transform` for #3666 because `upgrade_only_merge` also has to
+    rebuild them after it restores a status the vendor forgot — an aggregate computed
+    once at transform time and then left alone is how a merged record ends up reporting
+    `total_completed: 0` next to a `habit_statuses` map full of completions.
+    """
+    habits: dict = {}
+    group_done: dict[str, list[str]] = {}
+    group_possible: dict[str, list[str]] = {}
+    skipped_count = 0
+    for name, hs in habit_statuses.items():
+        status = hs.get("status")
+        is_completed = status == "completed"
+        habits[name] = Decimal("1") if is_completed else Decimal("0")
+        if status == "skipped":
+            skipped_count += 1
+        group = hs.get("group") or "Other"
+        if group in groups:
+            group_possible.setdefault(group, []).append(name)
+            if is_completed:
+                group_done.setdefault(group, []).append(name)
+
+    by_group = {}
+    for group in sorted(group_possible):
+        possible_list = group_possible[group]
+        done_list = group_done.get(group, [])
+        by_group[group] = {
+            "completed": len(done_list),
+            "possible": len(possible_list),
+            "pct": Decimal(str(round(len(done_list) / len(possible_list), 4))),
+            "habits_done": done_list,
+        }
+
+    total_possible = sum(len(v) for v in group_possible.values())
+    total_completed = sum(len(v) for v in group_done.values())
+
+    # TD-11 Phase 2: habits still open on a Pacific day that has not closed are excluded
+    # from the denominator — counting them as misses is the phantom-fail bug. For a past
+    # day `pending_count` is 0, so historical math is unchanged.
+    pending_count = sum(1 for hs in habit_statuses.values() if hs.get("status") == "pending")
+    # #3666: the owner-authored/platform-assumed split, surfaced at the top level so a
+    # consumer never has to walk habit_statuses to tell a reported lapse from an artefact.
+    failed_vendor_count = sum(1 for hs in habit_statuses.values() if hs.get("status") == "failed" and hs.get("miss_source") == "vendor")
+    failed_platform_count = sum(1 for hs in habit_statuses.values() if hs.get("status") == "failed" and hs.get("miss_source") == "platform")
+    resolved_possible = max(total_possible - pending_count, 0)
+    completion_pct = Decimal(str(round(total_completed / resolved_possible, 4))) if resolved_possible > 0 else Decimal("0")
+    # The strict "pending counts as a miss" reading, kept for comparison.
+    completion_pct_strict = Decimal(str(round(total_completed / total_possible, 4))) if total_possible > 0 else Decimal("0")
+
+    return {
+        "habits": habits,
+        "by_group": by_group,
+        "total_completed": total_completed,
+        "total_possible": total_possible,
+        "pending_count": pending_count,
+        "failed_vendor_count": failed_vendor_count,
+        "failed_platform_count": failed_platform_count,
+        "completion_pct": completion_pct,
+        "completion_pct_strict": completion_pct_strict,
+        "skipped_count": skipped_count,
     }
 
 
 def transform(raw: dict, date_str: str) -> list[dict]:
-    """Build the chronicling-compatible habit record (single per day)."""
+    """Build the chronicling-compatible habit record (single per day).
+
+    `date_str` is a PACIFIC calendar day — it becomes the `DATE#` key verbatim.
+    """
     if not raw:
         return []
     area_map = raw["area_map"]
     journal = raw["journal"]
     moods = raw["moods"]
     notes_by_name = raw.get("notes") or {}  # #422: {habit_name: [{content, created_at}]}
+    logs_by_name = raw.get("logs")  # #3666: {habit_name: [log, …]}; absent name = fetch failed
+    if not isinstance(logs_by_name, dict):
+        logs_by_name = {}
 
-    habits = {}
+    # #3666: the group registry, DERIVED from the live /areas response. The hand-stated
+    # P40_GROUPS list is the fallback for an empty/unusable /areas payload only.
+    groups = {g for g in area_map.values() if isinstance(g, str) and g} or set(P40_GROUPS)
+
+    habits_seen = []
     habit_statuses = {}  # TD-11 Phase 1: structured per-habit state alongside binary
-    group_habits_done: dict[str, list[str]] = {}
-    group_habits_possible: dict[str, list[str]] = {}
-    skipped_count = 0
+    log_attributed = 0
+    journal_fallback = 0
 
-    # `date_str` is the date we're ingesting for (UTC-anchored). We compare it
-    # to today (UTC) to disambiguate Habitify's `in_progress` between "pending"
-    # (today's deadline hasn't passed) and "failed" (past day, never resolved).
-    # End-of-UTC-day is Habitify's source-of-truth flip point per the TD-11 audit.
-    # The VENDOR's day boundary, not the platform's: this value is never a DATE# key —
-    # it is compared against Habitify's own UTC-anchored deadline to classify
-    # `in_progress` as pending vs. failed. Converting it to Pacific would grade a habit
-    # against a deadline the vendor has not reached yet.
-    # utc-exempt(#2811): vendor-frame comparison, not a platform day key.
-    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #3666: the comparison is PACIFIC-to-PACIFIC, and #2811's exemption on this site is
+    # RETIRED rather than reworded. That exemption's reasoning was true about
+    # the vendor and wrong about us: Habitify's `/journal` really does flip at end of the
+    # UTC day, but `date_str` — the other side of the comparison — is a PACIFIC day, the
+    # literal `DATE#` key this record is filed under. Comparing a Pacific day key against
+    # a UTC "today" marked every still-open habit `failed` from 17:00 PT onward, which is
+    # precisely when the owner ticks his evening habits. Both sides are now the Pacific
+    # calendar day, which is the frame the key, the site, and the owner all use.
+    today_pt = pacific_today()
+    day_open = date_str >= today_pt
 
     for entry in journal:
         if entry.get("is_archived"):
@@ -280,38 +553,96 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         status = entry.get("status", "none")
         if isinstance(status, dict):
             status = status.get("status", "none")
-        is_completed = status == "completed"
-        is_skipped = status == "skipped"
-        habits[name] = Decimal("1") if is_completed else Decimal("0")
-        if is_skipped:
-            skipped_count += 1
-
-        # TD-11 Phase 1: resolve API status → TD-11 enum.
-        if status == "completed":
-            resolved = "completed"
-        elif status == "skipped":
-            resolved = "skipped"
-        elif status == "failed":
-            resolved = "failed"
-        elif status == "in_progress":
-            # in_progress on today = pending (correct). On a past day = failed
-            # (Habitify normally flips this at end-of-UTC-day; carryover is rare
-            # but the audit found 1–2 per day, so handle it).
-            resolved = "pending" if date_str >= today_utc else "failed"
-        else:
-            resolved = status or "unknown"
 
         progress = entry.get("progress") or {}
+        periodicity, target_value = _goal_facets(entry, progress)
+
+        # #3666: `progress.reference_date` is deliberately NOT read. It echoes whatever
+        # `target_date` was queried (the monthly Sauna habit returns 09-04, 09-05, 09-06
+        # and 09-07 for the four respective queries), so it carries no intent whatsoever.
+        attributed = logs_on_pacific_day(logs_by_name[name], date_str) if name in logs_by_name else None
+        logged_value = sum((_decimal(log.get("value")) for log in attributed), Decimal("0")) if attributed is not None else None
+
+        # ── status resolution ────────────────────────────────────────────────────
+        # THREE distinct states, and keeping them distinct is half of #3666.
+        # Habitify reports a MISS (`failed` — the owner marked it missed in the app, or
+        # Habitify resolved it at the end of its own day) separately from an UNRESOLVED
+        # habit (`in_progress`). The retired line `"pending" if date_str >= today_utc else
+        # "failed"` collapsed them: after it ran, a reported lapse and a timezone artefact
+        # were byte-identical in the stored row. A mis-dated write can be re-derived from
+        # the vendor later; a destroyed distinction cannot be recovered from the record at
+        # all, and a reported lapse is exactly the behavioural signal ADR-104 exists to
+        # protect. So: the vendor's `failed` passes through as `failed` — including while
+        # the Pacific day is still open, because it is a statement about the day, not a
+        # deadline artefact — `pending` is reserved for `in_progress` and survives the
+        # whole Pacific day, and a platform-side resolution at day close says so in
+        # `miss_source` rather than hiding inside the same label.
+        miss_source = None
+        if status == "skipped":
+            # A skip is an owner decision with no log channel — the journal is its only source.
+            resolved = "skipped"
+        elif attributed is not None and periodicity == "daily":
+            log_attributed += 1
+            if logged_value >= target_value:
+                resolved = "completed"
+            elif status == "failed":
+                resolved, miss_source = "failed", "vendor"
+            elif day_open:
+                resolved = "pending"
+            else:
+                resolved, miss_source = "failed", "platform"
+        else:
+            # Fallback: the vendor's own journal status. Taken when the logs GET failed
+            # for this habit, or when the habit is a weekly/monthly aggregate whose
+            # `completed` is a PERIOD judgement the vendor owns and we do not re-derive.
+            # The pending/failed boundary is Pacific either way.
+            if attributed is None:
+                journal_fallback += 1
+            if status == "completed":
+                resolved = "completed"
+            elif status == "failed":
+                resolved, miss_source = "failed", "vendor"
+            elif status == "in_progress":
+                if day_open:
+                    resolved = "pending"
+                else:
+                    resolved, miss_source = "failed", "platform"
+            else:
+                resolved = status or "unknown"
+
+        current_value = (
+            logged_value if (logged_value is not None and periodicity == "daily") else _decimal(progress.get("current_value", 0))
+        )
         habit_statuses[name] = {
             "status": resolved,
-            "current_value": Decimal(str(progress.get("current_value", 0))),
-            "target_value": Decimal(str(progress.get("target_value", 1))),
-            "periodicity": progress.get("periodicity", "daily"),
+            "current_value": current_value,
+            "target_value": target_value,
+            "periodicity": periodicity,
             "scheduled_today": True,  # All current habits are RRULE=DAILY per audit
         }
-        if is_completed:
-            # Habitify doesn't expose a per-completion timestamp on the journal
-            # endpoint observed in the audit; record the ingestion observation time.
+        if miss_source:
+            # WHO said this was a miss.
+            #   "vendor"   — Habitify's own `failed`. That covers BOTH the owner marking it
+            #                missed in the app AND Habitify auto-resolving it at the end of
+            #                its own UTC day; the API does not separate the two and this
+            #                field does not pretend it can (ADR-104 — the honest label is
+            #                the one the data supports).
+            #   "platform" — nobody said anything: the habit was still `in_progress` when
+            #                its PACIFIC day closed and THIS Lambda resolved it. That is an
+            #                inference, and it is now labelled as one instead of being
+            #                stamped `failed` indistinguishably from a reported lapse.
+            habit_statuses[name]["miss_source"] = miss_source
+        # The real tap instant, not the ingestion observation time: the latest log
+        # attributed to THIS Pacific day. A back-dated completion therefore stamps
+        # 00:00 local of the day it was marked for, which is the vendor's own anchor.
+        if attributed:
+            habit_statuses[name]["completed_at"] = max(str(log.get("created_date") or "") for log in attributed)
+        elif attributed is None and resolved == "completed":
+            # Journal-fallback path only (this habit's logs GET failed). With logs in hand
+            # and none attributed to this day, there IS no completion instant for this day
+            # and stamping the ingest time would invent one — that is how a non-daily
+            # habit's period-level `completed` used to smear a fake timestamp across every
+            # date in its period.
             habit_statuses[name]["completed_at"] = datetime.now(timezone.utc).isoformat()
 
         area = entry.get("area")
@@ -329,52 +660,18 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             habit_statuses[name]["notes"] = [ne["content"] for ne in note_entries]
             habit_statuses[name]["notes_at"] = [ne.get("created_at", "") for ne in note_entries]
             habit_statuses[name]["note_channel"] = "habitify_note"
-        if group and group in P40_GROUPS:
-            group_habits_possible.setdefault(group, []).append(name)
-            if is_completed:
-                group_habits_done.setdefault(group, []).append(name)
-
-    by_group = {}
-    for group in P40_GROUPS:
-        possible_list = group_habits_possible.get(group, [])
-        done_list = group_habits_done.get(group, [])
-        if possible_list:
-            by_group[group] = {
-                "completed": len(done_list),
-                "possible": len(possible_list),
-                "pct": Decimal(str(round(len(done_list) / len(possible_list), 4))),
-                "habits_done": done_list,
-            }
-
-    total_possible = sum(len(v) for v in group_habits_possible.values())
-    total_completed = sum(len(v) for v in group_habits_done.values())
-
-    # TD-11 Phase 2: count habits still pending (today, deadline not yet passed).
-    # Excluding these from the denominator is the phantom-fail fix — mid-day
-    # `completion_pct` was reading near-zero because Habitify's in_progress was
-    # being treated as failure. For past days `pending_count` is always 0, so
-    # the math is identical for historical records.
-    pending_count = sum(1 for hs in habit_statuses.values() if hs["status"] == "pending")
-    resolved_possible = max(total_possible - pending_count, 0)
-    completion_pct = Decimal(str(round(total_completed / resolved_possible, 4))) if resolved_possible > 0 else Decimal("0")
-    # Legacy completion_pct kept under a clearly-named slot in case any reader
-    # wants the strict "pending counts as miss" interpretation for comparison.
-    completion_pct_strict = Decimal(str(round(total_completed / total_possible, 4))) if total_possible > 0 else Decimal("0")
+        habits_seen.append(name)
 
     record = {
         "source": "habitify",
         "date": date_str,
-        "habits": habits,
         "habit_statuses": habit_statuses,  # TD-11 Phase 1 — structured status alongside binary
-        "by_group": by_group,
-        "total_completed": total_completed,
-        "total_possible": total_possible,
-        "pending_count": pending_count,  # TD-11 Phase 2
-        "completion_pct": completion_pct,  # pending-aware (the bug fix)
-        "completion_pct_strict": completion_pct_strict,  # legacy interpretation, for comparison
-        "skipped_count": skipped_count,
+        # #3666: which channel decided this day's completions, stored so a degraded run is
+        # visible in the record itself rather than only in a log line nobody reads.
+        "attribution": ("logs" if journal_fallback == 0 and log_attributed else "journal_fallback" if not log_attributed else "mixed"),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    record.update(_aggregate(habit_statuses, groups))
 
     if moods:
         latest = moods[-1]
@@ -384,6 +681,92 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             record["mood_label"] = MOOD_LABELS.get(mood_value, "Unknown")
 
     return [record]
+
+
+def upgrade_only_merge(existing: dict, new: dict) -> dict:
+    """#3666: re-ingest may only UPGRADE a Pacific day, never downgrade it.
+
+    This Lambda rewrites today and yesterday on every one of its 24 daily runs, and each
+    write is a full `put_item` REPLACE rebuilt from the API response alone. Two ways that
+    loses real data, both live hazards rather than theory:
+
+      1. **A stored completion disappears.** `completed`/`skipped` are decisions the owner
+         made. A later run that cannot see them (a logs GET that failed, a habit renamed
+         or archived upstream, a vendor blip) must not overwrite them with `failed`.
+         Restored here, with the original `completed_at` instant.
+      2. **`pending` is finalised early.** A 17:05 PT run writes `pending` for the evening
+         habits; nothing may turn that into `failed` while the Pacific day is still open.
+         Once the day HAS closed, `pending -> failed` is the correct, allowed resolution —
+         that is the day ending, not data loss.
+
+    Notes and mood are carried forward too: both fetches are non-fatal by contract, so an
+    empty one on run N+1 means "not fetched", never "retracted".
+
+    Every roll-up is recomputed from the merged statuses (`_aggregate`) — a restored
+    completion that did not move `total_completed` would be a record disagreeing with
+    itself. Never raises: the framework calls this inside a try/except that stores the
+    un-merged item, but a merge that silently dropped the day would be worse than a red.
+    """
+    if not isinstance(existing, dict) or not isinstance(new, dict):
+        return new
+    prev_statuses = existing.get("habit_statuses") or {}
+    next_statuses = new.get("habit_statuses") or {}
+    if not isinstance(prev_statuses, dict) or not isinstance(next_statuses, dict):
+        return new
+
+    date_str = str(new.get("date") or existing.get("date") or "")
+    day_open = bool(date_str) and date_str >= pacific_today()
+    upgrades = []
+
+    for name, prev in prev_statuses.items():
+        if not isinstance(prev, dict):
+            continue
+        prev_status = prev.get("status")
+        cur = next_statuses.get(name)
+        if cur is None:
+            # The habit vanished from the journal (archived/renamed upstream). Keep the
+            # stored row when it recorded a decision; drop it otherwise.
+            if prev_status in TERMINAL_STATUSES:
+                next_statuses[name] = prev
+                upgrades.append(f"{name}:restored-{prev_status}")
+            continue
+        if not isinstance(cur, dict):
+            continue
+        cur_status = cur.get("status")
+        if prev_status in TERMINAL_STATUSES and cur_status not in TERMINAL_STATUSES:
+            cur["status"] = prev_status
+            if prev.get("completed_at"):
+                cur["completed_at"] = prev["completed_at"]
+            if _decimal(prev.get("current_value")) > _decimal(cur.get("current_value")):
+                cur["current_value"] = _decimal(prev.get("current_value"))
+            cur.pop("miss_source", None)  # it is no longer a miss
+            upgrades.append(f"{name}:{cur_status}->{prev_status}")
+        elif prev_status == "pending" and cur_status == "failed" and day_open and cur.get("miss_source") != "vendor":
+            # An UNRESOLVED failure on an open day is a premature finalisation; an
+            # owner-authored one is the owner telling us he missed it, and clamping that
+            # back to `pending` would destroy the very distinction #3666 restored.
+            cur["status"] = "pending"
+            upgrades.append(f"{name}:failed->pending(day-open)")
+        if prev.get("notes") and not cur.get("notes"):
+            cur["notes"] = prev["notes"]
+            cur["notes_at"] = prev.get("notes_at", [])
+            cur["note_channel"] = prev.get("note_channel", "habitify_note")
+
+    if "mood" in existing and "mood" not in new:
+        new["mood"] = existing["mood"]
+        if "mood_label" in existing:
+            new["mood_label"] = existing["mood_label"]
+
+    if not upgrades:
+        return new
+
+    new["habit_statuses"] = next_statuses
+    groups = {hs.get("group") for hs in next_statuses.values() if isinstance(hs, dict)}
+    groups = {g for g in groups if g and g != "Other"} or set(P40_GROUPS)
+    new.update(_aggregate(next_statuses, groups))
+    new["upgrade_only_merges"] = upgrades[:50]
+    logger.info("[UPGRADE-ONLY] %s: kept %d stored status(es): %s", date_str, len(upgrades), ", ".join(upgrades[:10]))
+    return new
 
 
 def supplement_bridge(items: list[dict], date_str: str) -> None:
@@ -456,9 +839,9 @@ _config = IngestionConfig(
     source_name="habitify",
     secret_id=SECRET_NAME,
     s3_archive_prefix="raw/matthew/habitify",
-    schema_version=2,  # TD-11 Phase 1: added habit_statuses alongside habits
+    schema_version=3,  # #3666: completions attributed by log created_date → Pacific day
     enable_gap_detection=True,
-    lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
+    lookback_days=LOOKBACK_DAYS,
     enable_item_size_guard=True,
     refresh_today=True,  # Habits update throughout day → re-write today every run
     # #477/E-2: the last write of UTC-day D is the 23:05 UTC run, while checks can
@@ -480,6 +863,9 @@ _config = IngestionConfig(
     # tests/test_source_enumeration_drift.py asserts the SET, so a fourth one cannot
     # enter without it.
     record_gap_exhausted_absence=True,
+    # #3666: every run is a full REPLACE of today AND yesterday. Without this, a stored
+    # completion or an open `pending` could be downgraded by the next run an hour later.
+    carry_forward_fn=upgrade_only_merge,
 )
 
 
@@ -493,6 +879,9 @@ def lambda_handler(event: dict, context) -> dict:
     try:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
+        # #3666: the logs memo is module-level and a warm container outlives the run —
+        # a stale hit would freeze a day's completions at whatever the last run saw.
+        reset_logs_cache()
         return run_ingestion(_config, authenticate, fetch_day, transform, event, context, post_store_fn=supplement_bridge)
     except Exception as e:
         logger.error("habitify ingestion failed: %s", e, exc_info=True)
