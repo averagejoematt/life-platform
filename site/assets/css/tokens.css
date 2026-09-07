@@ -754,7 +754,12 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .ndots.cf-high { color: var(--ember); }
 .ndots.cf-med  { color: var(--ink-muted); }
 .ndots.cf-low, .ndots--none { color: var(--ink-faint); }
-.ndots-more { font-size: 0.62rem; margin-left: 2px; opacity: 0.8; }
+/* The overflow count ("+76") carries REAL information — the dots past the cap. It recedes
+   by SIZE only: it inherits the row's confidence tint (--ember / --ink-muted / --ink-faint
+   from .ndots.cf-*), and an opacity here composited that inherited ink to 3.32-4.47:1 in
+   every palette block — under AA, and the sixth member of the #3544 recede class (it only
+   renders when n > cap, so it stayed invisible until the correlation n's crossed 12). */
+.ndots-more { font-size: 0.62rem; margin-left: 2px; }
 .ndots-n { font-size: 0.62rem; margin-left: 5px; color: var(--ink-faint); }
 .corr-n { white-space: nowrap; }
 /* CI whisker — a point estimate + its real interval on an auto-scaled rail; faint zero ref. */

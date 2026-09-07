@@ -24,6 +24,7 @@ the specific incident, this one guards the whole palette.
 """
 
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -620,3 +621,442 @@ def test_ch_state_grounds_on_a_ramp_step_not_an_accent_wash():
     assert wash_over_light_page == "#EDE1D1"  # exactly the background live axe reported
     assert round(_contrast("#6F6757", wash_over_light_page), 2) == 4.34
     assert round(_contrast("#6E665A", wash_over_light_page), 2) == 4.39
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3544 (second pass) — the recede set DERIVED from the CSS, not enumerated
+# ══════════════════════════════════════════════════════════════════════════════
+# The first pass above measured a hand-written RECEDE_TEXT_RULES list of six selectors.
+# A hand list only ever holds the members someone thought of, and this one missed a
+# seventh, an eighth and a ninth:
+#
+#   `.ndots-more`          tokens.css  — the "+76" overflow badge on a sample-size dot row.
+#                          It declares NO colour of its own: it inherits --ember from
+#                          `.ndots.cf-high` (or --ink-muted / --ink-faint from `.cf-med` /
+#                          `.cf-low`), and `opacity: 0.8` composited that inherited ink to
+#                          3.32–4.47:1 in every palette block. It is emitted by
+#                          charts.js::nDots ONLY when `n > cap` (12), so it did not exist on
+#                          any page until the correlations crossed 12 overlapping days — the
+#                          pages passed all day and then began failing. On 2026-09-06 it
+#                          rolled the site back three times (site-deploy runs 34056404335,
+#                          34057051481, 34066269969), each time CONFIRMED by the #2978
+#                          re-probe: deterministic, never a race.
+#   `.cockpit-intro__note` cockpit.css — "Shown once. It won't interrupt again." at 0.8.
+#   `.rd-comp-note`        cockpit.css — "a 0 is a real reading — counted, not hidden." at 0.85.
+#
+# So this pass replaces the list with a DERIVATION over every stylesheet in
+# site/assets/css/. Three questions, each answered from the CSS itself:
+#
+#   (1) which rules recede?      every `opacity: <1` declaration, minus animation stops and
+#                                the `opacity: 0` pre-reveal resting state.
+#   (2) which of those wrap text? the rule declares a text property itself (font-size,
+#                                color, letter-spacing …), OR the sheet contains a
+#                                descendant rule under it that does. The second half is what
+#                                catches the original `.ch-rung.is-locked { opacity: .55 }`
+#                                shape — a bare wrapper whose text lives in children.
+#   (3) at what colour?          the rule's own `color:` if it declares one; otherwise the
+#                                INHERITED candidates — the colours declared by its selector
+#                                family (`.ndots-more` → `.ndots.cf-high|cf-med|cf-low`) and
+#                                by the descendants that made it text-bearing — plus, always,
+#                                the dimmest text token in the palette, because an element
+#                                with no colour of its own can inherit anything above it.
+#
+# Everything the derivation flags is then either MEASURED to AA or listed in
+# DERIVED_OPACITY_EXEMPT with a written reason. Unlike the evidence.css-only classification
+# above, this half spans every sheet the site ships.
+
+SITE_CSS_DIR = TOKENS.parent
+# Derived, not enumerated: whatever stylesheets the site ships. A new sheet is in scope the
+# day it lands, without anyone remembering to add it here.
+GUARDED_SHEETS = tuple(sorted(SITE_CSS_DIR.glob("*.css")))
+
+# Properties whose presence in a rule body is the CSS's own statement that the rule styles
+# TEXT. `color` is included deliberately even though it also feeds currentColor on SVG and
+# borders: a false positive costs one exemption line with a reason, a false negative costs a
+# rolled-back deploy.
+TEXT_EVIDENCE_PROPS = (
+    "font-size",
+    "font-family",
+    "font-weight",
+    "font-style",
+    "font-variant",
+    "font-feature-settings",
+    "letter-spacing",
+    "line-height",
+    "text-transform",
+    "text-decoration",
+    "text-align",
+    "text-indent",
+    "word-break",
+    "color",
+)
+
+# The derived text-bearing rules that are NOT held to AA. WCAG 1.4.3's exceptions are
+# NARROW, so each row must say WHICH ONE it rests on — a reason that just asserts
+# "decorative" is the shape a later reader has to trust instead of audit. Three tags, and
+# `test_every_derived_exemption_names_its_wcag_limb` below refuses any row without one:
+#
+#   non-text:          the element renders NO text node — an SVG/graphic wrapper. 1.4.3 is
+#                      about text and does not reach it at all.
+#   pure-decoration:   it DOES render a text glyph, but the glyph is decorative and
+#                      aria-hidden — 1.4.3's "Incidental / pure decoration" exception. This
+#                      tag is the honest one for the wayfinder and loop-ribbon arrows and
+#                      separators: `&rarr;` and `&middot;` ARE text. They carry nothing the
+#                      DOM order and the nav's own aria-label do not, they are hidden from
+#                      assistive tech, and tokens.css `display: none`s them below 600px on
+#                      exactly that reasoning.
+#   inactive-control:  1.4.3's "inactive user interface component" exception. One row only.
+#
+# A rule that wraps informational prose belongs in none of these — it belongs in the
+# measured set, fixed with a colour step (see --recede-ink above).
+DERIVED_OPACITY_EXEMPT = {
+    ".wall-cell": (
+        "non-text: the attempt fingerprint wrapper — evidence_wall.js:42 puts only ${d.svg} inside "
+        "(the date is a `title` tooltip, not a rendered text node)"
+    ),
+    ".imark-rail": 'non-text: <div class="imark-rail" aria-hidden="true">${instrumentMark()}</div> — an SVG glyph, dispatches.js/coaching.js',
+    ".art-band": 'non-text: <div class="art-band" aria-hidden="true"> wrapping ruleBand()/seasonBand() SVG — the editorial texture band, tokens.css §13',
+    ".portrait .pt-hatch": 'non-text: the coach portrait\'s engraved shading LAYER — SVG strokes in var(--coach), inside <svg class="portrait"> (portraits.js, ADR-106)',
+    ".wf-arrow": 'pure-decoration: <span class="wf-arrow" aria-hidden="true">&rarr;</span> — a text glyph, but decorative; tokens.css display:none\'s it below 600px for that reason',
+    ".wf-sep": 'pure-decoration: <span class="wf-sep" aria-hidden="true">&middot;</span> — a decorative text glyph between two labelled wayfinder stops',
+    ".loop-ribbon .lr-arrow": 'pure-decoration: <span class="lr-arrow" aria-hidden="true">&rarr;</span> — a decorative text glyph in the loop ribbon',
+    ".loop-ribbon .lr-sep": 'pure-decoration: <span class="lr-sep" aria-hidden="true">&middot;</span> — a decorative text glyph in the loop ribbon',
+    ".predict-btn:disabled": "inactive-control: cockpit.js sets `b.disabled = true` after a cast — WCAG 1.4.3 exempts an inactive UI component",
+}
+
+# The three limbs a row may rest on, in the order 1.4.3 reaches them. Named for the
+# spec's own 'Incidental' heading rather than *_EXEMPT — it is a VOCABULARY, not an
+# exemption registry, and the gate census expands every `*_EXEMPT*` binding entry by
+# entry into gates that would each then need a verdict they cannot have.
+WCAG_INCIDENTAL_LIMBS = ("non-text:", "pure-decoration:", "inactive-control:")
+
+
+def _sheet_rules(path):
+    return list(_rules(path.read_text(encoding="utf-8")))
+
+
+def _all_guarded_rules():
+    """[(sheet_name, selector, body)] across every shipped stylesheet."""
+    return [(p.name, sel, body) for p in GUARDED_SHEETS for sel, body in _sheet_rules(p)]
+
+
+def _declares_text(body: str) -> bool:
+    return any(re.search(rf"(?<![-\w]){prop}:", body) for prop in TEXT_EVIDENCE_PROPS)
+
+
+def _classes(compound: str) -> set:
+    return set(re.findall(r"\.([\w-]+)", compound))
+
+
+def _color_tokens(body: str) -> list:
+    """The custom-property names a rule's `color:` resolves through, outermost first.
+
+    `color: var(--coach, var(--ember))` yields ['coach', 'ember'] — every link in the
+    fallback chain is a colour this element can actually render in.
+    """
+    m = re.search(r"(?<![-\w])color:\s*([^;]+)", body)
+    if not m:
+        return []
+    return re.findall(r"var\(\s*--([\w-]+)", m.group(1))
+
+
+def _is_pseudo_element(selector: str) -> bool:
+    return "::" in selector.split()[-1]
+
+
+def _dimmest_text_token(block: str, bg_hex: str, candidates) -> str:
+    """The palette token, among those the sheets actually use as `color:`, that a text node
+    inheriting blindly could land on with the LEAST contrast against `bg_hex`. The
+    worst-case stand-in for an inherited colour nobody declared."""
+    return min(candidates, key=lambda name: _contrast(_token(block, name), bg_hex))
+
+
+def _derived_recede_hits():
+    """Every `opacity: <1` rule the CSS itself says wraps text.
+
+    Returns [(sheet, selector, alpha, own_color_tokens, inherited_color_tokens, why)] —
+    `why` records WHICH evidence made it text-bearing, so a failure names its own reason.
+    """
+    rules_all = _all_guarded_rules()
+    hits = []
+    for sheet, selector, body in rules_all:
+        m = re.search(r"(?<![-\w])opacity:\s*([0-9.]+)\s*(?:;|$)", body)
+        if not m:
+            continue
+        alpha = float(m.group(1))
+        # opacity: 0 is motion.js's pre-reveal resting state, and `from`/`to`/`50%` are
+        # animation stops — neither is a rendered contrast question. Excluded by SHAPE.
+        if alpha >= 1.0 or alpha == 0.0 or _KEYFRAME_SELECTOR.match(selector):
+            continue
+        own = _color_tokens(body)
+        tail_classes = _classes(selector.split()[-1])
+        descendants = []
+        if not _is_pseudo_element(selector) and tail_classes:
+            for _s, sel2, body2 in rules_all:
+                parts = sel2.split()
+                if len(parts) < 2 or not _declares_text(body2):
+                    continue
+                if any(tail_classes <= _classes(p) for p in parts[:-1]):
+                    descendants.append((sel2, body2))
+        if not _declares_text(body) and not descendants:
+            continue
+        why = "declares a text property" if _declares_text(body) else f"wraps text via `{descendants[0][0]}`"
+        inherited = []
+        if not own:
+            # (a) the selector's own family — strip trailing `-segment`s off the tail class
+            #     to find the block it belongs to (`.ndots-more` → `.ndots`), then take the
+            #     colours every rule on that block declares. This is where --ember,
+            #     --ink-muted and --ink-faint come from for the n-dots overflow badge.
+            family = set()
+            for cls in tail_classes:
+                parts = cls.split("-")
+                family.update("-".join(parts[:i]) for i in range(1, len(parts)))
+            family.discard("")
+            for _s, sel2, body2 in rules_all:
+                if not _color_tokens(body2):
+                    continue
+                if _classes(sel2.split()[-1]) & family:
+                    inherited.extend(_color_tokens(body2))
+            # (b) the descendants that made it text-bearing declare colours of their own
+            for sel2, body2 in descendants:
+                inherited.extend(_color_tokens(body2))
+        hits.append((sheet, selector, alpha, own, sorted(set(inherited)), why))
+    return hits
+
+
+def _derived_failures(hits=None) -> list:
+    """The measured half: every non-exempt derived hit, composited over --page and
+    --surface in all three palette blocks."""
+    hits = _derived_recede_hits() if hits is None else hits
+    blocks = _extract_theme_blocks(TOKENS.read_text(encoding="utf-8"))
+    # The palette tokens the shipped sheets actually set text in — the pool an element with
+    # no colour of its own can inherit from. Derived from the CSS, filtered to the ones the
+    # palette really declares (var(--coach) and friends are per-component, not palette).
+    used = {t for _s, _sel, body in _all_guarded_rules() for t in _color_tokens(body)}
+    palette = sorted(t for t in used if re.search(rf"--{t}:\s*#[0-9A-Fa-f]{{6}}\b", blocks["dark :root"]))
+    failures = []
+    for sheet, selector, alpha, own, inherited, why in hits:
+        if selector in DERIVED_OPACITY_EXEMPT:
+            continue
+        for theme, block in blocks.items():
+            for bg_name in ("page", "surface"):
+                bg = _token(block, bg_name)
+                names = [t for t in (own or inherited) if re.search(rf"--{t}:\s*#[0-9A-Fa-f]{{6}}\b", block)]
+                if not own:
+                    # An inherited colour is whatever an ancestor happened to set, so the
+                    # worst case in the palette is always in scope, not just the ancestors
+                    # this parser could name. A token whose hex IS the ground is dropped
+                    # first: `color: var(--page)` exists only as a deliberate inverted
+                    # pairing on a filled control, never as an inherited fall-through, and
+                    # keeping it would emit a meaningless --page-on---page 1.00:1 row.
+                    pool = [t for t in palette if _token(block, t) != bg]
+                    names.append(_dimmest_text_token(block, bg, pool))
+                for ink in sorted(set(names)):
+                    fg = _token(block, ink)
+                    ratio = _contrast(_composite(fg, bg, alpha), bg)
+                    if ratio < AA_NORMAL:
+                        kind = "declares" if own else "inherits"
+                        failures.append(
+                            f"[{theme}] {sheet}: {selector} @ opacity {alpha} {kind} --{ink} {fg} "
+                            f"over --{bg_name} {bg} = {ratio:.2f}:1 < {AA_NORMAL}:1 ({why})"
+                        )
+    return failures
+
+
+def test_derived_text_opacity_rules_composite_to_aa():
+    """#3544 second pass: NOTHING the CSS itself describes as receding text may composite
+    below AA, in any shipped stylesheet, in either theme.
+
+    Derived, not enumerated — the list this replaces missed `.ndots-more`, and
+    `.ndots-more` rolled the site back three times."""
+    failures = _derived_failures()
+    assert not failures, (
+        "a text-bearing `opacity: <1` composites below WCAG AA (#3544 — recede by COLOUR, "
+        "never by whole-element opacity; see --recede-ink / --recede-ink-2 in tokens.css). "
+        "If the selector is genuinely a text-free mark or an inactive UI component, add it "
+        "to DERIVED_OPACITY_EXEMPT with the reason:\n" + "\n".join(failures)
+    )
+
+
+def test_derived_scan_is_live_and_its_exemptions_are_not_stale():
+    """The derivation must actually be finding rules, and every exemption must still name a
+    rule it really found. A scan that silently matched nothing would pass the test above
+    identically — and a stale exemption is a member of the set nobody is measuring."""
+    hits = _derived_recede_hits()
+    assert hits, "the derived scan found no text-bearing opacity rule at all — the parser has gone blind"
+    found = {selector for _s, selector, *_ in hits}
+    stale = sorted(set(DERIVED_OPACITY_EXEMPT) - found)
+    assert not stale, (
+        "DERIVED_OPACITY_EXEMPT names selectors the scan no longer finds — the rule was renamed, "
+        "deleted, or lost its opacity. Drop the row:\n" + "\n".join(stale)
+    )
+    # And the two halves must partition the set: nothing measured is exempt, nothing is both.
+    measured = sorted(found - set(DERIVED_OPACITY_EXEMPT))
+    assert not _derived_failures(hits), f"live sheets are not clean; measured set = {measured}"
+
+
+# The exact rule text each derived member shipped with, and the anchor to put it back. The
+# first three are the #3544 second-pass members; `.ch-rung.is-locked` is the ORIGINAL
+# hand-listed member, replayed here to prove the derivation reaches the shape the hand list
+# was written for (a bare wrapper with no text property and no colour of its own).
+#
+# selector: (sheet, shipped alpha, live anchor, restored rule, inherited inks, failing themes)
+# The failing-theme tuple is a recorded SCOPE FACT, asserted exactly: `.cockpit-intro__note`
+# renders in --ink-muted, which composites to 5.13:1 on the dark page and only misses on the
+# light one, so demanding all three blocks there would be a lie. If the set a member fails in
+# ever CHANGES, this reds — a widened miss is not allowed to pass as "still failing".
+ALL_BLOCKS = ("dark :root", "@media light", ":root[data-theme=light]")
+LIGHT_ONLY = ("@media light", ":root[data-theme=light]")
+DERIVED_SHIPPED = {
+    ".ndots-more": (
+        "tokens.css",
+        0.8,
+        ".ndots-more { font-size: 0.62rem; margin-left: 2px; }",
+        ".ndots-more { font-size: 0.62rem; margin-left: 2px; opacity: 0.8; }",
+        ["ember", "ink-faint", "ink-muted"],
+        ALL_BLOCKS,
+    ),
+    ".cockpit-intro__note": (
+        "cockpit.css",
+        0.8,
+        ".cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); }",
+        ".cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); opacity: 0.8; }",
+        ["ink-muted"],
+        LIGHT_ONLY,
+    ),
+    ".rd-comp-note": (
+        "cockpit.css",
+        0.85,
+        ".rd-comp-note { margin-top: 2px; color: var(--ink-faint); }",
+        ".rd-comp-note { margin-top: 2px; color: var(--ink-faint); opacity: 0.85; }",
+        ["ink-faint"],
+        ALL_BLOCKS,
+    ),
+    ".ch-rung.is-locked": (
+        "evidence.css",
+        0.55,
+        ".ch-rung.is-locked { border-style: dashed; }",
+        ".ch-rung.is-locked { opacity: 0.55; }",
+        ["ink-faint"],
+        ALL_BLOCKS,
+    ),
+}
+
+
+@pytest.mark.parametrize("selector", sorted(DERIVED_SHIPPED))
+def test_derived_guard_reds_when_the_shipped_opacity_comes_back(selector, monkeypatch, tmp_path):
+    """THE MUST-FAIL CONTROL, per member, through the real code path: write the rule's
+    shipped opacity back into a copy of the live sheet, re-point the scan at that copy, and
+    the same evaluator must produce failures naming the selector in ALL THREE palette
+    blocks — and naming every ink it inherits, not just one.
+
+    That last clause is the part that matters. A guard that only measured rules with a
+    literal `color:` would pass `.ndots-more` silently: the rule declares none. This asserts
+    --ember, --ink-muted AND --ink-faint all appear, i.e. the inheritance really resolved."""
+    sheet, alpha, anchor, restored, inks, themes = DERIVED_SHIPPED[selector]
+    assert not _derived_failures(), "precondition: the live sheets are clean"
+
+    staged = tmp_path / "css"
+    staged.mkdir()
+    for p in GUARDED_SHEETS:
+        text = p.read_text(encoding="utf-8")
+        if p.name == sheet:
+            assert text.count(anchor) == 1, f"the mutation anchor for {selector} moved — re-point this control"
+            text = text.replace(anchor, restored, 1)
+        (staged / p.name).write_text(text, encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "GUARDED_SHEETS", tuple(sorted(staged.glob("*.css"))))
+
+    failures = _derived_failures()
+    mine = [f for f in failures if f"{selector} @ opacity {alpha}" in f]
+    assert mine, f"restoring the shipped opacity {alpha} on {selector} did NOT red the derived guard — it is vacuous"
+    # NB the block label itself contains a "]" (`:root[data-theme=light]`), so match by
+    # prefix against the known block names rather than splitting on the bracket.
+    fired = {t for t in ALL_BLOCKS for f in mine if f.startswith(f"[{t}]")}
+    assert fired == set(themes), f"{selector} fails in {sorted(fired)}, but its recorded scope is {sorted(themes)} — the control is stale"
+    for ink in inks:
+        assert any(
+            f"--{ink} " in f for f in mine
+        ), f"{selector}'s control never measured the inherited --{ink} — inheritance did not resolve"
+
+
+def test_ndots_more_arithmetic_matches_the_live_axe_measurement():
+    """The blocking instance, pinned to the numbers a browser actually produced.
+
+    Live axe on /method/intelligence/ (chromium, 1440x900, light) read --ember #A34E13 at
+    4.45:1 on the flagged row's ember wash. The dark-theme composite at the shipped
+    opacity 0.8 is 4.47:1 on --page — a MISS by 0.03, which is why this member sat
+    invisible until n crossed the dot cap and then failed deterministically."""
+    assert round(_contrast(_composite("#DD7A37", "#0E0C08", 0.8), "#0E0C08"), 2) == 4.47  # dark  --ember @0.8
+    assert round(_contrast(_composite("#A34E13", "#F4EFE4", 0.8), "#F4EFE4"), 2) == 3.51  # light --ember @0.8
+    assert round(_contrast(_composite("#6F6757", "#F4EFE4", 0.8), "#F4EFE4"), 2) == 3.32  # light --ink-faint @0.8
+    # …and at full opacity every one of the three inherited inks clears AA on both grounds,
+    # so dropping the opacity is a fix, not a coincidence.
+    for fg in ("#DD7A37", "#A99F8C", "#988D78"):
+        assert _contrast(fg, "#0E0C08") >= AA_NORMAL
+    for fg in ("#A34E13", "#6E665A", "#6F6757"):
+        assert _contrast(fg, "#F4EFE4") >= AA_NORMAL
+
+
+def test_flagged_row_names_the_ndots_parent_not_three_of_its_four_states():
+    """#3325 lifted a flagged table row's faint readouts to --ink because --ember and the
+    faint inks both miss AA on the ember wash (4.34–4.45:1 over the light --page). It did
+    that by ENUMERATING `.ndots.cf-med, .ndots.cf-low, .ndots--none` — and left `.cf-high`,
+    the one state that renders in --ember, still failing. Requiring the PARENT `.ndots`
+    means every confidence state, and the `.ndots-more` badge inheriting from it, is
+    covered by construction. Re-enumerate the states and this reds."""
+    evidence = re.sub(r"/\*.*?\*/", "", EVIDENCE_CSS.read_text(encoding="utf-8"), flags=re.DOTALL)
+    m = re.search(r"\.rd-tbl tr\.rd-flag :is\(([^)]*)\)\s*\{([^}]*)\}", evidence)
+    assert m, "evidence.css: the flagged-row ink override is gone — re-point this guard"
+    members = {s.strip() for s in m.group(1).split(",")}
+    assert "--ink" in m.group(2), "the flagged-row override no longer lifts to --ink"
+    assert ".ndots" in members, (
+        "the flagged-row ink override enumerates .ndots confidence states instead of naming the "
+        f"parent .ndots — .cf-high would miss AA on the wash again (#3325 / #3544). Members: {sorted(members)}"
+    )
+    assert ".rd-flagmark" in members, "the FDR flag mark renders in --ember, which is 4.45:1 on the wash — it must lift to --ink"
+    # the arithmetic the rule exists for, held live
+    wash = _composite("#A34E13", "#F4EFE4", 0.09)
+    assert wash == "#EDE1D1"  # the background live axe reported
+    assert round(_contrast("#A34E13", wash), 2) == 4.46 and _contrast("#A34E13", wash) < AA_NORMAL  # axe rounds down to 4.45
+
+
+def test_every_derived_exemption_names_its_wcag_limb():
+    """An exemption is a WCAG judgement, and a judgement a reader cannot audit is a shrug.
+
+    WCAG 1.4.3's exceptions are narrow — incidental text (inactive UI component, pure
+    decoration, invisible, or part of a picture with significant other content) and
+    logotypes. Every row must name WHICH limb it rests on, in the vocabulary above, so a
+    later reader can check the claim against the emitting markup instead of trusting the
+    word "decorative". Four of these nine DO render a text glyph (the wayfinder and
+    loop-ribbon arrows and separators); saying so out loud is the point."""
+    unlabelled = [
+        f"{sel}: {reason[:70]}" for sel, reason in sorted(DERIVED_OPACITY_EXEMPT.items()) if not reason.startswith(WCAG_INCIDENTAL_LIMBS)
+    ]
+    assert not unlabelled, (
+        "an exemption row does not name its WCAG 1.4.3 limb. Prefix the reason with one of "
+        f"{list(WCAG_INCIDENTAL_LIMBS)} and cite the emitting markup:\n" + "\n".join(unlabelled)
+    )
+    # ...and the vocabulary itself must stay non-vacuous: a limb nobody uses is a limb
+    # nobody checked, and a limb that matched everything would label nothing.
+    used = {limb for limb in WCAG_INCIDENTAL_LIMBS for r in DERIVED_OPACITY_EXEMPT.values() if r.startswith(limb)}
+    assert used == set(WCAG_INCIDENTAL_LIMBS), f"unused limb(s) in WCAG_INCIDENTAL_LIMBS: {sorted(set(WCAG_INCIDENTAL_LIMBS) - used)}"
+
+
+@pytest.mark.parametrize("selector", sorted(DERIVED_OPACITY_EXEMPT))
+def test_every_derived_exemption_is_load_bearing(selector, monkeypatch):
+    """The other must-fail control, one per exemption: an exemption that changes nothing is
+    a row nobody would notice going wrong.
+
+    Drop the row and the MEASURED half must red naming that selector, in all three palette
+    blocks — i.e. every entry in DERIVED_OPACITY_EXEMPT is genuinely holding back a real
+    AA failure, and is a written WCAG 1.4.3 judgement rather than a shrug. Together with
+    test_derived_scan_is_live_and_its_exemptions_are_not_stale (which reds if the CSS rule
+    behind a row disappears) that is both directions, per entry."""
+    reason = DERIVED_OPACITY_EXEMPT[selector]
+    assert reason.strip(), f"{selector} is exempt with no written reason"
+    kept = {k: v for k, v in DERIVED_OPACITY_EXEMPT.items() if k != selector}
+    monkeypatch.setattr(sys.modules[__name__], "DERIVED_OPACITY_EXEMPT", kept)
+    mine = [f for f in _derived_failures() if f" {selector} @ opacity" in f]
+    assert mine, f"un-exempting {selector} produced no AA failure — the exemption is decorative, drop it"
+    for theme in ALL_BLOCKS:
+        assert any(f.startswith(f"[{theme}]") for f in mine), f"{selector} does not fail in {theme} — narrow the row's reason"
