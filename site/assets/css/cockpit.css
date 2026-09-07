@@ -175,7 +175,9 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   border-radius: var(--radius-xs); transition: background var(--dur-fast);
 }
 .cockpit-intro__go:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); }
-.cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); opacity: 0.8; }
+/* #3544 — prose ("Shown once. It won't interrupt again."). The opacity composited
+   --ink-muted to 3.35:1 on the light page; the ramp step IS the recede. */
+.cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); }
 .cockpit-intro__x {
   position: absolute; top: var(--sp-3); right: var(--sp-3);
   appearance: none; cursor: pointer; background: transparent; border: 0;
@@ -482,7 +484,9 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
    states what a zero means. */
 .rd-comp-zero .rd-comp-track { height: 2px; opacity: 0.6; }
 .rd-comp-zero .rd-comp-v { color: var(--ink-faint); }
-.rd-comp-note { margin-top: 2px; color: var(--ink-faint); opacity: 0.85; }
+/* #3544 — prose ("a 0 is a real reading — counted, not hidden."). The opacity
+   composited --ink-faint, already the AA floor, to 3.65:1 on the light page. */
+.rd-comp-note { margin-top: 2px; color: var(--ink-faint); }
 /* DIL-049 D4 — the readiness score's own input-completeness disclosure (only
    rendered when the compute run was actually built on stale/missing input;
    silent on a fully-qualified score, same "claim carries its context" idiom

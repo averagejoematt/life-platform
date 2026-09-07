@@ -246,8 +246,15 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
    at 4.34:1 on the ember wash in light theme — the daily sweep read 16 NEW serious color-contrast
    nodes on /method/intelligence/ the day 16 correlations went FDR-significant (a data-driven state:
    the row only exists when the data flags it; /data/labs/ carried the same class as baselined debt).
-   Flagged rows are the emphasised rows, so their readouts take primary ink (12.9:1 light, 13.3:1 dark). */
-.rd-tbl tr.rd-flag :is(.rd-range, .rd-unit, .ndots-n, .evb-score, .ndots.cf-med, .ndots.cf-low, .ndots--none) { color: var(--ink); }
+   Flagged rows are the emphasised rows, so their readouts take primary ink (12.9:1 light, 13.3:1 dark).
+   #3544: that list was an ENUMERATION, and it missed the two descendants that carry --ember rather
+   than a faint ink — `.ndots.cf-high` (and the `.ndots-more` overflow badge inheriting from it) and
+   `.rd-flagmark` ("FDR ✓"). --ember on the wash composited over the light --page (#EDE1D1) measures
+   4.45:1, under the 4.5 floor, so a high-confidence flagged row failed exactly where a medium one
+   passed. Naming the PARENT `.ndots` instead of three of its four confidence states closes the set;
+   `.rd-flagmark` is scoped to the flagged ROW, so its standalone uses (the current-cycle marks on
+   /method/intelligence/, which sit on plain --page at 5.01:1) keep their ember. */
+.rd-tbl tr.rd-flag :is(.rd-range, .rd-unit, .ndots, .ndots-n, .evb-score, .rd-flagmark) { color: var(--ink); }
 .rd-flagmark { color: var(--ember); font-weight: var(--weight-med); }
 .rd-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }
 

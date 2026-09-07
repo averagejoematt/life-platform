@@ -1018,3 +1018,89 @@ REGISTRY_PROOFS.update(
         for path, what in _ATTRIBUTION_ALLOWLIST_ENTRANTS.items()
     }
 )
+
+
+# ── #3544 (second pass): the nine entries of DERIVED_OPACITY_EXEMPT ────────────────────
+#
+# The first #3544 pass measured a hand-written list of six selectors. A hand list holds
+# only the members someone thought of, and this one missed `.ndots-more` — the "+N"
+# overflow badge on a sample-size dot row, which charts.js::nDots emits ONLY when
+# n > cap (12). When the correlations crossed 12 overlapping days it appeared, composited
+# its INHERITED --ember at 4.47:1 dark / 3.51:1 light, and rolled the site back three
+# times (site-deploy 34056404335, 34057051481, 34066269969), CONFIRMED each time by the
+# #2978 re-probe.
+#
+# So the second pass DERIVES the set: every `opacity: <1` rule in every shipped
+# stylesheet, text-bearing decided from the CSS itself, colour resolved through
+# inheritance. Nine of those rules are genuinely exempt from WCAG 1.4.3 (text-free marks,
+# aria-hidden decoration, one disabled control) and each gets a row in
+# `tests/test_token_contrast.py::DERIVED_OPACITY_EXEMPT` — and each row is a census gate.
+#
+# An exemption nobody has watched failing is indistinguishable from a rule that was never
+# enforced (the #3520 lesson, one file up), so every entry is proved in BOTH directions:
+#   (a) LOAD-BEARING — delete the row and the MEASURED half reds, naming that selector in
+#       all three palette blocks. If it did not, the row would be decoration over a rule
+#       that was never below AA in the first place.
+#   (b) NOT A BLANKET PASS — the row is keyed to a rule that must still EXIST with an
+#       opacity. Strip the opacity out of the CSS and
+#       `test_derived_scan_is_live_and_its_exemptions_are_not_stale` reds by name, so a
+#       renamed or retired rule cannot leave a live-looking excuse behind.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DERIVED_DECOR_COMMAND = (
+    "python3 -m pytest tests/test_token_contrast.py -q   "
+    "# 38 tests; the 9 parametrised cases of test_every_derived_exemption_is_load_bearing "
+    "are the per-entry (a) controls, and test_derived_scan_is_live_and_its_exemptions_are_not_stale is (b)"
+)
+_DERIVED_DECOR_SCOPE = (
+    "A verdict on the ARITHMETIC and on the CSS parse, offline — not on the rendered page. Each rule's "
+    "ink is composited over --page and --surface at the opacity parsed from the sheet, in all three palette "
+    "blocks; the guard does not know which background a given instance actually lands on and does not see a "
+    "wash ground (that is test_ch_state_grounds_on_a_ramp_step_not_an_accent_wash and "
+    "test_flagged_row_names_the_ndots_parent_not_three_of_its_four_states), inline styles, or JS-set colours. "
+    "The 'is this text?' decision is the CSS's own statement — a declared text property, or a descendant rule "
+    "that declares one — so a wrapper that styles nothing and whose text lives in a sibling is outside its "
+    "reach. Whether the exempt selector really carries no text node is a HUMAN judgement recorded as the row's "
+    "written reason (aria-hidden in the emitting JS/HTML, an SVG-only child, a :disabled control); the guard "
+    "proves the row is load-bearing and still points at a live rule, not that the reason is true. The live "
+    "arbiter stays tests/visual_qa.py's axe sweep."
+)
+
+# selector: (alpha, n failures when un-exempted, worst ratio per palette block)
+_DERIVED_DECOR_OBSERVED = {
+    ".wall-cell": (0.9, 6, "dark 1.05:1 / @media-light 1.06:1 / data-theme-light 1.06:1"),
+    ".imark-rail": (0.35, 6, "dark 1.70:1 / @media-light 1.60:1 / data-theme-light 1.60:1"),
+    ".wf-arrow": (0.55, 6, "dark 2.69:1 / @media-light 2.28:1 / data-theme-light 2.28:1"),
+    ".wf-sep": (0.7, 6, "dark 3.45:1 / @media-light 2.77:1 / data-theme-light 2.77:1"),
+    ".loop-ribbon .lr-arrow": (0.55, 6, "dark 2.69:1 / @media-light 2.28:1 / data-theme-light 2.28:1"),
+    ".loop-ribbon .lr-sep": (0.7, 6, "dark 3.45:1 / @media-light 2.77:1 / data-theme-light 2.77:1"),
+    ".portrait .pt-hatch": (0.75, 6, "dark 4.02:1 / @media-light 3.22:1 / data-theme-light 3.22:1"),
+    ".art-band": (0.6, 6, "dark 2.83:1 / @media-light 2.35:1 / data-theme-light 2.35:1"),
+    ".predict-btn:disabled": (0.5, 12, "dark 1.03:1 / @media-light 1.05:1 / data-theme-light 1.05:1"),
+}
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/test_token_contrast.py::DERIVED_OPACITY_EXEMPT::{selector}": {
+            "gate_name": f"DERIVED_OPACITY_EXEMPT[{selector}]",
+            "command": _DERIVED_DECOR_COMMAND,
+            "mutation": (
+                f"(a) the entry's own row deleted from DERIVED_OPACITY_EXEMPT, leaving `{selector}` "
+                f"(opacity {alpha}) measured. (b) the row left in place and `opacity: {alpha}` stripped out of "
+                "the rule in the real stylesheet, so the exemption points at a rule that no longer recedes."
+            ),
+            "observed": (
+                f"2026-09-06, watched in both directions. CLEAN: 0 derived failures, 38 passed, exit 0. "
+                f"ARMED (a): {n} AA failures naming `{selector} @ opacity {alpha}` — worst per block {worst} — "
+                f"and test_derived_text_opacity_rules_composite_to_aa reds. ARMED (b): "
+                "test_derived_scan_is_live_and_its_exemptions_are_not_stale reds naming the selector. "
+                "The whole-file real-tree control was watched separately for `.wf-arrow` (direction a: 6 failed / "
+                "31 passed, exit 1) and `.wf-sep` (direction b: 2 failed / 36 passed, exit 1) — mutating the "
+                "actual working tree, not a copy — and both REVERTED to 38 passed, exit 0."
+            ),
+            "scope": _DERIVED_DECOR_SCOPE,
+            "proved_on": "2026-09-06",
+        }
+        for selector, (alpha, n, worst) in _DERIVED_DECOR_OBSERVED.items()
+    }
+)
