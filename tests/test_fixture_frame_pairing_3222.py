@@ -142,8 +142,13 @@ _PT_PAIRED_RESIDUE: dict[str, int] = {
     # import `ingestion_framework`, which is PT for its DATE# writes — a file-level
     # over-approximation the residue absorbs rather than papering over with 13 markers.
     "tests/test_habitify_notes.py": 4,
-    "tests/test_habitify_status_resolution.py": 9,
-    "tests/test_now_remainder_batch.py": 1,
+    # tests/test_habitify_status_resolution.py (9) DRAINED to zero by #3666 — its
+    # `today`/`yesterday` are Pacific now, because the UTC ones were the bug under test
+    # rather than a harness detail. The ratchet forces the prune rather than leaving a
+    # cap the next slice could regrow into.
+    # tests/test_now_remainder_batch.py (1) DRAINED to zero by #3666 for the same reason
+    # as its sibling above: its `yesterday` was a UTC day compared against a Pacific
+    # DATE# key, which is the defect, not the harness.
     # `cost_governor_lambda._active_ceilings()` — `utc-exempt(#2798)`: the dated ADR-133
     # ceiling window is scoped to a BILLING month and reverts as the AWS budget month
     # rolls. Pacific would revert it 7-8h late. The fixture is in the handler's frame.
