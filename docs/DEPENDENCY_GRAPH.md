@@ -46,7 +46,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | constant |
 | `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | constant |
 | `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | constant |
-| `habitify-data-ingestion` | ingestion_stack | `cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | resolved |
 | `hevy-backfill` | ingestion_stack | `cron(0 12-23 * * ? *)` | constant |
 | `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | constant |
 | `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | constant |
@@ -230,7 +230,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**76 tools across 26 modules** (AST-counted from `mcp/registry.py`;
+**81 tools across 29 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 

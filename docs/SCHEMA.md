@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-09-06 (v8.6.0 — 76 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
+**Last updated:** 2026-09-07 (v8.6.0 — 81 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -920,17 +920,30 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
-| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
-| `by_group` | object | Map of P40 group name → group stats object (see below) |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, `miss_source` (`vendor`\|`platform`, present only when status is `failed` — #3666), etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
+| `by_group` | object | Map of AREA name → group stats object (see below). #3666: the group set is DERIVED from Habitify's live `/areas` response, not the hardcoded nine P40 names — those had been renamed to `Core`/`Optimize`/`Vice`, which left `by_group` empty and `total_possible` 0 on every stored day. |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
-| `pending_count` | number | Habits still pending (deadline not yet passed) — excluded from `completion_pct` denominator (TD-11 phantom-fail fix) |
+| `pending_count` | number | Habits still pending (the Pacific day has not closed) — excluded from `completion_pct` denominator (TD-11 phantom-fail fix) |
+| `failed_vendor_count` | number | #3666: misses Habitify itself reported (`failed` — the owner marked it in the app, or Habitify resolved it at the end of its own day; the API does not separate the two) |
+| `failed_platform_count` | number | #3666: habits still `in_progress` when their PACIFIC day closed, resolved by the ingest Lambda. An inference, counted separately from a reported lapse |
 | `completion_pct` | number | Pending-aware completion 0.0–1.0 |
 | `completion_pct_strict` | number | Legacy strict completion (pending counts as miss), for comparison |
 | `mood` | number | Habitify mood rating 1–5 (null if not logged) |
 | `mood_label` | string | Terrible / Bad / Okay / Good / Excellent (null if not logged) |
 | `skipped_count` | number | Habits explicitly skipped |
+| `attribution` | string | #3666: which channel decided the day's completions — `logs` (every habit attributed from `GET /logs/{habit_id}`.`created_date` → Pacific day), `mixed`, or `journal_fallback` (the logs GET failed; the vendor's UTC-bucketed journal status was used instead). A degraded run is visible in the record, not only in a log line. |
+| `upgrade_only_merges` | list | #3666: present only when a re-ingest RESTORED a status a later fetch had lost (`"Weigh In:failed->completed"`). `completed`/`skipped` are terminal for a Pacific day; `pending` may resolve to `failed` only once that day has closed. |
 | `updated_at` | string | ISO timestamp of last write |
+
+**Day attribution (#3666).** `DATE#` is a PACIFIC calendar day. A completion is attributed
+to the Pacific day of its log's `created_date` — never to the UTC day Habitify's
+`/journal` endpoint buckets by, and never to `progress.reference_date`, which merely
+echoes the `target_date` that was queried. Habitify anchors a BACK-DATED completion at
+00:00 local of the day it was marked for, so the same rule recovers a same-day tick, a
+19:11 PT tick and a two-days-later catch-up. Non-daily habits (`periodicity` weekly /
+monthly) keep the vendor's period-level `status`; their day-level evidence is
+`completed_at`, present only on the day a log actually attributes to.
 
 Each `by_group` entry:
 ```json

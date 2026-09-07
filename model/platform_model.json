@@ -6108,12 +6108,12 @@
       "module": "lambdas/ingestion/habitify_lambda.py",
       "schedules": [
         {
-          "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(5 * * * ? *)",
           "resolution": "resolved"
         }
       ],
       "stack": "ingestion_stack",
-      "timeout_seconds": 180
+      "timeout_seconds": 240
     },
     "health-auto-export-webhook": {
       "declared_alarm": "hae-webhook-errors",
@@ -6961,8 +6961,8 @@
       "contracts_ratchet": 8,
       "edges": 667,
       "lambdas": 104,
-      "mcp_tool_modules": 26,
-      "mcp_tools": 76,
+      "mcp_tool_modules": 29,
+      "mcp_tools": 81,
       "partitions": 105,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
@@ -8226,7 +8226,7 @@
       "utc": null
     },
     {
-      "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(5 * * * ? *)",
       "lambda": "habitify-data-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
