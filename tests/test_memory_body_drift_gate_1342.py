@@ -235,6 +235,54 @@ def test_state_rule_leaves_the_diary_alone(tmp_path):
     assert chk._state_hits([retired], "2026-09-05", "16") == []
 
 
+def test_current_dash_n_marker_line_is_exempt_but_the_bare_form_still_hits_3641(tmp_path):
+    """#3641: `\\bCURRENT\\b` matches inside `CURRENT-1` because `-` is a word
+    boundary — a correctly-labelled prior-cycle row using the corpus's own
+    `CURRENT-1 (date): …` marker grammar must NOT be a hit, even though it
+    echoes the bare live-state word "LIVE" to narrate what was true at the
+    time. The identical claim WITHOUT the marker (a bare, unlabelled line)
+    must still BE a hit — both directions are the test, per the acceptance
+    criterion verbatim."""
+    chk = _load()
+
+    marker_row = _plant(
+        tmp_path,
+        "MEMORY.md",
+        "**CURRENT-1 (2026-09-04): cycle 16 LIVE, genesis 2026-09-04**\n",
+    )
+    assert chk._state_hits([marker_row], "2026-09-06", "17") == [], "a CURRENT-1 history row must not be read as a live claim"
+
+    bare_row = _plant(
+        tmp_path,
+        "project_topic.md",
+        "cycle 16 LIVE, genesis 2026-09-04\n",
+    )
+    hits = chk._state_hits([bare_row], "2026-09-06", "17")
+    assert hits, "the identical claim WITHOUT the CURRENT-N marker must still be a genuine hit"
+    assert "2026-09-04" in hits[0] and "cycle 16" in hits[0], hits
+
+    # A bare `CURRENT:` (no dash-digit) must be UNCHANGED — still a live claim,
+    # not swallowed by the #3641 fix (the corpus also uses this form, e.g. a
+    # skill file's frontmatter description tag — see
+    # test_state_rule_fires_on_the_real_2026_09_05_lines above, the real
+    # pre-existing case this fix must not silence).
+    bare_current_colon = _plant(
+        tmp_path,
+        "project_desc_tag.md",
+        'description: "reset tooling — CURRENT: cycle 13 LIVE, genesis 2026-08-10"\n',
+    )
+    hits2 = chk._state_hits([bare_current_colon], "2026-09-06", "17")
+    assert hits2, "a bare CURRENT: (no dash-digit) must still fire — #3641 must not silence this real case"
+
+    # The marker generalizes past just "-1" — CURRENT-2, CURRENT-10, etc.
+    marker_row_n = _plant(
+        tmp_path,
+        "project_history.md",
+        "CURRENT-2 (2026-08-04): cycle 15 LIVE, genesis 2026-09-01\n",
+    )
+    assert chk._state_hits([marker_row_n], "2026-09-06", "17") == []
+
+
 def test_the_index_itself_is_in_scope_now(tmp_path):
     """`_scan_memory_files` used to exclude MEMORY.md. It is the first file a session
     reads, and nothing guarded it."""

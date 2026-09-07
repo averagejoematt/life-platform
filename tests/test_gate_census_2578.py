@@ -533,9 +533,15 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # sender default names a .invalid domain SES can never have verified).
         # BASELINE_TOTAL_GATES is deliberately NOT moved: #3588/#3629 net-removed one gate
         # in the same window, so the live total stays at the committed 597.
+        # Upper bound raised 71 -> 79 (2026-09-06, #3645): eight new proofs, one per
+        # tests/test_no_tool_attribution_3005.py::ALLOWLIST entrant the widened sweep-1
+        # mention pattern turned into a new gate — REGISTRY_PROOFS in
+        # scripts/gate_census_proofs.py, each proven load-bearing (delete the entry ->
+        # the guard reds naming exactly that file; reverted -> exit 0). Watched
+        # 2026-09-06 for all eight (see PR #3658).
         3
         <= len(proven)
-        <= 71  # re-measured 2026-09-06 on the merged tree: #3638's proven entrant atop main
+        <= 79  # re-measured 2026-09-06 on the merged tree: #3645's eight proven ALLOWLIST entrants atop #3638's
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

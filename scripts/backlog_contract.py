@@ -82,6 +82,22 @@ CHECKBOX_RE = re.compile(r"^[ \t]*[-*][ \t]+\[(?P<mark>[ xX])\][ \t]*(?P<text>.*
 STORIES_HEADING_RE = re.compile(r"^#{2,}[ \t]*Stories\b", re.IGNORECASE)
 ISSUE_REF_RE = re.compile(r"#(?P<number>\d+)")
 
+# #3594: every review/incident-filed bug or story carries a `## Set` section — the
+# enumeration query it was found by, plus a member count. No fixed grammar for the
+# count (the corpus already writes it several honest ways — "9 lines today", "6
+# members today", "Member count at filing: 1 verdict string, 3 causes, 1
+# distinguished") — the contract is looser than the score/epic lines: a heading,
+# and AT LEAST ONE integer somewhere in its body. See set_section_text() /
+# set_section_has_count() below.
+SET_HEADING_RE = re.compile(r"^#{2,}[ \t]*Set[ \t]*$")
+
+# The labels that mark an issue as FILED FROM a review sweep or an incident — the
+# `## Set` contract above only applies to these. `review:*` is the live label
+# family (e.g. `review:overnight-drain-2026-09-06`); `incident`/`incident:*` is
+# named in #3594's own text with no live example yet, so the pattern is written to
+# match it the day one exists.
+REVIEW_OR_INCIDENT_LABEL_RE = re.compile(r"^(?:review:|incident\b)")
+
 # The epic-link line, required on every story/bug/chore by the amendment:
 #   **Epic:** #1863            — or —   **Epic:** none — stands alone because …
 # A silently absent line is a contract violation; an explicit `none` is not, which
@@ -284,6 +300,37 @@ def acceptance_items(body: Optional[str]) -> List[Tuple[bool, str]]:
         if m:
             items.append((m.group("mark").lower() == "x", m.group("text").strip()))
     return items
+
+
+def set_section_text(body: Optional[str]) -> Optional[str]:
+    """The full text under the `## Set` heading, or None if the section is absent.
+
+    #3594: unlike outcome_line (first non-empty line only), this returns the WHOLE
+    section — the member count can land on any line of it ("… → **9 lines
+    today, of which 1 executes a commit**" is line 1; "**6 members today**" can be
+    the last line of a longer enumeration paragraph).
+    """
+    lines = [line for line in _section_lines(body, SET_HEADING_RE) if line.strip()]
+    return "\n".join(lines) if lines else None
+
+
+def set_section_has_count(body: Optional[str]) -> bool:
+    """True when the `## Set` section is present AND contains at least one integer.
+
+    Deliberately loose (no fixed phrase to match): the contract is "name the
+    enumeration query and the member count", and the corpus already states the
+    count several honest ways. An integer's presence is the cheap, generic proxy
+    for "a count was actually stated", same house style as
+    rule_acceptance_count's box-count check.
+    """
+    text = set_section_text(body)
+    return bool(text) and re.search(r"\d", text) is not None
+
+
+def filed_from_review_or_incident(labels: List[str]) -> bool:
+    """True when a label marks this issue as filed from a review sweep or an
+    incident — the `## Set` contract (#3594) applies only to these."""
+    return any(REVIEW_OR_INCIDENT_LABEL_RE.match(name) for name in labels)
 
 
 def find_epic_line(body: Optional[str]) -> Optional[str]:

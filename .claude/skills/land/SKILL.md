@@ -113,6 +113,13 @@ Per ADR-099, the session that merges owns the closing comment:
 **Partial acceptance is not a close** — merge the PR, reopen the issue, name the unmet
 boxes.
 
+**If the issue carries a `## Set` section (#3594),** read the PR body's own member list
+before writing the verdict — "instance-only" (the PR names and fixes only the specimen the
+issue happened to cite, with no count/member-list evidence the class was even considered)
+is a `partial`, not a `realized`, whatever the PR's own claim says. A residual member the
+PR didn't cover gets disposed exactly like any other residual above: a carrier `#N`, a fold
+onto a named open issue, or `not-work — <reason>` — never silently dropped.
+
 **An INSTRUMENT closes on its first live output, not on the merge (#3595).** If the work is
 an alarm, gate, sweep, judge, ledger, scheduled job or fail-soft write, the PR carries `Refs
 #N` (never `Fixes #N`), and the close waits for a comment carrying `**Live proof:** <UTC
