@@ -220,3 +220,58 @@ def test_sanction_issue_ref_live_check_is_a_pure_function():
     assert not any("#1234" in f for f in findings)
     # Every ref open: no findings.
     assert not check_css_tokens.verify_sanction_issue_refs(refs, open_issue_numbers={1234, 999})
+
+
+# ---------------------------------------------------------------------------
+# #3542 — the gate reaches the JS surface. The §10.1 sweep read stylesheets, then
+# generated <style> blocks, then built pages — but never a .js file, and evidence.js
+# branched its mobile-only scroll behaviour on `matchMedia("(max-width: 819px)")`:
+# one below the 820 token every evidence.css layout rule for that same boundary uses.
+# `grep -rnoE '\((max|min)-width: *[0-9]+px\)' site/assets/js/*.js` returned exactly
+# one hit, and it was the rogue one.
+# ---------------------------------------------------------------------------
+
+_PREFIX_JS = 'if (matchMedia("(max-width: 819px)").matches) { main.scrollIntoView({ block: "start" }); }'
+
+
+def test_js_breakpoint_sweep_is_non_vacuous():
+    """The JS half fires on the exact pre-fix evidence.js literal, and passes the token."""
+    findings = check_css_tokens.js_breakpoint_findings("site/assets/js/evidence.js", _PREFIX_JS)
+    assert len(findings) == 1
+    assert "819px" in findings[0] and "matchMedia" in findings[0]
+    fixed = 'const NAV_STACKS_MQ = "(max-width: 820px)";'
+    assert check_css_tokens.js_breakpoint_findings("site/assets/js/evidence.js", fixed) == []
+    # Every sanctioned breakpoint passes in JS exactly as it does in CSS.
+    for bp in sorted(check_css_tokens.SANCTIONED_BREAKPOINTS):
+        prefix = "min" if bp in (601, 761, 821, 901) else "max"
+        assert not check_css_tokens.js_breakpoint_findings("x.js", f'matchMedia("({prefix}-width: {bp}px)")'), bp
+
+
+def test_js_breakpoint_sweep_ignores_comments_but_not_urls():
+    """A boundary DISCUSSED in a comment is not a live query; a `//` inside a URL
+    string must not swallow the rest of the line (and with it a real breakpoint)."""
+    assert check_css_tokens.js_breakpoint_findings("x.js", "// was (max-width: 819px)\nconst A = 1;") == []
+    assert check_css_tokens.js_breakpoint_findings("x.js", "/* the old (max-width: 819px) rule */\nconst A = 1;") == []
+    assert check_css_tokens.js_breakpoint_findings("x.js", 'fetch("https://x.test/a"); matchMedia("(max-width: 555px)");')
+
+
+def test_js_breakpoint_sweep_surface_is_derived_and_non_empty():
+    """The vacuous-scan trap: a sweep whose file set covers nothing is green forever.
+    The JS surface is a glob over site/assets/js/, and evidence.js — the file that
+    carried the rogue literal — must be in it."""
+    labels = [label for label, _ in check_css_tokens.js_sources()]
+    assert len(labels) > 20, labels[:5]
+    assert "site/assets/js/evidence.js" in labels
+
+
+def test_check_includes_the_js_surface(tmp_path, monkeypatch):
+    """check() itself — what the pytest gate and CI run — must fold in the JS half.
+    A helper nothing calls is the #3200 class. Proven by pointing the (derived) JS
+    surface at a file carrying the pre-fix literal and watching check() go red, with
+    the real repo left untouched."""
+    assert not check_css_tokens.check()  # the repo is clean before we plant anything
+    planted = tmp_path / "evidence.js"
+    planted.write_text(_PREFIX_JS)
+    monkeypatch.setattr(check_css_tokens, "js_sources", lambda: [("site/assets/js/evidence.js", planted)])
+    findings = check_css_tokens.check()
+    assert any("819px" in f and "evidence.js" in f for f in findings), findings

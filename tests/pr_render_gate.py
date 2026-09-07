@@ -31,6 +31,17 @@ in addition to 1440×900 desktop — and asserts the Epic-A failure classes ther
 tap-target floor #1010/#1249 now gates). A PR that reintroduces one of those classes fails the gate
 before merge instead of surfacing on the live site.
 
+Mobile FIRST-LOAD pass (#3542): capture_page also drives a SEPARATE, FRESH navigation
+at 390x844 per gate page — a new page in the same (mocked, clock-pinned) context, sized
+before goto and never touched afterwards. The pre-existing mobile coverage above resizes
+an already-loaded, already-scrolled desktop page, so it was structurally unable to see a
+page that scrolls itself on first paint: evidence.js called scrollIntoView() on its
+INITIAL render at phone width, and every /data/ · /protocols/ · /method/ shell jumped
+past its own hero with no user input. The same probe asserts the DES-3 invariant — a
+sticky top bar whose computed backdrop-filter is `none` must be fully opaque. Both
+assertions live in visual_qa.mobile_first_load_findings, so this gate and the live
+post-deploy sweep enforce byte-for-byte the same contract.
+
 Realistic-data pass (#1039): the empty-mock pass is structurally blind to DATA-DRIVEN
 layout overflow — PR #1008 passed 8/8 here, then blew out /data/vitals/ by +255px at
 390px under real data (caught only by the post-deploy visual-AI QA + rollback, fixed
