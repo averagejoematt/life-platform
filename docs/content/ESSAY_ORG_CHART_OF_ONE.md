@@ -29,7 +29,7 @@ file:
 > every decision here is deterministic and auditable." (`remediation/automerge.py:7` — retired 2026-08-30, #2833)
 
 That sentence is the whole org chart, compressed. I run a production AWS platform —
-104 Lambda functions, 10 CDK stacks, ~76 MCP tools, a public website, a hard monthly
+104 Lambda functions, 10 CDK stacks, ~81 MCP tools, a public website, a hard monthly
 budget ceiling enforced in code — with no team. The engineering headcount is one human
 who has a day job and a family, plus N instances of Claude, where N is however many
 sessions ran this week.

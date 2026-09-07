@@ -1,6 +1,6 @@
 # MCP Tool Audit Ledger — the AUDITED_AT ratchet
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-08
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-06
 
 Dated, reviewable record of every batch of MCP registry removals (issue #395, epic #345
 "Less machine, same power", finding ER-04). Nothing disappears from the registry without
@@ -8,7 +8,12 @@ an entry here citing the usage telemetry that justified it. Git history is the a
 every deleted function is recoverable from the commit referenced by each batch.
 
 Companion ratchet: `tests/test_mcp_orphan_tools.py` (`AUDITED_AT`, orphan count, now 0)
-and `tests/test_mcp_registry.py` (`EXPECTED_MIN/MAX_TOOLS`, now 50–70).
+and `tests/test_mcp_registry.py` (`EXPECTED_MIN/MAX_TOOLS`, now 50–81).
+
+**This ledger governs removals only. Since 2026-09-06 it has a counterpart for ABSENCE:**
+the miss log (`mcp/miss_log.py` → `s3://matthew-life-platform/mcp-audit/misses/`). Read the
+correction in the 2026-09-06 section before citing any invocation telemetry — including the
+telemetry in this file — as evidence for the next expand-or-prune decision.
 
 ## Ratchet history
 
@@ -18,6 +23,7 @@ and `tests/test_mcp_registry.py` (`EXPECTED_MIN/MAX_TOOLS`, now 50–70).
 | 2026-05-17 | 116 | 64 | V2 P4.1 — tools_calendar.py deleted (ADR-030) |
 | **2026-07-08** | **143 → 60** | **64 → 0** | **#395 ER-04 prune — this record** |
 | 2026-07-08 | 60 → 62 | 0 | #422 addition — `get_habit_reflection_queue` + `log_habit_reflection` (habit causality reflection loop, `mcp/tools_habits.py`). Deliberate add, not drift; within the 50–70 band. |
+| **2026-09-06** | **76 → 81** | **0** | **#3668 addition — the surface index, the waiter, and three hot-path named tools.** `describe_platform_surfaces` + `get_platform_surface` (`mcp/tools_surfaces.py`, over the derived `mcp/surface_index.py`) reach all 108 owner-relevant site-API surfaces through TWO tools rather than 59; `get_experiment_cycle` + `get_habit_completion` + `get_platform_cost` (`mcp/tools_platform.py`) are the questions asked daily, where a named tool beats an index lookup. Band raised 76 → 81. See the correction below. |
 
 ---
 
@@ -188,10 +194,98 @@ Notes:
 - `get_character`, `get_board_of_directors`, challenges, hypotheses, protocols: all site/email-served
   features whose MCP read surfaces went unused; engine and site are untouched.
 
+## AUDITED_AT 2026-09-06 — the addition (#3668), and a correction to the evidence base
+
+### The addition
+
+Five tools, 76 → 81. The gap they close was measured by diffing the SERVED surface against
+the TOOL surface:
+
+```
+site API endpoints                                    134
+MCP tools (before)                                     76
+endpoints with no name-overlapping tool                85
+  minus reader-only surfaces                           26
+OWNER-RELEVANT ENDPOINTS WITH NO MCP TOOL              59
+```
+
+Name-overlap is a weak proxy and 59 is a floor, not a precise count. The clustering was the
+signal: habits, receipts and pre-registered hypotheses — three of the things the platform is
+*for* — had no owner-facing read path at all.
+
+**59 endpoints did NOT become 59 tools, and that is the whole design.** The #395 prune took the
+registry 143 → 60 *because* an oversized tool list degrades selection; rebuilding toward 135
+would have re-created the exact problem that prune solved. Instead:
+
+| tool | role |
+|---|---|
+| `describe_platform_surfaces` | the index — every surface, its question, its params, and **the rule it applies** |
+| `get_platform_surface` | the waiter — fetches any indexed surface, read-only, rule attached to every response |
+| `get_experiment_cycle` | hot path: the cycle number, returned from `experiment_stamp()` and never re-derived |
+| `get_habit_completion` | hot path: completion + streaks, with the date rule that produced them |
+| `get_platform_cost` | hot path: the budget envelope + the AI inference receipt |
+
+The index is **derived** from `site_api_lambda`'s route tables via
+`deploy/endpoint_registry.discover_endpoint_records` — the same AST walk `sync_doc_metadata`
+and the schema-completeness gate already share (#1436). It is not a list anyone maintains: a
+route that ships tomorrow is in the index tomorrow, unannotated but reachable, and
+`tests/test_mcp_surface_index_3668.py` plants a route into the source to prove it.
+
+Reader-only surfaces are excluded by a registry (`READER_ONLY_SURFACES`) whose every entry
+carries a written reason; **write endpoints are excluded by derivation** (POST-only), never by
+listing. Payloads pass through `privacy.field_tiers.strip_map()` — the same declaration
+`mcp/tools_data.py` reads, not a second copy of the ruling (#2803/#2809).
+
+### The correction: build-period telemetry is not demand evidence for a use period
+
+The #395 prune cited 30 days of `LifePlatform/MCP ToolInvocations` ending 2026-07-08. **That
+decision stands.** What does not stand is reusing that telemetry — or any telemetry of the same
+shape — as evidence for the *next* expand-or-prune decision.
+
+Measured against the cycle registry, the window covered cycle 3 (6 days) and cycle 4 (28 days).
+Cycle 4 is the second-longest of seventeen, so window LENGTH was not the defect. The population
+was:
+
+```
+median cycle length            5 days
+cycles lasting <= 2 days       8 of 17
+cycles exceeding 15 days       2 of 17   (cycle 1: 61d, cycle 4: 28d)
+```
+
+**Absence of invocation is not evidence a tool is unwanted.** It is equally consistent with the
+tool being unfindable, or with the owner never reaching the stage of a cycle where it applies.
+Pruning on absence assumes the opportunity existed and was declined. Across seventeen cycles
+averaging five days — in a period the owner describes as *building* the platform rather than
+using it — most surfaces never had the chance. That is a measurement defect of the same class as
+the rest of this backlog: **an instrument that cannot distinguish "no" from "never asked."**
+
+`ToolInvocations` measures what was USED. It is structurally silent on what was WANTED, and the
+cycle-number question that opened #3668 is the proof: it was asked, nothing answered it, and the
+platform never learned it had been asked.
+
+### The successor instrument
+
+**The miss log** (`mcp/miss_log.py`), one JSON object per unanswerable request under
+`s3://matthew-life-platform/mcp-audit/misses/YYYY/MM/DD/`. It records the surface asked for, the
+caller's own phrasing, the reason nothing matched, and the near-miss names — inverting the
+ratchet from *what was used* to *what was wanted*. It rides inside the existing `mcp-audit/`
+prefix on purpose: the MCP role already holds `s3:PutObject` (and only PutObject) there, and
+`deploy/bucket_policy.json` already denies `DeleteObject` on it, so the log is append-only and
+delete-protected on day one. Fail-open by contract — a miss log that can break a tool call would
+turn "I could not answer that" into "the platform is down".
+
+**The next removal decision cites the miss log alongside the invocation telemetry, or it is not
+evidence-based.** The owner began sustained conversational use in September 2026; that is the
+first population for which usage data means anything.
+
 ## How to remove a tool after this record
 
 1. Snapshot the trailing-30d `LifePlatform/MCP` ToolInvocations telemetry (as above).
-2. Add a dated `AUDITED_AT` section here: telemetry, the removal list, each keep-anyway reason.
-3. Delete registrations AND function bodies; keep `tests/test_mcp_orphan_tools.py` at zero orphans.
-4. Update `EXPECTED_MIN/MAX_TOOLS` consciously and run `deploy/sync_doc_metadata.py --apply`.
+2. Snapshot the miss log for the same window (`aws s3 ls --recursive s3://matthew-life-platform/mcp-audit/misses/`)
+   — a tool with zero invocations and repeated misses naming it is WANTED, not dead (2026-09-06, #3668).
+3. State explicitly what the window's cycle population was, and whether the tool had the
+   opportunity to be reached in it. "No invocations" is not "declined" (see the correction above).
+4. Add a dated `AUDITED_AT` section here: both telemetries, the removal list, each keep-anyway reason.
+5. Delete registrations AND function bodies; keep `tests/test_mcp_orphan_tools.py` at zero orphans.
+6. Update `EXPECTED_MIN/MAX_TOOLS` consciously and run `deploy/sync_doc_metadata.py --apply`.
 
