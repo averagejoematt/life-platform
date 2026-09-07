@@ -53,6 +53,7 @@ in the wrong door.
 | **Matthew (the N=1 subject)** | A daily instrument he returns to — today's read, what changed, the one thing that matters, his coaches' honest take. Returnability. |
 | **Friends & family** | The story — is he okay, is it working, what's the journey. The chronicle/journal/podcast carry this. |
 | **Health / quantified-self enthusiasts** | Depth and credibility — every source, every method, the correlations, the failures shown honestly. The Data + Method pillars carry this. |
+| **Matthew (the builder)** | A fifth audience, added 2026-09-07 and deliberately kept off the loop: the same person in his *orchestrator* role, needing to see how the BUILDING is going — backlog shape, delivery rate, what is improving, what the jury is out on. Served by one unlisted page (`/method/state/`), which is why that page is exempt from the "which part of the loop am I?" rule below rather than in violation of it. Nothing else may claim this exemption. |
 
 ## The success bar
 

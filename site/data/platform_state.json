@@ -1,0 +1,547 @@
+{
+  "about": "The joined owner-facing read of the BUILD of averagejoematt.com \u2014 not of the experiment. Every section delegates to the module that already owns its number; if a value here disagrees with its source, the source is right. A section that could not be computed is null WITH a reason, never a stale value silently retained.",
+  "autonomy": {
+    "alarms": 125,
+    "alarms_by_routing": {
+      "digest": 93,
+      "digest+paging": 2,
+      "paging": 2,
+      "urgent": 25,
+      "via-composite": 3
+    },
+    "as_of": "2026-09-07T22:15:53Z",
+    "contracts_enrolled": 8,
+    "error": null,
+    "lambdas": 104,
+    "remediation_mode": "shadow (permanent \u2014 `auto` retired 2026-08-30, ADR-129 amendment; it merges nothing in any mode)",
+    "scheduled": 81,
+    "source": "model/platform_model.json + remediation/ADR-129"
+  },
+  "bets": {
+    "as_of": "2026-09-07T22:15:35Z",
+    "epics": [
+      {
+        "number": 3593,
+        "title": "[EPIC] The review as an instrument \u2014 frozen anchors, a carry-forward cap, and its own negative control"
+      },
+      {
+        "number": 3592,
+        "title": "[EPIC] Close on evidence \u2014 the closure layer: first live output, the real wire, and deferrals with a carrier"
+      },
+      {
+        "number": 3498,
+        "title": "[EPIC] Subscriber and syndication surfaces \u2014 the promise, the status row, the counts and the share kits must be derived from what actually ships"
+      },
+      {
+        "number": 3497,
+        "title": "[EPIC] Security baseline 2026-09-05 \u2014 reader PII in a public prefix, gates ordered after the door, wildcard resources in a hand-kept policy"
+      },
+      {
+        "number": 3496,
+        "title": "[EPIC] Chart encodings that distort the series they draw \u2014 goal-anchored domains, index-positioned x, mismatched denominators, clipped scales"
+      },
+      {
+        "number": 3495,
+        "title": "[EPIC] Numbers that lie \u2014 served statistics whose stated method cannot produce them (ADR-105 rigor baseline, 2026-09-05)"
+      },
+      {
+        "number": 3494,
+        "title": "[EPIC] Measured floors \u2014 the type floor, contrast and a11y ledger are enforced on the whole surface, not a hand-picked subset"
+      },
+      {
+        "number": 3493,
+        "title": "[EPIC] CI and session-gate integrity \u2014 landing paths that skip the gates, readers that discard real reds, mirrors that restate their target"
+      },
+      {
+        "number": 3492,
+        "title": "[EPIC] Pre-start surfaces \u2014 absence rendered as zero, leaked placeholders and fallbacks-to-newest on the site's Day-0 pages"
+      },
+      {
+        "number": 3491,
+        "title": "[EPIC] The coaching door on Day 0 \u2014 pre-start and paused-source semantics lost at the prompt boundary, and a forked cast"
+      },
+      {
+        "number": 3490,
+        "title": "[EPIC] The reset\u2194writer contract \u2014 Day-0 provenance the sweep cannot see, tombstoned records whose pages stay live, phase-blind writers"
+      },
+      {
+        "number": 3489,
+        "title": "[EPIC] Observability baseline 2026-09-05 \u2014 detectors that cannot fire, citations that outlive their cause, sweeps blind to composites"
+      },
+      {
+        "number": 3042,
+        "title": "[EPIC] The A-Grade Program \u2014 external diligence remediation"
+      },
+      {
+        "number": 1737,
+        "title": "[EPIC] Podcast performance layer \u2014 lift the ADR-087 audio ceiling (Gemini 2.5 \u2192 3.1 Flash TTS)"
+      },
+      {
+        "number": 1564,
+        "title": "[EPIC] The Diary Studio: video diaries with Claude as the live interviewer"
+      },
+      {
+        "number": 1367,
+        "title": "[EPIC] The shareable machine \u2014 distribution, receipts, and the machine as exhibit"
+      },
+      {
+        "number": 1366,
+        "title": "[EPIC] From spectator to second N=1 \u2014 the participation ladder"
+      },
+      {
+        "number": 1365,
+        "title": "[EPIC] Progression you can defend \u2014 calibrate the character against felt reality"
+      },
+      {
+        "number": 1364,
+        "title": "[EPIC] Attempt #7 \u2014 the restart is the story"
+      },
+      {
+        "number": 718,
+        "title": "[EPIC] The fulfillment half \u2014 instrument connection, mood, meaning"
+      }
+    ],
+    "error": null,
+    "n_epics": 20,
+    "n_roadmap": 15,
+    "roadmap_parked": [
+      {
+        "number": 1740,
+        "title": "podcast: tag-aware script layer + strip tags before deterministic grading (S3)"
+      },
+      {
+        "number": 1739,
+        "title": "podcast: ship the winning TTS backend \u2014 gemini_tts.py model + prompt restructure, style rewrite, voice-bleed hack re-test (S2)"
+      },
+      {
+        "number": 1738,
+        "title": "podcast: the TTS bake-off \u2014 render one script through 2.5 / 3.1-bare / 3.1-tagged and pick by ear (S1)"
+      },
+      {
+        "number": 1677,
+        "title": "ingestion: closed-platform inbound capture \u2014 X + Instagram + TikTok (paste fallback + tokens)"
+      },
+      {
+        "number": 1629,
+        "title": "syndication: Bluesky content poster, shadow mode (GATED on the Phase 0 script hitting 15/30)"
+      },
+      {
+        "number": 1571,
+        "title": "claude-workflow: the /vlog mode + format library + Matthew-side studio kit"
+      },
+      {
+        "number": 1570,
+        "title": "site: diary cards \u2014 the public artifact of the video diary"
+      },
+      {
+        "number": 1415,
+        "title": "The Blind Week: audit the instrument's observer effect"
+      },
+      {
+        "number": 1407,
+        "title": "Monarch, the honest half: financial wellbeing without ingesting transactions"
+      },
+      {
+        "number": 1398,
+        "title": "The Detective: anomaly-triggered agentic case files, published dead ends included"
+      },
+      {
+        "number": 1391,
+        "title": "The Replication Kit: run my exact pre-registered experiment on yourself"
+      },
+      {
+        "number": 1389,
+        "title": "The Bandit hearing: value-of-information picks the next experiment, the panel debates it"
+      },
+      {
+        "number": 1388,
+        "title": "The Video Diary: avatar-anonymized daily diary with coach reactions"
+      },
+      {
+        "number": 1380,
+        "title": "Season Finale: templated scrollytelling cycle postmortem"
+      },
+      {
+        "number": 748,
+        "title": "Publish the fulfillment story once the data survives a bad week"
+      }
+    ],
+    "source": "gh issue list (epics, Roadmap, P1, closure:live-proof)"
+  },
+  "board": {
+    "actionable": 73,
+    "as_of": "2026-09-07T22:15:36Z",
+    "by_area": {
+      "ai": 5,
+      "claude-workflow": 21,
+      "data": 19,
+      "growth": 3,
+      "infra": 17,
+      "security": 1,
+      "site-ux": 7
+    },
+    "by_milestone": {
+      "Later": 23,
+      "Next": 20,
+      "Now": 29,
+      "none": 1
+    },
+    "by_prio": {
+      "P1": 10,
+      "P2": 38,
+      "P3": 24
+    },
+    "by_type": {
+      "bug": 40,
+      "story": 32
+    },
+    "cohorts": {
+      "actionable": 73,
+      "epic": 20,
+      "gated": 3,
+      "roadmap_parked": 15
+    },
+    "error": null,
+    "from_review": {
+      "fin-diligence-2026-08-31": 1,
+      "forensic-rca-2026-09-05": 24,
+      "fullreview-2026-09-05": 16,
+      "overnight-drain-2026-09-06": 5
+    },
+    "from_review_total": 46,
+    "reader_facing": 10,
+    "source": "gh issue list --state open",
+    "total_open": 111,
+    "truncated": false
+  },
+  "cost": {
+    "as_of": "2026-09-07T22:15:53Z",
+    "error": null,
+    "missing_keys": [],
+    "projected_scope": "recurring classes only (prod-cron, remediation)",
+    "projection_note": "Scope: this month-end projection extrapolates only the spend classes that recur on a schedule (prod-cron, remediation). Episodic spend (ci, dev-session) is counted in full in month-to-date \u2014 it is real money already spent \u2014 but is not multiplied out across the days remaining (#2892). Extrapolating every class instead gives $104.28.",
+    "raw_keys": [
+      "_meta",
+      "ai_daily_usd",
+      "as_of",
+      "base_ceiling_usd",
+      "ceiling_usd",
+      "ceiling_window",
+      "computed_at",
+      "episodic_billing_days",
+      "episodic_classes",
+      "episodic_premise_violations",
+      "history",
+      "month_end_date",
+      "month_to_date_usd",
+      "mtd_pct_of_ceiling",
+      "non_ai_daily_usd",
+      "note",
+      "per_feature_note",
+      "projected_all_classes_pct_of_ceiling",
+      "projected_all_classes_usd",
+      "projected_classes",
+      "projected_month_end_usd",
+      "projected_pct_of_ceiling",
+      "projected_scope",
+      "projection_note",
+      "recent_uniques",
+      "stale",
+      "stale_reason",
+      "surge_active",
+      "surge_ceiling_usd",
+      "surge_threshold_uniques",
+      "tier",
+      "tier_semantics"
+    ],
+    "receipts": {
+      "ai_daily_usd": 2.28,
+      "base_ceiling_usd": 215.0,
+      "ceiling_usd": 252.0,
+      "month_to_date_usd": 23.17,
+      "mtd_pct_of_ceiling": 9.2,
+      "non_ai_daily_usd": 1.2,
+      "projected_month_end_usd": 85.06,
+      "projected_pct_of_ceiling": 33.8,
+      "surge_active": true,
+      "surge_ceiling_usd": 252.0,
+      "tier": 0,
+      "tier_semantics": "All AI features active. Nothing is paused."
+    },
+    "source": "https://averagejoematt.com/api/receipts (public)"
+  },
+  "degraded_sections": [],
+  "delivery": {
+    "as_of": "2026-09-07T22:15:42Z",
+    "closed": 659,
+    "closed_within_24h": 403,
+    "cycle_hours": {
+      "median": 12.7,
+      "median_organic": 8.7,
+      "median_review_sourced": 29.2,
+      "n_organic": 407,
+      "n_review_sourced": 252,
+      "p90": 145.6
+    },
+    "error": null,
+    "n_sampled": 659,
+    "over_7_days": 56,
+    "prs_merged": 752,
+    "sampled": false,
+    "source": "gh issue list --state closed (trailing 30d)",
+    "window_days": 30
+  },
+  "generated_at": "2026-09-07T22:15:35Z",
+  "grades": {
+    "as_of": "2026-09-07T22:15:53Z",
+    "error": null,
+    "grade_distribution": {
+      "B": 3,
+      "B+": 9,
+      "B-": 3,
+      "C+": 2
+    },
+    "lenses": [
+      {
+        "grade": "B+",
+        "lens": "a11y",
+        "moved": true,
+        "prior": "A-",
+        "title": "Accessibility specialist"
+      },
+      {
+        "grade": "B",
+        "lens": "aiq",
+        "moved": true,
+        "prior": "B+",
+        "title": "AI-quality lead"
+      },
+      {
+        "grade": "B+",
+        "lens": "cost",
+        "moved": false,
+        "prior": "B+",
+        "title": "Cost engineer"
+      },
+      {
+        "grade": "B-",
+        "lens": "cpo",
+        "moved": true,
+        "prior": "B+",
+        "title": "CPO"
+      },
+      {
+        "grade": "B+",
+        "lens": "cto",
+        "moved": true,
+        "prior": "A-",
+        "title": "CTO / architect"
+      },
+      {
+        "grade": "B",
+        "lens": "data-architect",
+        "moved": true,
+        "prior": "B+",
+        "title": "Data architect"
+      },
+      {
+        "grade": "B",
+        "lens": "dataviz",
+        "moved": true,
+        "prior": "B+",
+        "title": "Data-viz expert"
+      },
+      {
+        "grade": "B+",
+        "lens": "designer",
+        "moved": true,
+        "prior": "A-",
+        "title": "Product designer"
+      },
+      {
+        "grade": "B+",
+        "lens": "devex",
+        "moved": true,
+        "prior": "A-",
+        "title": "DevEx / SDLC lead"
+      },
+      {
+        "grade": "C+",
+        "lens": "growth",
+        "moved": false,
+        "prior": "C+",
+        "title": "Growth PM"
+      },
+      {
+        "grade": "B+",
+        "lens": "integrations",
+        "moved": true,
+        "prior": "A-",
+        "title": "Integrations engineer"
+      },
+      {
+        "grade": "C+",
+        "lens": "narrative",
+        "moved": true,
+        "prior": "B+",
+        "title": "Narrative editor"
+      },
+      {
+        "grade": "B+",
+        "lens": "observability",
+        "moved": true,
+        "prior": "A-",
+        "title": "Observability lead"
+      },
+      {
+        "grade": "B+",
+        "lens": "principal",
+        "moved": true,
+        "prior": "A-",
+        "title": "Principal engineer"
+      },
+      {
+        "grade": "B-",
+        "lens": "qs",
+        "moved": true,
+        "prior": "C+",
+        "title": "QS / biohacker authority"
+      },
+      {
+        "grade": "B-",
+        "lens": "reader",
+        "moved": true,
+        "prior": "B+",
+        "title": "First-time reader (persona, on LIVE pages)"
+      },
+      {
+        "grade": "B+",
+        "lens": "security",
+        "moved": false,
+        "prior": "B+",
+        "title": "Security / privacy lead"
+      }
+    ],
+    "n_at_A": 0,
+    "n_lenses": 17,
+    "review_date": "2026-09-05",
+    "review_file": "docs/reviews/fullreview_grades_2026-09-05.json",
+    "source": "docs/reviews/*_grades_*.json (newest full review)"
+  },
+  "healthy": true,
+  "incidents": {
+    "as_of": "2026-09-07T22:15:53Z",
+    "by_month_recent": {
+      "2026-03": 21,
+      "2026-05": 1,
+      "2026-06": 2,
+      "2026-07": 36,
+      "2026-08": 126,
+      "2026-09": 7
+    },
+    "by_severity": {
+      "P1": 6,
+      "P2": 31,
+      "P3": 73,
+      "P4": 89,
+      "other": 5
+    },
+    "error": null,
+    "mttr_note": "not computed \u2014 TTD/TTR are free prose in INCIDENT_LOG.md; ~60-70% parseable, so any mean would be a selection artefact",
+    "source": "scripts/incident_log_patterns.py::build (docs/INCIDENT_LOG.md)",
+    "top_classes": null,
+    "total_rows": 204
+  },
+  "jury_out": {
+    "as_of": "2026-09-07T22:15:35Z",
+    "awaiting_live_proof": [
+      {
+        "number": 3651,
+        "title": "coach-nudge: a reservation stuck at 'attempting' for 156h consumed its day with no nudge recorded \u2014 #3569's fix left the pre-fix row with no path out"
+      },
+      {
+        "number": 3563,
+        "title": "fail-soft writes denied by IAM for weeks: /api/status 'Wednesday chronicle' is RED '44d ago' while three shipped (sender role lacks PutItem), and the Notion journal-dark dedup (#1480) has NEVER worked (LeadingKeys scoped to apple_health)"
+      },
+      {
+        "number": 3553,
+        "title": "commitments: the #532 follow-through ledger has never graded anything \u2014 480 records, 58 checkable, 51 past due, 0 kept / 0 broken; 37 bind to a source dark since 06-24, resets tombstone the rest, no dead-man reads the grader"
+      },
+      {
+        "number": 3516,
+        "title": "coach brief: the source inventory collapses every source to AVAILABLE / not available, dropping the registry's paused (ADR-074) and lag-by-design facets \u2014 coaches narrate Garmin and MacroFactor as 'not syncing yet'"
+      },
+      {
+        "number": 3511,
+        "title": "provenance: the #1947 countdown-gap sweep exempts every cycle-stamped live write, so 56 Day-0 coach rows (2 gradeable directional bets, 14 THREADs) sit as cycle-16 'current' \u2014 check 14 reports zero coach escapees by construction"
+      }
+    ],
+    "error": null,
+    "n_awaiting": 5,
+    "n_p1": 10,
+    "open_p1": [
+      {
+        "number": 3690,
+        "title": "honesty: /method/platform/ publicly serves review_grade 'A' while the newest review graded ZERO lenses at A (modal B+, worst C+) \u2014 plus site_pages 77 vs 93 and active_secrets 21 vs 28"
+      },
+      {
+        "number": 3685,
+        "title": "alarm: commitments-ungraded is uncreatable (14 x 86400s vs CloudWatch's 604800s ceiling) \u2014 the #3553 dead-man does not exist in AWS and LifePlatformMonitoring is wedged"
+      },
+      {
+        "number": 3621,
+        "title": "the experiment record: threshold provenance, a scheduled citation re-resolution, a horizon the record can answer, a lever write-contract, and the abandoned genesis"
+      },
+      {
+        "number": 3620,
+        "title": "security: schedule the instruments that already exist, assert the prefixes deny, and drift-check the live IAM policy against its tracked source"
+      },
+      {
+        "number": 3615,
+        "title": "one nightly cross-surface census: the (cycle_day \u00d7 hook \u00d7 artifact) matrix, same-week fact agreement, and the voice sampler that can only see one cycle"
+      },
+      {
+        "number": 3611,
+        "title": "the alarm estate says what it means: a producer census dead-man, capability self-tests, a suppressor registry, a 72h age dead-man, and hand-offs with identity"
+      },
+      {
+        "number": 3608,
+        "title": "one-bundle and CI-mirror paths are a SET: delete scripts/deploy.command, derive check_main_green's expected job set, ratchet the lane budget"
+      },
+      {
+        "number": 3607,
+        "title": "review: anchors become a sealed, derived artifact \u2014 ANCHORS.json + sha sibling, ${\u2026} placeholders, a tightening-only diff, and the UNOBSERVED verdict"
+      },
+      {
+        "number": 3598,
+        "title": "reset: the three one-function fixes \u2014 the wipe voids tombstoned drafts; experiment_stamp/tag_record derive phase from the write's date; archive_one is cycle-keyed under a per-step work contract"
+      },
+      {
+        "number": 3511,
+        "title": "provenance: the #1947 countdown-gap sweep exempts every cycle-stamped live write, so 56 Day-0 coach rows (2 gradeable directional bets, 14 THREADs) sit as cycle-16 'current' \u2014 check 14 reports zero coach escapees by construction"
+      }
+    ],
+    "source": "gh issue list (epics, Roadmap, P1, closure:live-proof)"
+  },
+  "quality": {
+    "as_of": "2026-09-07T22:15:53Z",
+    "by_family": {
+      "ci-step": 116,
+      "guard-script": 83,
+      "qa-smoke-check": 23,
+      "registry": 277,
+      "sentinel-check": 18,
+      "structural-test": 119
+    },
+    "error": null,
+    "gates_attempted_unproven": 3,
+    "gates_not_applicable": 6,
+    "gates_proven_can_fail": 89,
+    "gates_total": 636,
+    "gates_unproven": 538,
+    "proven_fraction_pct": 14.0,
+    "source": "scripts/gate_census.py --json + deploy/sync_doc_metadata.py",
+    "test_functions": 19968
+  },
+  "schema": 1
+}

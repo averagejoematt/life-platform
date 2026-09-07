@@ -432,6 +432,26 @@ REGISTRY = [
         "/legacy/platform/",
     ),
     (
+        "state",
+        "The build",
+        "How the building of this thing is actually going — the backlog decomposed, delivery rate, guard health, incidents, spend.",
+        "Credibility & the machine",
+        "data",
+        # A static generated artifact rather than an /api/ route: every number is
+        # derived at build time from the repo, GitHub and the public cost API, so
+        # it needs no Lambda and no IAM. See scripts/build_platform_state.py.
+        "/data/platform_state.json",
+        None,
+        None,
+        # UNLISTED (#1109): this page serves the owner-as-builder, which is not one
+        # of the four audiences PLATFORM_NORTH_STAR names, and it is not a station on
+        # the causal loop every listed page has to answer to. Reachable by direct URL;
+        # deliberately off the tile rail. NB unlisted is NOT private — the S3 website
+        # endpoint serves site/* publicly (see #1905 /legacy). Nothing here is secret:
+        # the repo is public and the cost figures are already on /method/receipts/.
+        "unlisted",
+    ),
+    (
         "data",
         "Data sources",
         "Every source feeding the platform, what it measures, how often.",
@@ -623,6 +643,7 @@ _REGROUP = {
     "build": "The machine",
     "intelligence": "The machine",
     "platform": "The machine",
+    "state": "The machine",  # unlisted, but grouped so any listing surface it reaches is coherent
     "data": "The machine",
     "pipeline": "The machine",
     "tools": "The machine",
