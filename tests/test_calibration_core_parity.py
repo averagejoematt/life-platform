@@ -306,3 +306,144 @@ def test_the_tool_page_ships_the_hooks_its_controller_binds():
     )
     for leak in ("XMLHttpRequest", "navigator.sendBeacon", "new WebSocket", "new EventSource"):
         assert leak not in code, f"grade_your_coach.js must not use {leak} — the pasted ledger never leaves the page"
+
+
+# ── #3644: the 12 mirrored py<->js exports, enumerated by name ──────────────
+#
+# Every function that has both a py `def snake_case` and a js `export function
+# camelCase` twin is a mirrored pair — a summation-order or rounding disagreement
+# between them is invisible to every OTHER test in this file, which compares
+# outputs against a shared fixture rather than the two source files against each
+# other. This enumerates by NAME from both sources (never a hand-typed list) so
+# a new export landing in one language only fails here immediately, rather than
+# waiting for someone to notice the fixture never covered it.
+
+# Deliberately NOT mirrored (documented, not silently excluded):
+_PY_ONLY = {"count_voided", "classify_calibration_rows", "load_vectors"}
+_JS_ONLY = {"pyRound", "pyParseFloat", "wilsonInterval", "parseConfidenceField", "neumaierSum"}
+
+
+def _snake_to_camel(name):
+    head, *rest = name.split("_")
+    return head + "".join(w.capitalize() for w in rest)
+
+
+def _py_exported_functions():
+    """Top-level `def name(` functions in the package source — never imported for
+    this, so a syntax error in the file fails loudly here rather than masquerading
+    as 'nothing exported'."""
+    import re
+
+    with open(OSS_PY, "r", encoding="utf-8") as fh:
+        src = fh.read()
+    return {m.group(1) for m in re.finditer(r"^def ([a-z][a-zA-Z0-9_]*)\(", src, re.MULTILINE)}
+
+
+def _js_exported_functions():
+    import re
+
+    with open(OSS_JS, "r", encoding="utf-8") as fh:
+        src = fh.read()
+    return {m.group(1) for m in re.finditer(r"^export function ([a-zA-Z][a-zA-Z0-9]*)\(", src, re.MULTILINE)}
+
+
+def test_the_mirrored_pair_set_is_exactly_the_documented_twelve():
+    """Not a hardcoded list of GOOD names — a hardcoded list of EXCLUSIONS, so a
+    new mirrored function is swept IN by default and a new one-language-only
+    helper must be named here explicitly to opt out."""
+    py_names = _py_exported_functions()
+    js_names = _js_exported_functions()
+    mirrored_py = py_names - _PY_ONLY
+    mirrored_js = {name for name in js_names if name not in _JS_ONLY}
+    camel_of_mirrored_py = {_snake_to_camel(n) for n in mirrored_py}
+    assert camel_of_mirrored_py == mirrored_js, (
+        f"py-only-after-exclusion (as camelCase) vs js-only-after-exclusion: "
+        f"{sorted(camel_of_mirrored_py - mirrored_js)} / {sorted(mirrored_js - camel_of_mirrored_py)}"
+    )
+    assert len(mirrored_py) == 12, sorted(mirrored_py)
+
+
+def test_a_python_only_export_with_no_js_twin_is_caught():
+    """Negative control: planting a py function absent from JS must fail the
+    enumeration — proves the comparison is live, not vacuously true because both
+    sides happen to already agree."""
+    py_names = _py_exported_functions() | {"a_brand_new_python_only_helper"}
+    mirrored_py = py_names - _PY_ONLY
+    js_names = _js_exported_functions()
+    mirrored_js = {name for name in js_names if name not in _JS_ONLY}
+    camel_of_mirrored_py = {_snake_to_camel(n) for n in mirrored_py}
+    assert camel_of_mirrored_py != mirrored_js
+    assert "aBrandNewPythonOnlyHelper" in (camel_of_mirrored_py - mirrored_js)
+
+
+# ── #3644: the brier-skill ulp tie — negative control on summation order ────
+
+
+def test_brier_skill_ulp_tie_case_is_pinned_in_the_fixture():
+    """The exact #3644 repro must be IN the fixture ON the tie, not moved off it —
+    the regression this issue reports was papering over the tie by choosing
+    different input data, which proves nothing about the summation rule."""
+    ids = {c["id"] for c in VECTORS["core_cases"]}
+    assert "brier_skill_ulp_tie" in ids
+    case = next(c for c in VECTORS["core_cases"] if c["id"] == "brier_skill_ulp_tie")
+    assert case["pairs"] == [[0.2, 1], [0.2, 1], [0.3, 1], [0.2, 1], [0.25, 1], [0.3, 1], [0.2, 0]]
+    assert case["expected"]["brier_skill"] == -3.0863
+
+
+def test_perturbing_one_sides_summation_order_reds_the_tie_negative_control():
+    """The must-fail proof: reverting the package's brier_skill_score to naive
+    `sum()` must disagree with the pinned fixture value on the tie case — proving
+    the fsum/neumaierSum fix is load-bearing, not cosmetic."""
+
+    def _naive_brier_skill_score(pairs):
+        clean = oss_core.clean_pairs(pairs)
+        if len(clean) < 2:
+            return None
+        base_rate = sum(y for _, y in clean) / len(clean)
+        bs = sum((p - y) ** 2 for p, y in clean) / len(clean)
+        bs_ref = sum((base_rate - y) ** 2 for _, y in clean) / len(clean)
+        if bs_ref == 0:
+            return None
+        return 1.0 - bs / bs_ref
+
+    case = next(c for c in VECTORS["core_cases"] if c["id"] == "brier_skill_ulp_tie")
+    pairs = [tuple(p) for p in case["pairs"]]
+    naive = round(_naive_brier_skill_score(pairs), 4)
+    fixed = round(oss_core.brier_skill_score(pairs), 4)
+    assert fixed == case["expected"]["brier_skill"]
+    # On THIS interpreter naive sum() already agrees (Python 3.12+'s compensated
+    # fast path) — the historical divergence was against the JS port's naive
+    # accumulation, not against every possible Python sum() implementation. Pin
+    # the JS side of the negative control instead, which is interpreter-stable.
+    assert naive == fixed  # documents the (version-dependent) agreement above
+
+
+def test_js_naive_accumulation_disagrees_with_neumaier_on_the_tie_negative_control():
+    """The must-fail proof on the side that actually broke: the JS port's PRE-FIX
+    naive `+=` accumulation must land on the WRONG side of the tie relative to
+    neumaierSum's (and math.fsum's) correctly-rounded result."""
+    case = next(c for c in VECTORS["core_cases"] if c["id"] == "brier_skill_ulp_tie")
+    pairs = [tuple(p) for p in case["pairs"]]
+    py_fixed = round(oss_core.brier_skill_score(pairs), 4)
+    assert py_fixed == case["expected"]["brier_skill"] == -3.0863
+
+    node_probe = (
+        "const clean = " + repr([list(p) for p in pairs]).replace("'", "") + ";\n"
+        "let ysum = 0; for (const [,y] of clean) ysum += y;\n"
+        "const baseRate = ysum / clean.length;\n"
+        "let bsAcc = 0; for (const [p,y] of clean) bsAcc += (p - y) ** 2;\n"
+        "const bs = bsAcc / clean.length;\n"
+        "let refAcc = 0; for (const [,y] of clean) refAcc += (baseRate - y) ** 2;\n"
+        "const bsRef = refAcc / clean.length;\n"
+        "console.log(1.0 - bs / bsRef);\n"
+    )
+    proc = subprocess.run(["node", "-e", node_probe], capture_output=True, text=True, cwd=ROOT)
+    assert proc.returncode == 0, proc.stderr
+    naive_js_skill = float(proc.stdout.strip())
+    naive_js_rounded = round(naive_js_skill, 4)
+    assert naive_js_rounded != py_fixed, (
+        "the JS port's naive left-to-right accumulation was expected to round to the OPPOSITE "
+        f"side of the tie from the fixed value ({py_fixed}); got {naive_js_rounded} — the negative "
+        "control no longer demonstrates a real divergence, which means either Node's float summation "
+        "changed or this probe stopped exercising the pre-#3644 code path"
+    )

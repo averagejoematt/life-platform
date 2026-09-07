@@ -141,6 +141,16 @@ SCORE_CASES = [
         10,
         [[0.125, 1], [0.125, 0], [0.375, 1], [0.375, 0], [0.6875, 1], [0.6875, 0], [0.8125, 1], [0.8125, 0]],
     ),
+    (
+        "brier_skill_ulp_tie",
+        "#3644: this Brier-skill sum lands on an exact 4-dp tie (-3.08625) where naive "
+        "left-to-right float summation and math.fsum's correctly-rounded sum disagree by one "
+        "ulp and round in OPPOSITE directions — a positive control pinned ON the tie, not "
+        "moved off it. Both implementations must sum with the SAME rule (math.fsum / "
+        "neumaierSum) to agree here.",
+        10,
+        [[0.2, 1], [0.2, 1], [0.3, 1], [0.2, 1], [0.25, 1], [0.3, 1], [0.2, 0]],
+    ),
 ]
 
 # (id, description, n_bins, {stratum: pairs}) — #3550: the pooled card scored
@@ -188,13 +198,12 @@ STRATA_CASES = [
     ),
     (
         "under_confident_worst_stratum",
-        "the worst-|gap| stratum is under-confident while the pool is not",
+        "the worst-|gap| stratum is under-confident while the pool is not — [0.25, 1] in slot 5 "
+        "lands the stratum's own skill on the #3644 4-dp tie (-3.08625), pinned here as a "
+        "positive control now that both implementations share one summation rule",
         10,
         {
-            # NB: not [0.25, 1] in slot 5 — that input lands the stratum's skill on an exact
-            # 4-dp tie (-3.08625) where the Python and JS Brier-skill sums differ by one ulp;
-            # a parity vector must test the scorer, not the platform's float summation order.
-            "hedgers": [[0.2, 1], [0.2, 1], [0.3, 1], [0.2, 1], [0.2, 1], [0.3, 1], [0.2, 0]],
+            "hedgers": [[0.2, 1], [0.2, 1], [0.3, 1], [0.2, 1], [0.25, 1], [0.3, 1], [0.2, 0]],
             "steady": [[0.8, 1]] * 30 + [[0.8, 0]] * 8,
         },
     ),

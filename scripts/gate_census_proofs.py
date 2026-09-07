@@ -674,6 +674,42 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
+    # #3548: the a11y ledger's own guard — five source-level checks (the archi-
+    # tecture SVG's <title>, cap-h/hb-group heading levels, /subscribe/confirm/'s
+    # h1, the 18 tabs.js dx-read hosts, the cycle-comparison table's corner <th>)
+    # plus a set-derivation floor. The must-fail proof is the ONE case that has a
+    # real historical specimen to revert to: the retired <article data-dx-read>
+    # tabpanel host, whose reintroduction is exactly the aria-allowed-role
+    # regression the issue reported.
+    "structural::test_a11y_ledger_3548.py": {
+        "gate_name": "test_a11y_ledger_3548.py",
+        "command": "python3 -m pytest tests/test_a11y_ledger_3548.py -q",
+        "mutation": (
+            'site/coaching/read/index.html\'s `<div class="dx-read" data-dx-read>` '
+            'reverted in place to the pre-#3548 `<article class="dx-read" '
+            'data-dx-read>` — the exact tag tabs.js::markActiveTab\'s role="tabpanel" '
+            "override is illegal on (aria-allowed-role), and the shape all 18 "
+            "dx-read hosts carried before this PR."
+        ),
+        "observed": (
+            "MUTATED: 1 of 11 FAILED — test_no_dx_read_panel_is_an_article: "
+            '"found <article data-dx-read> (should be <div>): '
+            '[.../site/coaching/read/index.html]". REVERTED: 11 passed. '
+            "Both watched 2026-09-07."
+        ),
+        "scope": (
+            "Proves the os.walk sweep (test_no_dx_read_panel_is_an_article) and, by "
+            "the same population, test_dx_read_div_count_matches_the_known_seventeen_"
+            "plus_home's floor. The other four checks in this file (svg <title>, "
+            "cap-h/hb-group heading level, /subscribe/confirm/'s h1, the empty "
+            "corner <th>) are each pinned by their own negative-control test in the "
+            "same file (see the test docstrings) but do not have a real pre-fix "
+            "tree snapshot to revert to the way the dx-read/article shape does — "
+            "this record proves the file CAN fail, not that every one of its five "
+            "checks has been watched against history."
+        ),
+        "proved_on": "2026-09-07",
+    },
     "structural::test_v4_build_sitemap_3567.py": {
         "gate_name": "test_v4_build_sitemap_3567.py",
         "command": "python3 -m pytest tests/test_v4_build_sitemap_3567.py -q -p no:cacheprovider",

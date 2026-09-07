@@ -17,12 +17,21 @@ the ledger's own contract rather than from a remembered symptom:
      ``attempting`` more than ``STUCK_HOURS`` after it was stamped means the run
      that claimed the day died between the reservation and the record — and,
      because ``graded=True``, that day is consumed forever and can never be
-     re-evaluated. RED.
+     re-evaluated. #3651: this leg now REAPS it rather than only reporting it —
+     a fail-soft ``put_item`` overwrites the row to ``status=expired``
+     (``build_expired_ledger_item``, same idempotent-overwrite shape as the
+     streak write in ``qa_smoke_lambda``), so a genuinely stuck reservation gets
+     a terminal disposition from the SAME scheduled run that found it, instead
+     of sitting as a permanent red only a human DDB edit could ever clear. The
+     reap is reported by name (never silently); if the write itself fails, the
+     row still surfaces as ``stuck`` exactly as before #3651 — reaping degrades
+     to reporting, never the other way around.
   2. **A terminal row must point at a record that exists.** ``sent``/``blocked``
-     both assert "a NUDGE# item was written"; ``failed`` (added by #3569)
-     deliberately does not. A ``sent`` row whose ``NUDGE#`` item is missing is a
-     delivered nudge with nothing to grade — the #3569 signature exactly, and
-     the check says so by name when EVERY terminal row is orphaned.
+     both assert "a NUDGE# item was written"; ``failed`` (added by #3569) and
+     ``expired`` (added by #3651) deliberately do not. A ``sent`` row whose
+     ``NUDGE#`` item is missing is a delivered nudge with nothing to grade —
+     the #3569 signature exactly, and the check says so by name when EVERY
+     terminal row is orphaned.
 
 Scoped to the trailing ``RETENTION_DAYS`` so the check measures liveness rather
 than accumulating history: an old stuck row is a fact about the past, and a
@@ -38,7 +47,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
-from coach.coach_nudge_engine import LEDGER_PK, LEDGER_SK_PREFIX, STATUS_ATTEMPTING, STATUS_FAILED, STATUSES_WITH_RECORD
+from coach.coach_nudge_engine import (
+    LEDGER_PK,
+    LEDGER_SK_PREFIX,
+    STATUS_ATTEMPTING,
+    STATUS_FAILED,
+    STATUSES_WITH_RECORD,
+    build_expired_ledger_item,
+)
 
 # #1964/#2811: the one Pacific frame and the one ISO parser. Both matter here —
 # a `DAY#` sk is the handler's PACIFIC calendar day (`now_pt.date()`), so both
@@ -101,16 +117,26 @@ def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK
         c.ok(f"no coach-nudge ledger row in the last {retention_days}d — no nudge attempted (the feature is quiet, not dark)")
         return [c]
 
-    stuck, orphaned, failed, terminal = [], [], [], 0
+    stuck, reaped, orphaned, failed, terminal = [], [], [], [], 0
     for row in rows:
         sk = str(row.get("sk") or "?")
         status = str(row.get("status") or "")
         if status == STATUS_ATTEMPTING:
             age = _stamped_age_hours(row, now)
             if age is None:
+                # Can't confirm it's actually past the bar — conservative: report,
+                # never reap something whose age is unknown.
                 stuck.append(f"{sk} (undateable, coach={row.get('coach_id')!r})")
             elif age > stuck_hours:
-                stuck.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r})")
+                # #3651: a dead reservation with no path to a terminal status is a
+                # PERMANENT red otherwise — reap it on the same scheduled run that
+                # found it. Fail-soft: if the write itself doesn't land, this
+                # degrades to the pre-#3651 report, never to silence.
+                try:
+                    table.put_item(Item=build_expired_ledger_item(row, now, stuck_hours, age))
+                    reaped.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r})")
+                except Exception as exc:  # noqa: BLE001 — reap must never crash the sweep
+                    stuck.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r}, reap failed: {str(exc)[:120]})")
             continue
         if status == STATUS_FAILED:
             failed.append(f"{sk} ({str(row.get('error') or 'no error recorded')[:160]})")
@@ -147,8 +173,11 @@ def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK
     if failed:
         problems.append(f"{len(failed)} nudge record write(s) failed: {'; '.join(failed)}")
 
+    # #3651: a successful reap clears the board it happened on — it is reported,
+    # never hidden, but it is not a problem the ledger is still carrying.
+    reap_note = f" ({len(reaped)} stuck reservation(s) reaped to 'expired' (#3651): {'; '.join(reaped)})" if reaped else ""
     if problems:
-        c.fail(" | ".join(problems)[:900]).with_details(problems)
+        c.fail(" | ".join(problems)[:900] + reap_note).with_details(problems + ([f"reaped: {r}" for r in reaped] if reaped else []))
     else:
-        c.ok(f"{len(rows)} ledger row(s) in the last {retention_days}d, every one terminal with its NUDGE# record present")
+        c.ok(f"{len(rows)} ledger row(s) in the last {retention_days}d, every one terminal with its NUDGE# record present" + reap_note)
     return [c]

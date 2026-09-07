@@ -18,6 +18,17 @@
 // into mantissa * 2^exp, scale by 10^n as an exact rational, and round the
 // quotient half-to-even. It is the load-bearing 30 lines in this file.
 //
+// #3644: a SECOND trap, one layer under rounding — summation order. Naive
+// left-to-right float accumulation (`let acc = 0; for (x of xs) acc += x;`)
+// and Python's `math.fsum` can disagree in their LAST BIT, and on
+// [(0.2,1),(0.2,1),(0.3,1),(0.2,1),(0.25,1),(0.3,1),(0.2,0)] that one-ulp gap
+// sits exactly on a 4-dp rounding tie (-3.08625), so pyRound() then rounds the
+// two languages in OPPOSITE directions even though it is byte-identical code.
+// `neumaierSum()` below (Neumaier/Kahan-Babuska compensated summation)
+// reproduces `math.fsum`'s correctly-rounded result on every case in
+// vectors/calibration_vectors.json, including that tie — verified by the
+// parity test, not asserted.
+//
 // Licence: MIT.
 
 export const VERSION = "1.2.0";
@@ -77,6 +88,25 @@ export function pyRound(x, nd) {
   // CPython's strtod round-trip produces too.
   const res = Number(q) / Number(P);
   return neg ? -res : res;
+}
+
+/**
+ * Neumaier (improved Kahan-Babuska) compensated summation — matches Python's
+ * `math.fsum` correctly-rounded result on every case this package is held to
+ * (#3644). Tracks a running compensation term for the low-order bits naive
+ * `+=` accumulation drops, added back in at the end.
+ * @param {number[]} values
+ * @returns {number}
+ */
+export function neumaierSum(values) {
+  let sum = 0;
+  let comp = 0; // running compensation for lost low-order bits
+  for (const x of values) {
+    const t = sum + x;
+    comp += Math.abs(sum) >= Math.abs(x) ? sum - t + x : x - t + sum;
+    sum = t;
+  }
+  return sum + comp;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -198,28 +228,23 @@ export function cleanPairs(pairs) {
   return out;
 }
 
-/** Mean Brier score. null when there are no valid pairs. Unrounded. */
+/** Mean Brier score. null when there are no valid pairs. Unrounded.
+ * #3644: summed with neumaierSum(), matching Python's math.fsum bit-for-bit. */
 export function brierScore(pairs) {
   const clean = cleanPairs(pairs);
   if (!clean.length) return null;
-  let acc = 0;
-  for (const [p, y] of clean) acc += (p - y) ** 2;
+  const acc = neumaierSum(clean.map(([p, y]) => (p - y) ** 2));
   return acc / clean.length;
 }
 
-/** Brier skill score vs. the base-rate climatology forecast. null if degenerate. */
+/** Brier skill score vs. the base-rate climatology forecast. null if degenerate.
+ * #3644: every summation here is neumaierSum() — see brierScore()'s note. */
 export function brierSkillScore(pairs) {
   const clean = cleanPairs(pairs);
   if (clean.length < 2) return null;
-  let ysum = 0;
-  for (const [, y] of clean) ysum += y;
-  const baseRate = ysum / clean.length;
-  let bsAcc = 0;
-  for (const [p, y] of clean) bsAcc += (p - y) ** 2;
-  const bs = bsAcc / clean.length;
-  let refAcc = 0;
-  for (const [, y] of clean) refAcc += (baseRate - y) ** 2;
-  const bsRef = refAcc / clean.length;
+  const baseRate = neumaierSum(clean.map(([, y]) => y)) / clean.length;
+  const bs = neumaierSum(clean.map(([p, y]) => (p - y) ** 2)) / clean.length;
+  const bsRef = neumaierSum(clean.map(([, y]) => (baseRate - y) ** 2)) / clean.length;
   if (bsRef === 0) return null;
   return 1.0 - bs / bsRef;
 }

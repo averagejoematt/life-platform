@@ -383,13 +383,11 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::daily-brief-schedule": "2026-09-05 seal (#3536)",
     "registry::tests/test_journal_archive_notice_3512.py::BASELINE": "2026-09-05 seal (#3536)",
     "registry::tests/test_journey_day1_synthetic_baseline_3478.py::BASELINE": "2026-09-05 seal (#3536)",
-    "registry::tests/test_module_size_guard.py::BASELINE::cdk/stacks/monitoring_stack.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::deploy/archive/onetime/daily_brief_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::deploy/sync_doc_metadata.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/ai/ai_calls.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/ai/ai_context.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/coach/coach_history_summarizer.py": "2026-09-05 seal (#3536)",
-    "registry::tests/test_module_size_guard.py::BASELINE::lambdas/coach/coach_narrative_orchestrator.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/coach/coach_prediction_evaluator.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/daily_insight_compute_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/daily_metrics_compute_lambda.py": "2026-09-05 seal (#3536)",
@@ -579,4 +577,16 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "structural::test_webkit_weekly_qa.py": "2026-09-05 seal (#3536)",
     "structural::test_whoop_workout_subrecord_class_3442.py": "2026-09-05 seal (#3536)",
     "structural::test_wiring_coverage.py": "2026-09-05 seal (#3536)",
+    # 2026-09-07 (#3548/#3676): guard::scripts/playwright_gated_tests.py matched the
+    # guard-name heuristic (`_gate` inside "...gated_tests.py") and enforcement_evidence
+    # flagged `sys.exit(main())` as EVIDENCE_NONZERO_EXIT — syntactically indistinguishable
+    # from a real gate, since the detector cannot see that main() always `return 0`. It
+    # genuinely never exits nonzero: it is a NAMED-SKIP REPORTER by design (#3640's own
+    # acceptance criteria wants a loud line naming each playwright-gated CI skip, not a
+    # blocking gate — every CI run has 5 such skips, so making this exit 1 would red every
+    # push unconditionally). A real fail-path would contradict the issue it ships for, so
+    # this is left unproven rather than fabricating a mutation that "proves" behaviour the
+    # gate does not, and should not, have. `tests/test_playwright_gated_skip_reporting.py`
+    # (a proven structural-test gate) covers the discovery logic this script wraps.
+    "guard::scripts/playwright_gated_tests.py": "2026-09-07 (#3548/#3676) — informational reporter, never exits nonzero by design",
 }
