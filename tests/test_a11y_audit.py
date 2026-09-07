@@ -131,7 +131,9 @@ def test_update_baseline_light_theme_writes_pages_light_and_preserves_pages(tmp_
     a11y_audit.update_baseline({"/cockpit/": [_v("color-contrast", "serious", nodes=2)]}, path=p, theme="light")
     base = a11y_audit.load_baseline(p)
 
-    assert set(base["pages"]["/cockpit/"][0]) == {"id", "impact", "help", "nodes"}
+    # #3548: serious/critical rows also carry `issue` (UNTRIAGED — no prior to carry forward).
+    assert set(base["pages"]["/cockpit/"][0]) == {"id", "impact", "help", "nodes", "issue"}
+    assert base["pages"]["/cockpit/"][0]["issue"] == a11y_audit.UNTRIAGED
     assert base["pages"]["/cockpit/"][0]["nodes"] == 1  # dark entry untouched by the light write
     assert base["pages_light"]["/cockpit/"][0]["nodes"] == 2
     assert base["_meta"]["captured_at"] == dark_meta_before  # dark capture record preserved
@@ -196,8 +198,10 @@ def test_update_baseline_writes_sorted_reviewable_entries(tmp_path):
         raw = json.load(f)
     assert list(raw["pages"]) == ["/a/", "/z/"]
     assert [r["id"] for r in raw["pages"]["/z/"]] == ["a-rule", "b-rule"]
-    # trimmed to the stable gate-relevant fields only (no volatile CSS targets)
-    assert set(raw["pages"]["/z/"][0]) == {"id", "impact", "help", "nodes"}
+    # trimmed to the stable gate-relevant fields only (no volatile CSS targets);
+    # #3548: serious/critical rows also carry `issue` (UNTRIAGED — no prior to carry forward).
+    assert set(raw["pages"]["/z/"][0]) == {"id", "impact", "help", "nodes", "issue"}
+    assert raw["pages"]["/z/"][0]["issue"] == a11y_audit.UNTRIAGED
 
 
 def test_missing_baseline_file_is_empty_baseline(tmp_path):
@@ -314,7 +318,13 @@ def test_committed_baseline_exists_and_matches_pinned_axe_version():
         for page, rows in base.get(key, {}).items():
             assert page.startswith("/")
             for r in rows:
-                assert set(r) == {"id", "impact", "help", "nodes"}, f"malformed baseline row on {key}/{page}: {r}"
+                # #3548: serious/critical rows carry an additional `issue` field
+                # (the ownership rule below); moderate/minor rows do not.
+                required = {"id", "impact", "help", "nodes"}
+                allowed = required | {"issue"}
+                assert required <= set(r) <= allowed, f"malformed baseline row on {key}/{page}: {r}"
+                if r.get("impact") in a11y_audit.GATING_IMPACTS:
+                    assert "issue" in r, f"serious/critical row missing `issue` on {key}/{page}: {r}"
 
 
 def test_visual_qa_wiring_defaults_off_for_direct_capture_callers():
@@ -508,3 +518,104 @@ def test_visual_qa_update_baseline_writes_both_viewports():
 
     src = inspect.getsource(visual_qa.run_sweep)
     assert '("desktop", "a11y"), ("mobile", "a11y_mobile")' in src, "--update-baseline must rewrite the mobile ledger from the mobile pass"
+
+
+# ── #3548: every serious/critical baseline entry names an owning issue ──────
+#
+# Mirrors tests/truth_baseline_audit.py's #2956 rule for the reader-truth
+# ledger: a debt ledger with no ownership requirement degrades into an excuse
+# file. Scoped to serious/critical (GATING_IMPACTS) — moderate/minor debt is
+# advisory by design and stays untracked, same line the gate itself draws.
+
+
+def test_committed_baseline_has_no_untriaged_serious_entries():
+    baseline = a11y_audit.load_baseline()
+    untriaged = a11y_audit.untriaged_serious_entries(baseline)
+    assert untriaged == [], (
+        "tests/a11y_baseline.json has serious/critical entries with no `issue` field — "
+        f"file/name the tracking issue for each before committing: {untriaged}"
+    )
+
+
+def test_untriaged_serious_entries_flags_a_planted_missing_issue():
+    """Negative control: a planted serious entry with no `issue` field must be
+    caught — proves the guard actually inspects the field, not a vacuous pass."""
+    baseline = {
+        "pages": {"/planted/": [_v("color-contrast", "serious")]},
+        "pages_light": {},
+        "pages_mobile": {},
+        "pages_light_mobile": {},
+    }
+    out = a11y_audit.untriaged_serious_entries(baseline)
+    assert out == [("pages", "/planted/", "color-contrast")]
+
+
+def test_untriaged_serious_entries_accepts_a_real_issue_ref():
+    baseline = {
+        "pages": {"/planted/": [{**_v("color-contrast", "serious"), "issue": "#3673"}]},
+        "pages_light": {},
+        "pages_mobile": {},
+        "pages_light_mobile": {},
+    }
+    assert a11y_audit.untriaged_serious_entries(baseline) == []
+
+
+def test_untriaged_serious_entries_rejects_a_blank_or_placeholder_issue():
+    for bad in ("", "   ", "UNTRIAGED", "3673", "issue #3673", "#abc"):
+        baseline = {
+            "pages": {"/planted/": [{**_v("color-contrast", "serious"), "issue": bad}]},
+            "pages_light": {},
+            "pages_mobile": {},
+            "pages_light_mobile": {},
+        }
+        out = a11y_audit.untriaged_serious_entries(baseline)
+        assert out == [("pages", "/planted/", "color-contrast")], f"issue={bad!r} should not satisfy the rule"
+
+
+def test_untriaged_serious_entries_never_flags_moderate_or_minor_debt():
+    """Moderate/minor rows are advisory by design (GATING_IMPACTS excludes them)
+    — the ownership rule must not reach past the same line the gate itself draws."""
+    baseline = {
+        "pages": {"/planted/": [_v("heading-order", "moderate"), _v("empty-table-header", "minor")]},
+        "pages_light": {},
+        "pages_mobile": {},
+        "pages_light_mobile": {},
+    }
+    assert a11y_audit.untriaged_serious_entries(baseline) == []
+
+
+def test_update_baseline_carries_forward_an_existing_issue_ref(tmp_path):
+    """#3548: without this, the NEXT --update-baseline after a human triages a
+    row would silently wipe the `issue` field right back to UNTRIAGED — the
+    ownership rule would then re-red on every legitimate re-sweep."""
+    p = str(tmp_path / "d.json")
+    a11y_audit.update_baseline({"/x/": [_v("color-contrast", "serious")]}, path=p)
+    base = a11y_audit.load_baseline(p)
+    assert base["pages"]["/x/"][0]["issue"] == a11y_audit.UNTRIAGED
+    base["pages"]["/x/"][0]["issue"] = "#3673"  # the human triage step
+    with open(p, "w") as f:
+        json.dump(base, f)
+
+    # A later re-sweep observes the SAME rule on the SAME page again.
+    a11y_audit.update_baseline({"/x/": [_v("color-contrast", "serious", nodes=9)]}, path=p)
+    base = a11y_audit.load_baseline(p)
+    assert base["pages"]["/x/"][0]["issue"] == "#3673", "the human's triage must survive a re-sweep"
+    assert base["pages"]["/x/"][0]["nodes"] == 9  # the fresh observation still lands
+
+
+def test_update_baseline_does_not_carry_an_issue_ref_to_a_different_rule(tmp_path):
+    """Negative control: the carry-forward is keyed by rule id — a DIFFERENT
+    rule newly appearing on the same page must land UNTRIAGED, not inherit an
+    unrelated rule's ownership by accident."""
+    p = str(tmp_path / "e.json")
+    a11y_audit.update_baseline({"/x/": [_v("color-contrast", "serious")]}, path=p)
+    base = a11y_audit.load_baseline(p)
+    base["pages"]["/x/"][0]["issue"] = "#3673"
+    with open(p, "w") as f:
+        json.dump(base, f)
+
+    a11y_audit.update_baseline({"/x/": [_v("color-contrast", "serious"), _v("svg-img-alt", "serious")]}, path=p)
+    base = a11y_audit.load_baseline(p)
+    rows = {r["id"]: r["issue"] for r in base["pages"]["/x/"]}
+    assert rows["color-contrast"] == "#3673"
+    assert rows["svg-img-alt"] == a11y_audit.UNTRIAGED

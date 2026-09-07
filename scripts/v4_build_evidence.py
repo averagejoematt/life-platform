@@ -707,7 +707,12 @@ EDITORIAL = {
         '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard monthly budget ceiling enforced in code (the live number is on the <a href="/method/cost/">Cost page</a>).</p>'
         # Hand-authored inline-SVG architecture diagram (themes via CSS vars; zero runtime cost).
         '<figure class="arch-fig" aria-label="System architecture: ingest, store, serve, with one AI chokepoint">'
-        '<svg class="arch-svg" viewBox="0 0 760 250" role="img" preserveAspectRatio="xMidYMid meet">'
+        # #3548: axe's svg-img-alt reads the SVG'S OWN name, not the wrapping
+        # <figure>'s aria-label — a role="img" svg with no <title>/aria-label of
+        # its own is an unnamed image to a screen reader even though the figure
+        # around it is labelled. <title> + aria-labelledby names the svg itself.
+        '<svg class="arch-svg" viewBox="0 0 760 250" role="img" aria-labelledby="archSvgTitle" preserveAspectRatio="xMidYMid meet">'
+        '<title id="archSvgTitle">System architecture: ingest, store, serve, with one AI chokepoint</title>'
         '<defs><marker id="ahd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">'
         '<path d="M0,0 L7,3 L0,6 Z" fill="var(--ink-faint)"/></marker></defs>'
         # ── Pipeline row: Sources → Ingest → Store → Compute → Serve ──

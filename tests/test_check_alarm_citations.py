@@ -494,6 +494,134 @@ def test_flap_window_matches_citation_window():
     assert cac.FLAP_WINDOW_HOURS == cac.ALARM_AGE_CITATION_HOURS
 
 
+# ── flapped_uncited — retired-alarm partition (#3655) ──────────────────────────
+#
+# CloudWatch keeps describe_alarm_history for ~2 weeks after an alarm is DELETED.
+# Without intersecting against the alarms that currently exist, a retired alarm's
+# residual pre-deletion flap reads as an uncited live flap for up to 72h — and the
+# only "fix" (citing it) reds test_real_registry_entries_all_name_a_real_alarm,
+# which rejects a citation naming an alarm that no longer exists. Two mutually
+# exclusive cures, no green state. `live_alarm_names` is the cure: it partitions
+# the result into (flapped, flapped_retired) instead of one flat list.
+
+
+def test_live_alarm_names_omitted_keeps_the_original_flat_list_return():
+    """Default behaviour (no live_alarm_names) is byte-identical to pre-#3655 —
+    every existing caller/test above this section keeps working unchanged."""
+    now = datetime(2026, 9, 6, tzinfo=timezone.utc)
+    history = [
+        _transition("flappy-alarm", 10.0, "OK", "ALARM", now),
+        _transition("flappy-alarm", 9.0, "ALARM", "OK", now),
+    ]
+    out = cac.flapped_uncited(history, citations={}, now=now)
+    assert out == [("flappy-alarm", 1, 1)]
+
+
+def test_a_still_live_alarms_flap_still_reds_negative_control():
+    """Direction A (must still fail): a flapping alarm that STILL EXISTS is not
+    exempted by the partition — it stays in `flapped`, red as before."""
+    now = datetime(2026, 9, 6, tzinfo=timezone.utc)
+    history = [
+        _transition("still-live", 10.0, "OK", "ALARM", now),
+        _transition("still-live", 9.0, "ALARM", "OK", now),
+    ]
+    flapped, flapped_retired = cac.flapped_uncited(history, citations={}, now=now, live_alarm_names={"still-live", "other-alarm"})
+    assert flapped == [("still-live", 1, 1)]
+    assert flapped_retired == []
+
+
+def test_a_deleted_alarms_flap_moves_to_the_retired_partition_negative_control():
+    """Direction B (must NOT fail): the exact #3655 repro — an alarm whose history
+    shows a fire-and-clear inside the window, but which is no longer in
+    describe_alarms (deleted), moves to `flapped_retired` and drops out of the red
+    list entirely."""
+    now = datetime(2026, 9, 6, tzinfo=timezone.utc)
+    history = [
+        _transition("ai-tokens-daily-brief-daily", 10.0, "OK", "ALARM", now),
+        _transition("ai-tokens-daily-brief-daily", 9.0, "ALARM", "OK", now),
+    ]
+    flapped, flapped_retired = cac.flapped_uncited(history, citations={}, now=now, live_alarm_names={"other-alarm"})
+    assert flapped == []
+    assert flapped_retired == [("ai-tokens-daily-brief-daily", 1, 1)]
+
+
+def test_retired_flap_is_reported_but_never_reds_render():
+    """render() must print the retired episode by name without contributing to
+    the exit code — no red, no silence."""
+    code, message = cac.render([], None, flapped=[], flapped_retired=[("ai-tokens-daily-brief-daily", 1, 1)])
+    assert code == 0
+    assert "ai-tokens-daily-brief-daily" in message
+    assert "no longer exists" in message
+
+
+def test_a_live_flap_and_a_retired_flap_can_coexist_in_one_render():
+    """A genuine still-live flap keeps reding even while a retired one is merely
+    reported — the partition must not blur the two into one bucket."""
+    code, message = cac.render([], None, flapped=[("still-live", 2, 2)], flapped_retired=[("retired-one", 1, 1)])
+    assert code == 1
+    assert "still-live" in message
+    assert "retired-one" in message
+    assert "no longer exists" in message
+
+
+def test_deleted_alarm_flap_and_the_registry_name_check_are_simultaneously_satisfiable():
+    """The #3655 contradiction, closed: a deleted alarm that flapped inside the
+    window needs NO entry in docs/alarm_citations.json to clear the flap leg (it
+    is reported informationally, exit 0) — and precisely because no entry is
+    added, test_real_registry_entries_all_name_a_real_alarm never sees a citation
+    naming an alarm that doesn't exist. Both gates are green at once, for the
+    same alarm, in the same run — the state #3655 reports as unreachable."""
+    now = datetime(2026, 9, 6, tzinfo=timezone.utc)
+    history = [
+        _transition("retired-and-flapped", 10.0, "OK", "ALARM", now),
+        _transition("retired-and-flapped", 9.0, "ALARM", "OK", now),
+    ]
+    citations = {}  # deliberately no entry — this is the point
+    flapped, flapped_retired = cac.flapped_uncited(history, citations, now=now, live_alarm_names={"some-other-live-alarm"})
+    code, message = cac.render([], None, flapped=flapped, flapped_retired=flapped_retired)
+    # The flap leg is clear without a citation:
+    assert code == 0
+    assert "retired-and-flapped" in message
+    # And the registry-name test never has to consider this alarm at all, because
+    # no entry was ever written for it — the citations dict above is empty and
+    # test_real_registry_entries_all_name_a_real_alarm walks the real registry
+    # file, not this synthetic one; the guarantee is that #3655's fix removes the
+    # PRESSURE to add such an entry in the first place.
+    assert "retired-and-flapped" not in citations
+
+
+def test_fetch_all_alarm_names_degrades_on_any_exception(monkeypatch):
+    """Same degrade-honestly shape as fetch_alarms/fetch_alarm_history — no
+    creds/network in test env must return (set(), error), never crash."""
+    names, err = cac.fetch_all_alarm_names()
+    assert isinstance(names, set)
+    assert err is None or isinstance(err, str)
+
+
+def test_main_falls_back_to_unpartitioned_flap_when_live_names_unreachable(monkeypatch, capsys):
+    """If the live-name read itself fails, main() must not silently drop a flap —
+    it falls back to the pre-#3655 flat list (conservative: stays red) rather than
+    treating an unreachable live-set read as evidence of retirement."""
+    now = datetime.now(timezone.utc)
+    planted = [
+        _transition("cant-tell-if-retired", 10.0, "OK", "ALARM", now),
+        _transition("cant-tell-if-retired", 9.0, "ALARM", "OK", now),
+    ]
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([], None))
+    monkeypatch.setattr(cac, "load_citations", lambda: {})
+    monkeypatch.setattr(cac, "load_alarm_audience", lambda: {})
+    monkeypatch.setattr(cac, "uncited_long_reds", lambda *a, **k: [])
+    monkeypatch.setattr(cac, "issueless_ancient_reds", lambda *a, **k: [])
+    monkeypatch.setattr(cac, "stale_episode_citations", lambda *a, **k: [])
+    monkeypatch.setattr(cac, "fetch_alarm_history", lambda window_hours=cac.FLAP_WINDOW_HOURS: (planted, None))
+    monkeypatch.setattr(cac, "fetch_all_alarm_names", lambda: (set(), "AccessDenied"))
+    monkeypatch.setattr(cac, "fetch_issue_states", lambda refs: ({}, None))
+    monkeypatch.setattr(cac, "fetch_qa_smoke_causes", lambda: ({}, None))
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 1
+    assert "cant-tell-if-retired" in capsys.readouterr().out
+
+
 # ── render() — flap section contract ───────────────────────────────────────────
 
 

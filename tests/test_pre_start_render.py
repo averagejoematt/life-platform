@@ -7,14 +7,19 @@ the pages the PRE-START payload contract — {pre_start, days_until_start,
 start_date} with wiped/empty data everywhere else — then asserts what a reader
 actually sees:
 
-  * Home: the hero counts DOWN ("days until the experiment begins"), the family
-    panel shows the awaiting-Day-1 state, no delta claim, no NaN/undefined leak.
+  * Home: the hero counts DOWN — the caption is compared against `dialCopy()`
+    (`site/assets/js/daily_line.js`), called live in-page rather than pinned as a
+    literal (#3640: the literal #3584 replaced sat broken for weeks because CI
+    never installs playwright to catch it), the family panel shows the
+    awaiting-Day-1 state, no delta claim, no NaN/undefined leak.
   * Cockpit: the T−N banner ("The instruments are on"), no NaN/undefined leak.
   * Character sheet: the "record begins Day 1" pre-start banner, no dormant /
     atrophy / quiet-stretch framing.
 
 Skips cleanly when Playwright (or its chromium) isn't installed — the backend
-contract is pinned by tests/test_pre_start_countdown.py either way.
+contract is pinned by tests/test_pre_start_countdown.py either way. CI names this
+module (and its four siblings) as a loud, non-silent skip rather than installing
+chromium here — see `scripts/playwright_gated_tests.py` (#3640).
 """
 
 import json
@@ -147,6 +152,24 @@ def pre_start_pages():
                 page.wait_for_timeout(1200)  # let the async renders settle
                 out[path] = {"text": page.inner_text("body"), "errors": errors}
                 page.close()
+
+            # #3640: derive the expected pre-start dial caption from the REAL
+            # module instead of pinning a literal — a copy change (#3584) retired
+            # "days until the experiment begins" and the old literal-pinned test
+            # could neither pass on a chromium machine nor fail in CI (CI never
+            # installs playwright). Importing the module in-page and calling the
+            # real dialCopy() means the next copy change can only break this test
+            # by actually changing what a reader sees.
+            dial_page = context.new_page()
+            dial_page.goto(base_url + "/", wait_until="domcontentloaded", timeout=30000)  # give the import a base URL
+            out["_dial_copy"] = dial_page.evaluate(
+                """async ({daysUntil, startLabel}) => {
+                    const mod = await import('/assets/js/daily_line.js');
+                    return mod.dialCopy({ daysUntil, startLabel }, null, null);
+                }""",
+                {"daysUntil": DAYS_UNTIL, "startLabel": START_LABEL},
+            )
+            dial_page.close()
             browser.close()
     finally:
         shutdown()
@@ -166,12 +189,26 @@ def _assert_no_leaks(res, path):
 def test_home_counts_down(pre_start_pages):
     res = pre_start_pages["/"]
     text = res["text"].lower()
-    assert "days until the experiment begins" in text
+    dial_copy = pre_start_pages["_dial_copy"]
+    assert dial_copy and dial_copy.get("cap"), "dialCopy() returned nothing for the pre-start payload"
+    assert dial_copy["cap"].lower() in text
     assert START_LABEL.lower() in text
     assert "awaiting day 1" in text  # the family panel's neutral state
     assert "days into the experiment" not in text  # the running-state caption is gone
     assert "since june 14 2026" not in text  # the running-state genesis stamp is hidden
     _assert_no_leaks(res, "/")
+
+
+def test_the_derived_caption_would_have_caught_the_3584_drift(pre_start_pages):
+    """Negative control: #3584 retired 'days until the experiment begins' from
+    the dial caption. The real caption derived from the live module must NOT
+    equal that retired literal — proving a test that hardcoded it back in
+    (the exact class of drift this issue reports) would be caught immediately
+    by comparing against the derivation, rather than the two silently agreeing
+    forever the way a re-pinned literal could."""
+    retired_literal = "days until the experiment begins"
+    dial_copy = pre_start_pages["_dial_copy"]
+    assert retired_literal not in dial_copy["cap"].lower()
 
 
 def test_cockpit_pre_start_banner(pre_start_pages):

@@ -73,6 +73,7 @@ unit suite at collection — memory: reference_test_layer_dep_import_collection_
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -85,6 +86,12 @@ AXE_VERSION = "4.12.1"
 
 # The gate is scoped to these axe impact levels (#1433 acceptance criteria).
 GATING_IMPACTS = ("critical", "serious")
+
+# #3548: a fresh serious/critical row lands with this placeholder `issue` value
+# (mirrors tests/truth_baseline_audit.py's UNTRIAGED) — the unit suite reds the
+# committed file on any UNTRIAGED entry, so an --update-baseline run can never
+# be committed without a human naming the tracking issue.
+UNTRIAGED = "UNTRIAGED"
 
 # The viewport the mobile pass runs at — the SAME 390×844 every existing mobile
 # check in tests/visual_qa.py (overflow, stuck reveals, app-bar, tap targets) and
@@ -203,6 +210,33 @@ def load_baseline(path=None):
     return data
 
 
+_ISSUE_REF_RE = re.compile(r"^#\d+$")
+
+
+def untriaged_serious_entries(baseline):
+    """(ledger_key, page_path, rule_id) for every SERIOUS/CRITICAL baseline row
+    with no valid `issue` field, across all four theme/viewport ledgers (#3548).
+
+    Mirrors `tests/truth_baseline_audit.py::untriaged_entries` (#2956): the
+    baseline is the triaged debt ledger, not an excuse file, so a serious a11y
+    finding may not sit here with no one accountable for it. Deliberately
+    scoped to serious/critical only — moderate/minor debt stays advisory and
+    untracked by design (this file's own module docstring), the same line
+    `test_a11y_audit.py`'s gate itself draws via `GATING_IMPACTS`. Pure — reads
+    the dict it is given, no I/O.
+    """
+    out = []
+    for key in LEDGER_KEYS:
+        for page_path, rows in (baseline.get(key) or {}).items():
+            for r in rows:
+                if r.get("impact") not in GATING_IMPACTS:
+                    continue
+                issue = str(r.get("issue") or "")
+                if not _ISSUE_REF_RE.match(issue):
+                    out.append((key, page_path, r.get("id")))
+    return out
+
+
 def gate_findings(page_path, violations, baseline, theme="dark", viewport="desktop"):
     """Classify one page's observed violations against the baseline.
 
@@ -248,18 +282,24 @@ def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop
     baseline = load_baseline(path)
     key = _baseline_key(theme, viewport)
     for page_path, violations in observed_by_path.items():
-        rows = sorted(
-            (
-                {
-                    "id": v["id"],
-                    "impact": v.get("impact"),
-                    "help": v.get("help", ""),
-                    "nodes": v.get("nodes", 0),
-                }
-                for v in violations
-            ),
-            key=lambda r: r["id"],
-        )
+        # #3548: a serious/critical row's `issue` field must survive a re-sweep.
+        # Without this, the very next --update-baseline would silently wipe
+        # every triage annotation this file's own ownership rule requires —
+        # mirrors truth_baseline_audit.update_baseline's UNTRIAGED carry-forward.
+        prior_issue_by_id = {r["id"]: r.get("issue") for r in baseline.get(key, {}).get(page_path, []) if r.get("issue")}
+
+        def _row(v):
+            out = {
+                "id": v["id"],
+                "impact": v.get("impact"),
+                "help": v.get("help", ""),
+                "nodes": v.get("nodes", 0),
+            }
+            if v.get("impact") in GATING_IMPACTS:
+                out["issue"] = prior_issue_by_id.get(v["id"], UNTRIAGED)
+            return out
+
+        rows = sorted((_row(v) for v in violations), key=lambda r: r["id"])
         if rows:
             baseline[key][page_path] = rows
         else:

@@ -173,11 +173,19 @@ def brier_score(pairs):
     Returns ``mean((p - y)^2)`` -- 0.0 is perfect, 0.25 is the always-say-50%
     baseline, 1.0 is confidently-wrong-every-time. ``None`` when there are no
     valid pairs. Unrounded; the caller owns presentation rounding.
+
+    #3644: summation uses ``math.fsum`` (Shewchuk's exact-then-round algorithm),
+    not the built-in ``sum()``. They usually agree, but CPython's ``sum()`` for
+    floats has itself changed algorithm across versions (3.12 added a
+    compensated fast path); ``math.fsum`` is the ONE summation rule this package
+    commits to regardless of interpreter/version, and the JS port's
+    ``neumaierSum`` is written to reproduce it bit-for-bit on the vectors this
+    package is held to (see the JS module's PARITY comment).
     """
     clean = clean_pairs(pairs)
     if not clean:
         return None
-    return sum((p - y) ** 2 for p, y in clean) / len(clean)
+    return math.fsum((p - y) ** 2 for p, y in clean) / len(clean)
 
 
 def brier_skill_score(pairs):
@@ -186,13 +194,21 @@ def brier_skill_score(pairs):
     1.0 perfect, 0.0 = no better than always predicting the observed base rate,
     negative = worse than the base rate. The honest "does stated confidence beat
     just guessing the average?" number.
+
+    #3644: every summation here is ``math.fsum`` — see ``brier_score``'s note.
+    Before this fix, the pairs
+    ``[(0.2,1),(0.2,1),(0.3,1),(0.2,1),(0.25,1),(0.3,1),(0.2,0)]`` landed on an
+    exact 4-dp tie (``-3.08625``) where this function's ``sum()`` and the JS
+    port's naive accumulation disagreed by one ulp in the un-rounded skill score
+    and therefore rounded in OPPOSITE directions. ``vectors/calibration_vectors.
+    json`` pins that exact tie as a positive control.
     """
     clean = clean_pairs(pairs)
     if len(clean) < 2:
         return None
-    base_rate = sum(y for _, y in clean) / len(clean)
-    bs = sum((p - y) ** 2 for p, y in clean) / len(clean)
-    bs_ref = sum((base_rate - y) ** 2 for _, y in clean) / len(clean)
+    base_rate = math.fsum(y for _, y in clean) / len(clean)
+    bs = math.fsum((p - y) ** 2 for p, y in clean) / len(clean)
+    bs_ref = math.fsum((base_rate - y) ** 2 for _, y in clean) / len(clean)
     if bs_ref == 0:
         return None  # every outcome identical -- skill is undefined
     return 1.0 - bs / bs_ref

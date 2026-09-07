@@ -304,10 +304,23 @@ def issueless_ancient_reds(alarms, citations, now=None, threshold_days=ALARM_TEN
     return out
 
 
-def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS):
+def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS, live_alarm_names=None):
     """(alarm_name, fired_count, cleared_count) for every alarm with an ALARM
     episode that both STARTED (a transition INTO ALARM) and ENDED (a transition
     FROM ALARM to any other state) within the window, and no entry in `citations`.
+
+    #3655: CloudWatch keeps `describe_alarm_history` for ~2 weeks after an alarm
+    is DELETED, so a retired alarm's residual pre-deletion flap otherwise reads as
+    an uncited live flap for up to 72h with no citation entry that
+    `test_real_registry_entries_all_name_a_real_alarm` would accept (the alarm no
+    longer exists to be named) — two gates with mutually exclusive cures.
+    `live_alarm_names`, when given (the set of alarm names CloudWatch currently
+    knows about, any state — `fetch_all_alarm_names()`), partitions the result and
+    the return becomes `(flapped, flapped_retired)`: names still in the live set
+    stay in `flapped` (red, as always), names no longer live move to
+    `flapped_retired` (informational — no citation required). When omitted (the
+    default; also every existing caller/test in this file), the live set is
+    unknown and the original single-list return is preserved unchanged.
 
     #2912: `describe_alarms(StateValue="ALARM")` is blind to these by construction
     (the alarm is no longer in ALARM when the wrap looks), so a QA failure that
@@ -354,7 +367,11 @@ def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS
         entry = citations.get(name)
         if not entry or not str(entry.get("citation", "")).strip():
             out.append((name, fired.get(name, 0), cleared.get(name, 0)))
-    return out
+    if live_alarm_names is None:
+        return out
+    flapped = [item for item in out if item[0] in live_alarm_names]
+    flapped_retired = [item for item in out if item[0] not in live_alarm_names]
+    return flapped, flapped_retired
 
 
 # ── #3412: an issue reference is not a DynamoDB sort key ─────────────────────
@@ -771,6 +788,35 @@ def fetch_alarm_history(window_hours=FLAP_WINDOW_HOURS):
     return items, None
 
 
+def fetch_all_alarm_names():
+    """Every alarm name CloudWatch currently knows about, ANY state — read-only,
+    paginated. #3655: `fetch_alarm_history()` reads ~2 weeks of residual history
+    for alarms that no longer exist; intersecting the flap window against this set
+    is what tells a retired alarm's pre-deletion flap apart from a live one still
+    owed a citation. Degrades the same way as its siblings: on any AWS failure
+    returns (set(), error) so the caller can fall back to the pre-#3655 behaviour
+    (no partition — every flap stays red) rather than silently under-reporting."""
+    try:
+        import boto3
+
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        names = set()
+        token = None
+        for _ in range(_HISTORY_MAX_PAGES):
+            kwargs = {"MaxRecords": 100, "AlarmTypes": ["CompositeAlarm", "MetricAlarm"]}
+            if token:
+                kwargs["NextToken"] = token
+            resp = cw.describe_alarms(**kwargs)
+            for a in list(resp.get("MetricAlarms", [])) + list(resp.get("CompositeAlarms", [])):
+                names.add(a.get("AlarmName", "?"))
+            token = resp.get("NextToken")
+            if not token:
+                break
+    except Exception as e:  # noqa: BLE001 — any AWS/boto3 failure must degrade, not crash
+        return set(), str(e)
+    return names, None
+
+
 def render(
     uncited,
     unreachable_error,
@@ -783,13 +829,21 @@ def render(
     stale_episodes=(),
     mismatched=(),
     cause_error=None,
+    flapped_retired=(),
 ):
     """(exit_code, message) for a computed result. Pure — unit-tested offline.
 
     #3423: `audience` (optional {alarm_name: "reader"}) only ANNOTATES which
     uncited entries were flagged under the first-red bar rather than the 72h
     one — it does not change which entries `uncited` holds (uncited_long_reds
-    already applied the conditional threshold upstream)."""
+    already applied the conditional threshold upstream).
+
+    #3655: `flapped_retired` — the partition of `flapped_uncited`'s result whose
+    names no longer exist in `describe_alarms` — is purely informational. It never
+    contributes to the exit code and never requires a citation; it is printed so a
+    retired alarm's pre-deletion flap stays legible at wrap without reintroducing
+    the contradiction against `test_real_registry_entries_all_name_a_real_alarm`
+    (which rejects a citation naming an alarm that no longer exists)."""
     audience = audience or {}
     if unreachable_error is not None:
         return 0, (
@@ -797,6 +851,14 @@ def render(
             "alarm citations UNVERIFIED this run. Note that explicitly in the handover "
             "(`**Alarms:** unverified — AWS unreachable`) rather than claiming a clean board."
         )
+    retired_lines = []
+    if flapped_retired:
+        retired_lines.append(
+            f"ℹ️  {len(flapped_retired)} RETIRED alarm(s) fired and cleared within the last "
+            f"{FLAP_WINDOW_HOURS}h before being deleted — no citation required (#3655):"
+        )
+        for name, fired_n, cleared_n in sorted(flapped_retired):
+            retired_lines.append(f"   - {name}  (entered ALARM x{fired_n}, cleared x{cleared_n}; no longer exists)")
     if not uncited and not ancient and not flapped and not dead and not stale_episodes and not mismatched:
         message = (
             "✅ every alarm in ALARM state >72h cites an incident row or issue (reader-audience alarms "
@@ -806,6 +868,8 @@ def render(
             "Every lit alarm's cited `#N` is OPEN (#2996), and no citation predates its "
             "alarm's current episode or names a cause the live run contradicts (#3501)."
         )
+        if retired_lines:
+            message += "\n" + "\n".join(retired_lines)
         if history_error is not None:
             message += (
                 f"\n⚠️  BUT the alarm-history read failed ({history_error}) — the fired-and-cleared "
@@ -906,6 +970,8 @@ def render(
             f"⚠️  qa-smoke cause read failed ({cause_error}) — the cause-identity check (#3501) is "
             "UNVERIFIED this run; note that explicitly rather than claiming every citation explains the live cause."
         )
+    if retired_lines:
+        lines.extend(retired_lines)
     return 1, "\n".join(lines)
 
 
@@ -918,12 +984,24 @@ def main():
     ancient = [] if err else issueless_ancient_reds(alarms, citations)
     stale_episodes = [] if err else stale_episode_citations(alarms, citations)
     if err:
-        history, history_err, flapped = [], None, []  # whole board already UNVERIFIED
+        history, history_err, flapped, flapped_retired = [], None, [], []  # whole board already UNVERIFIED
         issue_err, dead = None, []
         cause_err, mismatched = None, []
     else:
         history, history_err = fetch_alarm_history()
-        flapped = [] if history_err else flapped_uncited(history, citations)
+        if history_err:
+            flapped, flapped_retired = [], []
+        else:
+            # #3655: intersect against the alarms that currently exist so a retired
+            # alarm's residual pre-deletion history doesn't demand a citation that
+            # test_real_registry_entries_all_name_a_real_alarm would then reject. If
+            # the live-name read itself fails, fall back to the pre-#3655 behaviour
+            # (no partition — every flap stays red) rather than silently hiding one.
+            live_names, live_names_err = fetch_all_alarm_names()
+            if live_names_err:
+                flapped, flapped_retired = flapped_uncited(history, citations), []
+            else:
+                flapped, flapped_retired = flapped_uncited(history, citations, live_alarm_names=live_names)
         issue_states, issue_err = fetch_issue_states(cited_issue_refs(alarms, citations))
         dead = [] if issue_err else dead_citations(alarms, citations, issue_states)
         live_causes, cause_err = fetch_qa_smoke_causes()
@@ -940,6 +1018,7 @@ def main():
         stale_episodes=stale_episodes,
         mismatched=mismatched,
         cause_error=cause_err,
+        flapped_retired=flapped_retired,
     )
     print(message)
     if code == 0:

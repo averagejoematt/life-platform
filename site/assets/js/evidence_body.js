@@ -478,15 +478,15 @@ export function physicalCaptureBacklog(d, pa) {
   const haveTape = d.tape_measurements && Object.keys(d.tape_measurements).length;
   const cards = [];
   // P2.1 — DEXA cadence / scan-two scheduling (drives the countdown; unlocks velocity).
-  cards.push(`<div class="cap-card"><h4 class="cap-h">Scan two — scheduling <span class="cap-tag">unlocks velocity</span></h4><p class="rd-meta label">A second DEXA ~10 weeks into the cut turns every composition figure above from a dated snapshot into a real fat-vs-lean <em>trajectory</em>. Booking it is the single highest-value capture step — it's what the countdown at the top of the arc is waiting on. Not yet scheduled.</p></div>`);
+  cards.push(`<div class="cap-card"><h3 class="cap-h">Scan two — scheduling <span class="cap-tag">unlocks velocity</span></h3><p class="rd-meta label">A second DEXA ~10 weeks into the cut turns every composition figure above from a dated snapshot into a real fat-vs-lean <em>trajectory</em>. Booking it is the single highest-value capture step — it's what the countdown at the top of the arc is waiting on. Not yet scheduled.</p></div>`);
   // P2.2 — tape measurements (between-DEXA proxy).
-  cards.push(`<div class="cap-card"><h4 class="cap-h">Tape measurements <span class="cap-tag">${haveTape ? "flowing" : "needs capture"}</span></h4><p class="rd-meta label">${haveTape ? "Tape sessions are logging — a cheap, frequent proxy for the silhouette and segmental change between scans." : "Zero sessions yet. A monthly tape (waist, hips, limbs) is the cheap, frequent proxy that keeps the silhouette honest between the expensive scans. Awaiting the first measurement."}</p></div>`);
+  cards.push(`<div class="cap-card"><h3 class="cap-h">Tape measurements <span class="cap-tag">${haveTape ? "flowing" : "needs capture"}</span></h3><p class="rd-meta label">${haveTape ? "Tape sessions are logging — a cheap, frequent proxy for the silhouette and segmental change between scans." : "Zero sessions yet. A monthly tape (waist, hips, limbs) is the cheap, frequent proxy that keeps the silhouette honest between the expensive scans. Awaiting the first measurement."}</p></div>`);
   // P2.3 — progress photos (PRIVATE by default; explicit opt-in before any public render).
-  cards.push(`<div class="cap-card"><h4 class="cap-h">Progress photos <span class="cap-tag cap-private">private by default</span></h4><p class="rd-meta label">The most powerful change signal and the most sensitive — so they're private by default, never rendered here without an explicit opt-in. The faceless silhouette above is the public-safe stand-in. No photo is shown.</p></div>`);
+  cards.push(`<div class="cap-card"><h3 class="cap-h">Progress photos <span class="cap-tag cap-private">private by default</span></h3><p class="rd-meta label">The most powerful change signal and the most sensitive — so they're private by default, never rendered here without an explicit opt-in. The faceless silhouette above is the public-safe stand-in. No photo is shown.</p></div>`);
   // P2.4 — composition velocity (GATED on scan two + LSC).
-  cards.push(`<div class="cap-card"><h4 class="cap-h">Composition velocity <span class="cap-tag">awaits scan two</span></h4><p class="rd-meta label">Lean/fat/visceral change per week — the number everyone wants — stays blank on purpose. One DEXA is a point; velocity needs a second valid scan AND a delta that clears the scan's least-significant-change, or it's noise dressed as progress. Until then, weight is the only honest "change." Placeholder, not hidden.</p></div>`);
+  cards.push(`<div class="cap-card"><h3 class="cap-h">Composition velocity <span class="cap-tag">awaits scan two</span></h3><p class="rd-meta label">Lean/fat/visceral change per week — the number everyone wants — stays blank on purpose. One DEXA is a point; velocity needs a second valid scan AND a delta that clears the scan's least-significant-change, or it's noise dressed as progress. Until then, weight is the only honest "change." Placeholder, not hidden.</p></div>`);
   // P2.5 — complementary ages (optional; PhenoAge stays the anchor; WHOOP Age NOT built).
-  cards.push(`<div class="cap-card"><h4 class="cap-h">Complementary ages <span class="cap-tag">secondary lenses</span></h4><p class="rd-meta label">Vascular age (Withings pulse-wave velocity) and a VO₂max fitness age could sit beside PhenoAge as secondary lenses — PhenoAge stays the anchor. WHOOP's "age" isn't in their official API (only a fragile unofficial scrape), so it's deliberately not built. Awaiting the source wiring.</p></div>`);
+  cards.push(`<div class="cap-card"><h3 class="cap-h">Complementary ages <span class="cap-tag">secondary lenses</span></h3><p class="rd-meta label">Vascular age (Withings pulse-wave velocity) and a VO₂max fitness age could sit beside PhenoAge as secondary lenses — PhenoAge stays the anchor. WHOOP's "age" isn't in their official API (only a fragile unofficial scrape), so it's deliberately not built. Awaiting the source wiring.</p></div>`);
   return sec("What unlocks the arc — the capture backlog",
     `<div class="cap-grid">${cards.join("")}</div>` +
     `<p class="rd-meta label">Each of these is a real capability waiting on data, not a stub — honest empty states, ranked by what would move the picture most. Composition velocity is gated hardest: it does not get built off a single scan.</p>`);
@@ -502,7 +502,7 @@ export function physicalFullScanExpander(d) {
   const idx = x.indices || {}, bone = x.bone || {}, sf = x.segmental_fat || {}, sl = x.segmental_lean || {};
   const tval = Number(bone.t_score);
   const tImplausible = Number.isFinite(tval) && tval >= 3;
-  const boneBlock = `<h4 class="hb-group label">Bone density</h4>` + (
+  const boneBlock = `<h3 class="hb-group label">Bone density</h3>` + (
     tImplausible
       ? `<p class="rd-flag-note label">⚑ Bone T-score reported <strong>+${esc(fmt(tval, 1))}</strong> — suppressed as a likely scan artifact: a T-score that high is physiologically implausible (it would mean bone density ~4 SD above the young-adult peak). Treated as a parse/scan error pending a re-read, not shown as a result.</p>`
       : kvtable(bone)
@@ -510,10 +510,10 @@ export function physicalFullScanExpander(d) {
   const idxSlim = {};
   for (const k of ["ffmi_kg_m2", "fmi_kg_m2", "ffmi_rating", "fmi_rating"]) if (idx[k] != null) idxSlim[k] = idx[k];
   const inner =
-    (Object.keys(idxSlim).length ? `<h4 class="hb-group label">Indices (FFMI / FMI)</h4>${kvtable(idxSlim)}` : "") +
+    (Object.keys(idxSlim).length ? `<h3 class="hb-group label">Indices (FFMI / FMI)</h3>${kvtable(idxSlim)}` : "") +
     boneBlock +
-    (Object.keys(sf).length ? `<h4 class="hb-group label">Segmental fat %</h4>${kvtable(sf)}` : "") +
-    (Object.keys(sl).length ? `<h4 class="hb-group label">Segmental lean</h4>${kvtable(sl)}` : "");
+    (Object.keys(sf).length ? `<h3 class="hb-group label">Segmental fat %</h3>${kvtable(sf)}` : "") +
+    (Object.keys(sl).length ? `<h3 class="hb-group label">Segmental lean</h3>${kvtable(sl)}` : "");
   return sec("The full scan — everything else, dated",
     `<details class="fs-exp"><summary class="pa-sum label">Open the full ${esc(x.scan_date || "DEXA")} scan — indices, segmental, bone</summary><div class="fs-body">${inner}</div></details>` +
     note(`Every figure here is from the single ${esc(x.scan_date || "")} pre-cut scan — a dated snapshot, not a trend. Composition velocity unlocks at scan two.`));
