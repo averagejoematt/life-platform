@@ -32,7 +32,7 @@ WHAT IS PINNED, and how each one is proved able to fail
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
@@ -48,6 +48,12 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 import pytest  # noqa: E402
 from coach import commitment_grading as cg  # noqa: E402
 
+from tests.pacific_clock import freeze_pacific  # noqa: E402
+
+#: Every dated fixture in this file derives from this one instant. Nothing here reads a
+#: real wall clock — see `frozen_clock` below (#2376: a dated fixture against an
+#: unfrozen handler clock is green the day it is written and red at the next UTC
+#: midnight; that class red-mained main on 2026-08-09).
 TODAY = "2026-09-06"
 
 
@@ -139,10 +145,40 @@ def _rising_whoop(end_date, n=20):
 
 @pytest.fixture
 def ev(monkeypatch):
-    """The REAL evaluator module with its table + CloudWatch handles swapped."""
+    """The REAL evaluator module, with its clock pinned to TODAY (#2376).
+
+    Every grading decision here is a date comparison, so the handler's own
+    `pacific_today()` has to agree with the fixtures or this file is a time bomb:
+    green the day it is written, red at the next UTC midnight. The instant is DERIVED
+    from TODAY — a second hardcoded date is how this drifts back into a bomb.
+    """
     from coach import coach_prediction_evaluator as _ev
 
+    class _FrozenDatetime(_ev.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            y, m, d = (int(x) for x in TODAY.split("-"))
+            return _ev.datetime(y, m, d, 17, 0, 0, tzinfo=tz or timezone.utc)
+
+    monkeypatch.setattr(_ev, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, _ev, _FrozenDatetime)
     return _ev
+
+
+@pytest.fixture(autouse=True)
+def frozen_writer_clock(monkeypatch):
+    """Same pin for the WRITER — `_create_commitment_records` stamps `created_at` from
+    its own clock, and the born-ungradeable tests read the record back."""
+    from coach import coach_state_updater as _su
+
+    class _FrozenDatetime(_su.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            y, m, d = (int(x) for x in TODAY.split("-"))
+            return _su.datetime(y, m, d, 17, 0, 0, tzinfo=tz or timezone.utc)
+
+    monkeypatch.setattr(_su, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, _su, _FrozenDatetime)
 
 
 def _run(ev, monkeypatch, table, cw):
