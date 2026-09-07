@@ -48,6 +48,14 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py pytest pytest-cov boto3 botocore hypothesis pyyaml pillow)
           pip install $PINS
 
+      - name: Name every playwright-gated test skip (#3640)
+        # This job installs no playwright/chromium, so every module in this set
+        # SKIPS silently below (invisible in the tail-truncated pytest summary)
+        # while it can FAIL on any machine that does have chromium. Name each one
+        # loudly here so a lane's first red on such a machine is never mistaken
+        # for something this job would have caught.
+        run: python3 scripts/playwright_gated_tests.py
+
       - name: Run unit tests
         run: |
           echo "::group::Running tests/test_shared_modules.py"

@@ -134,7 +134,10 @@ SHELL = """<!DOCTYPE html>
     <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
     <div class="dx-layout">
       <ul class="dx-list" data-dx-list aria-label="Entries"></ul>
-      <article class="dx-read" data-dx-read></article>
+      <!-- #3548: div, not article — tabs.js::markActiveTab assigns role="tabpanel" to
+           this element, and <article>'s implicit strong native semantics don't permit
+           that role override (axe aria-allowed-role). A <div> allows any role. -->
+      <div class="dx-read" data-dx-read></div>
     </div>
   </main>
   <footer class="site-foot">

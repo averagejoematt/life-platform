@@ -275,7 +275,10 @@ export function renderCycles(d) {
   // contradiction. Say the column is still filling, and how far in it is. `in_progress`
   // is the server's own word for it; `is_current` is the older field the flagmark below
   // still keys off, and is the fallback for a payload served before the API ships.
-  const head = `<tr><th></th>${cs.map((c) => { const live = c.in_progress ?? c.is_current; return `<th>cycle ${esc(String(c.cycle))}${live ? ` · in progress${c.days_elapsed ? ` · day ${esc(String(c.days_elapsed))}` : ""}` : ""}</th>`; }).join("")}</tr>`;
+  // #3548: the corner cell names the row axis instead of shipping empty — axe's
+  // empty-table-header flags a <th> with no accessible text, and a screen-reader
+  // user landing on it heard nothing at all.
+  const head = `<tr><th class="sr-only">Metric</th>${cs.map((c) => { const live = c.in_progress ?? c.is_current; return `<th>cycle ${esc(String(c.cycle))}${live ? ` · in progress${c.days_elapsed ? ` · day ${esc(String(c.days_elapsed))}` : ""}` : ""}</th>`; }).join("")}</tr>`;
   const body = rows.map(([lbl, f]) => `<tr><td class="rd-name">${esc(lbl)}</td>${cs.map((c) => `<td class="num${c.is_current ? " rd-flagmark" : ""}">${f(c)}</td>`).join("")}</tr>`).join("");
   // #948: the day-1 case reads "first 1 day" — the singular recurs on every genesis day.
   return sec(`The same first ${K} day${K === 1 ? "" : "s"}, every restart`, `<table class="rd-tbl"><thead>${head}</thead><tbody>${body}</tbody></table>`) +
