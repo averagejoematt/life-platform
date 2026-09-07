@@ -253,16 +253,42 @@ def test_method_game_regression_guard_gates_after_rearm():
 
 
 def test_genuinely_live_pages_still_baselined_not_wiped_indiscriminately():
-    """Sanity check on the #1990 re-arm: pages that direct measurement showed
-    STILL carry live color-contrast debt (not "Day-1 emptiness" — re-verified
+    """Sanity check on the #1990 re-arm: a page that direct measurement showed
+    STILL carries live color-contrast debt (not "Day-1 emptiness" — re-verified
     mid-cycle-11 per the issue's own acceptance criteria) must still be
-    baselined, so this PR's shrink didn't just wipe the ledger wholesale."""
+    baselined, so a shrink cannot pass by wiping the ledger wholesale.
+
+    #3544 moved /data/{character,badges,vitals}/ off this list and onto
+    ``test_recede_swept_pages_gate_after_the_3544_shrink`` below — NOT because the
+    rule got weaker, but because the recede-grammar sweep (#3580, then this) actually
+    fixed them and a direct re-measurement read zero color-contrast nodes on each,
+    twice, at both viewports. /data/training/ is untouched by that sweep, still
+    measures debt, and stays here as the "did you just wipe it?" anchor."""
     base = a11y_audit.load_baseline()
-    for page_path in ("/data/character/", "/data/badges/", "/data/training/", "/data/vitals/"):
+    for page_path in ("/data/training/",):
         ids = {r["id"] for r in base["pages"].get(page_path, [])}
         assert "color-contrast" in ids, f"{page_path} measured live during #1990's re-arm — its entry must survive"
         out = a11y_audit.gate_findings(page_path, [_v("color-contrast", "serious")], base)
         assert out["new"] == [], f"{page_path}'s still-live color-contrast rule must stay baselined (not re-gate)"
+
+
+def test_recede_swept_pages_gate_after_the_3544_shrink():
+    """#3544's third acceptance box, held as a test rather than as a claim.
+
+    The three pages the recede-grammar sweep cleaned carried color-contrast as accepted
+    debt in the dark desktop AND mobile ledgers — 61/40/10 and 60/39/11 nodes — which
+    meant the gate could not fire on them at all. Direct re-measurement with the real
+    tests/visual_qa.py harness (live pages, this branch's CSS served in place) read zero
+    color-contrast nodes on each, so their rows are gone and a REAPPEARANCE is now a NEW
+    serious violation that reds the sweep. If someone re-baselines the debt without
+    fixing it, this reds."""
+    base = a11y_audit.load_baseline()
+    for page_path in ("/data/character/", "/data/badges/", "/data/vitals/"):
+        for ledger, viewport in (("pages", "desktop"), ("pages_mobile", "mobile")):
+            ids = {r["id"] for r in base[ledger].get(page_path, [])}
+            assert "color-contrast" not in ids, f"{page_path} ({viewport}) was re-measured clean by #3544 — its row must not come back"
+            out = a11y_audit.gate_findings(page_path, [_v("color-contrast", "serious")], base, viewport=viewport)
+            assert [v["id"] for v in out["new"]] == ["color-contrast"], f"{page_path} ({viewport}) must gate on a planted violation"
 
 
 # ── the committed artifacts: vendored bundle + day-one baseline ───────────────

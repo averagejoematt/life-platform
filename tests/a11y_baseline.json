@@ -1,13 +1,13 @@
 {
   "_meta": {
     "axe_version": "4.12.1",
-    "captured_at": "2026-08-02T21:24:07+00:00",
+    "captured_at": "2026-09-07T00:01:51+00:00",
     "note": "Committed a11y debt ledger (#1433) \u2014 honest capture of current axe violations per page. The visual-qa gate reds only on NEW serious/critical violations vs this file. Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate.",
-    "captured_at_light": "2026-08-02T20:45:21+00:00",
+    "captured_at_light": "2026-09-07T00:02:51+00:00",
     "note_light": "Light-theme sibling ledger (#1991) \u2014 same honest-capture contract as 'pages'/note above, scoped to axe findings observed under a Playwright color_scheme='light' context. Update DELIBERATELY via `python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep alternates dark/light by ISO-week parity so both ledgers stay current without a dedicated job.",
-    "captured_at_mobile": "2026-08-31T02:46:39+00:00",
+    "captured_at_mobile": "2026-09-07T00:01:51+00:00",
     "note_mobile": "Mobile-viewport sibling ledger (#3277) \u2014 same honest-capture contract as 'pages'/note above, scoped to axe findings observed at 390x844 after the mobile scroll/reveal pass (dark theme). Written by the SAME `python3 tests/visual_qa.py --update-baseline` run that writes 'pages' (one sweep captures both viewports); seeded 2026-08-31 from all 92 sweep paths against live production. Two things it states out loud: (1) `scrollable-region-focusable` is deliberately ABSENT \u2014 #3277 drove it from 15 pages / 33 nodes to zero (the motion.js scroll-region focus primitive), so a reappearance is a NEW serious violation and reds the gate; (2) the serious debt it DOES carry (color-contrast on the chart labels of /data/{vitals,training,character,badges}/, svg-img-alt on /method/build/) is PRE-EXISTING \u2014 re-measured unpatched on live at 390px, node-for-node identical, and the same rule set the desktop ledger already accepts. It is dated debt seen for the first time at this viewport, not a pass.",
-    "captured_at_light_mobile": "2026-08-31T02:46:39+00:00",
+    "captured_at_light_mobile": "2026-09-07T00:02:51+00:00",
     "note_light_mobile": "Light-theme mobile-viewport ledger (#3277) \u2014 the light sibling of 'pages_mobile', captured at 390x844 under color_scheme='light'. Written by `python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone alternates dark/light by ISO-week parity, so this is the ledger the light run gates against. Same two statements as 'pages_mobile': no `scrollable-region-focusable` anywhere, and its serious rows (19 pages of color-contrast + svg-img-alt) are the SAME set 'pages_light' already accepts on desktop \u2014 light theme simply carries more contrast debt than dark, at either viewport."
   },
   "pages": {
@@ -99,22 +99,6 @@
         "nodes": 1
       }
     ],
-    "/data/badges/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 40
-      }
-    ],
-    "/data/character/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 61
-      }
-    ],
     "/data/habits/": [
       {
         "id": "heading-order",
@@ -140,12 +124,6 @@
       }
     ],
     "/data/vitals/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 10
-      },
       {
         "id": "heading-order",
         "impact": "moderate",
@@ -389,20 +367,12 @@
         "nodes": 1
       }
     ],
-    "/data/badges/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 80
-      }
-    ],
     "/data/character/": [
       {
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 127
+        "nodes": 3
       }
     ],
     "/data/habits/": [
@@ -462,7 +432,7 @@
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 11
+        "nodes": 2
       },
       {
         "id": "heading-order",
@@ -743,22 +713,6 @@
         "nodes": 1
       }
     ],
-    "/data/badges/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 39
-      }
-    ],
-    "/data/character/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 60
-      }
-    ],
     "/data/habits/": [
       {
         "id": "heading-order",
@@ -784,12 +738,6 @@
       }
     ],
     "/data/vitals/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 11
-      },
       {
         "id": "heading-order",
         "impact": "moderate",
@@ -1027,20 +975,12 @@
         "nodes": 1
       }
     ],
-    "/data/badges/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 79
-      }
-    ],
     "/data/character/": [
       {
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 129
+        "nodes": 3
       }
     ],
     "/data/habits/": [
@@ -1086,7 +1026,7 @@
         "id": "color-contrast",
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 11
+        "nodes": 1
       },
       {
         "id": "heading-order",
@@ -1139,14 +1079,6 @@
         "impact": "minor",
         "help": "Table header text should not be empty",
         "nodes": 1
-      }
-    ],
-    "/method/intelligence/": [
-      {
-        "id": "color-contrast",
-        "impact": "serious",
-        "help": "Elements must meet minimum color contrast ratio thresholds",
-        "nodes": 4
       }
     ],
     "/method/results/": [
