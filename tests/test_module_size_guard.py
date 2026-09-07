@@ -188,7 +188,27 @@ BASELINE = {
     "lambdas/compute/daily_insight_compute_lambda.py": 1775,
     # 2409 -> 2424 (+15) 2026-08-09, #2351: find_days mode='similar' schema (mode/target_date/
     # features/k params + description). Deliberate feature addition, reasoned in the commit.
-    "mcp/registry.py": 2330,
+    #
+    # 2330 -> 2393 (+63) 2026-09-06, #3668. RAISED DELIBERATELY, and the extraction came first.
+    # WHY IT COULD NOT BE AVOIDED: this file is the dispatch TABLE. A new MCP tool has no other
+    # home — TWO independent derivations read the schema literal in place and would both go blind
+    # if the entries moved to a sibling and were spliced in: deploy/sync_doc_metadata.py's
+    # `_auto_discover_tool_count` (regex over 4-space keys inside `TOOLS = {`, the source of every
+    # tool-count literal in docs/) and scripts/generate_mcp_tool_catalog.py (AST walk over the same
+    # dict, which raises on an unrenderable non-literal description node). Splicing would have
+    # silently frozen the tool count at 76 while the registry held 81 — the exact drift class the
+    # AST discoverers exist to close.
+    # WHAT WAS PAID FIRST (#2610 rule 2, extraction on a seam the codebase already recognises):
+    # `tool_list_available_tools` — the ONE tool implementation that lived in the table rather than
+    # in a `tools_*` module — moved to the cohesive sibling mcp/tools_meta.py (63 lines, well under
+    # the ceiling), leaving a two-line binding. That is 49 logical lines out of this file, and
+    # without it the addition would have landed at 2442 rather than 2393.
+    # HONEST ACCOUNTING: 49 extracted earns 9 of headroom under the N/5 rule; this raise is 63, so
+    # 54 of it is NOT earned and is recorded here as debt rather than dressed up. The terminal cure
+    # is the same one every other entry in this registry is waiting on — dropping under the ceiling
+    # and pruning the line — and for a 2,400-line literal dict that means teaching the two
+    # discoverers above to read a spliced table first. That is its own issue, not this one's.
+    "mcp/registry.py": 2393,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict

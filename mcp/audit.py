@@ -78,6 +78,10 @@ WRITE_VERBS = frozenset(
 READ_VERBS = frozenset(
     {
         "compare",
+        # #3668: describe_platform_surfaces returns the DERIVED surface index. It reads
+        # source text and route tables and touches no partition at all — the purest read
+        # in the registry.
+        "describe",
         "find",
         "get",
         "list",
