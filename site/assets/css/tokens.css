@@ -1368,6 +1368,15 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
     .story-top, .ev-top, .cockpit-top {
       backdrop-filter: none; -webkit-backdrop-filter: none;
       transform: none; filter: none; perspective: none;
+      /* #3542 (DES-3): the 82%-alpha base background is HALF of a treatment — it is
+         readable only because the blur behind it destroys the text it sits over.
+         Stripping the blur (above) without restoring the background shipped the bar
+         as tinted cellophane: at 390px the computed background was oklch(… / 0.82)
+         with backdropFilter `none`, and tile prose scrolled straight through the
+         sticky bar. Opaque paper is the mobile treatment — one alpha, no blur.
+         tests/visual_qa.py asserts the invariant directly (computed alpha == 1
+         wherever the computed backdrop-filter is none). */
+      background: var(--page);
     }
     .doors {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
