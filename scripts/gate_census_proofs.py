@@ -811,6 +811,20 @@ GUARD_PROOFS.update(
     }
 )
 
+GUARD_PROOFS.update(
+    {
+        # #3678: watched RED against the LIVE repo's own unmodified config before the fix landed in this same PR.
+        "guard::scripts/check_job_timeout_headroom.py": {
+            "gate_name": "scripts/check_job_timeout_headroom.py",
+            "command": 'python3 scripts/check_job_timeout_headroom.py --job "Collect + deploy-critical + format" --window 30   # live, gh-backed; plus python3 -m pytest tests/test_check_job_timeout_headroom_3678.py -q for the offline synthetic must-fail/must-pass twin',  # noqa: E501
+            "mutation": "No mutation needed — the LIVE repo WAS the armed condition: pr-checks.yml's fast-lane job carried the stale `timeout-minutes: 15` (#3678's own trigger) while this gate's code was written, run against that unmodified file BEFORE the ceiling was raised in this same PR. The offline twin (test_reds_on_todays_stale_15_minute_ceiling_positive_control) reproduces the identical shape with a synthetic fixture workflow + injected `gh` durations, so the proof survives the live measurement drifting further after this record is written.",  # noqa: E501
+            "observed": '2026-09-07, watched in both directions, live against the real repo (trailing 30 completed runs, `gh`-backed): ARMED (ceiling still 15) — "timeout-minutes=15 vs. p95=14.87min x 1.2 = 17.84min required (n=21/28) — RED", exit 1. CLEAN (ceiling raised to 18, re-run minutes later against fresh live data) — "timeout-minutes=18 vs. p95=14.86min x 1.2 = 17.84min required (n=22/29) — OK", exit 0. The offline suite pins the identical shape deterministically (test_reds_on_todays_stale_15_minute_ceiling_positive_control RED@15min, test_ok_on_the_re_derived_18_minute_ceiling_negative_control OK@18min on the SAME samples, test_main_returns_1_and_prints_red_for_the_stale_config through `main()`) — 14 tests total in tests/test_check_job_timeout_headroom_3678.py, all passing.',  # noqa: E501
+            "scope": "A verdict on the DERIVATION (p95 x headroom vs. the declared ceiling), not on GitHub Actions' own timeout enforcement, which is trusted, not re-verified. Excludes a templated job `name:` (e.g. codeql.yml's `${{ matrix.language }}`) — SKIPPED-TEMPLATED, never asserted; a job under MIN_GENUINE_SAMPLES (5) non-cancelled completions — INSUFFICIENT-DATA, never a false RED or a silent skip; and any `gh`/network failure — a named UNVERIFIED row, never a red or a manufactured green. Not wired into blocking CI in this PR — standalone/manual like check_main_green.py, so a job newly falling below its headroom is caught on the NEXT invocation, not automatically.",  # noqa: E501
+            "proved_on": "2026-09-07",
+        },
+    }
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
 # GUARD_PROOFS above, only because `gate_census.py` sits at its 1,200-line ceiling
