@@ -117,6 +117,22 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#apple_health"]}},
         ),
         iam.PolicyStatement(
+            # #3563 (finding INT-1): the #1480 journal-dark guard writes its episode-dedup
+            # sentinel (ALERTSTATE#notion_journal_dark) on the NOTION partition, reusing the
+            # #468 shape above — but that PR never widened the allowlist, so the write
+            # AccessDenied'd on every run (155 denials in 14 days) and the dedup has never
+            # once worked: every invocation re-opened the episode and re-published to the
+            # digest. A SECOND statement rather than a second value in the sentinel
+            # statement's LeadingKeys list, for two reasons: the two partitions are
+            # independent concerns with independent reasons, and a changed condition on an
+            # existing Allow is a NARROWING to deploy/iam_additive_gate.py (#2834) — which
+            # strands CI — where a new Allow is admitted as additive.
+            sid="DynamoDBWriteNotionAlertState",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#notion"]}},
+        ),
+        iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],

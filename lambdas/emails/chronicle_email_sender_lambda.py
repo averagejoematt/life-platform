@@ -70,6 +70,19 @@ CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
+# ── #3563: the fail-soft SILENCE token (the #2654 shape) ─────────────────────
+# `_record_email_send` must never fail an otherwise-successful send, so it
+# swallows. That contract is right and it is also, by construction, silent: the
+# swallowed write was an IAM AccessDeniedException on EVERY send from 2026-08-08
+# to 2026-09-06, logged at INFO, and the only reader-visible symptom was
+# /api/status reporting the flagship weekly product as red / "46d ago" while it
+# shipped 3/3. The line now logs at ERROR and carries this literal token, which
+# a CloudWatch MetricFilter in cdk/stacks/monitoring_silence_alarms.py mints into
+# an alarm routed to the digest — so the next such denial is news within a day
+# instead of four weeks. Twin-pinned to the CDK filter pattern by
+# tests/test_denied_write_silence_3563.py.
+STATUS_WRITE_FAILED_TOKEN = "CHRONICLE-STATUS-WRITE-FAILED"  # noqa: S105 — a log token, not a credential
+
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 ses = boto3.client("sesv2", region_name=REGION)
@@ -257,7 +270,10 @@ def _record_email_send(sent_count: int) -> None:
             }
         )
     except Exception as exc:  # noqa: BLE001
-        logger.info("[status-tracking] Non-fatal write failure: %s", exc)
+        # ERROR, not INFO (#3563): the send succeeded but the row /api/status reads
+        # does not exist, so the public status page is now WRONG about a delivery
+        # that happened. Still fail-soft — the send is not undone — but no longer silent.
+        logger.error("%s [status-tracking] email_log row NOT written for %s: %s", STATUS_WRITE_FAILED_TOKEN, today, exc)
 
 
 def _get_confirmed_subscribers() -> list[dict]:

@@ -82,6 +82,14 @@
 #      ladder, which the script prints. The other zero-run states
 #      (path-filter-skip, bot-push-no-dispatch, indeterminate) are NAMED and
 #      polling CONTINUES — they are not swallows and must not be lumped in.
+#   6  CONFLICTING (#3653) — read BEFORE the swallow classifier ever runs: a PR
+#      whose `gh pr view --json mergeable` reports `CONFLICTING` mints ZERO
+#      check runs by construction (GitHub will not build a tree it cannot
+#      merge), which is the identical "zero checks at this sha" signal a
+#      genuine swallow produces — but the cure is the opposite one (merge
+#      `origin/main` into the branch, not the close/reopen recovery ladder).
+#      Printed as a distinct `CONFLICTING` line naming the cure; the swallow
+#      classifier is never invoked in this state, so it can't misreport it.
 #   4  GREEN-WITH-RECONCILE-OWNED-RED (#3200) — every expected check is green
 #      EXCEPT "Wiki drift gates", whose only red is `sync_doc_metadata.py
 #      --check` naming exclusively reconcile-owned paths (docs/*, CLAUDE.md,
@@ -313,6 +321,18 @@ _extract_wiki_drift_files() {
 _WAIT_PR_GREEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 CLASSIFY_CMD="${WAIT_PR_GREEN_CLASSIFY_CMD:-python3 ${_WAIT_PR_GREEN_DIR}/../scripts/check_main_green.py --classify-sha}"
 
+# ── #3653: the CONFLICTING discriminator, read BEFORE the swallow classifier ──
+# `gh pr view --json mergeable,mergeStateStatus <pr>` distinguishes a genuinely
+# CONFLICTING PR (zero check runs by construction — GitHub will not build a tree
+# it cannot merge) from an actual event-swallow, which produces the identical
+# "zero checks at this sha" signal but needs the opposite cure. One more `gh pr
+# view` call, in the same family the script already makes for `headRefOid`.
+# Overridable for tests, same pattern as CLASSIFY_CMD; the PR number is
+# appended as the last argument. Failure (gh not found, network, old gh without
+# the field) falls through to `{}` — an unreadable mergeable state must degrade
+# to "not known to be conflicting", never manufacture a false CONFLICTING.
+MERGEABLE_CMD="${WAIT_PR_GREEN_MERGEABLE_CMD:-gh pr view --repo ${REPO} --json mergeable,mergeStateStatus}"
+
 # ── #3455: the elapsed-time source is overridable for tests ─────────────────
 #
 # THE INCIDENT (main run 33605871465, 2026-09-02): the docs-only #3454 merge was
@@ -414,6 +434,29 @@ classify_zero_check_diagnosis() {
   echo "DIAGNOSIS ${state} — ${reason}"
   echo "  Not a swallow. Continuing to poll (this state is expected to resolve or to stay empty by design)."
   return 0
+}
+
+# conflicting_verdict <mergeable-json>
+#   Pure — takes the JSON `gh pr view --json mergeable,mergeStateStatus` prints
+#   (or the test-fixture equivalent), and returns 6 with the CONFLICTING lines
+#   when `.mergeable == "CONFLICTING"`, else 0 with no output at all (so a
+#   caller that ignores the return code sees nothing new). Keyed off gh's own
+#   `mergeable` enum field, never a phrase — the #3199 lesson.
+conflicting_verdict() {
+  local raw="$1"
+  local mergeable state
+  mergeable=$(jq -r '.mergeable // ""' <<<"${raw}" 2>/dev/null)
+  state=$(jq -r '.mergeStateStatus // ""' <<<"${raw}" 2>/dev/null)
+  if [[ "${mergeable}" != "CONFLICTING" ]]; then
+    return 0
+  fi
+  echo "CONFLICTING${state:+ (mergeStateStatus=${state})} — this is NOT a swallowed push (#3653)."
+  echo "  gh reports this PR's mergeable state as CONFLICTING: it mints zero check runs by"
+  echo "  construction (GitHub will not build a tree it cannot merge), which looks identical"
+  echo "  to an event-swallow on the \"zero checks at this sha\" signal alone."
+  echo "  Cure: merge origin/main into the branch (or \`gh pr update-branch <pr>\`), resolve"
+  echo "  conflicts, push. The swallow recovery ladder (close/reopen) CANNOT fix this."
+  return 6
 }
 
 # ── the pure evaluator — no gh, no network, fully unit-testable ──────────────
@@ -819,7 +862,7 @@ main() {
   # diagnosis is for "nothing ever attached", and a PR whose checks arrived and
   # then went quiet is a different animal that this must not misdiagnose.
   # `diagnosed` keeps a non-swallow verdict from reprinting every interval.
-  local attached=0 saw_attach=0 diagnosed=0 diag_out diag_rc
+  local attached=0 saw_attach=0 diagnosed=0 diag_out diag_rc mergeable_out conflict_out
   start=$(${TIME_CMD})
   while true; do
     now=$(${TIME_CMD})
@@ -853,6 +896,19 @@ main() {
 
     if [[ "${attached}" -eq 0 && "${saw_attach}" -eq 0 && "${diagnosed}" -eq 0 && "${elapsed}" -ge "${zero_check_grace}" ]]; then
       diagnosed=1
+
+      # #3653: read the CONFLICTING discriminator BEFORE the swallow classifier
+      # runs at all — a conflicting PR produces the same zero-checks signal a
+      # genuine swallow does, and the two cures are opposite. Checked first so
+      # the swallow classifier can never mislabel this state.
+      mergeable_out=$(${MERGEABLE_CMD} "${pr}" 2>/dev/null || echo '{}')
+      conflict_out=$(conflicting_verdict "${mergeable_out}")
+      if [[ $? -eq 6 ]]; then
+        echo "${conflict_out}"
+        echo "Stopping at ${elapsed}s — a CONFLICTING PR will never go green until the branch merges origin/main."
+        return 6
+      fi
+
       echo "No check has attached in ${elapsed}s (grace ${zero_check_grace}s) — classifying head sha ${head_sha} (#3219)."
       # The FULL 40-char sha, never a prefix: a short-sha `actions/runs?head_sha=`
       # query returns empty and would SELF-CONFIRM a swallow (failure mode #1 in

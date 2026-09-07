@@ -39,12 +39,20 @@ def _body(
     acceptance=3,
     score=CANONICAL_SCORE,
     epic="**Epic:** #1863",
+    set_section=None,
 ):
     parts = []
+    problem = "## Problem\n\nsomething is wrong.\n"
+    if set_section is not None:
+        # Real bodies place `## Set` between `## Problem` and `## Outcome`, always
+        # followed by another heading — matters here because _section_lines()
+        # reads to the NEXT HEADING, so a Set section with nothing after it would
+        # swallow the tail (Score/Epic lines) and falsely satisfy the count check.
+        problem += f"\n## Set\n\n{set_section}\n"
     if outcome:
-        parts.append(f"## Problem\n\nsomething is wrong.\n\n## Outcome\n\n{outcome}\n")
+        parts.append(f"{problem}\n## Outcome\n\n{outcome}\n")
     else:
-        parts.append("## Problem\n\nsomething is wrong.\n")
+        parts.append(problem)
     if acceptance:
         parts.append("## Acceptance\n\n" + "\n".join(f"- [ ] criterion {i}" for i in range(acceptance)) + "\n")
     tail = [line for line in (score, epic) if line]
@@ -391,6 +399,106 @@ def test_parse_epic_link_reads_both_forms():
     none_form = bc.parse_epic_link("**Epic:** none — stands alone")
     assert none_form.is_none and none_form.reason == "stands alone"
     assert bc.parse_epic_link("no epic line here") is None
+
+
+# ── rule: `## Set` on review/incident-filed bugs and stories (#3594) ──────────
+
+
+def test_set_section_only_applies_to_review_or_incident_labelled_issues():
+    """A plain bug/story with no review:/incident label is untouched by this rule —
+    only a REVIEW- or INCIDENT-filed issue is asked to enumerate the class it
+    re-instantiates."""
+    plain = _ctx(labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2"), body=_body(set_section=None))
+    assert hy.rule_set_section(plain) == []
+
+
+def test_set_section_bites_when_absent_on_a_review_labelled_bug():
+    ctx = _ctx(
+        labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2", "review:overnight-drain-2026-09-06"),
+        body=_body(set_section=None),
+    )
+    hit = hy.rule_set_section(ctx)
+    assert [f.rule for f in hit] == ["set_section"]
+    assert "no `## Set` section" in hit[0].message
+
+
+def test_set_section_bites_when_present_but_no_integer_count():
+    ctx = _ctx(
+        labels=("type:story", "area:claude-workflow", "model:opus", "prio:P2", "review:forensic-rca-2026-09-05"),
+        body=_body(set_section="Every place this pattern shows up in the codebase."),
+    )
+    hit = hy.rule_set_section(ctx)
+    assert [f.rule for f in hit] == ["set_section"]
+    assert "no integer member count" in hit[0].message
+
+
+def test_set_section_passes_with_an_enumeration_and_a_count():
+    ctx = _ctx(
+        labels=("type:bug", "area:claude-workflow", "model:sonnet", "prio:P3", "review:overnight-drain-2026-09-06"),
+        body=_body(
+            set_section="Every `git commit … --no-verify` execution site under deploy/ scripts/ .claude/ — "
+            "**9 lines today, of which 1 executes a commit**."
+        ),
+    )
+    assert hy.rule_set_section(ctx) == []
+
+
+def test_set_section_applies_to_incident_labels_too():
+    ctx = _ctx(
+        labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2", "incident"),
+        body=_body(set_section=None),
+    )
+    hit = hy.rule_set_section(ctx)
+    assert [f.rule for f in hit] == ["set_section"]
+
+
+def test_set_section_does_not_apply_to_epics_or_chores():
+    """The acceptance criteria name bug/story specifically — an epic's own `##
+    Stories` roster is a different contract (rule_epic_story_coverage), and a
+    chore filed from a review is not asked for this section."""
+    epic = _ctx(
+        labels=("type:epic", "area:claude-workflow", "review:overnight-drain-2026-09-06"),
+        body=_body(set_section=None),
+    )
+    assert hy.rule_set_section(epic) == []
+    chore = _ctx(
+        labels=("type:chore", "area:claude-workflow", "model:opus", "prio:P3", "review:overnight-drain-2026-09-06"),
+        body=_body(set_section=None),
+    )
+    assert hy.rule_set_section(chore) == []
+
+
+def test_set_section_text_and_has_count_parsers():
+    assert bc.set_section_text("## Problem\n\nx\n\n## Set\n\nEnumerate with grep -> **6 members today**.\n\n## Outcome\n\ny\n") == (
+        "Enumerate with grep -> **6 members today**."
+    )
+    assert bc.set_section_text("## Problem\n\nno set section here\n") is None
+    assert bc.set_section_has_count("## Set\n\n**6 members today**\n")
+    assert not bc.set_section_has_count("## Set\n\nno number stated here\n")
+    assert not bc.set_section_has_count("## Problem\n\nno set section here\n")
+
+
+def test_set_section_is_wired_into_the_whole_corpus_check():
+    """The rule must actually run as part of `check()`, not just exist as a
+    standalone callable — this is what a PER_ISSUE_RULES wiring regression would
+    silently drop."""
+    issues = list(_live_now_queue()) + [
+        _issue(
+            number=9001,
+            labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2", "review:overnight-drain-2026-09-06"),
+            body=_body(set_section=None),
+        )
+    ]
+    findings = hy.check(issues, now=NOW)
+    hits = [f for f in findings if f.rule == "set_section" and f.number == 9001]
+    assert hits, "rule_set_section did not fire through check() — is it still in PER_ISSUE_RULES?"
+
+
+def test_filed_from_review_or_incident_reads_the_label_family():
+    assert bc.filed_from_review_or_incident(["type:bug", "review:overnight-drain-2026-09-06"])
+    assert bc.filed_from_review_or_incident(["type:bug", "incident"])
+    assert bc.filed_from_review_or_incident(["type:bug", "incident:site-outage"])
+    assert not bc.filed_from_review_or_incident(["type:bug", "area:claude-workflow", "model:opus"])
 
 
 # ── rule: an epic's ## Stories covers every issue naming it ────────────────────

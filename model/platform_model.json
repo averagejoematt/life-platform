@@ -120,6 +120,12 @@
       "stack": "email_stack",
       "via": "declaration"
     },
+    "chronicle-status-write-failed": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
     "coherence-heartbeat": {
       "kind": "metric",
       "routing": "digest",
@@ -215,6 +221,12 @@
       "routing": "digest",
       "stack": "monitoring_stack",
       "via": "factory:_heartbeat_alarm"
+    },
+    "freshness-sentinel-write-failed": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
     },
     "grading-stalled": {
       "kind": "metric",
@@ -869,7 +881,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 122,
+    "alarms": 124,
     "emf_namespaces": 31,
     "schedules": 88,
     "secrets": 28
@@ -6928,9 +6940,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 122,
+      "alarms": 124,
       "alarms_by_routing": {
-        "digest": 90,
+        "digest": 92,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,

@@ -85,7 +85,29 @@ CYCLE_STATE = re.compile(r"\bcycle[\s-]+(\d+)\s*(?:\w+\s+)?(?:LIVE|CURRENT)\b|\b
 # ("**cycle 16 LIVE, genesis 2026-09-04**", "CURRENT: cycle 13 LIVE, genesis
 # 2026-08-10"). Case-sensitive on purpose: lowercase "live"/"current" run all through the
 # prose, the upper-case forms are the state vocabulary.
-_CURRENTNESS = re.compile(r"\b(?:LIVE|CURRENT)\b|\bcurrently\b")
+#
+# #3641: `\bCURRENT\b` also matches the `CURRENT` inside the corpus's OWN
+# `CURRENT-1 (date): …` / `CURRENT-N (date): …` history-row marker — `-` is a
+# word-boundary character, so `\bCURRENT\b` matches "CURRENT" in "CURRENT-1" as
+# cleanly as it matches a bare "CURRENT:". The `(?!-\d)` lookahead below closes
+# that for the token itself (defense in depth — nothing else in this file or a
+# future caller can re-trip it by matching `_CURRENTNESS` directly).
+_CURRENTNESS = re.compile(r"\b(?:LIVE|CURRENT)\b(?!-\d)|\bcurrently\b")
+
+# #3641, the other half of the fix: anchoring the token alone is not enough for
+# `_state_hits`' LINE-level check, because a correctly-labelled `CURRENT-1
+# (date): cycle N LIVE, …` row echoes the live-state word "LIVE" (bare, no
+# trailing digit) to describe what WAS live at the time — that bare "LIVE"
+# would still satisfy `_CURRENTNESS` on the anchor fix alone. The `CURRENT-<N>`
+# marker is a HISTORY ROW by the corpus's own grammar (mirrored in
+# `MEMORY.md`'s convention note): its presence anywhere on a line makes the
+# WHOLE LINE historical, exactly like the `HISTORICAL` phrase set — regardless
+# of what other currentness words the row also carries to narrate the past
+# state. A bare `CURRENT:` (no dash-digit) is UNCHANGED — it still trips
+# `_CURRENTNESS` normally (the corpus also uses "CURRENT:" as a live-description
+# tag, e.g. a skill file's frontmatter `description: "... CURRENT: cycle 13
+# LIVE, genesis 2026-08-10"` — a real, intended hit this fix must not silence).
+CURRENT_HISTORY_ROW = re.compile(r"\bCURRENT-\d+\b")
 
 # Known-retired literal ownership claims: compiled pattern -> why it's stale.
 STALE_STACK_CLAIMS = {
@@ -133,7 +155,7 @@ def _state_hits(files, genesis: str, cycle: str) -> list:
     hits = []
     for f in files:
         for lineno, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-            if HISTORICAL.search(line) or not _CURRENTNESS.search(line):
+            if HISTORICAL.search(line) or CURRENT_HISTORY_ROW.search(line) or not _CURRENTNESS.search(line):
                 continue
             for mo in GENESIS_STATE.finditer(line):
                 if mo.group(1) != genesis:
