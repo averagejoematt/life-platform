@@ -75,6 +75,19 @@ requests rather than DDB keys, and health_auto_export's `logger.set_date` correl
 which is a CloudWatch log dimension on a webhook that keys its records off the payload's
 own dates, never off "today").
 
+**#3666 RETIRED ONE OF THOSE FOUR, AND IT WAS THE VALVE'S OWN CAUTIONARY TALE.**
+Habitify's exemption was reasoned, specific, and wrong — not about the vendor, about US.
+Its prose argued (correctly) that Habitify's `/journal` flips `in_progress` at end of the
+UTC day, so grading against a Pacific "today" would judge a habit before the vendor's
+deadline. What nobody noticed is the OTHER side of the comparison: `date_str` is the
+PACIFIC `DATE#` key the record is filed under. Comparing a Pacific day key against a UTC
+"today" rewrote every still-open habit `failed` from 17:00 PT onward — precisely when the
+owner ticks his evening habits. `DATE#2026-09-06` stored 61 failed / 0 completed on a day
+he completed fifteen. The fix attributes completions from `GET /logs/{habit_id}`'s
+`created_date` converted to Pacific, and BOTH sides of the pending/failed comparison are
+now Pacific, so the site is gone rather than reworded — the exemption is DELETED below,
+which is the only honest way one leaves. Three remain.
+
 **#2817 added the two packages #2811 named as the follow-up**, and they arrived with the
 entries #2811 predicted. Measured against `origin/main` @ `1812f01f8`:
 `lambdas/emails/` 60 sites / 18 files → **0**, `mcp/` 89 sites / 24 files → **12**, all
@@ -459,7 +472,9 @@ def test_the_exempt_valve_is_actually_in_use_and_reasoned():
     An exemption marker with no prose next to it is how a valve becomes a mute button.
     """
     for rel, needle in (
-        ("lambdas/ingestion/habitify_lambda.py", "vendor-frame comparison"),
+        # habitify's entry was DELETED by #3666 — see the docstring. It is pinned as an
+        # absence by test_the_retired_habitify_exemption_stays_retired below, so the
+        # site cannot quietly come back under the reason that was already disproved.
         ("lambdas/ingestion/strava_lambda.py", "vendor-frame API window bound"),
         ("lambdas/ingestion/whoop_lambda.py", "utc-exempt(#2811)"),
         ("lambdas/ingestion/health_auto_export_lambda.py", "a log correlation id, not a DATE# key"),
@@ -467,6 +482,17 @@ def test_the_exempt_valve_is_actually_in_use_and_reasoned():
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "utc-exempt(#2811)" in src, f"{rel} lost its #2811 exemption marker"
         assert needle in src, f"{rel}'s #2811 exemption lost its stated reason"
+
+
+def test_the_retired_habitify_exemption_stays_retired():
+    """#3666 deleted this valve rather than rewording it. An absence has to be PINNED, or
+    the next reader re-adds the marker under the reasoning that was already disproved:
+    the vendor's UTC deadline is real, but `date_str` is a Pacific `DATE#` key, so the
+    comparison was cross-frame and made every evening tick read `failed`.
+    """
+    src = (ROOT / "lambdas/ingestion/habitify_lambda.py").read_text(encoding="utf-8")
+    assert "utc-exempt" not in src, "habitify re-took a #2811 exemption — #3666 proved that site cross-frame; both sides must be Pacific"
+    assert "pacific_today" in src, "habitify must compare its Pacific DATE# key against a Pacific today"
 
 
 def test_the_billing_calendar_exemption_is_the_only_2798_one_and_is_reasoned():

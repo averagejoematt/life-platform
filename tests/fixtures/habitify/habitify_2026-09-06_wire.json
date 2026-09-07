@@ -1,0 +1,1536 @@
+{
+ "_source": "LIVE Habitify API, captured 2026-09-06 ~20:30 PT for #3666 (read-only GETs).",
+ "_journal_query": "GET /journal?target_date=2026-09-06T00:00:00+00:00",
+ "_logs_query": "GET /logs/{habit_id}?from=2026-08-31T00:00:00+00:00&to=2026-09-08T00:00:00+00:00",
+ "_privacy": "One habit NAME is substituted ('Vice Habit (name withheld)') under the never-public content rule. Every timestamp, id, status, goal and value is verbatim wire.",
+ "area_map": {
+  "-P-Bq7K_2mUXjwtetrQp": "Core",
+  "-P-Bq87ujL_d3KDcrA8b": "Optimize",
+  "-P-Bq8ZX3wdlbk1dyQ1z": "Vice"
+ },
+ "journal": [
+  {
+   "id": "61252250-ED4F-4AE6-B6E4-C33993295C05",
+   "name": "Weigh In",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "1427C438-3012-47B6-846D-3CAEF84F4F9A",
+   "name": "Cold Shower",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "65B78A03-59EE-4A4F-89AB-88A14D5F7285",
+   "name": "Collagen",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "E3B1356D-ADD0-445C-9D59-ECF5D987F968",
+   "name": "Creatine",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "880D1CCF-B241-48DE-BD23-8D8F7FCC1430",
+   "name": "Electrolytes",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "EE3F690D-EE0F-4EC1-96E2-390AD3E71411",
+   "name": "L Glutamine",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "D7140A89-6ED9-4D07-975D-6A634A0A1E75",
+   "name": "Social Gratitude Touchpoint",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "972B4A56-BDA8-438C-B24A-DF1AA3910C7F",
+   "name": "Walk Outdoor >2mi",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "8862473E-A83E-49F1-B5CB-7D6A6F82EFE4",
+   "name": "Intermittent Fast 16:8",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "DBACD2CF-F839-42B2-A698-D214140EE370",
+   "name": "Food Journal",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "A072A66C-FDB6-4603-A46B-7C3B914E012E",
+   "name": "Floss",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "68DB1AF2-A098-449E-AEE1-536E3AEBEE64",
+   "name": "Nighttime Red Light Blocking Glasses",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "16D6E3B6-7345-4AB2-8DD1-F4BBEEADB750",
+   "name": "L-Threonate",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "5C5B850B-3877-401B-8133-E7617D482149",
+   "name": "Apigenin",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "70DCCA67-FA0F-475A-A5A0-8E8C104F8DAB",
+   "name": "Theanine",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "D013DD53-60FB-4D84-9B0D-9C8045F4242B",
+   "name": "No Fried Food",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "306691EF-799A-4B92-8AA5-336A522D6B95",
+   "name": "No solo takeout",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "6F66604E-9BC0-4492-B7DA-A7305E3C4146",
+   "name": "No Phone 30 Mins Before Bed",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "6DF2A02C-146B-41A0-841F-DACAEACF75ED",
+   "name": "Vice Habit (name withheld)",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "F1A7E0F3-1377-456F-B0FA-C43E85EA51E0",
+   "name": "No mindless scrolling",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "F92AFAEC-4B0F-43F0-8E93-42401FFF910D",
+   "name": "No sweets",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "24323781-32D8-4075-A517-F50446CEDCC8",
+   "name": "No alcohol",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "in_progress",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "97418321-0B71-44DA-9E56-380D47B3DF82",
+   "name": "Sauna",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "monthly"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "completed",
+   "progress": {
+    "current_value": 1,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "monthly",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "59D681AF-67FF-4714-8AEC-D7970B9D4CEB",
+   "name": "Out of Bed On Schedule",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "F5F5B8BB-62E8-4C74-9FD8-3C6E913F1DCD",
+   "name": "Whoop Journal",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "4285C3CF-65AB-4086-9358-F0C375F5BE05",
+   "name": "Primary Exercise",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "E3E96254-9BA6-4308-83A1-28CB306A00B4",
+   "name": "Mobility",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "CC8BDCB6-0B93-46D2-BC5C-E2DFEF8AE5AF",
+   "name": "Red Light Therapy On Face",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "6D37F8A7-1D58-4D06-B5CB-D943730FB01D",
+   "name": "Morning Skincare",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "D0651EE7-BFB4-4770-964C-9AF415A0BD84",
+   "name": "Morning Sunlight / Luminette Glasses",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "99A94E6D-3D82-4BE9-85EF-8858CB4BA340",
+   "name": "Morning Journal",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "BC87115D-09AD-4970-9D14-C04968E7A930",
+   "name": "Daytime Glasses Blue Light Blocking",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "C164166F-0BCC-496B-8058-EC54999BAF5C",
+   "name": "Morning Breathwork",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "662F9DCD-BD73-4E38-ADAC-C16DDEDB1FF1",
+   "name": "Deep Work Block",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "8D2F0FAE-BF17-418B-BAF9-2C245919E2ED",
+   "name": "Meditate",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "DBFFC84D-BE67-44F9-B235-70DC2749A566",
+   "name": "Normatec Legs",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "AA77E55C-5F91-41B1-8856-C7EDDDD8BD21",
+   "name": "Protein Goal",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "39E3B75A-DA7F-48C3-BB2C-7427176BC7DC",
+   "name": "Read News",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "AA7374E9-4C8B-49C3-AB51-81D9B363EB10",
+   "name": "Secondary Exercise",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "758336AB-2A0E-4333-B786-4068330985ED",
+   "name": "Skill development",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "41669374-0F05-42A1-9CE8-FCFDBDBF2F3A",
+   "name": "Mouthwash",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "57975F3D-F7B3-4D79-8FEB-7CBC1573C226",
+   "name": "Write",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "aab05692-d982-4d7e-be83-b1559026d8bd",
+   "name": "Psyllium Husk",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "32A47E30-9204-4D65-AD6E-C1E23E71196B",
+   "name": "Multivitamin",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "17CF0105-E527-4C7F-BAE7-B47940678BCB",
+   "name": "Glycine",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "50E63E49-3A62-47E1-9A4D-2EA946822E2A",
+   "name": "Inositol",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "52110568-62D6-4A27-9CD9-BCBF212A4362",
+   "name": "Basic B Complex",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "61530C7A-E0F1-4159-B461-61FFAA380B4F",
+   "name": "NAC",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "9568D883-0C4D-4D0A-911A-8DE1E23702B2",
+   "name": "Omega 3",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "A3ACCC4B-A3E9-4DD9-B480-FB2EBB7DE350",
+   "name": "Zinc Picolinate",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "F5B303EE-B418-4769-8C07-F64A55F5C0FB",
+   "name": "Vitamin D",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "1802879F-0DC4-46A9-BF6E-EA3868EBF14E",
+   "name": "Theragun",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "899BD633-8444-4FC7-8782-05B1D5CC8CED",
+   "name": "Calorie Goal",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "870441B8-B3B4-43DD-B504-CA545F646EF9",
+   "name": "Hydrate 3L",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq7K_2mUXjwtetrQp"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "3039C9BD-FE6A-4CE4-90AF-A54C4FB7B20A",
+   "name": "Mood log",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "79D6C725-E797-4258-84F8-956DD8D27A89",
+   "name": "Read A Book (10+ Pages)",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "439BE0C4-6345-41BC-9E2F-A14B9B2B3026",
+   "name": "Evening Skincare",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "583B4591-51CB-47C8-8A21-983879C9EC8C",
+   "name": "Body Skincare",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "A862488C-8219-48EB-AD1F-90CBFDC37788",
+   "name": "Evening Journal",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "1A91B93B-6375-4733-B519-729C57FA0A1B",
+   "name": "Evening Breathwork",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq87ujL_d3KDcrA8b"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  },
+  {
+   "id": "892AFAF7-BFF1-4878-937F-711E2C785ADE",
+   "name": "No porn",
+   "is_archived": false,
+   "goal": {
+    "unit_type": "rep",
+    "value": 1,
+    "periodicity": "daily"
+   },
+   "area": {
+    "id": "-P-Bq8ZX3wdlbk1dyQ1z"
+   },
+   "status": "failed",
+   "progress": {
+    "current_value": 0,
+    "target_value": 1,
+    "unit_type": "rep",
+    "periodicity": "daily",
+    "reference_date": "2026-09-06T00:00:00.000Z"
+   }
+  }
+ ],
+ "logs": {
+  "Weigh In": [
+   {
+    "id": "-P0bkMKALmJlNSPD4zZz",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:05.739Z",
+    "unit_type": "rep",
+    "habit_id": "61252250-ED4F-4AE6-B6E4-C33993295C05"
+   },
+   {
+    "id": "-P0tcawv9ZLsXVAg6fXE",
+    "value": 1,
+    "created_date": "2026-09-07T02:11:22.363Z",
+    "unit_type": "rep",
+    "habit_id": "61252250-ED4F-4AE6-B6E4-C33993295C05"
+   }
+  ],
+  "Cold Shower": [
+   {
+    "id": "-P0tcd2zvnTglNeBuWuG",
+    "value": 1,
+    "created_date": "2026-09-07T02:11:31.117Z",
+    "unit_type": "rep",
+    "habit_id": "1427C438-3012-47B6-846D-3CAEF84F4F9A"
+   }
+  ],
+  "Collagen": [
+   {
+    "id": "-P0bkSGOO6qBI9O47nat",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:30.116Z",
+    "unit_type": "rep",
+    "habit_id": "65B78A03-59EE-4A4F-89AB-88A14D5F7285"
+   },
+   {
+    "id": "-P0tciJejWjLtVkMUFMn",
+    "value": 1,
+    "created_date": "2026-09-07T02:11:52.665Z",
+    "unit_type": "rep",
+    "habit_id": "65B78A03-59EE-4A4F-89AB-88A14D5F7285"
+   }
+  ],
+  "Creatine": [
+   {
+    "id": "-P0bkSZvnjo9N81dURM8",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:31.366Z",
+    "unit_type": "rep",
+    "habit_id": "E3B1356D-ADD0-445C-9D59-ECF5D987F968"
+   },
+   {
+    "id": "-P0tciU10qEuIzrE3dYs",
+    "value": 1,
+    "created_date": "2026-09-07T02:11:53.329Z",
+    "unit_type": "rep",
+    "habit_id": "E3B1356D-ADD0-445C-9D59-ECF5D987F968"
+   }
+  ],
+  "Electrolytes": [
+   {
+    "id": "-P0bkSpKIitJRdOyHFv4",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:32.416Z",
+    "unit_type": "rep",
+    "habit_id": "880D1CCF-B241-48DE-BD23-8D8F7FCC1430"
+   },
+   {
+    "id": "-P0tcif7JivesbUBnD8w",
+    "value": 1,
+    "created_date": "2026-09-07T02:11:54.103Z",
+    "unit_type": "rep",
+    "habit_id": "880D1CCF-B241-48DE-BD23-8D8F7FCC1430"
+   }
+  ],
+  "L Glutamine": [
+   {
+    "id": "-P0bkT5GQoXMBgplcYOQ",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:33.500Z",
+    "unit_type": "rep",
+    "habit_id": "EE3F690D-EE0F-4EC1-96E2-390AD3E71411"
+   },
+   {
+    "id": "-P0tcis0N7n46qfkuUoU",
+    "value": 1,
+    "created_date": "2026-09-07T02:11:54.927Z",
+    "unit_type": "rep",
+    "habit_id": "EE3F690D-EE0F-4EC1-96E2-390AD3E71411"
+   }
+  ],
+  "Social Gratitude Touchpoint": [
+   {
+    "id": "-P0tcsqYPLR6tisUP_i5",
+    "value": 1,
+    "created_date": "2026-09-07T02:12:35.793Z",
+    "unit_type": "rep",
+    "habit_id": "D7140A89-6ED9-4D07-975D-6A634A0A1E75"
+   }
+  ],
+  "Walk Outdoor >2mi": [
+   {
+    "id": "-P0tctnZOA1x6Eyml4P9",
+    "value": 1,
+    "created_date": "2026-09-07T02:12:39.698Z",
+    "unit_type": "rep",
+    "habit_id": "972B4A56-BDA8-438C-B24A-DF1AA3910C7F"
+   }
+  ],
+  "Intermittent Fast 16:8": [
+   {
+    "id": "-P0td0zAGAtn67zDe6NP",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:13.205Z",
+    "unit_type": "rep",
+    "habit_id": "8862473E-A83E-49F1-B5CB-7D6A6F82EFE4"
+   }
+  ],
+  "Food Journal": [
+   {
+    "id": "-P0td1kloSfNFLd3qsEZ",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:16.384Z",
+    "unit_type": "rep",
+    "habit_id": "DBACD2CF-F839-42B2-A698-D214140EE370"
+   }
+  ],
+  "Floss": [],
+  "Nighttime Red Light Blocking Glasses": [],
+  "L-Threonate": [],
+  "Apigenin": [],
+  "Theanine": [],
+  "No Fried Food": [
+   {
+    "id": "-P0td5xGuBnMhFJ-RYT8",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:33.568Z",
+    "unit_type": "rep",
+    "habit_id": "D013DD53-60FB-4D84-9B0D-9C8045F4242B"
+   }
+  ],
+  "No solo takeout": [
+   {
+    "id": "-P0td6DxQTtcYrk92Mys",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:34.700Z",
+    "unit_type": "rep",
+    "habit_id": "306691EF-799A-4B92-8AA5-336A522D6B95"
+   }
+  ],
+  "No Phone 30 Mins Before Bed": [],
+  "Vice Habit (name withheld)": [
+   {
+    "id": "-P0td6bF5MPfon5PRGpw",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:36.254Z",
+    "unit_type": "rep",
+    "habit_id": "6DF2A02C-146B-41A0-841F-DACAEACF75ED"
+   }
+  ],
+  "No mindless scrolling": [],
+  "No sweets": [
+   {
+    "id": "-P0td711emLc0ZZfnHOg",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:37.970Z",
+    "unit_type": "rep",
+    "habit_id": "F92AFAEC-4B0F-43F0-8E93-42401FFF910D"
+   }
+  ],
+  "No alcohol": [
+   {
+    "id": "-P0td7Vf2Z_IbSJbn-GT",
+    "value": 1,
+    "created_date": "2026-09-07T02:13:39.930Z",
+    "unit_type": "rep",
+    "habit_id": "24323781-32D8-4075-A517-F50446CEDCC8"
+   }
+  ],
+  "Sauna": [
+   {
+    "id": "-P0tiGZecIgU8d0oUgM5",
+    "value": 1,
+    "created_date": "2026-09-04T07:00:00.000Z",
+    "unit_type": "rep",
+    "habit_id": "97418321-0B71-44DA-9E56-380D47B3DF82"
+   }
+  ],
+  "Out of Bed On Schedule": [],
+  "Whoop Journal": [
+   {
+    "id": "-P0bkRq96duSqCGpAXdG",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:28.337Z",
+    "unit_type": "rep",
+    "habit_id": "F5F5B8BB-62E8-4C74-9FD8-3C6E913F1DCD"
+   }
+  ],
+  "Primary Exercise": [
+   {
+    "id": "-P0bkMmqDbHEXi0655fM",
+    "value": 1,
+    "created_date": "2026-09-03T14:52:07.680Z",
+    "unit_type": "rep",
+    "habit_id": "4285C3CF-65AB-4086-9358-F0C375F5BE05"
+   }
+  ],
+  "Mobility": [],
+  "Red Light Therapy On Face": [],
+  "Morning Skincare": [],
+  "Morning Sunlight / Luminette Glasses": [],
+  "Morning Journal": [],
+  "Daytime Glasses Blue Light Blocking": [],
+  "Morning Breathwork": [],
+  "Deep Work Block": [],
+  "Meditate": [],
+  "Normatec Legs": [],
+  "Protein Goal": [],
+  "Read News": [],
+  "Secondary Exercise": [],
+  "Skill development": [],
+  "Mouthwash": [],
+  "Write": [],
+  "Psyllium Husk": [],
+  "Multivitamin": [],
+  "Glycine": [],
+  "Inositol": [],
+  "Basic B Complex": [],
+  "NAC": [],
+  "Omega 3": [],
+  "Zinc Picolinate": [],
+  "Vitamin D": [],
+  "Theragun": [],
+  "Calorie Goal": [],
+  "Hydrate 3L": [],
+  "Mood log": [],
+  "Read A Book (10+ Pages)": [],
+  "Evening Skincare": [],
+  "Body Skincare": [],
+  "Evening Journal": [],
+  "Evening Breathwork": [],
+  "No porn": []
+ }
+}
