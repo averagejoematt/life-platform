@@ -225,6 +225,12 @@ def test_naming_the_counts_file_is_still_an_outright_refusal(scratch):
     r = run_script(scratch, ["chore: nope", COUNTS])
 
     assert "GENERATED" in r.stderr, r.stderr
+    # #3642: the refusal used to dead-end here with no signpost — a sibling lane hit
+    # this on 2026-09-06 needing to carry a NON-test_count key this file's own branch
+    # legitimately moved (e.g. lambda_count for a new Lambda). The message now names
+    # the working route instead of just refusing.
+    assert "test_count" in r.stderr, r.stderr
+    assert "plain 'git commit'" in r.stderr, r.stderr
     _assert_refused(repo, before, r)
 
 

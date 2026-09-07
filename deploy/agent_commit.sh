@@ -178,6 +178,13 @@ for p in "${PATHS[@]}"; do
     echo "[agent-commit] ❌ '${p}' is GENERATED (#3101) — deploy/sync_doc_metadata.py --apply is its only writer," >&2
     echo "[agent-commit]    run by the reconcile bot on main. A branch carrying it conflicts with every sibling PR." >&2
     echo "[agent-commit]    Drop it: git checkout HEAD -- ${p}" >&2
+    echo "[agent-commit]    This is a hard refusal — no override exists, unlike ALLOW_DOC_LITERALS for docs/. But" >&2
+    echo "[agent-commit]    that is about 'test_count' specifically (bot-owned, PR-exempt, #3384): the file's" >&2
+    echo "[agent-commit]    OTHER DISCOVERED_COUNTS keys (lambda_count, tool_count, alarm_count, …) ARE the" >&2
+    echo "[agent-commit]    branch's to carry when the branch's own change moved them (a new Lambda, a new MCP" >&2
+    echo "[agent-commit]    tool, …). If that is what happened here, this script's staged-pathspec model is" >&2
+    echo "[agent-commit]    still the wrong shape for it — use the working route: plain 'git commit' (hooks" >&2
+    echo "[agent-commit]    intact; the pre-commit hook's own sync-and-stage step is what belongs on this file)." >&2
     refuse 1
   fi
   # docs/ is only *usually* literal-bearing. Allow an explicit override for the
