@@ -73,6 +73,7 @@ _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+import ci_job_timeouts  # noqa: E402 — #3678: the timeout-ceiling registry `civ.classify_cancelled_run` feeds on
 import ci_run_verdicts as civ  # noqa: E402 — must follow the sys.path insert above
 
 REPO = "averagejoematt/life-platform"
@@ -148,6 +149,9 @@ def latest_green_main_info():
     # #3530: classify the leading `cancelled` runs from their OWN jobs before
     # deciding which one is the verdict. Bounded, and it stops at the first run
     # that is not a proven supersession — nothing older can be the verdict then.
+    # #3678: read once, from this repo's own workflow files (local disk, no `gh`
+    # call) — never from a hand-typed number that can drift from the YAML.
+    timeouts_by_job_name = ci_job_timeouts.timeout_minutes_by_job_name()
     cancelled_verdicts, notes = {}, []
     for r in runs:
         if r.get("status") != "completed":
@@ -157,7 +161,7 @@ def latest_green_main_info():
         if len(notes) >= CANCELLED_PROBE_LIMIT:
             break
         jobs = civ.fetch_run_jobs(_gh_json, REPO, r.get("databaseId"))
-        verdict = civ.classify_cancelled_run(jobs)
+        verdict = civ.classify_cancelled_run(jobs, timeouts_by_job_name=timeouts_by_job_name)
         cancelled_verdicts[r.get("databaseId")] = verdict
         notes.append(civ.describe_cancelled(r, verdict, civ.failing_job_names(jobs)))
         if not civ.cancelled_is_skippable(verdict):

@@ -179,6 +179,7 @@ _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
+import ci_job_timeouts  # noqa: E402 — #3678: the timeout-ceiling registry `scan_cancelled` feeds civ
 import ci_run_verdicts as civ  # noqa: E402 — must follow the sys.path insert above
 
 # A run parked at the production approval gate is normal right after a merge
@@ -257,7 +258,9 @@ def latest_completed_run(runs: list[dict], rejected_ids: object = None, cancelle
     return None
 
 
-def scan_cancelled(runs: list[dict], probe_jobs, max_probes: int = CANCELLED_PROBE_LIMIT) -> tuple[dict, list[dict]]:
+def scan_cancelled(
+    runs: list[dict], probe_jobs, max_probes: int = CANCELLED_PROBE_LIMIT, timeouts_by_job_name: dict[str, float] | None = None
+) -> tuple[dict, list[dict]]:
     """#3530: classify every leading `cancelled` run from its OWN jobs.
 
     Pure by injection — `probe_jobs(run) -> jobs | None` is the only impure part
@@ -272,6 +275,10 @@ def scan_cancelled(runs: list[dict], probe_jobs, max_probes: int = CANCELLED_PRO
     non-`cancelled` completed run. `failure` runs are walked THROUGH rather than
     stopped at, because `scan_rejections` may yet classify them as rejected
     non-verdicts and land on an older cancelled run.
+
+    `timeouts_by_job_name` (#3678) is forwarded to `civ.classify_cancelled_run`
+    unchanged — see that function's docstring for the CANCELLED_TIMEOUT class it
+    unlocks. `None` (the default) reproduces pre-#3678 behaviour exactly.
     """
     verdicts: dict = {}
     notes: list[dict] = []
@@ -285,7 +292,7 @@ def scan_cancelled(runs: list[dict], probe_jobs, max_probes: int = CANCELLED_PRO
                 break
             probes += 1
             jobs = probe_jobs(r)
-            verdict = civ.classify_cancelled_run(jobs)
+            verdict = civ.classify_cancelled_run(jobs, timeouts_by_job_name=timeouts_by_job_name)
             verdicts[r.get("databaseId")] = verdict
             notes.append({"run": r, "verdict": verdict, "failing": civ.failing_job_names(jobs)})
             if not civ.cancelled_is_skippable(verdict):
@@ -831,6 +838,17 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
                     "   Its job list could NOT be read, so whether the cancel superseded a clean run or\n"
                     "   hid a real failure is unproven — that is not a green, and it is not a skip either (#3530)."
                 )
+            elif (note or {}).get("verdict") == civ.CANCELLED_TIMEOUT:
+                # #3678: NOT a failing job either — a job hit ITS OWN timeout-minutes
+                # ceiling while every step that ran was green. Reporting this as "carries
+                # a real failure" (the branch below) would send the operator to fix a job
+                # that never failed; the real fix is the ceiling.
+                lines.append(
+                    "   A `cancelled` rollup is NOT a superseded push on this repo (#3530) — but this is also\n"
+                    "   NOT a failing job (#3678): a job's own duration reached its configured `timeout-minutes`\n"
+                    "   ceiling while every step that ran was green. Raise or split that ceiling; re-running will\n"
+                    "   not fix it, since the job was never wrong."
+                )
             else:
                 lines.append(
                     f"   A `cancelled` rollup is NOT a superseded push on this repo (#3530): the run's own jobs\n"
@@ -968,7 +986,11 @@ def main() -> int:
     def _probe_jobs(run: dict) -> list[dict] | None:
         return civ.fetch_run_jobs(_gh_json, REPO, run.get("databaseId"))
 
-    cancelled_verdicts, cancelled_notes = scan_cancelled(runs, _probe_jobs)
+    # #3678: read once, from this repo's own workflow files — local disk, no `gh`
+    # call — never from a hand-typed number that can drift from the YAML.
+    cancelled_verdicts, cancelled_notes = scan_cancelled(
+        runs, _probe_jobs, timeouts_by_job_name=ci_job_timeouts.timeout_minutes_by_job_name()
+    )
 
     rejected, jobs = scan_rejections(runs, _probe, cancelled_verdicts=cancelled_verdicts)
 

@@ -275,7 +275,7 @@ import pytest
 BUDGET_SECONDS = 1950
 
 # ── THE WALL (#3224). A raise past this FAILS. Shed instead. ─────────────────
-# 2100s = 35 minutes = `timeout-minutes` on pr-checks.yml's `full-suite` job, the
+# 2340s = 39 minutes = `timeout-minutes` on pr-checks.yml's `full-suite` job, the
 # longest any lane in this repo is permitted to run, and the one every PR waits on.
 # The rule it encodes: no lane may be BUDGETED past the longest wall any lane is
 # allowed to RUN. Raising the pre-merge timeout to escape is possible but it is a
@@ -283,7 +283,16 @@ BUDGET_SECONDS = 1950
 # test_hard_ceiling_tracks_the_premerge_full_suite_timeout below forces that PR to
 # edit this constant in the same diff rather than letting the ceiling drift upward on
 # its own. Same idiom as tests/test_module_size_guard.py's HARD_CEILING.
-HARD_CEILING_SECONDS = 2100
+# 2100 -> 2340 (2026-09-07, #3678): NOT a duration-budget raise — the `full-suite` job's
+# OWN `timeout-minutes` moved from 35 to 39 because #3678's re-measurement (trailing 30
+# completed runs, `python3 scripts/check_job_timeout_headroom.py`) found ITS ceiling
+# inside its own noise band too (genuine p95 32.11min x the 1.2 headroom multiplier =
+# 38.53min required, against the then-35min cap) while re-deriving the SIBLING
+# `fast-lane` job's stale 15-minute ceiling — the second Set member #3678 enumerated,
+# fixed in the same PR. This constant is required by construction to track that job's
+# timeout-minutes exactly (the assertion below), so it moves WITH it, not as an
+# independent re-derivation of BUDGET_SECONDS above (which is unchanged).
+HARD_CEILING_SECONDS = 2340
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
