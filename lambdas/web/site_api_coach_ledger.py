@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from boto3.dynamodb.conditions import Key
 from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
+    commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
@@ -325,6 +326,37 @@ def _query_partition(pk, sk_prefix, projection_fields=None, paginate=False, *, _
             items.extend(resp.get("Items", []))
             pages += 1
     return [_decimal_to_float(r) for r in items]
+
+
+def _commitment_block(*, _g):
+    """The public follow-through numbers for /api/predictions (#3553).
+
+    ONE `get_item` against the rollup `coach-prediction-evaluator` writes every day
+    (`commitment_grading.ROLLUP_PK/ROLLUP_SK`) — not a re-scan of the seven COMMITMENT#
+    partitions. The first cut did re-scan them, in the same concurrent round as the
+    eight PREDICTION# partitions, and that doubled the handler's fan-out to 16 queries
+    against a 9-worker pool: two waves, and CI measured 0.76s against #1527's 0.70s
+    budget. #1527 exists because this endpoint once cost ~3.6s at origin and blew
+    /method/board/'s cold-cache LCP budget; relaxing its guard would have been fixing
+    the thermometer. The grader already computes this tally and already holds the whole
+    corpus, so it publishes it once instead.
+
+    Career and season, both carrying their n. Every rate ships with its 95% Wilson
+    interval (ADR-105) and `ungradeable_by_metric` NAMES what could not be graded rather
+    than shrinking the denominator to flatter the number — the whole point of #3553 is
+    that a labelled absence is honest and a hidden one is not.
+
+    `as_of` rides along so the surface can say WHEN it was last graded. An absent rollup
+    (before the evaluator's first post-deploy run, or an unreadable read) returns None,
+    and the page renders nothing — never a zero it did not measure.
+    """
+    table = _g["table"]
+    item = (table.get_item(Key={"pk": commitment_grading.ROLLUP_PK, "sk": commitment_grading.ROLLUP_SK}) or {}).get("Item")
+    if not item:
+        logger.info("[/api/predictions] no commitment tally yet — serving null, not zeros")
+        return None
+    out = _decimal_to_float(item)
+    return {"as_of": out.get("as_of"), "lifetime": out.get("lifetime") or {}, "season": out.get("season") or {}}
 
 
 def _fetch_prediction_partition(coach_pk, *, _g):
@@ -837,6 +869,9 @@ def handle_predictions(event, *, _g):
                 },
                 "by_coach": by_coach,
                 "predictions": all_predictions,
+                # #3553: the follow-through half of the same record. Fail-soft — the
+                # prediction scorecard must not go dark because the commitment read did.
+                "commitments": _commitment_block_safe(_g=_g),
                 "cycle": _current_cycle(),
                 "prereg_seal": seal,
             },
@@ -853,3 +888,14 @@ def handle_predictions(event, *, _g):
         # either one being given up.
         logger.error(f"[/api/predictions] {_e}", exc_info=True)
         return _error(500, "Prediction ledger temporarily unavailable", prereg_seal=seal)
+
+
+def _commitment_block_safe(*, _g):
+    """`_commitment_block`, but any failure serves an explicit null rather than either
+    sinking the scorecard or serving zeros — the same absence-as-zero (#2658) this
+    issue's whole surface is about. The page renders nothing for a null block."""
+    try:
+        return _g["_commitment_block"]()
+    except Exception as _ce:  # noqa: BLE001
+        logger.error(f"[/api/predictions] commitment tally read failed: {_ce}")
+        return None

@@ -81,7 +81,10 @@ from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.monitoring_budget_alarms import add_budget_alarms  # #2824: budget-unreadable, same seam
 from stacks.monitoring_compute_alarms import add_compute_alarms  # #3473: compute-pipeline liveness pairs
 from stacks.monitoring_dashboards import add_dashboards  # #2610: the dashboards live in a sibling
-from stacks.monitoring_prediction_alarms import add_prediction_alarms  # #727/#3046: the science alarms, same seam
+from stacks.monitoring_prediction_alarms import (
+    add_commitment_alarms,
+    add_prediction_alarms,
+)  # #727/#3046/#3553: the science alarms, same seam
 from stacks.monitoring_silence_alarms import add_silence_alarms  # #2977: the fail-soft token alarms, same seam
 from stacks.monitoring_token_alarms import add_token_alarms  # #3505: the AI token/spend family, same seam
 
@@ -541,6 +544,7 @@ class MonitoringStack(Stack):
 
         # #727/#3046 science + #2824 budget-unreadable alarms — siblings on the #2610 extraction seam (same scope, same digest topic).
         add_prediction_alarms(self, digest)
+        add_commitment_alarms(self, digest)  # #3553: the follow-through ledger's dead-man
         add_budget_alarms(self, digest)
 
         # ══════════════════════════════════════════════════════════════
