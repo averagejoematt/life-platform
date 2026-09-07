@@ -202,7 +202,7 @@ def evaluate(
     denominator) and `graded` (its numerator).
     """
     today = _parse(today_str)
-    stats = {
+    stats: dict[str, Any] = {
         STATUS_KEPT: 0,
         STATUS_BROKEN: 0,
         STATUS_UNRESOLVED: 0,
@@ -210,6 +210,9 @@ def evaluate(
         STATUS_PENDING: 0,
         "due_checkable": 0,
         "graded": 0,
+        # {sk: new status} for the records this run terminalised — the rollup applies
+        # these over the in-memory corpus so the published tally is not one day stale.
+        "applied": {},
     }
     if today is None:
         return stats
@@ -238,6 +241,7 @@ def evaluate(
             if expired:
                 update_status(c, STATUS_UNRESOLVED, "No machine-checkable action; window elapsed without coach follow-up.", today_str)
                 stats[STATUS_UNRESOLVED] += 1
+                stats["applied"][c.get("sk")] = STATUS_UNRESOLVED
             else:
                 stats[STATUS_PENDING] += 1
             continue
@@ -252,10 +256,12 @@ def evaluate(
             update_status(c, STATUS_KEPT, result.get("reason", ""), today_str)
             stats[STATUS_KEPT] += 1
             stats["graded"] += 1
+            stats["applied"][c.get("sk")] = STATUS_KEPT
         elif verdict == "refuted":
             update_status(c, STATUS_BROKEN, result.get("reason", ""), today_str)
             stats[STATUS_BROKEN] += 1
             stats["graded"] += 1
+            stats["applied"][c.get("sk")] = STATUS_BROKEN
         elif expired:
             # Terminal, and terminal for a NAMED reason with its n. The 2x grace has
             # run, so late data is no longer coming; the honest verdict is that the
@@ -277,6 +283,7 @@ def evaluate(
                 today_str,
             )
             stats[STATUS_UNGRADEABLE] += 1
+            stats["applied"][c.get("sk")] = STATUS_UNGRADEABLE
         else:
             # Inside the 2x grace — a late reading can still decide it. Stays pending.
             stats[STATUS_PENDING] += 1
@@ -345,7 +352,7 @@ def tally(records: Iterable[dict]) -> dict:
 # ── The DDB legs (injected handles — this module stays boto3-free) ────────────
 
 
-def fetch_pending(table, coach_ids, with_phase_filter, decimal_to_float, logger) -> list:
+def fetch_pending(table, coach_ids, with_phase_filter, decimal_to_float, logger) -> tuple[list, list]:
     """Every pending COMMITMENT# record across `coach_ids` — CROSS-PHASE, by rule.
 
     #3553: this read used to be `with_phase_filter`'d, and that one line is why the
@@ -362,8 +369,14 @@ def fetch_pending(table, coach_ids, with_phase_filter, decimal_to_float, logger)
     timeseries) is itself cross-phase (#2023). This is the read shape `/api/predictions`
     already uses for the career scorecard — one unfiltered partition fetch, with season
     derived from it by `singleton_visible` rather than by a second query.
+
+    Returns `(pending, everything)`. The whole corpus rides along because this loop
+    already pages every row and filters in Python — the second list is free, and it is
+    what `build_tally` needs to serve the public follow-through numbers without the
+    site-api re-scanning seven partitions on every request (#1527).
     """
     out: list = []
+    corpus: list = []
     for coach_id in coach_ids:
         try:
             kwargs = {
@@ -373,6 +386,7 @@ def fetch_pending(table, coach_ids, with_phase_filter, decimal_to_float, logger)
             while True:
                 resp = table.query(**with_phase_filter(kwargs, include_pilot=True))
                 for item in (decimal_to_float(i) for i in resp.get("Items", [])):
+                    corpus.append(item)
                     if item.get("status", "") == STATUS_PENDING:
                         out.append(item)
                 if "LastEvaluatedKey" not in resp:
@@ -380,8 +394,8 @@ def fetch_pending(table, coach_ids, with_phase_filter, decimal_to_float, logger)
                 kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         except Exception as e:  # noqa: BLE001 — one bad partition must not sink the pass
             logger.warning("Failed to fetch commitments for %s: %s", coach_id, e)
-    logger.info("Total pending commitments fetched: %d", len(out))
-    return out
+    logger.info("Total commitments fetched: %d (%d pending)", len(corpus), len(out))
+    return out, corpus
 
 
 def write_status(table, commitment, status, reason, today_str, algo_version, logger) -> None:
@@ -439,3 +453,67 @@ def emit_liveness(cw, stats, logger) -> dict:
     if deadman_breached(due, graded):
         logger.warning("[liveness] commitment dead-man: %d due&checkable this run, 0 graded", due)
     return {"due_checkable": due, "graded": graded, "emitted": data}
+
+
+# ── The public rollup (#3553) ────────────────────────────────────────────────
+#
+# WHY A ROLLUP AND NOT A LIVE SCAN. The first cut had /api/predictions fetch the seven
+# COMMITMENT# partitions itself, alongside the eight PREDICTION# ones. That doubled the
+# handler's fan-out to 16 concurrent queries against `_parallel_fetch`'s 9-worker pool
+# (and botocore's 10-connection default), so it ran in TWO waves — and CI caught it:
+# `test_predictions_fetches_partitions_concurrently` measured 0.76s against a 0.70s
+# budget. That test is #1527's guard, written after this exact endpoint blew
+# /method/board/'s cold-cache LCP budget at ~3.6s of origin latency. Relaxing it would
+# have been fixing the thermometer.
+#
+# The grader ALREADY computes these numbers daily and already has the whole corpus in
+# memory. So it writes the tally once and the site-api reads ONE item. The public number
+# is then a dated artifact rather than a per-request re-derivation, which is also the
+# more honest shape: the payload carries `as_of`, so a reader can see when it was last
+# graded instead of being served a fresh-looking recomputation of a stale corpus.
+ROLLUP_PK = "COACH#commitments"
+ROLLUP_SK = "TALLY#current"
+
+
+def build_tally(corpus, applied=None) -> dict:
+    """`{as_of, lifetime, season}` over the whole corpus, with this run's verdicts applied.
+
+    `applied` is `{sk: status}` for the records this run just graded — the DDB writes are
+    fire-and-forget per record, so the in-memory rows still carry their pre-run status
+    and a tally built off them would be one day stale on the day it matters most.
+    """
+    from experiment.phase_filter import singleton_visible
+
+    applied = applied or {}
+    career, season = [], []
+    for rec in corpus or []:
+        row = dict(rec or {})
+        if row.get("sk") in applied:
+            row["status"] = applied[row["sk"]]
+        career.append(row)
+        if singleton_visible(row):
+            season.append(row)
+    return {"lifetime": tally(career), "season": tally(season)}
+
+
+def write_tally(table, corpus, applied, today_str, logger) -> dict:
+    """Stamp the rollup the public scorecard reads. Fail-soft — a rollup write error
+    must never sink the grading pass that produced it; the surface then serves the
+    PREVIOUS dated tally (or null), never a zero it did not measure."""
+    payload = build_tally(corpus, applied)
+    payload["as_of"] = today_str
+    try:
+        from common.numeric import floats_to_decimal
+
+        table.put_item(Item={"pk": ROLLUP_PK, "sk": ROLLUP_SK, "as_of": today_str, **floats_to_decimal(payload)})
+        logger.info(
+            "[#3553] commitment tally: %s kept / %s broken / %s ungradeable of %s (as_of %s)",
+            payload["lifetime"]["kept"],
+            payload["lifetime"]["broken"],
+            payload["lifetime"]["ungradeable"],
+            payload["lifetime"]["total"],
+            today_str,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error("[#3553] commitment tally write failed (non-fatal): %s", e)
+    return payload

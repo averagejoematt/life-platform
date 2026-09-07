@@ -101,16 +101,19 @@ class TestConcurrentPartitionFetch:
         assert elapsed < WALL_CLOCK_BUDGET, f"predictions fetch not concurrent: {elapsed:.2f}s for 8 queries"
         assert len(body["by_coach"]) == 8
 
-    def test_coach_filter_still_fans_out_to_one_coach_only(self, monkeypatch):
-        """#3553 added the COMMITMENT# partition to the SAME concurrent round, so a
-        one-coach request is two partition reads (one ledger each) — never a fan-out
-        across coaches, which is the regression this pins."""
+    def test_coach_filter_still_single_fetch(self, monkeypatch):
+        """One coach, one QUERY — still true after #3553.
+
+        That issue first added the seven COMMITMENT# partitions to this same concurrent
+        round, which doubled the fan-out to 16 queries against a 9-worker pool and made
+        THIS file's sibling assertion fail at 0.76s against the 0.70s budget. The fix was
+        not a bigger budget: the follow-through tally is now a daily rollup the grader
+        writes and this handler reads with one GetItem, so the Query count is unchanged."""
         fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": [_full_pred()]})
         monkeypatch.setattr(api, "table", fake)
         body = _body(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}}))
         assert list(body["by_coach"].keys()) == ["sleep"]
-        assert len(fake.query_calls) == 2
-        assert all("sleep" in _pk_of(kw) for kw in fake.query_calls)
+        assert len(fake.query_calls) == 1
 
 
 class TestProjectionCarriesEveryEmittedField:

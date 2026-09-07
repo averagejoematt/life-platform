@@ -1412,7 +1412,11 @@ function commitmentLedgerHTML(cm) {
   const rateLabel = n
     ? `kept · n=${n}${ci ? ` · 95% CI ${ci[0]}–${ci[1]}%` : ""}`
     : "kept · nothing graded yet";
-  let h = `<p class="dx-kicker label sc-sub">follow-through · every cycle</p>`;
+  // The tally is a DATED artifact the grader publishes daily, not a per-request
+  // re-derivation — so the reader is told when it was last graded rather than being
+  // shown a fresh-looking recomputation of a stale corpus.
+  const asOf = cm.as_of ? ` · as of ${esc(String(cm.as_of).slice(0, 10))}` : "";
+  let h = `<p class="dx-kicker label sc-sub">follow-through · every cycle${asOf}</p>`;
   h += `<p class="dx-prose">A commitment is a concrete action a coach pushed Matthew to take. Where it maps to a measurable metric, the same deterministic evaluator that grades the calls above grades the follow-through — kept or broken, against the data of the commitment's own window. <span class="label">Self-scored on Matthew's own data, n=1.</span></p>`;
   h += `<div class="sc-tiles">` +
     `<div class="sc-tile"><span class="sc-n">${n ? `${esc(life.follow_through_pct)}%` : "—"}</span><span class="sc-l label">${esc(rateLabel)}</span></div>` +

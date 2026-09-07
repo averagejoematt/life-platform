@@ -1222,6 +1222,9 @@ ZERO_COMMITMENT_STATS = {
     "pending": 0,
     "due_checkable": 0,
     "graded": 0,
+    # #3553: {sk: new status} for whatever this run terminalised — the rollup applies
+    # these over the in-memory corpus so the published tally is not a day stale.
+    "applied": {},
 }
 
 
@@ -1234,7 +1237,10 @@ def due_series(table, values, days_late=23, field="hrv"):
 class TestCommitments:
     def test_only_pending_commitments_are_collected(self, table):
         seed(table, commitment(), commitment(sk="COMMITMENT#c2", commitment_id="c2", status="kept"))
-        assert [c["commitment_id"] for c in ev._fetch_commitments()] == ["c1"]
+        pending, corpus = ev._fetch_commitments()
+        assert [c["commitment_id"] for c in pending] == ["c1"]
+        # #3553: the whole corpus rides along for the rollup — the loop already pages it.
+        assert sorted(c["commitment_id"] for c in corpus) == ["c1", "c2"]
 
     def test_commitment_reads_are_cross_phase_so_a_reset_cannot_hide_the_corpus(self, table):
         """#3553, the inversion of the old pin. This read WAS phase-filtered, and that
@@ -1250,7 +1256,7 @@ class TestCommitments:
     def test_an_unreadable_coach_partition_does_not_lose_the_others(self, table):
         table.error_pks.add("COACH#sleep_coach")
         seed(table, commitment())
-        assert len(ev._fetch_commitments()) == 1
+        assert len(ev._fetch_commitments()[0]) == 1
 
     def test_a_commitment_is_not_graded_before_its_window_closes(self, table):
         stats = ev._evaluate_commitments([commitment(created_date=days_before(3))], TODAY, {})

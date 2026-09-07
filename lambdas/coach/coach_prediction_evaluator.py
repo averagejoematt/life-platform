@@ -353,7 +353,7 @@ def _retire_ungradeable(ungradeable, today_str):
 
 
 def _fetch_commitments():
-    """Pending COMMITMENT# records across all coaches — CROSS-PHASE by explicit rule
+    """`(pending, whole_corpus)` across all coaches — CROSS-PHASE by explicit rule
     (#3553; the reasoning, and the census that forced it, live in commitment_grading)."""
     return commitment_grading.fetch_pending(table, COACH_IDS, with_phase_filter, _decimal_to_float, logger)
 
@@ -1528,9 +1528,16 @@ def lambda_handler(event: dict, context) -> dict:
         commitment_stats: dict = {}
         commitment_pass_completed = False
         try:
-            commitments = _fetch_commitments()
+            commitments, commitment_corpus = _fetch_commitments()
             commitment_stats = _evaluate_commitments(commitments, today_str, {}) if commitments else {}
             commitment_pass_completed = True
+            # #3553: publish the tally the public scorecard reads. Written HERE, once a
+            # day, rather than re-derived by /api/predictions on every request — that
+            # would have doubled the endpoint's partition fan-out and re-opened the
+            # #1527 origin-latency regression (CI measured 0.76s against a 0.70s budget).
+            commitment_stats["tally"] = commitment_grading.write_tally(
+                table, commitment_corpus, commitment_stats.pop("applied", None) or {}, today_str, logger
+            )  # popped: it can carry hundreds of sks and the handler response is a log line
         except Exception as e:
             logger.error("Commitment evaluation failed (non-fatal): %s", e)
         # #3553 dead-man. Emit on every COMPLETED pass, including a wholly empty one —

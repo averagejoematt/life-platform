@@ -89,6 +89,7 @@ class _FakeTable:
         self.commitments = commitments or []
         self.metric_rows = metric_rows or []
         self.updates = {}
+        self.store = {}
 
     def query(self, **kw):
         pk = kw["ExpressionAttributeValues"][":pk"]
@@ -102,10 +103,10 @@ class _FakeTable:
         self.updates[kw["Key"]["sk"]] = kw["ExpressionAttributeValues"]
 
     def get_item(self, **kw):
-        return {}
+        return {"Item": self.store[tuple(kw["Key"].values())]} if tuple(kw["Key"].values()) in self.store else {}
 
     def put_item(self, **kw):
-        return {}
+        self.store[(kw["Item"]["pk"], kw["Item"]["sk"])] = kw["Item"]
 
 
 def _commitment(cid="c1", *, created=None, window=7, metric="hrv", direction="up", coach="physical_coach", **extra):
@@ -147,7 +148,8 @@ def ev(monkeypatch):
 def _run(ev, monkeypatch, table, cw):
     monkeypatch.setattr(ev, "table", table)
     monkeypatch.setattr(ev, "_cw", cw)
-    stats = ev._evaluate_commitments(ev._fetch_commitments(), TODAY, {})
+    pending, _corpus = ev._fetch_commitments()
+    stats = ev._evaluate_commitments(pending, TODAY, {})
     cg.emit_liveness(cw, stats, ev.logger)
     return stats
 
@@ -458,37 +460,40 @@ class TestScorecardApi:
     of one reader question, and because a ledger shown without its verdicts is the whole
     defect #3553 names."""
 
-    @staticmethod
-    def _sk_prefix(kw):
-        """The `begins_with` value out of a boto3 Key condition — the same shape
-        tests/test_predictions_parallel_fetch_1527.py reads the pk out of."""
-        try:
-            return kw["KeyConditionExpression"]._values[1]._values[1]
-        except Exception:  # noqa: BLE001
-            return ""
-
-    def _serve(self, commitment_rows, monkeypatch):
+    def _serve(self, rollup, monkeypatch):
+        """`/api/predictions` with the rollup `coach-prediction-evaluator` writes."""
         from web import site_api_coach as api
 
         from tests.fakes import FakeDdbTable
 
-        def _hook(_t, **kw):
-            return {"Items": list(commitment_rows) if self._sk_prefix(kw).startswith("COMMITMENT#") else []}
-
-        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_hook))
+        got = {"Item": rollup} if rollup is not None else {}
+        monkeypatch.setattr(
+            api,
+            "table",
+            FakeDdbTable(query_hook=lambda _t, **kw: {"Items": []}, get_item_hook=lambda _t, key, **kw: got),
+        )
         return json.loads(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}})["body"])
+
+    def _rollup(self, career, season=None):
+        return {
+            "pk": cg.ROLLUP_PK,
+            "sk": cg.ROLLUP_SK,
+            "as_of": TODAY,
+            **cg.build_tally(career if season is None else career + season),
+        }
 
     def test_the_payload_carries_kept_broken_with_n_and_a_wilson_interval(self, monkeypatch):
         rows = [{"status": "kept", "action_check": {"metric": "steps", "direction": "up"}} for _ in range(5)]
         rows += [{"status": "broken", "action_check": {"metric": "steps", "direction": "up"}} for _ in range(9)]
-        block = self._serve(rows, monkeypatch)["commitments"]
+        block = self._serve(self._rollup(rows), monkeypatch)["commitments"]
+        assert block["as_of"] == TODAY, "the reader is told WHEN it was last graded"
         assert block["lifetime"]["kept"] == 5 and block["lifetime"]["broken"] == 9
         assert block["lifetime"]["graded"] == 14 and block["lifetime"]["follow_through_pct"] == 35.7
         assert len(block["lifetime"]["follow_through_ci95"]) == 2
 
     def test_the_ungradeable_records_are_served_named_not_filtered_out(self, monkeypatch):
         rows = [{"status": "ungradeable", "action_check": {"metric": "total_protein_g", "direction": "up"}} for _ in range(37)]
-        block = self._serve(rows, monkeypatch)["commitments"]
+        block = self._serve(self._rollup(rows), monkeypatch)["commitments"]
         assert block["lifetime"]["ungradeable"] == 37
         assert block["lifetime"]["ungradeable_by_metric"] == {"total_protein_g": 37}
         assert block["lifetime"]["follow_through_pct"] is None, "no verdicts means no rate — never a comforting 0%"
@@ -500,8 +505,38 @@ class TestScorecardApi:
             {"status": "kept", "phase": "pilot", "tombstone": True, "action_check": {"metric": "steps", "direction": "up"}},
             {"status": "broken", "action_check": {"metric": "steps", "direction": "up"}},
         ]
-        block = self._serve(rows, monkeypatch)["commitments"]
+        block = self._serve(self._rollup(rows), monkeypatch)["commitments"]
         assert block["lifetime"]["graded"] == 2 and block["season"]["graded"] == 1
+
+    def test_the_scorecard_costs_ONE_extra_read_not_a_second_partition_fan_out(self, monkeypatch):
+        """#1527's guard is why this is a rollup at all: re-scanning the seven
+        COMMITMENT# partitions here doubled the handler's fan-out to 16 queries against
+        a 9-worker pool and blew the concurrency budget in CI. The tally must cost one
+        GetItem, and it must not add a single Query."""
+        from web import site_api_coach as api
+
+        from tests.fakes import FakeDdbTable
+
+        gets, queries = [], []
+
+        def _q(_t, **kw):
+            queries.append(kw)
+            return {"Items": []}
+
+        def _g_hook(_t, key, **kw):
+            gets.append(key)
+            return {"Item": self._rollup([{"status": "kept", "action_check": {"metric": "steps", "direction": "up"}}])}
+
+        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_q, get_item_hook=_g_hook))
+        body = json.loads(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}})["body"])
+        assert body["commitments"]["lifetime"]["kept"] == 1
+        assert len(queries) == 1, f"one coach must mean one PREDICTION# query, got {len(queries)}"
+        assert {"pk": cg.ROLLUP_PK, "sk": cg.ROLLUP_SK} in gets
+
+    def test_no_rollup_yet_serves_null_never_a_zeroed_ledger(self, monkeypatch):
+        """Before the evaluator's first post-deploy run there IS no tally. An absent
+        artifact must read as absent, not as 'the coaches have kept nothing'."""
+        assert self._serve(None, monkeypatch)["commitments"] is None
 
     def test_a_commitment_read_failure_never_takes_the_prediction_scorecard_down(self, monkeypatch):
         from web import site_api_coach as api
@@ -509,24 +544,47 @@ class TestScorecardApi:
         from tests.fakes import FakeDdbTable
 
         monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=lambda _t, **kw: {"Items": []}))
-        monkeypatch.setattr(api, "_commitment_block", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+        monkeypatch.setattr(api, "_commitment_block", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
         resp = api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}})
         assert resp["statusCode"] == 200
         assert json.loads(resp["body"])["commitments"] is None, "an unreadable ledger serves null, never a zeroed one"
 
-    def test_every_partition_failing_serves_null_not_a_zeroed_ledger(self, monkeypatch):
-        """#2658's lesson on this surface: `_parallel_fetch` degrades a failed partition
-        to [], so a total outage would tally to all-zero at HTTP 200 — 'the coaches have
-        made no commitments'. Absence must not render as zero."""
-        from web import site_api_coach as api
 
-        from tests.fakes import FakeDdbTable
+# ══════════════════════════════════════════════════════════════════════════════
+# G. The rollup itself — the grader publishes what it graded, dated
+# ══════════════════════════════════════════════════════════════════════════════
 
-        def _hook(_t, **kw):
-            if self._sk_prefix(kw).startswith("COMMITMENT#"):
+
+class TestRollup:
+    def test_this_runs_verdicts_are_applied_before_the_tally_is_published(self, ev, monkeypatch):
+        """The DDB status writes are per-record and the in-memory rows still carry the
+        PRE-run status, so a tally built straight off the corpus would be a day stale on
+        the day it matters most — the day the ledger first grades anything."""
+        due = _days_before(23)
+        table = _FakeTable(commitments=[_commitment("c1")], metric_rows=_rising_whoop(due))
+        cw = _FakeCw()
+        monkeypatch.setattr(ev, "table", table)
+        monkeypatch.setattr(ev, "_cw", cw)
+        pending, corpus = ev._fetch_commitments()
+        stats = ev._evaluate_commitments(pending, TODAY, {})
+        assert corpus[0]["status"] == "pending", "the fetched row is pre-verdict — that is the trap"
+        payload = cg.write_tally(table, corpus, stats["applied"], TODAY, ev.logger)
+        assert payload["lifetime"]["kept"] == 1 and payload["lifetime"]["pending"] == 0
+        assert payload["as_of"] == TODAY
+        assert table.store[(cg.ROLLUP_PK, cg.ROLLUP_SK)]["as_of"] == TODAY
+
+    def test_the_fetch_hands_back_the_whole_corpus_not_just_the_pending_set(self, ev, monkeypatch):
+        """The rollup needs every status; the loop already pages them all, so the
+        second list is free rather than a second scan."""
+        monkeypatch.setattr(ev, "table", _FakeTable(commitments=[_commitment("c1"), _commitment("c2", status="kept")]))
+        pending, corpus = ev._fetch_commitments()
+        assert [c["commitment_id"] for c in pending] == ["c1"]
+        assert sorted(c["commitment_id"] for c in corpus) == ["c1", "c2"]
+
+    def test_a_rollup_write_failure_never_sinks_the_grading_pass(self, ev):
+        class _Broken(_FakeTable):
+            def put_item(self, **kw):
                 raise RuntimeError("throttled")
-            return {"Items": []}
 
-        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_hook))
-        body = json.loads(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}})["body"])
-        assert body["commitments"] is None
+        payload = cg.write_tally(_Broken(), [{"sk": "COMMITMENT#x", "status": "kept"}], {}, TODAY, ev.logger)
+        assert payload["lifetime"]["kept"] == 1  # computed and returned even though the write died
