@@ -50,6 +50,16 @@ SOCIAL_CHANNELS_ENV = ",".join(social_channel_source_ids())
 # Cost: ~$0/month — gap-aware Lambdas short-circuit in <50ms when no new data exists
 INGEST_HOURLY = "0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23"
 
+# ── Habitify runs the FULL 24 hours (#3666) ──
+# The maintenance-window assumption above — "10pm-4am PT, no user activity expected" —
+# is false for exactly one source. UTC 6-11 is 23:00-04:00 PT, which is when the owner
+# ticks his evening habits (pills, breathwork before bed); a 23:30 PT tick sat unread
+# until 05:05 PT the next morning. Habitify is also the source whose whole value is
+# same-day freshness: the day is never finalised, he ticks as he goes, and every coach
+# and narrative surface reads the day's record. So it opts out of the window.
+# Cost: +6 invocations/day (18 -> 24), 256 MB, ~25-40s each = under $0.03/month.
+HABITIFY_HOURLY = "*"
+
 # ── Whoop cadence (#2204) — deliberately NOT hourly ──
 # Whoop's access token lives 3599s, one second SHORTER than an hourly interval, so
 # every hourly run found the stored token expired and spent a refresh-token rotation
@@ -279,15 +289,19 @@ class IngestionStack(Stack):
         )
         withings.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
-        # ── 5. Habitify — 5x daily (:05 stagger)
+        # ── 5. Habitify — every hour, all 24 (:05 stagger). See HABITIFY_HOURLY (#3666).
         create_platform_lambda(
             self,
             "HabitifyIngestion",
             function_name="habitify-data-ingestion",
             source_file="lambdas/ingestion/habitify_lambda.py",
             handler="ingestion.habitify_lambda.lambda_handler",
-            schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
-            timeout_seconds=180,
+            schedule=f"cron(5 {HABITIFY_HOURLY} * * ? *)",
+            # #3666: one extra GET /logs/{habit_id} per habit per invocation (memoised
+            # across the dates one run ingests). Measured pre-change duration was avg
+            # 22-26s / max 59s against this 180s timeout; the logs pass adds roughly half
+            # a notes pass, so the headroom is raised rather than spent.
+            timeout_seconds=240,
             environment={"HABITIFY_SECRET_NAME": "life-platform/habitify"},
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None,
