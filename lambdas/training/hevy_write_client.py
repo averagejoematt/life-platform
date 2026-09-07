@@ -286,7 +286,15 @@ def create_template(body: dict[str, Any]) -> dict[str, Any]:
 # ── Folders ───────────────────────────────────────────────────────────────
 
 
-def list_folders(page: int = 1, page_size: int = 50) -> dict[str, Any]:
+# Hevy caps pageSize at 10 on every collection endpoint EXCEPT /v1/exercise_templates
+# (verified live at 100). This default was 50 and 400'd every call for months (#3670):
+#   pageSize=10 -> 200 · pageSize=11 -> 400 {"error":"pageSize must be less than or equal to 10"}
+# _ensure_folder swallowed the 400, so every routine was created in the account root.
+# Do not raise this above 10 — see scripts/diag_hevy_folders.py for the live sweep.
+HEVY_MAX_PAGE_SIZE = 10
+
+
+def list_folders(page: int = 1, page_size: int = HEVY_MAX_PAGE_SIZE) -> dict[str, Any]:
     return _request("GET", "/v1/routine_folders", query={"page": page, "pageSize": page_size})
 
 
