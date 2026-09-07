@@ -995,3 +995,23 @@ def test_flagged_row_names_the_ndots_parent_not_three_of_its_four_states():
     wash = _composite("#A34E13", "#F4EFE4", 0.09)
     assert wash == "#EDE1D1"  # the background live axe reported
     assert round(_contrast("#A34E13", wash), 2) == 4.46 and _contrast("#A34E13", wash) < AA_NORMAL  # axe rounds down to 4.45
+
+
+@pytest.mark.parametrize("selector", sorted(DERIVED_OPACITY_EXEMPT))
+def test_every_derived_exemption_is_load_bearing(selector, monkeypatch):
+    """The other must-fail control, one per exemption: an exemption that changes nothing is
+    a row nobody would notice going wrong.
+
+    Drop the row and the MEASURED half must red naming that selector, in all three palette
+    blocks — i.e. every entry in DERIVED_OPACITY_EXEMPT is genuinely holding back a real
+    AA failure, and is a written WCAG 1.4.3 judgement rather than a shrug. Together with
+    test_derived_scan_is_live_and_its_exemptions_are_not_stale (which reds if the CSS rule
+    behind a row disappears) that is both directions, per entry."""
+    reason = DERIVED_OPACITY_EXEMPT[selector]
+    assert reason.strip(), f"{selector} is exempt with no written reason"
+    kept = {k: v for k, v in DERIVED_OPACITY_EXEMPT.items() if k != selector}
+    monkeypatch.setattr(sys.modules[__name__], "DERIVED_OPACITY_EXEMPT", kept)
+    mine = [f for f in _derived_failures() if f" {selector} @ opacity" in f]
+    assert mine, f"un-exempting {selector} produced no AA failure — the exemption is decorative, drop it"
+    for theme in ALL_BLOCKS:
+        assert any(f.startswith(f"[{theme}]") for f in mine), f"{selector} does not fail in {theme} — narrow the row's reason"
