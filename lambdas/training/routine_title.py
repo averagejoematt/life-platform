@@ -11,9 +11,11 @@ Title format:  "<Phase> - <Type> - <N> - <Y>"
            + 1. Does NOT reset on phase change. 1-based. Phases are now
            narrative markers; the experiment is the anchor.
   Y      — count of *performed* Hevy workouts since EXPERIMENT_START_DATE
-           + 1. Same anchor — both counters measure progress within the
-           current experiment, not lifetime. Pre-experiment Hevy history
-           is preserved in DDB but excluded from these counters.
+           + 1, DERIVED from constants (#3671) — never read from config, so a
+           reset zeroes it with no second edit. Pre-experiment Hevy history is
+           preserved in DDB but excluded from these counters. (N still anchors
+           on `current_started`, which the owner advances by hand: a phase may
+           deliberately span cycles.)
 
 Variant overrides:
   variant=re_entry → "Welcome back · <Type>" (no counters surfaced — kind
@@ -187,13 +189,26 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
         (phase_started_date), +1. Resets when the phase advances; a
         planned-but-skipped session never inflates it (we count performed, not
         pushed). Type is resolved via resolve_archetype (no title parsing).
-    Y — performed workouts since reset_epoch_date, +1. Honest, reset-relative —
-        skipped sessions don't inflate it; the experiment reset zeroes it.
+    Y — performed workouts since EXPERIMENT_START_DATE, +1. Honest,
+        reset-relative — skipped sessions don't inflate it, and the experiment
+        reset zeroes it *by construction* rather than by a second edit (#3671).
+
+    The Y anchor is DERIVED, never read from config (#3671). It used to be a
+    hand-maintained `reset_epoch_date` in training_phases.json, which the reset
+    pipeline does not own — ADR-077's phase taxonomy classifies DynamoDB
+    partitions and has no jurisdiction over config files. That copy therefore
+    survived ELEVEN resets stuck at 2026-06-16, and because the file is not
+    staged into the Lambda bundle (build_bundle stages only food_vocabulary /
+    personas / coaches), the copy the runtime actually read was the one in S3 —
+    so re-anchoring the repo copy by hand did not move the live counter either.
+    Deriving from EXPERIMENT_START_DATE, which every reset already regenerates
+    and which ships in every bundle (#781), removes the second copy instead of
+    scheduling a second thing to remember.
     """
     state = load_phase_state()
     phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
     phase_started = state.get("current_started") or EXPERIMENT_START_DATE
-    reset_epoch = state.get("reset_epoch_date") or EXPERIMENT_START_DATE
+    reset_epoch = EXPERIMENT_START_DATE
 
     # Load the index from the earlier of the two windows so an early performed
     # workout can still resolve to a routine pushed just before the phase began.
