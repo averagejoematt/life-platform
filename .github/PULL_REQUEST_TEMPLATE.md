@@ -32,6 +32,12 @@ Refs #<!-- issue number — instrument; first live output that will close it: ..
 - [ ] Conventional-commit title (`feat|fix|chore|docs|refactor|test|ci|build|perf|style(scope): …`)
 - [ ] **Docs:** updated the affected page(s) **OR** none needed (one-clause reason: …)
 - [ ] Shared code stays **one bundle, no layer** (#781) — I did not reintroduce a Lambda layer for shared modules
+- [ ] **Set and registry** (#3594): if this PR was filed from a review/incident finding — name the SET this
+      guard/fix enumerates (the query + member count) and the registry it derives from, so the fix lands on
+      the class, not just the specimen.
+- [ ] **Must-fail case** (#3594): if this PR adds or changes a gate/check/alarm/sweep — the must-fail case is
+      at `<file::test>` (a mutation that reds it, run, with its real output — a guard that cannot fail is not
+      a guard).
 
 ## Deploy / ops notes
 

@@ -133,20 +133,33 @@ cat > "$MSG_HOOK_FILE" << 'MSGEOF'
 # with the exact type set this repo uses. Machine-generated subjects (merge,
 # revert, fixup!/squash!/amend!) are exempt. Bypass in a real emergency with
 # `git commit --no-verify`.
+#
+# #3642: the pattern + the exemption case are NOT inlined here any more — they
+# live in ONE shared file, deploy/lib/commit_subject_pattern.sh, also sourced
+# by deploy/agent_commit.sh. Before this, the two copies disagreed (this
+# hook's scope class rejected the repo's own `fix(#N,#M): …` multi-issue
+# convention while agent_commit.sh's --no-verify bypass let it through
+# unchecked) — one file means they cannot drift apart again.
 
 MSG_FILE="$1"
+PROJ_ROOT="$(git rev-parse --show-toplevel)"
+CSP_LIB="$PROJ_ROOT/deploy/lib/commit_subject_pattern.sh"
+if [[ ! -f "$CSP_LIB" ]]; then
+  echo "[commit-msg] ⚠ $CSP_LIB not found — skipping the Conventional-Commits gate" >&2
+  exit 0
+fi
+# shellcheck source=deploy/lib/commit_subject_pattern.sh
+. "$CSP_LIB"
 
 # Subject = first line that is neither blank nor a comment.
 SUBJECT="$(grep -vE '^[[:space:]]*#' "$MSG_FILE" | grep -vE '^[[:space:]]*$' | head -n1)"
 
 # Skip subjects git itself generates.
-case "$SUBJECT" in
-  "Merge "* | "Revert "* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
-esac
+if commit_subject_is_exempt "$SUBJECT"; then
+  exit 0
+fi
 
-# type(optional-scope)!: subject  — types are the set actually used here.
-PATTERN='^(feat|fix|chore|docs|refactor|test|ci|build|perf|style|revert)(\([a-z0-9._-]+\))?!?: .+'
-if printf '%s' "$SUBJECT" | grep -qE "$PATTERN"; then
+if printf '%s' "$SUBJECT" | grep -qE "$COMMIT_SUBJECT_PATTERN"; then
   exit 0
 fi
 
@@ -159,6 +172,7 @@ fi
   echo "  Examples:  feat(coaching): add streak card"
   echo "             fix: correct sleep-duration rounding"
   echo "             docs(readme): fix a broken link"
+  echo "             fix(#3535,#3537): two issues, one landing fix"
   echo ""
   echo "  Bypass in a genuine emergency with: git commit --no-verify"
 } >&2

@@ -959,3 +959,62 @@ REGISTRY_PROOFS.update(
         for path, (what, plant) in _CAST_ALLOWLIST_ENTRANTS.items()
     }
 )
+
+
+# ── #3645: tests/test_no_tool_attribution_3005.py::ALLOWLIST, eight entrants ───────────
+#
+# #3645 widened the #3005 guard's sweep-1 mention patterns to catch a paraphrase that had
+# been slipping past it (spelled out in that test file's own header, not repeated here —
+# repeating it in THIS file would make gate_census_proofs.py itself the next offender).
+# Every tracked file that legitimately STATES the ban rather than instructing it became a
+# new offender the moment the wider pattern landed, because sweep 1 is whole-FILE: a file
+# not on `ALLOWLIST` is scanned in full, with no per-line/per-entry narrowing.
+#
+# ONE direction is provable here, not two: `ALLOWLIST` exempts an entire file by path, so
+# there is no "(b) not a blanket exemption" arm the way `PROMPT_LITERAL_ALLOWLIST` above
+# has (that registry matches by NAME within a shared file; this one matches by FILE, so an
+# allowlisted file has no narrower boundary within it to test). The one direction that
+# matters is LOAD-BEARING: delete the entry and the guard reds, naming exactly that file —
+# proving the entry excuses a REAL hit, not decoration over a file with nothing to find.
+_ATTRIBUTION_ALLOWLIST_SUITE = "python3 -m pytest tests/test_no_tool_attribution_3005.py::test_no_tracked_file_instructs_the_trailer -q"
+
+# path -> what real content on that path the entry excuses. Descriptions are deliberately
+# indirect (no literal quoting of the banned vocabulary) so this file does not become the
+# next offender the sweep it documents would catch.
+_ATTRIBUTION_ALLOWLIST_ENTRANTS = {
+    ".claude/README.md": "its one-line summary of the owner's 2026-08-12 authorship-ban decision",
+    ".claude/agents/worktree-implementer.md": (
+        "step 9's post-#3645 wording, which spells out each of the three banned forms by name so a "
+        "lane recognizes exactly what to refuse — the PR #3639 incident this issue fixes"
+    ),
+    "CONTRIBUTING.md": "its own commit-step line restating the same owner decision",
+    "docs/CONVENTIONS.md": "the §9 registry row citing #3005's guard and naming what it bans",
+    "handovers/HANDOVER_LATEST.md": "a session's own incident narrative reporting that a lane emitted the banned form",
+    "remediation/prompt.md": "the remediation agent's own prompt restating the owner authorship decision",
+    "scripts/gate_census_mutations.py": "a mutation-spec `detects=` string describing this very guard's own coverage",
+    "tests/test_worktree_implementer_no_footer_instruction_3645.py": (
+        "this PR's own regression test, which spells out all three forms in docstrings/fixtures to prove " "the widened sweep catches them"
+    ),
+}
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::{path}": {
+            "gate_name": f"ALLOWLIST[{path}]",
+            "command": _ATTRIBUTION_ALLOWLIST_SUITE,
+            "mutation": f"the entry's own line deleted from ALLOWLIST, leaving {what} unexcused.",
+            "observed": (
+                f"ARMED: exit 1, `FAILED ...::test_no_tracked_file_instructs_the_trailer`, naming `{path}` and the exact "
+                "form(s) matched (1 failed / N passed). REVERTED: exit 0 (the full sweep passes again). Watched "
+                "2026-09-06 on this branch for all eight entries — see PR #3658/#3645."
+            ),
+            "scope": (
+                "Load-bearing only (no 'not a blanket exemption' arm — see the block header above): proves the entry "
+                "excuses a real hit, not that the allowlist is narrow within the file. Keyed by PATH; a file rename "
+                "strands the entry silently until the next full-tree run re-derives the census."
+            ),
+            "proved_on": "2026-09-06",
+        }
+        for path, what in _ATTRIBUTION_ALLOWLIST_ENTRANTS.items()
+    }
+)
