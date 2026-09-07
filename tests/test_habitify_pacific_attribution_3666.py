@@ -526,9 +526,23 @@ def test_habitify_is_scheduled_every_hour_including_the_pacific_evening():
 
 
 def test_logs_window_spans_the_whole_ingest_lookback():
-    start, end = logs_window("2026-09-06", 7)
+    start, end = logs_window("2026-09-06", "2026-09-06", 7)
     assert start.startswith("2026-08-28")  # 7 lookback + 2 pad
     assert end.startswith("2026-09-08")  # 2 pad forward, so a back-date is visible
+
+
+def test_logs_window_stretches_to_reach_a_backfill_target():
+    """A `{"date_override": "2026-08-25"}` invoke targets a date outside the lookback. A
+    window anchored on today alone would return NO logs for it and the backfill would
+    confidently rewrite the day as a total miss — the bug, re-applied by its own fix."""
+    start, end = logs_window("2026-08-25", "2026-09-06", 7)
+    assert start.startswith("2026-08-23")  # the target, padded — not today - lookback
+    assert end.startswith("2026-09-08")
+
+
+def test_logs_window_is_constant_within_one_invocation():
+    """The memo depends on it: two dates of the same run must produce the same key."""
+    assert logs_window("2026-09-06", "2026-09-06", 7) == logs_window("2026-09-05", "2026-09-06", 7)
 
 
 def test_the_logs_fetch_is_memoised_across_the_dates_one_run_ingests(monkeypatch):

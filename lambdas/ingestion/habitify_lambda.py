@@ -268,16 +268,25 @@ def fetch_logs(api_key, habit_id, window_from, window_to):
     return api_get(f"/logs/{habit_id}", api_key, params)
 
 
-def logs_window(anchor_date, lookback_days):
+def logs_window(target_date, today_pt, lookback_days):
     """UTC ISO bounds wide enough to contain every tick the run could attribute.
 
-    Anchored on the PACIFIC day (`anchor_date`), padded by the ingest lookback plus
-    LOGS_WINDOW_PAD_DAYS on each side. One window per invocation, so the per-habit GET
-    is memoised across every date the run ingests instead of repeating per date.
+    Two dates, not one, and the second is what makes a backfill work. A normal run's
+    targets all sit inside `[today - lookback, today]`, so the window is identical for
+    every date and the per-habit GET is memoised across the whole invocation
+    (`_LOGS_CACHE`) instead of repeating per date. A `{"date_override": "2026-08-25"}`
+    backfill invoke targets a date OUTSIDE that span — and a window anchored on today
+    alone would return no logs for it, so every habit would read `failed` and the
+    backfill would confidently rewrite the day as a total miss. The window therefore
+    stretches to cover the target as well; it is still constant within one invocation.
+
+    LOGS_WINDOW_PAD_DAYS on each end covers the frame skew (a Pacific day's ticks can
+    carry the next UTC date) plus a back-dated completion just outside the span.
     """
-    anchor = datetime.strptime(anchor_date, "%Y-%m-%d").date()
-    start = anchor - timedelta(days=lookback_days + LOGS_WINDOW_PAD_DAYS)
-    end = anchor + timedelta(days=LOGS_WINDOW_PAD_DAYS)
+    target = datetime.strptime(target_date, "%Y-%m-%d").date()
+    today = datetime.strptime(today_pt, "%Y-%m-%d").date()
+    start = min(target, today - timedelta(days=lookback_days)) - timedelta(days=LOGS_WINDOW_PAD_DAYS)
+    end = max(target, today) + timedelta(days=LOGS_WINDOW_PAD_DAYS)
     return f"{start.isoformat()}T00:00:00+00:00", f"{end.isoformat()}T00:00:00+00:00"
 
 
@@ -380,7 +389,7 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     # invocation (memoised on the window, which is anchored on Pacific today, so the
     # second and subsequent dates of a run are free). A habit missing from this map had
     # its logs GET fail; `transform` degrades that habit alone to the journal status.
-    window = logs_window(pacific_today(), LOOKBACK_DAYS)
+    window = logs_window(date_str, pacific_today(), LOOKBACK_DAYS)
     logs_by_name = {}
     for entry in journal:
         if entry.get("is_archived"):
