@@ -556,7 +556,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # pre-#3548 `<article data-dx-read>` (the retired tabpanel-host shape all 18 dx-read
         # hosts carried). Watched RED: test_no_dx_read_panel_is_an_article failed naming the
         # file. REVERTED: 11 passed.
-        <= 89  # re-measured 2026-09-07 on the MERGED tree: 88 -> 89 proven, unproven 537 -> 538 (one new gate ledgered by design, not proven — see tests/gate_census_unproven_residue.py)
+        # Upper bound raised 89 -> 90 (2026-09-07, #3678): the 90th proof is
+        # `guard::scripts/check_job_timeout_headroom.py` — GUARD_PROOFS in
+        # scripts/gate_census_proofs.py, watched RED live against the real repo's own
+        # then-unmodified pr-checks.yml (timeout-minutes: 15 vs. measured p95 14.87min x
+        # 1.2 = 17.84min required), then OK against the same live measurement once the
+        # ceiling was raised to 18 in this same PR — plus the offline synthetic-fixture
+        # twin in tests/test_check_job_timeout_headroom_3678.py.
+        <= 90  # re-measured 2026-09-07 on this branch's own tree (#3678): 89 -> 90 proven, unproven UNCHANGED at 538 (this proof, not a new unproven entrant)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
