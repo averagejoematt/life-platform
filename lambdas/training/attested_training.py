@@ -30,10 +30,10 @@ from typing import Any
 
 # ── the attested record(s) ─────────────────────────────────────────────────
 #
-# STATUS: awaiting the owner's numbers (#3717). The entry below is the SHAPE,
-# recorded from his 2026-09-08 description, and is marked `active: False` until
-# he confirms the range and the period — an unconfirmed attestation must not
-# reach a prescription.
+# STATUS: ACTIVE. Confirmed by the owner 2026-09-08 — the window is the whole
+# 2024-25 transformation. `bpm_estimate` stays None: he gave minutes, not a
+# heart rate, and inventing one here would be indistinguishable from a measured
+# value downstream.
 #
 # What he described: "1 hour of lifting followed by 45 mins +/- (30-60) of low
 # cardio — normally recumbent bike, but sometimes treadmill, crosstrainer."
@@ -52,15 +52,25 @@ from typing import Any
 ATTESTATIONS: list[dict[str, Any]] = [
     {
         "id": "post_lift_low_cardio",
-        "active": False,  # ← flip to True only when the owner confirms below
-        "start_date": None,  # ← owner: when did this pattern begin?
-        "end_date": None,  # ← owner: when did it stop?
+        # CONFIRMED by the owner 2026-09-08: "it was during the whole 100lb
+        # transformation, i always kept doing cardio even when i was already in
+        # good shape". The window is set to the reference cut, which is the
+        # period the proven bands actually draw from. He states the habit also
+        # continued past it; extending the end date adds nothing to the
+        # reference and would be attesting beyond what was asked, so it stays
+        # at the transformation and is extended only on a further statement.
+        "active": True,
+        "start_date": "2024-09-05",
+        "end_date": "2025-04-30",
         "applies_when": "hevy_lift_logged",  # only on days with a logged lift
         "kind": "cycle",
         "minutes_low": 30,
         "minutes_high": 60,
         "minutes_typical": 45,
-        "bpm_estimate": None,  # ← owner: unknown; leave None rather than guess
+        # Deliberately None. He gave minutes, not a heart rate, and a seated
+        # low-intensity bike figure invented here would be indistinguishable
+        # from a measured one downstream. No attested HR is reported.
+        "bpm_estimate": None,
         "modalities": ["recumbent_bike", "treadmill", "cross_trainer"],
         "attested_by": "matthew",
         "attested_at": "2026-09-08",

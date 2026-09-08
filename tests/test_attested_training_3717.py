@@ -13,19 +13,6 @@ only holds if the separation is enforced, which is what these tests do.
 from lambdas.training import attested_training as at
 
 
-def test_an_unconfirmed_attestation_is_not_evidence():
-    """The seeded record is a SHAPE awaiting the owner's numbers. A draft must
-    not reach a prescription just because it exists in the file."""
-    assert at.ATTESTATIONS, "the shape should be recorded"
-    assert at.active_attestations() == [], "an unconfirmed attestation went live"
-    assert at.attested_overlay({"2024-10-01"}, {"2024-10-01"}) is None
-
-
-def test_an_attestation_missing_its_dates_never_activates(monkeypatch):
-    monkeypatch.setattr(at, "ATTESTATIONS", [{"id": "x", "active": True, "start_date": None, "end_date": None}])
-    assert at.active_attestations() == []
-
-
 def _confirmed(**over):
     base = {
         "id": "post_lift_low_cardio",
@@ -41,6 +28,37 @@ def _confirmed(**over):
     }
     base.update(over)
     return [base]
+
+
+def test_an_unconfirmed_attestation_is_not_evidence(monkeypatch):
+    """A draft must not reach a prescription just because it exists in the file.
+
+    Guarded against a SYNTHETIC record, not against whatever the shipped list
+    happens to contain — pinning "the file's entry is inactive" would test the
+    instance and would have to be rewritten every time the owner confirms one.
+    """
+    monkeypatch.setattr(at, "ATTESTATIONS", [dict(_confirmed()[0], active=False)])
+    assert at.active_attestations() == [], "an unconfirmed attestation went live"
+    assert at.attested_minutes_for_day("2024-10-01", had_lift=True) is None
+    assert at.attested_overlay({"2024-10-01"}, {"2024-10-01"}) is None
+
+
+def test_every_shipped_attestation_is_fully_specified():
+    """Whatever IS active must carry the fields that make it auditable — who
+    said it, when, and on what basis. An attestation without provenance is
+    indistinguishable from a guess someone typed in."""
+    for a in at.active_attestations():
+        for field in ("id", "start_date", "end_date", "attested_by", "attested_at", "basis"):
+            assert a.get(field), f"active attestation {a.get('id')!r} is missing {field}"
+        assert a["start_date"] <= a["end_date"]
+        assert (
+            a.get("minutes_low", 0) <= a.get("minutes_typical", 0) <= a.get("minutes_high", 0)
+        ), "an attested range must bracket its typical value"
+
+
+def test_an_attestation_missing_its_dates_never_activates(monkeypatch):
+    monkeypatch.setattr(at, "ATTESTATIONS", [{"id": "x", "active": True, "start_date": None, "end_date": None}])
+    assert at.active_attestations() == []
 
 
 def test_a_confirmed_attestation_applies_only_on_lift_days(monkeypatch):
