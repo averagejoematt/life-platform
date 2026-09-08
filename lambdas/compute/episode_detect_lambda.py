@@ -433,6 +433,44 @@ def enrich_episodes(idx, vals, episodes, activities, hevy_sets_by_date: dict) ->
     return out
 
 
+def _n_eff_for_days(day_set: set, activities: list) -> float:
+    """Effective sample size of the daily activity-hours series over `day_set`.
+
+    Uses the one sanctioned implementation (`common.stats_core`), per ADR-105 —
+    a parallel copy would need its own ADR. Fails soft to the raw day count so a
+    stats import problem degrades the tier rather than the whole weekly run.
+    """
+    try:
+        from common.stats_core import effective_sample_size
+
+        by_day: dict = {}
+        for a in activities:
+            d = a["date"][:10]
+            if d in day_set:
+                by_day[d] = by_day.get(d, 0.0) + float(a.get("hours") or 0.0)
+        # Autocorrelation is only meaningful WITHIN a contiguous visit. A band
+        # is visited repeatedly across years, and running lag-1 over the sorted
+        # union would treat the jump from 2020 to 2026 as a one-day lag — which
+        # both invents autocorrelation that is not there and hides the fact
+        # that separate visits ARE more independent than consecutive days.
+        # So: correct each contiguous run on its own, then sum.
+        days = sorted(day_set)
+        runs: list[list[str]] = []
+        for d in days:
+            if runs and (_d(d) - _d(runs[-1][-1])).days == 1:
+                runs[-1].append(d)
+            else:
+                runs.append([d])
+        total = 0.0
+        for run in runs:
+            series = [by_day.get(d, 0.0) for d in run]
+            total += float(len(series)) if len(series) < 3 else float(effective_sample_size(series))
+        return round(min(total, float(len(days))), 1)
+    except Exception as e:  # noqa: BLE001 - never fail the weekly run on a stats import
+        logger.warning("n_eff unavailable, falling back to raw dwell: %s", e)
+        return float(len(day_set))
+
+
 def build_reference(
     idx,
     vals,
@@ -493,6 +531,11 @@ def build_reference(
         # Counted INSIDE the restriction — a proven band must not borrow the
         # evidence of the all-history band it shares a key with.
         cov["n_weighins"] = len(band_weighin_dates.get(band, set()) & use)
+        # #3709 — autocorrelation-corrected evidence. Consecutive days of
+        # walking are heavily autocorrelated, so a raw 24-day dwell is nowhere
+        # near 24 independent observations (ADR-105's statistical floor). The
+        # consumer's evidence tiers apply their floors to THIS, not to n_days.
+        cov["n_eff"] = _n_eff_for_days(use, activities)
         cov["window"] = f"{min(use)}..{max(use)}"
         # A dwell or an n under the floor cannot carry a weekly rate honestly —
         # the rates stay, but the caller is told they are extrapolated (ADR-105).

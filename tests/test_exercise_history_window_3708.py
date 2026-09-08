@@ -24,6 +24,19 @@ from lambdas.training import exercise_history as eh
 TODAY = date(2026, 9, 8)
 
 
+@pytest.fixture(autouse=True)
+def frozen_handler_clock(monkeypatch):
+    """Pin the module's own notion of "today" to TODAY (#2376's guard).
+
+    Most assertions below pass `today=TODAY` explicitly, but the production
+    defaults fall through to `exercise_history.pacific_today()` — an unfrozen
+    handler clock next to dated fixture literals is the class that red-mained
+    main at a UTC midnight (#2354). The instant is DERIVED from TODAY; a second
+    hardcoded date is how this drifts back into a bomb.
+    """
+    monkeypatch.setattr(eh, "pacific_today", lambda: TODAY.isoformat())
+
+
 def _facts(days_ago: int, weight_kg: float = 100.0):
     return {
         "sessions_count": 6,
@@ -99,6 +112,17 @@ def test_recent_cue_is_unchanged_by_this_change():
     cue = eh.render_history_cue(_facts(days_ago=14), weight_index={recent: 327.3}, today=TODAY)
     assert "at 327 lb" not in cue, "recent cue gained a clause it should not have"
     assert cue == "Last: 100kg 5/5/4 (25 Aug)", cue
+
+
+def test_the_default_clock_path_is_frozen_and_behaves(monkeypatch):
+    """Without `today=`, the renderer reads the module clock. This asserts the
+    fixture actually reaches that path — a freeze nothing exercises is
+    decoration, and would let the bomb back in unnoticed."""
+    old = (TODAY - timedelta(days=600)).isoformat()
+    cue = eh.render_history_cue(_facts(days_ago=600), weight_index={old: 268.4})
+    assert "at 268 lb" in cue, cue
+    recent = eh.render_history_cue(_facts(days_ago=14), weight_index={})
+    assert recent == "Last: 100kg 5/5/4 (25 Aug)", recent
 
 
 def test_nearest_bodyweight_never_reaches_past_tolerance():
