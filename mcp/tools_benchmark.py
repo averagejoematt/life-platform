@@ -35,6 +35,11 @@ from mcp.core import get_profile, query_source
 # ever leaves the published set.
 RUN_GATE_LB = 240.0
 
+# The chronic training-load window (#3711). Rates computed over a shorter span
+# are arithmetic, not measurements — see band_reference.VOLUME_FLOOR_DAYS for
+# the provenance of the 21-28d range.
+_CHRONIC_WINDOW_DAYS = 28
+
 TRAINING_REFERENCE_SOURCE = "training_reference"
 WEIGHT_EPISODES_SOURCE = "weight_episodes"
 
@@ -67,6 +72,27 @@ def _read_episodes() -> list:
 
 
 # ── live helpers (computed at call time) ───────────────────────────────────────
+
+
+def _campaign_start() -> str:
+    """The current experiment genesis — the campaign this delta is measuring.
+
+    Read from the constant that ships in every bundle and that every reset
+    regenerates (#3671's lesson: never a second hand-maintained copy).
+    """
+    try:
+        from common.constants import EXPERIMENT_START_DATE
+
+        return str(EXPERIMENT_START_DATE)
+    except Exception:  # noqa: BLE001 - fail soft to a 28-day frame
+        return (datetime.strptime(_today(), "%Y-%m-%d") - timedelta(days=_CHRONIC_WINDOW_DAYS)).strftime("%Y-%m-%d")
+
+
+def _weight_on_or_after(day: str):
+    """First weigh-in on/after `day`, or None. The campaign's starting weight."""
+    rows = [r for r in query_source("withings", day, _today(), include_pilot=True) if r.get("weight_lbs") is not None]
+    pts = sorted(((r.get("date") or r.get("sk", "").replace("DATE#", ""))[:10], float(r["weight_lbs"])) for r in rows)
+    return pts[0][1] if pts else None
 
 
 def _band_for(weight: float) -> str:
@@ -332,6 +358,352 @@ def _benchmark_maintenance(args: dict) -> dict:
     }
 
 
+def _recent_volume(end_date: str, days: int = 28) -> dict:
+    """Trailing walking + lifting volume, in the same units the bands carry (#3710).
+
+    28 days matches the chronic window the volume floor is derived from, so
+    "now" and "then" are measured with the same denominator rather than one
+    being a 14-day slice compared against a month.
+    """
+    start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
+    weeks = days / 7.0
+    miles = hours = 0.0
+    bpm: list = []
+    for it in query_source("strava", start, end_date):
+        acts = it.get("activities") if isinstance(it.get("activities"), list) else [it]
+        for a in acts:
+            st = (a.get("sport_type") or a.get("type") or "").lower().replace(" ", "").replace("_", "")
+            if st not in ("walk", "hike", "walking", "hiking"):
+                continue
+            miles += float(a.get("distance_miles") or 0.0)
+            hours += float(a.get("moving_time_seconds") or 0.0) / 3600.0
+            if a.get("average_heartrate"):
+                bpm.append(float(a["average_heartrate"]))
+    return {
+        "window_days": days,
+        "walk_mi_wk": round(miles / weeks, 2),
+        "walk_hr_wk": round(hours / weeks, 2),
+        "walk_bpm": round(sum(bpm) / len(bpm)) if bpm else None,
+        "n_walk_bpm": len(bpm),
+    }
+
+
+def _ratio(now, then):
+    """`now` as a fraction of `then`, or None when the comparison is undefined."""
+    try:
+        if then in (None, 0) or now is None:
+            return None
+        return round(float(now) / float(then), 2)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def _benchmark_prescription(args: dict) -> dict:
+    """What was he doing at a comparable bodyweight, and is it citable? (#3710)
+
+    The join the night-before authoring path was missing. `get_benchmark` has
+    been registered since BENCH-1 and NOTHING in the training path ever called
+    it; the daily-debrief skill pulls 14 tools and not one carries a heart rate,
+    which is why the coach hedged about target HR on 2026-09-07.
+
+    Two tables, deliberately, and they are not interchangeable:
+      proven_target  — from days inside a detected LOSS episode. The target.
+      current_typical — from all history in the band he is in now. At his
+                        current weight that IS the period he is trying to
+                        escape, so it is the baseline, never the prescription.
+
+    The gap between them is the useful number, and #3711 ranks it.
+    """
+    from training.band_reference import resolve_band
+
+    end_date = args.get("date") or _today()
+    ref = _read_reference()
+    if not ref:
+        return {
+            "applicable": False,
+            "reason": "episode-detect has not written a training_reference yet",
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    if int(ref.get("reference_schema") or 1) < 2:
+        return {
+            "applicable": False,
+            "reason": (
+                "training_reference is v1 (no proven_bands, no per-band n). This is a STALE "
+                "REFERENCE, not a finding about his history — episode-detect needs redeploying "
+                "and re-running before this view can answer."
+            ),
+            "reference_schema": int(ref.get("reference_schema") or 1),
+            "derived_at": ref.get("derived_at"),
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    weight, rate, n_wi = _current_weight_and_rate(end_date)
+    if weight is None:
+        return {
+            "applicable": False,
+            "reason": "no recent weigh-in — cannot resolve a comparable period",
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    proven = resolve_band(weight, ref.get("proven_bands"))
+    typical = resolve_band(weight, ref.get("bands"))
+    now = _recent_volume(end_date)
+
+    out: dict = {
+        "applicable": True,
+        "date": end_date,
+        "current_weight": round(weight, 1),
+        "current_rate_lb_wk": rate,
+        "n_weighins_28d": n_wi,
+        "current_typical": None,
+        "proven_target": None,
+        "now": now,
+        "gap": {},
+        # ADR-104 — stated on every output, not inferred from its absence.
+        "intake_comparable": False,
+        "intake_note": (
+            "Training and activity only. There is NO nutrition data for the prior cut — "
+            "MacroFactor begins 2025-11-24, seven months after it ended — so intake, the "
+            "dominant lever in weight change, cannot be compared to what worked."
+        ),
+        "confidence": "low",
+        "_disclaimer": _BENCHMARK_DISCLAIMER,
+    }
+
+    if typical:
+        out["current_typical"] = {
+            "band": typical["band"],
+            "walk_mi_wk": typical.get("walk_mi_wk"),
+            "walk_hr_wk": typical.get("walk_hr_wk"),
+            "walk_bpm": typical.get("walk_bpm"),
+            "sets_wk": typical.get("sets_wk"),
+            "n_days": typical.get("n_days"),
+            "window": typical.get("window"),
+            "_role": "baseline — what he has typically done at this weight, NOT a target",
+        }
+
+    if not proven:
+        out["proven_target"] = None
+        out["signal"] = (
+            f"No comparable period from a losing phase within reach of {round(weight, 1)} lb. "
+            "Nothing to prescribe from — say so rather than substituting the current band."
+        )
+        return out
+
+    ev = proven.get("evidence") or {}
+    citable = bool(ev.get("volume_ok"))
+    out["proven_target"] = {
+        "band": proven["band"],
+        "band_distance_lb": proven["band_distance_lb"],
+        "exact": proven["exact"],
+        "walk_mi_wk": proven.get("walk_mi_wk"),
+        "walk_hr_wk": proven.get("walk_hr_wk"),
+        "target_walk_bpm": proven.get("walk_bpm"),
+        "sets_wk": proven.get("sets_wk"),
+        "tonnage_lb_wk": proven.get("tonnage_lb_wk"),
+        "top_kg_by_movement": proven.get("top_kg_by_movement"),
+        "window": proven.get("window"),
+        "n_days": proven.get("n_days"),
+        "n_effective": ev.get("n_effective"),
+        "n_weighins": proven.get("n_weighins"),
+        "evidence_tier": ev.get("tier"),
+        "volume_citable": citable,
+        "rate_assertable": bool(ev.get("rate_ok")),
+        "floor_provenance": ev.get("floor_provenance"),
+        "_role": ("target" if citable else "descriptive only — below the volume evidence floor"),
+    }
+    out["confidence"] = ev.get("tier") or "low"
+    out["gap"] = {
+        "walk_mi_wk_ratio": _ratio(now["walk_mi_wk"], proven.get("walk_mi_wk")),
+        "walk_hr_wk_ratio": _ratio(now["walk_hr_wk"], proven.get("walk_hr_wk")),
+        "walk_mi_wk_delta": (
+            round((proven.get("walk_mi_wk") or 0) - now["walk_mi_wk"], 2) if proven.get("walk_mi_wk") is not None else None
+        ),
+    }
+
+    dist = proven["band_distance_lb"]
+    where = "at this weight" if proven["exact"] else f"{dist} lb lighter"
+    if citable:
+        out["signal"] = (
+            f"Walking {where} ran {proven.get('walk_mi_wk')} mi/wk "
+            f"({proven.get('walk_hr_wk')} hr/wk @ {proven.get('target_walk_bpm') or proven.get('walk_bpm')} bpm) "
+            f"during a losing phase; the trailing 28d is {now['walk_mi_wk']} mi/wk."
+        )
+    else:
+        out["signal"] = (
+            f"The nearest losing-phase period is {proven['band']} ({where}), and it does not clear the "
+            f"volume evidence floor — {ev.get('n_effective')} effective days against "
+            f"{ev.get('volume_floor_days')}. Citable as description ({proven.get('walk_mi_wk')} mi/wk), "
+            "not as a target."
+        )
+    return out
+
+
+def _campaign_day_n(curve: list, day_n: int):
+    """The proven curve's cumulative loss at day N (linear between samples)."""
+    pts = sorted(((int(float(p.get("days_from_start") or 0)), float(p.get("cum_lost") or 0.0)) for p in curve or []))
+    if not pts:
+        return None
+    if day_n <= pts[0][0]:
+        return pts[0][1]
+    if day_n >= pts[-1][0]:
+        return pts[-1][1]
+    for (d0, c0), (d1, c1) in zip(pts, pts[1:]):
+        if d0 <= day_n <= d1:
+            if d1 == d0:
+                return c1
+            return round(c0 + (c1 - c0) * (day_n - d0) / (d1 - d0), 1)
+    return None
+
+
+def _benchmark_campaign(args: dict) -> dict:
+    """Is this campaign tracking the one that worked — and WHICH lever explains it? (#3711)
+
+    Reporting that weight is behind is not actionable. Ranking the levers by how
+    far each sits below its proven value is: it turns "you are behind" into
+    "walking is at 10% of the volume that worked, and it is the furthest-below
+    lever." That ranking is the whole output.
+
+    Windows shorter than the chronic window are labelled as artifacts rather
+    than printed as rates — three days over 0.43 weeks reads as 4.67 lift
+    days/wk, which is arithmetic, not a measurement.
+    """
+    from training.band_reference import resolve_band
+
+    end_date = args.get("date") or _today()
+    ref = _read_reference()
+    if not ref:
+        return {"applicable": False, "reason": "no training_reference yet", "_disclaimer": _BENCHMARK_DISCLAIMER}
+    if int(ref.get("reference_schema") or 1) < 2:
+        return {
+            "applicable": False,
+            "reason": "training_reference is v1 — a STALE REFERENCE, not a finding. Redeploy episode-detect.",
+            "reference_schema": int(ref.get("reference_schema") or 1),
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    weight, rate, _ = _current_weight_and_rate(end_date)
+    if weight is None:
+        return {"applicable": False, "reason": "no recent weigh-in", "_disclaimer": _BENCHMARK_DISCLAIMER}
+
+    genesis = args.get("since") or _campaign_start()
+    day_n = (datetime.strptime(end_date, "%Y-%m-%d") - datetime.strptime(genesis, "%Y-%m-%d")).days
+    window_days = max(1, day_n + 1)
+    artifact = window_days < _CHRONIC_WINDOW_DAYS
+
+    start_w = _weight_on_or_after(genesis)
+    actual_lost = round(start_w - weight, 1) if start_w is not None else None
+    proven_lost = _campaign_day_n(ref.get("proven_curve") or [], day_n)
+
+    now = _recent_volume(end_date, days=min(window_days, _CHRONIC_WINDOW_DAYS))
+    proven = resolve_band(weight, ref.get("proven_bands"))
+
+    levers = []
+    if proven:
+        for key, label in (("walk_mi_wk", "walking distance"), ("walk_hr_wk", "walking time"), ("sets_wk", "lifting sets")):
+            then = proven.get(key)
+            mine = now.get(key)
+            if mine is None or then in (None, 0):
+                continue
+            levers.append(
+                {
+                    "lever": label,
+                    "field": key,
+                    "now": mine,
+                    "proven": then,
+                    "ratio": _ratio(mine, then),
+                    "shortfall": round(float(then) - float(mine), 2),
+                }
+            )
+        levers.sort(key=lambda x: (x["ratio"] if x["ratio"] is not None else 99))
+
+    ev = (proven or {}).get("evidence") or {}
+    out = {
+        "applicable": True,
+        "date": end_date,
+        "campaign_start": genesis,
+        "day_n": day_n,
+        "window_days": window_days,
+        "rates_are_artifacts": artifact,
+        "artifact_note": (
+            f"The campaign is {window_days} day(s) old, shorter than the {_CHRONIC_WINDOW_DAYS}-day "
+            "chronic window. Per-week figures here are arithmetic on a short window, not measurements."
+            if artifact
+            else None
+        ),
+        "current_weight": round(weight, 1),
+        "lost_to_date_lb": actual_lost,
+        "proven_lost_at_same_day_lb": proven_lost,
+        "vs_proven_lb": (round(actual_lost - proven_lost, 1) if (actual_lost is not None and proven_lost is not None) else None),
+        "reference_band": (proven or {}).get("band"),
+        "reference_distance_lb": (proven or {}).get("band_distance_lb"),
+        "reference_tier": ev.get("tier"),
+        "levers_ranked": levers,
+        "worst_lever": levers[0] if levers else None,
+        "intake_comparable": False,
+        "intake_note": (
+            "Training and activity only — no nutrition data exists before 2025-11-24, so intake "
+            "cannot be compared to the cut that worked."
+        ),
+        "confidence": ev.get("tier") or "low",
+        "_disclaimer": _BENCHMARK_DISCLAIMER,
+    }
+    if artifact:
+        # The ranking is arithmetic on a window shorter than the chronic one.
+        # Printing a percentage here would state as a measurement the very thing
+        # `rates_are_artifacts` exists to deny — the flag must govern the
+        # headline, not sit beside a sentence that ignores it.
+        out["worst_lever"] = None
+        out["signal"] = (
+            f"Day {day_n}. Too early to rank levers: the campaign is {window_days} day(s) old against a "
+            f"{_CHRONIC_WINDOW_DAYS}-day chronic window, so per-week figures are arithmetic, not "
+            "measurements. Volumes are listed for context only."
+        )
+    elif levers:
+        w = levers[0]
+        out["signal"] = (
+            f"Day {day_n}. Furthest-below lever: {w['lever']} at {w['now']} vs {w['proven']} "
+            f"({int((w['ratio'] or 0) * 100)}% of the comparable losing period, {out['reference_distance_lb']} lb away)."
+        )
+    else:
+        out["signal"] = f"Day {day_n}. No comparable losing-phase period within reach of {round(weight, 1)} lb to rank against."
+    return out
+
+
+# ── the tool's own description (#3710) ─────────────────────────────────────────
+# Extracted from mcp/registry.py, which is FULL against the #1665 module-size
+# ceiling. A tool describing itself beside its own implementation is where this
+# belonged anyway: the two views added here needed ~15 lines of registry prose,
+# and the size guard's rule is to pay for new lines out of an extraction rather
+# than raise the baseline.
+GET_BENCHMARK_DESCRIPTION = (
+    "PRIVATE cut-benchmarking vs Matthew's own proven weight-loss history (descriptive, "
+    "correlational, n=1 — never causal). Use 'view' to select: "
+    "'pace' (default) = live pace vs the proven trajectory at the current weight — current "
+    "weight/rate + recent walking volume vs the by-band proven volumes, walk gap, and the "
+    "~240 lb run gate. "
+    "'episodes' = the detected loss/regain ledger + loss-vs-regain rate asymmetry. "
+    "'maintenance' = the regain firewall (near goal): rolling walk volume vs the proven floor "
+    "and the post-trough decay signature. "
+    "'prescription' = what he was ACTUALLY doing at a comparable bodyweight — walk miles/hours, "
+    "target walk heart rate, sets and per-movement loads — from the periods he was LOSING, with "
+    "the weight distance to that period and its evidence tier stated. Returns two tables that are "
+    "not interchangeable: proven_target (from losing phases; the target) and current_typical (all "
+    "history at his current weight; the BASELINE, never a target — at his current weight that is "
+    "the period he is trying to escape). Training/activity only: intake is not comparable, no "
+    "nutrition data exists before 2025-11-24. "
+    "'campaign' = is THIS transformation tracking the one that worked, and which lever "
+    "explains the gap — day-N cumulative loss vs the proven curve at the same day, plus the "
+    "levers RANKED by how far each sits below its comparable losing-phase value. Windows "
+    "shorter than the 28-day chronic window are flagged as artifacts, not printed as rates. "
+    "All views forward-framed (what works next), never a failure tally. "
+    "Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?', "
+    "'show my cut history', 'am I holding the loss?', 'what was I doing last time I weighed this?', "
+    "'what heart rate should I target?', 'how many miles this week?'."
+)
+
+
 # ── dispatcher ──────────────────────────────────────────────────────────────────
 
 
@@ -341,12 +713,18 @@ def tool_get_benchmark(args):
         "pace": _benchmark_pace,
         "episodes": _benchmark_episodes,
         "maintenance": _benchmark_maintenance,
+        "prescription": _benchmark_prescription,
+        "campaign": _benchmark_campaign,
     }
     view = (args.get("view") or "pace").lower().strip()
     if view not in VALID_VIEWS:
         return {
             "error": f"Unknown view '{view}'.",
             "valid_views": list(VALID_VIEWS.keys()),
-            "hint": "Default is 'pace' (live pace vs your proven trajectory). Also: 'episodes' (ledger), 'maintenance' (regain firewall).",
+            "hint": (
+                "Default is 'pace' (live pace vs your proven trajectory). Also: 'episodes' (ledger), "
+                "'maintenance' (regain firewall), 'prescription' (what he was doing at a comparable "
+                "bodyweight, with the weight distance and evidence tier stated)."
+            ),
         }
     return VALID_VIEWS[view](args)

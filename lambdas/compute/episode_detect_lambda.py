@@ -574,7 +574,17 @@ def build_reference(
         if cov:
             proven_bands[band] = cov
     # Proven curve: weekly samples along the reference window.
-    si, ei = pos.get(rstart), pos.get(rend)
+    # #3711 — the boundary need not BE a weigh-in day. `pos.get(rstart)` is an
+    # exact-match lookup, so a window edge that falls on a day he did not weigh
+    # yields si=None and a SILENTLY EMPTY curve — no error, just no proven
+    # trajectory for anything downstream to compare against. Snap to the nearest
+    # index inside the window instead.
+    si = pos.get(rstart)
+    if si is None:
+        si = next((i for i, d in enumerate(idx) if d >= rstart), None)
+    ei = pos.get(rend)
+    if ei is None:
+        ei = next((i for i in range(len(idx) - 1, -1, -1) if idx[i] <= rend), None)
     proven_curve = []
     if si is not None and ei is not None and ei > si:
         w0 = vals[si]
@@ -589,6 +599,12 @@ def build_reference(
             )
     n_cov = sum(1 for e in episodes if e.get("covariates_reliable") or (e["start_date"] >= COVARIATE_RELIABLE_FROM))
     return {
+        # #3710 — consumers MUST be able to tell a v1 record (no proven table,
+        # no per-band n) from a v2 record that genuinely found no comparable
+        # period. Without this the prescription view reports "nothing to
+        # prescribe from" for a stale reference, which reads as a finding about
+        # his history when it is a deploy problem.
+        "reference_schema": 2,
         "bands": bands,
         "proven_bands": proven_bands,
         "proven_curve": proven_curve,
