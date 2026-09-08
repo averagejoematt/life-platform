@@ -3,6 +3,14 @@
 (#3129/#3160, epic #2578 slice 2), and `GUARD_PROOFS` at the foot of this file — family
 2 (guard-script) records, added for the same size reason (#2834, 2026-08-30).
 
+# module-size-exception: a PROOF REGISTRY — one data record per gate whose can-fail
+# verdict was watched (command, mutation, observed, scope, proved_on). It grows by
+# exactly one entry each time a gate EARNS a verdict, which is the ratchet working
+# rather than drift; there is no logic here to factor smaller. Splitting it again would
+# put proofs for one census in two files and hand the next author a choice about where a
+# record goes, which is how a registry stops being one. Note this file already IS the
+# extraction (below).
+
 WHY ITS OWN MODULE
 ──────────────────
 `scripts/gate_census.py` sits at 1,183 lines against the 1,200-line hard ceiling
