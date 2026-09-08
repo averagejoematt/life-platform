@@ -9,7 +9,7 @@
       "urgent": 25,
       "via-composite": 3
     },
-    "as_of": "2026-09-07T22:15:53Z",
+    "as_of": "2026-09-07T23:34:11Z",
     "contracts_enrolled": 8,
     "error": null,
     "lambdas": 104,
@@ -18,7 +18,7 @@
     "source": "model/platform_model.json + remediation/ADR-129"
   },
   "bets": {
-    "as_of": "2026-09-07T22:15:35Z",
+    "as_of": "2026-09-07T23:33:52Z",
     "epics": [
       {
         "number": 3593,
@@ -169,34 +169,34 @@
     "source": "gh issue list (epics, Roadmap, P1, closure:live-proof)"
   },
   "board": {
-    "actionable": 73,
-    "as_of": "2026-09-07T22:15:36Z",
+    "actionable": 72,
+    "as_of": "2026-09-07T23:33:53Z",
     "by_area": {
       "ai": 5,
-      "claude-workflow": 21,
+      "claude-workflow": 20,
       "data": 19,
       "growth": 3,
-      "infra": 17,
+      "infra": 16,
       "security": 1,
       "site-ux": 7
     },
     "by_milestone": {
       "Later": 23,
       "Next": 20,
-      "Now": 29,
-      "none": 1
+      "Now": 27,
+      "none": 2
     },
     "by_prio": {
-      "P1": 10,
-      "P2": 38,
+      "P1": 9,
+      "P2": 37,
       "P3": 24
     },
     "by_type": {
-      "bug": 40,
+      "bug": 38,
       "story": 32
     },
     "cohorts": {
-      "actionable": 73,
+      "actionable": 72,
       "epic": 20,
       "gated": 3,
       "roadmap_parked": 15
@@ -211,11 +211,11 @@
     "from_review_total": 46,
     "reader_facing": 10,
     "source": "gh issue list --state open",
-    "total_open": 111,
+    "total_open": 110,
     "truncated": false
   },
   "cost": {
-    "as_of": "2026-09-07T22:15:53Z",
+    "as_of": "2026-09-07T23:34:11Z",
     "error": null,
     "missing_keys": [],
     "projected_scope": "recurring classes only (prod-cron, remediation)",
@@ -272,28 +272,28 @@
   },
   "degraded_sections": [],
   "delivery": {
-    "as_of": "2026-09-07T22:15:42Z",
-    "closed": 659,
-    "closed_within_24h": 403,
+    "as_of": "2026-09-07T23:34:00Z",
+    "closed": 662,
+    "closed_within_24h": 406,
     "cycle_hours": {
-      "median": 12.7,
+      "median": 12.6,
       "median_organic": 8.7,
       "median_review_sourced": 29.2,
-      "n_organic": 407,
+      "n_organic": 410,
       "n_review_sourced": 252,
-      "p90": 145.6
+      "p90": 144.5
     },
     "error": null,
-    "n_sampled": 659,
+    "n_sampled": 662,
     "over_7_days": 56,
-    "prs_merged": 752,
+    "prs_merged": 756,
     "sampled": false,
     "source": "gh issue list --state closed (trailing 30d)",
     "window_days": 30
   },
-  "generated_at": "2026-09-07T22:15:35Z",
+  "generated_at": "2026-09-07T23:33:52Z",
   "grades": {
-    "as_of": "2026-09-07T22:15:53Z",
+    "as_of": "2026-09-07T23:34:11Z",
     "error": null,
     "grade_distribution": {
       "B": 3,
@@ -430,18 +430,18 @@
   },
   "healthy": true,
   "incidents": {
-    "as_of": "2026-09-07T22:15:53Z",
+    "as_of": "2026-09-07T23:34:10Z",
     "by_month_recent": {
       "2026-03": 21,
       "2026-05": 1,
       "2026-06": 2,
       "2026-07": 36,
       "2026-08": 126,
-      "2026-09": 7
+      "2026-09": 8
     },
     "by_severity": {
       "P1": 6,
-      "P2": 31,
+      "P2": 32,
       "P3": 73,
       "P4": 89,
       "other": 5
@@ -450,11 +450,15 @@
     "mttr_note": "not computed \u2014 TTD/TTR are free prose in INCIDENT_LOG.md; ~60-70% parseable, so any mean would be a selection artefact",
     "source": "scripts/incident_log_patterns.py::build (docs/INCIDENT_LOG.md)",
     "top_classes": null,
-    "total_rows": 204
+    "total_rows": 205
   },
   "jury_out": {
-    "as_of": "2026-09-07T22:15:35Z",
+    "as_of": "2026-09-07T23:33:52Z",
     "awaiting_live_proof": [
+      {
+        "number": 3671,
+        "title": "reset: config/training_phases.json is never re-anchored, so Hevy title counters have run from 2026-06-16 through ELEVEN resets \u2014 the phase taxonomy governs DDB partitions and has no jurisdiction over config files"
+      },
       {
         "number": 3651,
         "title": "coach-nudge: a reservation stuck at 'attempting' for 156h consumed its day with no nudge recorded \u2014 #3569's fix left the pre-fix row with no path out"
@@ -477,16 +481,12 @@
       }
     ],
     "error": null,
-    "n_awaiting": 5,
-    "n_p1": 10,
+    "n_awaiting": 6,
+    "n_p1": 9,
     "open_p1": [
       {
         "number": 3690,
         "title": "honesty: /method/platform/ publicly serves review_grade 'A' while the newest review graded ZERO lenses at A (modal B+, worst C+) \u2014 plus site_pages 77 vs 93 and active_secrets 21 vs 28"
-      },
-      {
-        "number": 3685,
-        "title": "alarm: commitments-ungraded is uncreatable (14 x 86400s vs CloudWatch's 604800s ceiling) \u2014 the #3553 dead-man does not exist in AWS and LifePlatformMonitoring is wedged"
       },
       {
         "number": 3621,
@@ -524,10 +524,10 @@
     "source": "gh issue list (epics, Roadmap, P1, closure:live-proof)"
   },
   "quality": {
-    "as_of": "2026-09-07T22:15:53Z",
+    "as_of": "2026-09-07T23:34:10Z",
     "by_family": {
       "ci-step": 116,
-      "guard-script": 83,
+      "guard-script": 84,
       "qa-smoke-check": 23,
       "registry": 277,
       "sentinel-check": 18,
@@ -536,12 +536,12 @@
     "error": null,
     "gates_attempted_unproven": 3,
     "gates_not_applicable": 6,
-    "gates_proven_can_fail": 89,
-    "gates_total": 636,
+    "gates_proven_can_fail": 90,
+    "gates_total": 637,
     "gates_unproven": 538,
-    "proven_fraction_pct": 14.0,
+    "proven_fraction_pct": 14.1,
     "source": "scripts/gate_census.py --json + deploy/sync_doc_metadata.py",
-    "test_functions": 19968
+    "test_functions": 20032
   },
   "schema": 1
 }
