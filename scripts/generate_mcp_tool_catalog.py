@@ -74,16 +74,41 @@ MODULE_TITLES = {
 }
 
 
-def _config_constants() -> dict:
-    """Module-level simple literal assignments in mcp/config.py (e.g. RAW_DAY_LIMIT = 90)."""
-    consts = {}
-    tree = ast.parse(CONFIG.read_text(encoding="utf-8"))
+def _module_constants(path: Path) -> dict:
+    """Module-level simple literal assignments in one file (e.g. RAW_DAY_LIMIT = 90).
+
+    Implicit string concatenation across lines is included, which is how the
+    long tool descriptions are written.
+    """
+    consts: dict = {}
+    if not path.exists():
+        return consts
+    tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             try:
                 consts[node.targets[0].id] = ast.literal_eval(node.value)
             except (ValueError, SyntaxError):
                 pass
+    return consts
+
+
+def _config_constants() -> dict:
+    """Constants the registry may reference by NAME rather than inline.
+
+    mcp/config.py supplies the f-string substitutions. The tools_*.py modules
+    supply extracted tool descriptions: `mcp/registry.py` is baselined against
+    the #1665 module-size ceiling, and the sanctioned way to add lines there is
+    to extract a cohesive block to a sibling and reference it. A description
+    that moved to `tools_benchmark.GET_BENCHMARK_DESCRIPTION` is still the
+    catalog's source of truth, so this generator has to resolve it — otherwise
+    obeying the size guard reds the docs gate, which is how #3713 found this.
+    """
+    consts = _module_constants(CONFIG)
+    for mod in sorted(CONFIG.parent.glob("tools_*.py")):
+        for name, value in _module_constants(mod).items():
+            if isinstance(value, str) and name.isupper():
+                consts.setdefault(name, value)
     return consts
 
 
@@ -114,6 +139,15 @@ def _eval_schema(node: ast.AST, consts: dict):
         return [_eval_schema(e, consts) for e in node.elts]
     if isinstance(node, (ast.JoinedStr,)) or (isinstance(node, ast.Constant) and isinstance(node.value, str)):
         return _render_str(node, consts)
+    # A bare Name is an extracted constant (see _config_constants). Resolving it
+    # here is what lets a schema live beside its tool without going dark in the
+    # catalog; an unknown name still raises rather than rendering an empty cell.
+    if isinstance(node, ast.Name):
+        if node.id in consts:
+            return consts[node.id]
+        raise ValueError(
+            f"registry references unknown constant {node.id!r} — extract it to an mcp/tools_*.py module-level UPPERCASE string"
+        )
     return ast.literal_eval(node)
 
 
