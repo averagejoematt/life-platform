@@ -313,12 +313,27 @@ def classify_loss_outcome(idx, vals, trough_date, w_end, magnitude):
 
 
 def classify_activity(sport_type: str):
-    """Strava sport_type / CSV Activity Type → normalized kind, or None to ignore."""
+    """Strava sport_type / CSV Activity Type → normalized kind, or None to ignore.
+
+    #3716 — CYCLING WAS DROPPED ENTIRELY until 2026-09-08. `Ride` and
+    `VirtualRide` fell through to None, so 394 ride activities never reached a
+    single covariate. That is not a rounding error at the weights this
+    reference is consulted for: measured by 10-lb band, cycling is 49-56% of
+    all cardio hours in 220-249 and 17-21% in 250-289. A prescription built
+    from the old classifier told him walking was the whole of what worked.
+
+    It matters less at his current weight (0-6% of cardio hours above 300 lb),
+    which is why the 2026-09-08 band table still read plausibly — the defect
+    was invisible exactly where he happens to be standing and severe one
+    campaign-phase later.
+    """
     s = (sport_type or "").lower().replace(" ", "").replace("_", "")
     if s in ("walk", "hike", "walking", "hiking"):
         return "walk"
     if "run" in s:
         return "run"
+    if "ride" in s or "cycl" in s or "bike" in s or "biking" in s:
+        return "cycle"
     if "weighttraining" in s or s in ("workout", "weightlifting"):
         return "lift"
     return None
@@ -360,7 +375,9 @@ def weekly_covariates(
         days = max(1, (_d(end_date) - _d(start_date)).days)
     weeks = days / 7.0
     walks = walk_hr = runs = lifts = walk_mi = 0.0
+    cycles = cycle_hr = cycle_mi = 0.0
     walk_bpm: list = []
+    cycle_bpm: list = []
     for a in activities:
         if not _member(a["date"][:10]):
             continue
@@ -371,6 +388,12 @@ def weekly_covariates(
             walk_mi += float(a.get("miles") or 0.0)
             if a.get("hr"):
                 walk_bpm.append(float(a["hr"]))
+        elif k == "cycle":
+            cycles += 1
+            cycle_hr += float(a.get("hours") or 0.0)
+            cycle_mi += float(a.get("miles") or 0.0)
+            if a.get("hr"):
+                cycle_bpm.append(float(a["hr"]))
         elif k == "run":
             runs += 1
         elif k == "lift":
@@ -393,6 +416,14 @@ def weekly_covariates(
         "walks_wk": round(walks / weeks, 2),
         "walk_hr_wk": round(walk_hr / weeks, 2),
         "walk_mi_wk": round(walk_mi / weeks, 2),
+        "cycles_wk": round(cycles / weeks, 2),
+        "cycle_hr_wk": round(cycle_hr / weeks, 2),
+        "cycle_mi_wk": round(cycle_mi / weeks, 2),
+        "cycle_bpm": round(sum(cycle_bpm) / len(cycle_bpm)) if cycle_bpm else None,
+        "n_cycle_bpm": len(cycle_bpm),
+        # #3716 — the honest denominator for "how much cardio was he doing".
+        # Walking alone understates it by up to half at some weights.
+        "cardio_hr_wk": round((walk_hr + cycle_hr) / weeks, 2),
         "runs_wk": round(runs / weeks, 2),
         "lift_sessions_wk": round(lifts / weeks, 2),
         "sets_wk": round(sets / weeks, 1),
@@ -536,6 +567,18 @@ def build_reference(
         # near 24 independent observations (ADR-105's statistical floor). The
         # consumer's evidence tiers apply their floors to THIS, not to n_days.
         cov["n_eff"] = _n_eff_for_days(use, activities)
+        # #3717 — attested training travels BESIDE the measured figure, never
+        # inside it. `walk_hr_wk`/`cardio_hr_wk` stay measured forever; this is
+        # what the owner asserts was also happening and could never be captured.
+        # A consumer that renders it must carry its basis label.
+        try:
+            from training.attested_training import attested_overlay
+
+            overlay = attested_overlay(use, set(hevy_by_date or {}))
+            if overlay:
+                cov["attested"] = overlay
+        except Exception as e:  # noqa: BLE001 - an attestation must never break the run
+            logger.warning("attested overlay unavailable: %s", e)
         cov["window"] = f"{min(use)}..{max(use)}"
         # A dwell or an n under the floor cannot carry a weekly rate honestly —
         # the rates stay, but the caller is told they are extrapolated (ADR-105).

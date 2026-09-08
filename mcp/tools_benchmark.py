@@ -504,6 +504,13 @@ def _benchmark_prescription(args: dict) -> dict:
         "tonnage_lb_wk": proven.get("tonnage_lb_wk"),
         "top_kg_by_movement": proven.get("top_kg_by_movement"),
         "window": proven.get("window"),
+        "cardio_hr_wk": proven.get("cardio_hr_wk"),
+        "cycle_hr_wk": proven.get("cycle_hr_wk"),
+        # #3717 — present only when the owner has attested to training that was
+        # never captured. It is NEVER added to the measured figures above; a
+        # renderer must show it as a separate, labelled line or not at all.
+        "attested": proven.get("attested"),
+        "measurement_is_a_floor": bool(proven.get("attested")),
         "n_days": proven.get("n_days"),
         "n_effective": ev.get("n_effective"),
         "n_weighins": proven.get("n_weighins"),
