@@ -681,6 +681,40 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
     # real historical specimen to revert to: the retired <article data-dx-read>
     # tabpanel host, whose reintroduction is exactly the aria-allowed-role
     # regression the issue reported.
+    "structural::test_platform_stats_honesty_3690.py": {
+        "gate_name": "test_platform_stats_honesty_3690.py",
+        "command": "python3 -m pytest tests/test_platform_stats_honesty_3690.py -q",
+        "mutation": (
+            "PLATFORM_STATS restored to the three values the site was ACTUALLY serving "
+            'in production on 2026-09-07 — `review_grade: "A"`, `active_secrets: 21`, '
+            "`site_pages: 77` — against a newest review (2026-09-05, 17 lenses) whose "
+            "grades were B+ 9 / B 3 / B- 3 / C+ 2, a page registry of 93 and a model "
+            "secrets count of 28. No synthetic fixture: the armed condition is the live "
+            "defect this file was written to end."
+        ),
+        "observed": (
+            "MUTATED: 4 of 6 FAILED — test_review_grade_is_the_modal_lens_grade_of_the_"
+            "newest_review, test_review_grade_is_a_grade_the_review_actually_awarded "
+            "(the blunt one: 'A' is a grade NO lens holds), "
+            "test_site_pages_matches_the_single_page_registry, "
+            "test_active_secrets_matches_the_system_model. "
+            "REVERTED to the corrected values: 6 passed. Both watched 2026-09-07."
+        ),
+        "scope": (
+            "A verdict on three of the six hand-maintained public stats — review_grade, "
+            "site_pages, active_secrets — each against a real source (newest "
+            "docs/reviews/*_grades_*.json, tests/qa_manifest.MANIFEST, "
+            "model/platform_model.json cost_surface.secrets). review_count, "
+            "board_technical and board_product are deliberately NOT covered: nothing in "
+            "the repo enumerates reviews and the board rosters' live source is an S3 "
+            "config, so a check over them would report green about a number it had not "
+            "verified. That gap is named in the test module's own docstring and asserted "
+            "by test_the_unchecked_fields_are_named_rather_than_forgotten, so it cannot "
+            "be quietly forgotten. Says nothing about whether the deployed site-api has "
+            "been redeployed with the corrected literals — that is a post-merge live check."
+        ),
+        "proved_on": "2026-09-07",
+    },
     "structural::test_a11y_ledger_3548.py": {
         "gate_name": "test_a11y_ledger_3548.py",
         "command": "python3 -m pytest tests/test_a11y_ledger_3548.py -q",

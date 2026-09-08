@@ -563,7 +563,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 1.2 = 17.84min required), then OK against the same live measurement once the
         # ceiling was raised to 18 in this same PR — plus the offline synthetic-fixture
         # twin in tests/test_check_job_timeout_headroom_3678.py.
-        <= 90  # re-measured 2026-09-07 on this branch's own tree (#3678): 89 -> 90 proven, unproven UNCHANGED at 538 (this proof, not a new unproven entrant)
+        # Upper bound raised 90 -> 91 (2026-09-07, #3690): the 91st proof is
+        # `structural::test_platform_stats_honesty_3690.py`. No synthetic mutation was
+        # needed — the ARMED condition was the LIVE production defect: /api/platform_stats
+        # served review_grade "A" against a newest review (2026-09-05, 17 lenses) that
+        # graded B+ 9 / B 3 / B- 3 / C+ 2 and awarded A to nothing, plus site_pages 77
+        # against 93 registered and active_secrets 21 against 28 in the model. Restoring
+        # those three literals: 4 of 6 FAILED. Corrected: 6 passed.
+        <= 91  # re-measured 2026-09-07 on this branch's own tree (#3690): 90 -> 91 proven, unproven UNCHANGED at 538 (this proof, not a new unproven entrant)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
