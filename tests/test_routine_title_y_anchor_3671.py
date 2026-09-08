@@ -90,11 +90,24 @@ def test_training_phases_config_has_no_reset_epoch_date():
 def test_training_phases_config_still_carries_the_phase_anchors():
     """Negative control for the test above: it must reject the second copy WITHOUT
     licensing the deletion of `current_started`, which the owner advances by hand
-    and which a reset deliberately does NOT touch (a phase may span cycles)."""
+    and which a reset deliberately does NOT touch (a phase may span cycles).
+
+    The assertion is on the FIELD, not on a date. It pinned the literal "2026-06-16"
+    until 2026-09-07, when advancing the anchor to the cycle-17 genesis — the exact
+    hand-advance this docstring says the owner performs — reded it. A control keyed to
+    a value its own subject is designed to change is a control with an expiry date on
+    it; it fails on correct behaviour and teaches the next person to edit the test.
+    What must hold is that the anchor EXISTS, is a real ISO date, and names a phase
+    that exists.
+    """
+    import datetime
+
     with open(CONFIG, encoding="utf-8") as fh:
         cfg = json.load(fh)
-    assert cfg["current"] in cfg["phases"]
-    assert cfg["current_started"] == "2026-06-16"
+    assert cfg["current"] in cfg["phases"], f"current phase {cfg['current']!r} is not in the phases list"
+    started = cfg.get("current_started")
+    assert isinstance(started, str) and started, "current_started must survive — it is the N anchor"
+    datetime.date.fromisoformat(started)  # raises if it is not a real ISO date
 
 
 # ── the derivation itself ─────────────────────────────────────────────────────
