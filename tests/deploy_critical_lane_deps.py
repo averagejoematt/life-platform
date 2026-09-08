@@ -15,7 +15,10 @@ lane venv during collection.
 # The packages the deploy-critical lane pip-installs. Adding one here requires
 # updating ci-cd.yml's literal list in the same commit — the parity test is
 # what makes that a red instead of a convention.
-LANE_THIRD_PARTY_DEPS = ("pytest", "boto3", "botocore", "hypothesis")
+# pyyaml added #3684: tests/test_wait_pr_green_cancel_diagnosis_3678.py imports yaml at
+# module scope and carries the deploy_critical marker, so the lane collects it. Without
+# the install the whole lane died on ModuleNotFoundError and reded main.
+LANE_THIRD_PARTY_DEPS = ("pytest", "boto3", "botocore", "hypothesis", "pyyaml")
 
 # Distribution → importable top-level module names it (or its hard deps) ships.
 # Only names tests/ may import at MODULE SCOPE without crashing lane collection.
@@ -24,4 +27,5 @@ DEP_IMPORT_NAMES = {
     "boto3": {"boto3", "s3transfer"},
     "botocore": {"botocore", "dateutil", "jmespath", "urllib3"},
     "hypothesis": {"hypothesis", "attr", "attrs", "sortedcontainers"},
+    "pyyaml": {"yaml"},
 }

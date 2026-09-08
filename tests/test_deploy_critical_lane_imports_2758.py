@@ -152,16 +152,26 @@ def test_workflow_install_list_matches_the_dep_module():
 
 
 def test_guard_can_fail_on_a_planted_offender(tmp_path, monkeypatch):
-    """Mutation proof, in-suite and permanent: a planted `import yaml` is flagged.
+    """Mutation proof, in-suite and permanent: a planted forbidden import is flagged.
 
     The acceptance asks for watched-fail evidence; this keeps it executable
     forever instead of a one-time PR-body paste.
+
+    The plant is `requests`, NOT `yaml`. It was `yaml` until #3684 put pyyaml in
+    LANE_THIRD_PARTY_DEPS — at which point the plant became LEGAL and this mutation
+    proof silently stopped proving anything (it failed loudly here, which is the only
+    reason the coupling was noticed). A positive control keyed to a value that can
+    later be sanctioned is a control with an expiry date on it.
+
+    `requests` cannot acquire that problem: CLAUDE.md forbids external HTTP libraries
+    outright — stdlib urllib only, with Bedrock via boto3 the single stated exception —
+    so it can never legitimately enter the lane dep set.
     """
     plant = tmp_path / "test_planted_offender.py"
-    plant.write_text("import yaml\n\n\ndef test_x():\n    pass\n")
+    plant.write_text("import requests\n\n\ndef test_x():\n    pass\n")
     tree = ast.parse(plant.read_text())
     hits = [n for _, n in _module_scope_imports(tree) if n not in _allowed_names()]
-    assert hits == ["yaml"], "the guard must flag a module-scope import outside the dep set"
+    assert hits == ["requests"], "the guard must flag a module-scope import outside the dep set"
 
 
 def test_the_two_prior_instances_stay_guarded():
