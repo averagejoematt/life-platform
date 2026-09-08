@@ -211,4 +211,37 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-07 (Opus 5, **Session X — the overnight drain, cycle 17 Day 2**; owner: "execute the approved plan … close only on the named live output … lane cap THREE … do not invoke email Lambdas"). **Two numbers: 11 CLOSED on live proof · 4 MERGED awaiting first live output**; 9 PRs merged, 1 open at wrap (#3680), board 111 → 107 (87 actionable). **Read #3679 first: a hand-redacted habitify wire fixture leaked a SECOND blocked-category habit name to the PUBLIC repo, and it red-walled main for ~12h.** The file stores each habit name twice — the journal entry AND the `logs` key, since `logs` is keyed by name — so the redaction is a two-place edit with nothing asserting both were done; `pii_surface_guard --tracked` runs in BOTH `CI · Lint` and `sync_site_to_s3.sh`, so one cause showed as two red workflows, and CI/CD's `test`/`Plan`/`Deploy` were SKIPPED behind the failing lint while three more PRs merged into an untested, undeployed main. **The escape was upstream of the guard: PR #3672's head had ZERO check-runs** (swallowed push), so it never ran pre-merge — the guard itself worked on first contact with main. **PR #3679 merged at `4c650599b`** with a green full unit suite, which took main off the red — but the name stays reachable in git history at `3cea6db44`; **that is an owner disclosure decision, not a code one**, and a forward fix cannot remove it. The site has still not deployed: #3679 does not touch `site/**`, so the first `site/**` merge after this is what proves the path open. Shipped: #3656 (the #3652 flagship — the rollback declines when the AI oracle never judged the page; verdict budget 700→1200 sized from n=752, p99 637), #3657 (#3563 IAM writes), #3658 (agent-tooling ×5), #3664 (#3544 — the contrast gate DERIVED from the CSS; `.ndots-more` was the sixth member and was rolling back every site deploy), #3672 (#3666/#3667 habitify Pacific-day attribution, 24/24 rows backfilled, `pending: 60` a bucket the old code could not produce), #3674 (#3668 — an MCP surface INDEX + a waiter that declares its filter + a miss log; three tools, not fifty-nine), #3675, #3676 (×5). **The through-line the owner's own half of the session found: the platform is right and cannot explain itself** — the cycle number held in three agreeing places yet reported absent, nutrition filtered exactly as designed with the filter invisible, ACWR computed and dated a day back, habits captured and mis-dated, water ingested onto the wrong day. **#3675's Hevy re-anchor was INERT**: `build_bundle.py` does not stage `training_phases.json`, so the runtime reads the **S3** copy, which still said 2026-06-16 — a repo-side fix to an S3-read config verifies nothing; #3680 deletes the second copy and derives Y from `EXPERIMENT_START_DATE`. I also corrected myself mid-wrap: `pytest --timeout=900` is not accepted here, so a claimed "full suite green" was a run that never happened (I read the piped exit code instead of the output). Gates: alarms clean and #3655 closed on its own live proof (the retired-alarm flap printed as `ℹ️`, not a red); backlog hygiene cleared of everything this session touched (59 pre-existing `set_section`/`acceptance_count` remain, all filed before the #3594 rule); a PROPORTIONALITY row added for #3674's uncapped, unlifecycled miss-log prefix; a Session-W stash that would have removed 74 permission entries inspected and dropped. **Owner acts left:** the #3679 history-exposure call · the #3568 test send · one `apply: true` delete-user-data invoke (#3566) · two PM calls (#3643's milestone; five Session V filings over the acceptance contract).
+**Verified:** 2026-09-08 (Opus 5, **Session Y — unblock the site, build the owner's read, then
+stabilise for a 6-day pause**; owner: *"do everything that concerns you to get it stable, then
+wrap"*). **12 PRs merged, 8 issues closed on live proof, 1 reopened.** **Read the stabilise pass
+first: main was RED ~3h and two production deploy leases had been stranded 9.1h — both found by
+CHECKING when the owner asked whether pausing was safe, not by anyone watching.** The red was
+#3684's new test importing `yaml` into a deploy-critical lane that installs no PyYAML; a collection
+error takes the whole lane, and this is the **third appearance of that class in INCIDENT_LOG** (both
+leases were ancestors, rejected per approve-the-tip-reject-ancestors; the platform had auto-filed
+#3694 and nothing escalated it). **#3652 CLOSED on complete three-part proof** — two consecutive
+`site/**` deploys live plus the control run where `rollback-site-on-failure` DECLINED by name with
+`version.json` untouched; the 53 dark a11y files verified by CONTENT, not sha. Closed on boxes 2–4
+only: box 1 asked for a *retry* on a truncated judge verdict and #3656 delivered a *budget raise* —
+a mitigation, not the mechanism (**#3688**). **`/method/state/` is live** (#3691) — the joined
+owner-facing read that turns "110 open" into 72 actionable / 46 from commissioned audits / 10
+reader-facing / 9 P1 / 0 P0, with delivery over the true population (662 closed, 756 PRs, median
+12.6h, organic 8.7h vs audit-sourced 29.2h). It shipped **four** bugs and fixed all four, every one
+found by RUNNING it: it truncated its own population at a 400 cap; the page rendered nothing with
+**zero console errors** because `isBad()` is a scalar detector and `String(obj)` matches its own
+bracket test; MTD spend was missing because the key set was *guessed*; and three sections vanished
+silently while the footer claimed they showed as gaps. Its honesty contract then earned its keep on
+the first real deploy — green with **5 of 9 sections null**, each naming its own cause. Also
+stabilised: the site was publicly serving **`review_grade: "A"` while the newest review graded ZERO
+lenses at A** (now `B+` with the distribution, #3690), and the nightly had been permanently red
+since 09-03 on a false positive, so a real regression would have been invisible beside it (#3650).
+**Two controls turned out to have expiry dates on them** — a mutation proof planting `import yaml`
+went blind the moment pyyaml was legitimately added, and a config test pinned a date its own
+docstring says the owner advances by hand; *a positive control keyed to a value that can later be
+sanctioned is a control with an expiry date on it.* Owner threads answered live: the `Pull 3 - 2`
+counter (`current_started` re-anchored in **both** copies — the S3 one is what the runtime reads,
+the #3675 trap), and the training-note brief, where I **corrected the owner's leading hypothesis**:
+truncation returns `[]` and never raises, so it leaves `degraded: False` — a silent degradation
+meaning `degraded` **undercounts** (#3699, #3700). **Owner acts left:** the #3679 history-exposure
+disclosure call · the #3568 test send · Wednesday 09-09's chronicle send closes #3563 leg 2 on its
+own (IAM grant verified deployed).

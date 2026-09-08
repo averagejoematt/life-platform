@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 410** — feedback 24 · reference 228 · security 1 · project 154 · user 1 · index 2
+**Files in the memory index snapshot: 412** — feedback 24 · reference 229 · security 1 · project 155 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 253** — homed-here 61 · already-homed 168 · superseded 7 · narrative 15 · off-repo 2
+**Rule-class files (feedback + reference + security): 254** — homed-here 61 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
 
-**Program/session files (project): 154** — already-homed 14 · superseded 1 · narrative 136 · off-repo 2 · index 1
+**Program/session files (project): 155** — already-homed 14 · superseded 1 · narrative 137 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -223,6 +223,7 @@ project_session_u_2026_09_03.md
 project_session_v_2026_09_05.md
 project_session_w_2026_09_06.md
 project_session_x_2026_09_07.md
+project_session_y_2026_09_08.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -377,6 +378,7 @@ reference_iam_parity_codified_broken_state.md
 reference_import_time_frozen_globals_test_trap.md
 reference_inrepo_worktree_pollutes_scanners.md
 reference_io_threshold_tall_sections.md
+reference_isbad_is_a_scalar_detector.md
 reference_issue_closed_against_unmerged_pr.md
 reference_job_timeout_renders_as_cancelled.md
 reference_judge_flake_ground_truth.md
@@ -897,6 +899,8 @@ carries an operating rule.
 | `INDEX_review_discipline.md` | index | — the memory index itself | index |
 | `project_session_v_2026_09_05.md` | project | — narrative: a session record (the `/review full` baseline + the forensic RCA), not a rule | narrative |
 | `project_session_w_2026_09_06.md` | project | — narrative: a session record (the gate-census chain, cycle-17 Day 1), not a rule | narrative |
+| `project_session_y_2026_09_08.md` | project | — narrative: a session record (unblock the site, build `/method/state/`, then the stabilise pass that found main red and two stranded leases), not a rule; its extracted rule is the `reference_isbad_is_a_scalar_detector` row below | narrative |
+| `reference_isbad_is_a_scalar_detector.md` | reference | `site/assets/js/evidence_shared.js` (the `isBad` definition itself) + `tests/test_platform_state_3691.py` (the page-vs-artifact contract that catches a renderer showing nothing) | already-homed |
 | `project_session_x_2026_09_07.md` | project | — narrative: a session record (the fixture privacy leak + the owner's ingestion audit), not a rule; its three extracted rules are the reference rows below | narrative |
 | `reference_a_repo_side_fix_to_an_s3_read_config.md` | reference | `docs/CONVENTIONS.md` §7 (a config the runtime reads from S3 is not fixed by editing the repo copy — check `build_bundle.bundled_extra_paths()`, read the live object, and prefer deleting the second copy to synchronising it) | homed-here |
 | `reference_one_cause_two_red_workflows.md` | reference | `docs/CONVENTIONS.md` §7 (a red `lint` SKIPS CI/CD's `test`/`Plan`/`Deploy` — a skipped test job is not a passing one; two workflows red together usually share one cause; read the boot brief's main line at session START) | homed-here |

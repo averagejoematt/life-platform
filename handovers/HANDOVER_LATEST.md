@@ -1,224 +1,217 @@
-# Handover — Session X: the overnight drain, cycle 17 Day 2 (2026-09-06 ~18:00 PT → 2026-09-07 ~11:00 PT)
+# Handover — Session Y: unblock the site, build the owner's read, then stabilise for a pause (2026-09-07 ~11:00 PT → 2026-09-08 ~21:30 PT)
 
-**Driver:** Opus 5 (1M), lanes pinned to each issue's model label. **Plan:**
-`~/.claude/plans/mossy-jumping-puffin.md`. **Owner brief:** overnight autonomy, wrap with two
-numbers (closed / merged-awaiting-first-live-output); close only on the named live output;
-flagship #3652 (site deployability); lane cap 3; no email-Lambda invokes; quiet window
-09:15–10:05 PT.
-
-**The session ran long and the shape changed mid-way.** The plan's Wave 0 proof-harvest and
-lane drain happened, but from ~22:00 PT the owner was awake and working with the driver
-directly on ingestion trust — a tape-measurement write, the MacroFactor/Dropbox pipeline, a
-full ingestion audit, the Habitify day-boundary bug, and the Hevy naming convention. That was
-the more valuable work and it is what most of this handover is about.
+**Driver:** Opus 5 (1M), lanes pinned to each issue's model label — Opus or Sonnet only, no Fable.
+**Plan:** `~/.claude/plans/transient-honking-flame.md` (Session Y), then a mid-session owner
+redirect into a new build (`~/.claude/plans/mellow-pondering-squid.md`), then an explicit
+*"do everything that concerns you to get it stable, then wrap"* before a **6-day development pause**.
 
 ---
 
-## The two numbers
+## The shape of the session
 
-| | count |
-|---|---|
-| **CLOSED on live proof** | **11** (2026-09-07 UTC) |
-| **MERGED, awaiting first live output** | **4** (#3652, #3651, #3671, #3672's deploy half) |
-| **PRs merged** | **9** (#3656 #3657 #3658 #3664 #3672 #3674 #3675 #3676 #3679) |
-| **PRs open at wrap** | **1** (#3680) |
+Three movements, and the third was the owner's call:
 
-Board **111 → 107 open** (87 actionable after epics/Roadmap). The drain was smaller than the
-plan's 104 → 78–86 projection and smaller than the 20–30 I told the owner mid-session when he
-pushed back on my first estimate. Both numbers were wrong; this one is measured. The reason is
-in the next section and it is not "the work was slower".
-
----
-
-## The headline: main was red for ~12 hours, on a privacy leak, and nothing escalated it
-
-Found by the wrap's own (e2) gate, not by anyone watching.
-
-`tests/fixtures/habitify/habitify_2026-09-06_wire.json` landed in PR #3672 at 05:05Z carrying a
-`_privacy` note that read *"One habit NAME is substituted"*. **Two needed substituting.** The
-file stores each habit name **twice** — once in the `journal` entry, once as a `logs` **key**,
-because `logs` is keyed by name rather than id — so "redact the name" is a two-place edit with
-nothing asserting both places were done. The repo is public.
-
-Three consequences, in order of how much they matter:
-
-1. **`deploy/pii_surface_guard.py --tracked` failed from that merge onward.** That arm runs in
-   **both** `CI · Lint` and `sync_site_to_s3.sh`, so every main sha since showed `CI/CD → lint`
-   failure **and** `Site deploy → Deploy public site` failure. One cause, two red workflows —
-   which is exactly the shape that reads like two problems and gets triaged as neither.
-2. **CI/CD's `test`, `Plan`, `Deploy` and every post-deploy gate were SKIPPED behind the failing
-   lint.** For ~12h main was neither tested nor deployed, while three further PRs merged into it.
-   A red lint is not just a lint failure; it is a silent hold on the entire verification chain.
-3. **PR #3672's head `f6e663ce` has ZERO check-runs.** The swallowed-push class. The guard that
-   would have blocked this never ran, and the standing swallow-check-every-push reflex — which
-   is in the plan's own discipline list — was not applied before merging. **The guard worked
-   perfectly on first contact with main. The escape was upstream of it.**
-
-Fixed in **PR #3679**, **merged at `4c650599b`** with its full unit suite green in CI (30m35s), which is what took main off the twelve-hour red: the second name substituted in both surfaces with the
-placeholder the first redaction already used, `_privacy` rewritten to state the count **and**
-that both surfaces carry it — the fact whose absence caused the miss. Guard clean over 376
-tracked JSON files.
-
-**Not recoverable by a forward fix.** The name remains reachable in git history at `3cea6db44`
-on a public repo, and a history rewrite alone cannot remove it (GitHub keeps force-pushed
-commits reachable by sha — the `project_repo_privacy_remediation` finding). **This is an owner
-disclosure decision, not a code one, and it is the first thing to read at the next session.**
-
----
-
-## A correction I had to make to myself mid-wrap
-
-I claimed "full suite green (`pytest tests/ -q -x`, exit 0)" in PR #3679's body and in two
-closure comments. The command carried `--timeout=900`, which this pytest **does not accept** —
-it errored with `unrecognized arguments` and the shell still reported exit 0 through the pipe.
-**The suite never ran.** Posted as a correction on #3679 and re-run properly.
-
-This is the `a-ci-gate-that-cannot-fail` class pointed at myself: a piped step exits with the
-tail's status, and I read the exit code instead of the output. Worth carrying — it is the second
-time this week that shape produced a false green.
+1. **Unblock the site.** 53 reader-facing a11y files had been merged and dark since 03:16Z the
+   previous day; every `site/**` deploy since had died at `Deploy public site`.
+2. **Build the owner-facing read** (#3691) — the owner asked for a way to see "how is the build
+   going" without opening eight things, because a board of ~110 open issues reads as an emergency.
+3. **Stabilise for a pause** — the owner asked whether stopping for six days should worry me. It
+   should have: **main was RED and had been for ~3h**, and two production deploy leases had been
+   stranded 9.1h.
 
 ---
 
 ## What shipped
 
-| PR | issue | what |
-|---|---|---|
-| #3656 | #3652 | site-deploy declines the rollback when the AI oracle never judged the page; verdict budget 700 → 1200 sized from n=752 (p99 637) and pinned by a test |
-| #3657 | #3563 | the three IAM-denied DynamoDB writes granted; the next swallowed denial is visible |
-| #3658 | #3642 #3653 #3594 #3641 #3645 | agent-tooling batch — merge-conclusion guard, CONFLICTING-vs-swallow, `## Set` intake, `CURRENT-1`, attribution footer |
-| #3664 | #3544 | the recede-opacity contrast gate DERIVED from the CSS — `.ndots-more` was the sixth member and was rolling back every site deploy |
-| #3672 | #3666 #3667 | habitify Pacific-day attribution + the P40_GROUPS allowlist; 23-date backfill, 24/24 rows repaired |
-| #3674 | #3668 | MCP surface index + waiter + miss log — three tools, not fifty-nine |
-| #3675 | #3670 | a Hevy commit that could not folder its routine now says so in its own result |
-| #3676 | #3655 #3640 #3644 #3651 #3548 | five independent fixes (alarm-citation flap, playwright-gated skips, Brier ulp, nudge reaper, a11y ledger) |
-| #3679 | — | the fixture privacy leak above — **merged `4c650599b`**, main unblocked |
-| **#3680** | #3671 | **OPEN** — the Hevy Y anchor derived; see below |
+**12 PRs merged**, all green at merge, all with swallow-checked pushes.
 
-## The through-line the owner's own session found
+| PR | What |
+|---|---|
+| #3665 | the commitments follow-through ledger (#3553) + its full deploy runlist |
+| #3680 | the Hevy Y counter derives from `EXPERIMENT_START_DATE` (#3671) |
+| #3683 | mobile evidence shells stop scrolling past their own hero (#3542) |
+| #3684 | CI timeouts re-derived from measured p95 + a headroom guard (#3678) |
+| #3689 | `commitments-ungraded` made creatable + a guard over all 98 alarms (#3685) |
+| #3693 | **the build readout** — the join, `/method/state/`, `/qbr` (#3691) |
+| #3695 | the readout degraded on its first real deploy — `gh` token + PyYAML |
+| #3696 | **main-red fix** — deploy-critical lane had no PyYAML |
+| #3697 | the site publicly claimed `review_grade: "A"` (#3690) |
+| #3698 | the chronicle manifest check reded the nightly for days (#3650) |
+| #3701 | `current_started` re-anchored to the cycle-17 genesis (#3671) |
+| #3679 | (inherited, merged at session start) the habitify fixture leak |
 
-Five surfaces, one shape: **the platform is right and cannot explain itself.**
-
-- **cycle number** — held in three places that agree; his Claude said "the platform doesn't track it"
-- **nutrition** — filtered exactly as designed (ADR-058); the filter was invisible, so freshness
-  said "fresh through 06 Sep" while the nutrition door said "no data 16 Aug – 05 Sep". Both right.
-- **ACWR** — computed 0.929, dated a day back
-- **habits** — captured correctly, attributed to the wrong Pacific day
-- **water** — ingested from My Water, filed on the wrong day
-
-That is the argument #3668 was filed on and #3674 shipped against: an INDEX so a surface can be
-found without a tool per surface, a WAITER that **declares the filter it applied**, and a MISS
-LOG so the next "the platform doesn't track it" is countable rather than folklore. The #395
-prune was correct on its evidence — and its evidence was usage telemetry gathered while the
-owner was *building* the platform rather than *using* it. His words, worth keeping verbatim:
-*"this experiment has never taken off for a sustained period of time, so we evaluate usage of
-mcp tools when i have spent more time building the platform than using it."*
-
-## The Hevy counter — the fix that wasn't
-
-PR #3675 hand re-anchored `config/training_phases.json`'s `reset_epoch_date` to `2026-09-06`.
-**That edit was inert and could not have worked.** `build_bundle.py` stages only
-`food_vocabulary.json`, `personas.json` and `config/coaches/*` — **not** `training_phases.json` —
-so `load_phase_state()` falls through to the **S3** copy, which measured live today still read
-`2026-06-16`. The repo copy is not the one the runtime reads.
-
-The durable lesson: **when a config is read from S3 rather than the bundle, a repo-side "fix"
-verifies nothing.** PR #3680 removes the second copy entirely — Y derives from
-`EXPERIMENT_START_DATE`, which every reset regenerates and which ships in every bundle (#781).
-Both mutations red. N is deliberately unchanged per the owner's ruling: a phase may span cycles.
-
-## Owner rulings recorded this session
-
-- **Reader-facing credibility stories outrank everything else** on the board.
-- **Performed, not pushed** — "It's only a workout once I've done it."
-- **The phase advances only when he says so**; only the experiment counter Y zeroes on a reset.
-- **No backfilling MacroFactor gaps** — "everything blank prior will stay blank."
-- The six social feeds are **not started**, not broken.
-- Times in messages to him get **PT**, not UTC.
+**Closed on live proof:** #3652, #3566, #3650, #3685, #3690, #3691, #3687, #3694.
+**#3678 REOPENED** — a `Fixes` keyword closed it against my explicit recorded judgement that it
+needed a week of runs; the reversal and the mechanism are on the issue.
 
 ---
 
-## Gate outcomes
+## The flagship: the site path is proven open (#3652, closed)
 
-**Main:** red at the wrap's (e2) run and **fixed before the wrap commit** — one cause, decoded
-above: a blocked-category keyword in a tracked habitify fixture redding
-`pii_surface_guard --tracked` in both `CI · Lint` and `Site deploy`, with CI/CD's
-`test`/`Plan`/`Deploy` SKIPPED behind the failing lint. Red `3cea6db4` (05:05Z) → `a35f8ac6`,
-~12h. PR #3679 merged at `4c650599b` with a green full unit suite; main's own run at that sha
-was still in flight when this was written, so the next session should confirm the badge rather
-than inherit this sentence as proof.
-**Build beat:** none — the session's public-facing work is not deployed. Site deploy has failed
-on every main sha since 05:05Z, so #3664's a11y fixes and #3548's five defects are merged but
-not live; a beat narrating them would claim a deploy that did not happen.
-**Docs:** `docs/DECISIONS.md` (ADR-088 amendment — the Y anchor is derived, the second copy
-deleted), `docs/coaching/WORKORDER_HEVY_FOLDER_AND_TITLE.md` (the hand re-anchor marked
-superseded and explained), `docs/INCIDENT_LOG.md` (+1 row), `docs/PROPORTIONALITY.md` (+1 row).
-**Decisions:** none needed — the one governance-consequential call (derive the Y anchor rather
-than give the reset ownership of the config file) is an amendment to the existing ADR-088, filed
-in the same PR, not a new ADR.
-**Incidents:** 1 row added — the habitify fixture privacy leak and the ~12h main red behind it,
-with the zero-check-runs merge named as the escape and the public-history exposure recorded as
-not recoverable by a forward fix.
-**Stash/hooks:** `stash@{0}` found from Session W's base (`5829d9e57`) — a
-`.claude/settings.local.json` regression that would have REMOVED 74 permission entries.
-Inspected and dropped; not mine, and applying it would have narrowed the session's own
-permissions. Hook freshness 🟢.
-**Closures:** #3655 closed on live proof, and outcome verdicts posted on #3548, #3596, #3640,
-#3644, #3660, #3666 · DoD: scanned 10, hits 7 — all dispositioned. #3548/#3640/#3644/#3660 had
-zero comments and now carry the pair; #3596 and #3666 already had full evidence but wrote their
-verdict as `**Outcome — …**` and `**Outcome: …**`, neither of which the sweep reads as a verdict,
-so conforming lines were added rather than the evidence rewritten; #3544's `unhomed-residual`
-(`/protocols/discoveries/` light, 1 baselined node) is folded onto #3673.
-**Backlog:** Now live at 6 opus-startable stories against a floor of 3 — `now_liveness` not
-firing, no promotion needed; `later_staleness` clean (107 open issues satisfy the contract). Five
-hygiene violations on issues this session touched were fixed: #3673 gained a milestone and an
-explicit `**Epic:** none — …` line, and epics #3493/#3495/#3592 gained the four stories filed
-this session that named them (#3678, #3669, #3677, #3670). The 59 that remain are all
-pre-existing `set_section`/`acceptance_count` on issues filed **before** the #3594 rule existed —
-a corpus backfill, not this session's, and the acceptance-count half is already one of the
-owner's two open PM calls.
-**Alarms:** 0 red >72h uncited, and **1 retired alarm's residual flap correctly partitioned** —
-this run is #3655's own named live proof (`ai-tokens-daily-brief-daily` printed as `ℹ️`, not a
-red, with no citation added, so the registry test stays green). Both directions of that bind
-fired for real yesterday; today neither does.
-**CI warnings:** unverified — `check_ci_warnings.py` reads annotations on the latest **green**
-completed CI/CD run on main, and there has not been one since 05:05Z. Due on the first green run
-after #3679 merges; not a clean board, an unreadable one.
-**Ledger:** MCP surface index + miss log row added — #3674 shipped standing machinery (a
-derived index, a waiter, and an S3-writing miss log on an **uncapped, unlifecycled** prefix) with
-no row; posture, rent and both demote triggers are now on record, including the honest note that
-no miss has been recorded in production yet.
+Three-part proof, all cited by run id:
+
+| # | run | trigger | `version.json` | QA | rollback |
+|---|---|---|---|---|---|
+| 1 | `34150694105` | dispatch | `533e226` @ 18:13:07Z | success | skipped |
+| 2 | `34154159308` | **push** (#3665) | `deaed3e` @ 19:05:06Z | success | skipped |
+| 3 | `34160729881` | control, `ai-inject` | — | **red** | **DECLINED by name** |
+
+The control's annotation, verbatim: `Site rollback DECLINED (#3352/#3395) — visual-qa: 1 of 1
+failed page(s) are NOT site/**-reachable (surface=ai-unevaluated; all: ai-unevaluated=1)`, with
+`version.json` unchanged. Five more clean site deploys followed.
+
+Verified the a11y batch by **content**, not sha: `<title id="archSvgTitle">` + `aria-labelledby`
+live on `/method/build/`, `<h1>` on `/subscribe/confirm/`, `cap-h` as `h3` ×5 with no `h4`,
+`<th>` labelled, `role="tabpanel"` on a `<div>` with **zero** residual `<article>`.
+
+**Closed on boxes 2–4 only.** Box 1 asked for a *retry* on a truncated judge verdict; #3656
+delivered a *budget raise*, which is a mitigation, not the mechanism. Filed as **#3688** rather
+than waved through.
+
+---
+
+## The new surface: `/method/state/` (#3691, live)
+
+`https://averagejoematt.com/method/state/` — "The build". Unlisted, deterministic, regenerated on
+every site deploy. As served at wrap: **110 open → 72 actionable**, of which **46 came from
+commissioned audits**, **10 touch anything a reader sees**, **9 P1 / 0 P0**. Delivery over the true
+30-day population: **662 closed, 756 PRs, median cycle 12.6h**, split organic 8.7h vs audit-sourced
+29.2h. Plus graded lenses prior→now, what awaits live proof, incidents, gate census (90/637 proven),
+and spend from the governor.
+
+**It shipped four bugs and fixed all four — every one found by running it, not reading it:**
+
+1. **It truncated its own population** — capped GitHub paging at 400 and reported `closed: 400,
+   prs: 400`, both exactly the cap, with a median over an arbitrary subset. Truncation now derives
+   from the search API's own `total_count`.
+2. **The page rendered nothing, with ZERO console errors.** `isBad(d)` is a *scalar* placeholder
+   detector; `String(anyObject)` is `"[object Object]"`, which matches its `/^\[.*\]$/` test, so the
+   guard was unconditionally true. It read as "data not generated yet". → memory
+   `reference_isbad_is_a_scalar_detector`.
+3. **Month-to-date spend was missing entirely** and ceiling/surge both showed `$252.00` with no
+   `surge_active` — the key set was *guessed* and silently kept only what matched.
+4. **Three sections vanished silently on failure** while the footer claimed they were "shown as
+   gaps above" — found by running the negative control.
+
+**The honesty contract earned its keep on the first real deploy:** it shipped green with **5 of 9
+sections null** (`gh` has no token in Actions; the census had no PyYAML). Because each section
+carries its own error, one fetch named every cause. A design retaining last-known values would have
+shown plausible laptop numbers with no way to know.
+
+---
+
+## The stabilise pass (the owner's "should a 6-day pause worry me?")
+
+**It should have, and the answer was found by checking rather than asserting.**
+
+- **main was RED ~3h** — #3684's new test imports `yaml`; the deploy-critical lane installs no
+  PyYAML, and a collection error takes the whole lane. **Third lane in one day**, and the **third
+  appearance of this class in `INCIDENT_LOG`**. Fixed in #3696.
+- **Two deploy leases stranded 9.1h**, both **ancestors**. Rejected per the standing rule; the
+  platform had auto-filed #3694 and nothing escalated it.
+- **The site was publicly claiming `review_grade: "A"`** while the newest review graded **zero**
+  lenses at A (B+ 9 / B 3 / B- 3 / C+ 2). Now serves `B+` with the distribution beside it, plus
+  `site_pages` 77→93 and `active_secrets` 21→28. Deployed and verified live.
+- **The nightly had been permanently red since 09-03** on a false positive, so a real regression
+  would have been invisible beside it. Fixed and deployed; verified `ok` against the real partition.
+
+---
+
+## Two controls that had expiry dates on them
+
+Both found the same way — by doing the correct thing and watching a guard fail:
+
+- `test_deploy_critical_lane_imports_2758`'s mutation proof planted `import yaml` **because yaml was
+  forbidden**. Adding pyyaml legitimately made the plant legal and the control silently stopped
+  proving anything. Repointed at `requests`, which CLAUDE.md forbids outright.
+- `test_training_phases_config_still_carries_the_phase_anchors` pinned `current_started ==
+  "2026-06-16"` — a literal pin on a value **its own docstring says the owner advances by hand**.
+  Now asserts the field exists, parses as ISO, and names a real phase; watched red on all three.
+
+**A positive control keyed to a value that can later be sanctioned is a control with an expiry date
+on it.** Worth carrying forward.
+
+---
+
+## Owner threads answered mid-session
+
+- **"Pull 3 - 2" naming** — Y=2 correct; N=3 correct *by the rule* and wrong in fact, because
+  `current_started` still read `2026-06-16`. Re-anchored in **both** copies; the S3 one is what
+  matters (`load_phase_state` reads local-then-S3 and the file is **not** bundled — the #3675 trap).
+  Proven on the Lambda's own path with `CONFIG_DIR` pointed at an empty dir.
+- **Training-note extractor brief** — verified and **corrected the owner's leading hypothesis**:
+  truncation returns `[]` and never raises, so it leaves `degraded: False` — a *silent* degradation
+  that doesn't set the flag, which means `degraded` **undercounts**. Filed #3699. Ruled out the
+  model id and the monthly cap so nobody re-checks them.
+- **"Pull the cardio comments forward"** — the capture side is already correct: today's record
+  carries `note="Level 9 - 5.6 miles"`, `distance_m=9012`, `duration_sec=1800`. The gap is one
+  branch: `render_history_cue` returns `""` for any set without weight+reps, so cardio gets no cue.
+  Filed #3700.
+
+---
+
+## Gate marker lines
+
+**Build beat:** none — the session's headline (`/method/state/`) is an owner-facing internal
+surface, and `docs/content/BUILD_DISPATCH_CHECKLIST.md` scopes beats to reader-facing shipped work.
+**Docs:** `docs/INCIDENT_LOG.md` (+2 rows), `docs/alarm_citations.json` (re-cited),
+`docs/PROPORTIONALITY.md`, `docs/PLATFORM_NORTH_STAR.md` (fifth audience),
+`docs/SITE_MAP_AND_INTENT.md` (the new page) — all landed in their own PRs.
+**Decisions:** none needed — no governance-consequential choice was made that an existing ADR does
+not already cover; the north-star audience addition is recorded in that doc itself.
+**Main:** green (ba1cb95a) — HEAD `5262538f` has its run in flight; the two stranded ancestor leases
+were rejected, which is what returned the board to green.
+**Incidents:** 2 row(s) added — main red ~3h on the recurring undeclared-PyYAML deploy-critical
+class (its third appearance in this log), and the 9.1h production-deploy wedge from two
+undispositioned ancestor leases.
+**Stash/hooks:** clean
+**Closures:** #3652, #3566, #3650, #3685, #3690, #3691, #3687, #3694 commented; #3678 REOPENED
+(a `Fixes` keyword closed it against a recorded judgement) · DoD: scanned 2, hits 1 —
+`post-close-comment` on #3690, which is my own corrected live-proof line (the first carried
+`03:1xZ`, a placeholder the instant regex correctly refused); blocking=none.
+**Backlog:** Now live at 7 in-lane (floor 3) — nothing to promote; `later_staleness` clean, no stale
+`Later` issues to call. `check_backlog_hygiene` prints **61 violations over 56 issues and ZERO of
+them is an issue this session filed, touched or closed** (verified by set-differencing the violator
+list against this session's 24 issues) — all nine of my filings are contract-clean. The remainder is
+the standing pre-#3594 debt: 52 `set_section` on issues filed before that rule existed, 5
+`acceptance_count`, 4 `epic_story_coverage`. **#3594 is the issue that owns it**, and paying it down
+is a backlog campaign, not a wrap step.
+**Alarms:** 4 lit, all cited — `qa-smoke-failures` re-cited 2026-09-08 against the live cause the
+#3501 check caught contradicting it; `commitments-ungraded` is deploy-day `INSUFFICIENT_DATA` and
+clears over ~7 days; `chronicle-delivery-heartbeat` clears on Wednesday's send; the fourth carries
+no actions.
+**CI warnings:** 6 — one coverage-floor drift (74% vs 84.2%), filed this session as **#3686**; five
+identical playwright-skip lines from **#3640**, which is a by-design loud-skip reporter and needs no
+action.
+**Ledger:** owner-facing build readout row added (#3691) — posture, rent and demote trigger.
 
 ---
 
 ## Residual / next picks
 
-- **#3680 is the one PR open at wrap** (#3671's Y-anchor derivation) — checks were still running;
-  it was swallow-checked at push (9 check-runs). #3679 merged.
-- **Confirm main's badge at `4c650599b`** — #3679's own PR suite was green but main's post-merge
-  run had not completed when this was written. — not-work — a first-thing-to-check, not a
-  backlog item.
-- **The site has still not deployed.** #3679 does not touch `site/**`, so `Site deploy` did not
-  fire on it; the first `site/**` merge after this is the one that proves the path is open —
-  and it is also the first half of #3652's two-consecutive-merges proof.
-- **The public-history exposure of the habitify fixture** — not-work — an owner disclosure
-  decision, not a code change; a forward fix cannot remove it and a history rewrite alone cannot
-  either.
-- **#3671** stays open on two boxes PR #3680 does not close: no registry enumerates which
-  *config* fields are experiment-anchored (`vacation_fund.json`'s null `start_date` has never
-  been ruled on), and the reset's report does not name the anchors it moved.
-- **#3652's proof is still owed** — two consecutive `site/**` merges that deploy and stay
-  deployed, cited by run id and `version.json`. The decline path was proven live via the
-  `qa_inject_failure=ai-unevaluated` dispatch lever, but the two-merge proof cannot start until
-  #3679 unblocks the deploy path.
-- **#3548's live half is due** when the site deploys — a live axe re-run against the deployed
-  pages, then the deliberate `tests/visual_qa.py --update-baseline` shrink.
-- **#3660's class** — an auto-filed issue auto-closing on a green run of a *differently-triggered*
-  invocation of the same workflow, while the push-triggered job stayed red for 12h. Named in its
-  closure comment; needs a carrier if it recurs. — not-work — the auto-file/close policy is the
-  owner's to re-scope, not a backlog item I should invent.
-- **The `closure:live-proof` label exists and is applied to nothing.** Created in Session W; zero
-  open issues carry it, which is why the merged-awaiting-proof set has to be reconstructed by
-  hand every wrap. — not-work — a labelling habit for the next session to adopt, not a defect.
-- **Owner acts, unchanged:** the #3568 test send · one `apply: true` `delete-user-data` invoke
-  for #3566 · two PM calls (#3643's milestone; the five Session V filings carrying 6–8 acceptance
-  boxes against the 3–5 contract) · lab panel due ~2026-10-03.
+- **#3699** — training-note extractor throws every degrade reason away; truncation degrades
+  silently. Raw notes are sovereign and backfillable, so the pause costs nothing irreversible.
+- **#3700** — cardio has no progression loop; `render_history_cue` returns `""` without weight+reps.
+- **#3692** — `mcp/registry.py` is at its size ceiling and cannot accept any new tool.
+- **#3688** — the truncated-judge-verdict retry (#3652 box 1).
+- **#3686** — the coverage floor sits 10.2 points below measured.
+- **#3681** — the theme-river build has never succeeded in CI (no `dynamodb:Query`).
+- **#3682** — the wrap's Phase-1 doc gates run before Phase-2 writes the docs they derive from.
+- **#3678** (reopened) — needs a week of PR traffic with zero `cancelled` verdicts.
+- **#3651** — not closeable as written: all four stuck ledger rows aged out of `RETENTION_DAYS = 7`.
+  Disposition recorded on the issue.
+- **#3563 leg 2 / #3568** — both need Wednesday 2026-09-09's chronicle send. The IAM grant is
+  verified deployed, so `/api/status` should go green on its own.
+- **The #3679 history exposure** — `not-work — an owner disclosure decision; a forward fix cannot
+  remove a name reachable at `3cea6db44` on a public repo.`
+- **`current_started` will drift again at the next reset** — carried on #3671; it is a
+  hand-maintained field in an S3-read config `restart_pipeline.py` does not own.
+
+---
+
+## For the next session
+
+Main is green, the site is live at `5262538` matching `main`, no PR is open, no lease is waiting,
+and `/method/state/` is the fastest way to see where things stand. Note it regenerates on **site
+deploys** — during a development pause it will honestly show its own `generated_at` ageing rather
+than refreshing.
