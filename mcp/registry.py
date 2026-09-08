@@ -1744,21 +1744,26 @@ TOOLS = {
                             "type?, count? (repeat the set N times), duration_seconds? (cardio), "
                             "distance_meters?}], "
                             "rest_seconds?, superset_id? (same int = superset/circuit/tri-set), notes?}. "
-                            "If a title doesn't exist in Hevy yet it is auto-created (see "
-                            "create_missing); to control the new exercise pass muscle_group, "
-                            "exercise_type, and/or equipment_category on that item (else inferred). "
+                            "If a title doesn't exist in Hevy the draft FAILS with suggestions "
+                            "(create_missing defaults to false, #3718). To create it deliberately, "
+                            "pass create_missing:true AND muscle_group on that item — an inferred "
+                            "muscle group once guessed 'shoulders' for a calf press, which would "
+                            "have corrupted muscle-volume aggregation permanently. "
                             "Loads are taken verbatim — the platform does not compute them."
                         ),
                         "items": {"type": "object"},
                     },
                     "create_missing": {
                         "type": "boolean",
-                        "default": True,
+                        "default": False,
                         "description": (
-                            "draft_custom only: when an exercise title isn't found in Hevy, "
-                            "create it (so the draft never gets stuck) and report it under "
-                            "created_exercises. Set false to instead fail loudly with "
-                            "suggestions. Only creates from a human title, never a bare movement_key."
+                            "draft_custom only: when an exercise title isn't found in Hevy, create "
+                            "it and report it under created_exercises. DEFAULTS TO FALSE (#3718) — "
+                            "it previously defaulted to true and invented 'Calf Press on Leg Press "
+                            "Machine' as a SHOULDERS exercise, which would have counted every calf "
+                            "session toward shoulder volume for good. When enabling it, always pass "
+                            "muscle_group explicitly rather than letting it be inferred. Only ever "
+                            "creates from a human title, never a bare movement_key."
                         ),
                     },
                     "archetype": {

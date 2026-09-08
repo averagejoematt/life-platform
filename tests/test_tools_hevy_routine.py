@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import ExitStack
 from unittest.mock import patch
 
+import pytest
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 # The MCP package depends on boto3 + config at import time; conftest sets the
@@ -23,6 +24,27 @@ _TITLE_CTX = {
     "phase_started": "2026-06-01",
     "reset_epoch": "2026-06-01",
 }
+
+
+# #3718 — a commit now VERIFIES by reading the routine back from Hevy before it
+# may report "committed": template ids must match what was sent, and Hevy's own
+# updated_at must have moved. On 2026-09-08 a commit reported success while
+# Hevy's timestamp still read the previous day and the contents were a month
+# old, so an acknowledged write is no longer accepted as evidence of one.
+#
+# The fixtures below predate that and stub only create/update. This autouse
+# fixture supplies the SUCCESSFUL verdict so they keep testing what they were
+# written to test (foldering, warnings, branch notes). The verifier itself is
+# exercised directly in test_hevy_commit_readback_3718.py — patching it here
+# and nowhere else would be a gate that cannot fail.
+@pytest.fixture(autouse=True)
+def _commit_verifies(monkeypatch):
+    monkeypatch.setattr(
+        t,
+        "_verify_commit_landed",
+        lambda rid, body, before: {"verified": True, "reason": None, "folder_id": None, "updated_at": "2026-09-08T23:38:39Z"},
+        raising=False,
+    )
 
 
 def test_invalid_action_returns_error():
@@ -260,8 +282,13 @@ def test_draft_custom_unknown_offers_index_suggestions():
 
 
 def test_draft_custom_auto_creates_missing_exercise():
-    """A title Hevy doesn't have is created (create_missing defaults on) and used,
-    and reported under created_exercises — the draft does not get stuck."""
+    """A title Hevy doesn't have is created WHEN ASKED (create_missing=true) and
+    used, and reported under created_exercises.
+
+    #3718 flipped the DEFAULT to false: it previously invented "Calf Press on
+    Leg Press Machine" and guessed `shoulders`, which would have counted every
+    calf session toward shoulder volume permanently. Opting in is now explicit.
+    """
     captured: dict = {}
 
     def fake_put(ir):
@@ -285,6 +312,7 @@ def test_draft_custom_auto_creates_missing_exercise():
             {
                 "action": "draft_custom",
                 "archetype": "push",
+                "create_missing": True,  # #3718 — must now be explicit
                 "exercises": [
                     {
                         "title": "Landmine Snatch",
@@ -449,15 +477,39 @@ def test_commit_result_names_the_failure_when_foldering_fails():
     assert ir.hevy_folder_id is None
 
 
-def test_commit_reports_the_resolved_folder_title_on_success():
-    """The same key on the happy path — so `folder` is a report, not an error flag."""
+def test_commit_reports_the_resolved_folder_title_on_success(monkeypatch):
+    """The same key on the happy path — so `folder` is a report, not an error flag.
+
+    #3718: `ir.hevy_folder_id` is now recorded from the READBACK rather than
+    from intent. The 2026-09-08 incident stored 3087819 (Legs) on an update
+    that could never move the folder, and the routine was in Archive — an
+    intended folder written as an achieved one.
+    """
+    monkeypatch.setattr(
+        t,
+        "_verify_commit_landed",
+        lambda rid, body, before: {"verified": True, "reason": None, "folder_id": 3087792, "updated_at": "2026-09-08T23:38:39Z"},
+    )
     ir = _push_ir("r-folder-ok")
     with patch("training.hevy_write_client.create_folder") as create_folder_mock:
         result = _commit(ir, return_value={"routine_folders": [{"id": 3087792, "title": "Push"}]})
     assert result["status"] == "committed"
     assert result["folder"] == "Push"
+    assert result["hevy_folder_id"] == 3087792, "the folder must come from the readback"
     assert ir.hevy_folder_id == 3087792
     create_folder_mock.assert_not_called()
+
+
+def test_commit_does_not_record_a_folder_the_readback_did_not_confirm(monkeypatch):
+    """The #3718 shape exactly: Hevy holds Archive, the tool intended Legs."""
+    monkeypatch.setattr(
+        t,
+        "_verify_commit_landed",
+        lambda rid, body, before: {"verified": True, "reason": None, "folder_id": 3087806, "updated_at": "2026-09-08T23:38:39Z"},
+    )
+    ir = _push_ir("r-folder-archive")
+    _commit(ir, return_value={"routine_folders": [{"id": 3087792, "title": "Push"}]})
+    assert ir.hevy_folder_id == 3087806, "recorded the intended folder instead of the real one"
 
 
 def test_ensure_folder_returns_reason_when_create_folder_fails():
