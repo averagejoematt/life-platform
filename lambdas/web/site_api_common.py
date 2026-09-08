@@ -235,9 +235,22 @@ PLATFORM_STATS = {
     # This is a hand-maintained judgment field (never rewritten by sync_doc_metadata);
     # tests/test_platform_stats_cost.py is the offline drift guard.
     "review_count": 19,
-    "review_grade": "A",
-    "active_secrets": 21,
-    "site_pages": 77,
+    # #3690: was "A" while the newest full review graded ZERO lenses at A — the
+    # 2026-09-05 baseline is B+ 9 · B 3 · B- 3 · C+ 2 across 17 lenses, modal B+,
+    # worst C+. This is the platform's most-quoted credibility number, on the page a
+    # skeptic reaches for, and it was the LEAST guarded value on the site: the counts
+    # beside it (lambdas, mcp_tools, alarms, test_count) are all derived and CI-gated,
+    # while this one was a hand-typed letter nothing re-read.
+    #
+    # It is the MODAL lens grade, not an average and not a headline — a single letter
+    # cannot honestly summarise 17 lenses, so the page states the distribution beside
+    # it. tests/test_platform_stats_honesty_3690.py re-derives all three fields below
+    # from their real sources and reds when any drifts, which is what makes correcting
+    # them today more than a one-time patch.
+    "review_grade": "B+",
+    "review_grade_distribution": "B+ 9 · B 3 · B- 3 · C+ 2 (17 lenses, 2026-09-05)",
+    "active_secrets": 28,  # #3690: was 21; model/platform_model.json cost_surface.secrets
+    "site_pages": 93,  # #3690: was 77; tests/qa_manifest.py is the single page registry
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
