@@ -6,6 +6,7 @@ from contextlib import ExitStack
 from unittest.mock import patch
 
 import pytest
+from training import hevy_write_client as wc
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 # The MCP package depends on boto3 + config at import time; conftest sets the
@@ -40,8 +41,8 @@ _TITLE_CTX = {
 @pytest.fixture(autouse=True)
 def _commit_verifies(monkeypatch):
     monkeypatch.setattr(
-        t,
-        "_verify_commit_landed",
+        wc,
+        "verify_commit_landed",
         lambda rid, body, before: {"verified": True, "reason": None, "folder_id": None, "updated_at": "2026-09-08T23:38:39Z"},
         raising=False,
     )
@@ -113,8 +114,6 @@ def test_archive_calls_update_not_delete():
 
 def test_commit_handles_orphan_created():
     """When Hevy 400s but the routine was actually created, link the id and return a warning."""
-    from training import hevy_write_client as wc
-
     ir = RoutineSpec(
         routine_id="r-orphan",
         target_date="2026-06-01",
@@ -486,8 +485,8 @@ def test_commit_reports_the_resolved_folder_title_on_success(monkeypatch):
     intended folder written as an achieved one.
     """
     monkeypatch.setattr(
-        t,
-        "_verify_commit_landed",
+        wc,
+        "verify_commit_landed",
         lambda rid, body, before: {"verified": True, "reason": None, "folder_id": 3087792, "updated_at": "2026-09-08T23:38:39Z"},
     )
     ir = _push_ir("r-folder-ok")
@@ -503,8 +502,8 @@ def test_commit_reports_the_resolved_folder_title_on_success(monkeypatch):
 def test_commit_does_not_record_a_folder_the_readback_did_not_confirm(monkeypatch):
     """The #3718 shape exactly: Hevy holds Archive, the tool intended Legs."""
     monkeypatch.setattr(
-        t,
-        "_verify_commit_landed",
+        wc,
+        "verify_commit_landed",
         lambda rid, body, before: {"verified": True, "reason": None, "folder_id": 3087806, "updated_at": "2026-09-08T23:38:39Z"},
     )
     ir = _push_ir("r-folder-archive")

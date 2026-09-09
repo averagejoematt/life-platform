@@ -911,53 +911,6 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _verify_commit_landed(routine_id: str, body: dict, before_updated_at: str | None) -> dict:
-    """Read the routine back from Hevy and say whether the write actually landed (#3718).
-
-    THE INCIDENT. On 2026-09-08 a commit reported "Pushed. Foundation - Legs -
-    1 - 3, filed in your Legs folder." The IR recorded hevy_routine_id, an
-    hevy_folder_id of 3087819 (Legs) and hevy_pushed_at 23:00:03Z. Read live 29
-    minutes later, that routine was in folder 3087806 (Archive), its updated_at
-    was still 2026-09-07T04:05:50Z, and its contents were June's. Nothing
-    reached Hevy, the owner was told it had, and he would have discovered it at
-    the gym.
-
-    The response to a write is the API agreeing it received a request. It is
-    not evidence of state. This asks Hevy what it now holds and compares it to
-    what we sent — template ids and set counts, plus whether updated_at moved.
-    """
-    from training import hevy_write_client as wc
-
-    out = {"verified": False, "reason": None, "folder_id": None, "updated_at": None}
-    try:
-        got = wc.get_routine(routine_id)
-    except Exception as e:  # noqa: BLE001 - an unreadable routine is an unverified one
-        out["reason"] = f"readback failed ({type(e).__name__}: {e})"
-        return out
-    rt = got.get("routine") if isinstance(got.get("routine"), dict) else got
-    if isinstance(rt, list):
-        rt = rt[0] if rt else {}
-    if not rt:
-        out["reason"] = "readback returned no routine"
-        return out
-
-    out["folder_id"] = rt.get("folder_id")
-    out["updated_at"] = rt.get("updated_at")
-
-    sent = [str(e.get("exercise_template_id")) for e in (body.get("routine") or body).get("exercises", []) or []]
-    live = [str(e.get("exercise_template_id")) for e in (rt.get("exercises") or [])]
-    if sent and live != sent:
-        out["reason"] = f"content mismatch — sent {len(sent)} exercise(s), Hevy holds {len(live)}"
-        return out
-    if before_updated_at and str(rt.get("updated_at") or "") == str(before_updated_at):
-        # The decisive check for the #3718 case: a PUT that changed nothing.
-        out["reason"] = f"updated_at did not move (still {before_updated_at}) — the write did not apply"
-        return out
-
-    out["verified"] = True
-    return out
-
-
 def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
@@ -1014,14 +967,10 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
         ir.hevy_routine_id = parsed["hevy_routine_id"] or ir.hevy_routine_id
         ir.hevy_updated_at = parsed["updated_at"]
 
-        # #3718 — verify against Hevy, not against Hevy's acknowledgement.
-        check = (
-            _verify_commit_landed(ir.hevy_routine_id, body, before_updated_at)
-            if ir.hevy_routine_id
-            else {"verified": False, "reason": "no routine id returned"}
-        )
-        # An INTENDED folder is never recorded as an achieved one: folder_id is
-        # create-only, so on the update branch the local value would be fiction.
+        # #3718 — verify against Hevy, not against its acknowledgement; and record
+        # the folder the READBACK found, never the one we intended (folder_id is
+        # create-only, so on the update branch an intended value is fiction).
+        check = wc.verify_commit_landed(ir.hevy_routine_id, body, before_updated_at)
         ir.hevy_folder_id = check.get("folder_id")
         ir.hevy_pushed_at = _ts_now()
         ir.status = "active"
@@ -1043,23 +992,12 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # learns the routine landed in the Hevy account root instead of its folder.
             "folder": folder_note or _UPDATE_FOLDER_NOTE,
             # #3718 — what Hevy actually holds, read back after the write.
-            "verified": bool(check.get("verified")),
-            "hevy_folder_id": check.get("folder_id"),
-            "hevy_updated_at": check.get("updated_at"),
+            **wc.readback_fields(check, took_update_branch),
         }
-        if took_update_branch:
-            out["branch"] = (
-                "update — this commit targeted an EXISTING routine. folder_id is create-only in "
-                "Hevy, so the routine cannot move folders no matter what this result says."
-            )
         if not check.get("verified"):
             ir.status = "unverified"
             put_versioned(ir)
-            out["error"] = (
-                f"NOT VERIFIED: {check.get('reason')}. The write was acknowledged by Hevy but a "
-                f"readback does not show it. Do NOT tell the athlete this session is ready — "
-                f"check the routine in the app before relying on it."
-            )
+            out["error"] = wc.UNVERIFIED_NOTE.format(reason=check.get("reason"))
             warnings.append(out["error"])
         if warnings:
             out["warnings"] = warnings

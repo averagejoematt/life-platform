@@ -19,6 +19,7 @@ function, so the verifier is not a gate that only ever runs stubbed.
 """
 
 import pytest
+from training import hevy_write_client as wc  # verify_commit_landed lives with the client (#3718)
 
 from mcp import tools_hevy_routine as t
 
@@ -27,8 +28,6 @@ BEFORE = "2026-09-07T04:05:50.210Z"
 
 
 def _stub(monkeypatch, routine):
-    from training import hevy_write_client as wc
-
     monkeypatch.setattr(wc, "get_routine", lambda rid: {"routine": routine}, raising=False)
 
 
@@ -43,7 +42,7 @@ def test_a_write_that_did_not_move_hevys_timestamp_is_not_verified(monkeypatch):
             "exercises": [{"exercise_template_id": "2B4B7310"}, {"exercise_template_id": "cb2d3813"}],
         },
     )
-    out = t._verify_commit_landed("a98f6295", BODY, BEFORE)
+    out = wc.verify_commit_landed("a98f6295", BODY, BEFORE)
     assert out["verified"] is False
     assert "did not move" in out["reason"]
 
@@ -58,14 +57,14 @@ def test_a_write_that_moved_the_timestamp_and_matches_content_is_verified(monkey
             "exercises": [{"exercise_template_id": "2B4B7310"}, {"exercise_template_id": "cb2d3813"}],
         },
     )
-    out = t._verify_commit_landed("a98f6295", BODY, BEFORE)
+    out = wc.verify_commit_landed("a98f6295", BODY, BEFORE)
     assert out["verified"] is True and out["reason"] is None
 
 
 def test_content_mismatch_is_not_verified_even_when_the_timestamp_moved(monkeypatch):
     """A moved timestamp alone is not proof the right thing landed."""
     _stub(monkeypatch, {"id": "x", "updated_at": "2026-09-08T23:38:39Z", "exercises": [{"exercise_template_id": "SOMETHING_ELSE"}]})
-    out = t._verify_commit_landed("x", BODY, BEFORE)
+    out = wc.verify_commit_landed("x", BODY, BEFORE)
     assert out["verified"] is False
     assert "content mismatch" in out["reason"]
 
@@ -81,25 +80,24 @@ def test_the_real_folder_is_reported_not_the_intended_one(monkeypatch):
             "exercises": [{"exercise_template_id": "2B4B7310"}, {"exercise_template_id": "cb2d3813"}],
         },
     )
-    out = t._verify_commit_landed("a98f6295", BODY, BEFORE)
+    out = wc.verify_commit_landed("a98f6295", BODY, BEFORE)
     assert out["folder_id"] == 3087806
 
 
 def test_an_unreadable_routine_is_unverified_not_assumed_good(monkeypatch):
-    from training import hevy_write_client as wc
 
     def _boom(rid):
         raise RuntimeError("timeout")
 
     monkeypatch.setattr(wc, "get_routine", _boom, raising=False)
-    out = t._verify_commit_landed("x", BODY, BEFORE)
+    out = wc.verify_commit_landed("x", BODY, BEFORE)
     assert out["verified"] is False
     assert "readback failed" in out["reason"]
 
 
 def test_an_empty_readback_is_unverified(monkeypatch):
     _stub(monkeypatch, {})
-    out = t._verify_commit_landed("x", BODY, BEFORE)
+    out = wc.verify_commit_landed("x", BODY, BEFORE)
     assert out["verified"] is False
 
 
@@ -115,7 +113,7 @@ def test_a_first_create_has_no_prior_timestamp_and_still_verifies_on_content(mon
             "exercises": [{"exercise_template_id": "2B4B7310"}, {"exercise_template_id": "cb2d3813"}],
         },
     )
-    out = t._verify_commit_landed("new", BODY, before)
+    out = wc.verify_commit_landed("new", BODY, before)
     assert out["verified"] is True
 
 
