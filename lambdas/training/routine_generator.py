@@ -205,6 +205,7 @@ def _build_exercise_note(
     catalog: dict[str, Any],
     history_index: dict[str, list],
     notes_mode: str,
+    weight_index: dict[str, float] | None = None,
 ) -> str:
     """ADR-068: deterministic per-exercise note from real workout records.
 
@@ -216,7 +217,7 @@ def _build_exercise_note(
 
     template_id = catalog.get("movements", {}).get(movement_key, {}).get("hevy_template_id_hint")
     facts = history_facts(template_id, history_index)
-    history_cue = render_history_cue(facts)
+    history_cue = render_history_cue(facts, weight_index=weight_index)
     return pick_note(history_cue, ai_comment=None, mode=notes_mode)
 
 
@@ -298,15 +299,36 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     # ADR-068: pre-load exercise history once per generation. Pure data;
     # downstream renderers can quote but cannot invent.
     history_index: dict[str, list] = {}
+    weight_index: dict[str, float] = {}
     if notes_mode != "off":
         try:
-            from training.exercise_history import load_recent_history
-
-            history_index = load_recent_history(
-                lookback_days=int(week_cfg.get("exercise_notes_lookback_days", 180)),
+            from training.exercise_history import (
+                DEFAULT_LOOKBACK_DAYS,
+                FLOOR_LOOKBACK_DAYS,
+                load_recent_history,
             )
+
+            # #3708 — the floor is enforced HERE, not in the config file.
+            # training_week.json is NOT staged into the bundle (build_bundle
+            # stages only food_vocabulary/personas/coaches), so the runtime
+            # reads the S3 copy — and a stale S3 copy still saying 180 would
+            # silently reinstate the defect this issue fixes. Same shape as
+            # #3671: derive the guarantee from code that ships in every
+            # bundle, and let config widen the window but never narrow it
+            # below the floor.
+            configured = int(week_cfg.get("exercise_notes_lookback_days", DEFAULT_LOOKBACK_DAYS))
+            history_index = load_recent_history(lookback_days=max(configured, FLOOR_LOOKBACK_DAYS))
         except Exception as e:
             logger.warning(f"exercise_history load failed (notes will be empty): {e}")
+        # #3708 — bodyweight context for historical cues. Failing this load
+        # degrades the cue to a bare date; it never blocks generation and never
+        # substitutes a guessed weight.
+        try:
+            from training.exercise_history import load_bodyweight_index
+
+            weight_index = load_bodyweight_index()
+        except Exception as e:
+            logger.warning(f"bodyweight index load failed (cues lose the 'at X lb' clause): {e}")
 
     for muscle in targets:
         budget = _muscle_budget(muscle, landmarks, week_cfg, inputs.volume_7d, autoreg, inputs.add_load_enabled)
@@ -326,7 +348,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         muscle_sets = 0
         for movement_key, mdef in picks:
             tag = f"{muscle}_MEV_{landmarks['muscles'][muscle]['MEV']}_remaining_{max(0, landmarks['muscles'][muscle]['MEV'] - inputs.volume_7d.get(muscle, 0))}"
-            note = _build_exercise_note(movement_key, catalog, history_index, notes_mode)
+            note = _build_exercise_note(movement_key, catalog, history_index, notes_mode, weight_index=weight_index)
             exercises.append(_block_from_pick(movement_key, mdef, tag, note=note))
             muscle_sets += mdef["_sets"]
         budget_used[muscle] = muscle_sets

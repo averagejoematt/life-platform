@@ -97,6 +97,23 @@ If authoring tomorrow's session (skip this if `$ARGUMENTS` is `review`):
   targets.
 - Weight-loss trajectory: `get_weight_loss_progress` — early-cut drops are water, don't
   read week-1 rate as tissue.
+- **The weight-matched reference: `get_benchmark(view="prescription")` (#3710).** Cardio
+  volume and target heart rate are prescribed FROM this, not from feel. It returns what
+  Matthew was actually doing at a comparable bodyweight during a period he was LOSING —
+  walk miles/hours, target walk bpm, sets, per-movement loads — plus the weight distance
+  to that period and its evidence tier. Read it as follows, and do not improvise around it:
+  - `proven_target` is the target. `current_typical` is the BASELINE and must never be
+    quoted as a recommendation — at his current weight it is drawn from the very weeks he
+    is trying to escape.
+  - `volume_citable: false` means the nearest losing-phase period is below the evidence
+    floor. Cite it as description ("the nearest comparable period ran X mi/wk, from N
+    effective days — below the bar to set as a target"), never as a prescription.
+  - `band_distance_lb > 0` must be said out loud. A reference 18 lb lighter is not a
+    mirror, and presenting it as one is the failure this tool exists to prevent.
+  - `applicable: false` with `reference_schema: 1` is a STALE REFERENCE — `episode-detect`
+    needs redeploying. It is not a finding about his history; do not report it as one.
+  - Intake is never comparable (no nutrition data before 2025-11-24). Say so whenever the
+    comparison is used, per ADR-104.
 - Mood/journal continuity: `get_mood` — mood continuity is a make-or-break signal for
   whether tomorrow's session should push or hold.
 - Muscle volume vs MEV/MAV/MRV (`get_muscle_volume`) for the muscle groups in tomorrow's

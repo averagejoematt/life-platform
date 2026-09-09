@@ -27,7 +27,8 @@
   "floor_session_set_count": 6,
   "floor_session_minutes": 20,
   "exercise_notes_mode": "one_best_line",
-  "exercise_notes_lookback_days": 180,
+  "_exercise_notes_lookback_note": "#3708: this file is NOT staged into the Lambda bundle, so the runtime reads the S3 copy. The window is floored in code at exercise_history.FLOOR_LOOKBACK_DAYS — this value can widen it, never narrow it below the floor.",
+  "exercise_notes_lookback_days": 3650,
   "_notes": [
     "session_set_ceiling=25 caps total hard sets per session.",
     "skill_ceiling=2 means barbell tier-3 movements are excluded until the Sports Medicine seat is fully staffed (interim).",
