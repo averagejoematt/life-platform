@@ -211,37 +211,36 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-08 (Opus 5, **Session Y — unblock the site, build the owner's read, then
-stabilise for a 6-day pause**; owner: *"do everything that concerns you to get it stable, then
-wrap"*). **12 PRs merged, 8 issues closed on live proof, 1 reopened.** **Read the stabilise pass
-first: main was RED ~3h and two production deploy leases had been stranded 9.1h — both found by
-CHECKING when the owner asked whether pausing was safe, not by anyone watching.** The red was
-#3684's new test importing `yaml` into a deploy-critical lane that installs no PyYAML; a collection
-error takes the whole lane, and this is the **third appearance of that class in INCIDENT_LOG** (both
-leases were ancestors, rejected per approve-the-tip-reject-ancestors; the platform had auto-filed
-#3694 and nothing escalated it). **#3652 CLOSED on complete three-part proof** — two consecutive
-`site/**` deploys live plus the control run where `rollback-site-on-failure` DECLINED by name with
-`version.json` untouched; the 53 dark a11y files verified by CONTENT, not sha. Closed on boxes 2–4
-only: box 1 asked for a *retry* on a truncated judge verdict and #3656 delivered a *budget raise* —
-a mitigation, not the mechanism (**#3688**). **`/method/state/` is live** (#3691) — the joined
-owner-facing read that turns "110 open" into 72 actionable / 46 from commissioned audits / 10
-reader-facing / 9 P1 / 0 P0, with delivery over the true population (662 closed, 756 PRs, median
-12.6h, organic 8.7h vs audit-sourced 29.2h). It shipped **four** bugs and fixed all four, every one
-found by RUNNING it: it truncated its own population at a 400 cap; the page rendered nothing with
-**zero console errors** because `isBad()` is a scalar detector and `String(obj)` matches its own
-bracket test; MTD spend was missing because the key set was *guessed*; and three sections vanished
-silently while the footer claimed they showed as gaps. Its honesty contract then earned its keep on
-the first real deploy — green with **5 of 9 sections null**, each naming its own cause. Also
-stabilised: the site was publicly serving **`review_grade: "A"` while the newest review graded ZERO
-lenses at A** (now `B+` with the distribution, #3690), and the nightly had been permanently red
-since 09-03 on a false positive, so a real regression would have been invisible beside it (#3650).
-**Two controls turned out to have expiry dates on them** — a mutation proof planting `import yaml`
-went blind the moment pyyaml was legitimately added, and a config test pinned a date its own
-docstring says the owner advances by hand; *a positive control keyed to a value that can later be
-sanctioned is a control with an expiry date on it.* Owner threads answered live: the `Pull 3 - 2`
-counter (`current_started` re-anchored in **both** copies — the S3 one is what the runtime reads,
-the #3675 trap), and the training-note brief, where I **corrected the owner's leading hypothesis**:
-truncation returns `[]` and never raises, so it leaves `degraded: False` — a silent degradation
-meaning `degraded` **undercounts** (#3699, #3700). **Owner acts left:** the #3679 history-exposure
-disclosure call · the #3568 test send · Wednesday 09-09's chronicle send closes #3563 leg 2 on its
-own (IAM grant verified deployed).
+**Verified:** 2026-09-08 (Opus 5, **Session Z — plan from the campaign that worked**; owner:
+*"I authorize you to do everything this session"*). **7 stories on PR #3713, 12 issues filed,
+NOTHING MERGED AND NOTHING DEPLOYED — the whole branch is correct code nothing consults yet.**
+The owner asked from the gym why the planner guessed a load for a lift he'd done 80 times and
+hedged on target HR. Same cause, and it wasn't prompting: **every input the night-before path
+reads is a recent window** — `daily-debrief` pulls 14 tools, none carrying a prior campaign,
+none carrying a heart rate. Measured live: **489 of 537 logged movements were invisible** at the
+180-day lookback (Deadlift, 80 sessions, read as "no history"), and the trailing 30d ran +1.62
+lb/wk on 2.5 walk-mi/wk against the 21.5 that produced the first month of the 100-lb cut. Built:
+the window reaches the corpus (#3708 — floor enforced in code because `training_week.json` is
+S3-read and a repo fix would have been INERT, the #3675 trap); `training_reference` v2 with
+nearest-band resolution and per-band n (#3709 — bands summed over **in-band days**; `min..max`
+made every band a lifetime average wearing a band's name); the `prescription`/`campaign` views
+plus the skill wiring (#3710/#3711 — `get_benchmark` had existed since BENCH-1 with **nothing in
+the training path ever calling it**); **cycling was dropped from every covariate** (#3716 — 394
+rides, 62% of cardio hours at 230-239 lb, invisible above 300 lb which is why it read
+plausibly). Evidence floors came from research, not preference: 21 effective days, the chronic
+window's lower bound, applied to `n_eff` per contiguous visit — which honestly puts the band
+nearest 327 lb at n_eff 19.5, **just under**, so it may be described and not prescribed from.
+The owner asked to imply or backfill the uncaptured post-lift cardio; **rejected** — a synthetic
+row in `SOURCE#hevy` is indistinguishable from a measured one — and #3717 ships a declared
+attestation layer instead. **Four defects were found by RUNNING it**: a v1 reference reporting
+"no comparable period" (an undeployed Lambda reading as a finding about his history); a campaign
+signal printing "97%" off a 3-day window directly beneath its own `rates_are_artifacts: True`;
+an exact-match date lookup producing a **silently empty** proven curve; and `wc` out of scope in
+the new verifier with the fail-soft `except` swallowing the NameError, so **every commit would
+have reported "unverified."** Two guards proved to be **text matchers** — the #2376 wallclock
+gate is satisfied by the word "frozen" anywhere in a file, and my own first write-guard matched
+its own docstring; both now parse AST. **#3719 is live and it is the owner's call:**
+`/api/physical_overview` serves the full tape-measurement panel publicly with no tier and no
+consent stamp while adjacent DEXA carries `TIER_OWNER_PUBLISHED` — publish deliberately or
+restrict. **Owner acts left:** #3719's ruling · merge+deploy #3713 (held deliberately — it
+changes tomorrow morning's authoring path) · #3716's Cross-Training question.
