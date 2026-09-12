@@ -6131,7 +6131,7 @@
       "module": "lambdas/ingestion/hevy_backfill_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 12-23 * * ? *)",
+          "expr": "cron(0 * * * ? *)",
           "resolution": "constant"
         }
       ],
@@ -7282,7 +7282,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API-key pull, hourly 12\u201323 UTC",
+      "method": "API-key pull, hourly (24h)",
       "privacy_tier": "owner_only",
       "stale_hours": 168
     },
@@ -8233,7 +8233,7 @@
       "utc": null
     },
     {
-      "expr": "cron(0 12-23 * * ? *)",
+      "expr": "cron(0 * * * ? *)",
       "lambda": "hevy-backfill",
       "resolution": "constant",
       "stack": "ingestion_stack",

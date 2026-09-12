@@ -28,7 +28,7 @@ Public surface: `averagejoematt.com` — "The Measured Life" (ADR-071, v5 IA): H
 15 ingestion Lambdas (8 SIMP-2 framework + 7 pattern-exempt — ADR-056/060)
   • EventBridge cron (hourly at UTC hours 12–23 + 0–5, `INGEST_HOURLY` — skips the
     overnight-PT hours; exceptions: Weather 2x/day, Todoist 1x/day at 14:00 UTC,
-    Hevy hourly 12–23 UTC only, Garmin PAUSED — no schedule, manual invoke, ADR-074)
+    Hevy all 24 hours (#3720), Garmin PAUSED — no schedule, manual invoke, ADR-074)
   • HAE webhook (CGM, BP, water, State of Mind — near real-time)
   • S3/poll triggers (macrofactor CSV via dropbox-poll, measurements)
     │
