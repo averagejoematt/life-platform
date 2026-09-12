@@ -360,16 +360,25 @@ class IngestionStack(Stack):
         # ADR-103 retire-candidate). The handler source
         # (lambdas/ingestion/hevy_webhook_lambda.py) stays in git history for
         # revival if Hevy ever ships webhooks. This poller is the actual
-        # ingestion mechanism: every waking hour, walk
-        # /v1/workouts/events?since=<last_success>. 12-23 UTC = 5 AM – 4 PM
-        # PT. Adjust if Matthew lifts later.
+        # ingestion mechanism: every hour, walk
+        # /v1/workouts/events?since=<last_success>.
+        #
+        # #3720: was 12-23 UTC (5 AM – 4 PM PT) on the assumption he lifts in
+        # the morning. On 2026-09-11 he finished at 5:30 PM PT — 90 minutes
+        # after the last poll of the day — and the session was invisible to
+        # every consumer until 5 AM the next morning, an ~11.5h blind window
+        # the 7-day `stale_hours` facet cannot detect by construction. Moving
+        # the boundary to a later hour only relocates the same bug to whatever
+        # hour he eventually trains past, so the window is now 24h. An empty
+        # feed costs one API call and one page (~800 ms), so the 12 added
+        # invocations/day are rounding error against never missing a session.
         create_platform_lambda(
             self,
             "HevyBackfill",
             function_name="hevy-backfill",
             source_file="lambdas/ingestion/hevy_backfill_lambda.py",
             handler="ingestion.hevy_backfill_lambda.lambda_handler",
-            schedule="cron(0 12-23 * * ? *)",  # hourly :00, 5 AM – 4 PM PT
+            schedule="cron(0 * * * ? *)",  # hourly :00, 24h — #3720
             timeout_seconds=300,
             memory_mb=256,
             environment={

@@ -842,7 +842,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "active_api": True,
         "expected_days": None,  # lifting is event-driven — gaps are training structure
         "qa_tier": None,
-        "method": "API-key pull, hourly 12–23 UTC",
+        "method": "API-key pull, hourly (24h)",
         "metrics": "Strength sets, reps, load, rest times",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/hevy", "scheme": "flat-uuid", "note": "workout-UUID keyed, no date tree (X-9)"},
