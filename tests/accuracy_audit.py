@@ -275,9 +275,33 @@ def sanity_scan(run_dir):
 # pre-exemption is how a real impossible number gets waved through.
 _SIGNED_PCT_FIELDS = frozenset({"progress_pct"})
 
+# Percent fields that are a share OF A TARGET rather than of a whole: beating the
+# target is the point, so their legal domain runs above 100. 2026-09-12 (#3725):
+# /api/zone2 served `target_pct: 118` — 177 Zone-2 minutes against the 150-min weekly
+# target, with `target_met: true` in the SAME object — and this gate called Matthew's
+# best Zone-2 week three HIGH "impossible value" findings, reddening the
+# deploy-GATING copy. It would have reddened every site deploy until his weekly
+# Zone-2 fell back under 150, i.e. the pipeline was blocked by him training well.
+#
+# This is the second specimen of the class the 2026-07-17 progress_pct rollback was
+# the first of (see tests/test_accuracy_audit_ranges.py:1-7): the `_pct` SUFFIX is
+# not one semantic. Shares-of-a-whole, signed deltas and achievement ratios are three
+# domains wearing one name, and each one is discovered the day real data reaches it.
+#
+# Bounded, not exempt. The comment above is right that a broad pre-exemption is how a
+# real impossible number gets waved through, so the ceiling stays finite: a
+# divide-by-near-zero blowup still trips the gate. 1000% = ten times target, far past
+# any honest week and far below a computation failure.
+_ACHIEVEMENT_PCT_FIELDS = frozenset({"target_pct"})
+_ACHIEVEMENT_PCT_MAX = 1000
+
 
 def _pct_bounds(key):
-    return (-100, 100) if key in _SIGNED_PCT_FIELDS else (0, 100)
+    if key in _SIGNED_PCT_FIELDS:
+        return (-100, 100)
+    if key in _ACHIEVEMENT_PCT_FIELDS:
+        return (0, _ACHIEVEMENT_PCT_MAX)
+    return (0, 100)
 
 
 def scan_impossible_pcts(payload, source="payload"):
