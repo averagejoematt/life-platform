@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 412** — feedback 24 · reference 229 · security 1 · project 155 · user 1 · index 2
+**Files in the memory index snapshot: 418** — feedback 24 · reference 234 · security 1 · project 156 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 254** — homed-here 61 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
+**Rule-class files (feedback + reference + security): 259** — homed-here 64 · already-homed 169 · superseded 7 · narrative 17 · off-repo 2
 
-**Program/session files (project): 155** — already-homed 14 · superseded 1 · narrative 137 · off-repo 2 · index 1
+**Program/session files (project): 156** — already-homed 14 · superseded 1 · narrative 138 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -224,6 +224,7 @@ project_session_v_2026_09_05.md
 project_session_w_2026_09_06.md
 project_session_x_2026_09_07.md
 project_session_y_2026_09_08.md
+project_session_z_2026_09_08.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -247,6 +248,8 @@ project_voice_studio_2026_07_19.md
 project_whoop_reauth.md
 project_wiki_program_2026_07_10.md
 project_wrong_day_and_wrong_gauge_2026_08_18.md
+reference_a_band_is_not_a_contiguous_window.md
+reference_a_behavioral_threshold_cannot_see_a_same_day_miss.md
 reference_a_cancelled_ci_rollup_hides_real_failures.md
 reference_a_check_after_truncation_launders_the_defect.md
 reference_a_check_that_measures_nothing_returns_clean.md
@@ -260,6 +263,8 @@ reference_a_derived_artifact_needs_its_lane.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
+reference_a_page_of_logs_is_not_the_latest.md
+reference_a_pct_suffix_is_not_one_semantic.md
 reference_a_piped_exit_code_is_not_a_test_result.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
@@ -285,6 +290,7 @@ reference_arming_a_semantic_gate_needs_a_baseline.md
 reference_asset_hasher_comment_paths.md
 reference_asset_hashing_full_graph.md
 reference_ast_walk_annassign_blindness.md
+reference_attest_never_backfill.md
 reference_audit_mislabels_loadbearing_dirs.md
 reference_autoclose_keyword_ignores_negation.md
 reference_averagejoematt_dns_and_mail.md
@@ -910,6 +916,12 @@ carries an operating rule.
 | `reference_a_writer_that_ignores_the_wipe_tombstone.md` | reference | `docs/PHASE_TAXONOMY.md` (ADR-077 has a reader half and needed a writer half — an archived row is `status: draft` plus a tombstone, and every WRITER must check the tombstone, not just readers) | already-homed |
 | `reference_frozen_prereg_is_stamped_fix_the_test.md` | reference | `docs/CONVENTIONS.md` §7 (a SEALED pre-registration is never edited to make a test pass — the test is what is wrong; supersede by annotation) | already-homed |
 | `reference_session_limit_window_and_workflow_resume.md` | reference | — narrative: a dated observation about model usage windows and workflow resume behaviour, not a repo rule | narrative |
+| `reference_a_behavioral_threshold_cannot_see_a_same_day_miss.md` | reference | `lambdas/ingestion/source_registry.py` (the `behavioral` + `stale_hours` facets and their comments state why a behavioural source is lenient) and `cdk/stacks/ingestion_stack.py` §HevyBackfill (the #3720 comment states why the polling window is 24h and why moving the boundary only relocates the bug) | homed-here |
+| `reference_a_page_of_logs_is_not_the_latest.md` | reference | `scripts/check_alarm_citations.py` (`fetch_qa_smoke_causes`'s #3729 comment states that filter_log_events pages by stream, that the read must follow nextToken, and that ordering is the caller's guarantee) | homed-here |
+| `reference_a_pct_suffix_is_not_one_semantic.md` | reference | `tests/accuracy_audit.py` (the `_SIGNED_PCT_FIELDS` / `_ACHIEVEMENT_PCT_FIELDS` comment block states the three percent domains and why the achievement class is bounded rather than exempt) | homed-here |
+| `reference_a_band_is_not_a_contiguous_window.md` | reference | — narrative: filed by Session Z on the unmerged #3713 branch; its rule lands with `training_reference` v2 when that PR merges | narrative |
+| `reference_attest_never_backfill.md` | reference | — narrative: filed by Session Z on the unmerged #3713 branch; its rule lands with the #3717 attestation layer when that PR merges | narrative |
+| `project_session_z_2026_09_08.md` | project | — narrative: a session record, not a repo rule | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
 | `user_who_is_matthew.md` | user | — out of scope: who the owner is stays in memory | user |
 

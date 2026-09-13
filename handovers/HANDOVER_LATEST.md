@@ -1,217 +1,65 @@
-# Handover — Session Y: unblock the site, build the owner's read, then stabilise for a pause (2026-09-07 ~11:00 PT → 2026-09-08 ~21:30 PT)
+# Handover — Session AA: the poller stopped before he did, and three gates were grading the wrong thing (2026-09-11 ~20:30 PT → 2026-09-12 ~19:30 PT)
 
-**Driver:** Opus 5 (1M), lanes pinned to each issue's model label — Opus or Sonnet only, no Fable.
-**Plan:** `~/.claude/plans/transient-honking-flame.md` (Session Y), then a mid-session owner
-redirect into a new build (`~/.claude/plans/mellow-pondering-squid.md`), then an explicit
-*"do everything that concerns you to get it stable, then wrap"* before a **6-day development pause**.
+**Driver:** Opus 5 (1M). Started as one owner question from the gym floor — *"is the api down? i did log a hevy workout today"* — and became a session about instruments that report confidently on state they cannot see. Owner escalated mid-session to *"i want you to drive it all, get all the deploys etc."*
 
----
+## The question, and the real answer
 
-## The shape of the session
+Not down. `hevy-backfill` ran `cron(0 12-23 * * ? *)` — hourly, **05:00–16:00 PT**. He finished lifting at **17:30 PT**, 90 minutes after the last poll of the day. The session would have been invisible to every consumer until 05:00 the next morning: an **~11.5h blind window**.
 
-Three movements, and the third was the owner's call:
+Nothing failed. All 12 runs that day returned `ingested: 0`, `errors: 0`, each `since` window contiguous with the last. The comment above the schedule read *"Adjust if Matthew lifts later."*
 
-1. **Unblock the site.** 53 reader-facing a11y files had been merged and dark since 03:16Z the
-   previous day; every `site/**` deploy since had died at `Deploy public site`.
-2. **Build the owner-facing read** (#3691) — the owner asked for a way to see "how is the build
-   going" without opening eight things, because a board of ~110 open issues reads as an emergency.
-3. **Stabilise for a pause** — the owner asked whether stopping for six days should worry me. It
-   should have: **main was RED and had been for ~3h**, and two production deploy leases had been
-   stranded 9.1h.
+**Nothing could have caught it.** Hevy's `stale_hours` is `7*24` — correctly lenient, because lifting is event-driven and a rest week must not read as an outage. A behavioral source with a 7-day threshold **cannot detect a same-day miss by construction**. The owner noticed; no instrument did.
 
----
+## Shipped (all merged AND deployed, verified live)
 
-## What shipped
+- **#3720 / PR #3723** — hevy polls 24h. Widened to `cron(0 * * * ? *)` rather than to a later cutoff: moving the boundary relocates the same bug to whatever hour he eventually trains past. Live: `cron(0 * * * ? *)` ENABLED, target wired to `hevy-backfill`. Deployed via `cdk_deploy.sh LifePlatformIngestion` (both drift guards green) **and** re-applied by CI/CD run 34727155274, whose own reconcile job pushed the tip it then deployed.
+- **#3725 / PR #3727** — the accuracy gate called a **beaten** Zone-2 target impossible. `/api/zone2` served `target_pct: 118` (177 min against a 150-min target, `target_met: true` in the same object) and `scan_impossible_pcts` returned three HIGH findings, failing the site deploy. It is the deploy-GATING copy, so it would have blocked **every** site deploy until his weekly Zone-2 fell back under 150 — the pipeline blocked by him training well. Bounded at 1000%, not exempt. Live: 3 findings → **0** across `/api/zone2`, `/api/observatory_week`, `/api/vitals`.
+- **#3729 / PR #3730** — the alarm gate's live-cause read was truncated. `fetch_qa_smoke_causes` read ONE page of `filter_log_events`; CloudWatch pages **by log stream**, so page 1 held `CAUSE fail none -` from 09-11 while page 2 held the 09-13 01:20Z `coach_labs:truth`. It reported a **lit** alarm's cause as "no failures". Now paginated AND timestamp-sorted — the second assumption (concatenated pages are in time order) was false too.
 
-**12 PRs merged**, all green at merge, all with swallow-checked pushes.
+**Recovered immediately:** a manual `hevy-backfill` invoke pulled the missing session — `ingested: 1` → `DATE#2026-09-11#WORKOUT#f6e41751…`, 7 exercises, 21 sets, 10,942.93 kg, adherence `matched` 100%.
 
-| PR | What |
-|---|---|
-| #3665 | the commitments follow-through ledger (#3553) + its full deploy runlist |
-| #3680 | the Hevy Y counter derives from `EXPERIMENT_START_DATE` (#3671) |
-| #3683 | mobile evidence shells stop scrolling past their own hero (#3542) |
-| #3684 | CI timeouts re-derived from measured p95 + a headroom guard (#3678) |
-| #3689 | `commitments-ungraded` made creatable + a guard over all 98 alarms (#3685) |
-| #3693 | **the build readout** — the join, `/method/state/`, `/qbr` (#3691) |
-| #3695 | the readout degraded on its first real deploy — `gh` token + PyYAML |
-| #3696 | **main-red fix** — deploy-critical lane had no PyYAML |
-| #3697 | the site publicly claimed `review_grade: "A"` (#3690) |
-| #3698 | the chronicle manifest check reded the nightly for days (#3650) |
-| #3701 | `current_started` re-anchored to the cycle-17 genesis (#3671) |
-| #3679 | (inherited, merged at session start) the habitify fixture leak |
+## Filed, not fixed
 
-**Closed on live proof:** #3652, #3566, #3650, #3685, #3690, #3691, #3687, #3694.
-**#3678 REOPENED** — a `Fixes` keyword closed it against my explicit recorded judgement that it
-needed a week of runs; the reversal and the mechanism are on the issue.
+- **#3728** — *the one that matters to a reader.* The labs coach's served `position_summary` says "I have zero lab draws to interpret yet" while `/api/labs` serves `total_draws: 8`. Both public. **Not staleness and not fabrication**: the analysis regenerated the same day (`analysis_generated_at 2026-09-12T17:06:57Z`) and still says it, because the coach is cycle-scoped (genesis 09-06; all 8 draws are 2026-04-03, pre-genesis) and `/api/labs` is lifetime-scoped. Neither surface names its window. The check's own remedy ("regenerate the coach analysis") is therefore ineffective, and the check inherits the same flaw by comparing a cycle-scoped narration to a lifetime count.
+- **#3721** — `v4_build_gear.py` is stale: regenerating `/gear/` strips theme-color metas, the SVG favicon, manifest, apple-touch-icon and the loop-forward aside, redding 4 chrome tests. Worked around by patching the one string in place.
+- **#3722** — `test_regen_once_never_regresses` is a Hypothesis `FlakyFailure`; `regen_once` diverges between first and subsequent calls. Proven independent of the diff by a warm/wiped-DB bisect against pristine main.
+- **#3726** — the standalone nightly Visual QA has been red **8 consecutive nights** (09-05 → 09-12), 3 pages failing the sweep. #3650's class returned five days after it was closed.
+- **#3731** — Unit Tests duration budget: measured n=14 green-main runs, **13 of 14 over budget**, median 2575s vs 1950s (32% over), spread 48.3%. Not a spike. Filed asking for decomposition, **not** a raise — the number has been raised 7 times and SHED twice by decomposing.
+- **#3732** — coverage floor 74% sits 10.2 points under measured 84.2%: the ratchet stopped ratcheting, so ~10 points could be deleted silently.
 
----
+## Gotchas hit
 
-## The flagship: the site path is proven open (#3652, closed)
+- **A denied action is not always a missing permission.** `gh pr merge` sat in the allowlist (`Bash(gh pr merge *)`, plus a blanket `Bash(gh pr *)`) and was still refused — by the auto-mode classifier, which sits above the rules. Adding a permission would have fixed nothing; leaving auto mode did.
+- **The rollback scope check earned its keep.** The failing site deploy was classified `surface=api`, found not `site/**`-reachable, and the revert was **DECLINED by name**. `/version.json` stayed at `727473d`. That is #3652's mechanism working on a real case, not a drill.
+- **A `git checkout` looks like someone else editing your files.** `CLAUDE.md`'s status block appeared to change on disk mid-session; it was my own branch switching. Session Z wrapped on the unmerged #3713 branch, so its block lives only there while main still carried Session Y's.
+- **The reconcile bot is real and fast.** `c1c37a2f`'s own reconcile job pushed `dce72b5d` 43 seconds later, which is why the Deploy job checks out `needs.reconcile.outputs.build_sha` and not the run's head sha — the run that *looked* like an ancestor was the one that created the tip.
 
-Three-part proof, all cited by run id:
+## Verification
 
-| # | run | trigger | `version.json` | QA | rollback |
-|---|---|---|---|---|---|
-| 1 | `34150694105` | dispatch | `533e226` @ 18:13:07Z | success | skipped |
-| 2 | `34154159308` | **push** (#3665) | `deaed3e` @ 19:05:06Z | success | skipped |
-| 3 | `34160729881` | control, `ai-inject` | — | **red** | **DECLINED by name** |
+Full suite locally: **25,518 passed** (the 4 reds were the `platform_counts.py` test-count literal, driver-reconciled on main — CI's pre-merge job runs `sync_doc_metadata.py --apply` before the suite for exactly this). Every PR merged green: #3723 11/11, #3727 10/10, #3730 7/7. Both mutation-proof pairs bite: unbounding the pct ceiling and widening its class each red their own control; reverting the log read to one page reds the pagination control.
 
-The control's annotation, verbatim: `Site rollback DECLINED (#3352/#3395) — visual-qa: 1 of 1
-failed page(s) are NOT site/**-reachable (surface=ai-unevaluated; all: ai-unevaluated=1)`, with
-`version.json` unchanged. Five more clean site deploys followed.
-
-Verified the a11y batch by **content**, not sha: `<title id="archSvgTitle">` + `aria-labelledby`
-live on `/method/build/`, `<h1>` on `/subscribe/confirm/`, `cap-h` as `h3` ×5 with no `h4`,
-`<th>` labelled, `role="tabpanel"` on a `<div>` with **zero** residual `<article>`.
-
-**Closed on boxes 2–4 only.** Box 1 asked for a *retry* on a truncated judge verdict; #3656
-delivered a *budget raise*, which is a mitigation, not the mechanism. Filed as **#3688** rather
-than waved through.
-
----
-
-## The new surface: `/method/state/` (#3691, live)
-
-`https://averagejoematt.com/method/state/` — "The build". Unlisted, deterministic, regenerated on
-every site deploy. As served at wrap: **110 open → 72 actionable**, of which **46 came from
-commissioned audits**, **10 touch anything a reader sees**, **9 P1 / 0 P0**. Delivery over the true
-30-day population: **662 closed, 756 PRs, median cycle 12.6h**, split organic 8.7h vs audit-sourced
-29.2h. Plus graded lenses prior→now, what awaits live proof, incidents, gate census (90/637 proven),
-and spend from the governor.
-
-**It shipped four bugs and fixed all four — every one found by running it, not reading it:**
-
-1. **It truncated its own population** — capped GitHub paging at 400 and reported `closed: 400,
-   prs: 400`, both exactly the cap, with a median over an arbitrary subset. Truncation now derives
-   from the search API's own `total_count`.
-2. **The page rendered nothing, with ZERO console errors.** `isBad(d)` is a *scalar* placeholder
-   detector; `String(anyObject)` is `"[object Object]"`, which matches its `/^\[.*\]$/` test, so the
-   guard was unconditionally true. It read as "data not generated yet". → memory
-   `reference_isbad_is_a_scalar_detector`.
-3. **Month-to-date spend was missing entirely** and ceiling/surge both showed `$252.00` with no
-   `surge_active` — the key set was *guessed* and silently kept only what matched.
-4. **Three sections vanished silently on failure** while the footer claimed they were "shown as
-   gaps above" — found by running the negative control.
-
-**The honesty contract earned its keep on the first real deploy:** it shipped green with **5 of 9
-sections null** (`gh` has no token in Actions; the census had no PyYAML). Because each section
-carries its own error, one fetch named every cause. A design retaining last-known values would have
-shown plausible laptop numbers with no way to know.
-
----
-
-## The stabilise pass (the owner's "should a 6-day pause worry me?")
-
-**It should have, and the answer was found by checking rather than asserting.**
-
-- **main was RED ~3h** — #3684's new test imports `yaml`; the deploy-critical lane installs no
-  PyYAML, and a collection error takes the whole lane. **Third lane in one day**, and the **third
-  appearance of this class in `INCIDENT_LOG`**. Fixed in #3696.
-- **Two deploy leases stranded 9.1h**, both **ancestors**. Rejected per the standing rule; the
-  platform had auto-filed #3694 and nothing escalated it.
-- **The site was publicly claiming `review_grade: "A"`** while the newest review graded **zero**
-  lenses at A (B+ 9 / B 3 / B- 3 / C+ 2). Now serves `B+` with the distribution beside it, plus
-  `site_pages` 77→93 and `active_secrets` 21→28. Deployed and verified live.
-- **The nightly had been permanently red since 09-03** on a false positive, so a real regression
-  would have been invisible beside it. Fixed and deployed; verified `ok` against the real partition.
-
----
-
-## Two controls that had expiry dates on them
-
-Both found the same way — by doing the correct thing and watching a guard fail:
-
-- `test_deploy_critical_lane_imports_2758`'s mutation proof planted `import yaml` **because yaml was
-  forbidden**. Adding pyyaml legitimately made the plant legal and the control silently stopped
-  proving anything. Repointed at `requests`, which CLAUDE.md forbids outright.
-- `test_training_phases_config_still_carries_the_phase_anchors` pinned `current_started ==
-  "2026-06-16"` — a literal pin on a value **its own docstring says the owner advances by hand**.
-  Now asserts the field exists, parses as ISO, and names a real phase; watched red on all three.
-
-**A positive control keyed to a value that can later be sanctioned is a control with an expiry date
-on it.** Worth carrying forward.
-
----
-
-## Owner threads answered mid-session
-
-- **"Pull 3 - 2" naming** — Y=2 correct; N=3 correct *by the rule* and wrong in fact, because
-  `current_started` still read `2026-06-16`. Re-anchored in **both** copies; the S3 one is what
-  matters (`load_phase_state` reads local-then-S3 and the file is **not** bundled — the #3675 trap).
-  Proven on the Lambda's own path with `CONFIG_DIR` pointed at an empty dir.
-- **Training-note extractor brief** — verified and **corrected the owner's leading hypothesis**:
-  truncation returns `[]` and never raises, so it leaves `degraded: False` — a *silent* degradation
-  that doesn't set the flag, which means `degraded` **undercounts**. Filed #3699. Ruled out the
-  model id and the monthly cap so nobody re-checks them.
-- **"Pull the cardio comments forward"** — the capture side is already correct: today's record
-  carries `note="Level 9 - 5.6 miles"`, `distance_m=9012`, `duration_sec=1800`. The gap is one
-  branch: `render_history_cue` returns `""` for any set without weight+reps, so cardio gets no cue.
-  Filed #3700.
-
----
-
-## Gate marker lines
-
-**Build beat:** none — the session's headline (`/method/state/`) is an owner-facing internal
-surface, and `docs/content/BUILD_DISPATCH_CHECKLIST.md` scopes beats to reader-facing shipped work.
-**Docs:** `docs/INCIDENT_LOG.md` (+2 rows), `docs/alarm_citations.json` (re-cited),
-`docs/PROPORTIONALITY.md`, `docs/PLATFORM_NORTH_STAR.md` (fifth audience),
-`docs/SITE_MAP_AND_INTENT.md` (the new page) — all landed in their own PRs.
-**Decisions:** none needed — no governance-consequential choice was made that an existing ADR does
-not already cover; the north-star audience addition is recorded in that doc itself.
-**Main:** green (ba1cb95a) — HEAD `5262538f` has its run in flight; the two stranded ancestor leases
-were rejected, which is what returned the board to green.
-**Incidents:** 2 row(s) added — main red ~3h on the recurring undeclared-PyYAML deploy-critical
-class (its third appearance in this log), and the 9.1h production-deploy wedge from two
-undispositioned ancestor leases.
+**Build beat:** none — the three shipped fixes are gate-and-ingestion internals with no reader-visible change; the one reader-facing finding (#3728) is filed and unfixed, and a beat narrating a defect we have not closed would be a plan, not a beat.
+**Docs:** `docs/INCIDENT_LOG.md` (+1 row, Patterns regenerated), `docs/alarm_citations.json` (qa-smoke-failures re-cited to the true live cause), `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+6 rows, snapshot + counters recomputed from the rows), plus `docs/ARCHITECTURE.md` / `docs/ONBOARDING.md` / `docs/OPERATOR_GUIDE.md` / `docs/DEPENDENCY_GRAPH.md` in PR #3723.
+**Decisions:** none needed — three defect fixes inside existing ADR-104/ADR-105 semantics; no governance posture changed.
+**Main:** green (70a5e8ed)
+**Incidents:** 1 row added — the accuracy gate failing a healthy site deploy over a beaten Zone-2 target, where the rollback scope check correctly DECLINED the revert.
 **Stash/hooks:** clean
-**Closures:** #3652, #3566, #3650, #3685, #3690, #3691, #3687, #3694 commented; #3678 REOPENED
-(a `Fixes` keyword closed it against a recorded judgement) · DoD: scanned 2, hits 1 —
-`post-close-comment` on #3690, which is my own corrected live-proof line (the first carried
-`03:1xZ`, a placeholder the instant regex correctly refused); blocking=none.
-**Backlog:** Now live at 7 in-lane (floor 3) — nothing to promote; `later_staleness` clean, no stale
-`Later` issues to call. `check_backlog_hygiene` prints **61 violations over 56 issues and ZERO of
-them is an issue this session filed, touched or closed** (verified by set-differencing the violator
-list against this session's 24 issues) — all nine of my filings are contract-clean. The remainder is
-the standing pre-#3594 debt: 52 `set_section` on issues filed before that rule existed, 5
-`acceptance_count`, 4 `epic_story_coverage`. **#3594 is the issue that owns it**, and paying it down
-is a backlog campaign, not a wrap step.
-**Alarms:** 4 lit, all cited — `qa-smoke-failures` re-cited 2026-09-08 against the live cause the
-#3501 check caught contradicting it; `commitments-ungraded` is deploy-day `INSUFFICIENT_DATA` and
-clears over ~7 days; `chronicle-delivery-heartbeat` clears on Wednesday's send; the fourth carries
-no actions.
-**CI warnings:** 6 — one coverage-floor drift (74% vs 84.2%), filed this session as **#3686**; five
-identical playwright-skip lines from **#3640**, which is a by-design loud-skip reporter and needs no
-action.
-**Ledger:** owner-facing build readout row added (#3691) — posture, rent and demote trigger.
+**Closures:** #3720, #3725, #3729 commented · DoD: scanned 2, hits 0 after commenting (the sweep's window is `closed:>=` today UTC, so it sees #3725/#3729; #3720 closed just before that boundary and was commented on the same contract).
+**Backlog:** Now live at 13 actionable opus stories (floor 3, 0 short — nothing to promote); Later sweep — no stale issues, `later_staleness` clean over 130 open.
+**Alarms:** 0 uncited — `qa-smoke-failures` re-cited to its true live cause (#3728) after #3730 made the live-cause read honest; the gate now passes on a paginated read rather than a truncated one.
+**CI warnings:** 4 classes over 8 annotations — (1) smoke content-truth failure → #3728, the same cause as the alarm; (2) Unit Tests duration budget → #3731 with the n=14 measurement; (3) coverage floor drift → #3732; (4) 5× playwright-skip notices, deliberate no-action — the skips are by design on a non-chromium runner, though their cited `#3640` is CLOSED, so the pointer is stale even though the behaviour is intended.
+**Ledger:** none — no standing machinery shipped; all three fixes changed the behaviour of gates and a schedule that already existed and already carry their rows.
 
----
+## Two gates red at the wrap, both acknowledged rather than silently passed
+
+- **(e7) backlog-hygiene exits 1 on 62 pre-existing corpus violations, none of them this session's.** All nine issues this session filed, touched or closed (#3720, #3721, #3722, #3725, #3726, #3728, #3729, #3731, #3732) were checked individually and are clean — the session's own contribution went 78 → 62 after fixing labels, `## Outcome`, `## Acceptance`, the canonical `**Score:**` grammar (the `×`/`→` glyphs, not `x`/`->`) and `**Epic:**` links on the three it filed. The residue is 52 `set_section` + 5 `acceptance_count` + 5 `epic_story_coverage` on issues predating those rules, and **#3594 is open and owns that backfill by construction** — it is the issue that introduced the `## Set` requirement.
+- **(e11) ci-warnings exits 1 bare and 0 `--decoded`.** Each of the 4 classes is triaged on the `**CI warnings:**` line above; the battery invokes it bare, so it will red at every wrap until the underlying warnings clear.
 
 ## Residual / next picks
 
-- **#3699** — training-note extractor throws every degrade reason away; truncation degrades
-  silently. Raw notes are sovereign and backfillable, so the pause costs nothing irreversible.
-- **#3700** — cardio has no progression loop; `render_history_cue` returns `""` without weight+reps.
-- **#3692** — `mcp/registry.py` is at its size ceiling and cannot accept any new tool.
-- **#3688** — the truncated-judge-verdict retry (#3652 box 1).
-- **#3686** — the coverage floor sits 10.2 points below measured.
-- **#3681** — the theme-river build has never succeeded in CI (no `dynamodb:Query`).
-- **#3682** — the wrap's Phase-1 doc gates run before Phase-2 writes the docs they derive from.
-- **#3678** (reopened) — needs a week of PR traffic with zero `cancelled` verdicts.
-- **#3651** — not closeable as written: all four stuck ledger rows aged out of `RETENTION_DAYS = 7`.
-  Disposition recorded on the issue.
-- **#3563 leg 2 / #3568** — both need Wednesday 2026-09-09's chronicle send. The IAM grant is
-  verified deployed, so `/api/status` should go green on its own.
-- **The #3679 history exposure** — `not-work — an owner disclosure decision; a forward fix cannot
-  remove a name reachable at `3cea6db44` on a public repo.`
-- **`current_started` will drift again at the next reset** — carried on #3671; it is a
-  hand-maintained field in an S3-read config `restart_pipeline.py` does not own.
-
----
-
-## For the next session
-
-Main is green, the site is live at `5262538` matching `main`, no PR is open, no lease is waiting,
-and `/method/state/` is the fastest way to see where things stand. Note it regenerates on **site
-deploys** — during a development pause it will honestly show its own `generated_at` ageing rather
-than refreshing.
+- **#3728** — the labs coach vs `/api/labs` window mismatch. Reader-facing and live now; the highest-value thing on this list.
+- **#3726** — the 8-night-red nightly. A standing red is an absent check.
+- **#3721**, **#3722**, **#3732**, **#3731** — the generator, the flake, the two stale ratchets.
+- **#3553** — the commitment ledger that has never graded anything (480 records, 0 kept / 0 broken). Owner asked about fable-sized non-feature work; this is the one genuinely ready item in that lane.
+- PR **#3713** (Session Z, 7 stories) remains open and unmerged by owner decision — `not-work — the owner is holding it deliberately; it changes the night-before authoring path.`
+- **#3719** — tape measurements served publicly with no tier and no consent stamp. `not-work — an owner publish-or-restrict ruling, not an implementation task.`

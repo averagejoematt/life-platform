@@ -211,37 +211,28 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-08 (Opus 5, **Session Y — unblock the site, build the owner's read, then
-stabilise for a 6-day pause**; owner: *"do everything that concerns you to get it stable, then
-wrap"*). **12 PRs merged, 8 issues closed on live proof, 1 reopened.** **Read the stabilise pass
-first: main was RED ~3h and two production deploy leases had been stranded 9.1h — both found by
-CHECKING when the owner asked whether pausing was safe, not by anyone watching.** The red was
-#3684's new test importing `yaml` into a deploy-critical lane that installs no PyYAML; a collection
-error takes the whole lane, and this is the **third appearance of that class in INCIDENT_LOG** (both
-leases were ancestors, rejected per approve-the-tip-reject-ancestors; the platform had auto-filed
-#3694 and nothing escalated it). **#3652 CLOSED on complete three-part proof** — two consecutive
-`site/**` deploys live plus the control run where `rollback-site-on-failure` DECLINED by name with
-`version.json` untouched; the 53 dark a11y files verified by CONTENT, not sha. Closed on boxes 2–4
-only: box 1 asked for a *retry* on a truncated judge verdict and #3656 delivered a *budget raise* —
-a mitigation, not the mechanism (**#3688**). **`/method/state/` is live** (#3691) — the joined
-owner-facing read that turns "110 open" into 72 actionable / 46 from commissioned audits / 10
-reader-facing / 9 P1 / 0 P0, with delivery over the true population (662 closed, 756 PRs, median
-12.6h, organic 8.7h vs audit-sourced 29.2h). It shipped **four** bugs and fixed all four, every one
-found by RUNNING it: it truncated its own population at a 400 cap; the page rendered nothing with
-**zero console errors** because `isBad()` is a scalar detector and `String(obj)` matches its own
-bracket test; MTD spend was missing because the key set was *guessed*; and three sections vanished
-silently while the footer claimed they showed as gaps. Its honesty contract then earned its keep on
-the first real deploy — green with **5 of 9 sections null**, each naming its own cause. Also
-stabilised: the site was publicly serving **`review_grade: "A"` while the newest review graded ZERO
-lenses at A** (now `B+` with the distribution, #3690), and the nightly had been permanently red
-since 09-03 on a false positive, so a real regression would have been invisible beside it (#3650).
-**Two controls turned out to have expiry dates on them** — a mutation proof planting `import yaml`
-went blind the moment pyyaml was legitimately added, and a config test pinned a date its own
-docstring says the owner advances by hand; *a positive control keyed to a value that can later be
-sanctioned is a control with an expiry date on it.* Owner threads answered live: the `Pull 3 - 2`
-counter (`current_started` re-anchored in **both** copies — the S3 one is what the runtime reads,
-the #3675 trap), and the training-note brief, where I **corrected the owner's leading hypothesis**:
-truncation returns `[]` and never raises, so it leaves `degraded: False` — a silent degradation
-meaning `degraded` **undercounts** (#3699, #3700). **Owner acts left:** the #3679 history-exposure
-disclosure call · the #3568 test send · Wednesday 09-09's chronicle send closes #3563 leg 2 on its
-own (IAM grant verified deployed).
+**Verified:** 2026-09-12 (Opus 5, **Session AA — the poller stopped before he did**; owner: *"is the api
+down? i did log a hevy workout today"* → *"i want you to drive it all, get all the deploys etc."*). **3 PRs
+merged AND deployed, 6 issues filed, 3 closed on live proof.** One gym-floor question became a session about
+instruments reporting confidently on state they cannot see. **Not down:** `hevy-backfill` polled
+`cron(0 12-23 * * ? *)` — 05:00–16:00 PT — and he finished at **17:30 PT**, 90 min after the last poll, so the
+session was invisible for **~11.5h**. Nothing failed: 12 runs, `ingested: 0`, every `since` contiguous. Nothing
+*could* catch it — a behavioral source's 7-day `stale_hours` is correctly lenient and therefore **structurally
+blind to a same-day miss**; the CDK comment had said *"Adjust if Matthew lifts later"* since the day it was
+written. Widened to 24h (#3720/#3723) because moving the boundary only relocates the bug to whatever hour he
+trains past; the missing session was recovered by manual invoke (7 exercises, 21 sets, 10,942.93 kg, adherence
+100%). That deploy then **failed its own site gate** — because the accuracy rubric called `target_pct: 118`
+(177 Zone-2 min against a 150-min target, `target_met: true` in the same object) an **impossible value**, in the
+deploy-GATING copy, which would have blocked every site deploy until he trained *less* (#3725/#3727; bounded at
+1000%, not exempt; live 3 findings → 0). The #3652 rollback scope check **declined the revert by name** —
+`surface=api`, not `site/**`-reachable — so no healthy build was reverted. Chasing the lit alarm found the
+gate itself was lying: `fetch_qa_smoke_causes` read ONE unpaginated `filter_log_events` page, and CloudWatch
+pages **by stream**, so it reported a lit alarm's cause as "no failures" (#3729/#3730 — paginated AND
+timestamp-sorted; the "pages are chronological" docstring was false too). Under it sat the finding that
+matters: **#3728, live now** — the labs coach narrates *"zero lab draws"* beside `/api/labs total_draws=8`,
+and it is neither staleness nor fabrication (the analysis regenerated that day) but a **cycle-scoped claim
+next to a lifetime-scoped count with neither surface naming its window**; the check's own "regenerate it"
+remedy is therefore inert. Also measured, not guessed: the Unit Tests budget is breached by **13 of 14** green
+runs (median 32% over, #3731 — filed asking for decomposition, not the 8th raise), and the coverage floor sits
+**10.2 points** under measured, so it cannot fail (#3732). **Owner acts left:** #3728's window fix · #3726's
+8-night-red nightly · PR #3713 still held by choice · #3719's publish-or-restrict ruling.
