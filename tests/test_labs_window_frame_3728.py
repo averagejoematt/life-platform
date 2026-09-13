@@ -152,21 +152,28 @@ class TestTheEpisodicRegistry:
         assert "dexa" in iw._EPISODIC_PARTITIONS
 
     def test_an_episodic_partition_counts_over_all_history(self, monkeypatch):
-        _freeze(monkeypatch)
-        assert iw.inventory_window_start("labs") == "0000-00-00"
-        assert iw.inventory_window_start("dexa") == "0000-00-00"
+        now = _freeze(monkeypatch)
+        assert iw.inventory_window_start("labs", now) == "0000-00-00"
+        assert iw.inventory_window_start("dexa", now) == "0000-00-00"
 
     def test_a_daily_partition_keeps_the_ninety_day_window(self, monkeypatch):
         """The 90-day bound is RIGHT for a nightly stream — the fix must not
-        widen every source into a lifetime count."""
-        _freeze(monkeypatch)
-        assert iw.inventory_window_start("whoop") == "2026-06-14"
-        assert iw.inventory_window_start("macrofactor") == "2026-06-14"
+        widen every source into a lifetime count.
+
+        The frozen instant is passed EXPLICITLY. `_freeze` rebinds the clock on
+        `intelligence_common`, and since the registry moved to `inventory_window` a
+        bare call here would read the real wall clock and combine it with a fixture
+        date — the exact thing this repo's test discipline forbids, and it is why
+        this assertion started failing the day after it was written.
+        """
+        now = _freeze(monkeypatch)
+        assert iw.inventory_window_start("whoop", now) == "2026-06-14"
+        assert iw.inventory_window_start("macrofactor", now) == "2026-06-14"
 
     def test_the_episodic_floor_sorts_below_every_real_date_key(self):
         """`"0000-00-00"` is the all-history lower bound only if it orders below
         any `DATE#` a writer can produce — including the 2019 bulk import."""
-        assert iw.inventory_window_start("labs") < "2019-01-01"
+        assert iw.inventory_window_start("labs", datetime(2026, 9, 12)) < "2019-01-01"
 
     def test_every_episodic_partition_is_actually_inventoried(self):
         """A registry entry naming a partition no source reads is a rule that
@@ -387,6 +394,50 @@ class TestTheAssessorComparesLikeWithLike:
         ok, msg = qa.assess_coach_labs_truth({}, _coach(LIVE_LABS_SUMMARY))
         assert ok is True
         assert "nothing to compare" in msg.lower()
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            # VERBATIM from /api/coaching-dashboard, 2026-09-13T17:07:01Z — the
+            # regeneration that made the zero-claim regex go quiet.
+            "I'm tracking three commitments from our April planning session: scheduling the draw, "
+            "executing the fasting protocol, and entering results into the system.",
+            # VERBATIM, 2026-09-12 recent_outputs.
+            "Execute the fasting protocol precisely: 10+ hours fasting (water only), document the exact "
+            "window, and schedule the draw at least 48 hours after your last hard training session.",
+            # VERBATIM, 2026-09-13 recent_outputs — the plainest one.
+            "Report any unusual fatigue or cold sensitivity before the April draw to establish a " "symptom baseline.",
+        ],
+    )
+    def test_a_past_draw_narrated_as_an_upcoming_appointment_fails(self, text):
+        """THE ARM THAT SURVIVED THE DEFECT'S CHANGE OF WORDING.
+
+        On 2026-09-13 the analysis regenerated, stopped saying "zero lab draws", and the
+        `_ZERO_LABS_CLAIM` regex found nothing — while telling Matthew in September to
+        prepare for a panel drawn on 2026-04-03. A reader was being told to book an
+        appointment that had already happened five months earlier, and the check reported
+        green. Assert the FACT (the newest draw is in the past), not the wording.
+        """
+        ok, msg = qa.assess_coach_labs_truth({"total_draws": 8, "latest_draw_date": "2026-04-03"}, _coach(text))
+        assert ok is False
+        assert "2026-04-03" in msg
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Let's schedule the NEXT panel for October once his lipids have had 12 weeks to move.",
+            "I'd book a follow-up draw before drawing any conclusion about the trend.",
+            "An upcoming panel should include fasting insulin, which April's did not.",
+            "His HbA1c before the April draw was 5.9.",
+            "Since the April draw his weight is down 7 lb.",
+        ],
+    )
+    def test_naming_a_future_panel_or_describing_a_past_one_still_passes(self, text):
+        """The check must not make honest prose unsayable. Arranging the NEXT panel is
+        exactly what a labs coach should do, and describing history relative to a past
+        draw ("before the April draw his HbA1c was…") is ordinary past tense."""
+        ok, _msg = qa.assess_coach_labs_truth({"total_draws": 8, "latest_draw_date": "2026-04-03"}, _coach(text))
+        assert ok is True
 
     def test_the_weekly_priority_text_is_still_scanned(self):
         ok, msg = qa.assess_coach_labs_truth({"total_draws": 8}, [], weekly_priority_text=LIVE_LABS_SUMMARY)

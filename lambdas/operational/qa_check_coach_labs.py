@@ -50,6 +50,59 @@ _SENTENCE_SPLIT = re.compile(r"[.!?;\n]+")
 # the tight, non-fuzzy half of that and the only half worth asserting on.
 _POSITIVE_LABS_CLAIM = re.compile(r"\b(\d{1,3})\s+(?:total\s+)?(?:lab|blood)\s+(?:draws|panels|results)\b", re.IGNORECASE)
 
+# #3728 second pass — THE DEFECT CHANGED CLOTHES AND THIS CHECK WENT QUIET.
+#
+# The original `_ZERO_LABS_CLAIM` regex catches ONE wording. On 2026-09-13 at 17:07Z the
+# labs analysis regenerated and stopped saying "zero lab draws" — so the regex found
+# nothing — while telling Matthew, in September, to prepare for a panel drawn on
+# 2026-04-03:
+#
+#     "I'm tracking three commitments from our April planning session: SCHEDULING THE
+#      DRAW, executing the fasting protocol, and entering results into the system."
+#     "Report any unusual fatigue or cold sensitivity BEFORE THE APRIL DRAW to
+#      establish a symptom baseline."
+#
+# A reader is being told to book an appointment that already happened five months ago.
+# That is the same defect the zero-claim was a symptom of — the coach does not know its
+# only draw is in the past — and a check that can only see one phrasing of it reports
+# green while it is live. So assert the FACT, not the wording: when the store's newest
+# draw is in the PAST, no served text may talk about arranging one, unless it is
+# explicitly talking about the NEXT panel (which is honest and must stay sayable).
+_SCHEDULING_VERB = r"(?:schedul\w*|book\w*|arrang\w*|plan(?:ning|s|ned)?\s+(?:for|to)|prepare\s+for|mark\s+your\s+calendar)"
+_DRAW_NOUN = r"(?:draw|panel|bloodwork|blood\s+work|lab\s+order)"
+_SCHEDULING_A_DRAW = re.compile(_SCHEDULING_VERB + r"[^.!?;\n]{0,40}?\b" + _DRAW_NOUN + r"\b", re.IGNORECASE)
+
+# An honest forward-looking sentence names a FUTURE panel rather than borrowing the date
+# of a past one. These make the sentence legitimate, so they are not findings.
+_FUTURE_PANEL = re.compile(r"\b(?:next|another|a\s+second|follow[-\s]?up|upcoming|re[-\s]?test|repeat)\b", re.IGNORECASE)
+
+
+# The third live shape, and the plainest: an INSTRUCTION anchored to a past draw —
+#     "Report any unusual fatigue or cold sensitivity BEFORE THE APRIL DRAW"
+# — which has no scheduling verb at all. The discriminator against ordinary past tense
+# ("His HbA1c before the April draw was 5.9") is that the sentence OPENS with a bare
+# imperative: the coach is telling him to do something ahead of an event that is over.
+_DIRECTIVE_OPENER = re.compile(
+    r"^\s*(?:Report|Verify|Execute|Document|Confirm|Ensure|Bring|Fast|Avoid|Mark|Check|Make\s+sure|Be\s+sure|Remember)\b",
+    re.IGNORECASE,
+)
+_AHEAD_OF_A_DRAW = re.compile(
+    r"\b(?:before|ahead\s+of|prior\s+to|in\s+advance\s+of)\s+(?:the\s+)?(?:\w+\s+){0,2}?" + _DRAW_NOUN + r"\b", re.IGNORECASE
+)
+
+
+def _schedules_a_past_draw(text):
+    """Sentences that arrange, or instruct ahead of, a draw without naming a future one."""
+    out = []
+    for sentence in _SENTENCE_SPLIT.split(text or ""):
+        if _FUTURE_PANEL.search(sentence):
+            continue  # naming the NEXT panel is honest and must stay sayable
+        arranging = _SCHEDULING_A_DRAW.search(sentence)
+        instructing = _DIRECTIVE_OPENER.search(sentence) and _AHEAD_OF_A_DRAW.search(sentence)
+        if arranging or instructing:
+            out.append(" ".join(sentence.split())[:120])
+    return out
+
 
 def _zero_claim_is_framed(text):
     """True when EVERY zero claim in `text` names its window in its own sentence.
@@ -73,6 +126,8 @@ def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
         total_draws = int(float(total_draws)) if total_draws is not None else None
     except (TypeError, ValueError):
         total_draws = None
+
+    latest = labs.get("latest_draw_date") if isinstance(labs, dict) else None
 
     texts = []
     for coach in coaches or []:
@@ -105,6 +160,17 @@ def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
     # check compared the two directly and so fired on honest prose whenever the cycle was
     # young — and its stated remedy, "regenerate the coach analysis", was inert against
     # the real cause: regeneration reproduces the same unframed inputs.
+    # #3728 second pass: the store HAS draws and its newest is in the past, so nothing
+    # served may be arranging one. Checked before the zero-claim arm because it is the
+    # arm that survived the defect's change of wording.
+    scheduling = sorted({f"{cid}: {q}" for cid, text in texts for q in _schedules_a_past_draw(text)})
+    if scheduling:
+        return False, (
+            f"served coach text talks about ARRANGING a lab draw while /api/labs' newest draw is already in the past "
+            f"({latest or 'date unknown'}, {total_draws} on record for all cycles) and no future panel is named — a reader is "
+            f"being told to book an appointment that has happened: {' | '.join(scheduling)[:400]} (#3728)"
+        )
+
     offenders = sorted({cid for cid, text in texts if _ZERO_LABS_CLAIM.search(text) and not _zero_claim_is_framed(text)})
     if offenders:
         return False, (
