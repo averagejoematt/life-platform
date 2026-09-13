@@ -669,7 +669,20 @@ def build_training_reference_record(ref: dict) -> dict:
     item = {
         "pk": USER_PREFIX + TRAINING_REFERENCE_SOURCE,
         "sk": "DATE#" + derived_date,
+        # #3735: `reference_schema` and `proven_bands` are the two fields #3710 ADDED so a
+        # consumer could tell a stale v1 record from a v2 one that genuinely found no
+        # comparable period — and this builder dropped both on the floor. Measured live
+        # 2026-09-13: episode-detect deployed and re-run wrote DATE#2026-09-13 with
+        # attrs {bands, confidence, derived_at, n_episodes_with_covariates, pk,
+        # proven_curve, sk, source_window} and neither of the two, so `get_benchmark`
+        # view=prescription answered "training_reference is v1 ... episode-detect needs
+        # redeploying and re-running" against a reference re-derived four minutes
+        # earlier. That message can never clear: the writer cannot produce what the
+        # reader is looking for. The whole #3709/#3710/#3711 prescription and campaign
+        # surface was inert from the moment it shipped.
+        "reference_schema": _to_dec(ref.get("reference_schema", 1)),
         "bands": _deep_dec(ref["bands"]),
+        "proven_bands": _deep_dec(ref.get("proven_bands") or {}),
         "proven_curve": _deep_dec(ref["proven_curve"]),
         "source_window": ref["source_window"],
         "derived_at": derived_at,
