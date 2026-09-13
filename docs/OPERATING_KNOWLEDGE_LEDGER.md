@@ -922,6 +922,8 @@ carries an operating rule.
 | `reference_a_page_of_logs_is_not_the_latest.md` | reference | `scripts/check_alarm_citations.py` (`fetch_qa_smoke_causes`'s #3729 comment states that filter_log_events pages by stream, that the read must follow nextToken, and that ordering is the caller's guarantee) | homed-here |
 | `reference_a_pct_suffix_is_not_one_semantic.md` | reference | `tests/accuracy_audit.py` (the `_SIGNED_PCT_FIELDS` / `_ACHIEVEMENT_PCT_FIELDS` comment block states the three percent domains and why the achievement class is bounded rather than exempt) | homed-here |
 | `project_session_z_2026_09_08.md` | project | — narrative: a session record, not a repo rule | narrative |
+| `reference_a_sweep_that_restores_a_directory.md` | reference | `docs/CONVENTIONS.md` §7 (a verification sweep that ends in `git checkout -- <dir>` restores the WHOLE directory to HEAD, including your own uncommitted edits — commit before sweeping, or scope the restore to the paths the loop writes) | homed-here |
+| `project_session_ab_2026_09_13.md` | project | — narrative: a session record (landing Session Z's held campaign and finding it inert), not a repo rule; its extracted rules are the two reference rows above and in [[reference_conflicting_pr_mints_no_checks]] | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
 | `user_who_is_matthew.md` | user | — out of scope: who the owner is stays in memory | user |
 
