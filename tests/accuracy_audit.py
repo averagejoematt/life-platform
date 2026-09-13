@@ -273,7 +273,23 @@ def sanity_scan(run_dir):
 # baseline is honest negative progress (ADR-104 down-weeks-shown), bounded at -100 (the
 # full goal distance regained). Keep this set SMALL and evidence-driven — a broad
 # pre-exemption is how a real impossible number gets waved through.
-_SIGNED_PCT_FIELDS = frozenset({"progress_pct"})
+_SIGNED_PCT_FIELDS = frozenset({"progress_pct", "delta_pct"})
+
+# A signed DELTA's positive side is not bounded by 100 the way `progress_pct`'s is.
+# `progress_pct` is a share of a fixed goal distance, so 100 is the whole thing.
+# `delta_pct` is (new - old) / old * 100, which has no such ceiling: a metric that
+# doubles is +100, one that goes from 0.1 to 10 is +9900. Measured live 2026-09-13,
+# /api/deficit_sustainability, WITH the payload declaring its own semantics in a
+# sibling field:
+#
+#   {"name": "Sleep quality",     "direction": "declining", "delta_pct": -8.5}
+#   {"name": "Habit completion",  "direction": "improving", "delta_pct": 107.8}
+#
+# Both honest. Both HIGH "impossible value" findings under a [0, 100] rule, and the
+# pair reddened the deploy-gating copy of this audit on run 34770720925. The floor
+# stays -100: for a positive metric you cannot lose more than all of it, so anything
+# past that is a computation failure, not a bad week.
+_SIGNED_DELTA_PCT_MAX = 1000
 
 # Percent fields that are a share OF A TARGET rather than of a whole: beating the
 # target is the point, so their legal domain runs above 100. 2026-09-12 (#3725):
@@ -292,14 +308,48 @@ _SIGNED_PCT_FIELDS = frozenset({"progress_pct"})
 # real impossible number gets waved through, so the ceiling stays finite: a
 # divide-by-near-zero blowup still trips the gate. 1000% = ten times target, far past
 # any honest week and far below a computation failure.
-_ACHIEVEMENT_PCT_FIELDS = frozenset({"target_pct"})
+# 2026-09-13 (#3739): `z2_pct` is the SAME semantic as `target_pct`, found the same
+# way — by a live deploy going red. `site_api_training._z2_weekly_stats` computes it as
+# `round(weekly_avg / z2_target * 100)`, and the serving comment beside it says so
+# outright: "z2_pct is the 30d AVERAGE vs target, served uncapped (a capped 100 hid
+# that it was an average at all)". A field whose own producer documents that it is
+# deliberately uncapped cannot be bounded at 100 by a consumer.
+_ACHIEVEMENT_PCT_FIELDS = frozenset({"target_pct", "z2_pct"})
 _ACHIEVEMENT_PCT_MAX = 1000
 
 
-def _pct_bounds(key):
+#: Every `*_pct` key this audit has classified, with the domain it belongs to. The
+#: registry is the point: `_pct` is a SUFFIX, not a semantic, and each new domain has
+#: so far been discovered by a real deploy going red (2026-07-17 progress_pct,
+#: 2026-09-12 target_pct #3725, 2026-09-13 delta_pct + z2_pct #3739). A field absent
+#: from here gets the strict share-of-a-whole bound, which is the safe default and
+#: also the one that reddens a deploy — so `test_every_served_pct_field_is_classified`
+#: fails on an unclassified `*_pct` in a served payload rather than leaving it to be
+#: found by a blocked pipeline.
+PCT_DOMAINS = {
+    "share": "0..100 — a part of a whole; the strict default for anything unclassified",
+    "signed": "-100..%d — a signed change; negative is honest, the positive side is open" % _SIGNED_DELTA_PCT_MAX,
+    "achievement": "0..%d — a share OF A TARGET; beating it is the point" % _ACHIEVEMENT_PCT_MAX,
+}
+
+
+def pct_domain(key):
+    """Which domain a `*_pct` key belongs to. Unclassified -> the strict default."""
     if key in _SIGNED_PCT_FIELDS:
-        return (-100, 100)
+        return "signed"
     if key in _ACHIEVEMENT_PCT_FIELDS:
+        return "achievement"
+    return "share"
+
+
+def _pct_bounds(key):
+    domain = pct_domain(key)
+    if domain == "signed":
+        # `progress_pct` keeps its original 100 ceiling — it is a share of a fixed goal
+        # distance, so 100 IS the whole thing and more would be a defect. Only the open
+        # deltas get the wider positive side.
+        return (-100, 100 if key == "progress_pct" else _SIGNED_DELTA_PCT_MAX)
+    if domain == "achievement":
         return (0, _ACHIEVEMENT_PCT_MAX)
     return (0, 100)
 
