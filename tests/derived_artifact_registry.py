@@ -535,7 +535,14 @@ def _has_write_call(tree: ast.AST) -> bool:
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
-        if isinstance(fn, ast.Attribute) and fn.attr in ("write_text", "write_bytes", "writelines"):
+        # #3721 routed every page generator through `v4_apply_chrome.write_page(path,
+        # html)`, which normalizes the chrome and then writes. Six generators became
+        # invisible to this scan the moment their `.write_text(...)` disappeared — this
+        # gate caught that, which is the system working; teaching it the new shape is
+        # the fix, not adding six names to DISCOVERY_BLIND.
+        if isinstance(fn, ast.Attribute) and fn.attr in ("write_text", "write_bytes", "writelines", "write_page"):
+            return True
+        if isinstance(fn, ast.Name) and fn.id == "write_page":
             return True
         if isinstance(fn, ast.Attribute) and fn.attr == "dump" and isinstance(fn.value, ast.Name) and fn.value.id == "json":
             return True

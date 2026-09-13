@@ -34,6 +34,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
+
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -583,7 +586,7 @@ def main() -> int:
         # collateral.
         print(f"HOLD: {CANONICAL} not regenerated — {e}", file=sys.stderr)
         return 0
-    OUT_PATH.write_text(page, encoding="utf-8")
+    _apply_chrome.write_page(OUT_PATH, page)  # #3721
     pillars = len(config.get("pillars", {}))
     print(f"{CANONICAL}: {pillars} pillars · engine v{ce.ENGINE_VERSION} · config v{config.get('_meta', {}).get('version', '?')}")
     return 0

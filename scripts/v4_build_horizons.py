@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 import v4_chrome  # noqa: E402
 
 OUT = Path("site/data/horizons/index.html")
@@ -98,7 +99,7 @@ def render() -> str:
 
 def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(render(), encoding="utf-8")
+    _apply_chrome.write_page(OUT, render())  # #3721
     print(f"✅ wrote {OUT}")
 
 

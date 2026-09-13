@@ -37,6 +37,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from v4_proof import apply_og, home_block_html, home_og, load_character, load_journey  # noqa: E402
 
 HOME = Path("site/index.html")
@@ -79,14 +80,14 @@ def main() -> int:
     if not block:
         # No numbers at all (API + snapshot both empty) — keep any existing baked
         # block rather than blanking Home's only static content (last-known-good).
-        HOME.write_text(html, encoding="utf-8")
+        _apply_chrome.write_page(HOME, html)  # #3721
         print("  ⚠️  no journey data (API + snapshot both empty) — OG refreshed, keeping any existing baked block.", file=sys.stderr)
         return 0
     out = inject(html, block)
     if out is None:
         print("error: no injection anchor found in site/index.html.", file=sys.stderr)
         return 2
-    HOME.write_text(out, encoding="utf-8")
+    _apply_chrome.write_page(HOME, out)  # #3721
     print("updated site/index.html — home static core + data-driven OG baked.")
     return 0
 

@@ -54,6 +54,7 @@ sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import track_record as tr  # noqa: E402 — the pure computation module (also under test)
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from v4_chrome import doors_nav, head_chrome, loop_forward, site_footer  # noqa: E402 — shared chrome (#1009/#1639)
 from v4_kit import loop_ribbon  # noqa: E402 — shared .loop-ribbon (#578)
 
@@ -418,7 +419,7 @@ def main() -> int:
 
     out_dir = Path(args.out) if args.out else (ROOT / "site" / "story" / "build" / "agent-review")
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "index.html").write_text(render(rec), encoding="utf-8")
+    _apply_chrome.write_page(out_dir / "index.html", render(rec))  # #3721
     (out_dir / "track-record.json").write_text(json.dumps(rec, indent=2, default=str), encoding="utf-8")
 
     c = rec["counts"]

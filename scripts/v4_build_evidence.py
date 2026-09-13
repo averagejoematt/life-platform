@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 from v4_proof import (  # noqa: E402  — #1395 static core + data-driven OG on the door hubs
@@ -1096,9 +1097,9 @@ def main() -> int:
         elif pillar["dir"] == "protocols":
             summary = load_protocols()
             hub_proof, hub_og = protocols_block_html(summary), protocols_og(summary)
-        (out / "index.html").write_text(
+        _apply_chrome.write_page(  # #3721
+            out / "index.html",
             shell(first, pillar["base"], f"The {pillar['title']} — averagejoematt", pillar["lede"], pillar, proof=hub_proof, og=hub_og),
-            encoding="utf-8",
         )
         n = 0
         for slug, title, blurb, group, *rest in REGISTRY:
@@ -1110,9 +1111,9 @@ def main() -> int:
                 continue
             d = out / slug
             d.mkdir(parents=True, exist_ok=True)
-            (d / "index.html").write_text(
+            _apply_chrome.write_page(  # #3721
+                d / "index.html",
                 shell(slug, f"{pillar['base']}{slug}/", f"{title} — The {pillar['title']} — averagejoematt", blurb, pillar),
-                encoding="utf-8",
             )
             n += 1
         total += n

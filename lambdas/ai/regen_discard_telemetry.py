@@ -22,12 +22,67 @@ import logging
 import os
 
 import boto3
+from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
-_cw = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2"))
 _CW_NAMESPACE = "LifePlatform/AI"
 _METRIC_NAME = "RegenDiscarded"
+
+# #3722: the client is built LAZILY and bounded, and it was neither.
+#
+# It used to be a module-level `boto3.client(...)` and `log_discard` called
+# `put_metric_data` on it unconditionally — so every caller that merely IMPORTED this
+# module paid a client build, and every discard made a live HTTPS round-trip. The test
+# suite is a caller: `tests/test_prop_grounded_generation.py::test_regen_once_never_
+# regresses` drives `regen_once` 150 times per run, most of which discard, so the
+# property test was doing ~150 live CloudWatch calls. Measured on this machine,
+# n=150: first call 68.7ms, median 18.1ms, p95 57.1ms — and under Hypothesis's 200ms
+# default deadline that is a coin flip on network latency, which Hypothesis reports as
+# `FlakyFailure: produces unreliable results: Failed on the first call but did not on a
+# subsequent one`. The filed suspicion was lazy CREDENTIAL resolution; the measurement
+# says the divergence is real but the mechanism is per-call LATENCY, not a first-call
+# code path — the same numbers appear under CI's FAKE credentials (first 59.1ms,
+# median 14.9ms), where every call fails and is swallowed.
+#
+# Two independent things follow, and both are fixed:
+#   * telemetry must be OFF by default outside a Lambda. `AWS_LAMBDA_FUNCTION_NAME` is
+#     set by the runtime and by nothing else, so it is the signal that distinguishes
+#     "in production" from "imported by a test" without a test-only flag.
+#   * when it IS on, it must be bounded. An unbounded put_metric_data inside a
+#     fail-soft except is a hang wearing a no-op's clothes: a dead CloudWatch endpoint
+#     would have held a Lambda open for the SDK's default 60s connect timeout per
+#     discard. 1s/1s and a single attempt — this is fire-and-forget observability, and
+#     a metric worth waiting a minute for is not one.
+_TELEMETRY_ENABLED_ENV = "REGEN_TELEMETRY"
+_cw = None
+
+
+def _telemetry_enabled() -> bool:
+    """True when the CloudWatch emit should actually be attempted.
+
+    Explicit `REGEN_TELEMETRY=1|0` wins in both directions (so a test can turn it ON
+    and production can turn it OFF); otherwise it follows "am I running inside a
+    Lambda".
+    """
+    override = os.environ.get(_TELEMETRY_ENABLED_ENV, "").strip().lower()
+    if override in {"1", "true", "yes", "on"}:
+        return True
+    if override in {"0", "false", "no", "off"}:
+        return False
+    return bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+
+
+def _client():
+    """The CloudWatch client, built on first use and cached for the container."""
+    global _cw
+    if _cw is None:
+        _cw = boto3.client(
+            "cloudwatch",
+            region_name=os.environ.get("AWS_REGION", "us-west-2"),
+            config=Config(connect_timeout=1, read_timeout=1, retries={"max_attempts": 1}),
+        )
+    return _cw
 
 
 def log_discard(arm: str, surface: str, findings_count: int, *, reason: str = "", cost_estimate: str = "") -> None:
@@ -58,8 +113,12 @@ def log_discard(arm: str, surface: str, findings_count: int, *, reason: str = ""
         reason or "n/a",
         cost_estimate or "n/a",
     )
+    if not _telemetry_enabled():
+        # The ERROR line above is the durable record and is emitted either way; only
+        # the metric emit is skipped. A discard is never silent (#3086's whole point).
+        return
     try:
-        _cw.put_metric_data(
+        _client().put_metric_data(
             Namespace=_CW_NAMESPACE,
             MetricData=[
                 {

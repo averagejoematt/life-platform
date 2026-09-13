@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from experiment.methods_registry import SOURCE_MODULES, list_categories, list_stats  # noqa: E402
 from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
@@ -213,7 +214,7 @@ def main() -> int:
     categories = list_categories()
     out_dir = ROOT / "site" / "method" / SLUG
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "index.html").write_text(render(stats, categories), encoding="utf-8")
+    _apply_chrome.write_page(out_dir / "index.html", render(stats, categories))  # #3721
     print(f"{CANONICAL}: {len(stats)} stats across {len(categories)} categories")
     return 0
 

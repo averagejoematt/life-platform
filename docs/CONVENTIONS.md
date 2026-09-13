@@ -1077,6 +1077,26 @@ a grant that moved.
   start**, not at the wrap, or a 12-hour red goes unnoticed while further PRs merge into an
   untested, undeployed main.
 
+- **A verification sweep that ends in `git checkout -- <dir>` destroys your own uncommitted
+  work in that directory (2026-09-13, #3721).** The loop shape "run the generator, check the
+  gate, restore the tree" is a correct sweep and a data-loss bug at once: `git checkout --`
+  does not restore *what the loop wrote*, it restores the WHOLE directory to HEAD. A sweep
+  over `scripts/v4_build_*.py` ending in `git checkout -- site/` silently reverted that
+  session's own uncommitted `site/assets/css/tokens.css` and `site/assets/js/evidence_body.js`
+  **twice**; the loop prints the same thing either way, so nothing reports the loss. **Commit
+  before sweeping** — a commit leaves the working tree unchanged, so a concurrent test run is
+  unaffected and the restore becomes a no-op on your own work — or scope the restore to the
+  paths the loop actually writes (`git checkout -- site/**/index.html`), never the directory
+  that also holds your edits.
+
+- **A PR showing no checks is a merge conflict until `mergeable` says otherwise
+  (2026-09-13, third occurrence).** Before the swallowed-push ladder, before an outage
+  hypothesis, before an empty commit, before close/reopen: `gh pr view N --json
+  mergeable,mergeStateStatus`. A CONFLICTING PR has no merge ref to build checks against, so
+  every rung of that ladder "confirms" the swallow — and an empty-commit supersede is actively
+  misleading, because it changes the sha and the by-head_sha query keeps returning 0. See
+  §3's doc-sync literal collisions for the usual cause.
+
 - **`pytest --timeout` is not installed here — the flag errors and a pipe still reports exit 0
   (2026-09-07).** `python3 -m pytest tests/ -q --timeout=900` exits with
   `error: unrecognized arguments` before collecting anything; piped through `tail`, the shell

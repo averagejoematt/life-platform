@@ -211,28 +211,29 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-12 (Opus 5, **Session AA — the poller stopped before he did**; owner: *"is the api
-down? i did log a hevy workout today"* → *"i want you to drive it all, get all the deploys etc."*). **3 PRs
-merged AND deployed, 6 issues filed, 3 closed on live proof.** One gym-floor question became a session about
-instruments reporting confidently on state they cannot see. **Not down:** `hevy-backfill` polled
-`cron(0 12-23 * * ? *)` — 05:00–16:00 PT — and he finished at **17:30 PT**, 90 min after the last poll, so the
-session was invisible for **~11.5h**. Nothing failed: 12 runs, `ingested: 0`, every `since` contiguous. Nothing
-*could* catch it — a behavioral source's 7-day `stale_hours` is correctly lenient and therefore **structurally
-blind to a same-day miss**; the CDK comment had said *"Adjust if Matthew lifts later"* since the day it was
-written. Widened to 24h (#3720/#3723) because moving the boundary only relocates the bug to whatever hour he
-trains past; the missing session was recovered by manual invoke (7 exercises, 21 sets, 10,942.93 kg, adherence
-100%). That deploy then **failed its own site gate** — because the accuracy rubric called `target_pct: 118`
-(177 Zone-2 min against a 150-min target, `target_met: true` in the same object) an **impossible value**, in the
-deploy-GATING copy, which would have blocked every site deploy until he trained *less* (#3725/#3727; bounded at
-1000%, not exempt; live 3 findings → 0). The #3652 rollback scope check **declined the revert by name** —
-`surface=api`, not `site/**`-reachable — so no healthy build was reverted. Chasing the lit alarm found the
-gate itself was lying: `fetch_qa_smoke_causes` read ONE unpaginated `filter_log_events` page, and CloudWatch
-pages **by stream**, so it reported a lit alarm's cause as "no failures" (#3729/#3730 — paginated AND
-timestamp-sorted; the "pages are chronological" docstring was false too). Under it sat the finding that
-matters: **#3728, live now** — the labs coach narrates *"zero lab draws"* beside `/api/labs total_draws=8`,
-and it is neither staleness nor fabrication (the analysis regenerated that day) but a **cycle-scoped claim
-next to a lifetime-scoped count with neither surface naming its window**; the check's own "regenerate it"
-remedy is therefore inert. Also measured, not guessed: the Unit Tests budget is breached by **13 of 14** green
-runs (median 32% over, #3731 — filed asking for decomposition, not the 8th raise), and the coverage floor sits
-**10.2 points** under measured, so it cannot fail (#3732). **Owner acts left:** #3728's window fix · #3726's
-8-night-red nightly · PR #3713 still held by choice · #3719's publish-or-restrict ruling.
+**Verified:** 2026-09-13 (Opus 5, **Session AB — land the held campaign, and find it inert**; owner ruled
+*"reconcile and merge it… prove it by shipped behaviour, not by sha"*). **3 PRs merged AND deployed, 2 green
+and mergeable at wrap, 4 issues filed, 6 closed.** The brief's own instruction is the session: #3713 merged
+clean, deployed clean, verified clean **in the bundle** — and the feature did not work. `build_reference`
+returns eight keys; `build_training_reference_record` copied **six**, dropping `reference_schema` and
+`proven_bands` — the exact pair **#3710 added so a consumer could tell a stale record from a current one that
+found no comparable period.** Four minutes after episode-detect was redeployed *and re-run*,
+`get_benchmark view=prescription` still answered *"episode-detect needs redeploying and re-running"*. The
+message could never clear: the writer could not produce what the reader was looking for. **#3708 ranked 4.00,
+the top of the corpus, and the views built on it shipped inert, reporting their own inertness as an operations
+problem** (#3735/PR #3736 — closed on live proof: `applicable: true`, band 310-319 at distance 1, honestly
+refusing to prescribe from 4.0 effective days against a floor of 21). That deploy then went red on **three
+honest numbers** — `delta_pct: -8.5` beside its own `direction: "declining"`, `107.8` beside `"improving"`,
+and a `z2_pct` whose producer comment says *"served uncapped"*: the #3725 class again one day later, 3rd and
+4th specimens (#3739/PR #3740). **#3728's filed diagnosis was also wrong** — not cycle-vs-lifetime but
+`build_data_inventory`'s **rolling 90 days**, a third window nobody named, which also pinned the PHYSICAL
+coach to orientation permanently via dexa; and mid-session the defect **changed clothes** (the zero-draws
+regex went quiet while the coach told him to report symptoms *"before the April draw"*), so the check now
+asserts the FACT, not the wording. #3721 was not one stale generator but **fifteen** — five write through a
+module constant, so `.html` never appears at the call site, my own first detector saw nothing, and I had
+exempted two of them as "a JSON artifact" on the strength of their docstrings. **Three gotchas were mine:** a
+CONFLICTING PR mints no checks and I had the memory and worked two rungs of the swallow ladder anyway; a sweep
+ending in `git checkout -- site/` ate my own uncommitted work **twice**; and `git checkout main 2>/dev/null`
+failed silently, so the wrap battery graded the wrong tree. **Owner acts left:** #3737/#3738 merge+deploy ·
+#3739's full `_pct` enumeration · #3728's `/api/labs` half (next 17:00Z brief) · #3715/#3499 unstarted ·
+#3716/#3717/#3719 still `gate:owner`.

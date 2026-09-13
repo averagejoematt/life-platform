@@ -863,15 +863,14 @@ def test_verified_advisory_is_warn_only():
     stale: the advisory must print, and the exit code must still be 0. This is
     wall-clock-free and independent of which live docs happen to be stale at
     run time (the golden-test wall-clock lesson)."""
-    import os
-
-    env = dict(os.environ, CHECK_DOC_FACTS_TODAY="2036-01-01")
-    r = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/check_doc_facts.py")],
-        capture_output=True,
-        text=True,
-        env=env,
-    )
+    # #3731: this is an UNMUTATED-tree scan under a fixed env, so it is a cache key
+    # like any other — and tests/test_repo_scan_cache_3224.py already runs exactly this
+    # argv+env twice through the shared table. Spawning it by hand here made it the
+    # third real scan of the same thing, and on the coverage-instrumented CI lane it
+    # was the single slowest test in the suite: 68.04s of run 34732859207's 2183.92s.
+    # Routing it through the cache is the established remedy for this class (#3224's
+    # `cost = (tests that shell out) x (cost of one whole-repo scan)`), not a raise.
+    r = repo_scan_cache.run_repo_scan("scripts/check_doc_facts.py", env={"CHECK_DOC_FACTS_TODAY": "2036-01-01"})
     assert r.returncode == 0, "the Verified-stamp advisory redded the gate — it must be warn-only:\n" + r.stdout + r.stderr
     assert "Verified-stamp advisory" in r.stdout, "advisory output missing despite a decade-stale clock:\n" + r.stdout
     # …and on the refreshed tree the two Day-1 docs no longer warn on the real

@@ -207,7 +207,7 @@ jobs:
         run: |
           # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
           # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`
-          # exited with tail's status (always 0). Both `--cov-fail-under=74` AND every
+          # exited with tail's status (always 0). Both `--cov-fail-under=80` AND every
           # test failure in this step were therefore silently discarded — this gate has
           # never once failed a build. Proven locally:
           #   bash -e -c 'python3 -c "import sys; sys.exit(1)" | tail -100'; echo $?  → 0
@@ -231,7 +231,7 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=74 \
+              --cov-fail-under=80 \
               --durations=25 \
               -q 2>&1 | tail -160
           echo "::endgroup::"
@@ -333,7 +333,7 @@ jobs:
         if: always()
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 74 --gap-threshold 10 \
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 80 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \
               --high-water 83.20 --fail-on-regression
 
