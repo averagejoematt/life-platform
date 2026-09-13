@@ -1409,3 +1409,75 @@ def test_the_live_registry_stamps_every_entry_it_needs_to():
     registry = cac.load_citations()
     undated = [name for name, e in registry.items() if isinstance(e, dict) and e.get("cause") and not cac._citation_written_on(e)]
     assert not undated, f"entries declaring a `cause` with no `cause_observed`/`added` date: {undated}"
+
+
+# ── the live-cause read follows nextToken to the end (#3729) ──────────────────
+#
+# CloudWatch pages filter_log_events BY LOG STREAM, not chronologically, so page 1
+# routinely holds the OLDEST matching events and returns a nextToken. Measured live
+# 2026-09-13 on /aws/lambda/life-platform-qa-smoke: page 1 held `CAUSE fail none -`
+# from 09-11 while pages 2+ held the 09-13 01:20Z `CAUSE fail db57bedc
+# coach_labs:truth`, so the gate reported a LIT alarm's live cause as "no failures"
+# and flagged a correctly re-derived citation as a mismatch. The same truncation
+# breaks #3501 in the dangerous direction: a cause that genuinely changed reads as
+# unchanged, which is exactly what a FailCount aggregate cannot signal by itself.
+
+
+class _PagedLogs:
+    """Fake `logs` client: page 1 = the STALE cause, page 2 = the real latest one."""
+
+    def __init__(self, pages):
+        self.pages = pages
+        self.calls = []
+
+    def filter_log_events(self, **kwargs):
+        self.calls.append(kwargs.get("nextToken"))
+        idx = 0 if kwargs.get("nextToken") is None else int(kwargs["nextToken"])
+        events, nxt = self.pages[idx]
+        base = idx * 1000
+        out = {"events": [{"message": m, "timestamp": base + i} for i, m in enumerate(events)]}
+        if nxt is not None:
+            out["nextToken"] = str(nxt)
+        return out
+
+
+def _patch_boto(monkeypatch, client):
+    import types
+
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda *a, **k: client))
+
+
+def test_live_cause_read_follows_pagination_to_the_newest_line(monkeypatch):
+    """MUST-FAIL CONTROL for #3729: single-page reading returns the STALE cause."""
+    client = _PagedLogs(
+        [
+            (["[QA] CAUSE fail none -", "[QA] CAUSE warn none -"], 1),
+            (["[QA] CAUSE fail db57bedc coach_labs:truth", "[QA] CAUSE warn none -"], None),
+        ]
+    )
+    _patch_boto(monkeypatch, client)
+    causes, err = cac.fetch_qa_smoke_causes()
+    assert err is None
+    # Against the pre-#3729 single-page implementation this is [] — the phantom
+    # "no failures" that flagged a correct citation as a mismatch.
+    assert causes.get("qa-smoke-failures") == ["coach_labs:truth"]
+    assert len(client.calls) == 2, "the second page was never requested"
+
+
+def test_live_cause_read_degrades_rather_than_returning_a_partial_map(monkeypatch):
+    """A token still outstanding at the cap is an INCOMPLETE read, not a clean answer."""
+    pages = [(["[QA] CAUSE fail none -"], i + 1) for i in range(cac._CAUSE_PAGE_CAP + 2)]
+    _patch_boto(monkeypatch, _PagedLogs(pages))
+    causes, err = cac.fetch_qa_smoke_causes()
+    assert causes == {}
+    assert err and "pages" in err
+
+
+def test_live_cause_read_still_degrades_honestly_on_an_aws_error(monkeypatch):
+    class _Boom:
+        def filter_log_events(self, **kwargs):
+            raise RuntimeError("AccessDenied")
+
+    _patch_boto(monkeypatch, _Boom())
+    causes, err = cac.fetch_qa_smoke_causes()
+    assert causes == {} and "AccessDenied" in err
