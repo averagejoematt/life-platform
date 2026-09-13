@@ -29,6 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from v4_chrome import doors_nav, site_footer  # noqa: E402
 from v4_kit import loop_ribbon  # noqa: E402
 
@@ -222,7 +223,7 @@ def render_page() -> str:
 def main() -> int:
     out_dir = ROOT / "site" / "method" / SLUG
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "index.html").write_text(render_page(), encoding="utf-8")
+    _apply_chrome.write_page(out_dir / "index.html", render_page())  # #3721
     dist = ROOT / "site" / "data" / "mirror_distributions.json"
     if not dist.exists():
         print("WARNING: site/data/mirror_distributions.json is missing — run scripts/gen_mirror_distributions.py", file=sys.stderr)

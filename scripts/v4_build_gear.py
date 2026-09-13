@@ -56,6 +56,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from ingestion.source_registry import catalog_entries  # noqa: E402 — the authoritative device list
 from v4_chrome import doors_nav, site_footer  # noqa: E402 — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402 — shared .loop-ribbon (#578)
@@ -494,7 +495,18 @@ def main() -> int:
         return 2
     out_dir = ROOT / "site" / SLUG
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "index.html").write_text(render(entries), encoding="utf-8")
+    # #3721: normalize through the SAME pass the chrome contract asserts against,
+    # before writing. This generator's head/footer literals had drifted behind the
+    # chrome sweeps that updated the committed page, so regenerating /gear/ for an
+    # unrelated field (a registry `method` string, in #3720) silently stripped the
+    # theme-color pair, the SVG favicon, the manifest, the apple-touch-icon and the
+    # loop-forward aside — net 2 insertions, 7 deletions against a live reader page,
+    # and four red tests whose natural reading is "I broke the page" rather than "the
+    # generator is stale". v4_apply_chrome is idempotent and is already the
+    # authoritative post-build pass (its own docstring says to run it after any
+    # v4_build_*); calling it HERE means the generator and the contract cannot
+    # disagree again, because they are now the same code.
+    _apply_chrome.write_page(out_dir / "index.html", render(entries))  # #3721
     n_gear = sum(1 for e in entries if GEAR[e["id"]]["kind"] == "gear")
     n_live = sum(1 for e in entries if GEAR[e["id"]]["kind"] == "gear" and (GEAR[e["id"]].get("affiliate_url") or "").strip())
     print(f"{CANONICAL}: {n_gear} gear cards ({n_live} with live affiliate links), {len(entries) - n_gear} non-gear listed")

@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 from v4_proof import (  # noqa: E402  — #730/#803 static proof + #1395 data-driven OG + #1972 cadence
     chronicle_list_html,
@@ -215,7 +216,7 @@ def _section_proof(key: str, chronicle_proof: str) -> str:
 
 def write(path: Path, html_text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(html_text, encoding="utf-8")
+    _apply_chrome.write_page(path, html_text)  # #3721
 
 
 def main() -> None:

@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 from v4_proof import apply_og, cockpit_block_html, cockpit_og, load_character  # noqa: E402
 
 NOW = Path("site/cockpit/index.html")
@@ -72,14 +73,14 @@ def main() -> int:
     if not block:
         # No live data AND no snapshot — keep the existing baked block rather
         # than blanking the page's only static content (last-known-good).
-        NOW.write_text(html, encoding="utf-8")
+        _apply_chrome.write_page(NOW, html)  # #3721
         print("  ⚠️  no character data (API + snapshot both empty) — OG refreshed, keeping the existing baked block.", file=sys.stderr)
         return 0
     out = inject(html, block)
     if out is None:
         print("error: no injection anchor found in site/cockpit/index.html.", file=sys.stderr)
         return 2
-    NOW.write_text(out, encoding="utf-8")
+    _apply_chrome.write_page(NOW, out)  # #3721
     print("updated site/cockpit/index.html — cockpit proof + data-driven OG baked (level + pillars + as-of).")
     return 0
 
