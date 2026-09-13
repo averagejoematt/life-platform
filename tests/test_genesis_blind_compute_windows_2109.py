@@ -121,6 +121,13 @@ def _win(days: int) -> tuple[str, str]:
     return (_TODAY - timedelta(days=days)).isoformat(), _YESTERDAY
 
 
+# #3728: the single lab draw's date, named once so the inventory assertion below reads
+# the fixture rather than restating it. Deliberately outside the 90-day window — that is
+# the whole point of the episodic case.
+_LAB_DRAW_DATE_D = date(2026, 5, 2)
+_LAB_DRAW_DATE = _LAB_DRAW_DATE_D.isoformat()
+
+
 def _series(source: str, field: str, days: int, value=lambda i: 100.0 + i, end: date | None = None):
     """`days` consecutive daily rows ending at `end`, pilot-tagged before genesis."""
     end = end or (_TODAY - timedelta(days=1))
@@ -175,7 +182,7 @@ def _history_rows():
     rows += _series("state_of_mind", "valence", 90, lambda i: 0.1)
     rows += _series("measurements", "waist_in", 90, lambda i: 52.0)
     rows += _series("dexa", "body_fat_pct", 1, lambda i: 41.2, end=date(2026, 6, 14))
-    rows += _series("labs", "hba1c", 1, lambda i: 5.9, end=date(2026, 5, 2))
+    rows += _series("labs", "hba1c", 1, lambda i: 5.9, end=_LAB_DRAW_DATE_D)
     # The EXPERIMENT_SCOPED partitions these same readers touch. Derived intelligence
     # the reset tombstones on purpose — these must STAY hidden.
     rows += _series("computed_metrics", "readiness", 90, lambda i: 70.0)
@@ -258,7 +265,10 @@ def test_pre_fix_data_inventory_reports_the_pipes_as_empty(compute_tables, pre_f
     """…and the inventory half, which is what pushes every coach back to ORIENTATION
     voice ("I have 0 nights of data") the morning after a reset."""
     inventory = ic.build_data_inventory()
-    assert inventory["whoop"] == {"exists": False, "latest": None, "records": 0, "days_of_data": 0}
+    assert inventory["whoop"]["exists"] is False
+    assert inventory["whoop"]["latest"] is None
+    assert inventory["whoop"]["records"] == 0
+    assert inventory["whoop"]["days_of_data"] == 0
     assert inventory["withings"]["days_of_data"] == 0
     assert inventory["macrofactor"]["latest"] is None
 
@@ -348,7 +358,15 @@ def test_data_inventory_reports_the_bodys_history_not_the_cycles_age(compute_tab
     assert inventory["whoop"]["days_of_data"] == 90
     assert inventory["whoop"]["latest"] == _YESTERDAY
     assert inventory["withings"]["days_of_data"] == 90
-    assert inventory["labs"]["exists"] is False, "a 5-month-old lab draw is outside the 90-day window, correctly"
+    # #3728 overturned this line. It used to read "a 5-month-old lab draw is outside the
+    # 90-day window, correctly" — and that belief is what made the labs coach narrate a
+    # completed April 3rd panel as an upcoming appointment on the public dashboard. labs
+    # is EPISODIC: its records arrive on a cadence longer than any recency window, so a
+    # rolling denominator reports real bloodwork as absent. The RECENCY half of the claim
+    # is not lost — it moves to `latest` and the staleness directive, which is where a
+    # "this is old" statement belongs and where "this does not exist" never did.
+    assert inventory["labs"]["exists"] is True, "8 draws exist; being five months old is staleness, not absence (#3728)"
+    assert inventory["labs"]["latest"] == _LAB_DRAW_DATE
 
 
 def test_data_inventory_maturity_clears_orientation_on_genesis_day(compute_tables, frozen_inventory_clock):

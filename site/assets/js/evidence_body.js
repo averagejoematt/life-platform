@@ -117,7 +117,19 @@ export function renderSupplements(d) {
   return head + frame + correctionNotice(d) + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
 }
 
-export function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
+// #3728: the draws count is a LIFETIME figure — labs is CROSS_PHASE, so no restart
+// trims it. Served unlabelled beside a coach narrating its own shorter window, a reader
+// saw "8" next to "zero" with nothing to reconcile them. Name the denominator, and the
+// in-cycle companion when the server sends one. Both fields are additive and may be
+// absent on an artifact written before the fix — degrade to no label, never to a guess.
+function drawsScope(L) {
+  const scope = L.total_draws_scope;
+  if (!scope) return null;
+  const n = L.draws_this_cycle;
+  return typeof n === "number" ? `${scope} · ${n} this cycle` : scope;
+}
+
+export function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws", drawsScope(L)), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw", (L.latest_draw_archival || {}).pre_cycle ? "before this cycle" : null)]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
 
 // ── /data/physical/ — two tiers: the weight cockpit (daily) + the composition arc
 // (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.

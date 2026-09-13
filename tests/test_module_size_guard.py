@@ -290,7 +290,11 @@ BASELINE = {
     "deploy/sync_doc_metadata.py": 1007,  # 2026-08-31: shrank again — the #3101 counts sync extracted to deploy/doc_platform_counts.py (#3384)
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
-    "lambdas/intelligence/intelligence_common.py": 1350,
+    # #3728: extracted the inventory WINDOW half (75 lines: the episodic registry,
+    # inventory_window_start, inventory_row, out_of_window_line) to
+    # intelligence/inventory_window.py; the #3728 wiring that stayed costs 5, well
+    # inside the fifth-of-what-you-extracted earned-headroom allowance (#2610).
+    "lambdas/intelligence/intelligence_common.py": 1355,
     "lambdas/coach/coach_history_summarizer.py": 1264,
     "lambdas/coach/coach_prediction_evaluator.py": 1181,  # #3553: 1218 -> 1181, the commitment ledger extracted to coach/commitment_grading.py
     # 2026-08-13 (#2610): 1623 → 1382. This file was at 1623/1623 — zero headroom — and
@@ -337,7 +341,10 @@ BASELINE = {
     # seam caller. A considered raise, not a reflexive one; the NEXT growth extracts.
     "lambdas/compute/hypothesis_engine_lambda.py": 1292,
     "lambdas/ai/ai_context.py": 1076,
-    "lambdas/content/output_writers.py": 1113,  # #2816: extracted _dedup_activities (51 lines) to digest_utils.py; banked 10
+    # lambdas/content/output_writers.py LEFT this registry at #3728: extracting the whole
+    # /api/labs labs block (139 lines) to content/labs_scope.py took it 1116 -> 990, under
+    # the 1000-line ceiling, so it is governed by the normal rule now and needs no entry.
+    # #2816 had previously taken it to 1113 by extracting _dedup_activities.
     # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
     # import. That module exists because the compute Lambda and the daily brief had two
     # different definitions of "last week's weight" and the compute one was wrong (it took

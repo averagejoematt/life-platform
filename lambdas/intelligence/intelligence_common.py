@@ -29,6 +29,8 @@ from common.text_utils import truncate_at_word  # #1224: word-boundary summary t
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 
+from intelligence.inventory_window import inventory_row, inventory_window_start, out_of_window_line  # #3728
+
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -105,9 +107,15 @@ def build_data_inventory() -> dict:
     today, so all of them read cross-phase — but the decision is derived per partition
     from `phase_taxonomy` (#2092's shape), so adding an EXPERIMENT_SCOPED partition to
     the inventory later keeps its filter without anyone remembering to ask.
+
+    The WINDOW is a second, independent decision and lives in `inventory_window` —
+    90 days for a daily stream, all of history for an EPISODIC one, plus the
+    `out_of_window` third state that keeps "absent" and "present but not recently"
+    from collapsing into the same sentence (#3728; read that module before changing
+    either).
     """
     today = pacific_today()
-    d90 = (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    _now = pacific_now()  # #3728: ONE clock for this read — handed to inventory_window_start
 
     inventory: dict[str, Any] = {}
     seen_partitions = set()
@@ -124,6 +132,8 @@ def build_data_inventory() -> dict:
             pk = f"{USER_PREFIX}{partition}"
             # #2109: cross-phase unless the partition is EXPERIMENT_SCOPED — see the docstring.
             cross_phase = source_reads_cross_phase(partition)
+            # #3728: 90 days for a daily stream, all of history for an episodic one.
+            d90 = inventory_window_start(partition, _now)
             # Count records in last 90 days. Whoop counts DAY ROWS only (#3442): its
             # DATE#<d>#WORKOUT#<uuid> sub-records inflated this inventory ~45/90d, and
             # Select=COUNT cannot express the day-row grammar — sk-projected client count.
@@ -190,15 +200,10 @@ def build_data_inventory() -> dict:
                 cgm_items = cgm_latest_resp.get("Items", [])
                 latest_date = cgm_items[0].get("sk", "").replace("DATE#", "")[:10] if cgm_items else None
 
-            inventory[label] = {
-                "exists": count > 0,
-                "latest": latest_date,
-                "records": count,
-                "days_of_data": count,  # Approximation — 1 record per day
-            }
+            inventory[label] = inventory_row(count, latest_date, partition)  # #3728
         except Exception as e:
             logger.warning("Data inventory query failed for %s: %s", label, e)
-            inventory[label] = {"exists": False, "latest": None, "records": 0, "days_of_data": 0}
+            inventory[label] = inventory_row(0, None, partition)  # a failed read is absent, not out-of-window
 
     return inventory
 
@@ -511,6 +516,8 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
             except (ValueError, TypeError):
                 pass  # latest isn't a parseable date — skip staleness check
             inventory_lines.append(f"  - {src}: AVAILABLE ({count} records, latest: {latest}){staleness_tag}")
+        elif info.get("out_of_window"):
+            inventory_lines.append(out_of_window_line(src, info, _today))  # #3728
         else:
             inventory_lines.append(f"  - {src}: not available")
     parts.append("DATA SOURCES:\n" + "\n".join(inventory_lines) + "\n")

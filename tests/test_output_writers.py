@@ -24,6 +24,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
+from common.constants import EXPERIMENT_START_DATE  # #3728: the cycle genesis the scope fields name
 from content import output_writers as ow
 
 # ==============================================================================
@@ -1080,6 +1081,28 @@ def test_write_clinical_json_labs_are_ordered_by_category_then_name():
     assert by_name["Apob"]["decimals"] == 2
     # non-numeric biomarkers pass through verbatim
     assert by_name["Occult Blood"]["value"] == "negative"
+
+
+def test_write_clinical_json_labs_state_the_window_their_counts_are_over():
+    """#3728: `total_draws` is a LIFETIME count (labs is CROSS_PHASE — `include_pilot=True`
+    and no restart trims it). Served unlabelled beside a coach narrating its own, much
+    shorter window, a reader saw "8" next to "I have zero lab draws to interpret yet" and
+    one of them had to be lying. Neither was; the frame was missing on both sides.
+
+    Asserted on the WRITTEN artifact rather than on the source, because this is a
+    reader/writer wire contract — `site/assets/js/evidence_body.js::renderLabs` reads
+    these exact key names off `/api/labs`.
+    """
+    s3 = _write_clinical()
+    labs = s3.written(_CLINICAL_KEY)["labs"]
+    assert labs["total_draws_scope"] == "all cycles", "the lifetime count must name its scope"
+    assert labs["cycle_genesis"] == EXPERIMENT_START_DATE
+    assert isinstance(labs["draws_this_cycle"], int), "the in-cycle companion count must be served, even at 0"
+    # The fixture's only draw is 2026-02-15, before any plausible genesis, so it carries
+    # the archival frame. `archival_frame` returns None in-cycle by design — an always-on
+    # badge trains the reader to ignore it.
+    assert labs["latest_draw_archival"]["pre_cycle"] is True
+    assert labs["latest_draw_archival"]["genesis"] == EXPERIMENT_START_DATE
 
 
 def test_write_clinical_json_labs_precision_survives_real_ddb_decimal_values():

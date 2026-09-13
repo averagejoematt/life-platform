@@ -19,10 +19,11 @@ Exports:
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import PACIFIC
+
+from content import labs_scope  # #3728 — the /api/labs scope block
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -715,142 +716,10 @@ def write_clinical_json(data, profile, yesterday):
         except Exception as e:
             print("[WARN] Clinical: DEXA query failed: " + str(e))
 
-        # Lab Results
-        labs = {}
-        try:
-            from experiment.phase_filter import with_phase_filter
-
-            # ADR-058 include_pilot=True: clinical archive — labs/DEXA are date-independent
-            # (owner decision 2026-06-06; filtering would empty the public labs page)
-            resp = _table.query(
-                **with_phase_filter(
-                    {
-                        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
-                        "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
-                        "ScanIndexForward": False,
-                        "Limit": 1,
-                    },
-                    include_pilot=True,
-                )
-            )
-            all_draws = _table.query(
-                **with_phase_filter(
-                    {
-                        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
-                        "ExpressionAttributeValues": {":pk": _USER_PREFIX + "labs", ":sk": "DATE#"},
-                        "Select": "COUNT",
-                    },
-                    include_pilot=True,
-                )
-            )
-            total_draws = all_draws.get("Count", 0)
-
-            if resp.get("Items"):
-                lab_rec = resp["Items"][0]
-                biomarkers_raw = lab_rec.get("biomarkers", {})
-                out_of_range = lab_rec.get("out_of_range", [])
-
-                cat_order = [
-                    "lipids",
-                    "lipids_advanced",
-                    "cardiovascular",
-                    "metabolic",
-                    "cbc",
-                    "cbc_differential",
-                    "liver",
-                    "kidney",
-                    "thyroid",
-                    "hormones",
-                    "inflammation",
-                    "iron",
-                    "vitamins",
-                    "minerals",
-                    "electrolytes",
-                    "immune",
-                    "omega_fatty_acids",
-                    "prostate",
-                    "toxicology",
-                    "genetics",
-                    "blood_type",
-                    "digestive",
-                ]
-                cat_names = {
-                    "lipids": "Lipids",
-                    "lipids_advanced": "Advanced Lipids",
-                    "cardiovascular": "Cardiovascular",
-                    "metabolic": "Metabolic",
-                    "cbc": "Complete Blood Count",
-                    "cbc_differential": "CBC Differential",
-                    "liver": "Liver",
-                    "kidney": "Kidney",
-                    "thyroid": "Thyroid",
-                    "hormones": "Hormones",
-                    "inflammation": "Inflammation",
-                    "iron": "Iron Studies",
-                    "vitamins": "Vitamins",
-                    "minerals": "Minerals",
-                    "electrolytes": "Electrolytes",
-                    "immune": "Immune",
-                    "omega_fatty_acids": "Omega Fatty Acids",
-                    "prostate": "Prostate",
-                    "toxicology": "Toxicology",
-                    "genetics": "Genetics",
-                    "blood_type": "Blood Type",
-                    "digestive": "Digestive",
-                }
-
-                by_cat = {}
-                for key, bm in biomarkers_raw.items():
-                    cat = bm.get("category", "other")
-                    if cat not in by_cat:
-                        by_cat[cat] = []
-                    flag = bm.get("flag", "normal")
-                    flag_code = None
-                    if flag == "high":
-                        flag_code = "H"
-                    elif flag == "low":
-                        flag_code = "L"
-
-                    val = bm.get("value_numeric")
-                    if val is None:
-                        val = bm.get("value")
-                    decimals = 0
-                    is_numeric_val = isinstance(val, (int, float, Decimal))
-                    if is_numeric_val:
-                        if val != 0 and abs(val) < 1:
-                            decimals = 2
-                        elif abs(val) < 10:
-                            decimals = 1
-
-                    by_cat[cat].append(
-                        {
-                            "name": key.replace("_", " ").title(),
-                            "value": _d2f(val) if is_numeric_val else val,
-                            "unit": bm.get("unit", ""),
-                            "range": bm.get("ref_text", ""),
-                            "flag": flag_code,
-                            "decimals": decimals,
-                            "category": cat_names.get(cat, cat.replace("_", " ").title()),
-                        }
-                    )
-
-                biomarker_list = []
-                for cat in cat_order:
-                    if cat in by_cat:
-                        biomarker_list.extend(sorted(by_cat[cat], key=lambda x: x["name"]))
-                for cat in sorted(by_cat.keys()):
-                    if cat not in cat_order:
-                        biomarker_list.extend(sorted(by_cat[cat], key=lambda x: x["name"]))
-
-                labs = {
-                    "latest_draw_date": lab_rec.get("draw_date"),
-                    "lab_provider": lab_rec.get("lab_provider"),
-                    "total_draws": total_draws,
-                    "biomarkers": biomarker_list,
-                    "flagged_count": len(out_of_range),
-                }
-        except Exception as e:
-            print("[WARN] Clinical: labs query failed: " + str(e))
+        # Lab Results — the whole block lives in content/labs_scope (#3728). It was the
+        # single biggest thing in this function and it is cohesive on its own: query the
+        # draws, categorize the biomarkers, and state the window the counts are over.
+        labs = labs_scope.build_labs_block(_table, _USER_PREFIX + "labs")
 
         # Supplements
         supplements = []

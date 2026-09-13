@@ -27,6 +27,41 @@ from operational.qa_check_reader_truth import SITE_BASE_URL
 # "zero results" / "zero draws" / "zero lab results" — the empty-store claim.
 _ZERO_LABS_CLAIM = re.compile(r"\bzero\s+(?:lab\s+|blood\s+)?(?:results|draws)\b", re.IGNORECASE)
 
+# #3728: a zero-claim that NAMES ITS WINDOW is not a contradiction. `/api/labs` counts
+# lifetime draws (labs is CROSS_PHASE — no restart trims it); a coach saying "zero draws
+# THIS CYCLE" beside a lifetime 8 is two true statements about two windows, and a reader
+# can hold both. Only an unqualified zero — which a reader can only read as "there are
+# none" — contradicts the served count. Scanned within the claim's OWN SENTENCE: a
+# qualifier one sentence away frames that sentence, not this one, and reading across the
+# boundary let "Zero draws this cycle. And I have zero results at all." pass whole.
+_WINDOW_QUALIFIER = re.compile(
+    r"\b(?:this|the current|the present)\s+(?:cycle|experiment|phase|restart|round)\b"
+    r"|\bsince\s+(?:the\s+)?(?:restart|reset|genesis|day\s*1|this\s+cycle\s+began)\b"
+    r"|\b(?:in|during|within)\s+(?:this|the current)\s+(?:cycle|experiment|phase|window)\b"
+    r"|\bthis\s+cycle\b",
+    re.IGNORECASE,
+)
+_SENTENCE_SPLIT = re.compile(r"[.!?;\n]+")
+
+# The opposite direction (#3728): a served text asserting a POSITIVE draw count while
+# /api/labs serves an empty store. The original check returned True unconditionally
+# whenever the store was empty, so the honest-looking half of the same class — a coach
+# inventing bloodwork that does not exist — was never guarded at all. A numeric claim is
+# the tight, non-fuzzy half of that and the only half worth asserting on.
+_POSITIVE_LABS_CLAIM = re.compile(r"\b(\d{1,3})\s+(?:total\s+)?(?:lab|blood)\s+(?:draws|panels|results)\b", re.IGNORECASE)
+
+
+def _zero_claim_is_framed(text):
+    """True when EVERY zero claim in `text` names its window in its own sentence.
+
+    All-or-nothing on purpose: one unframed zero is the sentence a reader takes
+    away, however carefully the sentence beside it was hedged.
+    """
+    for sentence in _SENTENCE_SPLIT.split(text or ""):
+        if _ZERO_LABS_CLAIM.search(sentence) and not _WINDOW_QUALIFIER.search(sentence):
+            return False
+    return True
+
 
 def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
     """Pure assessor (#1993): (ok, message) for the served-coach-text vs
@@ -46,18 +81,39 @@ def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
     if weekly_priority_text:
         texts.append(("weekly_priority", str(weekly_priority_text)))
 
-    offenders = sorted({cid for cid, text in texts if _ZERO_LABS_CLAIM.search(text)})
+    if total_draws is None:
+        # Endpoint dark or unparseable: there is no count to compare against. Not a
+        # pass about the coaches — a statement that the comparison could not be made.
+        return True, "/api/labs served no readable total_draws — nothing to compare the served coach text against"
+
     if not total_draws:
-        # Store empty (or endpoint dark): a zero-results narration has nothing to
-        # contradict tonight — the extraction-side honesty lives in labs_facts.
-        return True, "labs store serves no draws — no served text can contradict it tonight"
+        # #3728: the store is genuinely empty. The old code returned here
+        # unconditionally, which left the opposite direction — a coach narrating
+        # bloodwork that does not exist — unguarded. Assert it.
+        inventors = sorted(
+            {f"{cid}:{m.group(1)}" for cid, text in texts for m in _POSITIVE_LABS_CLAIM.finditer(text) if int(m.group(1)) > 0}
+        )
+        if inventors:
+            return False, (
+                f"served coach text ({', '.join(inventors)}) claims a positive lab-draw count while /api/labs serves "
+                "an empty store — bloodwork narrated that the platform holds no record of (#3728)"
+            )
+        return True, "labs store serves no draws and no served text claims otherwise"
+
+    # #3728: `total_draws` is LIFETIME (labs is CROSS_PHASE). A coach narrating its own
+    # shorter window is not lying, so only an UNFRAMED zero contradicts it. The original
+    # check compared the two directly and so fired on honest prose whenever the cycle was
+    # young — and its stated remedy, "regenerate the coach analysis", was inert against
+    # the real cause: regeneration reproduces the same unframed inputs.
+    offenders = sorted({cid for cid, text in texts if _ZERO_LABS_CLAIM.search(text) and not _zero_claim_is_framed(text)})
     if offenders:
         return False, (
-            f"served coach text ({', '.join(offenders)}) narrates 'zero results/draws' while /api/labs serves "
-            f"total_draws={total_draws} — a fabricated data-integrity claim between two public surfaces "
-            "(regenerate the coach analysis; #1993)"
+            f"served coach text ({', '.join(offenders)}) narrates 'zero results/draws' with no window named, while "
+            f"/api/labs serves total_draws={total_draws} for all cycles — a reader sees zero beside {total_draws}. "
+            "Fix the frame, not the wording: check that build_data_inventory reports labs present (it is EPISODIC — "
+            "a rolling window is the wrong denominator) and that the claim names its window if it has one (#1993, #3728)"
         )
-    return True, f"no served coach text contradicts the labs store (total_draws={total_draws}, {len(texts)} texts scanned)"
+    return True, f"no served coach text contradicts the labs store (total_draws={total_draws} all cycles, {len(texts)} texts scanned)"
 
 
 def _fetch_site_json(path, timeout=15):
