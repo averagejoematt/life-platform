@@ -7,7 +7,7 @@ from typing import Any, cast
 from mcp.config import RAW_DAY_LIMIT, SOURCES
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
-from mcp.tools_benchmark import tool_get_benchmark
+from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
 
 # #1478: one-call session opener aggregating six pending-capture surfaces.
 from mcp.tools_capture import tool_get_capture_queues
@@ -446,26 +446,18 @@ TOOLS = {
         "fn": tool_get_benchmark,
         "schema": {
             "name": "get_benchmark",
-            "description": (
-                "PRIVATE cut-benchmarking vs Matthew's own proven weight-loss history (descriptive, "
-                "correlational, n=1 — never causal). Use 'view' to select: "
-                "'pace' (default) = live pace vs the proven trajectory at the current weight — current "
-                "weight/rate + recent walking volume vs the by-band proven volumes, walk gap, and the "
-                "~240 lb run gate. "
-                "'episodes' = the detected loss/regain ledger + loss-vs-regain rate asymmetry. "
-                "'maintenance' = the regain firewall (near goal): rolling walk volume vs the proven floor "
-                "and the post-trough decay signature. "
-                "All views forward-framed (what works next), never a failure tally. "
-                "Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?', "
-                "'show my cut history', 'am I holding the loss?'."
-            ),
+            "description": GET_BENCHMARK_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "view": {
                         "type": "string",
-                        "description": "pace (default), episodes (the cut ledger), or maintenance (the regain firewall).",
-                        "enum": ["pace", "episodes", "maintenance"],
+                        "description": (
+                            "pace (default), episodes (the cut ledger), maintenance (the regain firewall), "
+                            "or prescription (weight-matched training reference for authoring a session), "
+                            "or campaign (this cut vs the one that worked, with the levers ranked)."
+                        ),
+                        "enum": ["pace", "episodes", "maintenance", "prescription", "campaign"],
                     },
                     "date": {
                         "type": "string",
@@ -1752,21 +1744,26 @@ TOOLS = {
                             "type?, count? (repeat the set N times), duration_seconds? (cardio), "
                             "distance_meters?}], "
                             "rest_seconds?, superset_id? (same int = superset/circuit/tri-set), notes?}. "
-                            "If a title doesn't exist in Hevy yet it is auto-created (see "
-                            "create_missing); to control the new exercise pass muscle_group, "
-                            "exercise_type, and/or equipment_category on that item (else inferred). "
+                            "If a title doesn't exist in Hevy the draft FAILS with suggestions "
+                            "(create_missing defaults to false, #3718). To create it deliberately, "
+                            "pass create_missing:true AND muscle_group on that item — an inferred "
+                            "muscle group once guessed 'shoulders' for a calf press, which would "
+                            "have corrupted muscle-volume aggregation permanently. "
                             "Loads are taken verbatim — the platform does not compute them."
                         ),
                         "items": {"type": "object"},
                     },
                     "create_missing": {
                         "type": "boolean",
-                        "default": True,
+                        "default": False,
                         "description": (
-                            "draft_custom only: when an exercise title isn't found in Hevy, "
-                            "create it (so the draft never gets stuck) and report it under "
-                            "created_exercises. Set false to instead fail loudly with "
-                            "suggestions. Only creates from a human title, never a bare movement_key."
+                            "draft_custom only: when an exercise title isn't found in Hevy, create "
+                            "it and report it under created_exercises. DEFAULTS TO FALSE (#3718) — "
+                            "it previously defaulted to true and invented 'Calf Press on Leg Press "
+                            "Machine' as a SHOULDERS exercise, which would have counted every calf "
+                            "session toward shoulder volume for good. When enabling it, always pass "
+                            "muscle_group explicitly rather than letting it be inferred. Only ever "
+                            "creates from a human title, never a bare movement_key."
                         ),
                     },
                     "archetype": {

@@ -46,7 +46,7 @@ section heading is the anchor; where it cites a code file, the file's header doc
 <!-- LEDGER-COVERAGE:START -->
 **Files in the memory index snapshot: 418** — feedback 24 · reference 234 · security 1 · project 156 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 259** — homed-here 64 · already-homed 169 · superseded 7 · narrative 17 · off-repo 2
+**Rule-class files (feedback + reference + security): 259** — homed-here 66 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
 
 **Program/session files (project): 156** — already-homed 14 · superseded 1 · narrative 138 · off-repo 2 · index 1
 
@@ -909,6 +909,8 @@ carries an operating rule.
 | `reference_isbad_is_a_scalar_detector.md` | reference | `site/assets/js/evidence_shared.js` (the `isBad` definition itself) + `tests/test_platform_state_3691.py` (the page-vs-artifact contract that catches a renderer showing nothing) | already-homed |
 | `project_session_x_2026_09_07.md` | project | — narrative: a session record (the fixture privacy leak + the owner's ingestion audit), not a rule; its three extracted rules are the reference rows below | narrative |
 | `reference_a_repo_side_fix_to_an_s3_read_config.md` | reference | `docs/CONVENTIONS.md` §7 (a config the runtime reads from S3 is not fixed by editing the repo copy — check `build_bundle.bundled_extra_paths()`, read the live object, and prefer deleting the second copy to synchronising it) | homed-here |
+| `reference_attest_never_backfill.md` | reference | `lambdas/training/attested_training.py` module docstring (missing history gets a declared, labelled attestation layer that never merges into a measured field — never synthetic rows written into `SOURCE#hevy`/`SOURCE#strava`, which are indistinguishable from measured ones and sit under delete-protected `raw/*`) | homed-here |
+| `reference_a_band_is_not_a_contiguous_window.md` | reference | `lambdas/compute/episode_detect_lambda.py` (`build_reference` + `weekly_covariates` — bucket a re-entrant series by its in-band DAY SET, never `min..max`; `n_eff` per contiguous visit, then summed) | homed-here |
 | `reference_one_cause_two_red_workflows.md` | reference | `docs/CONVENTIONS.md` §7 (a red `lint` SKIPS CI/CD's `test`/`Plan`/`Deploy` — a skipped test job is not a passing one; two workflows red together usually share one cause; read the boot brief's main line at session START) | homed-here |
 | `reference_a_piped_exit_code_is_not_a_test_result.md` | reference | `docs/CONVENTIONS.md` §7 (`pytest --timeout` is not installed here — the flag errors and a piped shell still reports exit 0; read the `N passed` summary line, never the exit code) | homed-here |
 | `feedback_pacific_time_in_messages.md` | feedback | — off-repo: an audience convention for prose addressed to the owner, not a code or CI rule; the repo's own timestamps stay UTC by design | narrative |
@@ -919,8 +921,6 @@ carries an operating rule.
 | `reference_a_behavioral_threshold_cannot_see_a_same_day_miss.md` | reference | `lambdas/ingestion/source_registry.py` (the `behavioral` + `stale_hours` facets and their comments state why a behavioural source is lenient) and `cdk/stacks/ingestion_stack.py` §HevyBackfill (the #3720 comment states why the polling window is 24h and why moving the boundary only relocates the bug) | homed-here |
 | `reference_a_page_of_logs_is_not_the_latest.md` | reference | `scripts/check_alarm_citations.py` (`fetch_qa_smoke_causes`'s #3729 comment states that filter_log_events pages by stream, that the read must follow nextToken, and that ordering is the caller's guarantee) | homed-here |
 | `reference_a_pct_suffix_is_not_one_semantic.md` | reference | `tests/accuracy_audit.py` (the `_SIGNED_PCT_FIELDS` / `_ACHIEVEMENT_PCT_FIELDS` comment block states the three percent domains and why the achievement class is bounded rather than exempt) | homed-here |
-| `reference_a_band_is_not_a_contiguous_window.md` | reference | — narrative: filed by Session Z on the unmerged #3713 branch; its rule lands with `training_reference` v2 when that PR merges | narrative |
-| `reference_attest_never_backfill.md` | reference | — narrative: filed by Session Z on the unmerged #3713 branch; its rule lands with the #3717 attestation layer when that PR merges | narrative |
 | `project_session_z_2026_09_08.md` | project | — narrative: a session record, not a repo rule | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
 | `user_who_is_matthew.md` | user | — out of scope: who the owner is stays in memory | user |

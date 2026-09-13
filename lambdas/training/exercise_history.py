@@ -40,7 +40,29 @@ logger = logging.getLogger("exercise_history")
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-DEFAULT_LOOKBACK_DAYS = int(os.environ.get("EXERCISE_HISTORY_LOOKBACK_DAYS", "180"))
+# #3708 — the window covers the whole logged corpus, not a recent slice.
+# At 180 days, 489 of Matthew's 537 distinct logged movements were invisible
+# (Deadlift, 80 sessions, rendered as "no history" and the planner guessed a
+# starting load). Hevy history begins 2021-04-12; the partition holds ~900
+# workout records, so one paginated Query over all of it is cheap — the cost
+# is bounded by the partition, not by the window. Anything that narrows this
+# below FLOOR_LOOKBACK_DAYS re-creates the defect, and
+# tests/test_exercise_history_window_3708.py reds on it.
+DEFAULT_LOOKBACK_DAYS = int(os.environ.get("EXERCISE_HISTORY_LOOKBACK_DAYS", "3650"))
+
+# The regression floor. A cue for a lift last performed during the 2024-25 cut
+# sits 500-730 days back; a window under two years cannot see it.
+FLOOR_LOOKBACK_DAYS = 1095
+
+# A bodyweight annotation is only honest if a real weigh-in sits near the
+# session. Beyond this many days we omit it rather than interpolate (ADR-104).
+BODYWEIGHT_TOLERANCE_DAYS = 7
+
+# Below this age a cue reads as current capability and needs no bodyweight
+# context; above it, the reader needs to know the set is historical. Six
+# months is the floor because his bodyweight moves 30+ lb inside one, and a
+# top set lifted 30 lb lighter is not the same evidence.
+STALE_AFTER_DAYS = 180
 
 _ddb_table = None
 
@@ -152,6 +174,75 @@ def load_recent_history(
     return index
 
 
+def load_bodyweight_index(
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    today: date | None = None,
+) -> dict[str, float]:
+    """Single batched Query over SOURCE#withings → {YYYY-MM-DD: weight_lbs}.
+
+    #3708. A top set lifted years ago was lifted at a different bodyweight, so
+    quoting it without that context invites reading old capability as current.
+    One Query per routine generation, same shape as load_recent_history.
+
+    Cross-phase on purpose: bodyweight history predates every experiment reset,
+    and an annotation that vanished at each genesis would be worse than none.
+    """
+    today = today or date.fromisoformat(pacific_today())
+    start = (today - timedelta(days=lookback_days)).isoformat()
+    pk = f"USER#{USER_ID}#SOURCE#withings"
+    out: dict[str, float] = {}
+    last_key = None
+    while True:
+        kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start}"),
+            "ProjectionExpression": "sk, weight_lbs",
+        }
+        if last_key:
+            kwargs["ExclusiveStartKey"] = last_key
+        resp = _table().query(**kwargs)
+        for item in resp.get("Items", []):
+            lbs = _to_float(item.get("weight_lbs"))
+            if lbs <= 0:
+                continue
+            day = str(item.get("sk", ""))[5:15]
+            if len(day) == 10:
+                out[day] = lbs
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+    return out
+
+
+def nearest_bodyweight(
+    iso_date: str,
+    weight_index: dict[str, float] | None,
+    tolerance_days: int = BODYWEIGHT_TOLERANCE_DAYS,
+) -> float | None:
+    """Weigh-in closest to `iso_date`, or None if none sits within tolerance.
+
+    Never interpolates and never reaches for the nearest reading at any
+    distance — an absent weigh-in is reported as absence (ADR-104). Ties
+    resolve to the earlier date, which is deterministic rather than arbitrary.
+    """
+    if not weight_index or not iso_date:
+        return None
+    try:
+        target = date.fromisoformat(iso_date[:10])
+    except ValueError:
+        return None
+    best: tuple[int, str] | None = None
+    for day in weight_index:
+        try:
+            delta = abs((date.fromisoformat(day) - target).days)
+        except ValueError:
+            continue
+        if delta > tolerance_days:
+            continue
+        if best is None or (delta, day) < best:
+            best = (delta, day)
+    return weight_index[best[1]] if best else None
+
+
 def history_facts(template_id: str | None, index: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     """Return the facts the renderer can quote. Empty dict on no history."""
     if not template_id:
@@ -177,13 +268,25 @@ def history_facts(template_id: str | None, index: dict[str, list[dict[str, Any]]
 _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def _short_date(iso: str) -> str:
-    """ISO YYYY-MM-DD → 'D Mon'. Returns '' on bad input."""
+def _short_date(iso: str, today: date | None = None) -> str:
+    """ISO YYYY-MM-DD → 'D Mon' when recent, 'Mon YYYY' when historical (#3708).
+
+    A bare '24 May' is ambiguous once the window spans years — it reads as this
+    year's May. Sessions older than STALE_AFTER_DAYS render month + year so the
+    age of the set is legible in the cue itself. Returns '' on bad input.
+    """
     try:
         y, m, d = iso.split("-")
-        return f"{int(d)} {_MONTHS[int(m) - 1]}"
+        month = _MONTHS[int(m) - 1]
     except (ValueError, IndexError):
         return ""
+    ref = today or date.fromisoformat(pacific_today())
+    # The year is carried whenever the session is not in the current calendar
+    # year. Without it "4 Nov" on 2026-09-08 reads as a November that has not
+    # happened yet — the ambiguity a widened window introduces (#3708).
+    if y != str(ref.year):
+        return f"{month} {y}"
+    return f"{int(d)} {month}"
 
 
 def _round_weight(kg: float) -> str:
@@ -196,8 +299,22 @@ def _round_weight(kg: float) -> str:
     return f"{rounded}kg"
 
 
-def render_history_cue(facts: dict[str, Any]) -> str:
-    """One-line factual cue. Returns '' if no usable history."""
+def render_history_cue(
+    facts: dict[str, Any],
+    weight_index: dict[str, float] | None = None,
+    today: date | None = None,
+) -> str:
+    """One-line factual cue. Returns '' if no usable history.
+
+    Recent:     "Last: 60kg 8/8/7 (24 May)"
+    Historical: "Last: 100kg 5/5/4 (Nov 2024, at 268 lb)"
+
+    #3708. The bodyweight clause is added only for sets older than
+    STALE_AFTER_DAYS and only when a real weigh-in sits within
+    BODYWEIGHT_TOLERANCE_DAYS — otherwise it is omitted entirely. A missing
+    weigh-in never becomes an interpolated one (ADR-104): the cue silently
+    loses the clause rather than gaining a number nobody measured.
+    """
     if facts.get("sessions_count", 0) == 0:
         return ""
     weight = _round_weight(facts.get("last_top_weight_kg", 0))
@@ -205,10 +322,21 @@ def render_history_cue(facts: dict[str, Any]) -> str:
     if not weight or not reps:
         return ""
     reps_str = "/".join(str(r) for r in reps)
-    date_str = _short_date(facts.get("last_date", ""))
-    if date_str:
-        return f"Last: {weight} {reps_str} ({date_str})"
-    return f"Last: {weight} {reps_str}"
+    last_date = facts.get("last_date", "") or ""
+    date_str = _short_date(last_date, today=today)
+    if not date_str:
+        return f"Last: {weight} {reps_str}"
+
+    context = date_str
+    try:
+        age = ((today or date.fromisoformat(pacific_today())) - date.fromisoformat(last_date[:10])).days
+    except ValueError:
+        age = 0
+    if age > STALE_AFTER_DAYS:
+        lbs = nearest_bodyweight(last_date, weight_index)
+        if lbs:
+            context = f"{date_str}, at {int(round(lbs))} lb"
+    return f"Last: {weight} {reps_str} ({context})"
 
 
 def pick_note(

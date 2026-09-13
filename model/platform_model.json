@@ -3556,6 +3556,13 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/training/exercise_history.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/training/hevy_common.py",
       "partition": "hevy",
       "via": "pk"
@@ -6959,7 +6966,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 667,
+      "edges": 668,
       "lambdas": 104,
       "mcp_tool_modules": 29,
       "mcp_tools": 81,
@@ -6974,8 +6981,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 320,
-        "sites_resolved": 826,
-        "sites_total": 1146
+        "sites_resolved": 829,
+        "sites_total": 1149
       },
       "schedule_resolution": {
         "dynamic": 0,

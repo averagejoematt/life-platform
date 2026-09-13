@@ -656,7 +656,14 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             error_code="MISSING_ARG",
         )
 
-    create_missing = args.get("create_missing", True)
+    # #3718 — DEFAULT FLIPPED TO FALSE. On 2026-09-08 create_missing invented
+    # "Calf Press on Leg Press Machine" and guessed `shoulders` as its muscle
+    # group. Had it gone through, every calf session would have counted toward
+    # shoulder volume and get_muscle_volume would have reported calves untrained
+    # while inflating a muscle already worked three ways — a silent, permanent
+    # corruption of the aggregation, from a guess nobody was asked to approve.
+    # Failing loudly costs one round trip; guessing costs the data.
+    create_missing = args.get("create_missing", False)
     if isinstance(create_missing, str):
         create_missing = create_missing.lower() not in ("false", "0", "no")
 
@@ -935,6 +942,8 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     try:
         resolve = _make_resolver()
         title_ctx, why = _resolve_title_inputs(ir)
+        before_updated_at = ir.hevy_updated_at
+        took_update_branch = bool(ir.hevy_routine_id)
         if ir.hevy_routine_id:
             body = to_update_body(ir, resolve, title_context=title_ctx, why_note=why)
             resp = wc.update_routine_with_guard(
@@ -957,6 +966,12 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
         parsed = from_hevy_response(resp)
         ir.hevy_routine_id = parsed["hevy_routine_id"] or ir.hevy_routine_id
         ir.hevy_updated_at = parsed["updated_at"]
+
+        # #3718 — verify against Hevy, not against its acknowledgement; and record
+        # the folder the READBACK found, never the one we intended (folder_id is
+        # create-only, so on the update branch an intended value is fiction).
+        check = wc.verify_commit_landed(ir.hevy_routine_id, body, before_updated_at)
+        ir.hevy_folder_id = check.get("folder_id")
         ir.hevy_pushed_at = _ts_now()
         ir.status = "active"
         ir.parent_version = ir.version
@@ -968,7 +983,7 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 logger.info(f"id-map already present for routine {ir.routine_id}")
         out: dict[str, Any] = {
-            "status": "committed",
+            "status": "committed" if check.get("verified") else "unverified",
             "routine_id": ir.routine_id,
             "hevy_routine_id": ir.hevy_routine_id,
             "version": ir.version,
@@ -976,7 +991,14 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # "unfoldered: <reason>" is how a caller reading nothing but this dict
             # learns the routine landed in the Hevy account root instead of its folder.
             "folder": folder_note or _UPDATE_FOLDER_NOTE,
+            # #3718 — what Hevy actually holds, read back after the write.
+            **wc.readback_fields(check, took_update_branch),
         }
+        if not check.get("verified"):
+            ir.status = "unverified"
+            put_versioned(ir)
+            out["error"] = wc.UNVERIFIED_NOTE.format(reason=check.get("reason"))
+            warnings.append(out["error"])
         if warnings:
             out["warnings"] = warnings
         return out
