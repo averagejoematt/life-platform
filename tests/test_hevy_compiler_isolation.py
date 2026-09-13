@@ -20,6 +20,8 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_hevy_compiler.py"),
     os.path.join(ROOT, "tests", "test_hevy_compiler_isolation.py"),
     os.path.join(ROOT, "tests", "test_hevy_write_client.py"),
+    # #3718 — exercises verify_commit_landed, which compares wire template ids.
+    os.path.join(ROOT, "tests", "test_hevy_commit_readback_3718.py"),
     os.path.join(ROOT, "tests", "test_adherence_calc.py"),
     os.path.join(ROOT, "tests", "test_hevy_adherence_wiring.py"),
     # #417 2b end-to-end restamp test asserts on the compiled wire body's

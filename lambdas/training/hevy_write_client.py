@@ -271,6 +271,88 @@ def update_routine_with_guard(routine_id: str, body: dict[str, Any], expected_up
 # ── Exercise templates ────────────────────────────────────────────────────
 
 
+# #3718 — wire-contract facts, stated once, beside the client that knows them.
+UPDATE_BRANCH_NOTE = (
+    "update — this commit targeted an EXISTING routine. folder_id is create-only in "
+    "Hevy, so the routine cannot move folders no matter what this result says."
+)
+UNVERIFIED_NOTE = (
+    "NOT VERIFIED: {reason}. The write was acknowledged by Hevy but a readback does not "
+    "show it. Do NOT tell the athlete this session is ready — check the routine in the "
+    "app before relying on it."
+)
+
+
+def readback_fields(check: dict, took_update_branch: bool) -> dict:
+    """The commit-result keys that describe what Hevy ACTUALLY holds (#3718).
+
+    Assembled here so the wire facts and the words describing them live together,
+    and so a caller cannot report a verified commit while omitting the readback.
+    `branch` appears only on the update path, where the folder provably cannot move.
+    """
+    out = {
+        "verified": bool(check.get("verified")),
+        "hevy_folder_id": check.get("folder_id"),
+        "hevy_updated_at": check.get("updated_at"),
+    }
+    if took_update_branch:
+        out["branch"] = UPDATE_BRANCH_NOTE
+    return out
+
+
+def verify_commit_landed(routine_id: str, body: dict, before_updated_at: str | None) -> dict:
+    """Read the routine back from Hevy and say whether the write actually landed (#3718).
+
+    Lives HERE, not in the MCP tool layer: `exercise_template_id` is Hevy wire
+    schema, and tests/test_hevy_compiler_isolation.py holds that such knowledge
+    stays in hevy_compiler.py / this client. The guard was right — the client
+    owning "did this write land" is the correct shape anyway.
+
+    THE INCIDENT. On 2026-09-08 a commit reported "Pushed. Foundation - Legs -
+    1 - 3, filed in your Legs folder." The IR recorded hevy_routine_id, an
+    hevy_folder_id of 3087819 (Legs) and hevy_pushed_at 23:00:03Z. Read live 29
+    minutes later, that routine was in folder 3087806 (Archive), its updated_at
+    was still 2026-09-07T04:05:50Z, and its contents were June's. Nothing
+    reached Hevy, the owner was told it had, and he would have discovered it at
+    the gym.
+
+    The response to a write is the API agreeing it received a request. It is
+    not evidence of state. This asks Hevy what it now holds and compares it to
+    what we sent — template ids and set counts, plus whether updated_at moved.
+    """
+    out = {"verified": False, "reason": None, "folder_id": None, "updated_at": None}
+    if not routine_id:
+        out["reason"] = "no routine id returned"
+        return out
+    try:
+        got = get_routine(routine_id)
+    except Exception as e:  # noqa: BLE001 - an unreadable routine is an unverified one
+        out["reason"] = f"readback failed ({type(e).__name__}: {e})"
+        return out
+    rt = got.get("routine") if isinstance(got.get("routine"), dict) else got
+    if isinstance(rt, list):
+        rt = rt[0] if rt else {}
+    if not rt:
+        out["reason"] = "readback returned no routine"
+        return out
+
+    out["folder_id"] = rt.get("folder_id")
+    out["updated_at"] = rt.get("updated_at")
+
+    sent = [str(e.get("exercise_template_id")) for e in (body.get("routine") or body).get("exercises", []) or []]
+    live = [str(e.get("exercise_template_id")) for e in (rt.get("exercises") or [])]
+    if sent and live != sent:
+        out["reason"] = f"content mismatch — sent {len(sent)} exercise(s), Hevy holds {len(live)}"
+        return out
+    if before_updated_at and str(rt.get("updated_at") or "") == str(before_updated_at):
+        # The decisive check for the #3718 case: a PUT that changed nothing.
+        out["reason"] = f"updated_at did not move (still {before_updated_at}) — the write did not apply"
+        return out
+
+    out["verified"] = True
+    return out
+
+
 def list_templates(page: int = 1, page_size: int = 100) -> dict[str, Any]:
     return _request("GET", "/v1/exercise_templates", query={"page": page, "pageSize": page_size})
 
