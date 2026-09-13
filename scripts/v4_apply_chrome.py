@@ -227,6 +227,39 @@ def rewrite(html: str, self_path: str | None = None):
     return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed
 
 
+def write_page(path, html: str) -> str:
+    """Normalize a generator's HTML through `rewrite` and write it. Returns the
+    normalized text.
+
+    THE POINT (#3721). This module's docstring has always said it is the authoritative
+    post-build pass and to "run it after any `v4_build_*` build so generator-local
+    chrome can't re-drift" — and not one generator did. Every chrome sweep since #1009
+    updated the COMMITTED pages; the generators that produce them kept their own
+    copy-pasted head/footer literals and fell behind in silence. Measured 2026-09-13 by
+    running each generator against a clean tree and re-running
+    `tests/test_site_chrome.py`: TEN of them stripped chrome — coaching, dispatches,
+    evidence, eyeball, gear, grade_your_coach, methods, mirror, theme_river, tone. The
+    regen that found it (#3720, changing one registry `method` string) dropped the
+    theme-color pair, the SVG favicon, the manifest, the apple-touch-icon and the
+    loop-forward aside from a live reader page.
+
+    The contract test was not the thing that was broken — it caught this. What was
+    missing is that a generator could be written without going through the normalizer
+    at all. So the normalizer becomes the WRITER: a generator that emits a page calls
+    this, and `tests/test_generator_chrome_contract_3721.py` fails any `v4_build_*.py`
+    that writes an HTML page under `site/` by some other route.
+
+    `rewrite` is idempotent, so calling this on already-canonical HTML is a no-op.
+    """
+    path = os.fspath(path)
+    rel = os.path.relpath(path, SITE_ROOT).replace(os.sep, "/")
+    normalized, *_ = rewrite(html, self_path=rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(normalized)
+    return normalized
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Flatten site chrome to v4_chrome.py")
     ap.add_argument("--check", action="store_true", help="exit 1 if any page would change (no writes)")

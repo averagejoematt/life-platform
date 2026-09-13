@@ -41,6 +41,9 @@ from pathlib import Path
 from urllib.request import urlopen
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
+
 SITE = Path("site")
 BASE = "https://averagejoematt.com"
 POSTS_URL = f"{BASE}/journal/posts.json"
@@ -115,7 +118,7 @@ def _update_chronicle_noscript(posts: list[dict]) -> None:
         marker = '<ul class="dx-list" data-dx-list aria-label="Entries"></ul>'
         if marker in html:
             html = html.replace(marker, marker + "\n      " + block)
-    CHRONICLE_HUB.write_text(html, encoding="utf-8")
+    _apply_chrome.write_page(CHRONICLE_HUB, html)  # #3721
 
 
 def registry_urls() -> list[str]:

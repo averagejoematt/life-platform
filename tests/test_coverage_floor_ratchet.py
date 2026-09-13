@@ -71,7 +71,43 @@ import sys
 # this value: the enforced gate is 74, above 70, and it was set from a measurement
 # rather than a target — tranche 2's note said that needed measured ~74.6, and
 # measured is 78.24.
-RATCHET_FLOOR = 74
+# Ratcheted 74->80 by #3732 (2026-09-13). NOT a coverage gain — a ratchet that had
+# stopped ratcheting. Measured coverage kept climbing (78.24 -> 84.2) while the floor
+# stayed where tranche 3 left it, so the gap reached 10.2 points and the gate could
+# not fail: roughly ten points of real coverage were deletable with it green. Set from
+# a SAMPLE, not a reading — MEASURED_SAMPLE below, n=10 green-main runs, min 83.97 —
+# and placed 3.97pt under that minimum, the same ~4.2pt headroom-under-measured
+# convention every raise above used. The gap-warn threshold (>10pt) is what noticed;
+# test_the_floor_tracks_measured_coverage below is what will notice next time, at the
+# band rather than at the cliff.
+RATCHET_FLOOR = 80
+
+# ── THE SAMPLE THE FLOOR WAS SET FROM (#3732). ───────────────────────────────
+# "Total coverage: N%" read out of the CI job's own output on consecutive GREEN main
+# runs — the same invocation and pinned deps the gate itself runs, never re-derived
+# locally (a different pytest-cov is a different measurement). Coverage moves with
+# WHICH tests run, so a floor set from one reading is set from a sample of one.
+# Spread across this sample is 0.26pt, which is why 4pt of headroom is generous
+# rather than tight.
+MEASURED_SAMPLE = {
+    "34732859207": 84.23,  # a0b6c8f1  2026-09-13
+    "34727155274": 84.23,  # c1c37a2f  2026-09-13
+    "34186885235": 84.23,  # 68a5954f  2026-09-08
+    "34185822500": 84.23,  # 5262538f  2026-09-08
+    "34176150764": 84.22,  # ba1cb95a  2026-09-08
+    "34147941849": 84.22,  # 533e226f  2026-09-07
+    "34147842978": 84.22,  # 4c650599  2026-09-07
+    "34060328867": 84.12,  # 5829d9e5  2026-09-06
+    "34052652458": 84.12,  # ea34877b  2026-09-06
+    "34009185184": 83.97,  # 62134dde  2026-09-06
+}
+
+# The band the floor is allowed to sit in, below the SAMPLE MINIMUM. Under the low
+# edge the gate stops being able to fail (this issue). Over the high edge it reds main
+# on ordinary jitter. Both edges are asserted, so "the ratchet stopped ratcheting" is
+# caught by a test rather than by a wrap warning nobody is obliged to read.
+FLOOR_HEADROOM_MIN_POINTS = 2.0
+FLOOR_HEADROOM_MAX_POINTS = 6.0
 
 # ── THE MEASURED-COVERAGE HIGH-WATER MARK. UP-ONLY. (#1658) ──────────────────
 # Actual measured line coverage (lambdas/ + mcp/) as of the PR that last raised
@@ -349,3 +385,72 @@ def test_the_percentage_scan_fires_on_a_planted_measurement():
 
     # ...and issue/ADR tokens are not percentages.
     assert not _uncommitted_percentages(["# ENFORCED regression floor (ADR-080/ADR-107). See #3539 and #1658."])
+
+
+# ── #3732: the ratchet must keep ratcheting ──────────────────────────────────
+
+
+def test_the_floor_tracks_measured_coverage():
+    """The gate that could not fail.
+
+    On 2026-09-13 the floor sat at 74 while measured coverage was 84.2 — a 10.2pt
+    gap, meaning ~10 points of real coverage could have been deleted with every
+    check green. ADR-107 calls the floor a RATCHET; a ratchet that is never advanced
+    is a gate that has quietly stopped gating, and the only thing that noticed was a
+    `::warning::` on a wrap report.
+
+    This asserts the BAND directly, in both directions:
+
+      * too much headroom  -> the gate cannot fail (the #3732 defect)
+      * too little         -> the gate reds main on ordinary run-to-run jitter,
+                              which is how a floor gets lowered "temporarily"
+
+    Deliberately keyed to the committed MEASURED_SAMPLE rather than to a live
+    reading: this must be a repo-only, offline unit test, and a sample that goes
+    stale is itself the signal to re-measure.
+    """
+    low = min(MEASURED_SAMPLE.values())
+    headroom = low - RATCHET_FLOOR
+    assert headroom >= FLOOR_HEADROOM_MIN_POINTS, (
+        f"the coverage floor ({RATCHET_FLOOR}) is {headroom:.2f}pt under the sample minimum ({low}) — "
+        f"under the {FLOOR_HEADROOM_MIN_POINTS}pt jitter margin, so ordinary variance will red main"
+    )
+    assert headroom <= FLOOR_HEADROOM_MAX_POINTS, (
+        f"the coverage floor ({RATCHET_FLOOR}) is {headroom:.2f}pt under the sample minimum ({low}) — "
+        f"past the {FLOOR_HEADROOM_MAX_POINTS}pt band, so that much coverage is deletable with the gate green. "
+        "Re-measure on green main, refresh MEASURED_SAMPLE and ratchet RATCHET_FLOOR up (ADR-080/ADR-107, #3732)."
+    )
+
+
+def test_the_band_would_have_caught_the_defect_that_filed_this():
+    """Mutation proof, stated as history rather than as a synthetic. The exact
+    pre-#3732 pair — floor 74 against the same measured sample — must still breach
+    the band through this file's own arithmetic. If it ever passes, the band has
+    been widened to accommodate the defect instead of catching it."""
+    pre_fix_floor = 74
+    headroom = min(MEASURED_SAMPLE.values()) - pre_fix_floor
+    assert headroom > FLOOR_HEADROOM_MAX_POINTS, (
+        f"floor 74 against this sample is {headroom:.2f}pt of headroom, which the band now permits — " "the control has gone blind"
+    )
+
+
+def test_the_sample_is_a_sample_and_not_one_reading():
+    """`Acceptance` box 2: the floor is derived from several green-main runs, because
+    coverage moves with which tests ran. One reading is a sample of one."""
+    assert len(MEASURED_SAMPLE) >= 5, f"MEASURED_SAMPLE has {len(MEASURED_SAMPLE)} entries — too few to call a sample"
+    spread = max(MEASURED_SAMPLE.values()) - min(MEASURED_SAMPLE.values())
+    assert spread < FLOOR_HEADROOM_MIN_POINTS, (
+        f"measured coverage varies by {spread:.2f}pt across the sample, at or past the "
+        f"{FLOOR_HEADROOM_MIN_POINTS}pt jitter margin the floor is sized with — widen the margin before trusting it"
+    )
+
+
+def test_the_high_water_mark_still_sits_under_the_sample():
+    """The two ratchets have to stay consistent with each other: the measured
+    high-water mark is a floor for REAL coverage, so it can never be above what the
+    sample actually measured."""
+    low = min(MEASURED_SAMPLE.values())
+    assert RATCHET_HIGH_WATER <= low, (
+        f"RATCHET_HIGH_WATER ({RATCHET_HIGH_WATER}) is above the sample minimum ({low}) — "
+        "the regression gate is now armed above what the suite actually reaches and will red main"
+    )
