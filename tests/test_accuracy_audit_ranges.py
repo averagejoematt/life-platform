@@ -11,6 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import accuracy_audit  # noqa: E402 — #3739 uses the module surface (registry + resolver)
+import pytest  # noqa: E402
 from accuracy_audit import impossible_values
 
 
@@ -142,3 +144,78 @@ def test_impossible_values_still_grades_public_stats_the_same_way():
     Delegating its percentage half to the shared scanner must not change its verdicts."""
     assert _fields(impossible_values({"vitals": {"sleep_pct": 140}})) == {"vitals.sleep_pct"}
     assert impossible_values({"journey": {"progress_pct": -1.2}}) == []
+
+
+# ── #3739: the third and fourth `_pct` domains, both found by a red deploy ────────
+#
+# The `_pct` SUFFIX is not one semantic. Each domain has been discovered the day real
+# data reached it: 2026-07-17 `progress_pct` (signed), 2026-09-12 `target_pct` (#3725,
+# achievement), and now `delta_pct` + `z2_pct` — which reddened CI/CD run 34770720925's
+# deploy-gating audit with three HIGH findings on honest numbers.
+
+
+_LIVE_DEFICIT_CHANNELS = {
+    "deficit_sustainability": {
+        "channels": [
+            {"name": "HRV", "direction": "stable", "delta_pct": 0.1},
+            {"name": "Sleep quality", "direction": "declining", "delta_pct": -8.5},
+            {"name": "Recovery", "direction": "improving", "delta_pct": 6.5},
+            {"name": "Habit completion", "direction": "improving", "delta_pct": 107.8},
+        ]
+    }
+}
+
+
+def test_the_live_payload_that_reddened_the_deploy_is_clean():
+    """VERBATIM from /api/deficit_sustainability on 2026-09-13. The payload declares its
+    own semantics in a sibling field — `direction: declining` beside `delta_pct: -8.5` —
+    so calling that an impossible value was the gate misreading a field it had never
+    classified."""
+    assert accuracy_audit.scan_impossible_pcts(_LIVE_DEFICIT_CHANNELS, "live") == []
+
+
+def test_z2_pct_over_target_is_not_impossible():
+    """`site_api_training._z2_weekly_stats` computes `round(weekly_avg / z2_target*100)`
+    and its serving comment says it is "served uncapped (a capped 100 hid that it was an
+    average at all)". A consumer cannot bound at 100 what the producer documents as
+    deliberately uncapped."""
+    assert accuracy_audit.scan_impossible_pcts({"training": {"z2_pct": 118}}, "live") == []
+
+
+@pytest.mark.parametrize(
+    "payload,field",
+    [
+        ({"a": {"delta_pct": 5000}}, "a.delta_pct"),
+        ({"a": {"delta_pct": -250}}, "a.delta_pct"),
+        ({"training": {"z2_pct": 5000}}, "training.z2_pct"),
+        ({"a": {"body_fat_pct": 118}}, "a.body_fat_pct"),
+        ({"a": {"progress_pct": 150}}, "a.progress_pct"),
+    ],
+)
+def test_bounded_not_exempt(payload, field):
+    """MUST-FAIL CONTROLS. Widening a domain is how a real impossible number gets waved
+    through, so every one stays finite:
+      * a divide-by-near-zero blowup still trips, in both new domains;
+      * a decline past -100% is impossible for a positive metric, so it still trips;
+      * an UNCLASSIFIED `*_pct` keeps the strict 0..100 share bound — the safe default;
+      * `progress_pct` keeps its own 100 ceiling: it is a share of a FIXED goal
+        distance, so 100 is the whole thing and the wider delta ceiling must not leak
+        onto it.
+    """
+    fields = [f["field"] for f in accuracy_audit.scan_impossible_pcts(payload, "x")]
+    assert field in fields
+
+
+def test_every_classified_field_names_a_real_domain():
+    """The registry and the resolver cannot drift apart: every name in either set must
+    resolve to a domain that `PCT_DOMAINS` documents."""
+    for key in sorted(accuracy_audit._SIGNED_PCT_FIELDS | accuracy_audit._ACHIEVEMENT_PCT_FIELDS):
+        assert accuracy_audit.pct_domain(key) in accuracy_audit.PCT_DOMAINS, key
+    assert accuracy_audit.pct_domain("something_never_seen_pct") == "share"
+
+
+def test_the_two_classified_sets_do_not_overlap():
+    """A field in both sets would resolve by set-check ORDER rather than by meaning —
+    silently signed, never achievement. Nothing would say so."""
+    overlap = accuracy_audit._SIGNED_PCT_FIELDS & accuracy_audit._ACHIEVEMENT_PCT_FIELDS
+    assert not overlap, f"classified in two domains at once: {sorted(overlap)}"
