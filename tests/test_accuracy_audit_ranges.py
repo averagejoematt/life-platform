@@ -43,6 +43,47 @@ def test_negative_ctl_still_impossible():
     assert _fields(impossible_values(ps)) == {"training.ctl_fitness"}
 
 
+# ── a percent OF TARGET is an achievement ratio, not a share (2026-09-12, #3725) ──
+#
+# /api/zone2 served target_pct 118 — 177 Zone-2 minutes against the 150-min weekly
+# target, target_met: true — and the gate called it three HIGH impossible values,
+# reddening the deploy-GATING copy. Same class as the 2026-07-17 progress_pct
+# rollback at the top of this file, other end of the range.
+
+
+def test_beating_a_target_is_not_impossible():
+    """The live 2026-09-12 payload shape: 177 min against a 150-min target."""
+    ps = {"current_week": {"zone_2_minutes": 177.0, "target_pct": 118, "target_met": True}}
+    assert impossible_values(ps) == []
+
+
+def test_target_pct_is_bounded_above_not_exempt():
+    """MUST-FAIL CONTROL: the ceiling is real, so a computation blowup still trips."""
+    ps = {"current_week": {"target_pct": 1500}}
+    assert _fields(impossible_values(ps)) == {"current_week.target_pct"}
+
+
+def test_target_pct_still_cannot_be_negative():
+    ps = {"current_week": {"target_pct": -1}}
+    assert _fields(impossible_values(ps)) == {"current_week.target_pct"}
+
+
+def test_widening_is_scoped_to_target_pct_only():
+    """MUST-FAIL CONTROL: a share-of-a-whole at the same value is still impossible.
+
+    Without this, `_ACHIEVEMENT_PCT_FIELDS` could be widened to every `_pct` and the
+    suite would stay green — the exact 'broad pre-exemption' the rubric warns about.
+    """
+    ps = {"vitals": {"recovery_pct": 118}, "journey": {"body_fat_pct": 118}}
+    assert _fields(impossible_values(ps)) == {"vitals.recovery_pct", "journey.body_fat_pct"}
+
+
+def test_target_pct_is_found_at_any_depth():
+    """The 2026-08-21 recursive walk still applies to the new class."""
+    ps = {"weeks": [{"target_pct": 85}, {"target_pct": 1200}]}
+    assert _fields(impossible_values(ps)) == {"weeks[1].target_pct"}
+
+
 # ── the scan reaches the whole payload, not two top-level blocks (2026-08-21) ──
 #
 # The rubric above was always right; its DENOMINATOR was wrong. `impossible_values`
