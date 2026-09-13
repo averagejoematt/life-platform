@@ -554,8 +554,9 @@ def _qa_check_module():
 def parse_cause_events(messages, parse):
     """{alarm_name: [check ids]} from the most recent `[QA] CAUSE` line per kind.
 
-    `messages` is in chronological order (oldest first, as filter_log_events returns
-    them) and `parse` is qa_check.parse_cause_line — injected, so this stays pure and
+    `messages` is in chronological order (oldest first — the CALLER guarantees this by
+    sorting on the event timestamp; #3729: filter_log_events itself pages by stream, so
+    neither page order nor within-page order is a time order) and `parse` is qa_check.parse_cause_line — injected, so this stays pure and
     the regression test drives it with the REAL emitter's output.
     """
     latest = {}
@@ -568,6 +569,13 @@ def parse_cause_events(messages, parse):
         if alarm:
             latest[alarm] = ids
     return latest
+
+
+# Page cap for the qa-smoke cause read (#3729). The 48h window holds ~2 CAUSE lines
+# per daily run, so a handful of pages is already generous; the cap exists so a
+# pathological stream layout cannot spin the wrap, and hitting it degrades to an
+# explicit error rather than a silently partial answer.
+_CAUSE_PAGE_CAP = 20
 
 
 def fetch_qa_smoke_causes(window_hours=QA_SMOKE_CAUSE_LOOKBACK_HOURS):
@@ -585,16 +593,42 @@ def fetch_qa_smoke_causes(window_hours=QA_SMOKE_CAUSE_LOOKBACK_HOURS):
 
         logs = boto3.client("logs", region_name=REGION)
         start_ms = int((datetime.now(timezone.utc).timestamp() - window_hours * 3600) * 1000)
-        resp = logs.filter_log_events(
-            logGroupName=_QA_SMOKE_LOG_GROUP,
-            startTime=start_ms,
-            filterPattern=f'"{qa_check.CAUSE_LINE_PREFIX}"',
-            limit=200,
-        )
-        messages = [e.get("message", "") for e in resp.get("events", [])]
+        # PAGINATE (#3729). CloudWatch pages filter_log_events BY LOG STREAM, not
+        # chronologically, so page 1 routinely holds the OLDEST matching events and
+        # returns a nextToken. Reading one page and stopping made parse_cause_events
+        # pick "the most recent per kind" out of a truncated slice — measured live on
+        # 2026-09-13: page 1 held `CAUSE fail none -` from 09-11 while pages 2+ held
+        # the 09-13 01:20Z `CAUSE fail db57bedc coach_labs:truth`, so the gate reported
+        # a lit alarm's live cause as "no failures". That breaks the #3501 rule in the
+        # dangerous direction too: a cause that genuinely CHANGED reads as unchanged,
+        # which is the exact case a FailCount aggregate cannot signal on its own.
+        messages = []
+        token = None
+        for _ in range(_CAUSE_PAGE_CAP):
+            kwargs = {
+                "logGroupName": _QA_SMOKE_LOG_GROUP,
+                "startTime": start_ms,
+                "filterPattern": f'"{qa_check.CAUSE_LINE_PREFIX}"',
+                "limit": 200,
+            }
+            if token:
+                kwargs["nextToken"] = token
+            resp = logs.filter_log_events(**kwargs)
+            # Keep the timestamp and sort globally below: concatenated pages are in
+            # STREAM order, so "the last message wins" is an assumption about stream
+            # layout, not a fact about time. Sorting makes the ordering explicit.
+            messages.extend((e.get("timestamp") or 0, e.get("message", "")) for e in resp.get("events", []))
+            token = resp.get("nextToken")
+            if not token:
+                break
+        else:
+            # Cap hit with a token still outstanding: the read is INCOMPLETE, and a
+            # partial map presented as complete is the defect this fix exists to end.
+            return {}, f"qa-smoke cause read exceeded {_CAUSE_PAGE_CAP} pages — window too wide to read honestly"
     except Exception as e:  # noqa: BLE001 — any AWS/boto3 failure must degrade, not crash
         return {}, str(e)
-    return parse_cause_events(messages, qa_check.parse_cause_line), None
+    ordered = [m for _ts, m in sorted(messages, key=lambda pair: pair[0])]
+    return parse_cause_events(ordered, qa_check.parse_cause_line), None
 
 
 def cause_mismatches(alarms, citations, live_causes):
