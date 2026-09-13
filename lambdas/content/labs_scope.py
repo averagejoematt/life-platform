@@ -20,11 +20,14 @@ so there is no taxonomy read that produces it; it is an explicit date comparison
 `EXPERIMENT_START_DATE` and has to stay one.
 """
 
+import logging
 from decimal import Decimal
 
 from common.constants import EXPERIMENT_START_DATE
 from common.digest_utils import d2f as _d2f  # shared bundled helper (#970/#2816), same import output_writers uses
 from web.site_api_phase_frame import archival_frame, lifetime_scope  # #2957 — the shared framing vocabulary
+
+logger = logging.getLogger(__name__)
 
 
 def count_draws_this_cycle(table, pk: str, with_phase_filter) -> int:
@@ -156,7 +159,7 @@ def build_labs_block(table, pk: str) -> dict:
                 "digestive": "Digestive",
             }
 
-            by_cat = {}
+            by_cat: dict = {}
             for key, bm in biomarkers_raw.items():
                 cat = bm.get("category", "other")
                 if cat not in by_cat:
@@ -208,5 +211,9 @@ def build_labs_block(table, pk: str) -> dict:
                 **scope_fields(lab_rec.get("draw_date"), cycle_draws),  # #3728
             }
     except Exception as e:
-        print("[WARN] Clinical: labs query failed: " + str(e))
+        # Carried from output_writers, but converted: a NEW lambda file uses
+        # platform_logger, not print (tests/test_logger_discipline.py). Same fail-soft
+        # semantics — the endpoint serves no labs object and every consumer already
+        # handles that.
+        logger.warning("Clinical: labs query failed: %s", e)
     return labs
