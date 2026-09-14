@@ -214,16 +214,28 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
             w_lbs = float(w_kg) * _KG_TO_LBS
         elif w_lbs is not None and w_kg is None:
             w_kg = float(w_lbs) / _KG_TO_LBS
-        return {
+        out = {
             "set_type": s.get("set_type", "normal"),
             "weight_lbs": float(w_lbs or 0),
             "weight_kg": float(w_kg or 0),
             "reps": int(s.get("reps") or 0),
         }
+        # #3766: RPE carried through, additively. The normalizer used to drop it, so every
+        # consumer downstream could say how heavy a set was and none could say how hard it
+        # felt — the distinction `get_exercise_history` exists to serve. Absent stays absent
+        # (None, never 0): most of the 2024 corpus predates RPE logging (ADR-104).
+        rpe = s.get("rpe")
+        out["rpe"] = float(rpe) if rpe not in (None, "") else None
+        return out
 
     def _exercise(ex: dict) -> dict:
         return {
             "name": ex.get("name") or ex.get("exercise_name") or "",
+            # #3766: the stable Hevy template id and the freeform note, both additive. The
+            # id is what lets a caller ask by template rather than by a fuzzy name; the note
+            # is the raw text the derived signal layer is built FROM, and stays sovereign.
+            "template_id": str(ex.get("template_id") or ""),
+            "notes": (ex.get("notes") or "").strip(),
             "sets": [_set(s) for s in (ex.get("sets") or [])],
         }
 
@@ -255,19 +267,25 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
     return out
 
 
-def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups: bool = False) -> list:
+def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups: bool = False, template_id: str = "") -> list:
     """
-    Given raw DynamoDB hevy items and a target exercise name (fuzzy),
-    return a list of session dicts sorted by date.
+    Given raw DynamoDB hevy items and a target exercise name (fuzzy) OR an exact Hevy
+    `template_id`, return a list of session dicts sorted by date.
     Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, volume}
     """
-    target = exercise_name.lower()
+    target = (exercise_name or "").lower()
+    # #3766: a Hevy template id is the exact, stable handle for a movement; a name is a
+    # fuzzy one. "75A4F6C4" as a substring of a NAME matches nothing, so accept it as an id.
+    target_tid = (template_id or "").strip().upper()
     sessions = []
     for workout in normalize_hevy_items(hevy_items):
         date_str = workout["date"]
         for ex in workout["exercises"]:
             ex_name = ex["name"]
-            if target not in ex_name.lower():
+            if target_tid:
+                if (ex.get("template_id") or "").strip().upper() != target_tid:
+                    continue
+            elif target not in ex_name.lower():
                 continue
             sets_out = []
             for s in ex["sets"]:
@@ -277,7 +295,9 @@ def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups:
                 w = s["weight_lbs"]
                 r = s["reps"]
                 e1rm = None if is_bodyweight(ex_name) else estimate_1rm(w, r)
-                sets_out.append({"set_type": st, "weight_lbs": w, "reps": r, "estimated_1rm": e1rm})
+                sets_out.append(
+                    {"set_type": st, "weight_lbs": w, "weight_kg": s["weight_kg"], "reps": r, "rpe": s["rpe"], "estimated_1rm": e1rm}
+                )
             if not sets_out:
                 continue
             best_1rm = max((s["estimated_1rm"] for s in sets_out if s["estimated_1rm"]), default=None)
@@ -287,6 +307,8 @@ def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups:
                 {
                     "date": date_str,
                     "exercise_name": ex_name,
+                    "template_id": ex.get("template_id") or "",
+                    "note_raw": ex.get("notes") or "",
                     "sets": sets_out,
                     "best_1rm": best_1rm,
                     "best_weight": best_weight,

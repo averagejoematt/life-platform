@@ -13,7 +13,7 @@ from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import table
-from mcp.core import decimal_to_float
+from mcp.core import LAYER_DARK, decimal_to_float, derived_layer_status
 
 NOTES_SOURCE = "training_notes"
 
@@ -100,17 +100,43 @@ def tool_get_exercise_notes(args):
             if s.get("class") == "progression" and s.get("value"):
                 latest_progression = s["value"]
 
-    return {
+    # #3767: say whether the layer could be read at all, BEFORE reporting counts from it.
+    # The health function has existed since this layer shipped and its docstring says "hook
+    # into get_freshness_status"; it was hooked into the freshness TOOL and never into the
+    # reader whose zeros it qualifies.
+    try:
+        from training.training_notes import training_notes_health
+
+        health = training_notes_health(table)
+    except Exception as e:  # noqa: BLE001
+        health = {"checked": False, "error": f"{type(e).__name__}: {e}"}
+    status, reason = derived_layer_status(health)
+    dark = status in (LAYER_DARK, "unknown")
+
+    out = {
         "exercise": matched or exercise,
         "template_id": template_id,
         "lookback_days": lookback_days,
-        "sessions_with_notes": len(timeline),
-        "pain_flag_any": bool(pain_dates),  # PROMINENT — the pre-flight pain surface (§7)
+        # The contract: a count from an unreadable layer is None, never 0. A caller that
+        # sees null knows to ask get_exercise_history (the MEASURED sets) instead of
+        # concluding the movement has no history.
+        "sessions_with_notes": None if dark else len(timeline),
+        "pain_flag_any": None if dark else bool(pain_dates),  # PROMINENT — the pre-flight pain surface (§7)
         "pain_dates": pain_dates,
         "latest_progression": latest_progression,
-        "timeline": timeline,
+        "layer_status": status,
+        "layer_health": health,
         "note": (
             "Derived note-signal layer (inferred, confidence-tagged); raw Hevy notes are sovereign. "
             "pain_flag is over-inclusive by design — confirm or dismiss before loading that movement."
         ),
     }
+    if dark:
+        out["layer_reason"] = reason
+        out["measured_alternative"] = "get_exercise_history reads the raw logged sets and is unaffected by this layer."
+        # No timeline key at all rather than an empty list: an empty list is a claim.
+    else:
+        out["timeline"] = timeline
+        if reason:
+            out["layer_reason"] = reason
+    return out

@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-07
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-14
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-07 | **Total tools:** 81
+**Version:** v8.6.0 | **Last updated:** 2026-09-14 | **Total tools:** 82
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -16,7 +16,7 @@
 
 ---
 
-## All 81 Tools — by module
+## All 82 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -26,7 +26,7 @@
 | `mcp/tools_training.py` | 2 |
 | `mcp/tools_health.py` | 3 |
 | `mcp/tools_benchmark.py` | 1 |
-| `mcp/tools_strength.py` | 1 |
+| `mcp/tools_strength.py` | 2 |
 | `mcp/tools_nutrition.py` | 2 |
 | `mcp/tools_correlation.py` | 1 |
 | `mcp/tools_lifestyle.py` | 11 |
@@ -54,7 +54,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_exercise_notes` | exercise=, template_id=, lookback_days= | The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside get_exercise_history. Pass a human exercise name OR a Hevy template_id. Signals are inferred + confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or dismiss before loading that movement. |
+| `get_exercise_notes` | exercise=, template_id=, lookback_days= | The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or dismiss before loading that movement. |
 
 ### Core Data Access (`mcp/tools_data.py`)
 
@@ -102,6 +102,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
+| `get_exercise_history` | exercise_name=, template_id=, start_date=, end_date=, include_warmups= | Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, the note written on it, per-session volume, PR chronology and estimated-1RM trend. Pass an exact Hevy `template_id` (preferred — stable) or a fuzzy `exercise_name`. No default lookback: it answers from the whole history, back to 2021. Use for: 'have I done leg extensions before?', 'what did I last squat?', 'how has my bench progressed?', 'what loads did I use at this bodyweight?' — and as the pre-flight pull before prescribing a load on any movement. This reads raw Hevy; `get_exercise_notes` reads the DERIVED note-signal layer built from it. Zero notes there with sessions here means he logged the work and wrote nothing about it — never that the work is absent. |
 | `get_muscle_volume` | start_date=, end_date=, period= | Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?' |
 
 ### Nutrition (`mcp/tools_nutrition.py`)
@@ -179,7 +180,7 @@
 |------|-----------|-------------|
 | `get_todoist_snapshot` | view=, date=, days= | Unified Todoist snapshot. 'load' (default) = current task load: active count, overdue, due-today, priority breakdown, cognitive load signal (LOW/MODERATE/ELEVATED/HIGH). 'today' = full Todoist day summary for a specific date — completed tasks, project breakdown, counts. Use for: 'how many tasks do I have?', 'task load', 'am I overloaded?', 'decision fatigue', 'overdue tasks', 'Todoist summary', 'what tasks did I complete yesterday?', 'task backlog'. |
 | `update_todoist_task` | task_id, due_string=, due_date=, content=, description=, priority=, project_id= | Update an existing Todoist task — reschedule, change recurrence, rename, change priority or project. IMPORTANT: Always use 'every!' (with exclamation mark) for recurring due_string to reschedule from completion date, not original due date. This prevents pile-up when tasks are missed. Examples: due_string='every! week', 'every! month', 'every! 3 months', 'every! year'. To set first-fire date AND recurrence: set due_string='every! month' AND due_date='2026-04-01'. |
-| `create_todoist_task` | content, project_id=, due_string=, due_date=, priority=, description= | Create a new Todoist task with optional recurrence and due date. Always use 'every!' for recurring tasks. Get project_id from get_todoist_projects first. |
+| `create_todoist_task` | content, project_id=, due_string=, due_date=, priority=, description= | Create a new Todoist task with optional recurrence and due date. Always use 'every!' for recurring tasks. Omit project_id to file into Inbox; get_todoist_snapshot(view='today') shows the project breakdown for existing tasks. |
 | `close_todoist_task` | task_id | Mark a Todoist task as complete. For recurring tasks, advances to next occurrence. For one-time tasks, removes from active list. |
 
 ### Platform Memory (`mcp/tools_memory.py`)

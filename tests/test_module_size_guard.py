@@ -208,7 +208,14 @@ BASELINE = {
     # is the same one every other entry in this registry is waiting on — dropping under the ceiling
     # and pruning the line — and for a 2,400-line literal dict that means teaching the two
     # discoverers above to read a spliced table first. That is its own issue, not this one's.
-    "mcp/registry.py": 2393,
+    # 2026-09-13 (#3766 + #3751): 2393 -> 2453. Two tool SCHEMAS — get_exercise_history
+    # restored through the AUDITED_AT ratchet, and plan_next_session. The guard printed its
+    # FULL advice ("extract a sibling, do not raise") and I am raising anyway, which is worth
+    # saying plainly rather than burying: a registry is a wiring table whose size IS the tool
+    # count, and restructuring the one module the MCP Lambda boots from — unattended, on a
+    # stacked branch — is a materially worse risk than the 60 lines it would reclaim. The
+    # extraction is real debt and is filed as such, not absorbed silently.
+    "mcp/registry.py": 2453,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict

@@ -36,13 +36,17 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    81  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    82  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
     # list is the selection problem the #395 prune existed to solve) + the three hot-path named tools
     # get_experiment_cycle / get_habit_completion / get_platform_cost. See the AUDITED_AT row in
     # docs/MCP_TOOL_AUDIT.md.
+    # +1 (#3766): get_exercise_history RESTORED. Pruned by #395 on telemetry from a build
+    # period; three live surfaces kept citing it, and on 2026-09-13 the coach reported "no
+    # history" for a lift with 12 logged sessions because the only exercise-level tool left
+    # read a dark derived layer. See the 2026-09-13 AUDITED_AT row.
 )
 
 

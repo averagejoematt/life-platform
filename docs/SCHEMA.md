@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-09-07 (v8.6.0 — 81 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
+**Last updated:** 2026-09-14 (v8.6.0 — 82 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -607,7 +607,7 @@ coherent stage picture must pick ONE block. Same established pattern as
 boundary is fine — SAYING SO, every time, is the rule.
 
 ### hevy (strength training)
-Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history`, `get_strength_prs`, etc.) rather than `get_date_range`.
+Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history` for one movement's full set history, `get_muscle_volume` for weekly volume) rather than `get_date_range`.
 
 **Per-workout items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`, from `lambdas/training/hevy_common.py::normalize_workout`):
 
