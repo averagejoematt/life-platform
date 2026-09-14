@@ -72,12 +72,10 @@ def _yesterday_pt() -> str:
 
 
 def _date_label(date: str) -> str:
-    from datetime import date as _date
+    from common.pacific_time import parse_day_key
 
-    try:
-        return _date.fromisoformat(date).strftime("%a %-d %b")
-    except ValueError:
-        return date
+    d = parse_day_key(date)
+    return d.strftime("%a %-d %b") if d else date
 
 
 def _telegram_secret() -> dict:

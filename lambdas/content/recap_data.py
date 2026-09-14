@@ -360,11 +360,12 @@ def cycle_series(table, start: str, end: str) -> tuple[list[float | None], list[
 
 
 def _day_range(start: str, end: str) -> list[str]:
-    from datetime import date as _date, timedelta
+    from datetime import timedelta
 
-    try:
-        d0, d1 = _date.fromisoformat(start), _date.fromisoformat(end)
-    except ValueError:
+    from common.pacific_time import parse_day_key
+
+    d0, d1 = parse_day_key(start), parse_day_key(end)
+    if d0 is None or d1 is None:
         return []
     return [(d0 + timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
 
@@ -383,18 +384,18 @@ def trailing(table, end_date: str, days: int = 7, *, experiment_start: str | Non
     starts will eventually be asked a question that spans the boundary, so the boundary
     lives here, once, instead of in each caller's head.
     """
-    from datetime import date as _date, timedelta
+    from datetime import timedelta
 
-    try:
-        end = _date.fromisoformat(end_date)
-    except ValueError:
+    from common.pacific_time import parse_day_key
+
+    end = parse_day_key(end_date)
+    if end is None:
         return []
-    floor = None
-    if experiment_start:
-        try:
-            floor = _date.fromisoformat(experiment_start)
-        except ValueError:
-            floor = None
+    # An unparseable genesis leaves the window UNCLAMPED rather than empty — the same
+    # shape as `experiment_start=None`. That is deliberate: a bad genesis string must
+    # degrade to "no boundary known", never to "no data", or the card silently stops
+    # rendering on a typo instead of telling anyone.
+    floor = parse_day_key(experiment_start) if experiment_start else None
     out = []
     for i in range(days - 1, -1, -1):
         d = end - timedelta(days=i)

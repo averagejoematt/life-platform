@@ -136,30 +136,53 @@ def pacific_date_of(iso_ts: str) -> str | None:
     return dt.astimezone(PACIFIC).strftime("%Y-%m-%d") if dt else None
 
 
+def parse_day_key(date_str: str) -> date | None:
+    """Parse a ``YYYY-MM-DD`` day key into a ``date``. THE calendar-day parse (#3741).
+
+    The deliberate sibling of ``parse_iso_utc``, and the distinction between them is the
+    point. ``parse_iso_utc`` reads an ISO-8601 *instant* and has to disambiguate Z,
+    offsets and naive timestamps — that is the #1964 whoop-class bug surface. A DATE# day
+    key has none of those: no time, no zone, nothing to get wrong about it except whether
+    it parses at all. Routing a day key through the instant parser would be a relocation
+    dressed as a fix.
+
+    This exists because that second operation had no name. ``pacific_time`` performs it
+    internally in ``pacific_day_n`` and ``anchor_day_key`` without exposing it, so every
+    caller wanting "the date this key names" open-coded ``date.fromisoformat`` — which is
+    most of what ``tests/test_iso_parse_site_registry_3609.py``'s ~65-file registry
+    actually inventories. That registry is capped and shrink-only precisely so the answer
+    to a new site is a helper rather than a 66th row.
+
+    Returns None on anything unparseable (including None), matching this module's
+    caller-decides-the-fallback contract rather than raising into a render or a response.
+    """
+    try:
+        return date.fromisoformat(date_str)
+    except (ValueError, TypeError):
+        return None
+
+
 def shift_day_key(date_str: str, days: int) -> str:
     """Move a ``YYYY-MM-DD`` day key by ``days`` calendar days, in the Pacific frame.
 
     THE day-key arithmetic helper (#3751). This module already performed this exact
     operation twice internally (``pacific_day_n``, ``anchor_day_key``) without exposing
     it, so every caller that needed "seven days before this DATE# key" open-coded
-    ``date.fromisoformat(...) - timedelta(...)``. That is why
-    ``tests/test_iso_parse_site_registry_3609.py``'s registry holds ~65 files: most of
-    them are not the #1964 instant-parsing bug at all, they are this one missing helper
-    repeated.
+    ``date.fromisoformat(...) - timedelta(...)``.
 
-    Deliberately NOT ``parse_iso_utc``: a day key has no time, no zone and no Z/offset to
-    disambiguate. It names a Pacific calendar day, and shifting it is calendar arithmetic
-    — routing it through an instant parser would be a relocation, not a correctness fix
-    (that distinction is the #3609 registry's own carve-out).
+    Built on ``parse_day_key`` above rather than repeating the parse. The two arrived on
+    separate branches hours apart — #3751 needed the shift, #3741 needed the parse — and
+    the fact that both were needed in one session is the measurement: this operation was
+    missing, not merely inconvenient.
 
     Returns ``date_str`` unchanged when it is not a parseable day key, matching
     ``pacific_day_n``'s caller-decides-the-fallback contract rather than raising into a
-    tool response.
+    tool response. NOTE the asymmetry with ``parse_day_key``'s None, and it is
+    deliberate: this function's contract is "a day key in, a day key out", so the honest
+    failure is the input back, not a None a caller would have to re-handle.
     """
-    try:
-        return (date.fromisoformat(date_str) + timedelta(days=days)).isoformat()
-    except (ValueError, TypeError):
-        return date_str
+    d = parse_day_key(date_str)
+    return (d + timedelta(days=days)).isoformat() if d else date_str
 
 
 def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
