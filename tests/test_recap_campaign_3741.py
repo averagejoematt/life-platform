@@ -34,9 +34,25 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "lambdas"))
 
 from content.recap_data import DayFacts, WorkoutFact, trailing  # noqa: E402
-from web import (
-    recap_charts as ch,  # noqa: E402
-    recap_layouts as L,  # noqa: E402
+
+# PIL is NOT in the deploy-critical lane's dependency set
+# (tests/deploy_critical_lane_deps.py::LANE_THIRD_PARTY_DEPS). `web.recap_charts` and
+# `web.recap_layouts` both reach `web.card_engine`, which imports PIL at module scope — so
+# importing them at MODULE level here is a collection-time error in that lane, and a
+# collection error takes the whole lane (exit 2), not one test. This file's tests are not
+# deploy_critical-marked and were never selected there; pytest still has to IMPORT every
+# module to discover markers, which is the part that failed.
+#
+# Shipped 2026-09-14 and redded main: locally PIL is installed, so collection succeeded and
+# the full suite passed. The sibling tests/test_recap_render_3744.py had the guard in the
+# right place from the start; this file put `importorskip` inside two test bodies, which
+# runs far too late. Same class as the recurring PyYAML lane errors (2026-08-24, #3100/#3105
+# and 2026-09-08, #3684/#3696) — a third-party import at collection time.
+pytest.importorskip("PIL")
+
+from web import (  # noqa: E402
+    recap_charts as ch,
+    recap_layouts as L,
 )
 
 GENESIS = "2026-09-06"
