@@ -35,13 +35,12 @@ def _walk_hours_last_7d(end_date: str) -> float | None:
     Hours, not miles: the blueprint's floor is stated in hours per week, and converting
     between them needs a pace assumption that would be invented here.
     """
-    from datetime import date, timedelta
+    from common.pacific_time import shift_day_key
 
     from mcp.core import query_source_range
 
-    try:
-        start = (date.fromisoformat(end_date) - timedelta(days=6)).isoformat()
-    except ValueError:
+    start = shift_day_key(end_date, -6)
+    if start == end_date:  # unparseable day key — shift_day_key returns it unchanged
         return None
     items = query_source_range("strava", start, end_date) or []
     seconds = 0.0
@@ -155,9 +154,12 @@ def _recovery_tier(readiness: dict) -> str | None:
 
 
 def _minus_days(date_str: str, days: int) -> str:
-    from datetime import date, timedelta
+    """#3751: day-key arithmetic belongs to the Pacific frame, not to this module.
 
-    try:
-        return (date.fromisoformat(date_str) - timedelta(days=days)).isoformat()
-    except ValueError:
-        return date_str
+    Was a local `date.fromisoformat(...) - timedelta(...)`, which is the idiom #3609's
+    registry exists to inventory. `shift_day_key` is that operation, named once, with
+    the same return-it-unchanged fallback this function already had.
+    """
+    from common.pacific_time import shift_day_key
+
+    return shift_day_key(date_str, -days)

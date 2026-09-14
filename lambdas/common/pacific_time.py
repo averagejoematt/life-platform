@@ -34,7 +34,7 @@ module shipped, two of them (``site_api_freshness._parse_iso_ts`` backfilling
 answers to the same question.
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 # DST-aware Pacific Time. PT swings between UTC-8 (PST) and UTC-7 (PDT) — a hardcoded
@@ -134,6 +134,32 @@ def pacific_date_of(iso_ts: str) -> str | None:
     """
     dt = parse_iso_utc(iso_ts)
     return dt.astimezone(PACIFIC).strftime("%Y-%m-%d") if dt else None
+
+
+def shift_day_key(date_str: str, days: int) -> str:
+    """Move a ``YYYY-MM-DD`` day key by ``days`` calendar days, in the Pacific frame.
+
+    THE day-key arithmetic helper (#3751). This module already performed this exact
+    operation twice internally (``pacific_day_n``, ``anchor_day_key``) without exposing
+    it, so every caller that needed "seven days before this DATE# key" open-coded
+    ``date.fromisoformat(...) - timedelta(...)``. That is why
+    ``tests/test_iso_parse_site_registry_3609.py``'s registry holds ~65 files: most of
+    them are not the #1964 instant-parsing bug at all, they are this one missing helper
+    repeated.
+
+    Deliberately NOT ``parse_iso_utc``: a day key has no time, no zone and no Z/offset to
+    disambiguate. It names a Pacific calendar day, and shifting it is calendar arithmetic
+    — routing it through an instant parser would be a relocation, not a correctness fix
+    (that distinction is the #3609 registry's own carve-out).
+
+    Returns ``date_str`` unchanged when it is not a parseable day key, matching
+    ``pacific_day_n``'s caller-decides-the-fallback contract rather than raising into a
+    tool response.
+    """
+    try:
+        return (date.fromisoformat(date_str) + timedelta(days=days)).isoformat()
+    except (ValueError, TypeError):
+        return date_str
 
 
 def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
