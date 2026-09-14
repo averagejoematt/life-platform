@@ -188,6 +188,11 @@ SOURCE_TIERS: dict[str, int] = {
     # ── ADR-155 owner-published (verified served 2026-08-23) ──
     "labs": TIER_OWNER_PUBLISHED,  # /api/labs: full named-biomarker panel (value/unit/range/flag); genetic entries structurally stripped
     "dexa": TIER_OWNER_PUBLISHED,  # /api/* physical surface serves the full scan summary (owner decision 2026-06-06, now recorded)
+    # #3719: tape measurements (waist, chest, arms, thighs) were already being served
+    # publicly with NO tier declared and no consent stamp — publication by omission, which
+    # is the one thing this registry exists to make impossible. The owner's ruling
+    # (2026-09-13) is to KEEP publishing them, so the fix is the stamp, not a retraction.
+    "measurements": TIER_OWNER_PUBLISHED,  # tape measurements served on the physical surface (owner consent 2026-09-13, ADR-155)
     # ── owner-only partitions (DATA_GOVERNANCE Tier-2 rows, ported per #3045) ──
     "genome": TIER_OWNER_ONLY,  # variants/identifiers (#1943); served risk projection is the gated non-variant surface
     "notion": TIER_OWNER_ONLY,  # journal entries, full text; publication only via the diary consent/publish gates
@@ -202,6 +207,11 @@ SOURCE_TIERS: dict[str, int] = {
     "flourishing": TIER_OWNER_ONLY,  # #1403 — raw daily PERMA row; only the Tier-0 aggregate pillar tier surfaces
     "felt_probe": TIER_OWNER_ONLY,  # #1409 — raw taps; only the deterministic calibration aggregate is served
     "cgm_readings": TIER_OWNER_ONLY,  # S3 raw glucose reading stream (reading-level); DDB daily aggregates are the served surface
+    # #3757: progress photos. Declared BEFORE the first object exists — the whole point of
+    # the row is that there is no window in which a photo is stored under no tier. There is
+    # no public projection of this source and no aggregate carve-out: unlike hevy or
+    # macrofactor, nothing derived from a progress photo is served publicly either.
+    "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
 }
 
 

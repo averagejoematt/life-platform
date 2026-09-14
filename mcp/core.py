@@ -367,3 +367,49 @@ def pacific_today():
 def resolve_field(source, field):
     aliases = FIELD_ALIASES.get(source, {})
     return aliases.get(field, field)
+
+
+# ── Derived-layer honesty (#3767, epic #3762) ────────────────────────────────
+# A tool that reads a DERIVED partition (a projection some job computed) has two ways to
+# return nothing, and they mean opposite things: "the thing you asked about did not
+# happen" and "the layer that would know never ran". `get_exercise_notes` returned
+# `sessions_with_notes: 0, timeline: []` — a clean, confident zero — at the same minute
+# `get_freshness_status` reported that same layer `extractor_dark: true, 15/15 degraded`.
+# The reader cannot tell those apart, and on 2026-09-13 a coach did not: it reported "no
+# history" for a movement with twelve logged sessions.
+#
+# So a derived-layer read states its layer's status, and an unreadable layer returns
+# `None`, never `0`. The owner's rule, verbatim: "empty should be indistinguishable from
+# 'we couldn't look' only if it actually is."
+LAYER_OK = "ok"
+LAYER_DEGRADED = "degraded"
+LAYER_DARK = "dark"
+LAYER_UNKNOWN = "unknown"
+
+
+def derived_layer_status(health: dict | None) -> tuple[str, str]:
+    """(status, reason) for a derived layer, from its own health block.
+
+    `health` is whatever the layer's health function returned — the shape is not assumed
+    beyond `checked` / `extractor_dark` / `degraded`, so a layer with no health function
+    yet resolves to `unknown` rather than silently reading as healthy.
+    """
+    if not isinstance(health, dict) or not health:
+        return LAYER_UNKNOWN, "no health signal for this layer — status unknown, not healthy"
+    if not health.get("checked"):
+        return LAYER_UNKNOWN, f"the layer's own health check could not run ({health.get('error') or 'no reason given'})"
+    if health.get("extractor_dark"):
+        noted = health.get("noted_exercise_sessions")
+        return (
+            LAYER_DARK,
+            f"the producer is dark — {noted} noted session(s) in the last {health.get('lookback_days')}d produced "
+            f"{health.get('degraded')} degraded and {health.get('missing_records')} missing record(s). "
+            "Counts from this layer are withheld: they would read as measured zeros.",
+        )
+    if health.get("degraded"):
+        return (
+            LAYER_DEGRADED,
+            f"{health.get('degraded')} of {health.get('records_found')} recent record(s) are degraded — "
+            "deterministic signals only, the semantic pass did not run on those.",
+        )
+    return LAYER_OK, ""

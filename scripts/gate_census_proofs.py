@@ -517,6 +517,41 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    "guard::lambdas/content/recap_gate.py": {
+        "gate_name": "lambdas/content/recap_gate.py",
+        "command": "python3 -m pytest tests/test_recap_gate_3746.py -q   # 11 tests; baseline 11 passed",
+        "mutation": (
+            "Three defects planted one at a time in the real module, each the plausible 'simplification' of one "
+            "numbered step in the gate's contract. M1: the step-1 fail-closed return replaced by "
+            "`vocabulary = set()`, i.e. an unreachable vocabulary read as 'no blocked terms today'. M2: "
+            "`screen_items(...)` replaced by `set()`, so a blocked exercise or habit label never costs its template. "
+            "M3: the step-3 PrivacyViolation handler returning VERDICT_CLEARED instead of VERDICT_HELD, i.e. the "
+            "whole-card screen still runs and its verdict is discarded."
+        ),
+        "observed": (
+            "M1 RED (1 failed, 10 passed): test_an_unreadable_vocabulary_refuses_to_send. Worth recording exactly, "
+            "because it did not fail the way the plant intended — with step 1's refusal gone, execution reaches step "
+            "3, and `privacy_guard.assert_clean` independently calls `blocked_keywords(require=True)`, so "
+            "ContentFilterUnavailable escapes `gate()` uncaught (it catches only PrivacyViolation). The defense is "
+            "layered: deleting the explicit refusal does not produce a card, it produces a failed invocation. "
+            "M2 RED (1 failed, 10 passed): test_a_blocked_item_alone_does_not_hold_the_whole_card. "
+            "M3 RED (3 failed, 8 passed): test_banned_copy_holds_the_card, "
+            "test_the_caption_is_screened_with_the_card_not_after_it, "
+            "test_the_gate_record_never_carries_the_vocabulary. "
+            "Restored between each; 11 passed again after the third."
+        ),
+        "scope": (
+            "Covers the gate's own three steps and their ORDER, not the caller. That a renderer actually calls "
+            "`gate()` before sending is held separately by tests/test_recap_campaign_3741.py (gate_strings covers "
+            "every name a layout can draw) and by the render path's own tests. "
+            "`broadcast_sensitivity_gate.classify_sensitivity` is deliberately NOT called in v1 and is therefore NOT "
+            "covered by this verdict — the compensating control is the assertion that no card field is sourced from "
+            "journal body text or food-item names, which stops being sufficient the day a coach line lands (#3749). "
+            "Offline: the vocabulary and privacy_guard transports are monkeypatched, so this is the family-2 "
+            "test-mutation bar, not a live CI observation."
+        ),
+        "proved_on": "2026-09-13",
+    },
     "guard::deploy/iam_additive_gate.py": {
         "gate_name": "deploy/iam_additive_gate.py",
         "command": (

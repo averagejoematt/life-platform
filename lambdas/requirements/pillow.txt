@@ -5,7 +5,7 @@
 # Spec: deploy/build_lambda_layer.py::LAYERS['pillow'] · drift gate: --check-manifest (#2099)
 #
 # Pillow — PNG/WebP share-card rendering and book-cover processing.
-# Attached to: og-image-generator, reading-cover-pipeline (CDK stack: LifePlatformOperational).
+# Attached to: og-image-generator, reading-cover-pipeline, recap-card-generator (CDK stack: LifePlatformOperational).
 # Layer ARN: cdk/stacks/constants.py::PILLOW_LAYER_ARN.
 #
 # WHY THIS FILE EXISTS (#1336): third-party code reaches a running Lambda ONLY via

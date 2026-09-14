@@ -136,12 +136,20 @@ def brand_mark_tile(size=MARK_SIZE):
     return layer.resize((size, size), Image.LANCZOS)
 
 
-def draw_brand_mark(img, size=MARK_SIZE, margin=MARGIN, top=20):
+def draw_brand_mark(img, size=MARK_SIZE, margin=MARGIN, top=20, canvas=None):
     """Composite the AJM dial mark into the card's top-right corner — the brand
     signature, opposite the top-left `averagejoematt.com` wordmark. Alpha-composited
-    so the dial's translucent graduations read against the card ground."""
+    so the dial's translucent graduations read against the card ground.
+
+    #3744: `canvas` is the (width, height) this mark is being placed on. It defaults to
+    the 1200x630 unfurl card, so every existing caller is byte-identical; the portrait
+    recap card (1080x1350) passes its own. Three primitives read the module W/H — this
+    one, base_canvas and draw_footer — and all three take the same optional argument
+    rather than the engine growing a second, drifting copy of itself.
+    """
+    cw, _ch = canvas or (W, H)
     mark = brand_mark_tile(size)
-    x0 = W - margin - size
+    x0 = cw - margin - size
     img.paste(mark, (x0, top), mark)
     return img
 
@@ -177,18 +185,24 @@ def font(name, size):
 # ── Primitives ───────────────────────────────────────────────────────────────
 
 
-def base_canvas():
-    """A fresh 1200×630 brand card: background + top accent line + bottom bar.
-    Returns (img, draw)."""
-    img = Image.new("RGB", (W, H), BG)
+def base_canvas(size=None, margin=None):
+    """A fresh brand card: background + top accent line + bottom bar. Returns (img, draw).
+
+    Defaults to 1200x630 — the unfurl-preview format every existing card uses, unchanged
+    down to the pixel. `size` lets the portrait recap card (1080x1350, #3744) reuse the
+    same brand chrome instead of a second engine that would drift from this one.
+    """
+    cw, ch = size or (W, H)
+    m = margin if margin is not None else MARGIN
+    img = Image.new("RGB", (cw, ch), BG)
     draw = ImageDraw.Draw(img)
-    draw.rectangle([0, 0, W, 3], fill=GREEN)  # top accent
-    draw.rectangle([0, H - 40, W, H], fill=(6, 10, 8))  # bottom bar
+    draw.rectangle([0, 0, cw, 3], fill=GREEN)  # top accent
+    draw.rectangle([0, ch - 40, cw, ch], fill=(6, 10, 8))  # bottom bar
     # #1640: the AJM dial signs every card in the top-right corner. It lives in
     # base_canvas — the one shared brand-chrome primitive — so all card families
     # (daily pages, character, chronicle, moments) carry an identical mark. The
     # corner is empty on every card type (titles/metrics draw from the left).
-    draw_brand_mark(img)
+    draw_brand_mark(img, margin=m, canvas=(cw, ch))
     return img, draw
 
 
@@ -204,12 +218,14 @@ def draw_metric(draw, x, y, value, label, color=TEXT):
     draw.text((x, y + 60), label, fill=MUTED, font=font(FONT_MONO, 11))
 
 
-def draw_footer(draw, left_text="", right_text="updated daily by life-platform"):
+def draw_footer(draw, left_text="", right_text="updated daily by life-platform", canvas=None, margin=None):
     """The footer line: a left note (e.g. 'Day 42') and a right attribution."""
+    cw, ch = canvas or (W, H)
+    m = margin if margin is not None else MARGIN
     if left_text:
-        draw.text((MARGIN, H - 30), str(left_text), fill=FAINT, font=font(FONT_MONO, 11))
+        draw.text((m, ch - 30), str(left_text), fill=FAINT, font=font(FONT_MONO, 11))
     if right_text:
-        draw.text((W - MARGIN, H - 30), str(right_text), fill=FAINT, font=font(FONT_MONO, 11), anchor="ra")
+        draw.text((cw - m, ch - 30), str(right_text), fill=FAINT, font=font(FONT_MONO, 11), anchor="ra")
 
 
 def wrap(text, width=34, max_lines=4):

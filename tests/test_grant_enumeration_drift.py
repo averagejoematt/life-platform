@@ -182,6 +182,18 @@ _CONTENT_FILTER_WATCH: dict[str, str] = {
     "lambdas/ingestion/mastodon_lambda.py": "exempt 2026-08-23 (#2824): see bluesky",
     "lambdas/ingestion/youtube_lambda.py": "exempt 2026-08-23 (#2824): see bluesky",
     "mcp_server.py": "exempt 2026-08-23 (#2824): owner-only MCP surface (Claude Desktop), not a reader surface",
+    # #3741, 2026-09-13. Same shape as the bluesky/mastodon/youtube rows above, and for the
+    # same reason: an unavailable vocabulary here makes `recap_gate.gate()` abort BEFORE the
+    # render, so the failure direction is "publish nothing", never "publish unscrubbed". The
+    # distinction the alarmed rows turn on does not apply — site_api's risk is a silent
+    # no-op SCRUB (unfiltered text reaching a reader); this surface has no reader at all
+    # until the owner posts the card by hand, and a card that was never drawn cannot be
+    # posted. The outcome is recorded per run in the `SOURCE#recap_cards` row (`privacy:
+    # held`), so a hold is queryable after the fact rather than merely absent, and the
+    # separate recap-card-no-invocations-24h alarm covers the "stopped running at all" case
+    # this exemption does not.
+    "lambdas/web/recap_card_lambda.py": "exempt 2026-09-13 (#3741): fails CLOSED to a held card on an owner-only, "
+    "hand-posted surface — the failure publishes nothing; every run records its verdict in SOURCE#recap_cards",
 }
 
 

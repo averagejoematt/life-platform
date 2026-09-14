@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from training.hevy_common import (
@@ -155,10 +155,122 @@ def _tombstone_deleted(workout_id: str) -> None:
     logger.info("hevy delete marker written for %s", workout_id)
 
 
+#: Namespace + metric for the rebuild heartbeat (#3764). Emitted ONLY on a write that
+#: actually happened, which is what makes the alarm behind it a dead-man rather than an
+#: error alarm — see `_emit_rebuilt` and `HevyTemplateIndexStale` in the ingestion stack.
+INDEX_METRIC_NAMESPACE = "LifePlatform/HevyRoutine"
+INDEX_REBUILT_METRIC = "TemplateIndexRebuilt"
+
+
+def _emit_rebuilt(count: int) -> None:
+    """Emit the heartbeat for a rebuild that really published a new index.
+
+    Deliberately best-effort: a CloudWatch blip must not turn a successful rebuild into a
+    failed run. The cost of a dropped datapoint is one day of a two-day alarm window, and
+    the alarm needs both days empty before it fires.
+    """
+    try:
+        import boto3
+
+        boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2")).put_metric_data(
+            Namespace=INDEX_METRIC_NAMESPACE,
+            MetricData=[{"MetricName": INDEX_REBUILT_METRIC, "Value": 1, "Unit": "Count"}],
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("template index heartbeat emit failed: %s: %s", type(e).__name__, e)
+
+
+def rebuild_template_index() -> dict:
+    """Republish config/hevy_template_index.json from the live Hevy catalogue (#3764).
+
+    Emits `TemplateIndexRebuilt` on success and on success only. Every way this job can
+    fail ends in the SAME observable state — a `config/hevy_template_index.json` whose
+    `_built_at` stops moving — and none of them raises: the rule could stop firing, the
+    Hevy walk could 429, or `rebuild()` could refuse a shrink and return `written: False`.
+    A Lambda Errors alarm sees none of those three, because this function swallows its own
+    failure by design (below). So the thing worth watching is not the error, it is the
+    ABSENCE of the success, and that is what the heartbeat carries.
+    """
+    from training import hevy_template_cache as cache, hevy_template_index as idx, hevy_write_client as wc
+
+    try:
+        out = idx.rebuild(wc.list_templates, cache._write_s3_json, cache._read_s3_json)
+        logger.info("template index rebuild: %s", out)
+        if out.get("written"):
+            _emit_rebuilt(int(out.get("count") or 0))
+        else:
+            # A refused shrink is not an exception, but it IS a day the index did not
+            # move. No heartbeat, so the dead-man counts it like any other silent miss.
+            logger.warning("template index NOT rebuilt: %s", out.get("reason") or out.get("error"))
+        return out
+    except Exception as e:  # noqa: BLE001
+        # Never fail the function over the index: the resolver's live-walk fallback still
+        # answers, it is just slower. A failed rebuild is a log line, not an outage.
+        logger.error("template index rebuild failed: %s: %s", type(e).__name__, e)
+        return {"written": False, "error": f"{type(e).__name__}: {e}"}
+
+
+def reextract_training_notes(days: int) -> dict:
+    """Re-run the note extractor over already-ingested workouts (#3768).
+
+    The on-ingest hook only fires when a workout ARRIVES. When the extractor itself was
+    broken — as it was from the day it shipped until the Bedrock grant landed — every
+    note in the window was written with `degraded: true` and deterministic signals only,
+    and no future ingest will ever revisit them. This re-reads the raw partition and
+    re-derives, which is safe and idempotent: `write_workout_notes` is keyed by
+    workout+exercise and the LLM tail is hash-cached, so an unchanged note that already
+    extracted cleanly costs nothing and a degraded one is repaired.
+
+    Bounded by the same monthly Haiku cap as the live path — a breach degrades exactly
+    as before rather than failing the run.
+    """
+    from boto3.dynamodb.conditions import Key
+    from common.pacific_time import pacific_now
+    from training import training_notes as tn
+    from training.training_notes_llm import make_llm_fn
+
+    # Day arithmetic in the Pacific frame, with no hand-rolled ISO parse (#3609): the
+    # window is calendar days, and `pacific_now()` is the one place that frame is defined.
+    _end_day = pacific_now().date()
+    end = _end_day.isoformat()
+    start = (_end_day - timedelta(days=days)).isoformat()
+    resp = _table.query(
+        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#{SOURCE}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"),
+    )
+    llm_fn = make_llm_fn(_table)
+    workouts = 0
+    records = 0
+    for item in resp.get("Items", []):
+        exercises = item.get("exercises") or []
+        if not any((e.get("notes") or "").strip() for e in exercises):
+            continue
+        try:
+            res = tn.write_workout_notes(_table, item.get("date"), item.get("workout_uid", ""), exercises, llm_fn=llm_fn)
+            workouts += 1
+            records += res.get("records", 0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("re-extract failed for %s: %s: %s", item.get("workout_uid"), type(e).__name__, e)
+    out = {"reextracted_workouts": workouts, "records": records, "window": f"{start}..{end}"}
+    logger.info("training-notes re-extract: %s", out)
+    return out
+
+
 def lambda_handler(event: dict, context: Any) -> dict:
     """Scheduled backfill entry point. Polls the events feed since the
     last-known timestamp, ingests new/updated workouts, persists new
     high-water-mark on success."""
+    # #3764: the template index has a producer now. Runs on its own daily EventBridge
+    # rule with this constant input — the index was built by hand once on 2026-06-01 and
+    # had drifted 789 vs 828 live by 2026-09-13, every missing title costing a live walk.
+    if event and event.get("rebuild_template_index"):
+        return rebuild_template_index()
+
+    # #3768: one-shot repair mode. `{"reextract_days": N}` re-derives the note layer for
+    # the last N days instead of polling the events feed — the window the extractor was
+    # dark for has already been ingested, so nothing else would ever revisit it.
+    if event and event.get("reextract_days"):
+        return reextract_training_notes(int(event["reextract_days"]))
+
     poll_started_at = datetime.now(timezone.utc).isoformat()
     since = load_since()
     is_initial = since == INITIAL_SINCE

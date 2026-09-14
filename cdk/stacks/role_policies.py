@@ -145,6 +145,7 @@ from stacks.role_policies_operational import (  # noqa: F401  (re-export)
     operational_qa_smoke,
     operational_reading_cover_pipeline,
     operational_reading_recall_sweep,
+    operational_recap_card_generator,
     operational_remediation_dispatcher,
     operational_site_stats_refresh,
     operational_traffic_digest,

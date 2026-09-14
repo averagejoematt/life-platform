@@ -103,34 +103,58 @@ def handle_tools_call(params):
     # R6: per-tool soft timeout — returns a structured error instead of hanging
     # the Lambda until the 300s hard limit. 30s is the default; query-too-broad
     # errors guide Claude to try a narrower date range or use a summary tool.
+    #
+    # #3765: this used to be `with ThreadPoolExecutor(...) as pool:`. The `with` exit calls
+    # shutdown(wait=True), so the `return` inside it BLOCKED until the tool finished — the
+    # client waited the tool's full duration and was then told it had timed out at 30s.
+    # Reproduced: a 3s task with timeout=1 returned after 3.01s carrying the timeout error.
+    # The pool is now shut down without waiting, so the deadline is real. The worker thread
+    # keeps running until the Lambda freezes; that is deliberate — a write already in flight
+    # should be allowed to land, which is why the audit line says "may or may not have
+    # landed" and why the response now carries what the caller needs to check.
     _TOOL_TIMEOUT_SECS = 30
+    _pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
-            _future = _pool.submit(TOOLS[name]["fn"], arguments)
+        _future = _pool.submit(TOOLS[name]["fn"], arguments)
+        try:
+            result = _future.result(timeout=_TOOL_TIMEOUT_SECS)
+        except concurrent.futures.TimeoutError:
+            _pool.shutdown(wait=False)
+            _emit_tool_metric(name, _TOOL_TIMEOUT_SECS * 1000, success=False)
+            # #753: a timed-out write may or may not have landed — audit it.
+            _audit_tool_call(name, arguments, "timeout", _TOOL_TIMEOUT_SECS * 1000)
+            logger.warning(f"Tool '{name}' exceeded {_TOOL_TIMEOUT_SECS}s soft timeout")
+            # A write tool is not "scanning too much data" — telling the caller that sends
+            # them to narrow a date range that was never the problem, and hides the real
+            # question: did the write land? Say what is actually true of each case.
             try:
-                result = _future.result(timeout=_TOOL_TIMEOUT_SECS)
-            except concurrent.futures.TimeoutError:
-                _emit_tool_metric(name, _TOOL_TIMEOUT_SECS * 1000, success=False)
-                # #753: a timed-out write may or may not have landed — audit it.
-                _audit_tool_call(name, arguments, "timeout", _TOOL_TIMEOUT_SECS * 1000)
-                logger.warning(f"Tool '{name}' exceeded {_TOOL_TIMEOUT_SECS}s soft timeout")
-                return {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(
-                                mcp_error(
-                                    message=(
-                                        f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. "
-                                        "The query is likely scanning too much data."
-                                    ),
-                                    error_code="QUERY_TOO_BROAD",
-                                ),
-                                default=str,
-                            ),
-                        }
-                    ]
-                }
+                from mcp.audit import is_write_tool as _is_write_tool
+
+                _is_write = _is_write_tool(name)
+            except Exception:  # noqa: BLE001 — classification must never fail the response
+                _is_write = False
+            if _is_write:
+                message = (
+                    f"Tool '{name}' did not return within {_TOOL_TIMEOUT_SECS}s. It is a WRITE tool and may still be "
+                    "completing — do NOT retry blindly. Read the target back first (for a routine draft: "
+                    "manage_hevy_routine action=list for today) and only re-issue if nothing landed."
+                )
+                code = "WRITE_IN_FLIGHT"
+            else:
+                message = f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. The query is likely scanning too much data."
+                code = "QUERY_TOO_BROAD"
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            mcp_error(message=message, error_code=code),
+                            default=str,
+                        ),
+                    }
+                ]
+            }
+        _pool.shutdown(wait=False)
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         _audit_tool_call(name, arguments, "success", (time.time() - _t0) * 1000)  # #753
         return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}

@@ -519,13 +519,21 @@ LEDGER: dict[str, dict] = {
         note="RecallsDue, documented in CHANGELOG, read by nothing. A gauge with no dial.",
     ),
     "LifePlatform/HevyRoutine": _row(
-        owner="hevy_restamp + hevy_routine_cron",
-        verdict=RETIRE_CANDIDATE,
+        owner="hevy_restamp + hevy_routine_cron + hevy-backfill (index rebuild)",
+        verdict=KEEP,
         cardinality=FIXED,
         driver=None,
-        live_series=1,
+        live_series=2,
         series_budget=5,
-        note="No alarm, no dashboard, no reader, no doc reference anywhere in the repo.",
+        note=(
+            "Reclassified retire-candidate -> keep 2026-09-13 (#3764). The old note was accurate when "
+            "written — 'no alarm, no dashboard, no reader' — and this namespace was on the kill list for "
+            "exactly that reason. It now carries TemplateIndexRebuilt, the heartbeat behind "
+            "hevy-template-index-not-rebuilt-48h, which is the ONLY thing that can see the daily template-index "
+            "rebuild die: that job swallows all three of its failure modes (dead rule, failed Hevy walk, refused "
+            "shrink), so nothing raises, and the hourly poll on the same function keeps Invocations green "
+            "regardless. Retiring the namespace would now trade silent-failure coverage for pennies (ADR-116)."
+        ),
     ),
 }
 

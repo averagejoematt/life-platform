@@ -29,6 +29,7 @@ INVARIANTS (tests enforce):
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -130,6 +131,8 @@ _LEVEL_RE = re.compile(r"\b(?:level|lvl|l)\s*(\d{1,3})\b", re.IGNORECASE)
 _LOAD_RE = re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*(lbs?|kg|kilos?|pounds?)\b", re.IGNORECASE)
 
 from common.numeric import floats_to_decimal
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -273,8 +276,14 @@ def extract_signals(note_text: str, llm_fn=None) -> dict:
         try:
             llm = llm_fn(raw, TAXONOMY) or []
             used_llm = True
-        except Exception:
+        except Exception as e:  # noqa: BLE001
             degraded = True  # keep deterministic, never drop (Invariant 4)
+            # #3768: degrading silently is how this layer stayed dark for months. An
+            # AccessDenied from a missing bedrock grant looked exactly like a cap breach
+            # looked exactly like a healthy note with nothing semantic in it — and 14 days
+            # of Lambda logs carried no Bedrock line at all. Log the CLASS and message,
+            # never the note text (raw notes are owner-private, ADR-104/Tier-2 discipline).
+            logger.warning("training_notes llm degraded: %s: %s", type(e).__name__, e)
     signals, pain_flag = merge_signals(det, llm, pain_det)
     extracted_by = "hybrid" if (used_llm and det) else ("haiku" if used_llm else "deterministic")
     return {

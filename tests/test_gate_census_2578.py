@@ -570,7 +570,17 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # graded B+ 9 / B 3 / B- 3 / C+ 2 and awarded A to nothing, plus site_pages 77
         # against 93 registered and active_secrets 21 against 28 in the model. Restoring
         # those three literals: 4 of 6 FAILED. Corrected: 6 passed.
-        <= 91  # re-measured 2026-09-07 on this branch's own tree (#3690): 90 -> 91 proven, unproven UNCHANGED at 538 (this proof, not a new unproven entrant)
+        # Upper bound raised 91 -> 92 (2026-09-13, #3741): the 92nd proof is
+        # `guard::lambdas/content/recap_gate.py`, the daily recap card's publish gate.
+        # Three defects planted one at a time in the real module and each watched RED:
+        # the step-1 fail-closed return replaced by an empty vocabulary (1 failed);
+        # screen_items replaced by set() (1 failed); the step-3 PrivacyViolation handler
+        # returning CLEARED instead of HELD (3 failed). Restored between each, 11 passed
+        # again after the third. Recorded honestly in GUARD_PROOFS: M1 did NOT fail the
+        # way the plant intended — with step 1's refusal gone, privacy_guard independently
+        # requires the same vocabulary and raises uncaught, so deleting the explicit
+        # refusal produces a failed invocation rather than a card. Layered, not single.
+        <= 92  # re-measured 2026-09-13 on this branch's own tree (#3741): 91 -> 92 proven, unproven UNCHANGED at 538 (this proof, not a new unproven entrant)
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

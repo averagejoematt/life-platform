@@ -138,6 +138,14 @@ ROW_MAP: list[dict] = [
     {"key": "private_intake", "pattern": r"^Private intake", "requirements": [("source", "private_intake", OO)], "claims": []},
     {"key": "flourishing", "pattern": r"^Flourishing", "requirements": [("source", "flourishing", OO)], "claims": []},
     {"key": "felt_probe", "pattern": r"^Felt-reality", "requirements": [("source", "felt_probe", OO)], "claims": []},
+    # #3757: declared before the first photo exists, so there is no window in which an
+    # object is stored under no tier. No `claims` — this source has no public projection
+    # at all, which is the distinction the prose row turns on.
+    {"key": "progress_photos", "pattern": r"^Progress photos", "requirements": [("source", "progress_photos", OO)], "claims": []},
+    # #3719: already served publicly with no tier and no consent stamp. The owner ruled
+    # keep-publishing (2026-09-13), so this records the consent rather than changing the
+    # surface — publication by STAMP, never by omission.
+    {"key": "measurements", "pattern": r"^Tape measurements", "requirements": [("source", "measurements", OP)], "claims": []},
 ]
 
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this

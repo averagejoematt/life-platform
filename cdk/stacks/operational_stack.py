@@ -907,6 +907,108 @@ class OperationalStack(Stack):
             digest=True,
         )
 
+        # ── 12a. Recap Card Generator — daily at 19:30 UTC (11:30 AM PT), #3741.
+        # Renders YESTERDAY's card. One day behind on purpose and not as a compromise: Day
+        # N is not a finished day until the next morning (MacroFactor lands ~24h late, the
+        # night's Whoop sleep arrives the following morning, and computed_metrics for D is
+        # written by the compute cron on D+1). A same-evening card would publish a nutrition
+        # figure missing dinner and call it the day.
+        #
+        # A SEPARATE function from og-image-generator above, sharing only the Pillow layer.
+        # That one is the public-surface producer with a deliberately tiny role; this one
+        # needs DynamoDB, the Telegram secret and SES, and it writes to `recap/` — a prefix with
+        # no CloudFront behaviour AND no anonymous read, because the card is private until the
+        # owner posts it by hand (ADR-140 rule 5: no automated surface posts a vitals-derived
+        # mark, human selection only). It first shipped under `generated/recap/`, where the
+        # bucket policy made every card world-readable at a derivable key — the #3559 defect
+        # exactly, one prefix over. 'No CloudFront route' was never the property that mattered.
+        #
+        # The weekly card is derived inside the handler from `day_n % 7 == 0`, not a second
+        # rule: genesis moves every cycle and a weekday literal would be silently wrong
+        # after the next reset.
+        create_platform_lambda(
+            self,
+            "RecapCardGenerator",
+            function_name="recap-card-generator",
+            source_file="lambdas/web/recap_card_lambda.py",
+            handler="web.recap_card_lambda.lambda_handler",
+            schedule="cron(30 19 * * ? *)",  # 11:30 AM PT daily — the same clock as the OG cards
+            # ── TEMPORARY HOLD (owner ruling 2026-09-14) ───────────────────────────────
+            # The owner has not yet reviewed the v2 campaign cards, so the schedule renders
+            # and stores but sends NOTHING. Delete this line to resume delivery — the
+            # handler's own default is `deliver=True` and that stays the designed
+            # behaviour; this is a hold, not a contract change.
+            #
+            # It exists because the hold was ASSUMED and was not real: the rule passed no
+            # input, `lambda_handler` reads `event.get("deliver", True)`, and so every
+            # scheduled run would have delivered while the owner believed it was
+            # render-only. A default is not a decision until something states it.
+            schedule_input={"deliver": False},
+            timeout_seconds=120,
+            memory_mb=512,
+            additional_layers=[pillow_layer],
+            custom_policies=rp.operational_recap_card_generator(),
+            environment={
+                "RECAP_S3_PREFIX": "recap/",
+                "TELEGRAM_SECRET_ID": "life-platform/telegram",
+                "TELEGRAM_BOT_KEY": "headcoach",
+            },
+            table=local_table,
+            bucket=local_bucket,
+            dlq=local_dlq,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            # needs_ses deliberately NOT set: the custom policy above already grants
+            # ses:SendEmail + ses:SendRawEmail scoped to the identity and config set, and
+            # EMAIL_SENDER / EMAIL_RECIPIENT come from create_platform_lambda's shared env
+            # block. Setting it too would add a second, broader grant for nothing.
+        )
+
+        # ── #3741: the card's absence heartbeat ──────────────────────────────────
+        # The first draft of this took a dated EXEMPT on the heartbeat-completeness
+        # ledger, reasoning that a missing card is self-evident to its only consumer the
+        # same morning — he asked for a card every day to post, so a morning without one
+        # is the feature failing in his hand rather than in a log.
+        #
+        # That reasoning is sound ONLY once he is actually receiving a card every morning,
+        # and today he is not: delivery is off by default and the distribution path is
+        # still undecided (#3741). Until then "someone would notice" has no one to do the
+        # noticing — which is exactly what was believed about the training-note extractor
+        # while it sat dark for three months (#3768). An exemption whose premise is not
+        # yet true is not an exemption, so this gets the real thing instead.
+        #
+        # Invocations is the honest metric HERE specifically because this function has
+        # exactly ONE trigger — the daily rule above. (The same watch on hevy-backfill
+        # would be green by construction, because its hourly poll shares the function
+        # with #3764's rebuild rule.) A run that honestly declines to draw a card — no
+        # signal, or held by the privacy gate — still INVOKES and still emits a datapoint,
+        # so this never false-fires on a quiet day; only a dead schedule reads as zero.
+        # Digest, not paging (ADR-050): a missed card costs a day of the campaign, and the
+        # backfill script can render any past day on demand.
+        recap_no_invocations_alarm = cloudwatch.Alarm(
+            self,
+            "RecapCardNoInvocations",
+            alarm_name="recap-card-no-invocations-24h",
+            alarm_description=(
+                "#3741: recap-card-generator has not run in 24h. Its only trigger is the 11:30 PT daily "
+                "rule, so zero invocations means the schedule is dead — a run that declines to draw a "
+                "card still invokes. No daily card is being produced for the campaign."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": "recap-card-generator"},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        recap_no_invocations_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── 12b. Reading Cover Pipeline (ADR-097, Mind pillar Phase A) — on-demand only.
         # Invoked with a book dict; fetches a cover (Open Library → Google Books →
         # designed placeholder), caches it to generated/covers/<bookId>.jpg, and

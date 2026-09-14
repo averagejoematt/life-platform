@@ -1,12 +1,12 @@
 {
-  "_purpose": "#3374 R1 \u2014 the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff \u2014 that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
+  "_purpose": "#3374 R1 — the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff — that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
   "counts": {
     "ai_features": 18,
-    "alarms": 125,
+    "alarms": 128,
     "emf_namespaces": 31,
-    "schedules": 88,
+    "schedules": 90,
     "secrets": 28
   },
-  "measured_on": "2026-09-06",
-  "_last_change": "#3553 (2026-09-06): alarms 124 -> 125 \u2014 `commitments-ungraded`, the dead-man on the #532 follow-through ledger (one metric-math alarm over two Count metrics, ~$0.10/mo)."
+  "measured_on": "2026-09-13",
+  "_last_change": "#3741 (2026-09-13): schedules 89 -> 90 and alarms 126 -> 128, on top of #3764's rule and dead-man already on main. The schedule is the daily recap-card generator (cron(30 19 * * ? *), the same 11:30 PT clock as the OG cards). The two alarms are its per-Lambda error alarm ('ingestion-error-recap-card-generator') and its absence heartbeat ('recap-card-no-invocations-24h'); the heartbeat replaced a dated EXEMPT on the heartbeat-completeness ledger, whose premise — a missing card is self-evident to its only consumer the same morning — is not true until he is actually receiving one daily. One 512MB Lambda for ~5s/day, ~10 DDB reads and 1 write, one S3 PUT, one SES raw send, Telegram free, no Bedrock: under $0.05/mo plus ~$0.20/mo for the two alarms. It renders from stored metrics only — no model call, which is why a daily owner-facing artifact costs less than the alarms that watch it."
 }

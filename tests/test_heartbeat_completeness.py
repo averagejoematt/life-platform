@@ -688,6 +688,20 @@ COVERAGE = {
         "NOT part of the ingestion/compute/email error_alarm=False consolidation).",
         "ingestion-error-og-image-generator",
     ),
+    # #3741: the daily recap card. This row was first written as a dated EXEMPT, on the
+    # reasoning that a missing card is self-evident to its only consumer the same morning
+    # — he asked for a card every day to post, so a morning without one is the feature
+    # failing in his hand rather than in a log.
+    #
+    # That is true only once he is actually receiving a card every morning, and he is not
+    # yet: delivery is off by default and the distribution path is undecided. An exemption
+    # whose premise is not yet true is indistinguishable from "someone would notice",
+    # which is exactly what was believed about the training-note extractor while it sat
+    # dark for three months (#3768). So it gets the real alarm instead.
+    #
+    # Invocations works here because this function has exactly ONE trigger; a run that
+    # honestly declines to draw a card still invokes and still emits a datapoint.
+    "recap-card-generator": (ALARM, "recap-card-no-invocations-24h"),
     "hevy-restamp": (
         EXEMPT,
         "2026-07-19",
