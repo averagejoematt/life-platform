@@ -230,6 +230,11 @@ SOURCE_CLASS: dict[str, str] = {
     "labs": CROSS_PHASE,
     "dexa": CROSS_PHASE,
     "genome": CROSS_PHASE,
+    "progress_photos": CROSS_PHASE,  # #3757: body photos. CROSS_PHASE for two reasons that both
+    # hold on their own: a before/after that spans attempts is the entire point of taking them (a
+    # reset erasing attempt 16's photos would destroy exactly the comparison they exist for), and
+    # unlike every RAW_TIMESERIES source they are UNRECOMPUTABLE — no API can re-emit a photo of a
+    # body on a day that has passed. Sibling of "dexa" above: a durable body fact, not a cycle fact.
     "supplements": CROSS_PHASE,  # ADR-077 dec A: medication-safety — never hide
     "chronicling": CROSS_PHASE,  # ADR-077 dec D: frozen pre-platform "before" archive
     "subscribers": CROSS_PHASE,  # audience identity

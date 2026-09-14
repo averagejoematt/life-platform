@@ -6980,11 +6980,11 @@
       "lambdas": 104,
       "mcp_tool_modules": 29,
       "mcp_tools": 82,
-      "partitions": 105,
+      "partitions": 106,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 13,
-      "privacy_sources_owner_published": 2,
+      "privacy_sources_owner_only": 14,
+      "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 81,
       "schedules": 89
     },
@@ -7392,7 +7392,7 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual entry via MCP",
-      "privacy_tier": "public",
+      "privacy_tier": "owner_published",
       "stale_hours": 1440
     },
     "milestones": {
@@ -7432,6 +7432,14 @@
       "class": "raw_timeseries",
       "ingestion": false,
       "privacy_tier": "owner_only"
+    },
+    "progress_photos": {
+      "category": "Manual logs",
+      "class": "cross_phase",
+      "ingestion": true,
+      "method": "Sent to the headcoach Telegram bot with a /progress caption",
+      "privacy_tier": "owner_only",
+      "stale_hours": null
     },
     "protocols": {
       "class": "experiment_scoped",
@@ -7708,8 +7716,10 @@
       "hevy": "owner_only",
       "labs": "owner_published",
       "macrofactor": "owner_only",
+      "measurements": "owner_published",
       "notion": "owner_only",
       "private_intake": "owner_only",
+      "progress_photos": "owner_only",
       "reading": "owner_only",
       "sick_days": "owner_only",
       "state_of_mind": "owner_only",

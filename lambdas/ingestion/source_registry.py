@@ -869,6 +869,40 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "raw_layout": None,
         "capture_channel": "mcp",  # #746: entered by hand in an MCP conversation
     },
+    # #3757: progress photos. Registered BEFORE the capture path exists, so no object is
+    # ever written to a prefix `scripts/check_raw_zone_drift.py` does not know about — the
+    # raw zone fractured into five generations precisely because prefixes appeared before
+    # facets did (X-9/#498). Not monitored and not a freshness source: photos are a
+    # deliberate weekly-ish act, and a missed week is a behavioural lapse rather than a
+    # dead pipeline — the one thing a staleness alert must never conflate (#3720).
+    "progress_photos": {
+        "label": "Progress photos",
+        "checker_label": "Progress photos",
+        "desc": "Front / side / back body photos",
+        "category": "Manual logs",
+        "behavioral": True,
+        "stale_hours": None,
+        "freshness": False,
+        "monitored": False,  # never paged, never on the public board — owner-only (Tier 2, #3757)
+        # The registry feeds the PUBLIC data-source catalogue on averagejoematt.com
+        # (scripts/v4_build_data_sources.py -> site/data/data_sources.json). A Tier-2
+        # owner-only source must not advertise its own existence there, so it opts out the
+        # same way the unprovisioned social channels do (#1669). Without this line the
+        # catalogue would have carried a "Progress photos" row the day this merged.
+        "catalog": False,
+        "active_api": False,
+        "expected_days": None,
+        "qa_tier": None,
+        "method": "Sent to the headcoach Telegram bot with a /progress caption",
+        "metrics": "Body photos (owner-only; no public projection)",
+        "posture": "portfolio",
+        "capture_channel": "telegram",
+        "raw_layout": {
+            "prefix": "raw/matthew/progress_photos",
+            "scheme": "date-tree",
+            "filename": "<pose>.jpg",
+        },
+    },
     "food_delivery": {
         "label": "Food delivery",
         "checker_label": "Food delivery behavioral signal",
@@ -1019,7 +1053,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # contract (see the capture_channel doc above) an automatic pipe must not
         # carry one. A stray capture_channel here mislabelled youtube as a manual
         # "you forgot to log" source in evening nudges / coach check-ins / the data
-        # API, and tripped test_capture_channels_are_matthews_three.
+        # API, and tripped test_capture_channels_are_matthews_four.
         # Not on the public /data/ + gear catalogues yet — the source is wired but
         # awaits owner channel-id provisioning + the S4 display story (epic #1668).
         "catalog": False,
