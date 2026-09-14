@@ -86,7 +86,7 @@ from mcp.tools_reading import (
 from mcp.tools_sick_days import tool_manage_sick_days
 from mcp.tools_social import tool_get_social_dashboard
 from mcp.tools_social_connection import tool_get_social_connection_trend  # lifted out of tools_lifestyle by #2221
-from mcp.tools_strength import tool_get_muscle_volume
+from mcp.tools_strength import tool_get_exercise_history, tool_get_muscle_volume
 
 # tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
 # #3668: the derived surface index + the waiter. Two tools, full coverage, and the
@@ -108,7 +108,8 @@ TOOLS = {
                 "derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + "
                 "a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling "
                 "progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside "
-                "get_exercise_history. Pass a human exercise name OR a Hevy template_id. Signals are inferred + "
+                "get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their "
+                "notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + "
                 "confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or "
                 "dismiss before loading that movement."
             ),
@@ -481,6 +482,39 @@ TOOLS = {
                         "description": "Override start date YYYY-MM-DD. Defaults to journey_start_date from profile.",
                     },
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_exercise_history": {
+        "fn": tool_get_exercise_history,
+        "schema": {
+            "name": "get_exercise_history",
+            "description": (
+                "Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, "
+                "the note written on it, per-session volume, PR chronology and estimated-1RM trend. Pass an exact "
+                "Hevy `template_id` (preferred — stable) or a fuzzy `exercise_name`. No default lookback: it answers "
+                "from the whole history, back to 2021. Use for: 'have I done leg extensions before?', 'what did I "
+                "last squat?', 'how has my bench progressed?', 'what loads did I use at this bodyweight?' — and as "
+                "the pre-flight pull before prescribing a load on any movement. This reads raw Hevy; "
+                "`get_exercise_notes` reads the DERIVED note-signal layer built from it. Zero notes there with "
+                "sessions here means he logged the work and wrote nothing about it — never that the work is absent."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "exercise_name": {
+                        "type": "string",
+                        "description": "Exercise name, case-insensitive substring match (e.g. 'bench press', 'leg extension').",
+                    },
+                    "template_id": {
+                        "type": "string",
+                        "description": "Exact Hevy exercise template id (hex or uuid). Preferred over a name — stable across renames.",
+                    },
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to all time (2000-01-01)."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today (Pacific)."},
+                    "include_warmups": {"type": "boolean", "description": "Include warmup sets. Default false."},
                 },
                 "required": [],
             },
@@ -1246,7 +1280,10 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "string", "description": "Task ID from list_todoist_tasks."},
+                    "task_id": {
+                        "type": "string",
+                        "description": "Todoist task id (from get_todoist_snapshot, or the id returned when the task was created).",
+                    },
                     "due_string": {"type": "string", "description": "Recurrence e.g. 'every! week', 'every! month'. Use every! not every."},
                     "due_date": {"type": "string", "description": "First-fire date YYYY-MM-DD."},
                     "content": {"type": "string", "description": "New task name."},
@@ -1264,13 +1301,14 @@ TOOLS = {
             "name": "create_todoist_task",
             "description": (
                 "Create a new Todoist task with optional recurrence and due date. "
-                "Always use 'every!' for recurring tasks. Get project_id from get_todoist_projects first."
+                "Always use 'every!' for recurring tasks. Omit project_id to file into Inbox; "
+                "get_todoist_snapshot(view='today') shows the project breakdown for existing tasks."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "content": {"type": "string", "description": "Task name."},
-                    "project_id": {"type": "string", "description": "Project ID from get_todoist_projects."},
+                    "project_id": {"type": "string", "description": "Todoist project id. Omit for Inbox."},
                     "due_string": {"type": "string", "description": "e.g. 'every! Sunday', 'every! month'. Use every! for recurring."},
                     "due_date": {"type": "string", "description": "YYYY-MM-DD for one-time or first-fire date."},
                     "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
@@ -1288,7 +1326,10 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "string", "description": "Task ID from list_todoist_tasks."},
+                    "task_id": {
+                        "type": "string",
+                        "description": "Todoist task id (from get_todoist_snapshot, or the id returned when the task was created).",
+                    },
                 },
                 "required": ["task_id"],
             },

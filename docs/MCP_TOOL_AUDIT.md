@@ -24,6 +24,7 @@ telemetry in this file — as evidence for the next expand-or-prune decision.
 | **2026-07-08** | **143 → 60** | **64 → 0** | **#395 ER-04 prune — this record** |
 | 2026-07-08 | 60 → 62 | 0 | #422 addition — `get_habit_reflection_queue` + `log_habit_reflection` (habit causality reflection loop, `mcp/tools_habits.py`). Deliberate add, not drift; within the 50–70 band. |
 | **2026-09-06** | **76 → 81** | **0** | **#3668 addition — the surface index, the waiter, and three hot-path named tools.** `describe_platform_surfaces` + `get_platform_surface` (`mcp/tools_surfaces.py`, over the derived `mcp/surface_index.py`) reach all 108 owner-relevant site-API surfaces through TWO tools rather than 59; `get_experiment_cycle` + `get_habit_completion` + `get_platform_cost` (`mcp/tools_platform.py`) are the questions asked daily, where a named tool beats an index lookup. Band raised 76 → 81. See the correction below. |
+| **2026-09-13** | **81 → 82** | **0** | **#3766 RESTORATION — `get_exercise_history`.** The first row in this table that undoes one of its own. The #395 prune removed it on 30 days of telemetry taken during a BUILD period (the #3668 correction below already records that flaw); three live surfaces kept naming it as a standard pre-flight pull, including the description of `get_exercise_notes`, the tool that inherited its callers. On 2026-09-13 the coach asked for a movement's history, found only the notes tool, read its honest zero over a DARK layer and reported 'no history' for a lift with 12 logged sessions and working sets to 104 kg × 5 — then prescribed no load. Restored with two changes: an exact `template_id` argument, and `rpe` + `note_raw` carried on every set. Band raised 81 → 82. |
 
 ---
 
@@ -193,6 +194,43 @@ Notes:
   and `get_date_range(source=whoop|eightsleep)`.
 - `get_character`, `get_board_of_directors`, challenges, hypotheses, protocols: all site/email-served
   features whose MCP read surfaces went unused; engine and site are untouched.
+
+## AUDITED_AT 2026-09-13 — the restoration (#3766)
+
+### What came back, and why a removal ledger now records an un-removal
+
+`get_exercise_history` — every logged set for one movement across all time (date, load,
+reps, RPE, the note written on it, PR chronology, estimated-1RM trend).
+
+It was removed by #395 with the honest justification of the time: zero recorded uses in
+the 30-day telemetry window. The #3668 correction below had already found the flaw in that
+evidence base — the window was a period when the platform was being BUILT, not used — and
+this is the first case where the cost of a removal made on it is measurable.
+
+**The measurable cost.** 2026-09-13, a live coaching session. The coach was asked to
+program Leg Extension (Machine). The only exercise-level tool left in the registry read the
+DERIVED note-signal layer, which had been dark since it shipped (#3768). It returned
+`sessions_with_notes: 0, timeline: []` — a clean, confident zero. The coach reported "no
+history" and programmed the movement with no load. The raw partition held **twelve**
+sessions for that template since 2024-01-13, with working sets to 104 kg × 5.
+
+Three surfaces had gone on naming the deleted tool for eight weeks:
+`docs/coaching/COACH_SESSION.md`, `docs/SCHEMA.md`, and — worst — the live description of
+`get_exercise_notes`, which called it "a standard pre-flight pull". A shipped tool pointed
+at a tool that did not exist.
+
+**What changed on the way back in.** Two things, both from the incident:
+- it accepts an exact Hevy `template_id` as well as a fuzzy name (a template id is not a
+  substring of any name, so name-matching alone could never find it);
+- every set carries `rpe`, and the exercise's `note_raw` travels with its sets, so "how
+  heavy" and "how hard" arrive together.
+
+**The ratchet this adds.** `tests/test_exercise_history_and_layer_status_3766_3767.py`
+asserts that no live tool description names anything in this ledger's REMOVED set. Written
+for this one instance, it immediately found three more live specimens — `create_todoist_task`
+citing `get_todoist_projects`, and two `task_id` fields citing `list_todoist_tasks` — all
+pruned by #395, all fixed in the same PR. Guard the set, not the instance.
+
 
 ## AUDITED_AT 2026-09-06 — the addition (#3668), and a correction to the evidence base
 

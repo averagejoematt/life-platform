@@ -1,6 +1,6 @@
 """
 Todoist tools: task completion trends, load analysis, project activity, decision fatigue signal.
-Write tools: create_todoist_task, update_todoist_task, close_todoist_task, get_todoist_projects.
+Write tools: create_todoist_task, update_todoist_task, close_todoist_task.
 """
 
 import json
@@ -257,7 +257,7 @@ def create_todoist_task(args):
     """
     Create a new Todoist task.
     content:    Task name/title.
-    project_id: Get from get_todoist_projects(). Defaults to Inbox.
+    project_id: A Todoist project id. Defaults to Inbox when omitted.
     due_string: e.g. 'every! Sunday', 'every! month', 'Mar 20'.
                 Always use 'every!' for recurring tasks (completion-based scheduling).
     due_date:   YYYY-MM-DD for a specific one-time date.
