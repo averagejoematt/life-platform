@@ -818,6 +818,53 @@ def _maybe_refer(*, marker: Optional[str], referring: dict, chat_id, thread: lis
     return target
 
 
+# ── Inbound path 2: a progress photo (#3758) ──────────────────────────────────
+
+
+def _progress_photo(order: dict) -> dict:
+    """Store one progress photo and text him the outcome. Never reaches inference.
+
+    Placed here, dispatched at the very top of the handler, deliberately ABOVE the
+    work-order path rather than inside it. A photo order has no `text`, so the
+    malformed-order check would reject it before the dedupe ever ran — and the fix is
+    not to loosen that check (it is the only thing standing between a garbled webhook
+    and a coach turn with no question in it). A capture is a different shape of work
+    and gets its own branch.
+
+    Redelivery is handled by `progress_capture`'s own idempotence on
+    `telegram_file_unique_id` rather than by `_seen_update`. That is the stronger key
+    for this path: `_seen_update` is per-coach-partition and per-update, so the same
+    photo forwarded twice, or redelivered after a webhook re-registration with a fresh
+    update id, would pass it. The file's unique id does not change in either case.
+    """
+    from coach import progress_capture
+
+    coach_id = order.get("coach_id")
+    chat_id = order.get("chat_id")
+    token = _bot_token(coach_id) if coach_id else None
+    if not token:
+        logger.warning("[progress] no bot token for %s — dropping", coach_id)
+        return {"ok": False, "reason": "no token"}
+
+    from common.constants import EXPERIMENT_START_DATE
+    from common.pacific_time import pacific_now
+
+    result = progress_capture.handle(
+        order,
+        token,
+        s3=_s3_client(),
+        table=_table(),
+        bucket=S3_BUCKET,
+        chat_ids=_bot_chat_ids(coach_id),
+        today=pacific_now().date().isoformat(),
+        experiment_start=EXPERIMENT_START_DATE,
+    )
+    if result.get("reply"):
+        _tg(token, "sendMessage", {"chat_id": chat_id, "text": result["reply"]})
+    logger.info("[progress] %s: %s", coach_id, result.get("reason"))
+    return result
+
+
 # ── Outbound path 2: the morning check-in ─────────────────────────────────────
 
 
@@ -1021,6 +1068,8 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         return _morning_checkin()
     if (event or {}).get("kind") == "event_outbound":
         return _event_outbound()
+    if (event or {}).get("kind") == "progress_photo":
+        return _progress_photo(event or {})
 
     order = event or {}
     coach_id = order.get("coach_id")

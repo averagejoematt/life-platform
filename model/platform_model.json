@@ -1117,6 +1117,27 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/coach/progress_capture.py",
+      "partition": "progress_photos",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/progress_capture.py",
+      "partition": "progress_photos",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/coach/progress_capture.py",
+      "partition": "progress_photos",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/coach/spiral_breaker.py",
       "partition": "character_sheet",
       "via": "pk"
@@ -7065,7 +7086,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 677,
+      "edges": 680,
       "lambdas": 105,
       "mcp_tool_modules": 30,
       "mcp_tools": 83,
@@ -7080,8 +7101,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 327,
-        "sites_resolved": 839,
-        "sites_total": 1166
+        "sites_resolved": 842,
+        "sites_total": 1169
       },
       "schedule_resolution": {
         "dynamic": 0,

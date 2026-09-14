@@ -89,9 +89,23 @@ def extract_message(update: dict) -> dict:
     plain new text message starts a coach turn — an edit is deliberately NOT a new
     turn, because re-answering an edited question would produce two contradictory
     replies in the scrollback with no way to tell which is current.
+
+    #3758 added a second actionable shape: a message carrying a PHOTO. It is not a
+    coach turn and never reaches inference; it is a capture, routed by ``kind`` and
+    answered deterministically. A photo with no usable size is still nothing at all —
+    the array is what makes it a photo, not the key's presence.
     """
     msg = (update or {}).get("message") or {}
-    return msg if msg.get("text") else {}
+    if msg.get("text"):
+        return msg
+    if _has_photo(msg):
+        return msg
+    return {}
+
+
+def _has_photo(message: dict) -> bool:
+    """A message with at least one real photo size on it."""
+    return any(isinstance(s, dict) and s.get("file_id") for s in ((message or {}).get("photo") or []))
 
 
 def resolve_coach(bot_key: str, routing: dict) -> str:
@@ -190,11 +204,30 @@ def route(event: dict, *, secret: Optional[str], routing: dict, allowed_chat_ids
     update = parse_update(event.get("body"), bool(event.get("isBase64Encoded")))
     message = extract_message(update)
     if not message:
-        raise Rejected("no actionable text message in update")
+        raise Rejected("no actionable text or photo message in update")
 
     bot_key = (bot_key_of or _bot_key_from_path)(event)
     coach_id = resolve_coach(bot_key, routing)
     chat_id = authorize_chat(message, allowed_chat_ids)
+
+    if _has_photo(message):
+        # A capture, not a turn. Discriminated on `kind` for the same reason the
+        # scheduled events are (telegram_worker_lambda's handler doc): a malformed
+        # order must stay malformed rather than silently become something else. The
+        # bot_key travels because only ONE bot may capture, and only the gateway
+        # knows which bot the webhook hit.
+        return {
+            "kind": "progress_photo",
+            "coach_id": coach_id,
+            "chat_id": chat_id,
+            "bot_key": bot_key,
+            "caption": message.get("caption") or "",
+            "photo": [s for s in (message.get("photo") or []) if isinstance(s, dict) and s.get("file_id")],
+            "message_id": message.get("message_id"),
+            "is_group": str(((message.get("chat") or {}).get("type") or "")).endswith("group"),
+            "update_id": update.get("update_id"),
+            "message_date": message.get("date"),
+        }
 
     return {
         "coach_id": coach_id,

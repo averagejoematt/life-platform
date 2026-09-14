@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-677 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+680 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -202,6 +202,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `panelcast` | coach_panel_podcast_lambda.py, podcast_script_v2.py | coach_panel_podcast_lambda.py, podcast_script_v2.py, site_api_coach_ledger.py |
 | `platform_memory` | daily_insight_compute_lambda.py, failure_pattern_compute_lambda.py, hypothesis_engine_lambda.py, weekly_plate_lambda.py | daily_insight_compute_lambda.py, weekly_plate_lambda.py |
 | `private_intake` | — | intake_response.py |
+| `progress_photos` | progress_capture.py | progress_capture.py |
 | `protocols` | — | site_api_protocols.py |
 | `qa_predict_dark` | qa_smoke_lambda.py | qa_smoke_lambda.py |
 | `recall_embeddings` | — | — |
@@ -489,7 +490,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1166 total · 839 resolved · 327 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1169 total · 842 resolved · 327 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
 - Alarms: 128 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

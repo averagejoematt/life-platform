@@ -900,7 +900,12 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "raw_layout": {
             "prefix": "raw/matthew/progress_photos",
             "scheme": "date-tree",
-            "filename": "<pose>.jpg",
+            # #3758 corrected this from `<pose>.jpg`. Under `date-tree` the leaf sits in a
+            # {YYYY}/{MM}/ directory, so a pose-only name gives three objects PER MONTH and
+            # every week after the first silently overwrites the one before it — with no
+            # error, in a source whose entire value is comparing two photos weeks apart.
+            # The facet was written before a writer existed; the writer is what found it.
+            "filename": "YYYY-MM-DD-<pose>.jpg",
         },
     },
     "food_delivery": {

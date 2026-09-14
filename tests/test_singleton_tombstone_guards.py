@@ -947,6 +947,15 @@ _GENERATION_GET_ITEM_EXEMPT: dict = {
         "'PROFILE#v1'",
     ): "user profile — cross_phase, no phase attr, never tombstoned (same as intelligence_common's entry)",
     (
+        "coach/progress_capture.py",
+        "index_sk(date, pose)",
+    ): "progress-photo index (#3758) — progress_photos is CROSS_PHASE in phase_taxonomy for two reasons that "
+    "each hold alone: a before/after spanning attempts is the entire point of taking the photos, and a photo of "
+    "a body on a day that has passed is UNRECOMPUTABLE, unlike every RAW_TIMESERIES source. So these rows are "
+    "never tombstoned, and singleton_visible here would be actively wrong in the one direction that matters: "
+    "the read is an IDEMPOTENCE check, so a hidden row reads as 'not stored yet' and the capture re-downloads "
+    "and overwrites a photo it already has. A filter cannot make this safer and can make it lossy.",
+    (
         "intelligence/ai_expert_analyzer_lambda.py",
         "ingest_health_sk(src)",
     ): "SYSTEM# ingest-health ops row — system_state, never tombstoned",
