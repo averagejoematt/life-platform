@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 418** — feedback 24 · reference 234 · security 1 · project 156 · user 1 · index 2
+**Files in the memory index snapshot: 421** — feedback 24 · reference 235 · security 1 · project 158 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 259** — homed-here 66 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
+**Rule-class files (feedback + reference + security): 260** — homed-here 67 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
 
-**Program/session files (project): 156** — already-homed 14 · superseded 1 · narrative 138 · off-repo 2 · index 1
+**Program/session files (project): 158** — already-homed 14 · superseded 1 · narrative 140 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
+## Snapshot of the memory index — 2026-09-13 (Session AD: regenerated from the live directory — +3 files, two of them rows the Session AB wrap added here but never to this block). Prior: 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -207,6 +207,8 @@ project_sdlc_review_2026_07_18.md
 project_september_base_2026_08_18.md
 project_serial_and_self_sustaining.md
 project_session_a_2026_08_25.md
+project_session_ab_2026_09_13.md
+project_session_ac_2026_09_13.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -271,6 +273,7 @@ reference_a_proof_ledger_needs_its_own_freshness_guard.md
 reference_a_repo_side_fix_to_an_s3_read_config.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
 reference_a_sweep_one_import_away.md
+reference_a_sweep_that_restores_a_directory.md
 reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
@@ -924,6 +927,7 @@ carries an operating rule.
 | `project_session_z_2026_09_08.md` | project | — narrative: a session record, not a repo rule | narrative |
 | `reference_a_sweep_that_restores_a_directory.md` | reference | `docs/CONVENTIONS.md` §7 (a verification sweep that ends in `git checkout -- <dir>` restores the WHOLE directory to HEAD, including your own uncommitted edits — commit before sweeping, or scope the restore to the paths the loop writes) | homed-here |
 | `project_session_ab_2026_09_13.md` | project | — narrative: a session record (landing Session Z's held campaign and finding it inert), not a repo rule; its extracted rules are the two reference rows above and in [[reference_conflicting_pr_mints_no_checks]] | narrative |
+| `project_session_ac_2026_09_13.md` | project | — narrative: a session record (the owner's week-one feature review — three epics filed, then the training-tools investigation), not a repo rule; its extracted rules are the two reference rows above | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
 | `user_who_is_matthew.md` | user | — out of scope: who the owner is stays in memory | user |
 
