@@ -48,6 +48,12 @@ PUBLIC_BY_INTENT: dict[str, str] = {
     "generated/podcast/*": "the published podcast audio — anonymous readers ARE the feed's audience",
     "generated/podcast/debrief/*": "the debrief episodes of that same published feed",
     "generated/panelcast/*": "the published panelcast audio, same reasoning as the podcast feed",
+    "generated/assets/images/*": (
+        "the OG share cards (`og_image()`, WR-17) — a share card's whole purpose is to be fetched by a "
+        "stranger's social client from a link preview, so anonymous read is the feature. Surfaced on "
+        "2026-09-14 when #3758 taught this scan to read bare PolicyStatements: the grant had been live and "
+        "undeclared since WR-17, correct all along and never once reviewed as a public-write decision."
+    ),
     "generated/assets/images/editorial/*": "editorial images embedded in published posts — they load for every reader",
     "generated/coach_daily.json": "the coach surface the public site renders on every page load",
     "generated/coach_memoirs.json": "published coach memoirs, served to readers on the coaching pages",
@@ -79,8 +85,78 @@ def anonymously_readable_prefixes() -> list[str]:
     return out
 
 
+#: S3 actions that put bytes somewhere. `s3:*` counts: a wildcard over a public prefix is
+#: the widest possible version of the defect this file exists for.
+_S3_WRITE_ACTIONS = ("s3:PutObject", "s3:PutObjectAcl", "s3:DeleteObject", "s3:*")
+
+
+def _bucket_relative(node) -> str | None:
+    """The key part of a resource expression, for the two spellings the roles use.
+
+    `f"{BUCKET_ARN}/generated/foo/*"` is an f-string whose first piece is the bucket and
+    whose second is a literal key; a plain string resource is handled too. Anything more
+    dynamic than that returns None and is reported by its own test below, because a
+    resource this scan cannot read is a resource it cannot police.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        _, sep, tail = node.value.partition(":::")
+        if not sep:
+            return None
+        _, _, key = tail.partition("/")
+        return key or None
+    if isinstance(node, ast.JoinedStr):
+        text = ""
+        for part in node.values:
+            if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                text += part.value
+            else:
+                text += "\x00"  # an interpolation — the bucket arn, or a region/account
+        _, _, key = text.partition("/")
+        return key if key and "\x00" not in key else None
+    return None
+
+
+def _raw_statement_write_prefixes() -> dict[str, str]:
+    """Write prefixes granted by a hand-written `iam.PolicyStatement`, not a facet.
+
+    THE BLIND SPOT THIS CLOSES (#3758). Until now this file scanned only the
+    `needs_s3_write` / `extra_s3_write` keyword arguments of the role FACTORY helpers,
+    because every S3 write in the estate went through one. The telegram worker's
+    progress-photo grant is the first written as a bare `PolicyStatement`, and it went
+    straight past the scan — the grant was invisible, and would have stayed invisible
+    if its prefix had been `generated/` instead of `raw/`.
+
+    That is the same failure this whole file is about, one level up: #3559 and #3741 each
+    guarded the WRITERS they knew about, and this guarded the SPELLING it knew about.
+    A rule that only sees one way of saying a thing is a rule with a bypass, and the
+    bypass is always found by accident.
+    """
+    found: dict[str, str] = {}
+    for path in ROLE_FILES:
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+            if name != "PolicyStatement":
+                continue
+            kw = {k.arg: k.value for k in node.keywords if k.arg}
+            actions = kw.get("actions")
+            if not isinstance(actions, (ast.List, ast.Tuple)):
+                continue
+            literals = [e.value for e in actions.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+            if not any(a in _S3_WRITE_ACTIONS for a in literals):
+                continue
+            resources = kw.get("resources")
+            for elt in getattr(resources, "elts", []):
+                key = _bucket_relative(elt)
+                if key:
+                    found.setdefault(key, f"{path.name}:{elt.lineno}")
+    return found
+
+
 def declared_write_prefixes() -> dict[str, str]:
-    """{prefix: "file:line"} for every string literal in a write-grant list."""
+    """{prefix: "file:line"} for every write prefix, in EITHER spelling."""
     found: dict[str, str] = {}
     for path in ROLE_FILES:
         tree = ast.parse(path.read_text())
@@ -92,6 +168,8 @@ def declared_write_prefixes() -> dict[str, str]:
             for elt in node.value.elts:
                 if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                     found.setdefault(elt.value, f"{path.name}:{elt.lineno}")
+    for prefix, where in _raw_statement_write_prefixes().items():
+        found.setdefault(prefix, where)
     return found
 
 
@@ -113,6 +191,42 @@ def test_the_grant_scan_sees_the_write_facets():
     prefixes = declared_write_prefixes()
     assert len(prefixes) >= 15, f"only {len(prefixes)} write prefixes found — the AST scan has gone blind"
     assert "recap/*" in prefixes, "the recap card's own grant is not visible to this scan"
+
+
+def test_the_grant_scan_sees_a_bare_policy_statement_too(tmp_path):
+    """NEGATIVE CONTROL for the #3758 blind spot, on a synthetic role file.
+
+    The live assertion below it names a real grant; this one proves the parser would
+    catch the dangerous version — a bare `PolicyStatement` writing under `generated/` —
+    which by construction does not exist in the repo and so cannot be asserted live.
+    """
+    fake = tmp_path / "role_policies_fake.py"
+    fake.write_text(
+        "import x as iam\n"
+        "BUCKET_ARN = 'arn:aws:s3:::b'\n"
+        "def r():\n"
+        "    return [iam.PolicyStatement(sid='S', actions=['s3:PutObject'],\n"
+        '        resources=[f"{BUCKET_ARN}/generated/sneaky/*"])]\n'
+    )
+    global ROLE_FILES
+    saved, ROLE_FILES = ROLE_FILES, [fake]
+    try:
+        found = declared_write_prefixes()
+    finally:
+        ROLE_FILES = saved
+    assert "generated/sneaky/*" in found, "a bare PolicyStatement write is invisible to the scan"
+    assert _public_writes(found), "and therefore would not be judged against PUBLIC_BY_INTENT"
+
+
+def test_the_bare_statement_written_for_3758_is_actually_seen():
+    """The live half: the first real grant in that spelling is in the scan's output."""
+    found = declared_write_prefixes()
+    assert "raw/matthew/progress_photos/*" in found, (
+        "the telegram worker's progress-photo write grant is invisible to this scan — " "the blind spot #3758 closed has reopened"
+    )
+    assert not _public_writes(
+        {"raw/matthew/progress_photos/*": found["raw/matthew/progress_photos/*"]}
+    ), "progress photos are Tier-2 owner-only; a public read grant over that prefix is an incident, not a config change"
 
 
 def test_every_public_write_is_declared_intentional():

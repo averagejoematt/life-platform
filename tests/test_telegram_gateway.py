@@ -186,9 +186,67 @@ def test_an_EDITED_message_does_not_start_a_second_turn():
         route(ev)
 
 
-def test_a_photo_with_no_text_is_not_a_turn():
+def test_a_photo_with_no_usable_size_is_still_nothing_at_all():
+    """#3758 made a photo actionable; an EMPTY photo array is still not a photo.
+
+    This test asserted the old behaviour — that any `photo` message was rejected — and
+    rewriting it was the deliberate half of #3758, not collateral. What survives verbatim
+    is the assertion itself, because `photo: []` carries no `file_id` and therefore no
+    file: the array is what makes a message a photo, not the key's presence. A webhook
+    that sends the key with nothing in it is malformed, and malformed stays rejected.
+    """
     ev = event()
     ev["body"] = json.dumps({"update_id": 4, "message": {"message_id": 5, "photo": [], "chat": {"id": 8675309}}})
+    with pytest.raises(tg.Rejected):
+        route(ev)
+
+
+def test_a_real_photo_routes_as_a_capture_and_never_as_a_coach_turn():
+    """The new shape, and the property that keeps it out of the inference path.
+
+    A photo is discriminated on `kind`, exactly like the scheduled outbound events, so a
+    malformed work order can never drift into becoming one. It carries no `text`, which
+    is what guarantees it cannot fall through to the coach turn path even if the `kind`
+    dispatch were removed — the worker's malformed-order check would reject it first.
+    """
+    ev = event()
+    ev["body"] = json.dumps(
+        {
+            "update_id": 5,
+            "message": {
+                "message_id": 6,
+                "chat": {"id": 8675309, "type": "private"},
+                "caption": "/progress front",
+                "photo": [
+                    {"file_id": "small", "file_unique_id": "u1", "width": 90, "height": 120, "file_size": 1200},
+                    {"file_id": "large", "file_unique_id": "u2", "width": 900, "height": 1200, "file_size": 240000},
+                ],
+            },
+        }
+    )
+    order = route(ev)
+
+    assert order["kind"] == "progress_photo"
+    assert order["caption"] == "/progress front"
+    assert "text" not in order, "a photo order must not present as a coach turn"
+    assert order["bot_key"], "the capture bot must travel with the order — only one bot may capture"
+    assert [p["file_id"] for p in order["photo"]] == ["small", "large"]
+
+
+def test_a_captioned_photo_still_goes_through_the_chat_authorization():
+    """A stranger's photo is refused by the SAME gate a stranger's text is."""
+    ev = event()
+    ev["body"] = json.dumps(
+        {
+            "update_id": 6,
+            "message": {
+                "message_id": 7,
+                "chat": {"id": 111111, "type": "private"},
+                "caption": "/progress front",
+                "photo": [{"file_id": "x", "file_unique_id": "ux", "width": 9, "height": 12, "file_size": 10}],
+            },
+        }
+    )
     with pytest.raises(tg.Rejected):
         route(ev)
 
