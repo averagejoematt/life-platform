@@ -154,6 +154,122 @@ def test_schedule_signatures_counts_schedule_calls_only():
     assert g.schedule_signatures("x = (") == Counter()
 
 
+# ── #3781: the paved-road spelling, which was 81% of the estate and invisible ──
+
+
+class _CleanManifestForCron:
+    """No page findings, so a CRON verdict is the only thing these two tests measure."""
+
+    @staticmethod
+    def self_check():
+        return set(), set()
+
+
+_STACK_PAVED = "fn = create_platform_lambda(self, 'X', function_name='x', schedule=\"cron(30 19 * * ? *)\")\n"
+_STACK_PAVED_TWO = _STACK_PAVED + "fn2 = create_platform_lambda(self, 'Y', schedule=\"rate(30 minutes)\")\n"
+
+
+def test_the_string_form_schedule_is_counted():
+    """The defect: `schedule="cron(...)"` is how almost every schedule in this repo is
+    declared, and `schedule_signatures` saw none of them."""
+    sigs = g.schedule_signatures(_STACK_PAVED_TWO)
+    assert sum(sigs.values()) == 2, f"string-form schedules are invisible: {sigs}"
+
+
+def test_both_spellings_land_in_ONE_multiset():
+    """The diff logic downstream is a net COUNT, so mixing forms must not double-count
+    or miss. A file with one of each has two schedules, not one and not three."""
+    mixed = _STACK_ONE_CRON + _STACK_PAVED
+    assert sum(g.schedule_signatures(mixed).values()) == 2
+
+
+def test_a_string_that_is_not_a_schedule_expression_is_not_counted():
+    """`schedule=` carrying a variable, a name, or prose is not a declaration."""
+    for src in (
+        "f(schedule=some_variable)\n",
+        'f(schedule="daily")\n',
+        'f(schedule="")\n',
+        'f(scheduled="cron(0 1 * * ? *)")\n',  # a different kwarg entirely
+    ):
+        assert sum(g.schedule_signatures(src).values()) == 0, src
+
+
+def test_a_docstring_example_and_a_commented_cron_are_not_schedules():
+    """Why this is an AST walk and not the obvious grep.
+
+    Both of these exist on main today — the worked example in `lambda_helpers.py`'s
+    module docstring, and the commented-out Garmin cron at `ingestion_stack.py:183`
+    (the source is PAUSED, ADR-074). A grep counts both; blocking a PR because someone
+    edited a note about a paused source is how a gate teaches people to route around it.
+    """
+    docstring_src = '"""Example:\n\n    create_platform_lambda(schedule="cron(0 14 * * ? *)")\n"""\nx = 1\n'
+    comment_src = '# restore `schedule="cron(0 0,6,14,22 * * ? *)"` here when it un-pauses\nx = 1\n'
+    assert sum(g.schedule_signatures(docstring_src).values()) == 0
+    assert sum(g.schedule_signatures(comment_src).values()) == 0
+
+
+def test_the_leg_now_sees_the_whole_live_estate():
+    """Measured by RUNNING the module over the real stacks, never by arithmetic.
+
+    The floor is deliberately generous and one-sided: this asserts the leg is not back
+    to seeing a token fraction, not that the estate is a particular size. A stack added
+    tomorrow must not red this test; a regression that re-blinds the string form must.
+    """
+    import glob
+
+    stacks = sorted(glob.glob(os.path.join(_REPO, "cdk", "stacks", "*.py")))
+    assert stacks, "no CDK stacks found — this test has gone blind"
+
+    total = 0
+    string_form = 0
+    for path in stacks:
+        with open(path, encoding="utf-8") as f:
+            sigs = g.schedule_signatures(f.read())
+        total += sum(sigs.values())
+        string_form += sum(n for sig, n in sigs.items() if sig.startswith('schedule="'))
+
+    assert total >= 80, f"the CRON leg sees only {total} schedule declarations across {len(stacks)} stacks"
+    assert string_form >= 60, f"only {string_form} string-form schedules visible — the #3781 leg has regressed"
+
+
+def test_a_new_string_form_cron_with_no_monitoring_BLOCKS(monkeypatch):
+    """THE CONTROL THE ISSUE ASKED FOR, and the one that matters.
+
+    Every other test here proves the leg can PASS. This one proves it can FAIL in the
+    exact shape that slipped through on 2026-09-14: a stack gains a schedule written the
+    paved-road way, the diff carries no monitoring change, and the gate must block. Before
+    #3781 this same fixture produced "no QA-relevant surface added by this diff".
+    """
+    _fake_repo(
+        monkeypatch,
+        changed=[("M", "cdk/stacks/foo_stack.py")],
+        base_files={"cdk/stacks/foo_stack.py": _STACK_PAVED},
+        head_files={"cdk/stacks/foo_stack.py": _STACK_PAVED_TWO, g.IMPORT_GATE: _IMPORT_GATE_SRC},
+        qa_manifest=_CleanManifestForCron,
+    )
+    findings, changed, mb = g.run_gate("/fake", "origin/main")
+    cron = [f for f in findings if f.leg == "CRON"]
+    assert cron, "the CRON leg produced no finding at all for a new string-form schedule"
+    assert [f.severity for f in cron] == ["fail"], [(f.severity, f.surface) for f in cron]
+    assert "RESULT: FAIL" in g.format_report(findings, "origin/main", mb, len(changed))
+
+
+def test_the_same_string_form_cron_PASSES_with_monitoring(monkeypatch):
+    """The negative control. A leg that blocks every diff is a leg that gets bypassed."""
+    _fake_repo(
+        monkeypatch,
+        changed=[("M", "cdk/stacks/foo_stack.py")],
+        base_files={"cdk/stacks/foo_stack.py": _STACK_PAVED},
+        head_files={
+            "cdk/stacks/foo_stack.py": _STACK_PAVED_TWO + "alarm = metric.create_alarm(self, 'A', threshold=1)\n",
+            g.IMPORT_GATE: _IMPORT_GATE_SRC,
+        },
+        qa_manifest=_CleanManifestForCron,
+    )
+    findings, _changed, _mb = g.run_gate("/fake", "origin/main")
+    assert [f.severity for f in findings if f.leg == "CRON"] == ["ok"]
+
+
 def test_new_schedule_detection_is_net_count_based():
     head, base = g.schedule_signatures(_STACK_TWO_CRONS), g.schedule_signatures(_STACK_ONE_CRON)
     assert sum(head.values()) > sum(base.values())
@@ -183,6 +299,25 @@ def test_cron_leg_ledger_exemption_by_file_prefix():
 
 
 # ── JS leg ───────────────────────────────────────────────────────────────────
+
+
+def test_the_js_leg_sees_mjs_as_well_as_js(monkeypatch):
+    """#3781's sweep of the other legs: the JS leg matched ONE extension.
+
+    Zero `.mjs` files exist under site/ today, so nothing was escaping — this is the
+    one-spelling shape caught before it had an instance rather than after.
+    """
+    _fake_repo(
+        monkeypatch,
+        changed=[("A", "site/vendor/thing.mjs")],
+        base_files={},
+        head_files={g.IMPORT_GATE: _IMPORT_GATE_SRC},
+        qa_manifest=_CleanManifestForCron,
+    )
+    findings, _changed, _mb = g.run_gate("/fake", "origin/main")
+    js = [f for f in findings if f.leg == "JS"]
+    assert js, "an added .mjs module produced no JS finding at all"
+    assert [f.severity for f in js] == ["fail"], [(f.severity, f.surface) for f in js]
 
 
 def test_import_gate_scan_marker_true_on_the_real_script():
