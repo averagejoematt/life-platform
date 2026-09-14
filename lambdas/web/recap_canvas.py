@@ -67,6 +67,30 @@ def _text(draw, xy, s, *, font_name, size, fill):
     draw.text(xy, str(s), fill=fill, font=ce.font(font_name, size))
 
 
+#: The narrowest the hero may shrink before the card would rather wrap than squint.
+SIZE_HERO_MIN = 52
+
+
+def _fit_size(draw, text: str) -> int:
+    """The largest hero size at which `text` fits inside the margins.
+
+    MEASURED, not estimated from character count. The first version keyed off
+    `len(hero) <= 9` and a real card — "Foundation - Pull - 2 - 6", the Hevy auto-title —
+    ran clean off the right edge. Character count is not width: "1.1 lb" and "Wm" are the
+    same length and nothing like the same size, and a proportional display face makes the
+    gap worse. Pillow can measure the actual string, so it does.
+    """
+    usable = PORTRAIT[0] - 2 * MARGIN_P
+    for size in range(SIZE_HERO, SIZE_HERO_MIN - 1, -6):
+        try:
+            width = draw.textlength(text, font=ce.font(ce.FONT_DISPLAY, size))
+        except Exception:  # noqa: BLE001 — a default-font fallback cannot measure; be safe
+            return SIZE_HERO_SMALL
+        if width <= usable:
+            return size
+    return SIZE_HERO_MIN
+
+
 def draw_day_kicker(draw, day_label: str, date_label: str, y: int = 120) -> int:
     """`DAY 8 · SAT 13 SEP` — where this frame sits in the story. Returns the next y."""
     parts = [p for p in (day_label, date_label) if p]
@@ -83,7 +107,7 @@ def draw_hero(draw, hero: str, label: str, *, y: int, direction: str | None = No
     is exactly where someone would next hard-code a green.
     """
     hero_s = str(hero)
-    size = SIZE_HERO if len(hero_s) <= 9 else SIZE_HERO_SMALL
+    size = _fit_size(draw, hero_s)
     _text(draw, (MARGIN_P, y), hero_s, font_name=ce.FONT_DISPLAY, size=size, fill=ce.TEXT)
     y += int(size * 1.12)
 
