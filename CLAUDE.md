@@ -211,31 +211,27 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-14 (Opus 5, **Session AD — the three features, and a card that shipped public**; owner brief:
-his week-one review, P1 Hevy tools + planning engine, P2 the daily Instagram card, P3 progress photos; standing
-merge+deploy authority, **render only, deliver nothing**). **5 PRs merged AND deployed, 8 issues closed, 2 filed.**
-**A feature that had never once worked came alive:** #3768 was one IAM grant — the extractor's Bedrock call raised
-AccessDenied, `extract_signals` caught it, wrote the deterministic fallback and **reported success**, for the whole
-life of the feature. Live proof: `training_notes#USAGE / MONTH#2026-09` → **`calls: 15`** on a counter that had **no
-item for ANY month**; `extracted_by` → **15 `hybrid` / 7 `haiku` / 22 not degraded** where every record had been
-`deterministic` + `degraded: true`; `extractor_dark: false`, "healthy". `get_exercise_history` is back on the live
-registry (83 tools) after being pruned while another tool's description still cited it. The #3764 index dead-man
-fired on its own 13:40Z rule before anything was invoked and sits OK on a real datapoint. **The card pipeline is
-live and proven by shipped behaviour** — 9 PNGs from live DDB, beats genuinely varying (`trajectory` on the one
-weigh-in day, `session` on training days, `scorecard` on the untrained Day 1), and **Day 1 did NOT choose "new
-weigh-in"**, the cross-cycle bug that bit twice. `delivered: {}` on every row — nothing was sent. **Then the defect
-I shipped:** the cards went live **world-readable**. `generated/*` grants anonymous `s3:GetObject` **at the S3
-origin**; my privacy test asserted *no CloudFront route*, which was TRUE and was never the property that mattered —
-its docstring encoded the error in one clause. Verified live: **200, 48,779 bytes, byte-identical**, 8 days + the
-weekly, keys derivable from a date, prefix named in a public repo. **This was #3559 one prefix over**, whose fix
-moved ONE writer and named two doors by hand. Deletion was DENIED (`ProtectDataFromDeployScripts` protects
-`generated/*` from remediation too) so the objects were overwritten in place; #3783 moved the output to `recap/`
-and now guards the SET — which immediately found three more undeclared public writers. Anonymous GET now **403**.
-**Three gotchas were mine:** `Closes #A, #B` closes only #A (the epic closed over five shipped stories); the
-premerge lane is a **strict subset** of the full suite and I twice called a branch green off it; and a `git reset
---hard` after a **piped** `git checkout` hit the wrong branch — the pipe returned `tail`'s status. **Owner acts
-left:** his verdict on the 22 review cards and any `--deliver` · #3749/#3750 (the epic is reopened for them) ·
-#3758/#3760 the photo capture + viewer · #3753 redlines `ACTIVE` · #3770 Calf Press · Main went red at wrap on a
-COLLECTION error (PIL imported transitively through a first-party module at test-module scope, which takes the whole
-lane); **diagnosed and fixed before close** (`f3bc12f2a`) — and the guard written for exactly that class passed,
-because it checks only the first hop (**#3784**).
+**Verified:** 2026-09-14 (Opus 5, **Session AE — five features landed, and four defects the guards found in
+my own work**; approved plan `temporal-roaming-swan.md`, Phase 0a already done; standing merge+deploy
+authority, **no `--deliver`, the cron hold STAYS**). **6 PRs merged AND deployed, 12 issues closed on live
+proof, 3 filed.** #3737+#3789 (`847f5e00d`), #3786 (`b2849f714`), #3791 (`3b1d93362`), #3788 (`b4a2b80cc`),
+#3794 (`60e1cbf7e`) — every CI/CD run green through Deploy, Smoke and Visual+AI QA; every deploy gate
+approved, none left waiting. **Not one feature defect was found by me reading my code — each was found by the
+platform.** The coach line was selected, screened, stored, captioned and **drawn NOWHERE** (`_coach_line` ran
+last and dropped below `FLOOR_Y` on a real training day; found by rendering against live DDB — the test that
+missed it compared rendered BYTES, which differ when a layout changes *nothing visible*, and now counts lit
+pixels). A failed coach read would have **reported itself as a quiet day** — #3768's shape, written an hour
+after closing #3768; now `ok|absent|unreadable`. The hand-typed coach roster was **wrong on day one**
+(`training_coach` is not operational; `glucose_coach`/`explorer_coach` were missing) — caught by
+`test_coach_roster_set_guard_2334`, now derived from `persona_registry`. Two guards caught **me**: the closure
+contract blocked `Fixes #3781` on a `closure:live-proof` instrument, and a monitor read "ALL SETTLED" over a
+check set **missing both test jobs**. **Found unassigned:** #3764's live index had been silently reverted to a
+stale committed twin (820→789, invisible to its own dead-man — #3785); the `generated/*` public-write guard
+could not see bare `PolicyStatement` grants and my own PR was its first instance — widening it found a real
+undeclared public writer (OG cards, live since WR-17); and **#3737 does not reach the surface its own PR body
+screenshotted** (#3792). **My errors:** I made the alarm-citation gate GREEN with a citation naming the wrong
+cause — a well-formed citation is not a true one (#3793, and the mis-citation is recorded *in* the citation);
+I pushed two commits **past branch protection**; and at 20:54 `merge_train.sh --dry-run` had already computed
+the plan for three green PRs and I merged serially anyway, costing #3788 three rebase+CI cycles. **Owner acts
+left:** the first real progress photo (his phone) · his verdict on the 22 cards and any `--deliver` ·
+#3760 the viewer · #3792/#3793/#3785/#3784.
