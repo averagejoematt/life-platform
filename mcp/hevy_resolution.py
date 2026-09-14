@@ -48,10 +48,6 @@ _INDEX_TTL_SECONDS = int(os.environ.get("HEVY_TEMPLATE_INDEX_TTL", "900"))
 _index_cache: dict[str, Any] = {"at": 0.0, "templates": None}
 
 
-_INDEX_TTL_SECONDS = int(os.environ.get("HEVY_TEMPLATE_INDEX_TTL", "900"))
-_index_cache: dict[str, Any] = {"at": 0.0, "templates": None}
-
-
 def _template_index(force: bool = False) -> dict[str, Any]:
     """Full Hevy template index (ADR-069): normalized_title -> {id, title}.
 
