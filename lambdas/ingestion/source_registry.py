@@ -884,6 +884,12 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "stale_hours": None,
         "freshness": False,
         "monitored": False,  # never paged, never on the public board — owner-only (Tier 2, #3757)
+        # The registry feeds the PUBLIC data-source catalogue on averagejoematt.com
+        # (scripts/v4_build_data_sources.py -> site/data/data_sources.json). A Tier-2
+        # owner-only source must not advertise its own existence there, so it opts out the
+        # same way the unprovisioned social channels do (#1669). Without this line the
+        # catalogue would have carried a "Progress photos" row the day this merged.
+        "catalog": False,
         "active_api": False,
         "expected_days": None,
         "qa_tier": None,
@@ -1047,7 +1053,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # contract (see the capture_channel doc above) an automatic pipe must not
         # carry one. A stray capture_channel here mislabelled youtube as a manual
         # "you forgot to log" source in evening nudges / coach check-ins / the data
-        # API, and tripped test_capture_channels_are_matthews_three.
+        # API, and tripped test_capture_channels_are_matthews_four.
         # Not on the public /data/ + gear catalogues yet — the source is wired but
         # awaits owner channel-id provisioning + the S4 display story (epic #1668).
         "catalog": False,

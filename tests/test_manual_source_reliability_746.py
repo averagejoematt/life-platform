@@ -37,15 +37,28 @@ from web import site_api_data as sad  # noqa: E402
 # ── 1. Facets ────────────────────────────────────────────────────────────────
 
 
-def test_capture_channels_are_matthews_three():
-    """Matthew's decision: the manual capture channels are HAE, Notion, MCP —
-    and nothing else carries a capture_channel (a device pipe must not)."""
+def test_capture_channels_are_matthews_four():
+    """Matthew's decision: the manual capture channels are HAE, Notion, MCP and — since
+    2026-09-13 (#3757) — Telegram, and nothing else carries a capture_channel (a device
+    pipe must not).
+
+    TELEGRAM IS A DELIBERATE FOURTH, NOT A WIDENING FOR CONVENIENCE. This assertion is an
+    owner decision written down, so growing it is a decision too, and the reason is the
+    artifact: a progress photo is taken on a phone, and the three existing channels cannot
+    carry one. HAE pushes device metrics, Notion is journal text, and MCP is a typed
+    conversation — none of them moves an image off the phone at the moment it is taken.
+    The headcoach Telegram bot already runs, is already owner-authenticated 1:1, and is
+    already how he talks to the platform from his phone. The alternative was a new
+    authenticated upload surface on the public site, which is strictly more attack surface
+    for the most sensitive artifact on the platform.
+    """
     got = {k: v["channel"] for k, v in reg.manual_capture_sources().items()}
     assert got == {
         "apple_health": "hae",
         "notion": "notion",
         "measurements": "mcp",
         "food_delivery": "mcp",
+        "progress_photos": "telegram",
     }
     # No worn-device / scheduled-pull source leaks a capture_channel.
     for k in ("whoop", "garmin", "eightsleep", "strava", "withings", "habitify", "todoist", "weather"):
@@ -56,6 +69,7 @@ def test_channel_filter():
     assert set(reg.manual_capture_sources(channel="mcp")) == {"measurements", "food_delivery"}
     assert set(reg.manual_capture_sources(channel="hae")) == {"apple_health"}
     assert set(reg.manual_capture_sources(channel="notion")) == {"notion"}
+    assert set(reg.manual_capture_sources(channel="telegram")) == {"progress_photos"}
 
 
 def test_notion_threshold_derived_from_journaling_cadence():
