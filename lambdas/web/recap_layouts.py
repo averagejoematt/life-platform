@@ -134,6 +134,35 @@ def _vice_summary(facts) -> str | None:
     return f"{held} of {total} holding{tail}"
 
 
+#: Where a coach line sits and how much room it gets. Two mono lines at the card's content
+#: width; a third would push the fact footer off every layout that has one.
+COACH_LINE_WRAP = 54
+COACH_LINE_MAX_LINES = 2
+
+
+def _coach_line(draw, facts, *, y: int) -> int:
+    """The one sentence on the card a coach actually said. Absent when there is none.
+
+    Returns `y` unchanged when there is no line, which is the whole absence contract: a
+    day with no coach output draws no quote block, no empty rule and no "—" placeholder.
+    A gap where a quote would be is a lie about the day being quiet; nothing there at all
+    is just the card the day earned.
+
+    Drops itself below FLOOR_Y for the same reason `_fact_row` does. The quote is the
+    lowest-priority block on every layout that carries it — it is the colour, not the
+    evidence — so if a dense day has pushed the card down this far, the numbers win.
+    """
+    if not getattr(facts, "coach_line", None) or y > FLOOR_Y - 96:
+        return y
+    lines = ce.wrap(facts.coach_line, width=COACH_LINE_WRAP, max_lines=COACH_LINE_MAX_LINES)
+    if not lines:
+        return y
+    draw.rectangle([M, y, M + 3, y + 30 * len(lines) + 6], fill=ce.GREEN)
+    for i, line in enumerate(lines):
+        draw.text((M + 22, y + i * 30), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 22))
+    return y + 30 * len(lines) + 20
+
+
 def _session_label(title: str) -> str:
     parts = [p.strip() for p in str(title or "").split(" - ")]
     if len(parts) >= 2 and parts[1]:
@@ -218,6 +247,8 @@ def scorecard(facts, *, date_label: str):
         y += 42
         y = ch.draw_component_bars(draw, comps, x=M, y=y, w=W_CONTENT, label_w=230, row_h=48)
 
+    y = _coach_line(draw, facts, y=y + 30)
+
     # The fact footer: today's specifics, named.
     y = max(y + 40, 1010)
     if facts.workouts:
@@ -282,6 +313,7 @@ def trajectory(facts, *, date_label: str, weight_series=None, grade_series=None)
         )
         y += 52
 
+    y = _coach_line(draw, facts, y=y + 26)
     y = _goal_bar(draw, facts, y=max(y + 20, 880))
 
     y += 40
@@ -330,6 +362,7 @@ def session(facts, *, date_label: str):
             draw.text((M + 40, y), f"+{len(w.exercises) - 8} more", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 24))
             y += 42
 
+    y = _coach_line(draw, facts, y=y + 26)
     y = _goal_bar(draw, facts, y=max(y + 30, 1000))
 
     y += 34
@@ -391,6 +424,7 @@ def reckoning(facts, *, week_n: int, date_label: str, weight_series=None, grade_
     # under it said nothing the strip had not said better while colliding with it. One
     # visual per idea.
     y = draw_stakes(draw, y=max(y + 30, 668))
+    y = _coach_line(draw, facts, y=y + 18)
     y = _goal_bar(draw, facts, y=max(y + 22, 996))
 
     y += 26
@@ -467,6 +501,12 @@ def gate_strings(facts, caption: str = "") -> list[str]:
     deliberate, reviewable act rather than an accident.
     """
     out = [label for template, label in facts.item_labels() if template not in NEVER_DRAWN_BY_NAME]
+    # The coach line is drawn verbatim, so it is screened verbatim — by the deterministic
+    # text layer here AND by the semantic step the same change added (`recap_gate` step 4,
+    # fed separately from `facts.free_text()`). Both, not either: the vocabulary layer is
+    # what catches a blocked term inside a sentence, and the semantic layer is what exists
+    # for everything a vocabulary cannot enumerate.
+    out.extend(facts.free_text())
     if caption:
         out.append(caption)
     return out
@@ -485,12 +525,39 @@ def render_beat(layout: str, facts, *, date_label: str, weight_series=None, grad
     return scorecard(facts, date_label=date_label)
 
 
+#: Instagram takes far more than this; the limit is editorial, not technical. A caption
+#: that has to be expanded to be read is a caption most of the feed never reads (#3749).
+CAPTION_MAX_CHARS = 300
+
+
+def cap_caption(text: str) -> str:
+    """Hard-cap a caption at `CAPTION_MAX_CHARS`, on a word boundary.
+
+    The belt to `caption_for_beat`'s brace. That function drops the quote when it would
+    not fit, which handles the only variable-length part it adds — but the stats bits are
+    assembled from names (`Missed: …`) that have no length bound of their own, so the cap
+    is enforced here over the finished string rather than assumed upstream.
+    """
+    if len(text) <= CAPTION_MAX_CHARS:
+        return text
+    clipped = text[: CAPTION_MAX_CHARS - 1].rsplit(" ", 1)[0].rstrip(' ,;:—-"')
+    return (clipped + "…") if clipped else text[: CAPTION_MAX_CHARS - 1] + "…"
+
+
 def caption_for_beat(layout: str, facts, *, day_label: str, date_label: str) -> str:
     """The words beside the image — assembled from the card's own facts, never generated.
 
     A caption is published in the same breath as the image and is screened with it, so it
     says what the card says. The hook line differs by beat because a serial that opens the
     same way every day teaches people to scroll past it.
+
+    "Never generated" survived #3749 intact, but the reasoning under it widened. Until the
+    coach line, the claim was trivially true because every part of a caption was a number
+    this module formatted itself. Now one part is a sentence a language model wrote — and
+    it is still not generated HERE, because this function selects it rather than asking
+    for it. That distinction is the only thing standing between a caption and a fresh AI
+    flourish per card, which is exactly what #3749 was filed to prevent, so it is worth
+    stating rather than leaving as an inference from the code.
     """
     head = f"{day_label} · attempt #{ATTEMPT_NUMBER}"
     bits: list[str] = []
@@ -509,4 +576,12 @@ def caption_for_beat(layout: str, facts, *, day_label: str, date_label: str) -> 
             bits.append(f"Worst component: {_COMPONENT_NAMES.get(worst[0], worst[0])} at {worst[1]:.0f}/100.")
     if facts.missed_tier0:
         bits.append("Missed: " + ", ".join(facts.missed_tier0[:2]) + ".")
-    return (head + "\n" + " ".join(bits)).strip()
+    body = " ".join(bits)
+    # The coach line goes last and is the first thing dropped. The stats are the card's
+    # claim; the quote is its voice, and a caption that truncates mid-number reads as
+    # broken in a way a caption that simply has no quote does not (#3749).
+    line = getattr(facts, "coach_line", None)
+    if line:
+        candidate = f'{body} — "{line}"'.strip()
+        body = candidate if len(head) + 1 + len(candidate) <= CAPTION_MAX_CHARS else body
+    return cap_caption((head + "\n" + body).strip())

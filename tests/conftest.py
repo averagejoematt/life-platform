@@ -220,6 +220,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # hand-kept baseline missed them, and the bill arrived on an unrelated PR's
         # Deploy job two days later. A repo-shape ratchet, not a behaviour suite.
         "test_bundle_boot_pil_baseline_3784.py",
+        # #3749: reads coach_state_updater's source to hold the ONE write seam for
+        # public_summary, and globs config/coaches/. A registry-join check: the card may
+        # only quote a coach whose pipeline writes the field through audience_guard.
+        "test_recap_coach_line_3749.py",
         # #3690: sweeps docs/reviews/*_grades_*.json to re-derive the three hand-maintained
         # public stats (review_grade / site_pages / active_secrets) that /method/platform/
         # serves. Belongs pre-merge: it is a repo-shape ratchet over literals a PR can move,

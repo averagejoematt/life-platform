@@ -28,16 +28,39 @@ Food ITEM names (macrofactor is TIER_OWNER_ONLY; only rollup numbers cross this 
 and journal BODY text (the template labels are enough to say "he journaled"). Both are
 enforced by the compensating control in `tests/test_recap_gate_3746.py`, because the
 cheapest place to stop a leak is before the value is ever loaded.
+
+THE ONE FREE-TEXT FIELD, AND WHY IT IS THE ONLY ONE (#3749)
+
+`coach_line` is the single exception, and it is an exception by SELECTION, not by
+generation. Nothing here asks a model for a sentence about the day. The line is the
+opening sentence of a coach's `public_summary` — a field that was written by the coach's
+own run, passed the ADR-104 grounding gate there, and was stamped reader-safe by
+`coach/audience_guard.reader_safe` at write time. Reading it here adds no new AI surface
+and therefore no new grounding obligation; what it adds is a semantic risk that numbers
+never carried, which is why `recap_gate` grew its fourth step in the same change.
+
+The read seam is `audience_guard.public_blurb`, and the choice of seam is load-bearing.
+`coach_derived_prose.served_summary()` looks like the right helper and is not: its
+preference list is `key_recommendation, observatory_summary` with a fallback to the
+coach's full `content`, all three of which are the OWNER's register — second person,
+written to him. Falling back to any of them on a public card is the exact defect #2972
+exists to prevent. `public_blurb` reads `public_summary` and nothing else, guards the
+FULL text before truncating (order matters — truncation can delete the pronoun that makes
+a text an address), and returns "" when there is no reader-safe line. A held or missing
+condensation therefore means no line, never a substitute from a different audience.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
 from common.digest_utils import d2f
 from common.pacific_time import pacific_day_n
 from experiment.phase_filter import with_phase_filter
+
+logger = logging.getLogger(__name__)
 
 USER_PREFIX = "USER#matthew"
 
@@ -118,6 +141,11 @@ class DayFacts:
     protein_target_g: float | None = None
     # mind
     journal_templates: list[str] = field(default_factory=list)
+    # the one free-text field on the card — SELECTED from a coach's public_summary,
+    # never minted for the card. `coach_line_source` is the OUTPUT# record it came from,
+    # so any line on any card can be traced back to the run that wrote it (#3749).
+    coach_line: str | None = None
+    coach_line_source: str | None = None
     # the platform's OWN verdict on the day — 53 fields were available and the first
     # cards drew four. These are the ones a reader would actually want (#3741 rework).
     grade_letter: str | None = None
@@ -175,6 +203,17 @@ class DayFacts:
         if self.weight_lb is None or self.goal_weight_lb is None:
             return None
         return round(self.weight_lb - self.goal_weight_lb, 1)
+
+    def free_text(self) -> list[str]:
+        """Every string on the card that is PROSE rather than a number or a fixed label.
+
+        Deliberately separate from `item_labels()`. That list is names from partitions with
+        category rules, screened term-by-term against the blocked vocabulary; this one is
+        sentences, which a vocabulary match is the wrong instrument for. `recap_gate` runs
+        the semantic sensitivity layer over exactly this list and nothing else, so the day
+        the card grows a second prose field, adding it here is what puts it under that gate.
+        """
+        return [t for t in (self.coach_line,) if t]
 
     def item_labels(self) -> list[tuple[str, str]]:
         """(template, label) pairs the privacy gate screens — every name a card could draw.
@@ -332,6 +371,155 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
     facts.journal_templates = [t for t in (j.get("template") for j in journal) if t]
 
     return facts
+
+
+# ── the coach line: selected, never generated (#3749) ─────────────────────────
+#: Which coach gets FIRST refusal on which beat. A serial whose voice never changes
+#: reads as one voice with a template — the same complaint that produced `pick_beat`.
+#:
+#: This is a PREFERENCE, not a roster, and the distinction is the whole reason it is
+#: shaped this way. The first draft here hand-typed all five or six ids per beat, and
+#: `tests/test_coach_roster_set_guard_2334.py` was right to red it: the copy was already
+#: wrong on the day it was written. It named `training_coach`, which is not an
+#: operational coach and has never written an OUTPUT# row, and it omitted `glucose_coach`
+#: and `explorer_coach`, which are. A hand-typed roster does not drift eventually; it
+#: starts drifted and nobody looks.
+#:
+#: So the roster comes from `persona_registry.OPERATIONAL_COACH_IDS` and only the HEAD is
+#: named here — one or two ids per beat, well under the guard's overlap threshold because
+#: it is genuinely not a roster. A coach added to the platform tomorrow joins the card's
+#: fallback order with no edit here.
+#: ONE id per beat, and that is a rule rather than a coincidence: the conformance guard
+#: (#2844) treats a two-string literal as an enumeration of registry vocabulary and a
+#: one-string literal as a reference, which is exactly the right line here. The head is
+#: "who this beat most wants to hear from"; everyone else is fallback in registry order.
+CARD_COACH_HEAD: dict[str, str] = {
+    "session": "physical_coach",
+    "trajectory": "physical_coach",
+    "scorecard": "mind_coach",
+    "reckoning": "physical_coach",
+}
+
+
+def card_coach_order(beat: str = "") -> tuple:
+    """The beat's head, then every other operational coach in registry order.
+
+    Deterministic: `OPERATIONAL_COACH_IDS` is an ordered constant, so the same day and
+    beat always resolve to the same coach, which is what makes "a different card every
+    day" a property rather than a hope.
+    """
+    from coach import persona_registry
+
+    lead = CARD_COACH_HEAD.get(beat)
+    head = (lead,) if lead else ()
+    return head + tuple(c for c in persona_registry.OPERATIONAL_COACH_IDS if c != lead)
+
+
+#: The longest a drawn line may be. Three wrapped lines of mono at the card's content
+#: width; past that the quote stops being a line and becomes a paragraph, which is the
+#: one thing every layout note in `recap_layouts` says a card must not grow.
+COACH_LINE_MAX_CHARS = 150
+
+_SENTENCE_END = (". ", "! ", "? ")
+
+
+def first_sentence(text: str, limit: int = COACH_LINE_MAX_CHARS) -> str:
+    """The opening sentence of `text`, verbatim, or "" if there isn't a usable one.
+
+    A `public_summary` is 120-180 words — a paragraph written for a web page, not a line
+    for a card. Taking its first sentence keeps the operation SELECTION: the result is a
+    contiguous prefix of something a coach actually wrote, with nothing added and nothing
+    reordered. That distinction is the whole acceptance of #3749, so it is enforced by a
+    test asserting the return value is a prefix of the input rather than by this comment.
+
+    A first sentence longer than `limit` is cut at a word boundary with an ellipsis. It is
+    still the coach's words; it is no longer the coach's whole thought, and the ellipsis is
+    what says so on the card.
+    """
+    text = " ".join(str(text or "").split())
+    if not text:
+        return ""
+    cut = len(text)
+    for mark in _SENTENCE_END:
+        i = text.find(mark)
+        if i != -1 and i + 1 < cut:
+            cut = i + 1
+    sentence = text[:cut].strip()
+    if len(sentence) <= limit:
+        return sentence
+    clipped = sentence[:limit].rsplit(" ", 1)[0].rstrip(" ,;:—-")
+    return (clipped + "…") if clipped else ""
+
+
+#: What `coach_line` is reporting when it hands back no line. Three outcomes that look
+#: identical on the card and must never look identical in the record (#3768's lesson,
+#: applied before it can bite rather than after): the platform genuinely had nothing to
+#: quote, versus the read itself failed.
+LINE_OK = "ok"
+LINE_ABSENT = "absent"
+LINE_UNREADABLE = "unreadable"
+
+
+def coach_line(table, date: str, beat: str = "", *, coach_order=None) -> tuple:
+    """(line, source_record_id, status) for one PT day — the first reader-safe line.
+
+    `status` is the part worth explaining, and it exists because of #3768. There, a
+    missing IAM grant made `bedrock:InvokeModel` raise, the caller caught it, wrote the
+    deterministic fallback and reported success — for the entire life of the feature.
+    Nothing distinguished "the model had nothing to add" from "the model was never
+    reached", so a dark feature and a quiet day were the same observation.
+
+    This function is one scope-tightening away from that. It queries `COACH#*`, which the
+    recap role can read today only because its DynamoDB grant carries no `LeadingKeys`
+    condition (verified against the DEPLOYED role, 2026-09-14, not the CDK source). The
+    day someone scopes that read the way the WRITE is already scoped, every query here
+    raises AccessDenied, this returns no line, and the card renders — correctly, quietly,
+    and permanently without a coach voice.
+
+    So the three outcomes are named and the picker record stores which one happened:
+
+      * `ok`         — a line was found
+      * `absent`     — every coach read cleanly and none had a reader-safe line. A real
+                       day: the coach did not run, the ADR-104 grounding gate HELD the
+                       condensation, or `audience_guard` rejected it at write time.
+      * `unreadable` — at least one query raised. The card still renders without a quote,
+                       because a missing quote is a smaller wrong than a missing card —
+                       but it renders saying so.
+    """
+    from coach import audience_guard
+
+    order = coach_order if coach_order is not None else card_coach_order(beat)
+    failed = False
+    for coach_id in order:
+        rows, ok = _coach_outputs(table, coach_id, date)
+        failed = failed or not ok
+        for item in rows:
+            blurb = audience_guard.public_blurb(item, limit=COACH_LINE_MAX_CHARS * 4)
+            line = first_sentence(blurb)
+            if line:
+                return line, f"COACH#{coach_id}|{item.get('sk')}", LINE_OK
+    return None, None, (LINE_UNREADABLE if failed else LINE_ABSENT)
+
+
+def _coach_outputs(table, coach_id: str, date: str) -> tuple:
+    """(rows, ok) — one coach's OUTPUT# rows for one date, and whether the read worked."""
+    from boto3.dynamodb.conditions import Key
+
+    try:
+        # Through the phase filter like every other read here. An OUTPUT# row carries
+        # `phase` and `cycle`, so a tombstoned row from a previous attempt can sit at
+        # this very date; quoting it would put a previous cycle's coach on this cycle's
+        # card — the cross-genesis mistake `trailing()` above exists to prevent, in a
+        # second partition.
+        kwargs = with_phase_filter({"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with(f"OUTPUT#{date}#")})
+        resp = table.query(**kwargs)
+    except Exception as e:  # noqa: BLE001
+        # The CLASS and message, never the row. #3768 spent months undiagnosable because
+        # the swallowed exception was never logged at all — an AccessDenied, a throttle
+        # and a healthy empty day were one observation.
+        logger.warning("recap coach-line read failed for %s on %s: %s: %s", coach_id, date, type(e).__name__, e)
+        return [], False
+    return [d2f(i) for i in resp.get("Items", [])], True
 
 
 def cycle_series(table, start: str, end: str) -> tuple[list[float | None], list[str | None]]:
