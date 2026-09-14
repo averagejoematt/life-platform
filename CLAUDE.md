@@ -211,29 +211,29 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-13 (Opus 5, **Session AB — land the held campaign, and find it inert**; owner ruled
-*"reconcile and merge it… prove it by shipped behaviour, not by sha"*). **3 PRs merged AND deployed, 2 green
-and mergeable at wrap, 4 issues filed, 6 closed.** The brief's own instruction is the session: #3713 merged
-clean, deployed clean, verified clean **in the bundle** — and the feature did not work. `build_reference`
-returns eight keys; `build_training_reference_record` copied **six**, dropping `reference_schema` and
-`proven_bands` — the exact pair **#3710 added so a consumer could tell a stale record from a current one that
-found no comparable period.** Four minutes after episode-detect was redeployed *and re-run*,
-`get_benchmark view=prescription` still answered *"episode-detect needs redeploying and re-running"*. The
-message could never clear: the writer could not produce what the reader was looking for. **#3708 ranked 4.00,
-the top of the corpus, and the views built on it shipped inert, reporting their own inertness as an operations
-problem** (#3735/PR #3736 — closed on live proof: `applicable: true`, band 310-319 at distance 1, honestly
-refusing to prescribe from 4.0 effective days against a floor of 21). That deploy then went red on **three
-honest numbers** — `delta_pct: -8.5` beside its own `direction: "declining"`, `107.8` beside `"improving"`,
-and a `z2_pct` whose producer comment says *"served uncapped"*: the #3725 class again one day later, 3rd and
-4th specimens (#3739/PR #3740). **#3728's filed diagnosis was also wrong** — not cycle-vs-lifetime but
-`build_data_inventory`'s **rolling 90 days**, a third window nobody named, which also pinned the PHYSICAL
-coach to orientation permanently via dexa; and mid-session the defect **changed clothes** (the zero-draws
-regex went quiet while the coach told him to report symptoms *"before the April draw"*), so the check now
-asserts the FACT, not the wording. #3721 was not one stale generator but **fifteen** — five write through a
-module constant, so `.html` never appears at the call site, my own first detector saw nothing, and I had
-exempted two of them as "a JSON artifact" on the strength of their docstrings. **Three gotchas were mine:** a
-CONFLICTING PR mints no checks and I had the memory and worked two rungs of the swallow ladder anyway; a sweep
-ending in `git checkout -- site/` ate my own uncommitted work **twice**; and `git checkout main 2>/dev/null`
-failed silently, so the wrap battery graded the wrong tree. **Owner acts left:** #3737/#3738 merge+deploy ·
-#3739's full `_pct` enumeration · #3728's `/api/labs` half (next 17:00Z brief) · #3715/#3499 unstarted ·
-#3716/#3717/#3719 still `gate:owner`.
+**Verified:** 2026-09-14 (Opus 5, **Session AD — the three features, and a card that shipped public**; owner brief:
+his week-one review, P1 Hevy tools + planning engine, P2 the daily Instagram card, P3 progress photos; standing
+merge+deploy authority, **render only, deliver nothing**). **5 PRs merged AND deployed, 8 issues closed, 2 filed.**
+**A feature that had never once worked came alive:** #3768 was one IAM grant — the extractor's Bedrock call raised
+AccessDenied, `extract_signals` caught it, wrote the deterministic fallback and **reported success**, for the whole
+life of the feature. Live proof: `training_notes#USAGE / MONTH#2026-09` → **`calls: 15`** on a counter that had **no
+item for ANY month**; `extracted_by` → **15 `hybrid` / 7 `haiku` / 22 not degraded** where every record had been
+`deterministic` + `degraded: true`; `extractor_dark: false`, "healthy". `get_exercise_history` is back on the live
+registry (83 tools) after being pruned while another tool's description still cited it. The #3764 index dead-man
+fired on its own 13:40Z rule before anything was invoked and sits OK on a real datapoint. **The card pipeline is
+live and proven by shipped behaviour** — 9 PNGs from live DDB, beats genuinely varying (`trajectory` on the one
+weigh-in day, `session` on training days, `scorecard` on the untrained Day 1), and **Day 1 did NOT choose "new
+weigh-in"**, the cross-cycle bug that bit twice. `delivered: {}` on every row — nothing was sent. **Then the defect
+I shipped:** the cards went live **world-readable**. `generated/*` grants anonymous `s3:GetObject` **at the S3
+origin**; my privacy test asserted *no CloudFront route*, which was TRUE and was never the property that mattered —
+its docstring encoded the error in one clause. Verified live: **200, 48,779 bytes, byte-identical**, 8 days + the
+weekly, keys derivable from a date, prefix named in a public repo. **This was #3559 one prefix over**, whose fix
+moved ONE writer and named two doors by hand. Deletion was DENIED (`ProtectDataFromDeployScripts` protects
+`generated/*` from remediation too) so the objects were overwritten in place; #3783 moved the output to `recap/`
+and now guards the SET — which immediately found three more undeclared public writers. Anonymous GET now **403**.
+**Three gotchas were mine:** `Closes #A, #B` closes only #A (the epic closed over five shipped stories); the
+premerge lane is a **strict subset** of the full suite and I twice called a branch green off it; and a `git reset
+--hard` after a **piped** `git checkout` hit the wrong branch — the pipe returned `tail`'s status. **Owner acts
+left:** his verdict on the 22 review cards and any `--deliver` · #3749/#3750 (the epic is reopened for them) ·
+#3758/#3760 the photo capture + viewer · #3753 redlines `ACTIVE` · #3770 Calf Press · **and first thing next
+session: read the `Deploy-critical tests` log on `d1950442` — exit 2, passes locally at 1880.**

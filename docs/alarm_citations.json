@@ -99,5 +99,15 @@
   "weekly-signal-delivery-heartbeat": {
     "citation": "arming transition of the #2820 dead-man 2026-08-21 — not a delivery failure",
     "note": "Kept 2026-08-22 (#2996). The alarm is OK, but #2912's flap check reads a 72h window and this alarm's only episode is inside it: describe-alarm-history shows INSUFFICIENT_DATA -> ALARM at 2026-08-21 20:44 PT and ALARM -> OK at 21:44 PT — one hour, immediately after #2820 deployed the WeeklySignalSent dead-man (treat_missing=BREACHING, so a freshly created alarm with no datapoints is ALARM by construction until the first one lands). No signal was missed. THE PRUNE RULE, corrected: remove a recovered alarm's entry once it has been OK for longer than the flap window (72h), not the moment it clears — pruning on recovery alone trades a stale entry for a flap-gate red, which is what happened while writing this. Prune after 2026-08-24 21:44 PT if still OK."
+  },
+  "hevy-template-index-not-rebuilt-48h": {
+    "added": "2026-09-14",
+    "citation": "#3764 — created 2026-09-14, cleared on its first heartbeat the same hour",
+    "note": "BIRTH FLAP, expected and self-clearing: a dead-man alarm declares treat_missing_data=BREACHING, so it enters ALARM the instant CloudFormation creates it (no datapoint exists yet) and clears on the first emit. Both transitions happened inside the 2026-09-14 deploy window. This is the correct shape for the alarm — an absence alarm that stayed OK before its first datapoint would be green over an unknown, which is the state it exists to refuse. Any future BREACHING dead-man will flap once at birth the same way. Cleared when the 13:40Z rebuild rule emitted TemplateIndexRebuilt=1; alarm has been OK since."
+  },
+  "recap-card-no-invocations-24h": {
+    "added": "2026-09-14",
+    "citation": "#3741 — created 2026-09-14, cleared once the generator was invoked",
+    "note": "BIRTH FLAP, expected and self-clearing: a dead-man alarm declares treat_missing_data=BREACHING, so it enters ALARM the instant CloudFormation creates it (no datapoint exists yet) and clears on the first emit. Both transitions happened inside the 2026-09-14 deploy window. This is the correct shape for the alarm — an absence alarm that stayed OK before its first datapoint would be green over an unknown, which is the state it exists to refuse. Any future BREACHING dead-man will flap once at birth the same way. Cleared when the recap-card-generator was first invoked by the backfill; alarm has been OK since."
   }
 }
