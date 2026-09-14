@@ -909,7 +909,7 @@ def operational_recap_card_generator() -> list[iam.PolicyStatement]:
     return _operational_base(
         ddb_actions=["dynamodb:GetItem", "dynamodb:Query"],
         needs_dlq=True,
-        needs_s3_write=["generated/recap/*"],
+        needs_s3_write=["recap/*"],
         extra_statements=[
             iam.PolicyStatement(
                 sid="DynamoDBWriteRecapRecord",

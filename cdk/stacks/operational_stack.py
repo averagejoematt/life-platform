@@ -916,10 +916,12 @@ class OperationalStack(Stack):
         #
         # A SEPARATE function from og-image-generator above, sharing only the Pillow layer.
         # That one is the public-surface producer with a deliberately tiny role; this one
-        # needs DynamoDB, the Telegram secret and SES, and it writes to generated/recap/ —
-        # a prefix with NO CloudFront behaviour, because the card is private until the owner
-        # posts it by hand (ADR-140 rule 5: no automated surface posts a vitals-derived
-        # mark, human selection only).
+        # needs DynamoDB, the Telegram secret and SES, and it writes to `recap/` — a prefix with
+        # no CloudFront behaviour AND no anonymous read, because the card is private until the
+        # owner posts it by hand (ADR-140 rule 5: no automated surface posts a vitals-derived
+        # mark, human selection only). It first shipped under `generated/recap/`, where the
+        # bucket policy made every card world-readable at a derivable key — the #3559 defect
+        # exactly, one prefix over. 'No CloudFront route' was never the property that mattered.
         #
         # The weekly card is derived inside the handler from `day_n % 7 == 0`, not a second
         # rule: genesis moves every cycle and a weekday literal would be silently wrong
@@ -936,7 +938,7 @@ class OperationalStack(Stack):
             additional_layers=[pillow_layer],
             custom_policies=rp.operational_recap_card_generator(),
             environment={
-                "RECAP_S3_PREFIX": "generated/recap/",
+                "RECAP_S3_PREFIX": "recap/",
                 "TELEGRAM_SECRET_ID": "life-platform/telegram",
                 "TELEGRAM_BOT_KEY": "headcoach",
             },

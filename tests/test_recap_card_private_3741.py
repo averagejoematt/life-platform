@@ -12,14 +12,36 @@ privately, and handed to the owner; HE decides what goes on a grid. #1632 declin
 auto-posting in July for its own reasons (Meta App Review, a Business account, a linked
 Page) and #3750 keeps that decision dated and revisitable. Nothing here talks to Instagram.
 
-WHAT THAT MEANS STRUCTURALLY, AND WHY IT NEEDS A TEST
+WHAT THAT MEANS STRUCTURALLY, AND THE SENTENCE THAT USED TO BE HERE
 
-"Private" is one CloudFront behaviour away from "public". The `generated/` prefix is
-anonymously readable where a behaviour routes to it — that is how the OG cards are served
-— so a `/recap/*` path_pattern added by a future well-meaning change would publish every
-card ever rendered, retroactively, without touching this feature's code at all.
+This file's first version said: *"the `generated/` prefix is anonymously readable WHERE A
+BEHAVIOUR ROUTES TO IT"*. That is wrong, and the whole defect is in the clause. The bucket
+policy's `PublicReadGenerated` statement grants `Principal: *` `s3:GetObject` on
+`generated/*` **at the S3 origin**, with or without CloudFront. So the cards shipped to
+`generated/recap/`, CloudFront correctly returned 404 for `/recap/…`, this test passed —
+and every card was downloadable with no credentials at
+`https://matthew-life-platform.s3.us-west-2.amazonaws.com/generated/recap/2026-09-12.png`,
+at a key derivable from a date, in a PUBLIC repo that names the prefix.
 
-So the absence of that route is asserted, by name.
+Verified live 2026-09-14 before the fix: http 200, 48,779 bytes, byte-identical to the
+card. Eight days plus the weekly.
+
+This is #3559 one prefix over — reader-input moderation records carrying `email` and
+`ip_hash` had landed in `generated/` for the same reason, and the fix was the same: move
+off it. The guard written then covered the reader-input doors by name, so it could not see
+a new writer arriving at the same prefix. Guard the SET, not the instance.
+
+WHAT IS GUARDED NOW
+  1. the public-read prefixes are DERIVED from `deploy/bucket_policy.json`, never retyped;
+  2. the card's output prefix is under NONE of them — with a must-fail control that plants
+     `generated/recap/` back and watches this red;
+  3. the prefix is also OUTSIDE `ProtectDataFromDeployScripts`, so a card can be purged.
+     It could not be, during the incident: the deny that protects `generated/*` from deploy
+     scripts also blocked deleting the exposed cards, and they had to be overwritten in
+     place instead;
+  4. the CDK env and the handler default name the same prefix (a disagreement means the
+     deployed function writes somewhere no test has ever looked);
+  5. the CloudFront route is still asserted absent — necessary, just never sufficient.
 """
 
 from __future__ import annotations
@@ -124,6 +146,81 @@ def test_the_standing_rule_is_still_where_this_test_thinks_it_is():
     fb = (REPO / "lambdas" / "content" / "fingerprint_broadcast.py").read_text()
     assert "AUTOMATED_SYNDICATION_REASON" in fb
     assert "Human selection only" in fb
+
+
+# ── the property that actually matters ────────────────────────────────────────
+BUCKET_POLICY = REPO / "deploy" / "bucket_policy.json"
+CDK_OPERATIONAL = REPO / "cdk" / "stacks" / "operational_stack.py"
+
+
+def _policy_prefixes(effect: str, anonymous: bool) -> list[str]:
+    """Prefixes from the committed bucket policy. Derived, never retyped (#3559's rule)."""
+    import json
+
+    doc = json.loads(BUCKET_POLICY.read_text())
+    out = []
+    for st in doc.get("Statement", []):
+        if st.get("Effect") != effect:
+            continue
+        is_anon = st.get("Principal") == "*" or st.get("Principal") == {"AWS": "*"}
+        if is_anon != anonymous:
+            continue
+        res = st.get("Resource")
+        for r in [res] if isinstance(res, str) else (res or []):
+            _, _, tail = r.partition(":::")
+            _, _, key = tail.partition("/")
+            if key:
+                out.append(key.rstrip("*"))
+    return out
+
+
+def _recap_prefix() -> str:
+    import re as _re
+
+    m = _re.search(r'RECAP_PREFIX\s*=\s*os\.environ\.get\(\s*"RECAP_S3_PREFIX"\s*,\s*"([^"]+)"', HANDLER.read_text())
+    assert m, "could not read the handler's output prefix — the extractor has gone blind"
+    return m.group(1)
+
+
+def test_the_card_prefix_is_not_anonymously_readable():
+    """THE regression test for the 2026-09-14 exposure. Not 'is there a CDN route' —
+    'can a stranger with no credentials GET this object'."""
+    public = _policy_prefixes("Allow", anonymous=True)
+    assert public, "no anonymous-read prefixes derived — the policy parser has gone blind"
+    prefix = _recap_prefix()
+    hits = [p for p in public if prefix.startswith(p)]
+    assert not hits, (
+        f"the recap card writes to {prefix!r}, which is under anonymously-readable {hits} in "
+        "deploy/bucket_policy.json. Every card would be world-readable at a date-derivable key."
+    )
+
+
+def test_the_public_prefix_check_can_fail():
+    """MUST-FAIL CONTROL: plant the real defect and watch the rule catch it."""
+    public = _policy_prefixes("Allow", anonymous=True)
+    planted = "generated/recap/"
+    hits = [p for p in public if planted.startswith(p)]
+    assert hits, "the shipped defect (generated/recap/) is NOT flagged by this rule — the rule is inert"
+
+
+def test_a_card_can_still_be_purged():
+    """The other half of #3559's rule, learned the hard way on 2026-09-14: the exposed
+    cards could not be deleted, because `ProtectDataFromDeployScripts` denies DeleteObject
+    on `generated/*`. They had to be overwritten in place. A private prefix that cannot be
+    emptied is only half a fix."""
+    protected = _policy_prefixes("Deny", anonymous=False)
+    prefix = _recap_prefix()
+    hits = [p for p in protected if prefix.startswith(p)]
+    assert not hits, f"the recap prefix {prefix!r} is delete-protected by {hits} — an exposed card could not be removed"
+
+
+def test_the_deployed_prefix_and_the_handler_default_agree():
+    """A disagreement means the deployed function writes somewhere no test has looked."""
+    import re as _re
+
+    m = _re.search(r'"RECAP_S3_PREFIX"\s*:\s*"([^"]+)"', CDK_OPERATIONAL.read_text())
+    assert m, "the CDK no longer sets RECAP_S3_PREFIX — the handler default becomes the only truth"
+    assert m.group(1) == _recap_prefix(), f"CDK sets {m.group(1)!r}, the handler defaults to {_recap_prefix()!r}"
 
 
 if __name__ == "__main__":  # pragma: no cover
