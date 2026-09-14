@@ -397,6 +397,13 @@ _DIRECTION_SURFACES = [
     ("scripts/v4_proof.py", "home_block_html"),  # #3285 — the no-JS home proof block
     ("lambdas/web/og_moments.py", "_sweep_week_recap"),  # #3293 — the weekly recap moment
     ("lambdas/web/site_api_pulse.py", "pulse"),  # #3293 — the scale glyph + the daily narrative
+    # #3741 — the daily recap card. Two surfaces in one module: the signal that decides
+    # whether a weight move is worth a card at all (an UNKNOWN direction declines), and the
+    # copy that prints DOWN / UP / HELD on the image itself. A card is the least
+    # retractable surface on this platform — once it is posted to Instagram, a sign error is
+    # public and permanent — so it rules on the sign in exactly one place, like the rest.
+    ("lambdas/web/recap_templates.py", "_weight_signal"),
+    ("lambdas/web/recap_templates.py", "_weight_copy"),
 ]
 
 

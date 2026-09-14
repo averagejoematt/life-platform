@@ -95,14 +95,13 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "`model`. Delete the builder and the only proof that Bedrock Structured Outputs "
         "survive the chokepoint goes with it."
     ),
-    "lambdas/common/send_guard.py:guarded_send_raw_email": (
-        "a named member of a SAFETY SET. tests/test_ses_send_guard_set_2222.py declares "
-        "GUARD_HELPERS = {guarded_send_email, guarded_send_raw_email} as the sanctioned "
-        "gate every SES send must pass through, against SES_SEND_METHODS = {send_email, "
-        "send_raw_email, send_templated_email}. Removing the raw-email helper because no "
-        "sender uses it TODAY would mean the next raw-email sender has no sanctioned gate "
-        "to use — shrinking a safety set is the #2610 anti-pattern, not a cleanup."
-    ),
+    # `guarded_send_raw_email` was allowlisted here as an unreferenced member of a SAFETY
+    # SET — kept deliberately so the next raw-email sender would find a sanctioned gate
+    # waiting rather than reach for boto3. It had no caller from the day it was written.
+    # #3741's recap card is that sender: the card is a MIME message with a PNG attachment,
+    # so it must go through send_raw_email, and it goes through the guard. The entry is
+    # deleted rather than reworded because the scan no longer flags the def at all — the
+    # allowlist is for definitions nothing references, and something references it now.
     "lambdas/common/input_manifest.py:reset_run_manifests": (
         "test-support for a LIVE contract class. tests/test_input_manifest_contract_3049.py"
         "::TestChokepoint calls it to clear the per-run manifest cache between cases; "

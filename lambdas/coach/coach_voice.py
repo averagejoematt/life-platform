@@ -155,13 +155,17 @@ def sampled(text: str, rate: float) -> bool:
     return (int(digest[:8], 16) % 1000) < int(rate * 1000)
 
 
-def multipart_body(fields: dict, files: dict) -> tuple:
+def multipart_body(fields: dict, files: dict, content_type: str = AUDIO_CONTENT_TYPE) -> tuple:
     """``(bytes, content-type)`` for a multipart/form-data Bot API call.
 
     Hand-rolled because the platform ships no HTTP library (stdlib urllib only) and
     ``sendVoice`` cannot use a form body. ``files`` maps a field name to
     ``(filename, blob)``; every other value is a plain text part, stringified the
     way ``urlencode`` would have.
+
+    #3747: ``content_type`` was hardcoded to audio/mpeg, which is correct for the only
+    caller this had (``sendVoice``) and wrong for every future one. The recap card sends
+    a PNG through ``sendPhoto``; the default keeps the voice path byte-identical.
     """
     boundary = "----lp" + uuid.uuid4().hex
     sep = f"--{boundary}\r\n".encode()
@@ -169,7 +173,7 @@ def multipart_body(fields: dict, files: dict) -> tuple:
     for key, value in fields.items():
         parts.append(sep + f'Content-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
     for key, (filename, blob) in files.items():
-        head = f'Content-Disposition: form-data; name="{key}"; filename="{filename}"\r\nContent-Type: {AUDIO_CONTENT_TYPE}\r\n\r\n'
+        head = f'Content-Disposition: form-data; name="{key}"; filename="{filename}"\r\nContent-Type: {content_type}\r\n\r\n'
         parts.append(sep + head.encode() + bytes(blob) + b"\r\n")
     parts.append(f"--{boundary}--\r\n".encode())
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"

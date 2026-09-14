@@ -261,6 +261,24 @@ def test_current_phase_rows_are_not_excluded_by_the_fix():
 #     otherwise cross-phase function marks the whole function blind.
 
 _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
+    # #3741: the daily recap card. Current-cycle is not merely acceptable here, it is the
+    # requirement — the card's own headline is "DAY N · ATTEMPT #17", so a row from attempt
+    # #16 appearing in it would be a false public claim about this attempt. The card already
+    # learned this the hard way twice: an unclamped trailing window headlined "2.7 lb UP
+    # THIS WEEK" on Day 4 against a pre-genesis weight, and then chose the "new weigh-in"
+    # beat on Day 1 off a weight from the previous cycle. `recap_data.trailing()` now clamps
+    # at genesis for exactly that reason, and these two readers are the same intent.
+    "lambdas/content/recap_data.py::_query_prefix": (
+        "The daily card is scoped to one attempt by construction — it prints the cycle's own day "
+        "number and attempt number on the image. Pre-genesis rows are not stale data here, they "
+        "belong to a different experiment, and rendering one would be a public claim about a day "
+        "this cycle did not live."
+    ),
+    "lambdas/content/recap_data.py::_query_range": (
+        "Same view as _query_prefix: the card's trailing windows are within-cycle by design and "
+        "are additionally clamped at EXPERIMENT_START_DATE in trailing(), after an unclamped "
+        "window twice produced a cross-cycle claim on a rendered card."
+    ),
     "lambdas/coach/coach_computation_engine.py::_fetch_range": (
         "The engine clamps its lookback to EXPERIMENT_START_DATE before fetching ('Clamp lookback "
         "to experiment start'), so the filter is redundant with the genesis date clamp the "

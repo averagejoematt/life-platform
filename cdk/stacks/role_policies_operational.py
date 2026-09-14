@@ -889,6 +889,60 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
     )
 
 
+def operational_recap_card_generator() -> list[iam.PolicyStatement]:
+    """The daily recap card (#3741): reads the day, writes one PNG, sends it to him.
+
+    A SEPARATE role from the OG generator on purpose. That function is the public-surface
+    producer — every crawler's first pixel of this platform — and its role is a deliberately
+    tiny two-key GetObject plus two write prefixes. This one needs DynamoDB across six
+    partitions, the Telegram secret and SES, and hanging all of that on the public producer
+    would widen the blast radius of the one Lambda whose output everyone sees.
+
+    Write scope is one partition. `recap_cards` holds the picker's record — what was drawn,
+    what the losing candidates scored, what the privacy gate ruled, which channel took it —
+    and the LeadingKeys condition (#468's shape) means this role can write nothing else.
+
+    SES: `send_raw_email` is a DISTINCT IAM action from `send_email`, and the card is a MIME
+    message with an attachment, so `needs_ses=True` would not have been enough. Naming both
+    rather than discovering it at 11:30 the morning after.
+    """
+    return _operational_base(
+        ddb_actions=["dynamodb:GetItem", "dynamodb:Query"],
+        needs_dlq=True,
+        needs_s3_write=["generated/recap/*"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="DynamoDBWriteRecapRecord",
+                actions=["dynamodb:PutItem"],
+                resources=[TABLE_ARN],
+                conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#recap_cards"]}},
+            ),
+            iam.PolicyStatement(
+                sid="TelegramSecret",
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[_secret_arn("life-platform/telegram")],
+            ),
+            iam.PolicyStatement(
+                sid="SES",
+                actions=["ses:SendEmail", "ses:SendRawEmail"],
+                resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+            ),
+            # #2824: the fail-closed content-filter vocabulary (#2503 — off-repo, S3 channel).
+            # `recap_gate.gate()` calls `content_filter_channel.load(require=True)` FIRST and
+            # aborts the render if it is unavailable. Without this grant that load raises
+            # AccessDenied on every invocation, so the gate would fail closed always and every
+            # card would be held — the feature would ship dead, with the safest possible
+            # symptom and no error. Caught by tests/test_grant_enumeration_drift.py before a
+            # single card was rendered, which is the #2503 / #1196 incident class exactly.
+            iam.PolicyStatement(
+                sid="ContentFilterVocabulary",
+                actions=["s3:GetObject"],
+                resources=_s3("config/content_filter.json"),
+            ),
+        ],
+    )
+
+
 def operational_og_image_generator() -> list[iam.PolicyStatement]:
     """OG image generator: reads public_stats.json (+ the published Q&A feed for
     #404 moment permalinks), writes PNG cards + moment shells, invalidates CloudFront."""

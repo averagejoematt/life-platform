@@ -161,7 +161,7 @@ LAYERS: dict[str, LayerSpec] = {
         # across that set is 12.3.0). Pillow has no runtime dependencies, so the layer is
         # exactly one wheel.
         requirements=("Pillow==12.3.0",),
-        attached_to=("og-image-generator", "reading-cover-pipeline"),
+        attached_to=("og-image-generator", "reading-cover-pipeline", "recap-card-generator"),
         purpose="Pillow — PNG/WebP share-card rendering and book-cover processing.",
         notes=(
             "Pillow 12.x publishes manylinux_2_27/_2_28 wheels only — a manylinux2014-only",

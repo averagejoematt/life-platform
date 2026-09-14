@@ -74,6 +74,22 @@ def _stale_the_date(text: str) -> str:
     return new
 
 
+def _live_lambda_phrase(doc_text: str) -> str:
+    """The `<N> Lambdas` phrase as the doc CURRENTLY states it.
+
+    #3741: this was the literal "104 Lambdas". The fleet grew to 105 and the mutation
+    below became a no-op — `.replace()` found nothing, the doc was written back
+    unchanged, the gate passed, and the test that exists to prove the gate can FAIL
+    reported success. A hardcoded number inside a can-it-fail control is the same blind
+    spot the control was written to catch, one level up.
+    """
+    import re as _re
+
+    m = _re.search(r"\b(\d+) Lambdas\b", doc_text)
+    assert m, "no '<N> Lambdas' phrase in the doc — this control cannot mutate what it cannot find"
+    return m.group(0)
+
+
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
 def test_d_a_clean_tree_passes(doc_text):
     """Baseline. If this fails, every other case below is uninterpretable."""
@@ -90,8 +106,8 @@ def test_a_a_stale_date_stamp_alone_is_not_drift(doc_text):
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
 def test_b_a_substantive_drift_still_fails(doc_text):
     """The fix must not buy green by weakening the gate."""
-    assert "104 Lambdas" in doc_text or "Lambdas" in doc_text
-    _DOC.write_text(doc_text.replace("104 Lambdas", "999 Lambdas", 1), encoding="utf-8")
+    phrase = _live_lambda_phrase(doc_text)
+    _DOC.write_text(doc_text.replace(phrase, "999 Lambdas", 1), encoding="utf-8")
     assert _check() == 1, "a wrong Lambda count no longer fails the gate — the guard is gone"
 
 
@@ -99,7 +115,7 @@ def test_b_a_substantive_drift_still_fails(doc_text):
 def test_c_a_stale_date_does_not_hide_a_substantive_drift(doc_text):
     """The subtle one. Both literals live on the SAME line, so masking the date must
     not mask the count that shares it."""
-    both = _stale_the_date(doc_text).replace("104 Lambdas", "999 Lambdas", 1)
+    both = _stale_the_date(doc_text).replace(_live_lambda_phrase(doc_text), "999 Lambdas", 1)
     _DOC.write_text(both, encoding="utf-8")
     assert _check() == 1, "a stale date stamp masked a real drift on the same line (#2649)"
 

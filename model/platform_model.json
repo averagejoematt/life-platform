@@ -408,6 +408,12 @@
       "stack": "operational_stack",
       "via": "constructor:create_platform_lambda"
     },
+    "ingestion-error-recap-card-generator": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
     "key-rotator-errors": {
       "kind": "metric",
       "routing": "digest",
@@ -660,6 +666,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "recap-card-no-invocations-24h": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "declaration"
+    },
     "site-api-ai-errors": {
       "audience": "reader",
       "audience_ruling": "serve_stack \u2014 errors on the reader-facing AI endpoints (/api/ask, /api/board_ask).",
@@ -893,9 +905,9 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 126,
+    "alarms": 128,
     "emf_namespaces": 31,
-    "schedules": 89,
+    "schedules": 90,
     "secrets": 28
   },
   "edges": [
@@ -1808,6 +1820,48 @@
       "module": "lambdas/content/output_writers.py",
       "partition": "rewards",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "computed_metrics",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "habit_scores",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "hevy",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "macrofactor",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "notion",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "strava",
+      "via": "local-seam"
     },
     {
       "direction": "read",
@@ -3711,6 +3765,27 @@
       "lambda": "email-subscriber",
       "module": "lambdas/web/email_subscriber_lambda.py",
       "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "recap-card-generator",
+      "module": "lambdas/web/recap_card_lambda.py",
+      "partition": "recap_cards",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "recap-card-generator",
+      "module": "lambdas/web/recap_card_lambda.py",
+      "partition": "recap_cards",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "recap-card-generator",
+      "module": "lambdas/web/recap_card_lambda.py",
+      "partition": "recap_cards",
       "via": "pk"
     },
     {
@@ -6673,6 +6748,20 @@
       "stack": "operational_stack",
       "timeout_seconds": 60
     },
+    "recap-card-generator": {
+      "declared_alarm": null,
+      "handler": "web.recap_card_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/web/recap_card_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 19 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
     "scenario-explorer": {
       "declared_alarm": null,
       "handler": "compute.scenario_explorer_lambda.lambda_handler",
@@ -6963,9 +7052,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 126,
+      "alarms": 128,
       "alarms_by_routing": {
-        "digest": 94,
+        "digest": 96,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,
@@ -6976,8 +7065,8 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 668,
-      "lambdas": 104,
+      "edges": 677,
+      "lambdas": 105,
       "mcp_tool_modules": 30,
       "mcp_tools": 83,
       "partitions": 106,
@@ -6985,18 +7074,18 @@
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 14,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 81,
-      "schedules": 89
+      "scheduled_lambdas": 82,
+      "schedules": 90
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 322,
-        "sites_resolved": 829,
-        "sites_total": 1151
+        "sites_dynamic": 327,
+        "sites_resolved": 839,
+        "sites_total": 1166
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 81
+        "resolved": 82
       }
     },
     "non_census_families": [
@@ -7005,6 +7094,7 @@
       "intelligence_quality",
       "journal",
       "platform_memory",
+      "recap_cards",
       "zone2_efficiency"
     ],
     "scope_cuts": [
@@ -8206,6 +8296,13 @@
     {
       "expr": "cron(30 19 * * ? *)",
       "lambda": "og-image-generator",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "19:30"
+    },
+    {
+      "expr": "cron(30 19 * * ? *)",
+      "lambda": "recap-card-generator",
       "resolution": "constant",
       "stack": "operational_stack",
       "utc": "19:30"
