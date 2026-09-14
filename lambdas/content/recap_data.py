@@ -1,0 +1,260 @@
+"""recap_data.py — one PT day, assembled, with absence kept absent (#3744/#3745).
+
+WHAT THIS IS FOR
+
+The daily recap card needs a whole day in one shape: weight, the workout, habits,
+nutrition, whether he journaled, how far he walked. Six partitions, one date.
+
+WHY A NEW MODULE AND NOT THE BRIEF'S READERS
+
+`lambdas/emails/daily_brief_lambda.py` already does this superbly — `fetch_date`,
+`fetch_range`, `fetch_hevy_workouts` — but they are module-local to a handler that builds
+boto3 clients, resolves SES identities and reads a profile at import. A card renderer that
+imports an email Lambda to borrow three DDB queries has taken on that whole surface. The
+genuinely shared pieces are `common.digest_utils` and `experiment.phase_filter`, and those
+are imported here directly; the three query wrappers are six lines each.
+
+THE ONE RULE
+
+Every field is Optional and absence is recorded, never defaulted. A card that draws "0
+workouts" when the Hevy poll simply had not run yet is publishing a false statement about
+his day to a public grid — the #3527 class, on a surface that cannot be corrected after
+someone screenshots it. So: `None` means "we did not see it", `absent` lists what was
+missing, and the template layer refuses to render a field it does not have (#3745).
+
+WHAT IS DELIBERATELY NOT READ
+
+Food ITEM names (macrofactor is TIER_OWNER_ONLY; only rollup numbers cross this boundary)
+and journal BODY text (the template labels are enough to say "he journaled"). Both are
+enforced by the compensating control in `tests/test_recap_gate_3746.py`, because the
+cheapest place to stop a leak is before the value is ever loaded.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from common.digest_utils import d2f
+from common.pacific_time import pacific_day_n
+from experiment.phase_filter import with_phase_filter
+
+USER_PREFIX = "USER#matthew"
+
+
+# ── the three query wrappers ──────────────────────────────────────────────────
+def _get_day(table, source: str, date: str) -> dict[str, Any] | None:
+    """One row for one PT day, or None. A query error is None — never {}."""
+    try:
+        resp = table.get_item(Key={"pk": f"{USER_PREFIX}#SOURCE#{source}", "sk": f"DATE#{date}"})
+    except Exception:  # noqa: BLE001
+        return None
+    item = resp.get("Item")
+    return d2f(item) if item else None
+
+
+def _query_prefix(table, source: str, sk_prefix: str) -> list[dict[str, Any]]:
+    """Every row under a sort-key prefix (hevy workouts, journal entries)."""
+    from boto3.dynamodb.conditions import Key
+
+    try:
+        kwargs = with_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}#SOURCE#{source}") & Key("sk").begins_with(sk_prefix)}
+        )
+        resp = table.query(**kwargs)
+    except Exception:  # noqa: BLE001
+        return []
+    return [d2f(i) for i in resp.get("Items", [])]
+
+
+def _query_range(table, source: str, start: str, end: str) -> list[dict[str, Any]]:
+    from boto3.dynamodb.conditions import Key
+
+    try:
+        kwargs = with_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}#SOURCE#{source}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~")}
+        )
+        resp = table.query(**kwargs)
+    except Exception:  # noqa: BLE001
+        return []
+    return [d2f(i) for i in resp.get("Items", [])]
+
+
+@dataclass
+class WorkoutFact:
+    """A lift session, reduced to what a card can draw. Titles only, never notes."""
+
+    title: str
+    n_exercises: int
+    n_sets: int
+    volume_lbs: float
+    top_exercise: str | None = None
+
+
+@dataclass
+class DayFacts:
+    """One PT day. Every measurement Optional; `absent` says what was not seen."""
+
+    date: str
+    day_n: int | None = None
+    # weight
+    weight_lb: float | None = None
+    week_ago_weight_lb: float | None = None
+    weekly_rate_lb: float | None = None
+    rate_ci: tuple[float, float] | None = None
+    rate_provisional: bool = True
+    # training
+    workouts: list[WorkoutFact] = field(default_factory=list)
+    walk_miles: float | None = None
+    # habits — counts only, never habit NAMES on a public card
+    tier0_done: int | None = None
+    tier0_total: int | None = None
+    tier0_pct: float | None = None
+    tier0_streak: int | None = None
+    # nutrition — rollups only, never item names (macrofactor is TIER_OWNER_ONLY)
+    calories: float | None = None
+    protein_g: float | None = None
+    protein_target_g: float | None = None
+    # mind
+    journal_templates: list[str] = field(default_factory=list)
+    # provenance
+    absent: list[str] = field(default_factory=list)
+
+    @property
+    def journaled(self) -> bool | None:
+        """None when the journal partition could not be read at all."""
+        if "notion" in self.absent:
+            return None
+        return bool(self.journal_templates)
+
+    def item_labels(self) -> list[tuple[str, str]]:
+        """(template, label) pairs the privacy gate screens — every name a card could draw."""
+        out: list[tuple[str, str]] = []
+        for w in self.workouts:
+            if w.title:
+                out.append(("workout", w.title))
+            if w.top_exercise:
+                out.append(("workout", w.top_exercise))
+        return out
+
+
+def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
+    out: list[WorkoutFact] = []
+    for r in rows:
+        exercises = r.get("exercises") or []
+        sets = 0
+        volume = 0.0
+        best = (0.0, None)
+        for ex in exercises:
+            ex_vol = 0.0
+            for s in ex.get("sets") or []:
+                reps = s.get("reps") or 0
+                kg = s.get("weight_kg")
+                lbs = s.get("weight_lbs")
+                if lbs is None and kg is not None:
+                    lbs = float(kg) * 2.20462
+                try:
+                    ex_vol += float(lbs or 0) * int(reps or 0)
+                except (TypeError, ValueError):
+                    continue
+                sets += 1
+            volume += ex_vol
+            name = ex.get("name") or ex.get("title")
+            if name and ex_vol > best[0]:
+                best = (ex_vol, name)
+        out.append(
+            WorkoutFact(
+                title=(r.get("workout_name") or r.get("title") or "Training"),
+                n_exercises=len(exercises),
+                n_sets=sets,
+                volume_lbs=round(volume, 1),
+                top_exercise=best[1],
+            )
+        )
+    return out
+
+
+def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFacts:
+    """Assemble one PT day. Reads six partitions; records what it could not see."""
+    facts = DayFacts(date=date)
+    if experiment_start:
+        n = pacific_day_n(experiment_start, date)
+        facts.day_n = n or None
+
+    computed = _get_day(table, "computed_metrics", date)
+    if computed is None:
+        facts.absent.append("computed_metrics")
+    else:
+        facts.weight_lb = computed.get("latest_weight")
+        facts.week_ago_weight_lb = computed.get("week_ago_weight")
+        facts.weekly_rate_lb = computed.get("weekly_rate_lbs")
+        lo, hi = computed.get("weekly_rate_ci_low"), computed.get("weekly_rate_ci_high")
+        facts.rate_ci = (lo, hi) if lo is not None and hi is not None else None
+        # Absent provisionality is treated as PROVISIONAL, not as settled. A projected
+        # rate drawn as fact is the #551 / ADR-105 failure, and this card is public.
+        facts.rate_provisional = bool(computed.get("rate_provisional", True))
+        facts.protein_g = computed.get("protein_g_avg")
+        facts.protein_target_g = computed.get("protein_g_target")
+        facts.tier0_streak = computed.get("tier0_streak")
+
+    habits = _get_day(table, "habit_scores", date)
+    if habits is None:
+        facts.absent.append("habit_scores")
+    else:
+        facts.tier0_done = habits.get("tier0_done")
+        facts.tier0_total = habits.get("tier0_total")
+        pct = habits.get("tier0_pct")
+        facts.tier0_pct = float(pct) if pct is not None else None
+
+    hevy_rows = _query_prefix(table, "hevy", f"DATE#{date}")
+    if not hevy_rows:
+        # An empty query cannot distinguish "rest day" from "the poll has not run".
+        # The freshness of the hevy partition answers that, and the card templates ask
+        # for it — here we only record that nothing was returned.
+        facts.absent.append("hevy")
+    facts.workouts = _workout_facts(hevy_rows)
+
+    strava = _get_day(table, "strava", date)
+    if strava is None:
+        facts.absent.append("strava")
+    else:
+        miles = 0.0
+        for a in strava.get("activities") or []:
+            if (a.get("type") or a.get("sport_type") or "").lower() in ("walk", "hike"):
+                try:
+                    miles += float(a.get("distance_miles") or 0)
+                except (TypeError, ValueError):
+                    continue
+        facts.walk_miles = round(miles, 2)
+
+    mf = _get_day(table, "macrofactor", date)
+    if mf is None:
+        facts.absent.append("macrofactor")
+    else:
+        facts.calories = mf.get("total_calories_kcal")
+        if facts.protein_g is None:
+            facts.protein_g = mf.get("total_protein_g") or mf.get("protein_g")
+
+    journal = _query_prefix(table, "notion", f"DATE#{date}#journal#")
+    if not journal:
+        facts.absent.append("notion")
+    # Template LABELS only. The body is the entry; a public card says that he wrote, never
+    # what he wrote.
+    facts.journal_templates = [t for t in (j.get("template") for j in journal) if t]
+
+    return facts
+
+
+def trailing(table, end_date: str, days: int = 7, *, experiment_start: str | None = None) -> list[DayFacts]:
+    """The `days` PT days ending at `end_date`, oldest first — the picker's baseline."""
+    from datetime import date as _date, timedelta
+
+    try:
+        end = _date.fromisoformat(end_date)
+    except ValueError:
+        return []
+    out = []
+    for i in range(days - 1, -1, -1):
+        d = (end - timedelta(days=i)).isoformat()
+        out.append(day_facts(table, d, experiment_start=experiment_start))
+    return out
