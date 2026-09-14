@@ -933,6 +933,17 @@ class OperationalStack(Stack):
             source_file="lambdas/web/recap_card_lambda.py",
             handler="web.recap_card_lambda.lambda_handler",
             schedule="cron(30 19 * * ? *)",  # 11:30 AM PT daily — the same clock as the OG cards
+            # ── TEMPORARY HOLD (owner ruling 2026-09-14) ───────────────────────────────
+            # The owner has not yet reviewed the v2 campaign cards, so the schedule renders
+            # and stores but sends NOTHING. Delete this line to resume delivery — the
+            # handler's own default is `deliver=True` and that stays the designed
+            # behaviour; this is a hold, not a contract change.
+            #
+            # It exists because the hold was ASSUMED and was not real: the rule passed no
+            # input, `lambda_handler` reads `event.get("deliver", True)`, and so every
+            # scheduled run would have delivered while the owner believed it was
+            # render-only. A default is not a decision until something states it.
+            schedule_input={"deliver": False},
             timeout_seconds=120,
             memory_mb=512,
             additional_layers=[pillow_layer],

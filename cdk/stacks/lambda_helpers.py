@@ -111,6 +111,7 @@ def create_platform_lambda(
     alarm_name: str = None,
     secrets: list[str] = None,
     schedule: str = None,
+    schedule_input: dict = None,  # constant event for the scheduled target; None = EventBridge's own event
     timeout_seconds: int = 120,
     memory_mb: int = 256,
     environment: dict = None,
@@ -336,7 +337,17 @@ def create_platform_lambda(
             f"{id}Schedule",
             schedule=events.Schedule.expression(schedule),
         )
-        rule.add_target(targets.LambdaFunction(fn))
+        # `schedule_input` sends a CONSTANT event instead of EventBridge's own. It exists
+        # because a handler that reads a flag off its event gets the DEFAULT on a scheduled
+        # run, and the default is whatever the code says — not whatever the operator
+        # assumes. #3741: recap-card-generator reads `event.get("deliver", True)`, the rule
+        # passed no input, and so the schedule delivered. Naming the flag on the rule makes
+        # the scheduled behaviour readable in the stack instead of inferable from a default.
+        rule.add_target(
+            targets.LambdaFunction(fn, event=events.RuleTargetInput.from_object(schedule_input))
+            if schedule_input is not None
+            else targets.LambdaFunction(fn)
+        )
 
     # ── CloudWatch error alarm ──
     # ADR-050: alarms route to one of two SNS topics based on `digest` flag.
