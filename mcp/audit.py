@@ -85,6 +85,12 @@ READ_VERBS = frozenset(
         "find",
         "get",
         "list",
+        # #3751: plan_next_session computes the deterministic constraint block and returns
+        # it. It touches no partition — every input is another READ tool, and the commit
+        # path stays where it already is (manage_hevy_routine, a write tool, audited on its
+        # own). Same reasoning as `describe` above. If a future `plan_*` tool ever writes,
+        # it must not rely on this line: name it with a write verb.
+        "plan",
         "read",
         "search",
     }
