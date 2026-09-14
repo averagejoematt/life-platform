@@ -52,7 +52,13 @@ except ImportError:  # pragma: no cover — bundle-shape fallback
 
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-RECAP_PREFIX = os.environ.get("RECAP_S3_PREFIX", "generated/recap/")
+#: The card's S3 home. NOT under `generated/` (#3741 follow-up): the bucket policy's
+#: `PublicReadGenerated` statement grants anonymous `s3:GetObject` on `generated/*`, so a
+#: card written there is world-readable at a fully derivable key the moment it renders —
+#: which is exactly what shipped, and exactly the #3559 defect one prefix over. `recap/`
+#: is anonymously unreadable AND outside `ProtectDataFromDeployScripts`, so a card can
+#: also be purged; both halves are asserted in tests/test_recap_card_private_3741.py.
+RECAP_PREFIX = os.environ.get("RECAP_S3_PREFIX", "recap/")
 TELEGRAM_SECRET_ID = os.environ.get("TELEGRAM_SECRET_ID", "life-platform/telegram")
 TELEGRAM_BOT_KEY = os.environ.get("TELEGRAM_BOT_KEY", "headcoach")
 EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "")
