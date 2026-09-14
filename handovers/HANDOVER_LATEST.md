@@ -75,20 +75,20 @@ once, whose guard named two doors by hand. Mitigated by overwriting in place (de
 **Build beat:** 2026-09-14-three-months-dark
 **Docs:** SCHEMA.md (recap prefix + the reason it is private), DATA_GOVERNANCE.md (two Tier-2 rows + the `recap/` changelog row), INCIDENT_LOG.md (P2 row), PROPORTIONALITY.md (3 rows), MONITORING.md + ARCHITECTURE.md (regenerated counts), OPERATING_KNOWLEDGE_LEDGER.md (2 rows + snapshot), alarm_citations.json (2 entries), .claude/skills/deploy/SKILL.md (function→source table)
 **Decisions:** none needed — the two judgment calls (the recap prefix, Telegram as a fourth capture channel) are recorded in the code and test docstrings that enforce them, not new architecture; ADR-140 rule 5 and ADR-155 already governed both
-**Main:** red — `Deploy-critical tests` exited 2 on `d1950442` (a pytest collection/usage error, not test failures). The identical selection passes locally on that sha: `pytest -m "deploy_critical and not integration"` → **1880 passed, 36 skipped**. Cause not yet determined: GitHub withholds job logs until the whole run completes and `test / Unit Tests` was still running at wrap. NOT the IAM-gate class that redded the four preceding main runs — those were `Plan deployments` (R8-ST6, #1901), and both stacks have since been deployed so that leg should clear. **First thing next session: read that job's log.**
+**Main:** red at wrap, DIAGNOSED AND FIXED before close (`f3bc12f2a`). `Deploy-critical tests` exited 2 on `d1950442` — a COLLECTION error, which takes the whole lane and skips `Plan` → `Deploy`: `tests/test_recap_campaign_3741.py` imported `web.recap_charts`/`web.recap_layouts` at module scope, both reach `web.card_engine`, which imports PIL — and PIL is not in the minimal lane's dep set. Its `importorskip("PIL")` calls were inside two test bodies, far too late; the sibling `test_recap_render_3744.py` had it in the right place all along. Moved to match. Verified with PIL blocked at the import hook: the file collects `rc 5` (skipped) instead of `rc 2`, and the FULL lane collects `rc 0` / 1946 selected. Local was green because this machine has PIL. **The guard for this exact class passed** — `test_deploy_critical_lane_imports_2758` allows every repo-local name unconditionally, so it checks only the FIRST hop and cannot see PIL arriving transitively through a first-party module. Third instance of the class; filed as **#3784**.
 **Incidents:** 1 row added — the recap cards world-readable for ~47 min (P2, 2026-09-14), mitigated by overwrite and fixed by prefix move
 **Stash/hooks:** clean
 **Closures:** #3719, #3757, #3744, #3745, #3746, #3747, #3748 commented; #3741 REOPENED (two real children remain: #3749 the coach line, #3750 the Instagram account) · DoD: scanned 8, hits 0
 **Backlog:** Now live; #3781 filed this session and brought to the ADR-099 contract (Problem/Set/Outcome/Acceptance/Score/Epic). Later sweep — no stale issues surfaced. **(e7) remains red on 61 PRE-EXISTING corpus violations** (51 `set_section`, from the newer #3594 rule); none is on an issue this session filed, touched or closed — the gate's own contract is met, the corpus debt is not mine to pay here and is not silently skipped
 **Alarms:** 0 red >72h; 2 fired-and-cleared flaps cited — `hevy-template-index-not-rebuilt-48h` and `recap-card-no-invocations-24h`, both BIRTH flaps (a `treat_missing_data=BREACHING` dead-man enters ALARM the instant it is created and clears on its first datapoint; every future one will do the same)
 **CI warnings:** unverified — the latest completed main run isn't green, so there is no green run to read annotations from
-**Ledger:** 3 rows added — the daily recap card, the Hevy index rebuild + dead-man, and the public-write prefix registry
+**Ledger:** 3 rows added — the daily recap card, the Hevy index rebuild + dead-man, and the public-write prefix registry; PLUS the #2758 lane-import-guard row's "earns its keep" claim CORRECTED, because this session disproved it (it catches only the direct form — see #3784)
 
 ---
 
 ## Residual / next picks
 
-- **Read the `Deploy-critical tests` log on `d1950442` and fix or explain it** — exit 2, passes locally. `not-work — a diagnosis step, not a backlog item; it becomes an issue only if it is a real defect`
+- **#3784** — the deploy-critical lane-import guard checks only the first hop; a first-party import that transitively pulls a non-lane package is invisible to it (this session's own main-red, third instance of the class)
 - **#3781** — the surface-drift gate's CRON leg sees 16 of 86 schedules; the paved-road `schedule="cron(...)"` form is invisible to it
 - **#3749** — the grounded coach line / caption for the card (out of v1 deliberately)
 - **#3750** — the dedicated Instagram account + handle

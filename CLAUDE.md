@@ -235,5 +235,7 @@ and now guards the SET — which immediately found three more undeclared public 
 premerge lane is a **strict subset** of the full suite and I twice called a branch green off it; and a `git reset
 --hard` after a **piped** `git checkout` hit the wrong branch — the pipe returned `tail`'s status. **Owner acts
 left:** his verdict on the 22 review cards and any `--deliver` · #3749/#3750 (the epic is reopened for them) ·
-#3758/#3760 the photo capture + viewer · #3753 redlines `ACTIVE` · #3770 Calf Press · **and first thing next
-session: read the `Deploy-critical tests` log on `d1950442` — exit 2, passes locally at 1880.**
+#3758/#3760 the photo capture + viewer · #3753 redlines `ACTIVE` · #3770 Calf Press · Main went red at wrap on a
+COLLECTION error (PIL imported transitively through a first-party module at test-module scope, which takes the whole
+lane); **diagnosed and fixed before close** (`f3bc12f2a`) — and the guard written for exactly that class passed,
+because it checks only the first hop (**#3784**).
