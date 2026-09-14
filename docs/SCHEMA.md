@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-09-14 (v8.6.0 — 83 MCP tools, 20 data sources, 104 Lambdas, 12 cached tools)
+**Last updated:** 2026-09-14 (v8.6.0 — 81 MCP tools, 20 data sources, 105 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -154,6 +154,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#weekly_correlations` / `WEEK#<w>` | weekly cross-metric correlations | `compute/weekly_correlation_compute_lambda.py` | site_api_correlation | ✓ |
 | `…SOURCE#what_changed` / `SNAPSHOT#current`, `MONTH#<m>`, `STATE#first_seen` | SS-08 monthly delta + first-seen ledger | SS-08 compute | site_api_ai | ✓ |
 | `…SOURCE#chronicle` / `DATE#<d>`, `WEEK#<w>` | the Wednesday chronicle narrative. **Invariant (#2367): the sk is the row's IDENTITY; the `date` attribute is display/as-of and MAY be rewritten by the ADR-077 `--keep-chronicle` carry-forward** — a carried lead-in keeps its sk, gets a new `date`, and is stamped `redated_at`/`redated_from_sk` (+ re-stamped `cycle`, phase=experiment, no tombstone — a shape no other chronicle row has). A `date`≠sk row WITHOUT `redated_from_sk` is drift (the #2352 wrong-accusation class); key freshness/identity logic on the sk, never the attribute. Enforced nightly by `check_chronicle_sk_date_invariant` (qa-smoke). | `emails/wednesday_chronicle_lambda.py`; carry-forward: `deploy/restart_chronicle_handler.py::untombstone_and_redate` | chronicle sender, site_writer | ✓ |
+| `…SOURCE#recap_cards` / `DATE#<d>` | the daily recap card's picker record (#3741): `chosen`, every losing candidate's score, `absent_sources`, the privacy verdict, `delivered{telegram,email}`, `s3_key`, `outcome` (`sent`\|`rendered`\|`no_signal`\|`held`\|`blocked`). Written on EVERY run including the days that produce no card — 'a different card every day' is provable from this row, and 'no card' is explicable from it. The PNG lives at `generated/recap/<d>.png`, which NO CloudFront behaviour serves: the card is private until the owner posts it (ADR-140 rule 5). | `web/recap_card_lambda.py` | — (owner-facing; Telegram + email) | n/v |
 | `…SOURCE#panelcast` / — | The Panel podcast series state | `emails/coach_panel_podcast_lambda.py` | podcast lambdas | n/v |
 | `…SOURCE#experiments` / `EXP#<id>` | experiment records | MCP `create_experiment`/`end_experiment` | site_api_vitals/social, `list_experiments` | ✓ |
 | `…SOURCE#challenges` / `CHALLENGE#<slug>_<date>` | challenge records | `intelligence/challenge_generator_lambda.py`, MCP | site_api_social, `list_challenges` | ✓ |
@@ -607,7 +608,7 @@ coherent stage picture must pick ONE block. Same established pattern as
 boundary is fine — SAYING SO, every time, is the rule.
 
 ### hevy (strength training)
-Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history` for one movement's full set history, `get_muscle_volume` for weekly volume) rather than `get_date_range`.
+Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history`, `get_strength_prs`, etc.) rather than `get_date_range`.
 
 **Per-workout items** (`sk = DATE#YYYY-MM-DD#WORKOUT#<id>`, from `lambdas/training/hevy_common.py::normalize_workout`):
 

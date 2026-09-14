@@ -62,7 +62,7 @@ MCP Lambda (83 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
 site-api Lambda (~134 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
-~104 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 10 CDK stacks. Run-rate: ~$172/mo measured (2026-08, n=25) against a $215 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
+~105 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 10 CDK stacks. Run-rate: ~$172/mo measured (2026-08, n=25) against a $215 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
 
 ---
 
@@ -72,7 +72,7 @@ site-api Lambda (~134 endpoints, primarily read-only — ADR-037) ← averagejoe
 |---------|---------|-------------------|
 | **DynamoDB** (`life-platform`) | Single-table store for all source data, computed metrics, coach state | Read paths via MCP tools; writes via ingestion + compute Lambdas only |
 | **S3** (`matthew-life-platform`) | Raw archives + Lambda-generated content + site assets | `raw/`, `generated/`, `site/`, `uploads/`, `config/`, `cloudtrail/` — see ADR-046 for prefix separation |
-| **Lambda** (~104 CDK-defined) | All compute. Ingest, compute, coaches, email, MCP, site-api | Deploy with `deploy/deploy_lambda.sh` (single function), `deploy/deploy_fleet.sh` (shared-module change), or `cdk deploy <StackName>` (infra changes) |
+| **Lambda** (~105 CDK-defined) | All compute. Ingest, compute, coaches, email, MCP, site-api | Deploy with `deploy/deploy_lambda.sh` (single function), `deploy/deploy_fleet.sh` (shared-module change), or `cdk deploy <StackName>` (infra changes) |
 | **EventBridge** | All cron schedules, fixed UTC (no DST drift) | CDK-managed only — never create rules via Console |
 | **Secrets Manager** (`life-platform/*`) | All credentials | 26 active secrets. See `docs/SECRETS_MAP.md` |
 | **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |

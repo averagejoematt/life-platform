@@ -907,6 +907,51 @@ class OperationalStack(Stack):
             digest=True,
         )
 
+        # ── 12a. Recap Card Generator — daily at 19:30 UTC (11:30 AM PT), #3741.
+        # Renders YESTERDAY's card. One day behind on purpose and not as a compromise: Day
+        # N is not a finished day until the next morning (MacroFactor lands ~24h late, the
+        # night's Whoop sleep arrives the following morning, and computed_metrics for D is
+        # written by the compute cron on D+1). A same-evening card would publish a nutrition
+        # figure missing dinner and call it the day.
+        #
+        # A SEPARATE function from og-image-generator above, sharing only the Pillow layer.
+        # That one is the public-surface producer with a deliberately tiny role; this one
+        # needs DynamoDB, the Telegram secret and SES, and it writes to generated/recap/ —
+        # a prefix with NO CloudFront behaviour, because the card is private until the owner
+        # posts it by hand (ADR-140 rule 5: no automated surface posts a vitals-derived
+        # mark, human selection only).
+        #
+        # The weekly card is derived inside the handler from `day_n % 7 == 0`, not a second
+        # rule: genesis moves every cycle and a weekday literal would be silently wrong
+        # after the next reset.
+        create_platform_lambda(
+            self,
+            "RecapCardGenerator",
+            function_name="recap-card-generator",
+            source_file="lambdas/web/recap_card_lambda.py",
+            handler="web.recap_card_lambda.lambda_handler",
+            schedule="cron(30 19 * * ? *)",  # 11:30 AM PT daily — the same clock as the OG cards
+            timeout_seconds=120,
+            memory_mb=512,
+            additional_layers=[pillow_layer],
+            custom_policies=rp.operational_recap_card_generator(),
+            environment={
+                "RECAP_S3_PREFIX": "generated/recap/",
+                "TELEGRAM_SECRET_ID": "life-platform/telegram",
+                "TELEGRAM_BOT_KEY": "headcoach",
+            },
+            table=local_table,
+            bucket=local_bucket,
+            dlq=local_dlq,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            # needs_ses deliberately NOT set: the custom policy above already grants
+            # ses:SendEmail + ses:SendRawEmail scoped to the identity and config set, and
+            # EMAIL_SENDER / EMAIL_RECIPIENT come from create_platform_lambda's shared env
+            # block. Setting it too would add a second, broader grant for nothing.
+        )
+
         # ── 12b. Reading Cover Pipeline (ADR-097, Mind pillar Phase A) — on-demand only.
         # Invoked with a book dict; fetches a cover (Open Library → Google Books →
         # designed placeholder), caches it to generated/covers/<bookId>.jpg, and

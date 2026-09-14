@@ -688,6 +688,28 @@ COVERAGE = {
         "NOT part of the ingestion/compute/email error_alarm=False consolidation).",
         "ingestion-error-og-image-generator",
     ),
+    # #3741: the daily recap card. A dated EXEMPT rather than a heartbeat, and the reason
+    # is a real one rather than "someone would notice" — which is precisely what was
+    # believed about the training-note extractor while it sat dark for months (#3768).
+    #
+    # This Lambda's absence is SELF-EVIDENT to its only consumer within one day: the owner
+    # asked for a card every morning to post, so a morning with no card is the feature
+    # failing in his hand, not in a log. That is a genuine liveness signal in a way a
+    # background projection's silence never was. It also writes a `SOURCE#recap_cards` row
+    # on EVERY run including "no signal" and "held", so the absence of rows is the absence
+    # of runs and is queryable after the fact. Terminal failures reach the DLQ digest plus
+    # its own per-Lambda error alarm.
+    #
+    # If the delivery ever becomes unattended (auto-posting — deliberately out of scope,
+    # #1632/#3750), this row stops being honest and the function needs a real heartbeat.
+    "recap-card-generator": (
+        EXEMPT,
+        "2026-09-13",
+        "Owner-facing daily artifact: a missing card is visible to its only consumer the same morning, and every run "
+        "writes a SOURCE#recap_cards row (including no_signal/held) so absence is queryable. Terminal failures → DLQ "
+        "digest (#809/ADR-116) + its own per-Lambda error alarm. Revisit if delivery ever becomes unattended (#3750).",
+        "ingestion-error-recap-card-generator",
+    ),
     "hevy-restamp": (
         EXEMPT,
         "2026-07-19",

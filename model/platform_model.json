@@ -264,12 +264,6 @@
       "stack": "operational_stack",
       "via": "constructor:create_platform_lambda"
     },
-    "hevy-template-index-not-rebuilt-48h": {
-      "kind": "metric",
-      "routing": "digest",
-      "stack": "ingestion_stack",
-      "via": "declaration"
-    },
     "ingest-auth-unhealthy-24h": {
       "kind": "metric",
       "routing": "urgent",
@@ -403,6 +397,12 @@
       "via": "constructor:create_platform_lambda"
     },
     "ingestion-error-reading-recall-sweep": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "ingestion-error-recap-card-generator": {
       "kind": "metric",
       "routing": "digest",
       "stack": "operational_stack",
@@ -1808,6 +1808,48 @@
       "module": "lambdas/content/output_writers.py",
       "partition": "rewards",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "computed_metrics",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "habit_scores",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "hevy",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "macrofactor",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "notion",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
+      "partition": "strava",
+      "via": "local-seam"
     },
     {
       "direction": "read",
@@ -3711,6 +3753,27 @@
       "lambda": "email-subscriber",
       "module": "lambdas/web/email_subscriber_lambda.py",
       "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "recap-card-generator",
+      "module": "lambdas/web/recap_card_lambda.py",
+      "partition": "recap_cards",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "recap-card-generator",
+      "module": "lambdas/web/recap_card_lambda.py",
+      "partition": "recap_cards",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "recap-card-generator",
+      "module": "lambdas/web/recap_card_lambda.py",
+      "partition": "recap_cards",
       "via": "pk"
     },
     {
@@ -6146,10 +6209,6 @@
         {
           "expr": "cron(0 * * * ? *)",
           "resolution": "constant"
-        },
-        {
-          "expr": "cron(40 13 * * ? *)",
-          "resolution": "constructed"
         }
       ],
       "stack": "ingestion_stack",
@@ -6673,6 +6732,20 @@
       "stack": "operational_stack",
       "timeout_seconds": 60
     },
+    "recap-card-generator": {
+      "declared_alarm": null,
+      "handler": "web.recap_card_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/web/recap_card_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 19 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
     "scenario-explorer": {
       "declared_alarm": null,
       "handler": "compute.scenario_explorer_lambda.lambda_handler",
@@ -6976,27 +7049,27 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 668,
-      "lambdas": 104,
-      "mcp_tool_modules": 30,
-      "mcp_tools": 83,
-      "partitions": 106,
+      "edges": 677,
+      "lambdas": 105,
+      "mcp_tool_modules": 29,
+      "mcp_tools": 81,
+      "partitions": 105,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 14,
-      "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 81,
+      "privacy_sources_owner_only": 13,
+      "privacy_sources_owner_published": 2,
+      "scheduled_lambdas": 82,
       "schedules": 89
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 322,
-        "sites_resolved": 829,
-        "sites_total": 1151
+        "sites_dynamic": 325,
+        "sites_resolved": 838,
+        "sites_total": 1163
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 81
+        "resolved": 82
       }
     },
     "non_census_families": [
@@ -7005,6 +7078,7 @@
       "intelligence_quality",
       "journal",
       "platform_memory",
+      "recap_cards",
       "zone2_efficiency"
     ],
     "scope_cuts": [
@@ -7392,7 +7466,7 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual entry via MCP",
-      "privacy_tier": "owner_published",
+      "privacy_tier": "public",
       "stale_hours": 1440
     },
     "milestones": {
@@ -7432,14 +7506,6 @@
       "class": "raw_timeseries",
       "ingestion": false,
       "privacy_tier": "owner_only"
-    },
-    "progress_photos": {
-      "category": "Manual logs",
-      "class": "cross_phase",
-      "ingestion": true,
-      "method": "Sent to the headcoach Telegram bot with a /progress caption",
-      "privacy_tier": "owner_only",
-      "stale_hours": null
     },
     "protocols": {
       "class": "experiment_scoped",
@@ -7716,10 +7782,8 @@
       "hevy": "owner_only",
       "labs": "owner_published",
       "macrofactor": "owner_only",
-      "measurements": "owner_published",
       "notion": "owner_only",
       "private_intake": "owner_only",
-      "progress_photos": "owner_only",
       "reading": "owner_only",
       "sick_days": "owner_only",
       "state_of_mind": "owner_only",
@@ -7810,13 +7874,6 @@
       "resolution": "constant",
       "stack": "operational_stack",
       "utc": "13:30"
-    },
-    {
-      "expr": "cron(40 13 * * ? *)",
-      "lambda": "hevy-backfill",
-      "resolution": "constructed",
-      "stack": "ingestion_stack",
-      "utc": "13:40"
     },
     {
       "expr": "cron(0 14 ? * MON *)",
@@ -8206,6 +8263,13 @@
     {
       "expr": "cron(30 19 * * ? *)",
       "lambda": "og-image-generator",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "19:30"
+    },
+    {
+      "expr": "cron(30 19 * * ? *)",
+      "lambda": "recap-card-generator",
       "resolution": "constant",
       "stack": "operational_stack",
       "utc": "19:30"

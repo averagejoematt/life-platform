@@ -205,7 +205,7 @@ _**122** CloudWatch alarms are defined in `cdk/stacks/*.py` and AST-discovered b
 - `ai-tokens-platform-daily-total`
 - `token-alarm-genesis-window-active`
 
-**`operational_stack.py`** (23)
+**`operational_stack.py`** (24)
 
 - `cost-metric-drift-sustained`
 - `freshness-checker-errors`
@@ -216,6 +216,7 @@ _**122** CloudWatch alarms are defined in `cdk/stacks/*.py` and AST-discovered b
 - `ingestion-error-pipeline-health-check`
 - `ingestion-error-reading-cover-pipeline`
 - `ingestion-error-reading-recall-sweep`
+- `ingestion-error-recap-card-generator`
 - `key-rotator-errors`
 - `life-platform-canary-anthropic-failure`
 - `life-platform-canary-ddb-failure`
