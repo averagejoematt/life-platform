@@ -70,11 +70,27 @@ def _weight_signal(facts, trailing) -> float | None:
     direction, magnitude = classify_delta(facts.week_ago_weight_lb - facts.weight_lb, decimals=1)
     if direction == UNKNOWN or magnitude is None:
         return None
+
+    lo, hi = facts.rate_ci or (None, None)
+    ci_known = lo is not None and hi is not None
+    ci_excludes_zero = ci_known and ((lo > 0 and hi > 0) or (lo < 0 and hi < 0))
+
+    # ADR-105, found by rendering real data: on 2026-09-09 this scored 0.9 and headlined
+    # "2.7 lb UP THIS WEEK" while its own interval ran -0.5 to +3.4 — a direction the
+    # measurement does not establish, stated as the single largest thing on a permanent
+    # public frame. The blueprint says the same in words ("early-cut drops are water, don't
+    # read week-1 rate as tissue"), and a straddling interval is that sentence in numbers.
+    #
+    # It is NOT suppressed — a stated weight is honest and the card may still carry it as
+    # the supporting beat. It just stops being the headline, which is what a score above
+    # the second-slot floor buys.
+    if ci_known and not ci_excludes_zero:
+        return round(min(SECOND_SLOT_FLOOR - 0.05, 0.2 + abs(magnitude) / 20.0), 3)
+
     score = min(1.0, abs(magnitude) / 3.0)
-    if facts.rate_ci and facts.rate_ci[0] is not None and facts.rate_ci[1] is not None:
-        # A confidence interval clear of zero is a stronger claim than a point estimate.
-        if (facts.rate_ci[0] > 0 and facts.rate_ci[1] > 0) or (facts.rate_ci[0] < 0 and facts.rate_ci[1] < 0):
-            score += 0.3
+    if ci_excludes_zero:
+        # An interval clear of zero is a stronger claim than a point estimate.
+        score += 0.3
     return round(min(score, 1.0), 3)
 
 
@@ -145,6 +161,20 @@ def _comeback_signal(facts, trailing) -> float | None:
 
 
 # ── copy (the strings a renderer draws; drawing itself is #3744) ──────────────
+def _session_label(title: str) -> str:
+    """A human name for a session, from Hevy's filing convention.
+
+    The compiler auto-names every routine `Phase - Type - N - Y` ("Foundation - Pull - 2 -
+    6"). That is exactly right in a workout app, where it sorts and dedupes, and exactly
+    wrong as the largest words on a card a stranger sees — it reads like a build number.
+    Take the type, keep the rest for the caption if anyone wants it.
+    """
+    parts = [p.strip() for p in str(title or "").split(" - ")]
+    if len(parts) >= 2 and parts[1]:
+        return f"{parts[1]} day".title() if len(parts[1]) <= 12 else parts[1]
+    return str(title or "Training")
+
+
 def _weight_copy(facts) -> dict[str, Any]:
     from web.journey_direction import DOWN, EVEN, UP, classify_delta
 
@@ -168,7 +198,7 @@ def _workout_copy(facts) -> dict[str, Any]:
         raise RecapNullFact("no workouts — this template should not have been picked")
     sets = sum(w.n_sets for w in facts.workouts)
     vol = sum(w.volume_lbs for w in facts.workouts)
-    titles = ", ".join(w.title for w in facts.workouts)
+    titles = ", ".join(_session_label(w.title) for w in facts.workouts)
     lines = [f"{sets} working sets", f"{vol:,.0f} lb moved"]
     top = next((w.top_exercise for w in facts.workouts if w.top_exercise), None)
     if top:
@@ -177,11 +207,13 @@ def _workout_copy(facts) -> dict[str, Any]:
 
 
 def _habits_copy(facts) -> dict[str, Any]:
-    done = _require("tier0_done", facts.tier0_done)
-    total = _require("tier0_total", facts.tier0_total)
+    # DynamoDB returns Decimals, which format as "6.0/7.0". A count of habits is an
+    # integer everywhere a human says it out loud, and the card is read by humans.
+    done = int(_require("tier0_done", facts.tier0_done))
+    total = int(_require("tier0_total", facts.tier0_total))
     lines = []
     if facts.tier0_streak:
-        lines.append(f"{facts.tier0_streak}-day streak")
+        lines.append(f"{int(facts.tier0_streak)}-day streak")
     return {"hero": f"{done}/{total}", "label": "TIER-0 HABITS", "lines": lines}
 
 
@@ -202,7 +234,7 @@ def _journal_copy(facts) -> dict[str, Any]:
 
 
 def _comeback_copy(facts) -> dict[str, Any]:
-    pct = _require("tier0_pct", facts.tier0_pct)
+    pct = float(_require("tier0_pct", facts.tier0_pct))
     pct = pct / 100.0 if pct > 1 else pct
     return {"hero": f"{pct * 100:.0f}%", "label": "BACK ON IT", "lines": ["habits, after a miss"]}
 

@@ -89,6 +89,7 @@ class WorkoutFact:
     n_sets: int
     volume_lbs: float
     top_exercise: str | None = None
+    exercises: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -117,6 +118,27 @@ class DayFacts:
     protein_target_g: float | None = None
     # mind
     journal_templates: list[str] = field(default_factory=list)
+    # the platform's OWN verdict on the day — 53 fields were available and the first
+    # cards drew four. These are the ones a reader would actually want (#3741 rework).
+    grade_letter: str | None = None
+    grade_score: float | None = None
+    component_scores: dict[str, float] = field(default_factory=dict)
+    readiness: float | None = None
+    readiness_colour: str | None = None
+    acwr: float | None = None
+    acwr_zone: str | None = None
+    sleep_debt_hrs: float | None = None
+    hrv_ms: float | None = None
+    # habit + vice DETAIL. These carry NAMES, so they travel through item_labels() and the
+    # privacy gate — "which habit" is the interesting half and also the risky half.
+    missed_tier0: list[str] = field(default_factory=list)
+    vice_streaks: dict[str, float] = field(default_factory=dict)
+    # the throughline: where he started, where he is, where he is going
+    baseline_weight_lb: float | None = None
+    goal_weight_lb: float | None = None
+    # the cycle so far, for the sparkline. Gaps stay gaps.
+    weight_series: list[float | None] = field(default_factory=list)
+    grade_series: list[str | None] = field(default_factory=list)
     # provenance
     absent: list[str] = field(default_factory=list)
 
@@ -127,14 +149,53 @@ class DayFacts:
             return None
         return bool(self.journal_templates)
 
+    @property
+    def total_lost_lb(self) -> float | None:
+        """Cumulative loss since Day 1 — the single most postable number of a cycle.
+
+        The first seven cards did not carry it once. He lost 7.66 lb in week one and no
+        card said so, because every template was scoped to a single day.
+        """
+        if self.weight_lb is None or self.baseline_weight_lb is None:
+            return None
+        return round(self.baseline_weight_lb - self.weight_lb, 1)
+
+    @property
+    def pct_to_goal(self) -> float | None:
+        """Fraction of the baseline→goal distance covered. None when either end is absent."""
+        if self.weight_lb is None or self.baseline_weight_lb is None or self.goal_weight_lb is None:
+            return None
+        span = self.baseline_weight_lb - self.goal_weight_lb
+        if span <= 0:
+            return None
+        return max(0.0, min(1.0, (self.baseline_weight_lb - self.weight_lb) / span))
+
+    @property
+    def lb_to_goal(self) -> float | None:
+        if self.weight_lb is None or self.goal_weight_lb is None:
+            return None
+        return round(self.weight_lb - self.goal_weight_lb, 1)
+
     def item_labels(self) -> list[tuple[str, str]]:
-        """(template, label) pairs the privacy gate screens — every name a card could draw."""
+        """(template, label) pairs the privacy gate screens — every name a card could draw.
+
+        Habit and vice NAMES are here for a reason: "which habit did he miss" and "what is
+        he holding a streak on" are the interesting half of that data AND the risky half.
+        One of his live vice streaks is a blocked-category name; the gate is what keeps it
+        off a public grid, and the gate can only screen what this list hands it.
+        """
         out: list[tuple[str, str]] = []
         for w in self.workouts:
             if w.title:
                 out.append(("workout", w.title))
             if w.top_exercise:
                 out.append(("workout", w.top_exercise))
+            for ex in w.exercises:
+                out.append(("training", ex))
+        for name in self.missed_tier0:
+            out.append(("habits", name))
+        for name in self.vice_streaks:
+            out.append(("streaks", name))
         return out
 
 
@@ -169,6 +230,7 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
                 n_sets=sets,
                 volume_lbs=round(volume, 1),
                 top_exercise=best[1],
+                exercises=[e.get("name") or e.get("title") for e in exercises if (e.get("name") or e.get("title"))],
             )
         )
     return out
@@ -196,6 +258,18 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.protein_g = computed.get("protein_g_avg")
         facts.protein_target_g = computed.get("protein_g_target")
         facts.tier0_streak = computed.get("tier0_streak")
+        # The platform's own verdict on the day, and what earned it. 53 fields were sitting
+        # here while the first cards drew four (#3741 rework).
+        facts.grade_letter = computed.get("day_grade_letter")
+        facts.grade_score = computed.get("day_grade_score")
+        facts.component_scores = {k: v for k, v in (computed.get("component_scores") or {}).items() if v is not None}
+        facts.readiness = computed.get("readiness_score")
+        facts.readiness_colour = computed.get("readiness_colour")
+        facts.acwr = computed.get("acwr")
+        facts.acwr_zone = computed.get("acwr_zone")
+        facts.sleep_debt_hrs = computed.get("sleep_debt_7d_hrs")
+        facts.hrv_ms = computed.get("hrv_ms")
+        facts.vice_streaks = {k: v for k, v in (computed.get("vice_streaks") or {}).items() if v}
 
     habits = _get_day(table, "habit_scores", date)
     if habits is None:
@@ -205,6 +279,11 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.tier0_total = habits.get("tier0_total")
         pct = habits.get("tier0_pct")
         facts.tier0_pct = float(pct) if pct is not None else None
+        # WHICH habits were missed is the interesting half — "5/7" says nothing a reader
+        # can hold on to, "missed the 5k walk" is a person having a day.
+        facts.missed_tier0 = [m for m in (habits.get("missed_tier0") or []) if isinstance(m, str)]
+        if not facts.vice_streaks:
+            facts.vice_streaks = {k: v for k, v in (habits.get("vice_streaks") or {}).items() if v}
 
     hevy_rows = _query_prefix(table, "hevy", f"DATE#{date}")
     if not hevy_rows:
@@ -235,6 +314,16 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         if facts.protein_g is None:
             facts.protein_g = mf.get("total_protein_g") or mf.get("protein_g")
 
+    # The throughline. Where he started, where he is going — the two numbers that make a
+    # single card legible to someone who has never seen another one.
+    try:
+        from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_GOAL_WEIGHT_LBS
+
+        facts.baseline_weight_lb = float(EXPERIMENT_BASELINE_WEIGHT_LBS)
+        facts.goal_weight_lb = float(EXPERIMENT_GOAL_WEIGHT_LBS)
+    except Exception:  # noqa: BLE001
+        pass
+
     journal = _query_prefix(table, "notion", f"DATE#{date}#journal#")
     if not journal:
         facts.absent.append("notion")
@@ -243,6 +332,41 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
     facts.journal_templates = [t for t in (j.get("template") for j in journal) if t]
 
     return facts
+
+
+def cycle_series(table, start: str, end: str) -> tuple[list[float | None], list[str | None]]:
+    """(weights, grades) for every PT day from `start` to `end`, gaps as None.
+
+    A missing day stays None all the way to the renderer, which breaks the sparkline
+    rather than drawing through it. He has ONE weigh-in in week 1; a smooth seven-point
+    descent through a single measurement would be the prettiest possible lie.
+    """
+    rows = {r.get("date"): r for r in _query_range(table, "computed_metrics", start, end) if r.get("date")}
+    weights: list[float | None] = []
+    grades: list[str | None] = []
+    last_seen = None
+    for day in _day_range(start, end):
+        row = rows.get(day) or {}
+        w = row.get("latest_weight")
+        # computed_metrics carries the LAST KNOWN weight forward, so an unchanged value is
+        # not a new measurement. Only a CHANGE is a data point; the rest are repeats of it.
+        if w is not None and w != last_seen:
+            weights.append(float(w))
+            last_seen = w
+        else:
+            weights.append(None)
+        grades.append(row.get("day_grade_letter"))
+    return weights, grades
+
+
+def _day_range(start: str, end: str) -> list[str]:
+    from datetime import date as _date, timedelta
+
+    try:
+        d0, d1 = _date.fromisoformat(start), _date.fromisoformat(end)
+    except ValueError:
+        return []
+    return [(d0 + timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
 
 
 def trailing(table, end_date: str, days: int = 7, *, experiment_start: str | None = None) -> list[DayFacts]:
