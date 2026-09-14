@@ -45,6 +45,7 @@ s3 = boto3.client("s3", region_name=REGION)
 # Per-source rationale (thresholds, pause reasons) lives in source_registry.py.
 from ingestion.source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
 from operational.output_artifact_registry import check_all as check_output_artifacts, not_ok as artifacts_not_ok
+from training.training_notes import training_notes_health  # #3768: a derived layer can be dark while its raw source is fresh
 
 SOURCES = checker_sources()
 SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)
@@ -686,6 +687,39 @@ def lambda_handler(event, context):
         except ValueError:
             stale_sources.append((source_name, f"Invalid date format: {date_str}"))
             source_status.append(f"  ❌ {source_name}: Invalid date {date_str}")
+
+    # NB (#3768): this sits ABOVE the alert block on purpose. The output-artifact
+    # dead-man below runs AFTER the SNS publish, so its own comment overstates its
+    # reach — it lands in the return body, the email and the StaleSourceCount metric
+    # (which does alarm), but never in that direct publish. A derived layer going
+    # dark should read exactly like a pipeline going dark, so this one runs first.
+
+    # ── Derived layers: a projection can be dark while its RAW source is fresh ───
+    # #3768: `hevy` reported fresh every single day while the derived training-note
+    # layer had been dark since the day it shipped — the Bedrock tail raised
+    # AccessDenied, extract_signals swallowed it into `degraded: true`, and the only
+    # place that said so was `training_notes_health`, reachable ONLY by calling the MCP
+    # tool by hand. Nobody calls a health field by hand for months. Folded in here so a
+    # dark derived layer rides the same SNS + email + SLO path as a dead pipeline: it is
+    # INFRASTRUCTURE staleness (the extractor is broken), not a behavioral lapse.
+    try:
+        tn_health = training_notes_health(table)
+        if tn_health.get("checked") and tn_health.get("extractor_dark"):
+            stale_sources.append(
+                (
+                    "Training-note extractor",
+                    f"Notes present but the derived layer is dark — {tn_health.get('noted_exercise_sessions')} noted sessions "
+                    f"in {tn_health.get('lookback_days')}d, {tn_health.get('degraded')} degraded, "
+                    f"{tn_health.get('missing_records')} missing. Check the Bedrock grant and the Haiku cap.",
+                )
+            )
+        elif not tn_health.get("checked"):
+            stale_sources.append(
+                ("Training-note extractor", f"The check itself failed ({tn_health.get('error')}) — status unknown, not fresh.")
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.error("Training-note health check failed: %s", e)
+        stale_sources.append(("Training-note extractor", f"The check itself failed ({type(e).__name__}: {e}) — status unknown, not fresh."))
 
     if stale_sources:
         stale_list = "\n".join([f"  - {name}: {detail}" for name, detail in stale_sources])

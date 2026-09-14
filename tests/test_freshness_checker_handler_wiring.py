@@ -188,6 +188,10 @@ def _install(monkeypatch, table, sns=None, cw=None, s3=None):
     monkeypatch.setattr(fc, "BEHAVIORAL_SOURCES", set())
     monkeypatch.setattr(fc, "DAILY_SOURCES", set())
     monkeypatch.setattr(fc, "FIELD_COMPLETENESS_CHECKS", {})
+    # #3768: the derived-layer health check reads the raw hevy partition with boto3 Key()
+    # conditions this double does not speak. Stub it HEALTHY by default so these tests stay
+    # about the wiring; the dark path gets its own test below, which drives the real handler.
+    monkeypatch.setattr(fc, "training_notes_health", lambda *_a, **_k: {"checked": True, "extractor_dark": False})
     return sns, cw
 
 
@@ -251,3 +255,45 @@ def test_handler_survives_a_secretsmanager_outage(monkeypatch):
     body = fc.lambda_handler({}, None)
 
     assert body["statusCode"] == 200
+
+
+def test_handler_reports_a_dark_derived_layer_as_stale(monkeypatch):
+    """#3768: `hevy` reads fresh every day while the note layer derived FROM it is dark.
+
+    The raw partition arriving on time says nothing about whether the projection built on
+    it ran — and for months it had not. `training_notes_health` knew; its only reader was
+    an MCP field nobody calls on a schedule. This drives the REAL handler and asserts the
+    dark verdict reaches `stale_sources`, which is what the SNS alert, the email body and
+    the SLO metric are all computed from.
+    """
+    table = FakeTable(rows=[])
+    sns, _cw = _install(monkeypatch, table)
+    monkeypatch.setattr(
+        fc,
+        "training_notes_health",
+        lambda *_a, **_k: {
+            "checked": True,
+            "extractor_dark": True,
+            "lookback_days": 14,
+            "noted_exercise_sessions": 15,
+            "degraded": 15,
+            "missing_records": 0,
+        },
+    )
+
+    body = fc.lambda_handler({}, None)
+
+    assert "Training-note extractor" in body["stale_sources"], body["stale_sources"]
+    stale_publishes = [p for p in sns.published if "stale source" in p.get("Subject", "")]
+    assert stale_publishes, "a dark derived layer did not reach the SNS alert"
+    assert "Training-note extractor" in stale_publishes[0]["Message"]
+
+
+def test_handler_does_not_report_a_healthy_derived_layer(monkeypatch):
+    """NEGATIVE CONTROL for the above — the check must be capable of staying quiet."""
+    table = FakeTable(rows=[])
+    _sns, _cw = _install(monkeypatch, table)  # _install stubs it healthy
+
+    body = fc.lambda_handler({}, None)
+
+    assert "Training-note extractor" not in body["stale_sources"], body["stale_sources"]

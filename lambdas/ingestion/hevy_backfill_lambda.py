@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from training.hevy_common import (
@@ -155,10 +155,61 @@ def _tombstone_deleted(workout_id: str) -> None:
     logger.info("hevy delete marker written for %s", workout_id)
 
 
+def reextract_training_notes(days: int) -> dict:
+    """Re-run the note extractor over already-ingested workouts (#3768).
+
+    The on-ingest hook only fires when a workout ARRIVES. When the extractor itself was
+    broken — as it was from the day it shipped until the Bedrock grant landed — every
+    note in the window was written with `degraded: true` and deterministic signals only,
+    and no future ingest will ever revisit them. This re-reads the raw partition and
+    re-derives, which is safe and idempotent: `write_workout_notes` is keyed by
+    workout+exercise and the LLM tail is hash-cached, so an unchanged note that already
+    extracted cleanly costs nothing and a degraded one is repaired.
+
+    Bounded by the same monthly Haiku cap as the live path — a breach degrades exactly
+    as before rather than failing the run.
+    """
+    from boto3.dynamodb.conditions import Key
+    from common.pacific_time import pacific_now
+    from training import training_notes as tn
+    from training.training_notes_llm import make_llm_fn
+
+    # Day arithmetic in the Pacific frame, with no hand-rolled ISO parse (#3609): the
+    # window is calendar days, and `pacific_now()` is the one place that frame is defined.
+    _end_day = pacific_now().date()
+    end = _end_day.isoformat()
+    start = (_end_day - timedelta(days=days)).isoformat()
+    resp = _table.query(
+        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#{SOURCE}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"),
+    )
+    llm_fn = make_llm_fn(_table)
+    workouts = 0
+    records = 0
+    for item in resp.get("Items", []):
+        exercises = item.get("exercises") or []
+        if not any((e.get("notes") or "").strip() for e in exercises):
+            continue
+        try:
+            res = tn.write_workout_notes(_table, item.get("date"), item.get("workout_uid", ""), exercises, llm_fn=llm_fn)
+            workouts += 1
+            records += res.get("records", 0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("re-extract failed for %s: %s: %s", item.get("workout_uid"), type(e).__name__, e)
+    out = {"reextracted_workouts": workouts, "records": records, "window": f"{start}..{end}"}
+    logger.info("training-notes re-extract: %s", out)
+    return out
+
+
 def lambda_handler(event: dict, context: Any) -> dict:
     """Scheduled backfill entry point. Polls the events feed since the
     last-known timestamp, ingests new/updated workouts, persists new
     high-water-mark on success."""
+    # #3768: one-shot repair mode. `{"reextract_days": N}` re-derives the note layer for
+    # the last N days instead of polling the events feed — the window the extractor was
+    # dark for has already been ingested, so nothing else would ever revisit it.
+    if event and event.get("reextract_days"):
+        return reextract_training_notes(int(event["reextract_days"]))
+
     poll_started_at = datetime.now(timezone.utc).isoformat()
     since = load_since()
     is_initial = since == INITIAL_SINCE
