@@ -214,6 +214,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
+        # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
+        # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
+        # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the
+        # hand-kept baseline missed them, and the bill arrived on an unrelated PR's
+        # Deploy job two days later. A repo-shape ratchet, not a behaviour suite.
+        "test_bundle_boot_pil_baseline_3784.py",
         # #3690: sweeps docs/reviews/*_grades_*.json to re-derive the three hand-maintained
         # public stats (review_grade / site_pages / active_secrets) that /method/platform/
         # serves. Belongs pre-merge: it is a repo-shape ratchet over literals a PR can move,

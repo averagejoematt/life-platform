@@ -159,12 +159,30 @@ def test_premerge_lane_runs_the_bundle_boot_gate():
 
 
 def test_baseline_holds_only_probe_environment_gaps():
-    """A baseline is a place to hide failures. Keep it small, documented, and PIL-only.
+    """A baseline is a place to hide failures. Keep it documented, PIL-only, and DERIVED.
 
     Every entry must be a dependency that reaches the Lambda from a LAYER — never
     from the bundle — so it is structurally unfixable by a bundle change. If this
     test reds because someone parked a real failure here, unpark it.
+
+    THE CAP THAT USED TO BE HERE, AND WHY IT IS GONE (#3784)
+
+    This ended at `assert len(entries) <= 6` — a headroom number over the four entries
+    that existed when it was written. The intent was right: stop the baseline becoming a
+    dumping ground. The instrument was wrong in both directions, and #3780 showed both.
+
+    Too loose: three new PIL modules could have been added silently, because six is more
+    than four. Too tight: the moment the code legitimately grew a seventh PIL-importing
+    module, a correct baseline update failed this test — which is where it actually bit,
+    while a deploy was blocked and the right change was the one being refused.
+
+    The real property was never the COUNT. It is that every entry is a genuine
+    module-scope PIL importer and no such importer is missing. That is derivable from the
+    source, and `tests/test_bundle_boot_pil_baseline_3784.py::pil_closure` derives it. A
+    count cap on a derived set is a magic number guarding a fact.
     """
+    from test_bundle_boot_pil_baseline_3784 import pil_closure
+
     data = json.loads(BASELINE.read_text(encoding="utf-8"))
     notes = [k for k in data if k.startswith("_")]
     entries = {k: v for k, v in data.items() if not k.startswith("_")}
@@ -172,7 +190,13 @@ def test_baseline_holds_only_probe_environment_gaps():
     assert entries, "an empty baseline means --compare is a no-op; drop the flag instead"
     for module, err in entries.items():
         assert "No module named 'PIL'" in err, f"{module}: only layer-provided Pillow imports may be baselined, got {err!r}"
-    assert len(entries) <= 6, f"baseline has grown to {len(entries)} entries — that is a ratchet, not a suppression list"
+
+    parked = sorted(set(entries) - pil_closure())
+    assert not parked, (
+        f"baselined module(s) that do NOT import PIL at module scope: {parked} — that is a real "
+        "bundle-shape failure parked in the suppression list, which is the #2632 outage class this "
+        "gate exists to catch. Unpark it."
+    )
 
 
 def test_baseline_loader_ignores_the_prose_keys():
