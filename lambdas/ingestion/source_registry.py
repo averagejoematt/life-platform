@@ -869,6 +869,34 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "raw_layout": None,
         "capture_channel": "mcp",  # #746: entered by hand in an MCP conversation
     },
+    # #3757: progress photos. Registered BEFORE the capture path exists, so no object is
+    # ever written to a prefix `scripts/check_raw_zone_drift.py` does not know about — the
+    # raw zone fractured into five generations precisely because prefixes appeared before
+    # facets did (X-9/#498). Not monitored and not a freshness source: photos are a
+    # deliberate weekly-ish act, and a missed week is a behavioural lapse rather than a
+    # dead pipeline — the one thing a staleness alert must never conflate (#3720).
+    "progress_photos": {
+        "label": "Progress photos",
+        "checker_label": "Progress photos",
+        "desc": "Front / side / back body photos",
+        "category": "Manual logs",
+        "behavioral": True,
+        "stale_hours": None,
+        "freshness": False,
+        "monitored": False,  # never paged, never on the public board — owner-only (Tier 2, #3757)
+        "active_api": False,
+        "expected_days": None,
+        "qa_tier": None,
+        "method": "Sent to the headcoach Telegram bot with a /progress caption",
+        "metrics": "Body photos (owner-only; no public projection)",
+        "posture": "portfolio",
+        "capture_channel": "telegram",
+        "raw_layout": {
+            "prefix": "raw/matthew/progress_photos",
+            "scheme": "date-tree",
+            "filename": "<pose>.jpg",
+        },
+    },
     "food_delivery": {
         "label": "Food delivery",
         "checker_label": "Food delivery behavioral signal",
