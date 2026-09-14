@@ -264,6 +264,12 @@
       "stack": "operational_stack",
       "via": "constructor:create_platform_lambda"
     },
+    "hevy-template-index-not-rebuilt-48h": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "ingestion_stack",
+      "via": "declaration"
+    },
     "ingest-auth-unhealthy-24h": {
       "kind": "metric",
       "routing": "urgent",
@@ -887,7 +893,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 125,
+    "alarms": 126,
     "emf_namespaces": 31,
     "schedules": 89,
     "secrets": 28
@@ -6957,9 +6963,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 125,
+      "alarms": 126,
       "alarms_by_routing": {
-        "digest": 93,
+        "digest": 94,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,

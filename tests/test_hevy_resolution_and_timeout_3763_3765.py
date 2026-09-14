@@ -221,6 +221,138 @@ def test_rebuild_is_reachable_from_an_invoke():
     assert "rebuild_template_index" in (ast.get_source_segment(src, handler) or "")
 
 
+# ── #3764: the rebuild's dead-man ─────────────────────────────────────────────
+# The rebuild swallows every one of its own failures on purpose, so there is no error
+# for an error alarm to see. What separates a dead job from a healthy one is the ABSENCE
+# of a success, so the heartbeat has to be emitted on a real write and on nothing else.
+
+
+class _FakeCw:
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, **kw):
+        self.calls.append(kw)
+
+
+def _fake_training(monkeypatch, rebuild_fn):
+    """Swap the three `training.*` submodules `rebuild_template_index` imports.
+
+    It uses `from training import hevy_template_index as idx`, which reads ATTRIBUTES off
+    the already-imported `training` package — patching `sys.modules` keys leaves the real
+    modules in place, and the real one then raises TypeError on the stub args. That failure
+    happens to look exactly like the refused-shrink case (`written: False`, no heartbeat),
+    so a sys.modules fake made one of these tests pass for the wrong reason.
+    """
+    import types
+
+    import training
+
+    monkeypatch.setattr(training, "hevy_template_index", types.SimpleNamespace(rebuild=rebuild_fn), raising=False)
+    monkeypatch.setattr(
+        training,
+        "hevy_template_cache",
+        types.SimpleNamespace(_write_s3_json=lambda *_a: None, _read_s3_json=lambda *_a: None),
+        raising=False,
+    )
+    monkeypatch.setattr(training, "hevy_write_client", types.SimpleNamespace(list_templates=lambda *_a, **_k: {}), raising=False)
+
+
+def _fake_cloudwatch(monkeypatch, cw):
+    import types
+
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda *_a, **_kw: cw))
+
+
+def _run_rebuild(monkeypatch, rebuild_result):
+    """Drive `rebuild_template_index` with the index module and CloudWatch both faked."""
+    from ingestion import hevy_backfill_lambda as hbl
+
+    cw = _FakeCw()
+    _fake_cloudwatch(monkeypatch, cw)
+    _fake_training(monkeypatch, lambda *_a, **_kw: rebuild_result)
+    return hbl.rebuild_template_index(), cw
+
+
+def test_the_heartbeat_is_emitted_when_the_index_is_really_published(monkeypatch):
+    out, cw = _run_rebuild(monkeypatch, {"written": True, "count": 828})
+    assert out["written"] is True
+    assert len(cw.calls) == 1, "a successful rebuild emitted no heartbeat — the dead-man would fire on a healthy job"
+    md = cw.calls[0]["MetricData"][0]
+    assert md["MetricName"] == "TemplateIndexRebuilt" and md["Value"] == 1
+
+
+def test_a_refused_shrink_emits_no_heartbeat(monkeypatch):
+    """The failure mode with no exception and no error: a run that wrote nothing."""
+    out, cw = _run_rebuild(monkeypatch, {"written": False, "reason": "refusing to shrink 828 -> 41"})
+    assert out["written"] is False
+    assert cw.calls == [], "a run that published nothing still emitted a heartbeat — the alarm can never fire"
+
+
+def test_a_raised_walk_emits_no_heartbeat(monkeypatch):
+    from ingestion import hevy_backfill_lambda as hbl
+
+    cw = _FakeCw()
+    _fake_cloudwatch(monkeypatch, cw)
+
+    def _boom(*_a, **_kw):
+        raise RuntimeError("429 from Hevy mid-walk")
+
+    _fake_training(monkeypatch, _boom)
+
+    out = hbl.rebuild_template_index()
+    assert out["written"] is False and "RuntimeError" in out["error"]
+    assert cw.calls == [], "a failed walk emitted a heartbeat"
+
+
+def test_a_cloudwatch_blip_does_not_fail_the_rebuild(monkeypatch):
+    """NEGATIVE CONTROL — the heartbeat is best-effort; losing it must not lose the run."""
+    from ingestion import hevy_backfill_lambda as hbl
+
+    class _BrokenCw:
+        def put_metric_data(self, **_kw):
+            raise RuntimeError("cloudwatch unavailable")
+
+    _fake_cloudwatch(monkeypatch, _BrokenCw())
+    _fake_training(monkeypatch, lambda *_a, **_kw: {"written": True, "count": 828})
+
+    assert hbl.rebuild_template_index()["written"] is True
+
+
+def test_the_alarm_watches_the_heartbeat_and_breaches_on_silence():
+    """The alarm must watch the metric the function emits, and treat NO DATA as the fault.
+
+    An Errors or Invocations alarm would be green by construction here: nothing raises,
+    and the same Lambda runs an hourly poll that keeps Invocations high with this rule
+    stone dead. This pins the three properties that make it a dead-man instead.
+    """
+    import ast
+
+    src = (REPO / "cdk" / "stacks" / "ingestion_stack.py").read_text()
+    tree = ast.parse(src)
+    alarm = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and any(
+            isinstance(kw.value, ast.Constant) and kw.value.value == "hevy-template-index-not-rebuilt-48h"
+            for kw in node.keywords
+            if kw.arg == "alarm_name"
+        ):
+            alarm = node
+            break
+    assert alarm is not None, "the rebuild cron lost its dead-man alarm"
+
+    body = ast.get_source_segment(src, alarm) or ""
+    # It watches what the Lambda actually emits — the names are asserted against the
+    # function's own constants, so renaming one side breaks this rather than the alarm.
+    from ingestion import hevy_backfill_lambda as hbl
+
+    assert hbl.INDEX_REBUILT_METRIC in body, "the alarm does not watch the metric the rebuild emits"
+    assert hbl.INDEX_METRIC_NAMESPACE in body
+    assert "BREACHING" in body and "NOT_BREACHING" not in body, "missing data must BE the failure"
+    assert "LESS_THAN_THRESHOLD" in body
+    assert "evaluation_periods=2" in body, "one dropped emit should not wake anyone"
+
+
 # ── #3765: the deadline is real ───────────────────────────────────────────────
 def test_the_soft_timeout_returns_at_the_deadline_not_after_the_tool_finishes():
     """The defect, reproduced as a unit: `with ThreadPoolExecutor(...)` calls
