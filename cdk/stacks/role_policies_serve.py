@@ -712,6 +712,13 @@ def telegram_worker() -> list[iam.PolicyStatement]:
     but WRITE-SCOPED to COACH#* via LeadingKeys — CHAT# turns + the outbound daily
     ledger (UpdateItem on COACH#outbound_ledger), never a DATE# timeseries row.
     Bedrock via ADR-062; the telegram store; read-only SSM for budget tier + cycle.
+
+    #3758 added the only two writes outside that shape: the progress-photo index row
+    (one named partition) and the photo object (one named raw prefix). They are the
+    worker's first S3 write, so they arrive with the worker's first S3 write canary —
+    `tests/test_telegram_worker_s3_write_scope_3758.py`, mirroring the site-api one,
+    because `tests/test_raw_archive_role_parity.py` is scoped to `lambdas/ingestion/`
+    and would never have seen a coach-worker prefix widen.
     """
     return [
         iam.PolicyStatement(
@@ -730,6 +737,31 @@ def telegram_worker() -> list[iam.PolicyStatement]:
                     "dynamodb:LeadingKeys": ["COACH#*"],
                 },
             },
+        ),
+        # #3758: the progress-photo index row. A SECOND write statement rather than a
+        # second pattern inside the one above, because the two grants exist for
+        # unrelated reasons and must be removable independently — and because
+        # `ForAllValues:StringLike` over a two-element list would widen COACH chat
+        # writes to the photo partition as a side effect of the narrower grant.
+        # One partition, named in full: not a prefix, not a wildcard.
+        iam.PolicyStatement(
+            sid="DynamoDBProgressPhotoIndexWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["USER#matthew#SOURCE#progress_photos"],
+                },
+            },
+        ),
+        # #3758: the photo itself. The worker's FIRST S3 write of any kind, scoped to
+        # the one prefix the source registry declares for it (`raw_layout.prefix`).
+        # No ListBucket and no delete: a capture path writes, and a capture path that
+        # can delete is a capture path that can lose the thing it captured.
+        iam.PolicyStatement(
+            sid="S3ProgressPhotoWrite",
+            actions=["s3:PutObject"],
+            resources=[f"{BUCKET_ARN}/raw/matthew/progress_photos/*"],
         ),
         _bedrock_statement(),
         iam.PolicyStatement(
