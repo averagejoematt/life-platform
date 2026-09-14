@@ -758,6 +758,50 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-07",
     },
+    # #3784: the bundle-boot PIL baseline's derivation guard. Both mutations are the
+    # REAL failure modes, one of which had already happened: M1 is the exact state of
+    # main that blocked #3737's deploy, M2 is the dumping-ground the file's own note
+    # forbids. No synthetic fixture in either.
+    "structural::test_bundle_boot_pil_baseline_3784.py": {
+        "gate_name": "test_bundle_boot_pil_baseline_3784.py",
+        "command": (
+            "python3 -m pytest tests/test_bundle_boot_pil_baseline_3784.py tests/test_bundle_boot_wiring_2632.py -q"
+            "   # 15 tests; baseline 15 passed"
+        ),
+        "mutation": (
+            "M1: `deploy/bundle_boot_baseline.json` reverted to its pre-#3780 four entries — the literal state of "
+            "main on 2026-09-14, under which the fleet-deploy bundle probe reported three NEW import failures and "
+            "FAILED the Deploy job for #3737, a PR that touched none of those files. "
+            "M2: a fabricated entry for `web.site_api_lambda` — a module that imports cleanly without Pillow — "
+            "parked in the file with the PIL error string. That is the dumping-ground the file's own `_note` "
+            "forbids and the #2632 outage class: a real bundle-shape failure suppressed by name."
+        ),
+        "observed": (
+            "M1 RED (1 failed, 14 passed): test_the_baseline_is_exactly_the_pil_closure, naming the three missing "
+            "modules (web.recap_canvas, web.recap_charts, web.recap_layouts) in its message. Note what did NOT "
+            "red: the four negative controls on the closure itself still pass, so the failure is located in the "
+            "FILE rather than in the derivation. "
+            "M2 RED (2 failed, 13 passed): the same test from the other direction (`extra`), plus "
+            "test_bundle_boot_wiring_2632.py::test_baseline_holds_only_probe_environment_gaps — which is the "
+            "anti-parking control that replaced that file's `len(entries) <= 6` cap, so M2 also proves the cap's "
+            "removal did not cost the property the cap was there for. "
+            "Restored between each; 15 passed again after the second. Both watched 2026-09-14."
+        ),
+        "scope": (
+            "Covers the BASELINE's agreement with the source: every module-scope PIL importer is in the file and "
+            "nothing else is. The closure carries its own three negative controls — the known direct importers "
+            "are found, a first-party hop is followed (`recap_layouts` never says PIL, it says "
+            "`from web import card_engine`), and a FUNCTION-LOCAL PIL import is NOT counted "
+            "(`reading.cover_placeholder`), because a closure that over-reached would baseline a healthy module "
+            "and hide its future failure. "
+            "Does NOT cover the probe itself — that `verify_bundle_boot.py` actually imports every module out of "
+            "a staged bundle is `tests/test_bundle_boot_wiring_2632.py`'s verdict and the deploy job's own "
+            "Bundle-boot gate step. This file only asserts that the suppression list it is handed is honest. "
+            "Offline: a pure AST walk over `lambdas/`, so it runs identically with or without Pillow installed — "
+            "which matters, because the workstation HAS Pillow and the deploy runner does not."
+        ),
+        "proved_on": "2026-09-14",
+    },
     "structural::test_a11y_ledger_3548.py": {
         "gate_name": "test_a11y_ledger_3548.py",
         "command": "python3 -m pytest tests/test_a11y_ledger_3548.py -q",

@@ -43,7 +43,7 @@ import pathlib
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LAMBDAS = REPO / "lambdas"
-BASELINE = REPO / "deploy" / "bundle_boot_baseline.json"
+BASELINE_FILE = REPO / "deploy" / "bundle_boot_baseline.json"
 
 
 def _module_map() -> dict:
@@ -108,7 +108,7 @@ def pil_closure() -> set:
 
 
 def baseline_modules() -> set:
-    data = json.loads(BASELINE.read_text(encoding="utf-8"))
+    data = json.loads(BASELINE_FILE.read_text(encoding="utf-8"))
     return {k for k in data if not k.startswith("_")}
 
 
@@ -140,21 +140,21 @@ def test_the_baseline_is_exactly_the_pil_closure():
     missing = sorted(derived - recorded)
     extra = sorted(recorded - derived)
     assert not missing, (
-        f"module(s) import PIL at module scope but are not in {BASELINE.name}: {missing}\n"
+        f"module(s) import PIL at module scope but are not in {BASELINE_FILE.name}: {missing}\n"
         "The bundle probe will report them as NEW import failures and FAIL THE DEPLOY — on whatever "
         "PR happens to trigger the next fleet deploy, which is unlikely to be the one that added them "
         "(that is exactly how #3780's three modules broke #3737's deploy). Add them with the "
         "ModuleNotFoundError string, or stop importing PIL at module scope."
     )
     assert not extra, (
-        f"{BASELINE.name} suppresses module(s) that import cleanly without Pillow: {extra}\n"
+        f"{BASELINE_FILE.name} suppresses module(s) that import cleanly without Pillow: {extra}\n"
         "The file's own note is explicit that ONLY probe-environment gaps belong here. A stale entry "
         "suppresses a real bundle-shape failure — the #2632 outage class this gate exists to prevent."
     )
 
 
 def test_every_baseline_entry_states_the_pil_reason():
-    data = json.loads(BASELINE.read_text(encoding="utf-8"))
+    data = json.loads(BASELINE_FILE.read_text(encoding="utf-8"))
     for name, reason in data.items():
         if name.startswith("_"):
             continue
