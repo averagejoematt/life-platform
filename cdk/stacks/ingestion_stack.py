@@ -372,7 +372,7 @@ class IngestionStack(Stack):
         # hour he eventually trains past, so the window is now 24h. An empty
         # feed costs one API call and one page (~800 ms), so the 12 added
         # invocations/day are rounding error against never missing a session.
-        create_platform_lambda(
+        hevy_backfill = create_platform_lambda(
             self,
             "HevyBackfill",
             function_name="hevy-backfill",
@@ -388,6 +388,25 @@ class IngestionStack(Stack):
             },
             custom_policies=rp.ingestion_hevy_backfill(),
             **shared,
+        )
+
+        # #3764: rebuild the Hevy exercise-template index daily. The index is what
+        # draft_custom resolves an exercise TITLE against (ADR-069); it was built by hand
+        # ONCE on 2026-06-01 and had no producer in this repo at all. Measured 2026-09-13:
+        # 789 indexed vs 828 live, and every one of the 39 missing titles cost a walk of
+        # the live catalogue on each draft that named it. Same Lambda, constant input —
+        # the whoop_reconcile_rule idiom — so the fleet gains a schedule, not a function.
+        hevy_index_rule = events.Rule(
+            self,
+            "HevyTemplateIndexRebuild",
+            schedule=events.Schedule.cron(hour="13", minute="40"),  # 06:40 PT, fixed UTC
+            description="#3764: republish config/hevy_template_index.json from the live Hevy catalogue",
+        )
+        hevy_index_rule.add_target(
+            targets.LambdaFunction(
+                hevy_backfill,
+                event=events.RuleTargetInput.from_object({"rebuild_template_index": True}),
+            )
         )
 
         # ── (6c) MacroFactor unofficial-API puller removed 2026-05-25.

@@ -155,6 +155,21 @@ def _tombstone_deleted(workout_id: str) -> None:
     logger.info("hevy delete marker written for %s", workout_id)
 
 
+def rebuild_template_index() -> dict:
+    """Republish config/hevy_template_index.json from the live Hevy catalogue (#3764)."""
+    from training import hevy_template_cache as cache, hevy_template_index as idx, hevy_write_client as wc
+
+    try:
+        out = idx.rebuild(wc.list_templates, cache._write_s3_json, cache._read_s3_json)
+        logger.info("template index rebuild: %s", out)
+        return out
+    except Exception as e:  # noqa: BLE001
+        # Never fail the function over the index: the resolver's live-walk fallback still
+        # answers, it is just slower. A failed rebuild is a log line, not an outage.
+        logger.error("template index rebuild failed: %s: %s", type(e).__name__, e)
+        return {"written": False, "error": f"{type(e).__name__}: {e}"}
+
+
 def reextract_training_notes(days: int) -> dict:
     """Re-run the note extractor over already-ingested workouts (#3768).
 
@@ -204,6 +219,12 @@ def lambda_handler(event: dict, context: Any) -> dict:
     """Scheduled backfill entry point. Polls the events feed since the
     last-known timestamp, ingests new/updated workouts, persists new
     high-water-mark on success."""
+    # #3764: the template index has a producer now. Runs on its own daily EventBridge
+    # rule with this constant input — the index was built by hand once on 2026-06-01 and
+    # had drifted 789 vs 828 live by 2026-09-13, every missing title costing a live walk.
+    if event and event.get("rebuild_template_index"):
+        return rebuild_template_index()
+
     # #3768: one-shot repair mode. `{"reextract_days": N}` re-derives the note layer for
     # the last N days instead of polling the events feed — the window the extractor was
     # dark for has already been ingested, so nothing else would ever revisit it.

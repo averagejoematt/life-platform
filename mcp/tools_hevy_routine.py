@@ -34,6 +34,7 @@ programming with red-day deload guard."
 from __future__ import annotations
 
 import logging
+import os
 import time
 import urllib.error
 from datetime import datetime, timedelta, timezone
@@ -300,7 +301,16 @@ def _normalize_title(t: str) -> str:
     return re.sub(r"\s+", " ", (t or "").strip().lower())
 
 
-def _template_index() -> dict[str, Any]:
+# #3763: the index was re-read from S3 once PER EXERCISE. `_load_json` is deliberately
+# uncached (routine_generator.py:46 says so), and a 20-exercise draft therefore paid 20
+# GETs of the same 98 KB object. Memoized for the container's life with a TTL: the index
+# is rebuilt daily (#3764), so a warm container holding it for 15 minutes cannot serve a
+# meaningfully stale answer, and the live-walk fallback still self-heals a true miss.
+_INDEX_TTL_SECONDS = int(os.environ.get("HEVY_TEMPLATE_INDEX_TTL", "900"))
+_index_cache: dict[str, Any] = {"at": 0.0, "templates": None}
+
+
+def _template_index(force: bool = False) -> dict[str, Any]:
     """Full Hevy template index (ADR-069): normalized_title -> {id, title}.
 
     Covers every built-in Hevy exercise plus the account's custom ones, so
@@ -309,12 +319,104 @@ def _template_index() -> dict[str, Any]:
     Returns {} if the index is absent — resolution then falls back to a live
     Hevy lookup.
     """
+    import time as _time
+
     from training.routine_generator import _load_json
 
+    if not force and _index_cache["templates"] is not None and (_time.time() - _index_cache["at"]) < _INDEX_TTL_SECONDS:
+        return _index_cache["templates"]
     try:
-        return (_load_json("hevy_template_index.json") or {}).get("templates", {})
+        templates = (_load_json("hevy_template_index.json") or {}).get("templates", {})
     except Exception:
-        return {}
+        templates = {}
+    _index_cache["templates"] = templates
+    _index_cache["at"] = _time.time()
+    return templates
+
+
+def _reset_index_cache_for_tests() -> None:
+    _index_cache["templates"] = None
+    _index_cache["at"] = 0.0
+
+
+def _title_tokens(name: str) -> set[str]:
+    """Word tokens of a title, punctuation dropped.
+
+    "Squat (Barbell)" and "Squat Barbell" must tokenize the same way; splitting on
+    whitespace alone leaves "(barbell)" and the subset test silently never matches.
+    """
+    import re as _re
+
+    return {w for w in _re.findall(r"[a-z0-9]+", _normalize_title(name)) if len(w) > 1}
+
+
+def _index_fuzzy(name: str) -> str | None:
+    """Exact-or-nothing token-set match against the index — never a near guess.
+
+    'Leg Curl (Machine)' is not a Hevy title; 'Seated Leg Curl (Machine)' is. Before
+    #3763 that one-word gap cost a full 9-page walk of the live catalogue, and then
+    resolved anyway from the curated loose match that had been sitting one step further
+    down all along. This closes the gap without ever guessing: a candidate qualifies only
+    when the query's tokens are a SUBSET of the title's, and only when exactly one
+    candidate qualifies. Two candidates is ambiguity, and ambiguity returns None so the
+    caller fails loudly with suggestions rather than pushing the wrong exercise.
+    """
+    tokens = _title_tokens(name)
+    if not tokens:
+        return None
+    hits = []
+    for norm, v in _template_index().items():
+        if not v.get("id"):
+            continue
+        if tokens <= _title_tokens(norm):
+            hits.append(str(v["id"]))
+            if len(hits) > 1:
+                return None
+    return hits[0] if len(hits) == 1 else None
+
+
+class _LiveWalk:
+    """One pass over the live Hevy template list, shared by every title in a draft.
+
+    The walk is the expensive half of resolution: 828 templates = 9 pages at the client's
+    1 req/s throttle, ~8.4s. It used to run once PER unresolved exercise, from page 1, so
+    three imprecise titles cost ~27s — at the MCP handler's 30s soft timeout. The pages
+    are identical across titles within one draft, so they are fetched at most once.
+    """
+
+    def __init__(self, list_templates_fn=None):
+        self._list = list_templates_fn
+        self._by_title: dict[str, str] = {}
+        self._walked = False
+
+    def _ensure(self) -> None:
+        if self._walked:
+            return
+        self._walked = True  # a failed walk is not retried per-title either
+        lister = self._list
+        if lister is None:
+            from training import hevy_write_client as wc
+
+            lister = wc.list_templates
+        page = 1
+        while page <= 30:
+            try:
+                resp = lister(page=page, page_size=100)
+            except Exception:
+                return
+            items = resp.get("exercise_templates") or resp.get("templates") or []
+            if not items:
+                return
+            for t in items:
+                if t.get("id"):
+                    self._by_title.setdefault(_normalize_title(t.get("title")), str(t["id"]))
+            if len(items) < 100:
+                return
+            page += 1
+
+    def id_for(self, name: str) -> str | None:
+        self._ensure()
+        return self._by_title.get(_normalize_title(name))
 
 
 def _live_template_id_by_title(name: str) -> str | None:
@@ -345,17 +447,24 @@ def _live_template_id_by_title(name: str) -> str | None:
     return None
 
 
-def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | None:
+def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any], walk: "_LiveWalk | None" = None) -> str | None:
     """Map a caller-supplied exercise onto a resolvable movement key.
 
-    Resolution order (conservative — exact matches before fuzzy, curated before
-    index, to avoid silent mis-maps):
+    Resolution order — every FREE step before the paid one (#3763). Until this fix the
+    live Hevy walk sat at step 4, ahead of the in-memory curated match that would have
+    answered instantly, so a single imprecise title cost ~9s and three of them reached the
+    30s soft timeout. The measured shape: 20 exact titles resolved in 0.01s, 3 non-exact
+    titles took 27.5s. Exercise COUNT never mattered — which is the whole origin of the
+    "draft_custom times out above ~7 exercises" folklore (#3771).
+
       1. explicit `movement_key` that is a curated catalog key (keeps generator
          metadata + ADR-067/068 semantics)
       2. exact title match against the curated catalog
       3. exact normalized-title match against the full Hevy index -> "tmpl:<id>"
-      4. exact title match against the live Hevy list (self-heal) -> "tmpl:<id>"
+      4. unambiguous token-subset match against the index -> "tmpl:<id>"
       5. loose contains match within the small curated catalog only
+      6. the live Hevy list (self-heal for templates newer than the index) -> "tmpl:<id>",
+         walked at most ONCE per draft and shared across every unresolved title
 
     Returns None when nothing maps — caller surfaces a loud, listy error.
     """
@@ -378,16 +487,22 @@ def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | 
     if hit and hit.get("id"):
         return "tmpl:" + str(hit["id"])
 
-    # 4. live Hevy lookup (self-heal for templates newer than the index)
-    live_id = _live_template_id_by_title(name)
-    if live_id:
-        return "tmpl:" + live_id
+    # 4. index, unambiguous token-subset ("Leg Curl (Machine)" -> "Seated Leg Curl (Machine)")
+    fuzzy_id = _index_fuzzy(name)
+    if fuzzy_id:
+        return "tmpl:" + fuzzy_id
 
     # 5. loose contains within the curated catalog only (small + trusted)
     for k, v in catalog.items():
         title = (v.get("title") or "").strip().lower()
         if title and (nlow in title or title in nlow):
             return k
+
+    # 6. LAST: the live Hevy walk. Everything above is in-memory; this is ~9s of paged
+    #    HTTP at the client throttle, so it runs only when nothing free could answer.
+    live_id = (walk.id_for(name) if walk is not None else _live_template_id_by_title(name)) or None
+    if live_id:
+        return "tmpl:" + live_id
     return None
 
 
@@ -668,6 +783,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         create_missing = create_missing.lower() not in ("false", "0", "no")
 
     catalog = _catalog_movements()
+    # #3763: ONE live walk for the whole draft, lazily started and only if some title
+    # cannot be resolved for free. Shared across every exercise in this call.
+    walk = _LiveWalk()
     blocks: list = []
     unknown: list[str] = []  # unresolved + (no human title OR create disabled)
     created: list[dict] = []  # newly created Hevy exercises this draft
@@ -678,7 +796,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             continue
         raw_label = str(ex.get("title") or ex.get("name") or ex.get("movement_key") or "?")
         human_title = (ex.get("title") or ex.get("name") or "").strip()
-        mk = _resolve_movement_key(ex, catalog)
+        mk = _resolve_movement_key(ex, catalog, walk)
         if not mk:
             norm = _normalize_title(human_title)
             if norm and norm in newly_created:  # already created earlier this draft
