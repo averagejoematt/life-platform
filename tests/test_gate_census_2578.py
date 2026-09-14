@@ -580,7 +580,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # way the plant intended — with step 1's refusal gone, privacy_guard independently
         # requires the same vocabulary and raises uncaught, so deleting the explicit
         # refusal produces a failed invocation rather than a card. Layered, not single.
-        <= 92  # re-measured 2026-09-13 on this branch's own tree (#3741): 91 -> 92 proven, unproven UNCHANGED at 538 (this proof, not a new unproven entrant)
+        # 92 -> 94 on 2026-09-14: TWO new proofs this session, and the bound is set to
+        # cover both so it holds whichever merges first.
+        #   structural::test_bundle_boot_pil_baseline_3784.py — M1 restores the exact
+        #     baseline state that failed #3737's Deploy job (1 failed / 14); M2 parks a
+        #     fabricated non-PIL entry (2 failed / 13).
+        #   structural::test_recap_coach_line_3749.py (#3786) — M1 restores the placement
+        #     bug that shipped (1 failed / 50, and only dense-session); M2 swaps the read
+        #     seam to served_summary, the owner-register fallback (9 failed / 42).
+        # Both are mutation-backed against REAL failure modes, which is the property this
+        # band exists to protect. Unproven UNCHANGED — neither is a new unproven entrant.
+        # Transient slack of 1 while only one of the two has merged; it closes on the second.
+        <= 94
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
