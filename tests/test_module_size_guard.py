@@ -362,7 +362,6 @@ BASELINE = {
     # gate’s blob/regen/hold/read helpers live in coach/coach_derived_prose.py, which the
     # three serving paths import anyway. Tightened to the measured count so the 35 lines
     # handed back are not left as unpoliced headroom.
-    "mcp/tools_hevy_routine.py": 1022,
 }
 
 # ── #2610: make the red legible ─────────────────────────────────────────────────────────

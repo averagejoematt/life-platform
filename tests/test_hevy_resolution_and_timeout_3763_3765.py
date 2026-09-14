@@ -40,11 +40,12 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from training import hevy_template_index as hti  # noqa: E402
 
+import mcp.hevy_resolution as res  # noqa: E402
 import mcp.tools_hevy_routine as thr  # noqa: E402
 
 # Captured before the autouse fixture patches the name, so the memo test can exercise the
 # real loader rather than the stub.
-_REAL_TEMPLATE_INDEX = thr._template_index
+_REAL_TEMPLATE_INDEX = res._template_index
 
 # A miniature index in the live shape: normalized title -> {id, title}.
 _INDEX = {
@@ -75,10 +76,11 @@ class _Lister:
 
 @pytest.fixture(autouse=True)
 def _fresh_index(monkeypatch):
-    thr._reset_index_cache_for_tests()
+    res._reset_index_cache_for_tests()
+    monkeypatch.setattr(res, "_template_index", lambda *a, **k: _INDEX)
     monkeypatch.setattr(thr, "_template_index", lambda *a, **k: _INDEX)
     yield
-    thr._reset_index_cache_for_tests()
+    res._reset_index_cache_for_tests()
 
 
 def _ex(title):
@@ -89,7 +91,7 @@ def _ex(title):
 def test_exact_index_titles_never_touch_the_live_catalogue():
     """20 exact titles used to cost 0.01s already — this pins that they still do."""
     lister = _Lister()
-    walk = thr._LiveWalk(lister)
+    walk = res._LiveWalk(lister)
     catalog = {}
     for title in [v["title"] for v in _INDEX.values()] * 4:
         assert thr._resolve_movement_key(_ex(title), catalog, walk) is not None
@@ -104,22 +106,22 @@ def test_a_near_miss_title_resolves_from_the_index_without_a_walk():
     UNAMBIGUOUS, which this index deliberately makes it not (seated AND lying both match),
     so the correct answer is that the token-subset step declines and the walk decides.
     """
-    assert thr._index_fuzzy("Leg Curl (Machine)") is None, "an ambiguous token match must not guess"
+    assert res._index_fuzzy("Leg Curl (Machine)") is None, "an ambiguous token match must not guess"
     # With only one candidate it resolves, still for free:
-    assert thr._index_fuzzy("Leg Extension") == "75A4F6C4"
-    assert thr._index_fuzzy("Squat Barbell") == "D04AC939"
+    assert res._index_fuzzy("Leg Extension") == "75A4F6C4"
+    assert res._index_fuzzy("Squat Barbell") == "D04AC939"
 
 
 def test_fuzzy_match_never_invents_a_movement():
     """NEGATIVE CONTROL — tokens absent from every title resolve to nothing."""
-    assert thr._index_fuzzy("Zercher Carry") is None
-    assert thr._index_fuzzy("") is None
+    assert res._index_fuzzy("Zercher Carry") is None
+    assert res._index_fuzzy("") is None
 
 
 def test_one_walk_serves_every_unresolved_title_in_a_draft():
     """Three unknown titles used to mean three full walks from page 1 (~27s)."""
     lister = _Lister(titles=[f"Made Up {i}" for i in range(250)])
-    walk = thr._LiveWalk(lister)
+    walk = res._LiveWalk(lister)
     for i in range(3):
         walk.id_for(f"Made Up {i}")
     assert lister.pages_served == 3, f"expected one 3-page walk shared by all three titles, got {lister.pages_served} page fetches"
@@ -141,7 +143,7 @@ def test_a_failed_walk_is_not_retried_per_title():
         calls["n"] += 1
         return _boom(page=page, page_size=page_size)
 
-    walk = thr._LiveWalk(_counting)
+    walk = res._LiveWalk(_counting)
     assert walk.id_for("A") is None
     assert walk.id_for("B") is None
     assert calls["n"] == 1
@@ -150,7 +152,7 @@ def test_a_failed_walk_is_not_retried_per_title():
 def test_the_walk_is_lazy():
     """A draft where everything resolves for free must not open the catalogue at all."""
     lister = _Lister(titles=["Whatever"])
-    walk = thr._LiveWalk(lister)
+    walk = res._LiveWalk(lister)
     thr._resolve_movement_key(_ex("Squat (Barbell)"), {}, walk)
     assert lister.calls == 0
 
@@ -164,7 +166,7 @@ def test_the_index_is_memoized(monkeypatch):
         return {"templates": _INDEX}
 
     monkeypatch.setattr("training.routine_generator._load_json", _fake_load)
-    thr._reset_index_cache_for_tests()
+    res._reset_index_cache_for_tests()
     for _ in range(5):
         assert _REAL_TEMPLATE_INDEX() == _INDEX
     assert loads["n"] == 1, f"the index was loaded {loads['n']} times for 5 lookups"
@@ -189,7 +191,7 @@ def test_rebuild_writes_the_shape_the_resolver_reads():
 def test_the_writer_and_the_reader_normalize_titles_identically():
     """Two normalizers that disagree means every lookup misses. Assert, don't assume."""
     for raw in ("  Seated   Leg Curl (Machine) ", "BENCH Press (Barbell)", "Farmers Carry"):
-        assert hti.normalize_title(raw) == thr._normalize_title(raw)
+        assert hti.normalize_title(raw) == res._normalize_title(raw)
 
 
 def test_rebuild_refuses_to_shrink_the_index():
