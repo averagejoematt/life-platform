@@ -170,12 +170,15 @@ def reextract_training_notes(days: int) -> dict:
     as before rather than failing the run.
     """
     from boto3.dynamodb.conditions import Key
-    from common.pacific_time import pacific_today
+    from common.pacific_time import pacific_now
     from training import training_notes as tn
     from training.training_notes_llm import make_llm_fn
 
-    end = pacific_today()
-    start = (datetime.fromisoformat(end).date() - timedelta(days=days)).isoformat()
+    # Day arithmetic in the Pacific frame, with no hand-rolled ISO parse (#3609): the
+    # window is calendar days, and `pacific_now()` is the one place that frame is defined.
+    _end_day = pacific_now().date()
+    end = _end_day.isoformat()
+    start = (_end_day - timedelta(days=days)).isoformat()
     resp = _table.query(
         KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#{SOURCE}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"),
     )
