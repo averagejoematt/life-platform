@@ -7052,7 +7052,7 @@
       "edges": 677,
       "lambdas": 105,
       "mcp_tool_modules": 29,
-      "mcp_tools": 81,
+      "mcp_tools": 82,
       "partitions": 105,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
@@ -7063,9 +7063,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 325,
-        "sites_resolved": 838,
-        "sites_total": 1163
+        "sites_dynamic": 327,
+        "sites_resolved": 839,
+        "sites_total": 1166
       },
       "schedule_resolution": {
         "dynamic": 0,
