@@ -104,11 +104,35 @@ def _record(sk: str, payload: dict[str, Any]) -> None:
         logger.error("recap record write failed for %s: %s: %s", sk, type(e).__name__, e)
 
 
+def _week_totals(table, start: str, end: str) -> dict[str, Any]:
+    """The week's own numbers, computed from its days — never hand-typed (the #3565 class)."""
+    from content import recap_data
+
+    from web import recap_layouts as RL
+
+    days = recap_data._day_range(start, end)
+    allf = [recap_data.day_facts(table, d, experiment_start=EXPERIMENT_START_DATE) for d in days]
+    weighed = [x.weight_lb for x in allf if x.weight_lb is not None]
+    pcts = [x.tier0_pct for x in allf if x.tier0_pct is not None]
+    worst = min(((k, v) for x in allf for k, v in x.component_scores.items()), key=lambda kv: kv[1], default=None)
+    totals: dict[str, Any] = {
+        "sessions": sum(1 for x in allf if x.workouts),
+        "sets": sum(sum(w.n_sets for w in x.workouts) for x in allf),
+    }
+    if len(weighed) >= 2:
+        totals["weight_delta"] = round(weighed[-1] - weighed[0], 1)
+    if pcts:
+        totals["habit_pct"] = round(100 * sum(p if p <= 1 else p / 100 for p in pcts) / len(pcts))
+    if worst:
+        totals["misses"] = f"{RL._COMPONENT_NAMES.get(worst[0], worst[0])} — {worst[1]:.0f}/100 at its worst"
+    return totals
+
+
 def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry_run: bool = False) -> dict[str, Any]:
     """Render (and optionally send) the card for one PT date. Returns the picker record."""
     from content import recap_data, recap_deliver, recap_gate
 
-    from web import recap_canvas, recap_templates
+    from web import recap_canvas, recap_layouts
 
     sk = f"DATE#{date}"
     if not force:
@@ -119,48 +143,49 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
 
     facts = recap_data.day_facts(_table, date, experiment_start=EXPERIMENT_START_DATE)
     trailing = recap_data.trailing(_table, date, days=7, experiment_start=EXPERIMENT_START_DATE)
-    scores = recap_templates.score_all(facts, trailing)
+    weight_series, grade_series = recap_data.cycle_series(_table, EXPERIMENT_START_DATE, date)
+
+    # The BEAT, not the biggest number. See recap_layouts.pick_beat.
+    layout, why = recap_layouts.pick_beat(facts, trailing)
+    day_label = f"Day {facts.day_n}" if facts.day_n else ""
 
     base: dict[str, Any] = {
         "date": date,
         "day_n": facts.day_n,
-        "candidates": scores,
+        "beat": layout,
+        "beat_reason": why,
+        "grade": facts.grade_letter,
         "absent_sources": facts.absent,
-        "algo_version": recap_templates.ALGO_VERSION,
+        "algo_version": recap_layouts.__name__ + "@2",
         "rendered_at": pacific_now().isoformat(),
         "dry_run": dry_run,
     }
 
-    picked = recap_templates.pick(facts, trailing)
-    if not picked:
-        # Not a failure. Some days have nothing a reader would notice, and inventing a
-        # card for one of them is exactly what #3527 did.
-        _record(sk, {**base, "outcome": "no_signal", "chosen": []})
-        return {**base, "outcome": "no_signal", "chosen": []}
+    caption = recap_layouts.caption_for_beat(layout, facts, day_label=day_label, date_label=_date_label(date))
 
-    copies = [recap_templates.copy_for(n, facts) for n in picked]
-    day_label = f"Day {facts.day_n}" if facts.day_n else ""
-    caption = recap_deliver.caption_for(copies, day_label=day_label, date_label=_date_label(date))
-
-    verdict = recap_gate.gate(recap_templates.all_strings(copies, caption), items=facts.item_labels())
-    if verdict.blocked_templates:
-        # A blocked label costs its template; the picker chooses again once.
-        picked = recap_templates.pick(facts, trailing, exclude=verdict.blocked_templates)
-        if not picked:
-            _record(sk, {**base, "outcome": "blocked", "chosen": [], "privacy": verdict.to_dict()})
-            return {**base, "outcome": "blocked", "chosen": []}
-        copies = [recap_templates.copy_for(n, facts) for n in picked]
-        caption = recap_deliver.caption_for(copies, day_label=day_label, date_label=_date_label(date))
-        verdict = recap_gate.gate(recap_templates.all_strings(copies, caption), items=facts.item_labels())
-
+    # GATE BEFORE RENDER. A blocked term costs CPU, never a public frame.
+    verdict = recap_gate.gate(recap_layouts.gate_strings(facts, caption), items=facts.item_labels())
     if not verdict.may_send:
-        _record(sk, {**base, "outcome": "held", "chosen": picked, "privacy": verdict.to_dict()})
+        _record(sk, {**base, "outcome": "held", "privacy": verdict.to_dict()})
         logger.warning("recap for %s held by the privacy gate: %s", date, verdict.reason)
-        return {**base, "outcome": "held", "chosen": picked}
+        return {**base, "outcome": "held"}
 
-    img = recap_canvas.render_card(copies, day_label=day_label, date_label=_date_label(date), footer_left="the measured life")
+    try:
+        img = recap_layouts.render_beat(layout, facts, date_label=_date_label(date), weight_series=weight_series, grade_series=grade_series)
+    except Exception as e:  # noqa: BLE001
+        # A layout that cannot be drawn honestly for this day falls back to the scorecard,
+        # which needs the least. If THAT cannot draw either, the day has no card — which is
+        # a fact about the day, not a failure of the run.
+        logger.warning("beat %s could not render for %s (%s); falling back to scorecard", layout, date, type(e).__name__)
+        try:
+            img = recap_layouts.scorecard(facts, date_label=_date_label(date))
+            base["beat"] = layout = "scorecard"
+            base["beat_reason"] = f"fell back from {layout} — {type(e).__name__}"
+        except Exception as e2:  # noqa: BLE001
+            _record(sk, {**base, "outcome": "no_signal", "error": f"{type(e2).__name__}: {e2}"})
+            return {**base, "outcome": "no_signal"}
+
     png = recap_canvas.to_png_bytes(img)
-
     key = f"{RECAP_PREFIX}{date}.png"
     try:
         # No CacheControl and no CloudFront invalidation: this object is NOT served. There
@@ -169,6 +194,29 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         _s3.put_object(Bucket=S3_BUCKET, Key=key, Body=png, ContentType="image/png")
     except Exception as e:  # noqa: BLE001
         logger.error("recap put_object failed for %s: %s: %s", key, type(e).__name__, e)
+
+    # The weekly card is derived from the daily run, not a second cron.
+    weekly_key = None
+    day_n = pacific_day_n(EXPERIMENT_START_DATE, date)
+    if day_n and day_n % 7 == 0:
+        try:
+            week_n = day_n // 7
+            wk_start = recap_data._day_range(EXPERIMENT_START_DATE, date)[-7]
+            totals = _week_totals(_table, wk_start, date)
+            wimg = recap_layouts.reckoning(
+                facts,
+                week_n=week_n,
+                date_label=f"week {week_n} · {_date_label(wk_start)} – {_date_label(date)}",
+                weight_series=weight_series,
+                grade_series=grade_series[-7:],
+                totals=totals,
+            )
+            weekly_key = f"{RECAP_PREFIX}week-{week_n:02d}.png"
+            _s3.put_object(Bucket=S3_BUCKET, Key=weekly_key, Body=recap_canvas.to_png_bytes(wimg), ContentType="image/png")
+            base["weekly"] = {"week": week_n, "s3_key": weekly_key, "totals": totals}
+        except Exception as e:  # noqa: BLE001
+            logger.error("weekly card failed for %s: %s: %s", date, type(e).__name__, e)
+            base["weekly"] = {"error": f"{type(e).__name__}: {e}"}
 
     delivered: dict[str, str] = {}
     if deliver:
@@ -188,7 +236,6 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     record = {
         **base,
         "outcome": "sent" if deliver else "rendered",
-        "chosen": picked,
         "s3_key": key,
         "privacy": verdict.to_dict(),
         "delivered": delivered,
@@ -212,12 +259,6 @@ def lambda_handler(event: dict | None, context: Any) -> dict:
         dry_run = is_dry_run(event)
 
         out = render_for_date(date, deliver=deliver, force=force, dry_run=dry_run)
-
-        # The weekly card is derived from the daily run, not a second cron: genesis moves
-        # every cycle, so a weekday literal would drift. Day 7, 14, 21 … closes a week.
-        day_n = pacific_day_n(EXPERIMENT_START_DATE, date)
-        if day_n and day_n % 7 == 0:
-            out["weekly"] = {"due": True, "week": day_n // 7, "note": "weekly card is #3748 — not rendered yet"}
 
         return {"statusCode": 200, "body": out}
     except Exception as e:  # noqa: BLE001

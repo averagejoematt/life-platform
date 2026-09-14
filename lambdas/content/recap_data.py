@@ -370,15 +370,35 @@ def _day_range(start: str, end: str) -> list[str]:
 
 
 def trailing(table, end_date: str, days: int = 7, *, experiment_start: str | None = None) -> list[DayFacts]:
-    """The `days` PT days ending at `end_date`, oldest first — the picker's baseline."""
+    """The `days` PT days ending at `end_date`, oldest first — the picker's baseline.
+
+    CLAMPED AT THE EXPERIMENT START, and the clamp is the whole point. An unclamped window
+    reaches into the PREVIOUS cycle, and comparing across a genesis boundary is how the
+    first cards headlined "2.7 lb UP THIS WEEK" on Day 4 — a week-ago weight belonging to a
+    different attempt, rendered as a gain. It recurred the moment beat-selection began
+    reading this same window: Day 1 chose the "new weigh-in" beat off a weight from before
+    the cycle began.
+
+    Twice is a class, not a coincidence. Any window that does not know where the experiment
+    starts will eventually be asked a question that spans the boundary, so the boundary
+    lives here, once, instead of in each caller's head.
+    """
     from datetime import date as _date, timedelta
 
     try:
         end = _date.fromisoformat(end_date)
     except ValueError:
         return []
+    floor = None
+    if experiment_start:
+        try:
+            floor = _date.fromisoformat(experiment_start)
+        except ValueError:
+            floor = None
     out = []
     for i in range(days - 1, -1, -1):
-        d = (end - timedelta(days=i)).isoformat()
-        out.append(day_facts(table, d, experiment_start=experiment_start))
+        d = end - timedelta(days=i)
+        if floor and d < floor:
+            continue
+        out.append(day_facts(table, d.isoformat(), experiment_start=experiment_start))
     return out

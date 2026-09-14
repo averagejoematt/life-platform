@@ -407,3 +407,106 @@ def reckoning(facts, *, week_n: int, date_label: str, weight_series=None, grade_
 
 
 LAYOUTS = {"scorecard": scorecard, "trajectory": trajectory, "session": session, "reckoning": reckoning}
+
+
+# ── beat selection ────────────────────────────────────────────────────────────
+#: Sets that make a day a training STORY rather than a training fact.
+HEAVY_SETS = 20
+
+
+def pick_beat(facts, trailing=None) -> tuple[str, str]:
+    """Which layout this day's story wants, and why. Returns (layout, reason).
+
+    Ava Moreau's correction, and the reason the first cards felt interchangeable: the
+    original picker chose by DATA MAGNITUDE — largest number wins — which is not how a
+    serial works. A campaign picks a BEAT. The same 27-set session is a different post on
+    the day he also weighed in than on the day he did not.
+
+    Deterministic and ordered, so the same day always produces the same beat and "a
+    different card every day" is a property rather than a hope.
+    """
+    trailing = trailing or []
+
+    # 1. A new weigh-in is the arc moving. It is the rarest event and the most postable —
+    #    and on this cycle it is genuinely rare: one in the whole first week.
+    prev = next((d.weight_lb for d in reversed(trailing) if d.date != facts.date and d.weight_lb is not None), None)
+    if facts.weight_lb is not None and prev is not None and abs(facts.weight_lb - prev) > 0.05:
+        return "trajectory", "new weigh-in — the arc moved"
+
+    # 2. A heavy session is its own story, with the movements named.
+    sets = sum(w.n_sets for w in facts.workouts)
+    if sets >= HEAVY_SETS:
+        return "session", f"{sets} working sets — a session worth showing"
+
+    # 3. Everything else is the day, graded. The default is not a fallback: a C- with its
+    #    components exposed is the format that carries the account's whole promise.
+    return "scorecard", "the day, graded"
+
+
+#: Item classes that NO layout draws by name. `item_labels()` is the complete risk-surface
+#: registry — every name that could ever reach a card converges there, deliberately — but
+#: the whole-card text screen must run over what will ACTUALLY be drawn. Vice streaks are
+#: rendered as a count and never as a name (see `_vice_summary`), so including their names
+#: in the text screen held every single card on a blocked-category streak the card was
+#: never going to print. The per-ITEM screen still sees them, via `items=item_labels()`.
+NEVER_DRAWN_BY_NAME = {"streaks"}
+
+
+def gate_strings(facts, caption: str = "") -> list[str]:
+    """Everything a layout could put on a card that did not come from a number.
+
+    Screens the INPUT rather than the drawn output. Layouts render names (workout titles,
+    exercises, missed habits), formatted numbers, and fixed labels — the numbers and labels
+    are ours, so the names are the whole risk surface, and `item_labels()` is where every
+    name already converges for exactly that reason. Screening inputs also cannot drift the
+    way a parallel list of "strings this layout draws" would the first time a layout changed.
+
+    The one exclusion is `NEVER_DRAWN_BY_NAME`, and it is load-bearing in both directions:
+    without it the gate held all seven cards over a name none of them print; and if a future
+    layout ever DOES print a vice name, it must remove that class from this set, which is a
+    deliberate, reviewable act rather than an accident.
+    """
+    out = [label for template, label in facts.item_labels() if template not in NEVER_DRAWN_BY_NAME]
+    if caption:
+        out.append(caption)
+    return out
+
+
+def render_beat(layout: str, facts, *, date_label: str, weight_series=None, grade_series=None, week_n=None, totals=None):
+    """Render one beat. Raises if the layout cannot be honestly drawn for this day."""
+    if layout == "trajectory":
+        return trajectory(facts, date_label=date_label, weight_series=weight_series, grade_series=grade_series)
+    if layout == "session":
+        return session(facts, date_label=date_label)
+    if layout == "reckoning":
+        return reckoning(
+            facts, week_n=week_n or 1, date_label=date_label, weight_series=weight_series, grade_series=grade_series, totals=totals
+        )
+    return scorecard(facts, date_label=date_label)
+
+
+def caption_for_beat(layout: str, facts, *, day_label: str, date_label: str) -> str:
+    """The words beside the image — assembled from the card's own facts, never generated.
+
+    A caption is published in the same breath as the image and is screened with it, so it
+    says what the card says. The hook line differs by beat because a serial that opens the
+    same way every day teaches people to scroll past it.
+    """
+    head = f"{day_label} · attempt #{ATTEMPT_NUMBER}"
+    bits: list[str] = []
+    if layout == "trajectory" and facts.total_lost_lb:
+        bits.append(f"{facts.total_lost_lb:.1f} lb down since day one. {facts.weight_lb:.1f} lb today.")
+        if facts.lb_to_goal:
+            bits.append(f"{facts.lb_to_goal:.0f} lb to go.")
+    elif layout == "session" and facts.workouts:
+        w = facts.workouts[0]
+        bits.append(f"{_session_label(w.title)}. {w.n_sets} working sets, {w.volume_lbs:,.0f} lb moved.")
+    else:
+        if facts.grade_letter:
+            bits.append(f"Today graded {facts.grade_letter}.")
+        worst = min(facts.component_scores.items(), key=lambda kv: kv[1], default=None)
+        if worst:
+            bits.append(f"Worst component: {_COMPONENT_NAMES.get(worst[0], worst[0])} at {worst[1]:.0f}/100.")
+    if facts.missed_tier0:
+        bits.append("Missed: " + ", ".join(facts.missed_tier0[:2]) + ".")
+    return (head + "\n" + " ".join(bits)).strip()
