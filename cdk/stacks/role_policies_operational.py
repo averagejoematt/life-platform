@@ -927,6 +927,18 @@ def operational_recap_card_generator() -> list[iam.PolicyStatement]:
                 actions=["ses:SendEmail", "ses:SendRawEmail"],
                 resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
             ),
+            # #2824: the fail-closed content-filter vocabulary (#2503 — off-repo, S3 channel).
+            # `recap_gate.gate()` calls `content_filter_channel.load(require=True)` FIRST and
+            # aborts the render if it is unavailable. Without this grant that load raises
+            # AccessDenied on every invocation, so the gate would fail closed always and every
+            # card would be held — the feature would ship dead, with the safest possible
+            # symptom and no error. Caught by tests/test_grant_enumeration_drift.py before a
+            # single card was rendered, which is the #2503 / #1196 incident class exactly.
+            iam.PolicyStatement(
+                sid="ContentFilterVocabulary",
+                actions=["s3:GetObject"],
+                resources=_s3("config/content_filter.json"),
+            ),
         ],
     )
 

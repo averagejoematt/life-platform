@@ -341,6 +341,31 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
 
 #: Seams born after SEED_DATE that are deliberately not contracted: (date, reason).
 #: The reason must be an argument (40-char floor, enforced by the guard).
-PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {}
+# The first rows this dict has ever carried (#3741). See the reason itself for why these
+# five are a decision rather than five contracts.
+_RECAP_READ_REASON = "#3741 recap card: a READ-ONLY consumer that cannot make a false claim from a shape change. Verified on the module, not assumed: recap_data does no [] indexing on any source row (every field goes through .get()), DayFacts declares 21 Optional fields and the non-Optional ones default to empty list/dict, and web/recap_templates raises RecapNullFact on any None at RENDER rather than formatting it — fmt(None) == '-' is forbidden on this surface. So a renamed or dropped field makes the beat that needs it DECLINE; it can never become a wrong number on a public card. Residual risk stated plainly rather than waved: the card would then degrade to a fallback beat silently, and the only record is `absent_sources` on the SOURCE#recap_cards row per run, which is queryable but not alarmed. Contracting five read seams whose worst case is 'draws less' is disproportionate (ADR-103/144) while that holds; if a card ever derives a number from two partitions that must agree, that seam gets a PairContract instead of this row."
+
+PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "computed_metrics::lambdas/content/recap_data.py::read": (
+        "2026-09-13",
+        _RECAP_READ_REASON,
+    ),
+    "habit_scores::lambdas/content/recap_data.py::read": (
+        "2026-09-13",
+        _RECAP_READ_REASON,
+    ),
+    "hevy::lambdas/content/recap_data.py::read": (
+        "2026-09-13",
+        _RECAP_READ_REASON,
+    ),
+    "notion::lambdas/content/recap_data.py::read": (
+        "2026-09-13",
+        _RECAP_READ_REASON,
+    ),
+    "strava::lambdas/content/recap_data.py::read": (
+        "2026-09-13",
+        _RECAP_READ_REASON,
+    ),
+}
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]
