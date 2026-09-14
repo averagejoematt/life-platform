@@ -155,6 +155,61 @@ def _tombstone_deleted(workout_id: str) -> None:
     logger.info("hevy delete marker written for %s", workout_id)
 
 
+#: Namespace + metric for the rebuild heartbeat (#3764). Emitted ONLY on a write that
+#: actually happened, which is what makes the alarm behind it a dead-man rather than an
+#: error alarm — see `_emit_rebuilt` and `HevyTemplateIndexStale` in the ingestion stack.
+INDEX_METRIC_NAMESPACE = "LifePlatform/HevyRoutine"
+INDEX_REBUILT_METRIC = "TemplateIndexRebuilt"
+
+
+def _emit_rebuilt(count: int) -> None:
+    """Emit the heartbeat for a rebuild that really published a new index.
+
+    Deliberately best-effort: a CloudWatch blip must not turn a successful rebuild into a
+    failed run. The cost of a dropped datapoint is one day of a two-day alarm window, and
+    the alarm needs both days empty before it fires.
+    """
+    try:
+        import boto3
+
+        boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2")).put_metric_data(
+            Namespace=INDEX_METRIC_NAMESPACE,
+            MetricData=[{"MetricName": INDEX_REBUILT_METRIC, "Value": 1, "Unit": "Count"}],
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("template index heartbeat emit failed: %s: %s", type(e).__name__, e)
+
+
+def rebuild_template_index() -> dict:
+    """Republish config/hevy_template_index.json from the live Hevy catalogue (#3764).
+
+    Emits `TemplateIndexRebuilt` on success and on success only. Every way this job can
+    fail ends in the SAME observable state — a `config/hevy_template_index.json` whose
+    `_built_at` stops moving — and none of them raises: the rule could stop firing, the
+    Hevy walk could 429, or `rebuild()` could refuse a shrink and return `written: False`.
+    A Lambda Errors alarm sees none of those three, because this function swallows its own
+    failure by design (below). So the thing worth watching is not the error, it is the
+    ABSENCE of the success, and that is what the heartbeat carries.
+    """
+    from training import hevy_template_cache as cache, hevy_template_index as idx, hevy_write_client as wc
+
+    try:
+        out = idx.rebuild(wc.list_templates, cache._write_s3_json, cache._read_s3_json)
+        logger.info("template index rebuild: %s", out)
+        if out.get("written"):
+            _emit_rebuilt(int(out.get("count") or 0))
+        else:
+            # A refused shrink is not an exception, but it IS a day the index did not
+            # move. No heartbeat, so the dead-man counts it like any other silent miss.
+            logger.warning("template index NOT rebuilt: %s", out.get("reason") or out.get("error"))
+        return out
+    except Exception as e:  # noqa: BLE001
+        # Never fail the function over the index: the resolver's live-walk fallback still
+        # answers, it is just slower. A failed rebuild is a log line, not an outage.
+        logger.error("template index rebuild failed: %s: %s", type(e).__name__, e)
+        return {"written": False, "error": f"{type(e).__name__}: {e}"}
+
+
 def reextract_training_notes(days: int) -> dict:
     """Re-run the note extractor over already-ingested workouts (#3768).
 
@@ -204,6 +259,12 @@ def lambda_handler(event: dict, context: Any) -> dict:
     """Scheduled backfill entry point. Polls the events feed since the
     last-known timestamp, ingests new/updated workouts, persists new
     high-water-mark on success."""
+    # #3764: the template index has a producer now. Runs on its own daily EventBridge
+    # rule with this constant input — the index was built by hand once on 2026-06-01 and
+    # had drifted 789 vs 828 live by 2026-09-13, every missing title costing a live walk.
+    if event and event.get("rebuild_template_index"):
+        return rebuild_template_index()
+
     # #3768: one-shot repair mode. `{"reextract_days": N}` re-derives the note layer for
     # the last N days instead of polling the events feed — the window the extractor was
     # dark for has already been ingested, so nothing else would ever revisit it.

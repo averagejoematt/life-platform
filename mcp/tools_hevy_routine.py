@@ -293,69 +293,36 @@ def _catalog_movements() -> dict[str, Any]:
     return (_load_json("movement_catalog.json") or {}).get("movements", {})
 
 
-def _normalize_title(t: str) -> str:
-    """Normalize a title for index lookup: lowercase, collapse whitespace, strip."""
-    import re
-
-    return re.sub(r"\s+", " ", (t or "").strip().lower())
-
-
-def _template_index() -> dict[str, Any]:
-    """Full Hevy template index (ADR-069): normalized_title -> {id, title}.
-
-    Covers every built-in Hevy exercise plus the account's custom ones, so
-    draft_custom can author any exercise by name without a curated catalog
-    entry. Distinct from movement_catalog.json (the generator's curated pool).
-    Returns {} if the index is absent — resolution then falls back to a live
-    Hevy lookup.
-    """
-    from training.routine_generator import _load_json
-
-    try:
-        return (_load_json("hevy_template_index.json") or {}).get("templates", {})
-    except Exception:
-        return {}
+# #3763: title resolution lives in `mcp/hevy_resolution.py` (a cohesive seam, extracted
+# under the #1665 size ratchet). Re-exported here because every existing caller and test
+# reaches these through this module — the names are the module's public surface.
+from mcp.hevy_resolution import (  # noqa: E402
+    _index_fuzzy,
+    _live_template_id_by_title,
+    _LiveWalk,
+    _normalize_title,
+    _template_index,
+)
 
 
-def _live_template_id_by_title(name: str) -> str | None:
-    """Self-heal: search the live Hevy template list for an exact title match.
-
-    Triggered only when the static index misses (e.g. a template created in
-    Hevy after the index was last built). Exact normalized-title match only —
-    never a fuzzy guess, to avoid silently pushing the wrong exercise.
-    """
-    from training import hevy_write_client as wc
-
-    target = _normalize_title(name)
-    page = 1
-    while page <= 30:
-        try:
-            resp = wc.list_templates(page=page, page_size=100)
-        except Exception:
-            return None
-        items = resp.get("exercise_templates") or resp.get("templates") or []
-        if not items:
-            return None
-        for t in items:
-            if _normalize_title(t.get("title")) == target and t.get("id"):
-                return str(t["id"])
-        if len(items) < 100:
-            return None
-        page += 1
-    return None
-
-
-def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | None:
+def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any], walk: "_LiveWalk | None" = None) -> str | None:
     """Map a caller-supplied exercise onto a resolvable movement key.
 
-    Resolution order (conservative — exact matches before fuzzy, curated before
-    index, to avoid silent mis-maps):
+    Resolution order — every FREE step before the paid one (#3763). Until this fix the
+    live Hevy walk sat at step 4, ahead of the in-memory curated match that would have
+    answered instantly, so a single imprecise title cost ~9s and three of them reached the
+    30s soft timeout. The measured shape: 20 exact titles resolved in 0.01s, 3 non-exact
+    titles took 27.5s. Exercise COUNT never mattered — which is the whole origin of the
+    "draft_custom times out above ~7 exercises" folklore (#3771).
+
       1. explicit `movement_key` that is a curated catalog key (keeps generator
          metadata + ADR-067/068 semantics)
       2. exact title match against the curated catalog
       3. exact normalized-title match against the full Hevy index -> "tmpl:<id>"
-      4. exact title match against the live Hevy list (self-heal) -> "tmpl:<id>"
+      4. unambiguous token-subset match against the index -> "tmpl:<id>"
       5. loose contains match within the small curated catalog only
+      6. the live Hevy list (self-heal for templates newer than the index) -> "tmpl:<id>",
+         walked at most ONCE per draft and shared across every unresolved title
 
     Returns None when nothing maps — caller surfaces a loud, listy error.
     """
@@ -378,16 +345,22 @@ def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any]) -> str | 
     if hit and hit.get("id"):
         return "tmpl:" + str(hit["id"])
 
-    # 4. live Hevy lookup (self-heal for templates newer than the index)
-    live_id = _live_template_id_by_title(name)
-    if live_id:
-        return "tmpl:" + live_id
+    # 4. index, unambiguous token-subset ("Leg Curl (Machine)" -> "Seated Leg Curl (Machine)")
+    fuzzy_id = _index_fuzzy(name)
+    if fuzzy_id:
+        return "tmpl:" + fuzzy_id
 
     # 5. loose contains within the curated catalog only (small + trusted)
     for k, v in catalog.items():
         title = (v.get("title") or "").strip().lower()
         if title and (nlow in title or title in nlow):
             return k
+
+    # 6. LAST: the live Hevy walk. Everything above is in-memory; this is ~9s of paged
+    #    HTTP at the client throttle, so it runs only when nothing free could answer.
+    live_id = (walk.id_for(name) if walk is not None else _live_template_id_by_title(name)) or None
+    if live_id:
+        return "tmpl:" + live_id
     return None
 
 
@@ -668,6 +641,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         create_missing = create_missing.lower() not in ("false", "0", "no")
 
     catalog = _catalog_movements()
+    # #3763: ONE live walk for the whole draft, lazily started and only if some title
+    # cannot be resolved for free. Shared across every exercise in this call.
+    walk = _LiveWalk()
     blocks: list = []
     unknown: list[str] = []  # unresolved + (no human title OR create disabled)
     created: list[dict] = []  # newly created Hevy exercises this draft
@@ -678,7 +654,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
             continue
         raw_label = str(ex.get("title") or ex.get("name") or ex.get("movement_key") or "?")
         human_title = (ex.get("title") or ex.get("name") or "").strip()
-        mk = _resolve_movement_key(ex, catalog)
+        mk = _resolve_movement_key(ex, catalog, walk)
         if not mk:
             norm = _normalize_title(human_title)
             if norm and norm in newly_created:  # already created earlier this draft

@@ -11,7 +11,7 @@ from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 # The MCP package depends on boto3 + config at import time; conftest sets the
 # path. Importing the tool module is enough.
-from mcp import tools_hevy_routine as t
+from mcp import hevy_resolution as res, tools_hevy_routine as t
 
 # The dry_run/commit paths render the routine title via routine_title.build_title_context,
 # which reads DynamoDB (phase state + routine index + performed history). Unit tests must
@@ -280,6 +280,16 @@ def test_draft_custom_unknown_offers_index_suggestions():
     assert "Bench Press (Barbell)" in str(out)
 
 
+class _MissingWalk:
+    """A live walk that finds nothing — the resolution-miss half of the test."""
+
+    def __init__(self, *_a, **_k):
+        pass
+
+    def id_for(self, _name):
+        return None
+
+
 def test_draft_custom_auto_creates_missing_exercise():
     """A title Hevy doesn't have is created WHEN ASKED (create_missing=true) and
     used, and reported under created_exercises.
@@ -300,12 +310,19 @@ def test_draft_custom_auto_creates_missing_exercise():
         create_calls.append(body)
         return body["exercise"]["title"]  # Hevy returns a bare id-ish string
 
-    # live lookup MISSES during resolution, then HITS on the post-create reconcile
+    # Live lookup MISSES during resolution, then HITS on the post-create reconcile.
+    # #3763 split those two paths: resolution now goes through the per-draft `_LiveWalk`
+    # (one shared pass, so three unknown titles cost one walk rather than three), while
+    # `_create_template_for`'s reconcile still calls `_live_template_id_by_title`. Patching
+    # both is what keeps this test honest about which path did what.
     with (
         patch("training.routine_repo.draft_versioned", side_effect=fake_put),
         patch.object(t, "_template_index", return_value={}),
+        patch("mcp.hevy_resolution._template_index", return_value={}),
         patch("training.hevy_write_client.create_template", side_effect=fake_create),
-        patch.object(t, "_live_template_id_by_title", side_effect=[None, "NEWID123"]),
+        patch.object(res, "_LiveWalk", _MissingWalk),
+        patch.object(t, "_LiveWalk", _MissingWalk),
+        patch.object(t, "_live_template_id_by_title", return_value="NEWID123"),
     ):
         out = t.tool_manage_hevy_routine(
             {

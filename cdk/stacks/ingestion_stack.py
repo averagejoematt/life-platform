@@ -14,8 +14,11 @@ from pathlib import Path
 
 import aws_cdk as cdk
 from aws_cdk import (
+    Duration,
     Stack,
     aws_apigatewayv2 as apigwv2,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
@@ -372,7 +375,7 @@ class IngestionStack(Stack):
         # hour he eventually trains past, so the window is now 24h. An empty
         # feed costs one API call and one page (~800 ms), so the 12 added
         # invocations/day are rounding error against never missing a session.
-        create_platform_lambda(
+        hevy_backfill = create_platform_lambda(
             self,
             "HevyBackfill",
             function_name="hevy-backfill",
@@ -389,6 +392,68 @@ class IngestionStack(Stack):
             custom_policies=rp.ingestion_hevy_backfill(),
             **shared,
         )
+
+        # #3764: rebuild the Hevy exercise-template index daily. The index is what
+        # draft_custom resolves an exercise TITLE against (ADR-069); it was built by hand
+        # ONCE on 2026-06-01 and had no producer in this repo at all. Measured 2026-09-13:
+        # 789 indexed vs 828 live, and every one of the 39 missing titles cost a walk of
+        # the live catalogue on each draft that named it. Same Lambda, constant input —
+        # the whoop_reconcile_rule idiom — so the fleet gains a schedule, not a function.
+        hevy_index_rule = events.Rule(
+            self,
+            "HevyTemplateIndexRebuild",
+            schedule=events.Schedule.cron(hour="13", minute="40"),  # 06:40 PT, fixed UTC
+            description="#3764: republish config/hevy_template_index.json from the live Hevy catalogue",
+        )
+        hevy_index_rule.add_target(
+            targets.LambdaFunction(
+                hevy_backfill,
+                event=events.RuleTargetInput.from_object({"rebuild_template_index": True}),
+            )
+        )
+
+        # ── #3764: the rebuild's dead-man ────────────────────────────────────────
+        # Every way this job can fail ends in the same observable state — an index whose
+        # `_built_at` stops moving — and NOT ONE of them raises:
+        #   1. the rule stops firing (disabled, deleted, a bad cron edit) — no invocation;
+        #   2. the Hevy walk 429s or the auth blips — `rebuild_template_index` catches it
+        #      and returns, deliberately, because a slow draft beats a failed poll;
+        #   3. `rebuild()` refuses to shrink the index — a successful run that wrote
+        #      nothing.
+        # So none of the obvious watches work here. A Lambda Errors alarm sees zero of the
+        # three (nothing raises). An Invocations heartbeat on hevy-backfill sees zero of
+        # the three either, and would be the worse kind of wrong — it is GREEN by
+        # construction, because the same function also runs the hourly poll (cron(0 * * * ? *)
+        # above) and would keep invoking 24x a day with this rule stone dead. That is an
+        # alarm that cannot fail.
+        # What separates all three from a healthy day is the ABSENCE of a success, so the
+        # function emits TemplateIndexRebuilt only when it really publishes, and this
+        # watches for that going quiet. BREACHING on missing data is the whole point: no
+        # datapoint IS the failure. Two 24h periods, not one, so a single dropped emit or
+        # one 429 self-heals on tomorrow's run without waking anyone.
+        # Digest, not paging (ADR-050): a stale index degrades draft_custom back to the
+        # live-walk path it used before #3764 — slower, never wrong.
+        hevy_index_stale_alarm = cloudwatch.Alarm(
+            self,
+            "HevyTemplateIndexStale",
+            alarm_name="hevy-template-index-not-rebuilt-48h",
+            alarm_description=(
+                "#3764: config/hevy_template_index.json has not been republished in 48h. The daily "
+                "rebuild is not writing (rule not firing, Hevy walk failing, or a refused shrink). "
+                "draft_custom still resolves via the live catalogue walk, just slower."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/HevyRoutine",
+                metric_name="TemplateIndexRebuilt",
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=2,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        hevy_index_stale_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── (6c) MacroFactor unofficial-API puller removed 2026-05-25.
         # Was attempted as WS-2 Tier 1 under SPEC_HEVY_AND_NUTRITION_BRIDGE §3

@@ -314,7 +314,10 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
         secret_name="life-platform/hevy",
         s3_prefix="raw/hevy/*",
         # #412: adherence_calc reads the movement catalog + resolved template cache from S3 to map movements → Hevy template ids.
-        extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json"],
+        # #3764: + the template INDEX, which this function now rebuilds daily. It reads the
+        # previous copy (to refuse a shrink that would mean a partial walk) and writes the new one.
+        extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json", "config/hevy_template_index.json"],
+        extra_s3_write=["config/hevy_template_index.json"],
     ) + [_bedrock_statement()]
 
 

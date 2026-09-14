@@ -264,6 +264,12 @@
       "stack": "operational_stack",
       "via": "constructor:create_platform_lambda"
     },
+    "hevy-template-index-not-rebuilt-48h": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "ingestion_stack",
+      "via": "declaration"
+    },
     "ingest-auth-unhealthy-24h": {
       "kind": "metric",
       "routing": "urgent",
@@ -887,9 +893,9 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 125,
+    "alarms": 126,
     "emf_namespaces": 31,
-    "schedules": 88,
+    "schedules": 89,
     "secrets": 28
   },
   "edges": [
@@ -6140,6 +6146,10 @@
         {
           "expr": "cron(0 * * * ? *)",
           "resolution": "constant"
+        },
+        {
+          "expr": "cron(40 13 * * ? *)",
+          "resolution": "constructed"
         }
       ],
       "stack": "ingestion_stack",
@@ -6953,9 +6963,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 125,
+      "alarms": 126,
       "alarms_by_routing": {
-        "digest": 93,
+        "digest": 94,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,
@@ -6976,7 +6986,7 @@
       "privacy_sources_owner_only": 13,
       "privacy_sources_owner_published": 2,
       "scheduled_lambdas": 81,
-      "schedules": 88
+      "schedules": 89
     },
     "coverage": {
       "edge_sites": {
@@ -7790,6 +7800,13 @@
       "resolution": "constant",
       "stack": "operational_stack",
       "utc": "13:30"
+    },
+    {
+      "expr": "cron(40 13 * * ? *)",
+      "lambda": "hevy-backfill",
+      "resolution": "constructed",
+      "stack": "ingestion_stack",
+      "utc": "13:40"
     },
     {
       "expr": "cron(0 14 ? * MON *)",
