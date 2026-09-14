@@ -153,6 +153,12 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     layout, why = recap_layouts.pick_beat(facts, trailing)
     day_label = f"Day {facts.day_n}" if facts.day_n else ""
 
+    # The coach line is selected AFTER the beat and set onto the facts, because which
+    # coach speaks depends on what the day's story turned out to be — a session card
+    # wants the physical coach, a graded day wants the mind coach. `day_facts()` stays
+    # unaware of beats on purpose; it assembles a day, it does not narrate one (#3749).
+    facts.coach_line, facts.coach_line_source, coach_line_status = recap_data.coach_line(_table, date, layout)
+
     base: dict[str, Any] = {
         "date": date,
         "day_n": facts.day_n,
@@ -160,7 +166,14 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         "beat_reason": why,
         "grade": facts.grade_letter,
         "absent_sources": facts.absent,
-        "algo_version": recap_layouts.__name__ + "@2",
+        "algo_version": recap_layouts.__name__ + "@3",
+        # The OUTPUT# record the quote came from, so any line on any card is traceable to
+        # the coach run that wrote it. None when the day had no reader-safe coach line —
+        # recorded either way, because "no line" is a fact about the day worth keeping.
+        "coach_line_source": facts.coach_line_source,
+        # `ok` | `absent` | `unreadable`. Three outcomes that look identical on the card
+        # and must not look identical here — see recap_data.coach_line (#3749/#3768).
+        "coach_line_status": coach_line_status,
         "rendered_at": pacific_now().isoformat(),
         "dry_run": dry_run,
     }
@@ -168,7 +181,11 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     caption = recap_layouts.caption_for_beat(layout, facts, day_label=day_label, date_label=_date_label(date))
 
     # GATE BEFORE RENDER. A blocked term costs CPU, never a public frame.
-    verdict = recap_gate.gate(recap_layouts.gate_strings(facts, caption), items=facts.item_labels())
+    verdict = recap_gate.gate(
+        recap_layouts.gate_strings(facts, caption),
+        items=facts.item_labels(),
+        free_text=facts.free_text(),
+    )
     if not verdict.may_send:
         _record(sk, {**base, "outcome": "held", "privacy": verdict.to_dict()})
         logger.warning("recap for %s held by the privacy gate: %s", date, verdict.reason)

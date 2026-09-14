@@ -802,6 +802,54 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-14",
     },
+    # #3749: the coach line's guard. Both mutations are REAL historical defects from the
+    # session that wrote it, not synthetic plants — M1 is the bug that shipped and was
+    # caught by rendering against live data, M2 is the wrong read seam the plan itself
+    # recommended before the audience registers were checked.
+    "structural::test_recap_coach_line_3749.py": {
+        "gate_name": "test_recap_coach_line_3749.py",
+        "command": "python3 -m pytest tests/test_recap_coach_line_3749.py -q   # 51 tests; baseline 51 passed",
+        "mutation": (
+            "M1: `_coach_line` moved back to its original position — called last in every layout, after the "
+            "fact footer. It drops itself below FLOOR_Y rather than overprint the footer band, so on a dense "
+            "day the quote is selected, screened, stored in the picker record, put in the caption and drawn "
+            "NOWHERE. This is the defect as shipped; it was found by rendering a card against live DynamoDB, "
+            "and the first version of this test passed against it. "
+            "M2: the read seam swapped from `audience_guard.public_blurb` to "
+            "`coach_derived_prose.served_summary`, whose preference list ends at the coach's full `content`. "
+            "That is the owner's register — second person, written TO Matthew — on a public Instagram card, "
+            "the #2972 defect. Not a hypothetical: `served_summary` is the helper the implementation plan "
+            "named, and the swap is one identifier."
+        ),
+        "observed": (
+            "M1 RED (1 failed, 50 passed): test_every_layout_DRAWS_the_line_on_a_real_day[dense-session] — and "
+            "ONLY that case, which is the point. The three sparse-fixture parametrisations and the other three "
+            "layouts still pass, because on those the quote does fit. A byte-comparison test passed on all "
+            "eight; counting lit pixels against a fixture built from a real logged day is what separates 'the "
+            "quote is on the card' from 'the quote was computed and silently dropped'. "
+            "M2 RED (9 failed, 42 passed): test_a_public_summary_becomes_the_line_and_names_its_record, all "
+            "three owner-register parametrisations (observatory_summary, key_recommendation, content), "
+            "test_a_held_condensation_leaves_the_card_silent, test_one_broken_coach_does_not_hide_a_line_from_"
+            "another, and the three beat-ordering cases. "
+            "Restored between each; 51 passed again after the second. Both watched 2026-09-14."
+        ),
+        "scope": (
+            "Covers SELECTION — that the line is a verbatim contiguous prefix of a coach's `public_summary`, "
+            "that no owner-register field can ever substitute for it, that absence stays absent, that the "
+            "record id travels, and that a failed READ is reported as `unreadable` rather than as a quiet day "
+            "(the #3768 shape, asserted before it can bite: this queries COACH#* partitions the recap role can "
+            "read only because its DynamoDB grant carries no LeadingKeys condition). "
+            "Does NOT cover the privacy screening of the selected line — that is `recap_gate`'s step 4 and has "
+            "its own verdict under guard::lambdas/content/recap_gate.py, whose M4/M5 are that step. The split "
+            "is deliberate: this file would pass a well-formed sentence from the wrong audience exactly as "
+            "cleanly as the right one if the seam were not asserted here, and the gate would screen it exactly "
+            "as cleanly either way. "
+            "Offline: DynamoDB is a hand-written FakeTable that reads the real boto3 condition objects, and "
+            "the renders are real Pillow output — so this is the family-5 hand-performed bar, not a live CI "
+            "observation."
+        ),
+        "proved_on": "2026-09-14",
+    },
     "structural::test_a11y_ledger_3548.py": {
         "gate_name": "test_a11y_ledger_3548.py",
         "command": "python3 -m pytest tests/test_a11y_ledger_3548.py -q",

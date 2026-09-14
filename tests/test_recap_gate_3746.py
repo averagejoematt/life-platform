@@ -12,12 +12,18 @@ and is used by the site. What did not exist was a caller for a surface not yet w
 So the gate ships first, and these tests are what "ships first" means: the send path
 cannot be built until they pass.
 
-THE THREE FAILURE MODES, EACH WITH ITS CONTROL
+THE FOUR FAILURE MODES, EACH WITH ITS CONTROL
   1. the vocabulary cannot be read       → refuse (not "no blocked terms today")
   2. a blocked label appears in an item  → drop THAT template, keep the day
   3. banned content anywhere in the copy → hold the whole card
+  4. the card's PROSE is unsafe          → hold the whole card (#3749)
 Each has a negative control, because a gate that refuses everything teaches its owner to
 route around it, which is the same outcome as no gate.
+
+Step 4 arrived with the coach line and its controls live in
+`tests/test_recap_coach_line_3749.py`, beside the selection they exist to protect. This
+file keeps the one assertion that belongs to the GATE rather than to that feature: that
+the free-text screen is wired at all, in both directions.
 """
 
 from __future__ import annotations
@@ -131,28 +137,37 @@ def test_the_gate_record_never_carries_the_vocabulary(clean_channel):
     assert payload["hit_kinds"] == ["vice"], "the record should say the KIND, not the term"
 
 
-# ── The compensating control for not running the semantic classifier ─────────
-def test_no_card_field_is_sourced_from_free_text(clean_channel):
-    """v1 draws numbers and fixed labels only — which is WHY the sensitivity classifier is
-    not wired (with no classifier it holds everything, and its deterministic layer is
-    already step 3). If a template ever draws journal prose or a food-item name, this
-    test is the thing that should stop it and send the author back to #3749.
+# ── What replaced the compensating control (#3749) ───────────────────────────
+# This slot held `test_no_card_field_is_sourced_from_free_text`: an AST scan asserting no
+# card template read journal prose or a food-item name, standing in for the semantic gate
+# v1 deliberately did not run. It was retired here for two reasons, and the second is the
+# more important one.
+#
+# The stated reason is that its premise expired exactly as it predicted it would. #3749
+# put a coach line on the card, so there IS free text now, and the answer is the gate
+# itself — `recap_gate` step 4, with controls in `tests/test_recap_coach_line_3749.py`
+# including one that fails if the step ever runs over an empty list and reports a pass.
+#
+# The reason worth recording is that the control had never once run. It opened with
+# `if not templates.exists(): pytest.skip(...)` against `lambdas/web/recap_templates.py`,
+# and the deck shipped as `recap_layouts.py` — so from the day #3744 landed, the
+# compensating control for the unwired sensitivity gate was a silent skip. It is the
+# #3200 shape: a guard whose subject moved, still counted in the passing total. Replacing
+# a skip with a gate is the fix; saying so here is what keeps the next author from
+# writing the same shape.
+def test_the_free_text_screen_is_wired_and_named(clean_channel):
+    """The successor claim, held to the module rather than to a filename that can move.
+
+    Not an AST scan for forbidden field names — that is what missed. A direct assertion
+    that prose reaching the gate is judged: a planted vice term inside a sentence holds
+    the card, and the same call with no prose clears. Both halves, because a screen that
+    holds everything and a screen that holds nothing are equally useless.
     """
-    import ast
+    held = recap_gate.gate(["Day 8"], free_text=["he kept the placeholderterm streak"])
+    cleared = recap_gate.gate(["Day 8"], free_text=["a clean sentence about his training"])
 
-    templates = REPO / "lambdas" / "web" / "recap_templates.py"
-    if not templates.exists():
-        pytest.skip("the template deck has not landed yet (#3744/#3745) — the gate ships first, by design")
-
-    src = templates.read_text()
-    tree = ast.parse(src)
-    forbidden = {"note_raw", "body", "content", "food_name", "journal_text", "entry_text"}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in forbidden:
-            raise AssertionError(
-                f"a card template reads {node.value!r} — free text on a public card needs the semantic gate (#3749), "
-                "which v1 deliberately does not run"
-            )
+    assert held.verdict == recap_gate.VERDICT_HELD, "prose reached a public card unjudged"
+    assert cleared.verdict == recap_gate.VERDICT_CLEARED, "the screen holds everything — it will be routed around"
 
 
 if __name__ == "__main__":  # pragma: no cover

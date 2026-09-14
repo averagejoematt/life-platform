@@ -590,7 +590,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         #     seam to served_summary, the owner-register fallback (9 failed / 42).
         # Both are mutation-backed against REAL failure modes, which is the property this
         # band exists to protect. Unproven UNCHANGED — neither is a new unproven entrant.
-        # Transient slack of 1 while only one of the two has merged; it closes on the second.
+        # Both have now landed (#3789 then #3786), so the band is exact: slack 0.
         <= 94
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
