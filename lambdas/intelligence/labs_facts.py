@@ -20,7 +20,10 @@ STRUCTURAL rather than narrative:
   extraction gap on real draws, never an empty store.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper
 
 # #3283: the nested-map read is the shared accessor — this module and
 # health.labs_coaching each independently shipped the same "top-level schema
@@ -104,3 +107,51 @@ def build_labs_fact_block(lab_items: Optional[List[Dict[str, Any]]]) -> Dict[str
             "results or a sync failure"
         )
     return block
+
+
+def labs_prompt_block(data: Dict[str, Any]) -> str:
+    """The labs expert's prompt frame — the sentences that tell the model how to read
+    the fact block above it.
+
+    Lives here rather than in `ai_expert_analyzer_lambda` (#3728) because it is the
+    other half of `build_labs_fact_block`: the block says `total_draws: 8, draw_date:
+    2026-04-03`, and this says what those two numbers mean and what may not be
+    inferred from them. Keeping them apart is how they drifted.
+
+    The `#1993` half is the original: a zero-results narration is honest ONLY when
+    `store_empty` is true, and `flagged_count: 0` is an unremarkable panel, never a
+    sync failure (ADR-104).
+
+    The `#3728` half is newer and was learned the expensive way. Naming only the DATE
+    was not enough. The model was simultaneously being told "You have 0 blood draws of
+    data" by the maturity voice — `build_data_inventory` counted labs over a rolling
+    90-day window and all 8 draws are older than that — and it reconciled the
+    contradiction by reading 2026-04-03 as a date in the FUTURE, telling Matthew on the
+    public dashboard to "schedule the draw" before it. The inventory window is fixed at
+    the source (`intelligence/inventory_window.py`); this states the direction of time
+    so the frame cannot be misread again from a different direction.
+    """
+    draw_date = data.get("draw_date") or "unknown"
+    draw_age = ""
+    try:
+        age_days = (pacific_now().date() - datetime.strptime(str(draw_date)[:10], "%Y-%m-%d").date()).days
+        if age_days >= 0:
+            draw_age = f" — {age_days} days ago, ALREADY DRAWN AND RESULTED"
+    except (ValueError, TypeError):
+        pass
+    return f"""
+IMPORTANT: Lab data spans Matthew's full history, not just the current experiment.
+The data shows {data.get('total_draws', 0)} total blood draws, with the most recent
+on {draw_date}{draw_age}. Do NOT describe this as "draws during the
+experiment" — these are periodic lab draws over time.
+EVERY draw named above is in the PAST. Never write about a past draw as if it were
+scheduled, upcoming, or still to be booked, and never tell Matthew to prepare for a
+date that has already gone by. If you want to talk about the NEXT panel, say so
+without borrowing a date from the list above.
+DATA-INTEGRITY GROUND RULES (ADR-104, #1993): you may describe the labs store as
+empty ("zero results", "no draws", "a sync failure") ONLY when store_empty is true
+in the data above. When draws exist, flagged_count of 0 means every extracted
+biomarker was in range — an unremarkable panel, never a data failure. If
+extraction_incomplete appears, name it as a platform extraction gap on real draws,
+not as missing labs.
+"""

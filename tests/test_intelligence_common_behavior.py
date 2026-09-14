@@ -370,7 +370,16 @@ class TestInventoryShape:
 
         monkeypatch.setattr(ic, "table", FakeTable(router=router))
         inv = ic.build_data_inventory()
-        assert inv["whoop"] == {"exists": True, "latest": "2026-08-07", "records": 3, "days_of_data": 3}
+        # #3728 added the window facets to every row; the shape is asserted whole so a
+        # future key cannot appear unreviewed.
+        assert inv["whoop"] == {
+            "exists": True,
+            "latest": "2026-08-07",
+            "records": 3,
+            "days_of_data": 3,
+            "out_of_window": False,
+            "window_days": 90,
+        }
 
     def test_a_partition_with_no_rows_reports_absence_not_a_fabricated_zero_date(self, monkeypatch):
         _freeze(monkeypatch)
@@ -391,7 +400,14 @@ class TestInventoryShape:
         table.fail_pks.add("USER#matthew#SOURCE#whoop")
         monkeypatch.setattr(ic, "table", table)
         inv = ic.build_data_inventory()
-        assert inv["whoop"] == {"exists": False, "latest": None, "records": 0, "days_of_data": 0}
+        assert inv["whoop"] == {
+            "exists": False,
+            "latest": None,
+            "records": 0,
+            "days_of_data": 0,
+            "out_of_window": False,  # #3728: a failed read never claims history it could not see
+            "window_days": 90,
+        }
         assert inv["withings"]["records"] == 9
 
     def test_the_ninety_day_window_is_derived_from_the_frozen_clock(self, monkeypatch):

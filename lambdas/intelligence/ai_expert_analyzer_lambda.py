@@ -46,9 +46,11 @@ from typing import TYPE_CHECKING, Any
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from intelligence import analyzer_grounding as _ag  # #3517/#3516: the shared phase frame + the registry source facet
-
 # #1993: labs fact extraction against the real draw-record schema (SCHEMA.md).
+from intelligence import (
+    analyzer_grounding as _ag,  # #3517/#3516: the shared phase frame + the registry source facet
+    labs_facts,  # #3728 — the labs fact block AND its prompt frame
+)
 from intelligence.labs_facts import build_labs_fact_block
 
 logger = logging.getLogger(__name__)
@@ -619,20 +621,9 @@ training load from Hevy first, then note the confirmed-empty aerobic/NEAT pictur
         except Exception as _me:
             logger.warning("movement assessability failed: %s", _me)
 
-    labs_context = ""
-    if expert_key == "labs":
-        labs_context = f"""
-IMPORTANT: Lab data spans Matthew's full history, not just the current experiment.
-The data shows {data.get('total_draws', 0)} total blood draws, with the most recent
-on {data.get('draw_date', 'unknown')}. Do NOT describe this as "draws during the
-experiment" — these are periodic lab draws over time.
-DATA-INTEGRITY GROUND RULES (ADR-104, #1993): you may describe the labs store as
-empty ("zero results", "no draws", "a sync failure") ONLY when store_empty is true
-in the data above. When draws exist, flagged_count of 0 means every extracted
-biomarker was in range — an unremarkable panel, never a data failure. If
-extraction_incomplete appears, name it as a platform extraction gap on real draws,
-not as missing labs.
-"""
+    # #3728: the labs prompt block moved to intelligence/labs_facts, beside the fact
+    # block it frames — this module is at its #1665 ceiling and the two belong together.
+    labs_context = labs_facts.labs_prompt_block(data) if expert_key == "labs" else ""
 
     # #1894: forbid day-labelling a stale weigh-in (silent when fresh).
     weight_context = weight_recency.weight_recency_prompt_block(data) if expert_key == "physical" else ""
