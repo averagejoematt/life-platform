@@ -4,9 +4,9 @@
     "ai_features": 18,
     "alarms": 125,
     "emf_namespaces": 31,
-    "schedules": 88,
+    "schedules": 89,
     "secrets": 28
   },
-  "measured_on": "2026-09-06",
-  "_last_change": "#3553 (2026-09-06): alarms 124 -> 125 \u2014 `commitments-ungraded`, the dead-man on the #532 follow-through ledger (one metric-math alarm over two Count metrics, ~$0.10/mo)."
+  "measured_on": "2026-09-13",
+  "_last_change": "#3764 (2026-09-13): schedules 88 -> 89 \u2014 a daily EventBridge rule on the EXISTING hevy-backfill function that republishes config/hevy_template_index.json from the live Hevy catalogue. No new Lambda and no new invocation cost of consequence (one extra invoke/day of a 256MB function, plus ~9 Hevy GETs); the index had no producer at all since it was hand-built on 2026-06-01, and had drifted 789 indexed vs 828 live."
 }

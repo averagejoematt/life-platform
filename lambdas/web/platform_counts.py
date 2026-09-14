@@ -50,5 +50,9 @@ DISCOVERED_COUNTS = {
     "alarms": 121,
     "cdk_stacks": 10,
     "adrs": 153,
+<<<<<<< HEAD
     "test_count": 20161,
+=======
+    "test_count": 20176,
+>>>>>>> 83f078827 (chore(docs): sync the generated counts for the restored tool and the new schedule (#3766, #3764))
 }

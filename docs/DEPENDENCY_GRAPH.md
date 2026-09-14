@@ -47,7 +47,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | constant |
 | `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | constant |
 | `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | resolved |
-| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` | constant |
+| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(40 13 * * ? *)` | constant, constructed |
 | `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | constant |
 | `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | constant |
 | `hypothesis-engine` | compute_stack | `cron(0 19 ? * SUN *)` | constant |
@@ -486,7 +486,7 @@ Field-level rulings (only non-default fields are declared):
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
 - Alarms: 125 literal-named declarations across three idioms, 4 composite; routing digest 93 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 13 owner-only + 2 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 88 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
+- Schedules: 89 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -503,7 +503,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | ai_features | 18 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 125 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 88 | this model's schedules plane (CDK AST) |
+| schedules | 89 | this model's schedules plane (CDK AST) |
 | secrets | 28 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

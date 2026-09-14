@@ -889,7 +889,7 @@
     "ai_features": 18,
     "alarms": 125,
     "emf_namespaces": 31,
-    "schedules": 88,
+    "schedules": 89,
     "secrets": 28
   },
   "edges": [
@@ -6140,6 +6140,10 @@
         {
           "expr": "cron(0 * * * ? *)",
           "resolution": "constant"
+        },
+        {
+          "expr": "cron(40 13 * * ? *)",
+          "resolution": "constructed"
         }
       ],
       "stack": "ingestion_stack",
@@ -6976,7 +6980,7 @@
       "privacy_sources_owner_only": 13,
       "privacy_sources_owner_published": 2,
       "scheduled_lambdas": 81,
-      "schedules": 88
+      "schedules": 89
     },
     "coverage": {
       "edge_sites": {
@@ -7790,6 +7794,13 @@
       "resolution": "constant",
       "stack": "operational_stack",
       "utc": "13:30"
+    },
+    {
+      "expr": "cron(40 13 * * ? *)",
+      "lambda": "hevy-backfill",
+      "resolution": "constructed",
+      "stack": "ingestion_stack",
+      "utc": "13:40"
     },
     {
       "expr": "cron(0 14 ? * MON *)",
