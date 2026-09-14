@@ -66,6 +66,7 @@ from mcp.tools_memory import (
 )
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
+from mcp.tools_plan import tool_plan_next_session
 
 # #3668: the three hot-path named tools (cycle / habits / cost) over the same waiter
 # machinery the index uses — never a second copy of the rule declaration.
@@ -482,6 +483,28 @@ TOOLS = {
                         "description": "Override start date YYYY-MM-DD. Defaults to journey_start_date from profile.",
                     },
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Defaults to today."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "plan_next_session": {
+        "fn": tool_plan_next_session,
+        "schema": {
+            "name": "plan_next_session",
+            "description": (
+                "The DETERMINISTIC constraint block for a training session — the same inputs, computed the same way, "
+                "whichever client asks. Returns: the walking-volume gap against his own proven floor (FIRST, because it "
+                "is the largest lever at his current weight), recovery tier, ACWR, 28d per-muscle volume, the "
+                "weight-matched reference WITH the sentences its evidence cannot support, and each owner tripwire as "
+                "tripped / clear / UNKNOWN. No model runs in this tool. Stage 1 of 3: it does not draft the session and "
+                "the adversarial critics are not wired, so a plan built on it is not red-teamed — the payload says so. "
+                "Use before authoring any session, in chat or in Claude Code, so both get the same constraints."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "target_date": {"type": "string", "description": "Session date YYYY-MM-DD. Defaults to today (Pacific)."},
                 },
                 "required": [],
             },

@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-14
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-14 | **Total tools:** 82
+**Version:** v8.6.0 | **Last updated:** 2026-09-14 | **Total tools:** 83
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -16,7 +16,7 @@
 
 ---
 
-## All 82 Tools — by module
+## All 83 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -26,6 +26,7 @@
 | `mcp/tools_training.py` | 2 |
 | `mcp/tools_health.py` | 3 |
 | `mcp/tools_benchmark.py` | 1 |
+| `mcp/tools_plan.py` | 1 |
 | `mcp/tools_strength.py` | 2 |
 | `mcp/tools_nutrition.py` | 2 |
 | `mcp/tools_correlation.py` | 1 |
@@ -97,6 +98,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_benchmark` | view=, date= | PRIVATE cut-benchmarking vs Matthew's own proven weight-loss history (descriptive, correlational, n=1 — never causal). Use 'view' to select: 'pace' (default) = live pace vs the proven trajectory at the current weight — current weight/rate + recent walking volume vs the by-band proven volumes, walk gap, and the ~240 lb run gate. 'episodes' = the detected loss/regain ledger + loss-vs-regain rate asymmetry. 'maintenance' = the regain firewall (near goal): rolling walk volume vs the proven floor and the post-trough decay signature. 'prescription' = what he was ACTUALLY doing at a comparable bodyweight — walk miles/hours, target walk heart rate, sets and per-movement loads — from the periods he was LOSING, with the weight distance to that period and its evidence tier stated. Returns two tables that are not interchangeable: proven_target (from losing phases; the target) and current_typical (all history at his current weight; the BASELINE, never a target — at his current weight that is the period he is trying to escape). Training/activity only: intake is not comparable, no nutrition data exists before 2025-11-24. 'campaign' = is THIS transformation tracking the one that worked, and which lever explains the gap — day-N cumulative loss vs the proven curve at the same day, plus the levers RANKED by how far each sits below its comparable losing-phase value. Windows shorter than the 28-day chronic window are flagged as artifacts, not printed as rates. All views forward-framed (what works next), never a failure tally. Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?', 'show my cut history', 'am I holding the loss?', 'what was I doing last time I weighed this?', 'what heart rate should I target?', 'how many miles this week?'. |
+
+### mcp.tools_plan (`mcp/tools_plan.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `plan_next_session` | target_date= | The DETERMINISTIC constraint block for a training session — the same inputs, computed the same way, whichever client asks. Returns: the walking-volume gap against his own proven floor (FIRST, because it is the largest lever at his current weight), recovery tier, ACWR, 28d per-muscle volume, the weight-matched reference WITH the sentences its evidence cannot support, and each owner tripwire as tripped / clear / UNKNOWN. No model runs in this tool. Stage 1 of 3: it does not draft the session and the adversarial critics are not wired, so a plan built on it is not red-teamed — the payload says so. Use before authoring any session, in chat or in Claude Code, so both get the same constraints. |
 
 ### Strength Training (`mcp/tools_strength.py`)
 
