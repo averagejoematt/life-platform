@@ -1,12 +1,12 @@
 {
-  "_purpose": "#3374 R1 \u2014 the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff \u2014 that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
+  "_purpose": "#3374 R1 — the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff — that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
   "counts": {
     "ai_features": 18,
-    "alarms": 126,
+    "alarms": 127,
     "emf_namespaces": 31,
     "schedules": 89,
     "secrets": 28
   },
   "measured_on": "2026-09-13",
-  "_last_change": "#3741 (2026-09-13): schedules 88 -> 89 and alarms 125 -> 126 \u2014 the daily recap-card generator (cron(30 19 * * ? *), the same 11:30 PT clock as the OG cards) and its per-Lambda error alarm 'ingestion-error-recap-card-generator'. One 512MB Lambda for ~5s/day, ~10 DDB reads and 1 write, one S3 PUT, one SES raw send, Telegram free, no Bedrock: under $0.05/mo. It renders from stored metrics only \u2014 no model call, which is why a daily owner-facing artifact costs less than the alarm that watches it."
+  "_last_change": "#3741 (2026-09-13): alarms 126 -> 127 — recap-card-no-invocations-24h, the daily recap card's absence heartbeat. The card generator first took a dated EXEMPT on the heartbeat-completeness ledger, reasoning that a missing card is self-evident to its only consumer the same morning; that premise is not true yet (delivery is off by default and the distribution path is undecided), and an exemption whose premise is not yet true is indistinguishable from ‘someone would notice’. A standard CloudWatch metric alarm (~$0.10/mo) on an existing AWS/Lambda metric — no new namespace, no new schedule, no new function."
 }

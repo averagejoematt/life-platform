@@ -102,9 +102,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (16)
+### cross_phase (15)
 
-`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `recall_embeddings`, `subscribers`, `supplements`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (33)
 
@@ -265,7 +265,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 94 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 — of 126 alarms (4 composite)
+Routing: digest 95 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 — of 127 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -374,6 +374,7 @@ Routing: digest 94 · digest+paging 2 · paging 2 · urgent 25 · via-composite 
 | `qa-smoke-warnings` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `recall-index-failed-chronicle-approve` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recall-index-failed-wednesday-chronicle` | monitoring_silence_alarms | metric | digest | declaration |  |
+| `recap-card-no-invocations-24h` | operational_stack | metric | digest | declaration |  |
 | `site-api-ai-errors` | serve_stack | metric | digest | declaration | reader |
 | `site-api-ai-throttles` | serve_stack | metric | digest | declaration | reader |
 | `site-api-content-filter-fallback` | serve_stack | metric | digest | declaration | reader |
@@ -426,10 +427,8 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `hevy` | owner_only |
 | `labs` | owner_published |
 | `macrofactor` | owner_only |
-| `measurements` | owner_published |
 | `notion` | owner_only |
 | `private_intake` | owner_only |
-| `progress_photos` | owner_only |
 | `reading` | owner_only |
 | `sick_days` | owner_only |
 | `state_of_mind` | owner_only |
@@ -489,8 +488,8 @@ Field-level rulings (only non-default fields are declared):
 
 - Edge sites: 1166 total · 839 resolved · 327 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
-- Alarms: 126 literal-named declarations across three idioms, 4 composite; routing digest 94 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
+- Alarms: 127 literal-named declarations across three idioms, 4 composite; routing digest 95 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Privacy: 13 owner-only + 2 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 89 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `recap_cards`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
@@ -506,7 +505,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 18 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 126 | this model's alarms plane (CDK AST) |
+| alarms | 127 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 89 | this model's schedules plane (CDK AST) |
 | secrets | 28 | `tests/test_secret_references.py::KNOWN_SECRETS` |

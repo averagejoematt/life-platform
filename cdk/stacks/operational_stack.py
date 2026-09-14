@@ -952,6 +952,50 @@ class OperationalStack(Stack):
             # block. Setting it too would add a second, broader grant for nothing.
         )
 
+        # ── #3741: the card's absence heartbeat ──────────────────────────────────
+        # The first draft of this took a dated EXEMPT on the heartbeat-completeness
+        # ledger, reasoning that a missing card is self-evident to its only consumer the
+        # same morning — he asked for a card every day to post, so a morning without one
+        # is the feature failing in his hand rather than in a log.
+        #
+        # That reasoning is sound ONLY once he is actually receiving a card every morning,
+        # and today he is not: delivery is off by default and the distribution path is
+        # still undecided (#3741). Until then "someone would notice" has no one to do the
+        # noticing — which is exactly what was believed about the training-note extractor
+        # while it sat dark for three months (#3768). An exemption whose premise is not
+        # yet true is not an exemption, so this gets the real thing instead.
+        #
+        # Invocations is the honest metric HERE specifically because this function has
+        # exactly ONE trigger — the daily rule above. (The same watch on hevy-backfill
+        # would be green by construction, because its hourly poll shares the function
+        # with #3764's rebuild rule.) A run that honestly declines to draw a card — no
+        # signal, or held by the privacy gate — still INVOKES and still emits a datapoint,
+        # so this never false-fires on a quiet day; only a dead schedule reads as zero.
+        # Digest, not paging (ADR-050): a missed card costs a day of the campaign, and the
+        # backfill script can render any past day on demand.
+        recap_no_invocations_alarm = cloudwatch.Alarm(
+            self,
+            "RecapCardNoInvocations",
+            alarm_name="recap-card-no-invocations-24h",
+            alarm_description=(
+                "#3741: recap-card-generator has not run in 24h. Its only trigger is the 11:30 PT daily "
+                "rule, so zero invocations means the schedule is dead — a run that declines to draw a "
+                "card still invokes. No daily card is being produced for the campaign."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": "recap-card-generator"},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        recap_no_invocations_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── 12b. Reading Cover Pipeline (ADR-097, Mind pillar Phase A) — on-demand only.
         # Invoked with a book dict; fetches a cover (Open Library → Google Books →
         # designed placeholder), caches it to generated/covers/<bookId>.jpg, and
