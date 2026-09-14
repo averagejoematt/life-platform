@@ -79,6 +79,15 @@ MONITORING_STACK = "cdk/stacks/monitoring_stack.py"
 
 _SCHEDULE_METHODS = {"cron", "rate", "expression"}  # events.Schedule.<method>(...)
 
+# #3781: the OTHER spelling, and the dominant one. `create_platform_lambda(schedule="cron(…)")`
+# passes the expression as a STRING; the helper turns it into `events.Schedule.expression(...)`
+# internally, so the constructor form never appears in the stack file that declares the
+# schedule. Measured on main 2026-09-14 by running this module: 16 constructor-form vs 69
+# string-form, i.e. the CRON leg was evaluating 19% of the estate's schedule declarations
+# and reporting a clean pass over the other 81%.
+_SCHEDULE_KWARGS = {"schedule"}
+_SCHEDULE_EXPR_RE = re.compile(r"^\s*(cron|rate)\s*\(", re.IGNORECASE)
+
 
 @dataclass
 class Finding:
@@ -278,19 +287,56 @@ def route_leg(new_routes: set, schema_stems, exemptions: list) -> list:
 
 
 def schedule_signatures(source: str) -> Counter:
-    """Multiset of Schedule.cron/rate/expression call signatures in a CDK stack source."""
+    """Multiset of every schedule DECLARATION in a CDK stack source, in either spelling.
+
+    Two forms, one signature multiset, because the diff logic downstream only cares how
+    many schedules a file gained — not how they were written:
+
+      1. the constructor form, `events.Schedule.cron(hour="13", minute="40")`
+      2. the paved-road form, `create_platform_lambda(..., schedule="cron(30 19 * * ? *)")`
+
+    (2) was invisible until #3781, and it is 69 of the estate's 85 declarations. The leg
+    that exists so a new cron cannot land unmonitored was therefore silent about the way
+    almost every new cron is actually written — and silent in the worst direction, since
+    an unseen schedule produces a PASS. It was found because two crons landed the same
+    day: #3776's used form (1) and was correctly BLOCKED; #3780's used form (2) and the
+    gate reported "no QA-relevant surface added by this diff".
+
+    AST, not a grep, and that distinction is load-bearing rather than stylistic. The
+    obvious grep for a `schedule=` string returns 70 string-form hits; this walk finds
+    68. The two it drops are the worked example inside `lambda_helpers.py`'s own module
+    docstring and the commented-out Garmin cron at `ingestion_stack.py:183`. Neither is a
+    schedule, a docstring is one string constant and a comment is not in the tree at all
+    — and a CRON leg that blocked a PR for editing a note about a PAUSED source is a gate
+    people would learn to route around. Measured totals, by running this function over
+    `cdk/stacks/*.py` on 2026-09-14: 16 before, 84 after.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return Counter()
     sigs: Counter = Counter()
     for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _SCHEDULE_METHODS):
+        if not isinstance(node, ast.Call):
             continue
-        owner = node.func.value
-        owner_name = owner.attr if isinstance(owner, ast.Attribute) else (owner.id if isinstance(owner, ast.Name) else None)
-        if owner_name == "Schedule":
-            sigs[ast.unparse(node)] += 1
+
+        # Form 1 — events.Schedule.<method>(...)
+        if isinstance(node.func, ast.Attribute) and node.func.attr in _SCHEDULE_METHODS:
+            owner = node.func.value
+            owner_name = owner.attr if isinstance(owner, ast.Attribute) else (owner.id if isinstance(owner, ast.Name) else None)
+            if owner_name == "Schedule":
+                sigs[ast.unparse(node)] += 1
+                continue
+
+        # Form 2 — any call taking `schedule="cron(...)"` / `schedule="rate(...)"`.
+        # Deliberately not keyed to `create_platform_lambda` by name: the point of a
+        # signature multiset is to see the schedule, and pinning the helper's name is how
+        # this leg goes blind again the next time the paved road is renamed or wrapped.
+        for kw in node.keywords:
+            if kw.arg not in _SCHEDULE_KWARGS:
+                continue
+            if isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str) and _SCHEDULE_EXPR_RE.match(kw.value.value):
+                sigs[f'schedule="{kw.value.value}"'] += 1
     return sigs
 
 
@@ -451,7 +497,13 @@ def collect_cron_findings(repo: str, mb: str, changed: list, exemptions: list) -
 
 
 def collect_js_findings(repo: str, changed: list, exemptions: list) -> list:
-    added_js = {p for s, p in changed if s == "A" and p.startswith("site/") and p.endswith(".js")}
+    # `.mjs` alongside `.js` (#3781). This leg had the same one-spelling shape the CRON
+    # leg did, one order of magnitude smaller: zero `.mjs` files exist under site/ today,
+    # so nothing was escaping — but the site is all ES modules and `.mjs` is the spelling
+    # someone reaches for the day a module needs to be unambiguous. Found by the sweep
+    # the #3781 acceptance asked for; fixed here rather than filed, because the fix is
+    # one tuple and a filed issue about a two-character gap is worse than the gap.
+    added_js = {p for s, p in changed if s == "A" and p.startswith("site/") and p.endswith((".js", ".mjs"))}
     gate_src = read_worktree(repo, IMPORT_GATE)
     scan_intact = bool(gate_src) and import_gate_scans_directory(gate_src)
     return js_leg(added_js, scan_intact, exemptions)
