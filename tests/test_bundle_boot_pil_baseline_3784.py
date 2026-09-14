@@ -38,6 +38,7 @@ and one that quietly disagrees with it.
 from __future__ import annotations
 
 import ast
+import functools
 import json
 import pathlib
 
@@ -71,8 +72,23 @@ def _import_time_nodes(tree: ast.Module):
     return out
 
 
-def pil_closure() -> set:
-    """Every module whose IMPORT would raise without Pillow installed."""
+@functools.lru_cache(maxsize=1)
+def pil_closure() -> frozenset:
+    """Every module whose IMPORT would raise without Pillow installed.
+
+    MEMOISED — one whole-repo AST walk per suite process, not one per test (#3224/#3265).
+    Four tests in this file call it, and the duration-budget class record is explicit that
+    the dominant term in CI growth has twice been DUPLICATED WHOLE-REPO SCANS rather than
+    test count. Measured here: 4 x 0.75s → one 0.75s walk, ~2.2s back.
+
+    That is small against a 2,790s job and is NOT offered as a fix for the budget — the
+    same-day spread is 75% (1,626s to 2,854s, including 69% between two runs 68 seconds
+    apart on near-identical trees), so that breach is runner variance, not this. It is
+    fixed because it is the named recurring class and it was mine to avoid.
+
+    Safe to cache: the walk reads `lambdas/` only. The tests that MUTATE
+    `bundle_boot_baseline.json` compare against `baseline_modules()`, which re-reads the
+    file on every call and is deliberately not cached."""
     mods = _module_map()
     direct, first_party = set(), {}
     for name, path in mods.items():
@@ -104,7 +120,7 @@ def pil_closure() -> set:
             if name not in reached and deps & reached:
                 reached.add(name)
                 changed = True
-    return reached
+    return frozenset(reached)
 
 
 def baseline_modules() -> set:
