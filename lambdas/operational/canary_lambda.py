@@ -57,7 +57,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import boto3
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
@@ -622,8 +622,14 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         mode = "mcp-only" if mcp_only else "full"
         print(f"Canary run ({mode}): {canary_ts} | hash={payload_hash}")
 
-        results = {}
-        failures = []
+        results: dict[str, dict[str, Any]] = {}
+        # #3830: annotated because the entries now carry `failure_code: str | None`
+        # alongside `check: str`, and an unannotated literal would infer the VALUE
+        # type as `str | None` — which reds the tier-2 mypy gate on line ~727's
+        # `sorted({f["check"] for f in failures})`. The annotation states the shape
+        # rather than casting at the read site, so `check` stays a `str` to every
+        # consumer including `send_alert`.
+        failures: list[dict[str, Any]] = []
 
         def record(check_key: str, ok, message: str, latency_ms: float = 0.0, failure_code: Optional[str] = None) -> None:
             """Store one check result + its lane, and enroll a failure.
