@@ -35,6 +35,18 @@ from pathlib import Path
 
 import pytest
 
+# ── #3025: this whole module is `serial` ─────────────────────────────────────
+#
+# It MUTATES THE REAL CHECKOUT — see tests/test_suite_parallel_safety_3025.py's
+# IN_TREE_WRITERS for the reason it cannot be pointed at a temp dir. Under `pytest -n auto`
+# that write is visible to every concurrent whole-tree sweep in the suite for as long as it
+# exists, so this module is deselected from the parallel pass and runs afterwards in one
+# process. Marked at MODULE level deliberately: `--dist loadfile` already groups a file onto
+# one worker, so the file is the natural unit, and a per-test marker would miss a write done
+# by a fixture.
+pytestmark = pytest.mark.serial
+
+
 _REPO = Path(__file__).resolve().parents[1]
 _SCRIPT = _REPO / "deploy" / "sync_doc_metadata.py"
 _DOC = _REPO / "docs" / "ARCHITECTURE.md"

@@ -50,6 +50,18 @@ sys.path.insert(0, str(REPO / "lambdas"))
 from operational import qa_smoke_lambda as qa  # noqa: E402
 from operational.qa_check import CONTENT_TRUTH, Check, run_isolated  # noqa: E402
 
+# ── #3025: this whole module is `serial` ─────────────────────────────────────
+#
+# It MUTATES THE REAL CHECKOUT — see tests/test_suite_parallel_safety_3025.py's
+# IN_TREE_WRITERS for the reason it cannot be pointed at a temp dir. Under `pytest -n auto`
+# that write is visible to every concurrent whole-tree sweep in the suite for as long as it
+# exists, so this module is deselected from the parallel pass and runs afterwards in one
+# process. Marked at MODULE level deliberately: `--dist loadfile` already groups a file onto
+# one worker, so the file is the natural unit, and a per-test marker would miss a write done
+# by a fixture.
+pytestmark = pytest.mark.serial
+
+
 # The null-coercion scan set (#2336). Widen by APPENDING roots — never narrow
 # it back, and never carve out a directory wholesale. All 21 hits found at
 # widening time were the real defect and were converted to the `or`-form; if a
@@ -303,9 +315,19 @@ def test_the_per_line_waiver_exempts_exactly_the_waived_line():
         assert len(hits) == 1 and ":7" in hits[0], f"waiver must exempt line 6 only, got: {hits}"
 
 
+@pytest.mark.serial
 def test_the_widened_scan_actually_covers_each_root():
     """Mutation proof for the #2336 widening: a synthetic offender dropped into
-    EACH scan root is caught — the roots are wired, not just declared."""
+    EACH scan root is caught — the roots are wired, not just declared.
+
+    `serial` (#3025): this plants `_null_coercion_mutation_proof_2336.py` inside EVERY
+    real scan root — `lambdas/` included — and the planting is the point, so a private
+    temp dir would make the proof vacuous. Under `-n auto` that file is visible to every
+    concurrent whole-tree sweep for the few milliseconds it exists. Measured 2026-09-15:
+    it reached `tests/test_mypy_clean_modules.py::test_every_first_party_package_is_in_the_clean_set`,
+    which reported `first-party package(s) ['lambdas'] hold .py modules` — a red naming a
+    file that no longer existed by the time anyone read the log.
+    """
     mutant_src = "import json\n\n\ndef f(raw):\n    data = json.loads(raw)\n    return data.get('day_grade', {}).get('components')\n"
     for root in NULL_COERCION_SCAN_ROOTS:
         assert root.is_dir(), f"scan root vanished: {root}"

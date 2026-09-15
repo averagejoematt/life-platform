@@ -7,6 +7,13 @@
 # from ci-test.yml (Unit Tests) and ci-cd.yml's test-critical lane, not quoted here.
 pytest==9.1.1
 pytest-cov==7.1.0
+# pytest-xdist — the pre-merge full suite runs `-n auto --dist loadfile` (#3025's
+# duration class, 8th instance). `loadfile` keeps a file's tests on one worker, which
+# removes every intra-file ordering assumption for free; the cross-file hazard was a
+# single test planting a probe inside `lambdas/`, fixed at the source and ratcheted by
+# tests/test_suite_parallel_safety_3025.py. Version MUST equal the CI gate's pin
+# (CQ-01, #1963) — resolved by scripts/ci_pins.py, not quoted in the workflow.
+pytest-xdist==3.8.0
 # Property-based testing (Hypothesis @given) — pure calculators + AI grounding
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
