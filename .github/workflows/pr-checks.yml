@@ -233,9 +233,22 @@ jobs:
         if: always()
         run: python3 deploy/sync_doc_metadata.py --apply
 
-      - name: Full unit suite (same selection as the post-merge coverage gate)
+      # TWO PASSES (#3025). The suite's only genuinely shared mutable state is the
+      # checkout itself, and four modules MUST write into it — they are mutation proofs
+      # whose point is the real file (docs/ARCHITECTURE.md, docs/SLOs.md, a planted module
+      # inside lambdas/ingestion/, a planted offender in every null-coercion scan root).
+      # Those carry `pytestmark = pytest.mark.serial`, are deselected from the parallel
+      # pass, and run afterwards in one process where no concurrent reader exists.
+      # tests/test_suite_parallel_safety_3025.py is the registry + guard and asserts BOTH
+      # steps here — a contract that reads only the first line is how a second step drifts.
+      - name: Full unit suite — parallel pass (same selection as the post-merge coverage gate)
         if: always()
-        run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25 -n auto --dist loadfile
+        run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25 -n auto --dist loadfile -m "not serial"
+
+      # `if: always()` per #749: a red parallel pass must not hide the serial result.
+      - name: Full unit suite — serial pass (modules that mutate the checkout, #3025)
+        if: always()
+        run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25 -m serial
 
   # ════════════════════════════════════════════════════════════════
   # #2831 — API-before-frontend sequencing check.

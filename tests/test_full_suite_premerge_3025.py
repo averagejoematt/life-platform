@@ -30,14 +30,24 @@ def _read(path):
         return fh.read()
 
 
-def _full_suite_pytest_line():
-    """The full-suite job's pytest command line in pr-checks.yml."""
+def _full_suite_pytest_lines():
+    """EVERY pytest command line in the full-suite job.
+
+    #3025 ran one command; since the parallel split it runs two — a `-m "not serial"`
+    parallel pass and a `-m serial` single-process pass for the four modules that must
+    mutate the checkout. Reading only the first line is how the second step would drift
+    unwatched, so every contract below is asserted across the whole list.
+    """
     src = _read(PR_CHECKS)
-    job_start = src.index("  full-suite:")
-    block = src[job_start:]
-    m = re.search(r"run:\s*(python3 -m pytest[^\n]*)", block)
-    assert m, "pr-checks.yml full-suite job no longer runs a single-line pytest command"
-    return m.group(1)
+    block = src[src.index("  full-suite:") :]
+    lines = re.findall(r"run:\s*(python3 -m pytest[^\n]*)", block)
+    assert lines, "pr-checks.yml full-suite job no longer runs a pytest command"
+    return lines
+
+
+def _full_suite_pytest_line():
+    """The PARALLEL pass — the one that carries the shared selection contract."""
+    return _full_suite_pytest_lines()[0]
 
 
 def _coverage_gate_ignores():
@@ -52,8 +62,15 @@ def test_selection_parity_with_postmerge_coverage_gate():
     """Same target, same --ignore set: the pre-merge full suite runs what the
     post-merge coverage gate runs (minus instrumentation). If either side changes
     its selection, this fails on the PR that did it, not on main afterward."""
-    line = _full_suite_pytest_line()
-    assert " tests/ " in line + " ", f"full-suite no longer targets tests/: {line}"
+    lines = _full_suite_pytest_lines()
+    for line in lines:
+        assert " tests/ " in line + " ", f"full-suite no longer targets tests/: {line}"
+        assert "--cov" not in line, "coverage instrumentation is a post-merge concern (~1.4x, #2259) — do not add it here"
+        assert "--durations=25" in line, f"the durations block is the #2692 measurement channel — keep it on every pass: {line}"
+        assert (
+            set(re.findall(r"--ignore=(\S+)", line)) == _coverage_gate_ignores()
+        ), f"selection divergence on a pass: {line} vs coverage gate {sorted(_coverage_gate_ignores())}"
+    line = lines[0]
     premerge_ignores = set(re.findall(r"--ignore=(\S+)", line))
     assert premerge_ignores == _coverage_gate_ignores(), (
         f"selection divergence: full-suite ignores {sorted(premerge_ignores)} vs "
@@ -67,8 +84,8 @@ def test_selection_parity_with_postmerge_coverage_gate():
 def test_full_suite_command_is_unpiped():
     """`pytest ... | tail` exits with tail's status — the gate-that-cannot-fail
     class (#2746). The full-suite step must stay a bare pytest invocation."""
-    line = _full_suite_pytest_line()
-    assert "|" not in line, f"full-suite pytest command is piped — its exit status is no longer the gate's: {line}"
+    for line in _full_suite_pytest_lines():
+        assert "|" not in line, f"a full-suite pytest command is piped — its exit status is no longer the gate's: {line}"
 
 
 def test_dep_parity_with_ci_test():
