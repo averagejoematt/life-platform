@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 429** — feedback 24 · reference 241 · security 1 · project 160 · user 1 · index 2
+**Files in the memory index snapshot: 432** — feedback 24 · reference 243 · security 1 · project 161 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 266** — homed-here 73 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
+**Rule-class files (feedback + reference + security): 268** — homed-here 74 · already-homed 169 · superseded 7 · narrative 15 · off-repo 3
 
-**Program/session files (project): 160** — already-homed 14 · superseded 1 · narrative 142 · off-repo 2 · index 1
+**Program/session files (project): 161** — already-homed 14 · superseded 1 · narrative 143 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -211,6 +211,7 @@ project_session_ab_2026_09_13.md
 project_session_ac_2026_09_13.md
 project_session_ad_2026_09_14.md
 project_session_ae_2026_09_14.md
+project_session_af_2026_09_15.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -277,6 +278,7 @@ reference_a_private_artifact_under_a_public_prefix.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
 reference_a_repo_side_fix_to_an_s3_read_config.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
+reference_a_success_line_is_not_a_stored_row.md
 reference_a_sweep_one_import_away.md
 reference_a_sweep_that_restores_a_directory.md
 reference_a_transform_can_be_correct_and_unreachable.md
@@ -483,6 +485,7 @@ reference_task_notification_exit_codes_lie.md
 reference_test_importing_aws_cdk_reds_ci.md
 reference_test_layer_dep_import_collection_red.md
 reference_the_doc_literal_merge_treadmill.md
+reference_the_first_denial_masks_the_second.md
 reference_the_rubric_can_be_the_finding_generator.md
 reference_time_dependent_gate_outside_its_window.md
 reference_token_overlap_misses_structural_cloning.md
@@ -929,6 +932,9 @@ carries an operating rule.
 | `reference_a_generated_artifact_with_a_committed_twin.md` | reference | `lambdas/training/hevy_template_index.py` — the producer's own module docstring names the key, the provenance fields (`_built_at`/`_sha256`) and the shrink guard, and its `INDEX_KEY` is the single literal both writer and reader derive from. The SET-level rule (classify every `config/*.json` generated-vs-hand-owned; no stale committed twin for a generated one) is filed as #3785 and has no home until it lands | homed-here |
 | `reference_the_doc_literal_merge_treadmill.md` | reference | `deploy/merge_train.sh` (#3104) — the batch path itself is the rule's home; `--dry-run` is a complete rehearsal that stops before every mutation and names each PR's disposition | homed-here |
 | `project_session_ae_2026_09_14.md` | project | n/a — session narrative, not a rule | narrative |
+| `project_session_af_2026_09_15.md` | project | n/a — session narrative, not a rule | narrative |
+| `reference_the_first_denial_masks_the_second.md` | reference | `infra/iam/README.md` — the `KMSDecryptViaDynamoDB` entry in the Kept table states the layered-denial reason, the `kms:ViaService` scoping, and why it is a separate statement from the plain-`DescribeKey` Sid; the grant itself is pinned in `tests/test_sync_site_generator_steps_3681.py` (mutation-proved in both directions) | homed-here |
+| `reference_a_success_line_is_not_a_stored_row.md` | reference | n/a — the rule (a success line must sit after the write, or carry the write's outcome) is the acceptance criteria of open issue #3829 and has no repo home until that lands | off-repo |
 | `reference_a_private_artifact_under_a_public_prefix.md` | reference | `tests/test_public_write_prefix_registry_3741.py` (every `needs_s3_write`/`extra_s3_write` grant under an anonymously-readable prefix in `deploy/bucket_policy.json` must be declared intentional) + `tests/test_recap_card_private_3741.py` (the card's own prefix, with a must-fail control) | homed-here |
 | `project_session_ad_2026_09_14.md` | project | — off-repo: a session narrative (what shipped, what broke, what was proved live); its one durable rule is homed in the reference row above | narrative |
 | `reference_a_piped_exit_code_is_not_a_test_result.md` | reference | `docs/CONVENTIONS.md` §7 (`pytest --timeout` is not installed here — the flag errors and a piped shell still reports exit 0; read the `N passed` summary line, never the exit code) | homed-here |

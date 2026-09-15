@@ -211,27 +211,28 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-14 (Opus 5, **Session AE — five features landed, and four defects the guards found in
-my own work**; approved plan `temporal-roaming-swan.md`, Phase 0a already done; standing merge+deploy
-authority, **no `--deliver`, the cron hold STAYS**). **6 PRs merged AND deployed, 12 issues closed on live
-proof, 3 filed.** #3737+#3789 (`847f5e00d`), #3786 (`b2849f714`), #3791 (`3b1d93362`), #3788 (`b4a2b80cc`),
-#3794 (`60e1cbf7e`) — every CI/CD run green through Deploy, Smoke and Visual+AI QA; every deploy gate
-approved, none left waiting. **Not one feature defect was found by me reading my code — each was found by the
-platform.** The coach line was selected, screened, stored, captioned and **drawn NOWHERE** (`_coach_line` ran
-last and dropped below `FLOOR_Y` on a real training day; found by rendering against live DDB — the test that
-missed it compared rendered BYTES, which differ when a layout changes *nothing visible*, and now counts lit
-pixels). A failed coach read would have **reported itself as a quiet day** — #3768's shape, written an hour
-after closing #3768; now `ok|absent|unreadable`. The hand-typed coach roster was **wrong on day one**
-(`training_coach` is not operational; `glucose_coach`/`explorer_coach` were missing) — caught by
-`test_coach_roster_set_guard_2334`, now derived from `persona_registry`. Two guards caught **me**: the closure
-contract blocked `Fixes #3781` on a `closure:live-proof` instrument, and a monitor read "ALL SETTLED" over a
-check set **missing both test jobs**. **Found unassigned:** #3764's live index had been silently reverted to a
-stale committed twin (820→789, invisible to its own dead-man — #3785); the `generated/*` public-write guard
-could not see bare `PolicyStatement` grants and my own PR was its first instance — widening it found a real
-undeclared public writer (OG cards, live since WR-17); and **#3737 does not reach the surface its own PR body
-screenshotted** (#3792). **My errors:** I made the alarm-citation gate GREEN with a citation naming the wrong
-cause — a well-formed citation is not a true one (#3793, and the mis-citation is recorded *in* the citation);
-I pushed two commits **past branch protection**; and at 20:54 `merge_train.sh --dry-run` had already computed
-the plan for three green PRs and I merged serially anyway, costing #3788 three rebase+CI cycles. **Owner acts
-left:** the first real progress photo (his phone) · his verdict on the 22 cards and any `--deliver` ·
-#3760 the viewer · #3792/#3793/#3785/#3784.
+**Verified:** 2026-09-15 (Opus 5, **Session AF — the ~20h drain, and the second permission the first one was
+hiding**; owner brief *"141 open issues, get it as low as it honestly goes"*, standing merge+deploy authority,
+**no `--deliver`, the cron hold STAYS**, every deploy gate approved or REJECTED). **141 open -> 122: 28 closed
+(25 on evidence, 3 triage — the split is the point), 9 filed, 19 PRs merged, six CDK deploy runs, 3 lease
+tips approved / 9 ancestors rejected by name.** **#3681 is the session in miniature:** #3814's
+`dynamodb:Query` was necessary and NOT sufficient — the table's CMK means DynamoDB decrypts on the CALLER's
+behalf, and the Query denial short-circuits before KMS is consulted, so **the first denial masked the second
+and only the run after the first fix could reveal it**. Its own instrument is what made that legible
+(`theme river build FAILED — CAUSE: denied` where the old idiom printed `skipped (offline?)` and shipped
+green); after a `kms:Decrypt` scoped by `kms:ViaService`, `theme_river.json` went `empty/n_days 0` ->
+`warming_up/n_days 2/8 themes` — **the first successful theme-river live build in CI, ever**. **#3793 (Phase
+0): the coach was RIGHT** — the defect was the checker's framing, not the claim (`ContentTruthFailCount` 1.0
+-> 0.0, sustained). **#3714's adherence found a real one on its first live session** (4 sets at RPE 8.0 under
+a 7.0 ceiling, scored 100% by set-count). **#3499 read 3/11 after deploying Monitoring** — the eight
+`site-api-*` alarms live in `serve_stack`, caught only because the check read AWS not the CDK tree; 11/11
+after Serve. **The guards caught me again:** the #3688 Set guard went red during its own rebase naming a 4th
+judge (#3699's, landed after that branch was cut -> #3828, registered as a residual because retrying a
+DETERMINISTIC truncation bills N times for N identical failures); I measured #3797's census at 644 and it was
+a #3315 registry-name **phantom**; and the 5-test arithmetic gap I had posted as open **does not exist**
+(proved by node-id diff, now a structural test). **Found at wrap, unlooked-for:** #3829 —
+`coach-ensemble-digest` logs *"Ensemble digest produced"* and then dies at its 90s ceiling, 3x90s billed,
+**no `CYCLE#2026-09-15` row** (the 09-13 gap is explicitly unexplained). **Owner acts left:** read
+`Auto-rollback` on run 35013357326 FIRST (smoke red on `Verify canary`; the canary is `all_pass: true` live) ·
+#3797 held, must re-stamp to 644 · whether `Bash(bash deploy/cdk_deploy.sh:*)` becomes a durable grant
+(deliberately uncommitted) · #3829.
