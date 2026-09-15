@@ -12,6 +12,11 @@ read-only engine:
      failure classes as regression tests (#1013) — app-bar row ≤ viewport (#1003),
      no reveal stuck at opacity:0 after scroll (#1002), viewport meta present (#1004),
      and the tap-target floor audit (#1010/#1249, gating: effective hit area ≥ 44px).
+     #3733: the SAME horizontal-overflow measurement also runs once at the DESKTOP
+     context's own viewport (1440x900 by default) — #1013's control only ever existed
+     at 390px, so a table pushed past its container at a full desktop width (a 1216px
+     .rd-tbl inside an overflow-x:visible .rd-sec on /method/, /method/cycles/) went
+     uncaught for as long as this sweep existed.
   6. Captures full-page + per-chart element screenshots.
   7. Optional --ai-qa: hands the screenshots to Claude (Bedrock) for semantic
      "does this actually render correctly" judgement — robust to daily data changes
@@ -1229,6 +1234,20 @@ def capture_page(
             issues.append(f"CLS {cls:.3f} exceeds budget {cls_budget}")
 
         _scroll_and_reveal(page)
+
+        # ── desktop overflow (#3733) — the same `_mobile_overflow` measurement, taken
+        # at the DESKTOP context's own viewport (1440x900 by default) instead of only
+        # at 390px below. Before #3733 nothing ever measured horizontal page overflow
+        # at desktop width: a 1216px .rd-tbl inside an overflow-x:visible .rd-sec on
+        # /method/ and /method/cycles/ pushed the page out 248px at 1440 and this sweep
+        # never noticed, because #1013's control only exists at the mobile viewport.
+        # Skipped when context_mobile — that pass already opened at 390x844, and the
+        # identical check runs below against the mobile ledger; running it twice at the
+        # same viewport would just double-count one finding.
+        if not context_mobile:
+            desktop_overflow = _mobile_overflow(page)
+            if desktop_overflow and desktop_overflow > 4:
+                issues.append(f"Horizontal overflow at desktop viewport — content exceeds viewport by {desktop_overflow}px")
 
         # ── element/text checks ──
         for check in page_def.get("checks", []):
