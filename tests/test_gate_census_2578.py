@@ -591,7 +591,15 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Both are mutation-backed against REAL failure modes, which is the property this
         # band exists to protect. Unproven UNCHANGED — neither is a new unproven entrant.
         # Both have now landed (#3789 then #3786), so the band is exact: slack 0.
-        <= 94
+        # Upper bound raised 94 -> 95 (2026-09-14, #3642/#3799): the 95th proof is
+        # `guard::scripts/check_no_verify_sites.py`, the --no-verify commit-bypass SET
+        # guard. Two real-tree mutations, each watched RED live against the actual
+        # tracked files (not a copy) and reverted: moving .claude/settings.json's
+        # `Bash(git commit --no-verify:*)` entry from `ask` to `allow` (POSTURE
+        # ESCALATION, exit 1; reverted, exit 0), and separately blanking `--no-verify`
+        # off deploy/agent_commit.sh's own commit line (EXECUTION site vanishes, exit 1;
+        # reverted, exit 0). Unproven UNCHANGED — a proven entrant, not a new unproven one.
+        <= 95
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
