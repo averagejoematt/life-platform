@@ -60,7 +60,11 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-PR_CHECKS = os.path.join(REPO, ".github", "workflows", "pr-checks.yml")
+# NOT `PR_CHECKS`: that spelling matches gate_census._REGISTRY_NAME's `.*_CHECKS` arm and the
+# census minted a phantom `registry::` gate for what is a single path string, not a registry of
+# gate entries (#3315). The sanctioned remedy for a registry-name phantom is to rename the
+# constant, which is what this is — not a ledger line for a gate that does not exist.
+PR_CHECKS_WORKFLOW = os.path.join(REPO, ".github", "workflows", "pr-checks.yml")
 
 # ── the registry (charter primitive 1) ───────────────────────────────────────
 #
@@ -313,7 +317,7 @@ def test_the_scan_can_actually_fail_on_both_idioms():
 
 # ── the parallel run itself ──────────────────────────────────────────────────
 def _full_suite_steps():
-    with open(PR_CHECKS, encoding="utf-8") as fh:
+    with open(PR_CHECKS_WORKFLOW, encoding="utf-8") as fh:
         src = fh.read()
     block = src[src.index("  full-suite:") :]
     return re.findall(r"run:\s*(python3 -m pytest[^\n]*)", block)
@@ -337,7 +341,7 @@ def test_the_full_suite_runs_a_parallel_pass_and_a_serial_pass():
 def test_xdist_is_pinned_and_installed_by_the_lane_that_uses_it():
     with open(os.path.join(REPO, "requirements-dev.txt"), encoding="utf-8") as fh:
         assert re.search(r"^pytest-xdist==\d+\.\d+\.\d+$", fh.read(), re.M), "pytest-xdist is not pinned in requirements-dev.txt"
-    with open(PR_CHECKS, encoding="utf-8") as fh:
+    with open(PR_CHECKS_WORKFLOW, encoding="utf-8") as fh:
         block = fh.read()
     block = block[block.index("  full-suite:") :]
     m = re.search(r"ci_pins\.py ([^\)\n]+)", block)

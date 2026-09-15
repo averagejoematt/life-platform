@@ -130,3 +130,62 @@ def test_warner_bar_sits_between_honest_slow_and_pathological():
     determinism) and far below the 180.85s pathological case that motivated it.
     Moving the bar is fine — but do it against a fresh --durations reading."""
     assert 55 < conftest.PER_TEST_WARN_SECONDS < 180
+
+
+def test_the_two_passes_partition_the_suite_exactly():
+    """The split is only safe if every test lands in EXACTLY ONE pass.
+
+    Two passes over one selection have two silent failure modes and they look identical
+    from the outside — both report a green check:
+
+      * a test in NEITHER pass is a test that stopped running, and the job is green
+      * a test in BOTH passes runs twice, which is waste, and worse, an in-tree writer
+        running concurrently with its own serial twin is the exact race the `serial`
+        marker exists to prevent
+
+    The guarantee here is STRUCTURAL rather than a count: the two marker expressions
+    must be exact complements over one marker name, so the partition is a property of
+    the selection grammar and cannot drift with the suite's size. A count would go stale
+    the next time anyone adds a test.
+
+    MEASURED once to back the reasoning, 2026-09-15, on this branch's own rebased tree,
+    by `--collect-only` on all three selections and diffing NODE IDS, not totals:
+
+        full selection            26,401
+        -m "not serial"           26,353
+        -m serial                      48
+        in ALL, in NEITHER pass:   (empty)
+        in a pass, not in ALL:     (empty)
+        in BOTH passes:            (empty)
+
+    That also settles an open question I posted on the PR: an apparent five-test
+    arithmetic gap between an implied collected count and the reported outcomes. There
+    is no gap. The two numbers came from different runs on different trees, and the
+    suite had grown by five tests between them. The partition itself was always exact,
+    and this test is what keeps saying so without anyone re-running the measurement.
+    """
+    lines = _full_suite_pytest_lines()
+    assert len(lines) == 2, f"expected exactly two full-suite pytest passes, found {len(lines)}: {lines}"
+
+    exprs = []
+    for line in lines:
+        # `python3 -m pytest` carries its own `-m`; strip the interpreter's module flag
+        # first or every line looks like it selects on a marker named "pytest".
+        args = re.sub(r"^\s*python3?\s+-m\s+pytest\b", "", line)
+        m = re.findall(r"""-m\s+(?:"([^"]+)"|'([^']+)'|(\S+))""", args)
+        assert len(m) == 1, f"a pass must carry exactly one -m marker expression: {line}"
+        exprs.append(next(g for g in m[0] if g).strip())
+
+    assert sorted(exprs) == ["not serial", "serial"], (
+        f"the two passes must select on exact complements of ONE marker; got {exprs!r}. "
+        "Anything else (a second marker, an `and`/`or` clause, a renamed marker on one "
+        "side only) breaks the partition and a test can fall into neither pass while "
+        "both steps stay green."
+    )
+
+    # ...and the marker they complement over must be the registered one, or `-m serial`
+    # selects nothing and pytest's strict-marker setting is the only thing standing
+    # between that and a silently empty serial pass.
+    with open(os.path.join(REPO, "pytest.ini"), encoding="utf-8") as fh:
+        ini = fh.read()
+    assert re.search(r"^\s*serial:", ini, re.M), "the `serial` marker is not registered in pytest.ini — see #3025"

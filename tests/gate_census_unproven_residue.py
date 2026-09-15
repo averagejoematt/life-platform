@@ -129,7 +129,23 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "ci::.github/workflows/pr-checks.yml::fast-lane / Lint gate (ruff — same command + pin as ci-lint.yml)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/pr-checks.yml::fast-lane / Mypy gate (tier-2 clean set — same command + pin as ci-lint.yml)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/pr-checks.yml::fast-lane / Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)": "2026-09-05 seal (#3536)",
-    "ci::.github/workflows/pr-checks.yml::full-suite / Full unit suite (same selection as the post-merge coverage gate)": "2026-09-05 seal (#3536)",
+    # 2026-09-15 (#3025, PR #3797): the single "Full unit suite" step above became TWO steps —
+    # a parallel pass (-n auto --dist loadfile -m "not serial") and a serial pass (-m serial) —
+    # so its 2026-09-05 seal line is RETIRED here and replaced by the two lines below. This is
+    # the rename case this file's own KEYS note calls out: "inserting a step ahead of it does
+    # not make it a new entrant; RENAMING a step does, and that is the honest reading."
+    #
+    # Both arrive UNPROVEN and the reason is the same for each: proving a CI STEP means watching
+    # that step go red in a real CI run, which for a pytest step means pushing a deliberately
+    # failing test to the branch under review. That reds the PR that is trying to land the gate.
+    # The repo already carries this exact residual shape by name — the #2834 additive-IAM steps
+    # are census gates of their own and are UNPROVEN for the same reason (see the scope note in
+    # scripts/gate_census.py). What IS proven offline, and is not being passed off as a proof of
+    # these two: tests/test_suite_parallel_safety_3025.py mutation-proves the in-tree-writer scan
+    # in both directions, and tests/test_full_suite_premerge_3025.py asserts the selection-parity,
+    # no-cov, durations and unpiped contracts across EVERY pytest step rather than the first one.
+    "ci::.github/workflows/pr-checks.yml::full-suite / Full unit suite — parallel pass (same selection as the post-merge coverage gate)": "2026-09-15 (#3025, PR #3797): the xdist pass. Proving a CI pytest step red requires pushing a failing test to the branch landing it.",
+    "ci::.github/workflows/pr-checks.yml::full-suite / Full unit suite — serial pass (modules that mutate the checkout,": "2026-09-15 (#3025, PR #3797): the -m serial pass over the 4 registered in-tree writers. Same reason as its parallel twin above.",
     "ci::.github/workflows/pr-checks.yml::full-suite / Install lane dependencies": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/remediation-agent.yml::remediate / Infra drift sentinel": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/remediation-agent.yml::remediate / Install agent runtime": "2026-09-05 seal (#3536)",
