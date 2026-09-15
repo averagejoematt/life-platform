@@ -205,7 +205,16 @@
       "Bash(aws route53 list-* *)",
       "Bash(.venv/bin/black --check *)",
       "Bash(python3 scripts/skill_lint.py --offline*)",
-      "Bash(python3 scripts/diligence_verify.py *)"
+      "Bash(python3 scripts/diligence_verify.py *)",
+      "Bash(python3 scripts/module_size_headroom.py *)",
+      "Bash(python3 scripts/check_no_verify_sites.py *)",
+      "Bash(python3 scripts/check_ingestion_hardcoded_literals.py *)",
+      "Bash(python3 scripts/closure_contract.py *)",
+      "Bash(python3 scripts/worktree_reaper.py --check*)",
+      "Bash(python3 deploy/countdown_gap_sweep.py)",
+      "Bash(python3 scripts/check_pr_closing_set.py *)",
+      "Bash(python3 scripts/check_repo_level_git_ops.py *)",
+      "Bash(python3 scripts/surface_drift_gate.py *)"
     ]
   },
   "hooks": {
