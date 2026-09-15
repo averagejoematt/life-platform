@@ -117,6 +117,9 @@ from operational.cost_governor_surge import (  # noqa: F401 — the historic add
     SURGE_FLIPS_30D_ALARM,
     SURGE_SIGMA_K,
     SURGE_UNIQUES_THRESHOLD,
+    decode_surge_state,
+    encode_surge_state,
+    held_by_note,
     surge_threshold_from_baseline,
 )
 
@@ -772,21 +775,25 @@ def _write_tier(tier: int) -> None:
     _ssm.put_parameter(Name=SSM_TIER_PARAM, Value=str(tier), Type="String", Overwrite=True)
 
 
-def _read_surge_active() -> bool:
-    """Previously-persisted surge state, for edge-triggered alerting (ADR-133).
-    Fails closed to False — a transient SSM read error never fabricates a
-    surge→normal transition alert that didn't happen."""
+def _read_surge_state() -> tuple:
+    """(prev_surge_active, engaged_at_bar) — the persisted state AND the bar that minted it.
+
+    #3661: the bar rides the same parameter (`true@1188`), because until it did, an
+    engaged surge could not be attributed to any threshold and was inherited across
+    bar moves it would never have crossed. Fails closed to (False, None) — a transient
+    SSM read error never fabricates a surge→normal transition alert that didn't happen,
+    and never fabricates an attribution either."""
     try:
-        return _ssm.get_parameter(Name=SSM_SURGE_PARAM)["Parameter"]["Value"] == "true"
+        return decode_surge_state(_ssm.get_parameter(Name=SSM_SURGE_PARAM)["Parameter"]["Value"])
     except _ssm.exceptions.ParameterNotFound:
-        return False
+        return False, None
     except Exception as e:
         logger.warning(f"Surge-state SSM read failed: {e}")
-        return False
+        return False, None
 
 
-def _write_surge_active(active: bool) -> None:
-    _ssm.put_parameter(Name=SSM_SURGE_PARAM, Value="true" if active else "false", Type="String", Overwrite=True)
+def _write_surge_active(active: bool, engaged_at_bar: int = None) -> None:
+    _ssm.put_parameter(Name=SSM_SURGE_PARAM, Value=encode_surge_state(active, engaged_at_bar), Type="String", Overwrite=True)
 
 
 def _write_breakdown(
@@ -802,6 +809,8 @@ def _write_breakdown(
     surge_threshold: int | None = None,
     surge_threshold_rule: str | None = None,
     surge_flips_30d: int | None = None,
+    surge_held_by: str | None = None,
+    surge_engaged_at_bar: int | None = None,
     ai_class_split: dict | None = None,
     prod_class_share=None,
     projected_all_classes: float | None = None,
@@ -849,6 +858,12 @@ def _write_breakdown(
         "surge_threshold_rule": surge_threshold_rule,
         "surge_threshold_floor": SURGE_UNIQUES_THRESHOLD,
         "surge_flips_30d": surge_flips_30d,
+        # #3661: WHICH of the two rules is holding surge on — the bar itself, or the
+        # hysteresis band below it — and the bar that minted the engaged state. A $252
+        # ceiling against a $215 base is 17% on every tier band; a reader of the receipt
+        # must not have to open the source to learn which reading bought it.
+        "surge_held_by": surge_held_by,
+        "surge_engaged_at_bar": surge_engaged_at_bar,
         "base_ceiling": base_ceiling,
         # Floored at the base exactly as _effective_ceiling() floors it, so the
         # payload can never advertise a surge ceiling BELOW the base — a pair the
@@ -1203,8 +1218,16 @@ def lambda_handler(event, context):
         # PREVIOUSLY persisted state — read here rather than at the alert site below so
         # both the decision and the edge detection see the same prior.
         surge_threshold, surge_threshold_rule = surge_threshold_from_baseline(_weekly_uniques_baseline(now))
-        prev_surge_active = _read_surge_active()
-        effective_ceiling, surge_active = _effective_ceiling(recent_uniques, surge_threshold, prev_surge_active)
+        # #3661: the persisted state carries the bar that MINTED it, and `decide` re-decides
+        # from OFF when that bar is not the bar in force — hysteresis may hold a state
+        # across noise, never across a threshold the reading would not have crossed.
+        prev_surge_active, prev_engaged_bar = _read_surge_state()
+        surge = cost_governor_surge.decide(recent_uniques, surge_threshold, prev_surge_active, prev_engaged_bar)
+        surge_held_by = held_by_note(surge, recent_uniques)
+        # `surge.active` is passed as the prior deliberately: _effective_ceiling re-runs the
+        # same hysteretic predicate, and feeding it the DECIDED state makes the two agree by
+        # construction. test_effective_ceiling_agrees_with_decide pins that identity.
+        effective_ceiling, surge_active = _effective_ceiling(recent_uniques, surge_threshold, surge.active)
 
         # Projection escalates at most ONE tier above actual mtd spend (and not at
         # all in the early-month window) — see _decide_tier for the two failure
@@ -1219,7 +1242,7 @@ def lambda_handler(event, context):
             f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE} "
             f"self_reported_mtd=${self_reported:.2f} recent_uniques={recent_uniques} "
             f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f} "
-            f"surge_threshold={surge_threshold} [{surge_threshold_rule}] "
+            f"surge_threshold={surge_threshold} [{surge_threshold_rule}] surge_held_by={surge_held_by} "
             f"prod_class_share={prod_class_share} ai_class_split={ai_class_split} "
             f"ai_dev_ci ~${ai_dev_ci_daily:.2f}/day projected_all_classes=${projected_all_classes:.2f}"
         )
@@ -1253,6 +1276,7 @@ def lambda_handler(event, context):
                         "recent_uniques": recent_uniques,
                         "surge_threshold": surge_threshold,
                         "surge_threshold_rule": surge_threshold_rule,
+                        "surge_held_by": surge_held_by,
                     }
                 ),
             }
@@ -1273,13 +1297,19 @@ def lambda_handler(event, context):
         # since #3510 the decision itself depends on it (hysteresis).
         surge_flips_30d = _surge_flips_30d(now)
         if surge_active != prev_surge_active:
-            _write_surge_active(surge_active)
+            _write_surge_active(surge_active, surge.engaged_at_bar)
             _emit_surge_flip()
             # This edge is part of the count the operator is being told about.
             surge_flips_30d = None if surge_flips_30d is None else surge_flips_30d + 1
             _alert_surge(surge_active, recent_uniques, mtd, projected, surge_threshold, surge_threshold_rule)
             if surge_flips_30d is not None and surge_flips_30d >= SURGE_FLIPS_30D_ALARM:
                 _alert_surge_flapping(surge_flips_30d, surge_threshold, surge_threshold_rule, recent_uniques)
+        elif surge.active and surge.engaged_at_bar != prev_engaged_bar:
+            # #3661: NOT an edge — surge stayed on, but the bar moved and this reading
+            # cleared the new one, so the state is now attributable to it. Persisting the
+            # re-attribution is what stops the next run re-deciding against a bar that is
+            # already retired. No SurgeFlip and no alert: nothing flipped.
+            _write_surge_active(True, surge.engaged_at_bar)
         _emit_surge_flip_gauge(surge_flips_30d)
 
         # #822: persist the projection breakdown EVERY enforcement run (not just
@@ -1300,6 +1330,8 @@ def lambda_handler(event, context):
             surge_threshold=surge_threshold,
             surge_threshold_rule=surge_threshold_rule,
             surge_flips_30d=surge_flips_30d,
+            surge_held_by=surge_held_by,
+            surge_engaged_at_bar=surge.engaged_at_bar,
             ai_class_split=ai_class_split,
             prod_class_share=prod_class_share,
             projected_all_classes=projected_all_classes,

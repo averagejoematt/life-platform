@@ -101,3 +101,124 @@ def engaged(recent_uniques, threshold: int | None, prev_surge_active: bool) -> b
     if prev_surge_active:
         return recent_uniques >= SURGE_DISENGAGE_RATIO * bar
     return recent_uniques >= bar
+
+
+# ── #3661: the bar that MINTED an engaged surge, and re-evaluation across a bar move ──
+# The hysteresis band above is right and its docstring is right; what neither could do is
+# tell "held by the band under the SAME bar" (the band doing its job) apart from "held by
+# a band derived from a bar that did not exist when the state was minted" (nobody's
+# design). The live record: surge engaged 2026-08-31 under the retired 900 bar and was
+# still ON at 2026-09-14T16:00Z, by then held by 0.8*1383 = 1106.4 — a band from a bar two
+# derivations later. Effective ceiling $252 against the $215 base for 14 days, and with it
+# all three tier bands (the tier-1 trip moves $157.67 -> $184.80). The governor could not
+# even name the discrepancy, because the minting bar was never written down.
+#
+# So the state persisted at `/life-platform/surge-active` now carries its bar —
+# `true@1188` — and `decide()` re-decides FROM OFF whenever the bar in force differs from
+# the one that minted the state. Hysteresis keeps doing what it is for (suppressing
+# oscillation around a STABLE bar) and stops carrying a state across a bar the reading
+# would never have crossed.
+#
+# WHY A SUFFIX ON THE EXISTING PARAMETER, not a second one: the value is read in exactly
+# one place (`cost_governor_lambda._read_surge_state`) — every other consumer reads
+# `surge_active` out of the budget-breakdown payload — so the format is private to the
+# governor. A second SSM parameter would need a `role_policies_operational.py` statement
+# and therefore a CDK deploy to add a fact the existing parameter has room for. Rent: zero
+# new AWS resources, zero new IAM, zero new schedules, one extra field in a string the
+# governor already writes on every edge.
+SURGE_STATE_SEP = "@"
+# An engaged state whose minting bar is UNRECORDED is treated as cross-bar, i.e. re-decided
+# from OFF. This is the deploy-migration path (every value written before #3661 is a bare
+# `true`), and it is deliberately the tightening direction: "held by hysteresis" is a claim
+# about which bar engaged the state, and a state that cannot support that claim must not
+# get the looser ceiling. Same posture as `_effective_ceiling`'s "fails closed to the base
+# ceiling, never the surge one".
+SURGE_UNATTRIBUTED_IS_CROSS_BAR = True
+
+
+def decode_surge_state(raw) -> tuple[bool, int | None]:
+    """`"true@1188"` -> (True, 1188); `"true"` -> (True, None); anything else -> (False, None).
+
+    Backwards compatible in the only direction that matters: every value written before
+    #3661 is a bare `true`/`false`, and a bare `true` decodes as engaged-with-unknown-bar,
+    which `decide()` then re-decides rather than inheriting.
+    """
+    text = "" if raw is None else str(raw).strip()
+    head, _, tail = text.partition(SURGE_STATE_SEP)
+    if head.lower() != "true":
+        return False, None
+    try:
+        return True, int(tail)
+    except (TypeError, ValueError):
+        return True, None
+
+
+def encode_surge_state(active: bool, engaged_at_bar: int | None) -> str:
+    """The inverse of `decode_surge_state`. A disengaged state has no minting bar to
+    record, so it stays the bare `false` the parameter has always held."""
+    if not active:
+        return "false"
+    return "true" if engaged_at_bar is None else f"true{SURGE_STATE_SEP}{int(engaged_at_bar)}"
+
+
+class SurgeDecision(tuple):
+    """(active, bar, engaged_at_bar, held_by, rebar_from) — the surge state AND its provenance.
+
+    `held_by` is `"bar"` (the reading is at or above the bar in force), `"hysteresis"`
+    (below the bar, held by the band under the bar that minted it) or `None` (not surging).
+    `rebar_from` is the retired minting bar when this run re-decided across a bar move —
+    the fact the log line and the receipt exist to surface.
+    """
+
+    __slots__ = ()
+
+    def __new__(cls, active, bar, engaged_at_bar, held_by, rebar_from):
+        return tuple.__new__(cls, (bool(active), int(bar), engaged_at_bar, held_by, rebar_from))
+
+    active = property(lambda self: self[0])
+    bar = property(lambda self: self[1])
+    engaged_at_bar = property(lambda self: self[2])
+    held_by = property(lambda self: self[3])
+    rebar_from = property(lambda self: self[4])
+
+
+def decide(recent_uniques, threshold: int | None, prev_surge_active: bool, prev_engaged_bar: int | None = None) -> SurgeDecision:
+    """The full surge decision: `engaged()` plus which bar may be leaned on.
+
+    PURE, and the only place the cross-bar rule lives. Three cases:
+
+      * previously OFF                -> engage iff ``recent_uniques >= bar``
+      * previously ON, SAME bar       -> `engaged()`'s hysteretic hold (>= 0.8*bar)
+      * previously ON, DIFFERENT bar  -> **re-decide as if OFF**; the band belongs to a
+        threshold that did not mint this state, so leaning on it would hold a ceiling no
+        current reading could have produced.
+
+    An unknown minting bar counts as DIFFERENT (`SURGE_UNATTRIBUTED_IS_CROSS_BAR`).
+    """
+    bar = SURGE_UNIQUES_THRESHOLD if threshold is None else int(threshold)
+    minted = None if prev_engaged_bar is None else int(prev_engaged_bar)
+    cross_bar = bool(prev_surge_active) and minted != bar
+    active = engaged(recent_uniques, bar, bool(prev_surge_active) and not cross_bar)
+    rebar_from = minted if cross_bar else None
+    if not active:
+        return SurgeDecision(False, bar, None, None, rebar_from)
+    above_bar = recent_uniques is not None and recent_uniques >= bar
+    engaged_at = bar if (cross_bar or not prev_surge_active) else minted
+    return SurgeDecision(True, bar, engaged_at, "bar" if above_bar else "hysteresis", rebar_from)
+
+
+def held_by_note(decision: SurgeDecision, recent_uniques) -> str:
+    """The operator-facing attribution string for the log line and `/api/receipts`.
+
+    A 17% ceiling difference must never be invisible to whoever reads the receipt, and
+    "surge_active=true" alone does not say whether the reading cleared the bar or is
+    merely inside the band below it.
+    """
+    if not decision.active:
+        if decision.rebar_from is not None:
+            return f"none (re-decided across bar {decision.rebar_from}->{decision.bar}: {recent_uniques} < {decision.bar})"
+        return "none"
+    if decision.held_by == "bar":
+        return f"bar ({recent_uniques} >= {decision.bar}, engaged_at_bar={decision.engaged_at_bar})"
+    band = SURGE_DISENGAGE_RATIO * decision.bar
+    return f"hysteresis (band {band:.1f}, bar {decision.bar}, engaged_at_bar={decision.engaged_at_bar})"
