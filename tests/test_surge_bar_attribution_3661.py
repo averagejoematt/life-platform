@@ -75,6 +75,11 @@ def gov():
 # Kept as data because the whole finding is about a bar that MOVES.
 _LIVE_BARS = ((900, None), (1188, 1011), (1383, 1218), (1355, 905))
 
+# Derived, never hand-typed (#2898): `tests/test_budget_ceiling_registry_2898.py` sweeps
+# for a ceiling-family literal in any Python consumer, and caught the two receipt fixtures
+# below writing 252.0 the first time this file ran the full suite.
+_SURGE_CEILING = importlib.import_module("operational.cost_governor_lambda").SURGE_CEILING_USD
+
 
 # ── A. the cross-bar rule, both directions ───────────────────────────────────────────────
 def test_a_same_bar_hysteresis_hold_survives(surge):
@@ -259,7 +264,7 @@ def test_d_the_receipt_serves_the_attribution(monkeypatch):
         "tier": 0,
         "mtd": 48.48,
         "projected": 93.94,
-        "ceiling": 252.0,
+        "ceiling": _SURGE_CEILING,
         "surge_active": True,
         "recent_uniques": 1218,
         "surge_threshold": 1383,
@@ -302,7 +307,7 @@ def test_d_an_old_breakdown_serves_null_not_a_manufactured_bar(monkeypatch):
         "tier": 0,
         "mtd": 48.48,
         "projected": 93.94,
-        "ceiling": 252.0,
+        "ceiling": _SURGE_CEILING,
         "surge_active": True,
         "recent_uniques": 1218,
         "surge_threshold": 1383,
