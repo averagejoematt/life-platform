@@ -710,7 +710,8 @@ def lambda_handler(event, context):
                     "Training-note extractor",
                     f"Notes present but the derived layer is dark — {tn_health.get('noted_exercise_sessions')} noted sessions "
                     f"in {tn_health.get('lookback_days')}d, {tn_health.get('degraded')} degraded, "
-                    f"{tn_health.get('missing_records')} missing. Check the Bedrock grant and the Haiku cap.",
+                    f"{tn_health.get('missing_records')} missing. Degrade reasons: "
+                    f"{tn_health.get('degraded_reasons_note') or 'none recorded'}. Check the Bedrock grant and the Haiku cap.",
                 )
             )
         elif not tn_health.get("checked"):

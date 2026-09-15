@@ -398,18 +398,22 @@ def derived_layer_status(health: dict | None) -> tuple[str, str]:
         return LAYER_UNKNOWN, "no health signal for this layer — status unknown, not healthy"
     if not health.get("checked"):
         return LAYER_UNKNOWN, f"the layer's own health check could not run ({health.get('error') or 'no reason given'})"
+    # #3699: a layer that says it is degraded and cannot say WHY sends its reader back to
+    # hypotheses. The producer supplies the tally; this is the sentence every consumer reads.
+    why = health.get("degraded_reasons_note") or ""
     if health.get("extractor_dark"):
         noted = health.get("noted_exercise_sessions")
         return (
             LAYER_DARK,
             f"the producer is dark — {noted} noted session(s) in the last {health.get('lookback_days')}d produced "
-            f"{health.get('degraded')} degraded and {health.get('missing_records')} missing record(s). "
-            "Counts from this layer are withheld: they would read as measured zeros.",
+            f"{health.get('degraded')} degraded and {health.get('missing_records')} missing record(s)"
+            + (f" (degrade reasons: {why})" if why else "")
+            + ". Counts from this layer are withheld: they would read as measured zeros.",
         )
     if health.get("degraded"):
         return (
             LAYER_DEGRADED,
             f"{health.get('degraded')} of {health.get('records_found')} recent record(s) are degraded — "
-            "deterministic signals only, the semantic pass did not run on those.",
+            "deterministic signals only, the semantic pass did not run on those" + (f" (degrade reasons: {why})" if why else "") + ".",
         )
     return LAYER_OK, ""

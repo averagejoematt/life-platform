@@ -43,9 +43,21 @@ def test_parse_signals_defensive():
     assert sigs[0]["confidence"] == 1.0  # clamped
 
 
-def test_parse_signals_garbage_returns_empty():
-    assert tnl._parse_signals("no json here", TAXONOMY) == []
-    assert tnl._parse_signals("", TAXONOMY) == []
+def test_parse_signals_garbage_raises_instead_of_returning_empty():
+    """#3699 INVERTED this test. It used to assert `== []`, and that assertion WAS the bug:
+
+    an unreadable response returning [] meant `used_llm=True, degraded=False` — a broken
+    extraction recorded as a healthy one that simply found nothing. The full degrade-path
+    coverage lives in tests/test_training_notes_degrade_reason_3699.py.
+    """
+    import pytest
+
+    with pytest.raises(tnl.UnparseableResponse):
+        tnl._parse_signals("no json here", TAXONOMY)
+    with pytest.raises(tnl.UnparseableResponse):
+        tnl._parse_signals("", TAXONOMY)
+    # NEGATIVE CONTROL: a response that genuinely parsed to an empty array is NOT a degrade.
+    assert tnl._parse_signals("[]", TAXONOMY) == []
 
 
 def test_cache_hit_skips_model(monkeypatch):

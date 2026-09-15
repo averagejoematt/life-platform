@@ -25,7 +25,7 @@ The mental model Matthew gave, verbatim in spirit: *a two-way voice, as if a per
 1. **Raw notes are untouched.** The extracted signal layer is a derived projection. The raw Hevy `notes` (per-exercise) and `description` (per-workout) fields stay the source of truth — verbatim, queryable, never mutated, never deleted. Every signal record stores `note_raw` exactly as written. The signal view is *additive*.
 2. **Inferred, and labelled as such.** An extracted signal is an inference over natural language. Every signal carries `confidence` + `extracted_by` (`deterministic` / `haiku` / `hybrid`). No surface presents an extracted signal as ground truth without that treatment (Henning standard).
 3. **Notes never silently overwrite numbers.** A note that qualifies a logged metric ("that RPE 9 was shins, not calves") emits an **overlay** the coach reads — it never mutates the raw logged RPE/load. Raw wins; interpretation is additive (the `ruck_log` override precedent: persisted overlay, raw is the under/over-count beneath it).
-4. **Conservation of notes.** Every non-empty raw note maps to exactly one signal record (which may carry ≥1 signals). A note is never dropped on extraction failure — on failure it is stored with `note_raw` + deterministic signals only, flagged `extracted_by:"deterministic"` and `degraded:true`. The pipeline going dark must be **visible**, not silent (freshness hook, §8).
+4. **Conservation of notes.** Every non-empty raw note maps to exactly one signal record (which may carry ≥1 signals). A note is never dropped on extraction failure — on failure it is stored with `note_raw` + deterministic signals only, flagged `extracted_by:"deterministic"` and `degraded:true`. The pipeline going dark must be **visible**, not silent (freshness hook, §8). **Amended #3699:** a degrade also records WHY, on the record (`degraded_reason`), and a response that is truncated or unreadable is a degrade — it used to return `[]` with `degraded:false`, so `degraded` was an undercount and `extractor_dark` a floor rather than the number.
 5. **Pain is never missed.** The `pain_discomfort` class has a deterministic floor that fires regardless of the LLM (§6). False positives are acceptable here by design.
 6. **Private.** Training notes are personal free text. They are never an auto-public surface. No website rendering without an explicit, separate gate (Yael / Henning).
 
@@ -132,6 +132,10 @@ signals           [ { class, summary, value?, confidence } , ... ]   # ≥1 per 
 pain_flag         false
 sentiment         "positive" | "neutral" | "negative" | null
 degraded          false                            # true = LLM failed/capped, deterministic-only
+degraded_reason   null                             # #3699: "<code>: <ExcClass>: <msg>"; code ∈
+                                                   # truncated | unparseable | cap_exceeded | llm_error.
+                                                   # ABSENT (not null) on records written before #3699 —
+                                                   # consumers report those as `unrecorded`, never re-derived.
 extracted_by      "deterministic" | "haiku" | "hybrid"
 algo_version      "note-extractor@1.0.0"
 extracted_at      <ts>
