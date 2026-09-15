@@ -93,10 +93,48 @@ _ANCHOR_WINDOW_CHARS = 24
 # NOT "last night": in this domain that is the CURRENT reading, not a historical one —
 # a whoop morning IS last night's sleep. The existing #2113 sleep test caught that on the
 # first draft of this pattern, which is the behaviour it exists to protect.
+#
+# ── #3793: a coach writes dates the way a PERSON does, not the way a key does ──
+#
+# The second instance of the same class, measured 2026-09-14 and the sole driver of
+# that day's five consecutive `cross_surface:vitals` FAILs (18:31Z→22:34Z) and of the
+# `qa-smoke-failures` alarm:
+#
+#   "On September 12th, his Whoop recorded 73% recovery, 36.4 ms HRV, and 60 bpm
+#    resting heart rate — solid single-night readings…"   (Dr. Max Reyes)
+#
+# Every number is right. 73 / 36.42 / 60 is `DATE#2026-09-13` verbatim, and that
+# record's night is 2026-09-12 — which is not the coach's coinage but the platform's
+# own published label: /api/vitals ships `night_of` = as-of minus one, and served
+# `recovery_as_of 2026-09-14 / night_of 2026-09-13 / recovery_pct 63` at the same
+# instant. Coach right, cockpit right, and the `published_vitals` stamp right too
+# (63.0 as-of 2026-09-14, byte-identical to the cockpit, so the #2575 lag path was
+# never even reached). Three correct surfaces and a red gate.
+#
+# The defect is here: the sentence rule above recognises a date only as an ISO string
+# or "Day N". A prose calendar date — the form a narrative coach actually writes, and
+# the form `night_of` describes in English — was invisible, so a correctly-dated
+# citation was judged as a claim about now. #1985 again: this gate fired on a coach
+# doing exactly what ADR-104 asks of it.
+#
+# Still an EXPLICIT calendar date: a month name with a day number beside it. A bare
+# month ("in September") is not enough here — `_HISTORICAL_ANCHOR` already covers the
+# adjacent-anchor form of that — and neither are "yesterday" / "last night", which in
+# this domain name the CURRENT reading.
+#
+# `May` is carved out because it is also a modal verb: it needs an ordinal ("May 3rd"),
+# a year ("May 3, 2026") or a date preposition ("on May 3") before it counts, so a
+# sentence like "that may 3% of the time" cannot launder an undated figure.
+_MONTHS_UNAMBIGUOUS = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?"
+
 _DATED_SENTENCE = re.compile(
-    r"""(?:
-          \d{4}-\d{2}-\d{2}                        # an explicit ISO date in the sentence
+    rf"""(?:
+          \d{{4}}-\d{{2}}-\d{{2}}                    # an explicit ISO date in the sentence
         | \b(?:on|since)\s+day\s+\d+\b             # "on Day 3"
+        | \b(?:{_MONTHS_UNAMBIGUOUS})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?\b   # "September 12th", "Sep 12"
+        | \b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:{_MONTHS_UNAMBIGUOUS})\b  # "12 September"
+        | \bmay\s+\d{{1,2}}(?:st|nd|rd|th|\s*,\s*\d{{4}})               # "May 3rd", "May 3, 2026"
+        | \b(?:on|since)\s+may\s+\d{{1,2}}\b                           # "on May 3"
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -112,7 +150,7 @@ def weights_cited_in(prose: str) -> list[float]:
     out = []
     # Sentence-scoped first (#2738), so the dated escape hatch stays ONE seam shared
     # with vitals_cited_in; the adjacent-anchor check below is unchanged.
-    for text in _SENTENCE_SPLIT.split(prose or ""):
+    for text in _sentences(prose):
         if _DATED_SENTENCE.search(text):
             continue
         for m in _WEIGHT_IN_PROSE.finditer(text):
@@ -228,6 +266,20 @@ _VITALS_TARGET_SENTENCE = re.compile(
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
 
+# #3793: "Sept. 12" is one date, and the splitter above would cut it in half at the
+# abbreviation's own period — leaving the day number stranded in the next sentence
+# where no date rule can see it. Normalising the period away before splitting keeps
+# the abbreviated form working without teaching the splitter every abbreviation in
+# English. Narrow by construction: the merge it can cause needs a sentence to END on
+# a bare month name AND the next to OPEN on a 1-2 digit number, and the same
+# `\b\d{1,2}\b` bound that stops "September 2026" from reading as a date stops that too.
+_MONTH_ABBREV_DOT = re.compile(rf"\b({_MONTHS_UNAMBIGUOUS}|may)\.", re.IGNORECASE)
+
+
+def _sentences(prose: str) -> list[str]:
+    """The ONE sentence seam both cited-in readers use. See `_DATED_SENTENCE`."""
+    return _SENTENCE_SPLIT.split(_MONTH_ABBREV_DOT.sub(r"\1", prose or ""))
+
 
 def vitals_cited_in(prose: str) -> dict:
     """Every vital a blob of prose asserts **as a current reading**, by metric.
@@ -238,7 +290,7 @@ def vitals_cited_in(prose: str) -> dict:
     and figures outside the metric's real domain.
     """
     out: dict[str, list[float]] = {}
-    for sentence in _SENTENCE_SPLIT.split(prose or ""):
+    for sentence in _sentences(prose):
         if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
             continue
         for metric, patterns in _VITALS_PATTERNS.items():

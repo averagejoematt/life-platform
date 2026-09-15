@@ -109,10 +109,19 @@ CAUSE IDENTITY — A CITATION MATCHES A NAME, NOT A DEFECT (#3501)
       re-implemented here), read through `fetch_qa_smoke_causes()`. Unreadable logs are
       UNVERIFIED, never a clean cause.
 
-  Deliberately narrow in the same way as the #2996 check: an entry with no `cause` is
-  not flagged (prose citations stay valid), and an alarm with no live cause channel is
-  not flagged. This buys the qa-smoke family — the count-aggregated alarms where the
-  defect class actually occurred — without inventing a cause channel for 118 alarms.
+  Deliberately narrow in the same way as the #2996 check: an alarm with no live cause
+  channel is not flagged. This buys the qa-smoke family — the count-aggregated alarms
+  where the defect class actually occurred — without inventing a cause channel for 118
+  alarms.
+
+  A THIRD check closes the hole the first two left (#3793). `cause` was optional, and on
+  2026-09-14 `qa-smoke-failures` was re-cited in prose at a cause that was real, cured
+  and NOT the one firing; the entry declared no `cause`, so `cause_mismatches` had
+  nothing to compare and every leg passed while the live channel said
+  `cross_surface:vitals` all day. `undeclared_causes` flags a lit alarm whose live cause
+  channel NAMES a cause its citation does not declare — making the machine-readable field
+  mandatory exactly where a machine-readable channel exists, and nowhere else. An empty
+  live cause list (the self-clearing case) is still never flagged.
 
 DEGRADE HONESTLY
   If CloudWatch can't be reached (no creds, offline, throttled) this prints a clear
@@ -663,6 +672,43 @@ def cause_mismatches(alarms, citations, live_causes):
     return out
 
 
+def undeclared_causes(alarms, citations, live_causes):
+    """(alarm_name, live_cause) for every lit alarm whose cause channel NAMES a cause
+    while its citation declares none (#3793).
+
+    `cause_mismatches` above can only compare a cause an entry chose to declare, and
+    `cause` is optional — so on 2026-09-14 `qa-smoke-failures` was re-cited in prose
+    at a cause that was real, cured and **not the one firing**, the entry carried no
+    `cause` key, and every leg of this gate passed over an alarm whose live channel was
+    saying `cross_surface:vitals` the whole time. A well-formed citation is not a true
+    one; the fix is to stop letting the machine-readable field be optional exactly where
+    a machine-readable channel exists.
+
+    Narrow by the same construction as its sibling, so it cannot manufacture a red:
+      * only alarms with a NON-EMPTY live cause list — an empty list is the
+        self-clearing case (the metric's aggregate is still lit, nothing is failing
+        now) and has no cause to declare;
+      * an alarm with no live cause reading at all is UNKNOWN, never flagged, so the
+        118 alarms with no cause channel are untouched;
+      * silent when the entry already declares a `cause` — `cause_mismatches` owns
+        that comparison.
+
+    Pure and deterministic — `live_causes` is injected, exactly like `issue_states`.
+    """
+    out = []
+    for a in alarms:
+        name = a.get("name") or "?"
+        if a.get("by_construction"):
+            continue
+        live = live_causes.get(name)
+        if not live:
+            continue
+        if (citations.get(name) or {}).get("cause"):
+            continue
+        out.append((name, ",".join(sorted(live))))
+    return out
+
+
 def _citation_written_on(entry):
     """The date an entry's CLAIM was made, as YYYY-MM-DD, or None.
 
@@ -864,6 +910,7 @@ def render(
     mismatched=(),
     cause_error=None,
     flapped_retired=(),
+    undeclared=(),
 ):
     """(exit_code, message) for a computed result. Pure — unit-tested offline.
 
@@ -893,14 +940,15 @@ def render(
         )
         for name, fired_n, cleared_n in sorted(flapped_retired):
             retired_lines.append(f"   - {name}  (entered ALARM x{fired_n}, cleared x{cleared_n}; no longer exists)")
-    if not uncited and not ancient and not flapped and not dead and not stale_episodes and not mismatched:
+    if not uncited and not ancient and not flapped and not dead and not stale_episodes and not mismatched and not undeclared:
         message = (
             "✅ every alarm in ALARM state >72h cites an incident row or issue (reader-audience alarms "
             "cite on FIRST red instead, #3423), and every one red "
             f">{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
             f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912). "
             "Every lit alarm's cited `#N` is OPEN (#2996), and no citation predates its "
-            "alarm's current episode or names a cause the live run contradicts (#3501)."
+            "alarm's current episode, names a cause the live run contradicts, or leaves a live "
+            "cause channel undeclared (#3501/#3793)."
         )
         if retired_lines:
             message += "\n" + "\n".join(retired_lines)
@@ -989,6 +1037,17 @@ def render(
         lines.append(
             "   Re-cite against the cause that is actually firing, or fix it — the alarm is red for a reason nobody has written down."
         )
+    if undeclared:
+        lines.append(
+            f"❌ {len(undeclared)} lit alarm(s) whose LIVE cause channel names a cause the citation does not declare (#3793) — "
+            "prose alone cannot be checked against it:"
+        )
+        for name, live in sorted(undeclared):
+            lines.append(f"   - {name}  (live cause: {live}; entry has no `cause` field)")
+        lines.append(
+            '   Add `"cause": "<check id>"` to the entry so #3501 can compare it every run. This is the leg that '
+            "would have caught a citation naming a real-but-cured defect while a different one held the alarm."
+        )
     if history_error is not None:
         lines.append(
             f"⚠️  Alarm-history read failed ({history_error}) — the fired-and-cleared check is UNVERIFIED "
@@ -1020,7 +1079,7 @@ def main():
     if err:
         history, history_err, flapped, flapped_retired = [], None, [], []  # whole board already UNVERIFIED
         issue_err, dead = None, []
-        cause_err, mismatched = None, []
+        cause_err, mismatched, undeclared = None, [], []
     else:
         history, history_err = fetch_alarm_history()
         if history_err:
@@ -1040,6 +1099,7 @@ def main():
         dead = [] if issue_err else dead_citations(alarms, citations, issue_states)
         live_causes, cause_err = fetch_qa_smoke_causes()
         mismatched = [] if cause_err else cause_mismatches(alarms, citations, live_causes)
+        undeclared = [] if cause_err else undeclared_causes(alarms, citations, live_causes)
     code, message = render(
         uncited,
         err,
@@ -1053,6 +1113,7 @@ def main():
         mismatched=mismatched,
         cause_error=cause_err,
         flapped_retired=flapped_retired,
+        undeclared=undeclared,
     )
     print(message)
     if code == 0:
