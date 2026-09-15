@@ -328,7 +328,32 @@ _UNENROLLED_WRITING_LAMBDA_PY = (
 )
 
 
+# Assembled: tests/test_judge_verdict_retry_3688.py sweeps lambdas/ mcp/ scripts/ deploy/
+# cdk/ for any line that DECIDES on a truncated model reply, and THIS file is under
+# scripts/ — writing the idiom whole here would make the mutations module itself an
+# unregistered judge and red the guard with no plant at all. Same trap as _FIXED_OFFSET_PY
+# above, one gate later.
+_UNREGISTERED_JUDGE_PY = (
+    '"""probe — a synthetic AI judge that calls a truncated verdict terminal."""\n\n\n'
+    "def assess(resp):\n"
+    "    if (resp." + _lit('get("stop_re', 'ason") or "") == "max_', 'tokens"') + ":\n"
+    '        return "truncated"\n'
+    "    return None\n"
+)
+
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_judge_verdict_retry_3688.py": MutationSpec(
+        gate_id="structural::test_judge_verdict_retry_3688.py",
+        target="tests/test_judge_verdict_retry_3688.py",
+        detects=(
+            "a NEW AI-judge call site that records a truncated/unparseable verdict as terminal with no "
+            "retry — the #3688 class, which cannot surface post-merge because `ai-unevaluated` is a "
+            "DECLINE class in visual_qa_verdict.py, so the gate reds and the deploy is never reverted"
+        ),
+        plants=(("lambdas/operational/_census_probe_3688.py", _UNREGISTERED_JUDGE_PY),),
+        track=False,  # the guard walks the filesystem (os.walk), not the git index
+    ),
     "structural::test_role_family_write_scope.py": MutationSpec(
         gate_id="structural::test_role_family_write_scope.py",
         target="tests/test_role_family_write_scope.py",
@@ -585,6 +610,12 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_judge_verdict_retry_3688.py": _proof(
+        "structural::test_judge_verdict_retry_3688.py",
+        "baseline: 32 passed | mutated: 1 failed, 31 passed :: test_the_judge_call_site_set_is_enumerated_from_source_and_every_member_is_covered | reverted: 32 passed",
+        'lambdas/ mcp/ scripts/ deploy/ cdk/ on disk (os.walk, .py only) plus tests/visual_ai_qa.py, tests/visual_qa.py and tests/visual_qa_verdict.py by name, so an UNTRACKED judge is in scope and the rest of tests/ deliberately is not — its `stop_reason` literals are FIXTURES implementing the wire, not decisions on it. The rule is ONE line-level pattern: a `get("stop_reason")` compared to `"max_tokens"` outside a comment. A judge that decides on truncation some other way — a helper that returns the stop reason, a dict unpacked into locals, a `resp["stop_reason"]` subscript, or a parse failure reached without ever reading stop_reason — is INVISIBLE to it; that is a gap, not a pass, and it is why the two covered sites ALSO carry behavioural tests rather than resting on the census alone. It judges SOURCE SHAPE, never the live gate: whether the next `Visual QA (standalone)` run actually retries is an observation no offline gate can make (#3688 closes on that run, not on this test).',
+        proved_on="2026-09-14",
+    ),
     "structural::test_role_family_write_scope.py": _proof(
         "structural::test_role_family_write_scope.py",
         "baseline: 18 passed | mutated: 1 failed, 17 passed :: test_every_ddb_writing_entrypoint_is_enrolled_in_the_family | reverted: 18 passed",
