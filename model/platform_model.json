@@ -766,6 +766,12 @@
       "stack": "mcp_stack",
       "via": "declaration"
     },
+    "swallowed-permission-denial": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_denial_alarms",
+      "via": "declaration"
+    },
     "telegram-coach-hold": {
       "kind": "metric",
       "routing": "digest",
@@ -905,7 +911,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 128,
+    "alarms": 129,
     "emf_namespaces": 31,
     "schedules": 90,
     "secrets": 28
@@ -7073,9 +7079,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 128,
+      "alarms": 129,
       "alarms_by_routing": {
-        "digest": 96,
+        "digest": 97,
         "digest+paging": 2,
         "paging": 2,
         "urgent": 25,
