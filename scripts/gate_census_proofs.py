@@ -994,6 +994,49 @@ GUARD_PROOFS.update(
     }
 )
 
+GUARD_PROOFS.update(
+    {
+        # #3642: watched RED live against the REAL repo's own tracked files, two mutations,
+        # each reverted and watched green again before this record was written.
+        "guard::scripts/check_no_verify_sites.py": {
+            "gate_name": "scripts/check_no_verify_sites.py",
+            "command": "python3 scripts/check_no_verify_sites.py   # live, reads the real deploy/ scripts/ tree and .claude/settings.json directly; plus python3 -m pytest tests/test_no_verify_set_guard_3642.py -q for the offline synthetic must-fail/must-pass twin (21 tests)",  # noqa: E501
+            "mutation": (
+                "Two defects planted one at a time in the real, tracked files — not a copy. M1: in the live "
+                ".claude/settings.json, moved `Bash(git commit --no-verify:*)` out of the `ask` list into `allow` "
+                "(json.load/json.dump round-trip, whitespace preserved) — the actual posture escalation this "
+                "guard's ASK_GATED_BYPASS bucket exists to catch. M2 (independent, tree restored to clean between "
+                "the two): in deploy/agent_commit.sh, changed the live commit line from "
+                '`git commit --no-verify -m "${MSG}" || refuse 1` to `git commit -m "${MSG}" || refuse 1` — the '
+                "hook-bypass silently re-enabling itself."
+            ),
+            "observed": (
+                "2026-09-14, watched in both directions, live against the real repo. BASELINE: "
+                "`[check-no-verify-sites] OK — 18 site(s), all registered.`, exit 0. M1 ARMED: exit 1, printing "
+                "both `expected at least 4 ask-gated bypass affordances in .claude/settings.json's 'ask' list, "
+                "found 3` and `POSTURE ESCALATION: bypass affordance 'Bash(git commit --no-verify:*)' found in "
+                ".claude/settings.json's 'allow' list, not 'ask'`. M1 REVERTED (settings.json restored byte-for-"
+                "byte, confirmed via `git diff --stat` showing no change): OK, exit 0. M2 ARMED: exit 1, "
+                "`expected exactly 1 EXECUTION site, found 0: []`. M2 REVERTED (agent_commit.sh restored, `git "
+                "diff --stat` clean): OK, exit 0. The offline suite pins the identical shapes deterministically — "
+                "TestMustFailCases::test_an_entry_escalated_to_allow_fails_by_name and "
+                "::test_zero_execution_sites_fails — 21 tests total in tests/test_no_verify_set_guard_3642.py, "
+                "all passing."
+            ),
+            "scope": (
+                "A verdict on the CLASSIFIER (grep population + structural .claude/settings.json parse), not on "
+                "Claude Code's own permission-prompt enforcement of the `ask` list, which is trusted, not "
+                "re-verified — this guard can see an entry sitting in the wrong list, not confirm the runtime "
+                "actually prompts before running it. Also out of scope: a wholly new bypass affordance phrased in "
+                "neither `--no-verify`/`-n` nor `.git/hooks/pre-commit` form would not match "
+                "`_ASK_GATED_BYPASS_RE` and would need the regex widened by hand, the same limit any "
+                "pattern-based census carries."
+            ),
+            "proved_on": "2026-09-14",
+        },
+    }
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
 # GUARD_PROOFS above, only because `gate_census.py` sits at its 1,200-line ceiling
