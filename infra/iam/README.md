@@ -73,6 +73,51 @@ dated registry in `tests/test_iam_twin_free_3336.py` (`_WILDCARD_OK_ACTIONS` —
 with `aws iam simulate-custom-policy`, and the same registry the 38 `resources=["*"]`
 statements in `cdk/stacks/role_policies_*.py` satisfy). The registry may only SHRINK.
 
+### PENDING APPLY — the deploy role's `dynamodb:Query` (#3681, 2026-09-14)
+
+`github-actions-deploy-role.permissions.json`'s `DynamoDB` statement gained one action in
+the repo; **the attended apply has not run**, so live is still the two-action document and
+`verify_oidc_iam.py` reports exactly ONE expected DRIFT on
+`github-actions-deploy-role:life-platform-cicd-permissions`.
+
+| Sid | was | now |
+|---|---|---|
+| `DynamoDB` | `dynamodb:DescribeTable`, `dynamodb:DescribeContinuousBackups` | + `dynamodb:Query`, same `table/life-platform` resource |
+
+Statement count is UNCHANGED (14 → 14); the delta is one read-only action on the table
+ARN, no index, no `Scan`, no write.
+
+**Why.** `deploy/sync_site_to_s3.sh`'s theme-river step runs
+`scripts/v4_build_theme_river.py --live`, which `Query`s the notion journal partition
+(`lambdas/content/theme_river.py::list_enriched_entries`). The deploy role has never held
+that grant, so the live build has **never once succeeded** from CI — and the step's
+`|| echo "… skipped (offline?)"` reported the `AccessDeniedException` as a network blip
+while the deploy went green. `https://averagejoematt.com/data/theme_river.json` has served
+`{"state": "empty"}` for the whole life of the feature. The swallow half is fixed in the
+same PR (`deploy/lib/generator_step.sh`); **until this apply runs, the theme-river step
+will now FAIL the site deploy instead of lying about it** — which is the intended
+behaviour, and the reason this apply should precede the merge.
+
+Apply (attended, `matthew-admin` — IAM is Bucket B, #2611):
+
+```bash
+aws iam get-role-policy --role-name github-actions-deploy-role \
+  --policy-name life-platform-cicd-permissions --query PolicyDocument > /tmp/deploy-perms.rollback.json
+aws iam put-role-policy --role-name github-actions-deploy-role \
+  --policy-name life-platform-cicd-permissions \
+  --policy-document file://infra/iam/github-actions-deploy-role.permissions.json
+python3 deploy/verify_oidc_iam.py --strict   # the one expected DRIFT disappears
+```
+
+Then delete the `github-actions-deploy-role` entry from `_PENDING_PERMISSIONS_APPLY` in
+`tests/test_grant_enumeration_drift.py` (that test reds once the apply has landed, so the
+queue cannot become a graveyard). Rollback: re-apply `/tmp/deploy-perms.rollback.json` and
+`git revert` the PR.
+
+Live proof the grant worked: the next site deploy's
+`curl -s https://averagejoematt.com/data/theme_river.json | jq '.generated_at'` is
+non-null, i.e. no longer `{"state": "empty", "generated_at": null}`.
+
 ### Staged, NOT yet applied — the golden-eval role (#812)
 - `github-actions-golden-eval-role.trust.json` — trust policy (main-only subject from day one; no
   repo-wide grant to tighten later)

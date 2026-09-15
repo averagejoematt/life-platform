@@ -149,15 +149,46 @@ def test_mutation_a_pytest_plugin_flag_without_the_plugin_is_caught():
     assert sweep.violations(sweep.evaluate_job("x.yml", "j", ok, _REPO)) == []
 
 
-def test_mutation_the_shell_layer_is_followed_and_fail_open_is_named():
-    """`bash deploy/deploy_site.sh` → sync_site_to_s3.sh → `python3 …/render_portraits.py || echo skipped`:
-    the sweep must reach the builder AND flag that a `|| echo` hides the failure."""
+def test_mutation_the_shell_layer_is_followed():
+    """`bash deploy/deploy_site.sh` → sync_site_to_s3.sh → `python3 …/render_portraits.py`:
+    the sweep must reach the builder through TWO shell hops and report the dist it needs.
+
+    #3681 UPDATE. This test used to assert a THIRD thing — that the sweep flagged the step
+    as FAIL-OPEN, because the real call site was
+    `python3 …/render_portraits.py || echo "  ⚠️  portrait PNG render skipped …"`. That
+    idiom is gone: every generation step in sync_site_to_s3.sh now runs through
+    `run_site_generator`, which classifies the failure and (outside the two degradable
+    causes, and never in CI) exits non-zero. The specimen this assertion was written
+    against no longer exists in the repo, so asserting it here would be asserting the
+    defect back into existence. The fail-open DETECTOR is still armed and still proven —
+    by the sibling below, against the `continue-on-error` arm, which is the one that still
+    has real instances. Deleting the assertion instead would have left the detector dark.
+    """
     job = _job("bash deploy/deploy_site.sh")
     res = sweep.evaluate_job("site-deploy.yml", "deploy-site", job, _REPO)
     scripts = {s.script: s for r in res for s in r.scripts}
     assert "scripts/render_portraits.py" in scripts, sorted(scripts)
     assert "sync_site_to_s3.sh" in scripts["scripts/render_portraits.py"].via
-    assert scripts["scripts/render_portraits.py"].fail_open
+    assert not scripts["scripts/render_portraits.py"].fail_open, (
+        "sync_site_to_s3.sh's portrait step is fail-open again — #3681 removed the "
+        '`|| echo "… skipped (offline?)"` idiom from every generation step in that script'
+    )
+    bad = sweep.violations(res)
+    assert any("render_portraits.py" in v and "pillow" in v for v in bad), bad
+
+
+def test_mutation_fail_open_is_named_when_a_step_is_continue_on_error():
+    """The fail-open arm, kept proven after #3681 removed the `|| echo` specimen.
+
+    `continue-on-error: true` is the other way a CI step hides a failure, and unlike the
+    shell idiom it still has live instances. The sweep must SAY so on the violation line:
+    a missing dist behind a continue-on-error step is worse than one in front of it,
+    because nothing downstream will ever notice."""
+    job = _job("bash deploy/deploy_site.sh")
+    job["steps"][-1]["continue-on-error"] = True
+    res = sweep.evaluate_job("site-deploy.yml", "deploy-site", job, _REPO)
+    scripts = {s.script: s for r in res for s in r.scripts}
+    assert scripts["scripts/render_portraits.py"].fail_open, "continue-on-error on the step must mark every script it reaches fail-open"
     bad = sweep.violations(res)
     assert any("render_portraits.py" in v and "pillow" in v and "FAIL-OPEN" in v for v in bad), bad
 
