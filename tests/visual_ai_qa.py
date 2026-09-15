@@ -524,6 +524,42 @@ def _unevaluated_verdict(kind, text):
     }
 
 
+def _response_text(resp):
+    """Concatenate the text blocks of a Bedrock Messages response; never raises."""
+    if not isinstance(resp, dict):
+        return ""
+    return "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
+
+
+def _verdict_unreadable_kind(resp):
+    """The UNEVALUATED kind for a RAW judge response, or None if it is readable (#3688).
+
+    The #3540 routing decision lifted out of `_assess_page` so that ONE definition
+    both decides whether to re-ask and records the final outcome. `stop_reason`
+    still outranks the parse result.
+    """
+    if isinstance(resp, dict) and (resp.get("stop_reason") or "") == "max_tokens":
+        return _KIND_TRUNCATED
+    return _parse_verdict(_response_text(resp)).get(_UNEVALUATED_FIELD)
+
+
+def _verdict_retry():
+    """The shared unreadable-verdict retry chokepoint (#3688).
+
+    `lambdas/common/retry_utils.invoke_until_readable_verdict` — the SAME loop
+    `operational/reader_truth_qa.assess_prose` uses, not a second copy. Imported
+    lazily for the same reason `_import_bedrock` is, and with no try/except: a
+    missing chokepoint must be a loud ImportError, never a silent fallback to the
+    no-retry path this issue exists to remove.
+    """
+    lam = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas")
+    if lam not in sys.path:
+        sys.path.insert(0, lam)
+    from common.retry_utils import invoke_until_readable_verdict
+
+    return invoke_until_readable_verdict
+
+
 def _parse_verdict(text):
     """Pull the JSON verdict out of Claude's reply, tolerating stray prose/fences.
 
@@ -594,16 +630,27 @@ def _assess_page(bedrock, name, path, shots):
     # per-feature ranking (17.9M input tok / $33.19 trailing 30d, measured
     # 2026-08-27). This gate and the reader-truth gate run in the same process, so
     # only the owning code can split them.
+    # #3688: an unreadable verdict gets ONE re-ask at a doubled budget before the
+    # page is called UNEVALUATED, and the re-ask prints. #3652 box 1 asked for
+    # "retried (or its budget raised)"; PR #3656 shipped only the raise
+    # (700 → 1200), and a raised budget is not a retry.
     with _attributed(bedrock, "visual-ai-qa"):
-        resp = bedrock.invoke(body, model_name=_VISION_MODEL)
-    text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
+        resp, unread, _attempts = _verdict_retry()(
+            bedrock.invoke,
+            body,
+            unreadable=_verdict_unreadable_kind,
+            model_name=_VISION_MODEL,
+            label=f"{name} ({path})",
+        )
+    text = _response_text(resp)
     # #3540: `stop_reason` outranks the parse result. A reply cut off at
     # max_tokens is a partial judgement even in the rare case its prefix closes
     # into valid JSON — the page was not fully assessed, so it is UNEVALUATED
     # rather than "whatever the prefix happened to say". #2893 already meters
     # this class at the bedrock chokepoint as a WARN; here it decides a gate.
-    if isinstance(resp, dict) and (resp.get("stop_reason") or "") == "max_tokens":
-        return _unevaluated_verdict(_KIND_TRUNCATED, text)
+    # That ruling is unchanged — it is now taken on the LAST attempt, not the first.
+    if unread:
+        return _unevaluated_verdict(unread, text)
     return _parse_verdict(text)
 
 

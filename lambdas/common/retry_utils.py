@@ -296,3 +296,112 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
             else:
                 _emit_failure_metric()
                 raise
+
+
+# ── #3688 — the unreadable-VERDICT retry ───────────────────────────────────────
+#
+# The two retry loops above are TRANSPORT retries: the call did not return, so
+# nothing was billed and another attempt is free of double-charge. #2893 wrote
+# the rule they obey in the comment inside `call_anthropic_api` — "Transport
+# failures retry; a response you have already paid for does not" — and that rule
+# is right for a narrative generation, where a truncated paragraph is still
+# usable prose.
+#
+# It is NOT right for a JUDGE. A judge's answer is a verdict or it is nothing:
+# a reply cut off at `max_tokens`, or one whose JSON will not parse, yields no
+# judgement at all, so the money is already spent AND no coverage was bought.
+# #3652 box 1 asked for "retried (or its budget raised) before the page is
+# called UNEVALUATED" and PR #3656 shipped only the budget raise (700 → 1200).
+# A raised budget makes truncation less likely; it does not make a truncated
+# verdict recoverable. Live proof that the tail is still there: the scheduled
+# `Visual QA (standalone)` workflow has failed every run since 2026-09-05 —
+# run 34907061838 (2026-09-14T23:03Z) recorded 2 truncated + 1 unparseable
+# reader-truth batches, 14 reader-facing surfaces unjudged, and because
+# `ai-unevaluated` is a DECLINE class in tests/visual_qa_verdict.py the site was
+# never reverted. Red for 9 consecutive days, silent by construction.
+#
+# So the retry is deliberately NARROW and lives here, at the existing chokepoint,
+# rather than as a fourth loop somewhere else:
+#   * it fires ONLY on a verdict the caller's own predicate calls unreadable —
+#     never on a transport error (those already retry above) and never on a
+#     readable verdict the caller merely dislikes;
+#   * the second attempt is not a repeat of the first. `max_tokens` is multiplied,
+#     so the retry is materially different from the call that just failed — a
+#     re-ask at the identical cap is the #2893 re-bill with extra steps;
+#   * it is capped at ONE retry by default (2 attempts total), so the worst case
+#     is 1 + `budget_multiplier` caps' worth of output tokens on a batch that
+#     would otherwise have bought nothing;
+#   * EVERY attempt past the first prints, by attempt number and reason. #3652
+#     box 1's actual wording was "with the retry visible in the log", and a run
+#     that retried must be distinguishable from a run that did not.
+VERDICT_RETRY_MAX_ATTEMPTS = 2
+VERDICT_RETRY_BUDGET_MULTIPLIER = 2
+
+
+def invoke_until_readable_verdict(
+    invoke,
+    body: dict[str, Any],
+    unreadable,
+    model_name: Optional[str] = None,
+    label: str = "judge",
+    max_attempts: int = VERDICT_RETRY_MAX_ATTEMPTS,
+    budget_multiplier: int = VERDICT_RETRY_BUDGET_MULTIPLIER,
+    log=print,
+):
+    """Invoke a judge, retrying once when the reply carries no readable verdict (#3688).
+
+    Args:
+        invoke:  a `bedrock_client.invoke`-compatible callable, called as
+                 ``invoke(body, model_name=model_name)``.
+        body:    the Anthropic Messages body. NEVER mutated — a retry gets a copy
+                 with a raised `max_tokens` (callers reuse the body per batch).
+        unreadable: ``resp -> reason_or_None``. Truthy means "the judge returned,
+                 and its answer cannot be read as a verdict" (truncated /
+                 unparseable / no verdict). The caller owns this predicate because
+                 the two judge schemas differ; this module owns only the loop.
+        model_name: forwarded to `invoke` unchanged.
+        label:   what is being judged, for the log line (batch paths / page name).
+        max_attempts: total attempts including the first. 1 disables the retry.
+        budget_multiplier: `max_tokens` multiplier applied per retry attempt.
+        log:     injectable printer (tests capture it).
+
+    Returns:
+        (resp, reason, attempts) — `reason` is None when a readable verdict was
+        obtained, otherwise the FINAL attempt's unreadable reason, which the
+        caller records exactly as it did before this existed. `attempts` is how
+        many invocations were actually made.
+
+    Raises:
+        whatever `invoke` raises — a transport failure is NOT this loop's class
+        and is left to the caller's existing fail-soft handling (#1440).
+    """
+    attempts_allowed = max(1, int(max_attempts))
+    cap = int(body.get("max_tokens") or 0)
+    resp: Any = None
+    reason = None
+    for attempt in range(1, attempts_allowed + 1):
+        call_body = body
+        if attempt > 1 and cap > 0:
+            call_body = dict(body)
+            call_body["max_tokens"] = cap * (int(budget_multiplier) ** (attempt - 1))
+        resp = invoke(call_body, model_name=model_name)
+        reason = unreadable(resp)
+        if not reason:
+            if attempt > 1:
+                log(
+                    f"  ↻ verdict retry ({label}): attempt {attempt}/{attempts_allowed} returned a READABLE "
+                    f"verdict at max_tokens={call_body.get('max_tokens')} — NOT recorded UNEVALUATED (#3688)"
+                )
+            return resp, None, attempt
+        if attempt >= attempts_allowed:
+            log(
+                f"  ↻ verdict retry ({label}): still unreadable ({reason}) after {attempt}/{attempts_allowed} "
+                f"attempt(s) — recording UNEVALUATED (#3688)"
+            )
+            return resp, reason, attempt
+        next_cap = cap * (int(budget_multiplier) ** attempt) if cap > 0 else None
+        log(
+            f"  ↻ verdict retry ({label}): attempt {attempt}/{attempts_allowed} was unreadable ({reason}) — "
+            f"RETRYING at max_tokens={next_cap} (#3688)"
+        )
+    return resp, reason, attempts_allowed  # pragma: no cover — the loop always returns
