@@ -533,3 +533,89 @@ def test_skip_census_preflight_flag_bypasses_it(monkeypatch):
     with pytest.raises(SystemExit) as ei:
         pipeline.main()
     assert ei.value.code == 99  # reached Withings fetch (past the skipped preflight), never raised from _boom
+
+
+# ── #3671: config-anchor coverage PREFLIGHT (the config-file sibling of the
+# ADR-077 census preflight above) ───────────────────────────────────────────
+#
+# phase_taxonomy's totality guarantee covers DynamoDB pk families; it has no
+# jurisdiction over config/*.json, which is exactly where training_phases.json's
+# reset_epoch_date sat stale through eleven resets undetected. These tests mirror
+# the census-preflight wiring tests above: non-vacuous (a planted failure aborts
+# the reset), and the --skip flag genuinely bypasses it.
+
+
+def test_config_anchor_preflight_is_wired_into_the_dry_run_sequence(monkeypatch):
+    called = {"n": 0}
+
+    def _fake_coverage(config_dir=None):
+        called["n"] += 1
+        raise KeyError("planted — wiring probe")
+
+    monkeypatch.setattr(pipeline.config_anchor_registry, "assert_full_coverage", _fake_coverage)
+    monkeypatch.setattr(pipeline, "read_cycle_from_ssm", lambda: 6)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "restart_pipeline.py",
+            "--genesis",
+            "2026-09-01",
+            "--override-weight-lbs",
+            "300",
+            "--no-close-cycle",
+            "--skip-deploy",
+            "--skip-census-preflight",  # isolate: only the config-anchor preflight under test
+        ],
+    )
+    with pytest.raises(SystemExit) as ei:
+        pipeline.main()
+    assert ei.value.code == 5
+    assert called["n"] == 1
+
+
+def test_skip_config_anchor_preflight_flag_bypasses_it(monkeypatch):
+    def _boom(config_dir=None):
+        raise AssertionError("preflight ran despite --skip-config-anchor-preflight")
+
+    monkeypatch.setattr(pipeline.config_anchor_registry, "assert_full_coverage", _boom)
+    monkeypatch.setattr(pipeline, "read_cycle_from_ssm", lambda: 6)
+    # Stop main() right after the gate so we don't march into AWS steps.
+    monkeypatch.setattr(pipeline, "fetch_withings_for", lambda *_a, **_k: (_ for _ in ()).throw(SystemExit(99)))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "restart_pipeline.py",
+            "--genesis",
+            "2026-09-01",
+            "--skip-census-preflight",
+            "--skip-config-anchor-preflight",
+            "--no-close-cycle",
+            "--skip-deploy",
+        ],
+    )
+    with pytest.raises(SystemExit) as ei:
+        pipeline.main()
+    assert ei.value.code == 99
+
+
+def test_update_configs_prints_the_config_anchor_report(tmp_path, monkeypatch, capsys):
+    """The reset's own report (acceptance criterion 3): update_configs() must print
+    every registered anchor's before/after value, not just the two files it writes."""
+    user_goals = {"timeline": {"start_date": "2026-06-16", "end_date": "2027-06-15", "baseline_measurement_utc": None}, "last_updated": ""}
+    char_sheet = {"_meta": {"last_updated": ""}, "baseline": {"start_date": "2026-06-16"}}
+    ug_path = tmp_path / "user_goals.json"
+    cs_path = tmp_path / "character_sheet.json"
+    ug_path.write_text(__import__("json").dumps(user_goals))
+    cs_path.write_text(__import__("json").dumps(char_sheet))
+    monkeypatch.setattr(pipeline, "USER_GOALS", ug_path)
+    monkeypatch.setattr(pipeline, "CHAR_SHEET", cs_path)
+
+    pipeline.update_configs("2026-09-06", 320.0, 145.15, "2026-09-06T12:00:00+00:00", apply=False)
+    out = capsys.readouterr().out
+    assert "config anchor report" in out
+    assert "character_sheet.json:baseline.start_date" in out
+    assert "2026-06-16" in out and "2026-09-06" in out
+    assert "[deliberate_carry] training_phases.json:current_started" in out  # untouched file still named
+    assert "[derives_live] vacation_fund.json:start_date" in out  # ditto

@@ -126,7 +126,7 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))  # #2612: importable when loaded b
 # prereg_voids: the #1199/#1978 grade-or-void ledger, shared with reconcile_prereg_voids.py.
 # restart_hooks: the #1092 post-verify hook sequence, split out at #2612 (this module
 # sits against the 1200-line ceiling); re-exported so the public entrypoint never moved.
-from experiment import phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
+from experiment import config_anchor_registry, phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
 from restart_hooks import build_post_verify_hooks  # noqa: E402,F401
 from restart_work_contract import work_contract_rc  # noqa: E402 — #3598: per-step work contract (input>0 ∧ acted==0, unnamed → red)
 
@@ -562,6 +562,7 @@ def bust_lambda_warm_cache(apply: bool):
 def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measurement_utc: str, apply: bool):
     # user_goals.json
     cfg = json.loads(USER_GOALS.read_text())
+    before_goals = json.loads(json.dumps(cfg))  # deep-copy snapshot pre-mutation, for the #3671 report below
     today_iso = date.today().isoformat()
     end_date = (date.fromisoformat(target_date) + (date.fromisoformat("2027-05-17") - date.fromisoformat("2026-05-18"))).isoformat()
     cfg["last_updated"] = today_iso
@@ -578,6 +579,7 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
 
     # character_sheet.json
     cs = json.loads(CHAR_SHEET.read_text())
+    before_char = json.loads(json.dumps(cs))
     cs["_meta"]["last_updated"] = today_iso
     cs["baseline"]["start_date"] = target_date
     cs["baseline"]["start_weight_lbs"] = weight_lbs
@@ -585,6 +587,19 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
     cs["baseline"]["baseline_source"] = "withings"
     if apply:
         CHAR_SHEET.write_text(json.dumps(cs, indent=2) + "\n")
+
+    # #3671: print EVERY registered config anchor's before/after value — not just
+    # the two files this function writes — so a reset that forgets to touch a
+    # RESET_TO_GENESIS field (or an unexpected change to a DELIBERATE_CARRY /
+    # DERIVES_LIVE one) is visible in the run's own output, rather than
+    # discoverable 82 days and eleven resets later the way reset_epoch_date was.
+    print("    config anchor report (lambdas/experiment/config_anchor_registry.py, #3671):")
+    for line in config_anchor_registry.report_lines(
+        before_docs={"user_goals.json": before_goals, "character_sheet.json": before_char},
+        after_docs={"user_goals.json": cfg, "character_sheet.json": cs},
+        config_dir=str(REPO_ROOT / "config"),
+    ):
+        print(line)
 
 
 # ── #1219: --keep-chronicle plan-figure cross-check (WARN-only, read-only) ────
@@ -832,6 +847,13 @@ def main():
         help="Skip the #1234 pk-family census preflight (the ADR-077 totality guard that fails the "
         "reset if any live pk family is unclassified). Default: runs first, in both dry-run and apply.",
     )
+    parser.add_argument(
+        "--skip-config-anchor-preflight",
+        action="store_true",
+        help="Skip the #3671 config-anchor coverage preflight (fails the reset if any config/*.json field "
+        "shaped like an experiment anchor has no CONFIG_ANCHOR_REGISTRY entry). Default: runs first, read-only, "
+        "in both dry-run and apply.",
+    )
     args = parser.parse_args()
     close_cycle = not args.no_close_cycle
 
@@ -881,6 +903,31 @@ def main():
                 )
                 sys.exit(4)
             print("   --continue-on-error: proceeding despite the totality gap.")
+
+    # Step 0b (#3671): config-anchor coverage PREFLIGHT — the phase_taxonomy census
+    # preflight above covers DynamoDB pk families; it has no jurisdiction over
+    # config/*.json, which is exactly where reset_epoch_date sat stale through
+    # eleven resets. Runs FIRST, read-only, in dry-run AND apply: every
+    # anchor-shaped config field (config_anchor_registry.scan_config_tree) must be
+    # classified in CONFIG_ANCHOR_REGISTRY, so a NEW hand-maintained anchor (in an
+    # existing config file or a brand-new one) can no longer silently survive.
+    if args.skip_config_anchor_preflight:
+        print("\n[0b] Config anchor preflight SKIPPED (--skip-config-anchor-preflight)")
+    else:
+        print("\n[0b] Config anchor preflight — every anchor-shaped config field must be classified (#3671)")
+        try:
+            hit_count = config_anchor_registry.assert_full_coverage()
+            print(f"    OK — {hit_count} anchor-shaped config field(s) all classified in CONFIG_ANCHOR_REGISTRY")
+        except KeyError as e:
+            print(f"\n✗ CONFIG ANCHOR PREFLIGHT FAILED\n{e}")
+            if not args.continue_on_error:
+                print(
+                    "\n   ABORTING before any reset step — add the missing ConfigAnchor entry, then re-run.\n"
+                    "   (escape hatches: --continue-on-error to proceed anyway, "
+                    "--skip-config-anchor-preflight to bypass entirely)"
+                )
+                sys.exit(5)
+            print("   --continue-on-error: proceeding despite the config-anchor coverage gap.")
 
     # Step 1: fetch Withings reading
     if args.override_weight_lbs:
