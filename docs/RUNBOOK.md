@@ -1675,7 +1675,7 @@ aws lambda update-function-configuration --function-name life-platform-cost-gove
 
 ## Remediation Agent (ADR-064/065)
 
-Triage agent runs ~07:45 PT on Mon/Wed/Fri (cron `45 14 * * 1,3,5`) via `.github/workflows/remediation-agent.yml`, plus on-demand urgent dispatch. Proposes the safe class and the rest as PRs a human merges, emails what needs the operator. Replaces the raw `[LP digest]` noise. **Shadow permanently** (#2833, ADR-129 amendment 2026-08-30) — it merges nothing.
+Triage agent runs ~10:35 PT on Mon/Wed/Fri (cron `35 17 * * 1,3,5` — after the 16:20Z AI canary, #3499) via `.github/workflows/remediation-agent.yml`, plus on-demand urgent dispatch. Proposes the safe class and the rest as PRs a human merges, emails what needs the operator. Replaces the raw `[LP digest]` noise. **Shadow permanently** (#2833, ADR-129 amendment 2026-08-30) — it merges nothing.
 
 **Mode kill-switch (SSM `/life-platform/remediation-mode`):**
 
@@ -1751,7 +1751,7 @@ param, workflow reads fail open to `standard` (logged).
 ## Urgent-Alarm Dispatcher (fast path, ADR-064)
 
 `life-platform-remediation-dispatcher` Lambda is subscribed to the `life-platform-alerts` SNS topic. On each fire it:
-1. Filters to urgent alarms (substrings: `canary`, `dlq-depth`, `site-api-error`, `budget-tier`, `bedrock-throttle`, `slo-`). Routine ingestion-source errors stay non-urgent — the Mon/Wed/Fri 07:45 PT sweep handles them.
+1. Filters to urgent alarms (substrings: `canary`, `dlq-depth`, `site-api-error`, `budget-tier`, `bedrock-throttle`, `slo-`). Routine ingestion-source errors stay non-urgent — the Mon/Wed/Fri ~10:35 PT sweep handles them.
 2. Dedupes per 30-min window via S3 marker (`s3://matthew-life-platform/remediation-log/dispatch-dedupe/{alarm}-{stamp}.marker`; markers expire after 1 day via lifecycle rule).
 3. Calls GitHub `POST /repos/averagejoematt/life-platform/dispatches` with `event_type: urgent_alarm`, authenticated via a fine-grained PAT in Secrets Manager (`life-platform/github-dispatch-token`).
 4. The workflow's `repository_dispatch: [urgent_alarm]` trigger fires the agent immediately.
@@ -1796,7 +1796,7 @@ The fine-grained PAT in `life-platform/github-dispatch-token` expires every 90 d
 4. No Lambda redeploy needed — the dispatcher re-reads the secret on each cold start.
 5. Old PAT can be left to expire naturally OR deleted at github.com/settings/personal-access-tokens.
 
-**If the PAT is missing or expired**, urgent alarms still email you via the existing SNS subscriptions (no degradation); the dispatcher logs `SecretNotFound` or `GitHub HTTP 401` and the Mon/Wed/Fri 07:45 PT sweep still covers the signal — just without the urgent fast path.
+**If the PAT is missing or expired**, urgent alarms still email you via the existing SNS subscriptions (no degradation); the dispatcher logs `SecretNotFound` or `GitHub HTTP 401` and the Mon/Wed/Fri ~10:35 PT sweep still covers the signal — just without the urgent fast path.
 
 ---
 

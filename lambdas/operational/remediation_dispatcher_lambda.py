@@ -6,7 +6,7 @@ with `NewStateValue=ALARM` AND its name matches the URGENT_PATTERNS list, this
 Lambda calls GitHub's repository_dispatch API to fire `event_type=urgent_alarm`
 on `averagejoematt/life-platform`. The `remediation-agent.yml` workflow accepts
 that trigger and runs the remediation agent immediately, closing the urgent-
-alarm → triage latency that the daily 07:45 PT sweep otherwise covers.
+alarm → triage latency that the Mon/Wed/Fri ~10:35 PT sweep otherwise covers.
 
 Routine ingestion-source error alarms are NOT urgent (the daily sweep handles
 them); the URGENT_PATTERNS list keeps the firing surface narrow.
@@ -69,7 +69,7 @@ DEDUPE_BUCKET = os.environ.get("DEDUPE_BUCKET", "matthew-life-platform")
 DEDUPE_WINDOW_MIN = int(os.environ.get("DEDUPE_WINDOW_MIN", "30"))
 
 # Substrings — match if any is in the alarm name. Narrow on purpose: the daily
-# 07:45 PT sweep already handles routine ingestion-source errors / QA smoke /
+# ~10:35 PT sweep already handles routine ingestion-source errors / QA smoke /
 # freshness — those should NOT fire urgent dispatches and cost a workflow run.
 #
 # #1444 (2026-07-18): reconciled against ACTUAL alarm->topic routing. This

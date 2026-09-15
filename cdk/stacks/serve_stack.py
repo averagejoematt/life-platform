@@ -41,6 +41,7 @@ from aws_cdk import (
 from stacks import role_policies as rp
 from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
 from stacks.lambda_helpers import create_platform_lambda
+from stacks.reader_audience import URGENT_TOPIC_NAME, route_reader_audience  # #3499
 from stacks.secrets_helpers import site_api_origin_secret_value
 
 # #1328: every Lambda this stack defines gets a Throttles alarm — a throttle on
@@ -59,6 +60,7 @@ ACCT = "205930651321"
 LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
+ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:{URGENT_TOPIC_NAME}"  # #3499: ADR-052 tier 1, real-time
 
 
 class ServeStack(Stack):
@@ -74,6 +76,10 @@ class ServeStack(Stack):
         local_table = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
+        # #3499: the urgent tier. Only reader-audience alarms reach it from this stack,
+        # and the facet — not this file — decides which those are (see the block after
+        # the alarm declarations below).
+        local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
 
         # #815 (R22-SEC-03): one read, reused for both Lambdas below. web_stack.py
         # calls the SAME helper (own construct instance, same underlying secret
@@ -396,6 +402,36 @@ class ServeStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
         _site_api_ai_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # ── #3499: the reader-audience facet ALSO routes urgent ──
+        # Every alarm above is digest-routed by the ADR-050/052 rulings recorded at each
+        # declaration, and those rulings are unchanged — a degradation signal still lands
+        # in the batched daily email. What #3499 adds is a SECOND action on the members of
+        # `scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS` (#3423), the curated
+        # set whose ALARM state means a real reader is hitting a broken door. Those now
+        # also publish to `life-platform-alerts` — immediate SES email, and the topic the
+        # remediation dispatcher Lambda subscribes to — so escalation runs on the
+        # DETECTOR's clock instead of the next 15:00Z digest or the next human session.
+        #
+        # The membership test is the facet's, never this file's: adding `audience: reader`
+        # to an alarm is the one act that both lowers its escalation bar (#3423) and gives
+        # it this route, and cdk/app.py's assert_facet_fully_routed() FAILS THE SYNTH if a
+        # member declared anywhere went unrouted. The pairs below are (name, construct)
+        # because an L2 Alarm's `.alarm_name` is a CDK token at synth time, not the literal
+        # (verified — it renders `${Token[TOKEN.n]}`), so the name cannot be read back off
+        # the construct; a forgotten pair is caught by the synth-time assertion, not by
+        # trusting this list to be complete.
+        for _ra_name, _ra_alarm in (
+            ("site-api-errors", _site_api_errors_alarm),
+            ("site-api-handled-5xx", _site_api_handled_5xx),
+            ("site-api-ai-errors", site_api_ai_errors),
+            ("site-api-ai-throttles", _site_api_ai_throttles),
+            ("site-api-content-filter-fallback", _site_api_content_filter_fallback),
+            ("site-api-invocation-spike", _site_api_spike_alarm),
+            ("site-api-p95-latency-high", _site_api_latency_alarm),
+            ("site-api-throttles", _site_api_throttles),
+        ):
+            route_reader_audience(_ra_alarm, _ra_name, local_alerts_topic)
 
         # #2364: the Telegram pair. The worker's reserved concurrency is 2 — a binding
         # cap means the owner's texts are silently queueing/dropping, which reads as

@@ -138,7 +138,7 @@ Daily brief is "protect longest" by design. Manual reset for testing: `aws ssm p
 
 ## Self-healing Remediation Agent (ADR-064/065 — a triage instrument, shadow permanently)
 
-Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~07:45 PT Mon/Wed/Fri — cron `45 14 * * 1,3,5`; urgent alarms still trigger it on-demand via `repository_dispatch`) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — opens PRs for what it can fix, reports needs-human items in one curated email. **It merges nothing, in any mode.**
+Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~10:35 PT Mon/Wed/Fri — cron `35 17 * * 1,3,5`, moved from `45 14` by #3499 so the sweep runs AFTER the 16:20Z AI canary it reads, not 95 min before it; urgent alarms still trigger it on-demand via `repository_dispatch`) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — opens PRs for what it can fix, reports needs-human items in one curated email. **It merges nothing, in any mode.**
 
 **Auth:** AWS OIDC → `github-actions-remediation-role` (Bedrock + read-only diagnosis + scoped audit-log writes, NO deploy/IAM mutate). Model: Haiku-primary on Bedrock (Sonnet for escalation) — no Anthropic key.
 

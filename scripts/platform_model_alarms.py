@@ -472,4 +472,18 @@ def extract_alarms() -> dict[str, dict]:
         assert name in alarms, f"READER_AUDIENCE_ALARMS names {name!r}, which is not a CDK-declared alarm — typo or rename?"
         alarms[name]["audience"] = "reader"
         alarms[name]["audience_ruling"] = ruling
+        # #3499: the facet is now a ROUTING rule as well as an escalation-bar rule.
+        # cdk/stacks/reader_audience.py::route_reader_audience gives every member the
+        # urgent SNS action on top of whatever ADR-052 class its declaration asks for, and
+        # cdk/app.py fails the synth if one is missed. That action is attached by a shared
+        # helper — called from inside monitoring_stack's `_alarm` factory body and from a
+        # (name, construct) loop in serve_stack — which none of the three AST passes above
+        # can trace to a literal alarm name. Traced HERE instead, from the registry that
+        # decides it. A routing plane that reported these as digest-only would understate
+        # the very escalation path #3499 landed, which is the class of quiet wrongness
+        # this whole plane exists to prevent. Held against the REAL synthesized template
+        # by tests/test_reader_audience_urgent_routing_3499.py, so this can never become a
+        # claim the CDK does not honour.
+        prior = set() if alarms[name]["routing"] == "unresolved" else set(alarms[name]["routing"].split("+"))
+        alarms[name]["routing"] = _join_routing(prior | {"urgent"})
     return alarms
