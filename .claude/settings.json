@@ -214,7 +214,8 @@
       "Bash(python3 deploy/countdown_gap_sweep.py)",
       "Bash(python3 scripts/check_pr_closing_set.py *)",
       "Bash(python3 scripts/check_repo_level_git_ops.py *)",
-      "Bash(python3 scripts/surface_drift_gate.py *)"
+      "Bash(python3 scripts/surface_drift_gate.py *)",
+      "Bash(bash deploy/cdk_deploy.sh:*)"
     ]
   },
   "hooks": {
