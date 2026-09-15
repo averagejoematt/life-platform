@@ -323,7 +323,18 @@ files or a handover clause while `docs/INCIDENT_LOG.md` looked like a clean mont
   as such).
 - For each one, add a row to the Incident History table in `docs/INCIDENT_LOG.md` (match
   the existing columns: Date | Severity | Summary | Root Cause | TTD | TTR | Data Loss?)
-  and bump the `Last updated:` line at the top of the file.
+  and bump the `Last updated:` line at the top of the file. **Regenerate the derived
+  Patterns block in the SAME edit** — `python3 scripts/incident_log_patterns.py --apply`
+  — never add a row and leave the block for later; Phase 3's `wrap_gates.py --verify` now
+  re-runs `incident_log_patterns.py --check` (#3682) precisely because a row moves the
+  live totals and an un-regenerated block reds the wrap instead of quietly passing it.
+- **Stage it, don't leave it dirty (#3682).** `docs/INCIDENT_LOG.md` must be in the Phase
+  4 `git add` list alongside the row's own commit. PR #3680's stale block cost a second
+  incident: the wrap's added row sat as an uncommitted diff in a shared checkout and was
+  picked up by an unrelated in-flight PR's commit instead — the row was never on `main` at
+  all until that PR merged. See Phase 4's `git add` line, which now names
+  `docs/INCIDENT_LOG.md` explicitly rather than relying on a `docs/` catch-all whose
+  conditions didn't mention this step.
 - The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
   `**Incidents:** <N row(s) added — one-clause list>` or `**Incidents:** none`.
 - A live auto-rollback firing already publishes to SNS — this row is the audit half of
@@ -658,6 +669,19 @@ residual-queue gate, the (e12) proportionality-ledger gate, and the (d) beat
 validators. **It must exit 0 before the wrap commit.** A truncated wrap now fails
 loudly instead of producing a handover that reads complete and is not.
 
+**Since #3682, it also RE-RUNS the derived doc leg** — the same `docs_ci_gate_commands()`
+list (minus `MUTATING_GATES`) Phase 1 ran BEFORE anything was written — now AFTER Phase 2
+has written `docs/INCIDENT_LOG.md` (e3), `docs/alarm_citations.json` (e10),
+`docs/PROPORTIONALITY.md` (e12), `docs/**` pages (e), and `CLAUDE.md`/
+`handovers/HANDOVER_LATEST.md` (a). Phase 1 alone could pass over a derived block Phase 2
+was about to stale, and the very next push to `main` paid for it (PR #3680: the
+Incident-log Patterns block said 204/169 while the live table said 205/170). The re-run is
+generic — a thirteenth Docs CI gate is inherited with no edit to `wrap_gates.py`, never a
+hard-coded `incident_log_patterns` special case. It also runs
+`python3 -m pytest tests/test_operating_knowledge_ledger_2848.py -q` — the (c) ledger
+check's sixth-member counterpart, hand-listed rather than derived because it is a pytest
+test, not a docs-ci.yml step, but the identical time-axis defect (Session AE, 2026-09-14).
+
 ## Phase 4 — Commit
 
 ### (f) Commit the wrap
@@ -668,7 +692,7 @@ Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are
 git and are never part of this commit):
 
 ```bash
-git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages or (e10) updated docs/alarm_citations.json
+git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ if (e) touched pages, (e3) added a docs/INCIDENT_LOG.md row (#3682 — stage it explicitly, don't rely on the catch-all alone), (e10) updated docs/alarm_citations.json, or (e12) updated docs/PROPORTIONALITY.md
 git commit -m "$(cat <<'EOF'
 docs(wrap): <short session theme> (<n items/PRs shipped>)
 EOF
@@ -691,7 +715,7 @@ The registry (#3007 — one row per former guardrail bullet, no rule dropped):
 | Docs or explicit skip (wiki contract) — the wiki checkers must be green at the wrap commit | (e) | doc checkers (Phase 1); line asserted by `check_handover_lines.py` | `**Docs:** <pages or "none needed — reason">` |
 | Decisions or explicit skip (#1343) — a governance decision must never land only in a workflow file or a commit message | (e) | `check_handover_lines.py` | `**Decisions:** <ADR-NNN filed or "none needed — reason">` |
 | Main is declared from a read badge, never assumed (#1327; stranded classes #1901/#2052) | (e2) | `scripts/check_main_green.py` exit 0, clean or `--decoded` (Phase 1) | `**Main:** green (<sha>)` / `red — <decode>` / `stranded — <decode>` |
-| Incident rows or explicit skip (#1332) — every incident-class event gets a `docs/INCIDENT_LOG.md` row the same session | (e3) | rows in `docs/INCIDENT_LOG.md`; line asserted by `check_handover_lines.py` | `**Incidents:** <rows added or "none">` |
+| Incident rows or explicit skip (#1332) — every incident-class event gets a `docs/INCIDENT_LOG.md` row the same session, its derived Patterns block regenerated in the same edit, and staged in the wrap commit (#3682) | (e3) | rows in `docs/INCIDENT_LOG.md`; `incident_log_patterns.py --check` re-run in Phase 3 (#3682); line asserted by `check_handover_lines.py` | `**Incidents:** <rows added or "none">` |
 | Residual queue cites an issue, never silence (#1340) — every residual/next-picks bullet carries `#<issue>` or `not-work — <reason>`; the gate script must print `OK` before the wrap commit | (e4) | `scripts/check_residual_queue.py` (Phase 3) | (per-bullet tags, not one marker line) |
 | Stash empty + hook fresh, or explained (#1326) | (e5) | `git stash list` + `deploy/session_postflight.py` (Phase 1) | `**Stash/hooks:** clean` / `<found + action>` |
 | Filing-contract violators get fixed, not deferred (#1870, blocking since #1872 — which absorbed and deleted the old #1349 `model:*`-only gate). A printed violator on an issue this session filed, touched or closed may not be left unfixed; a live-fetch failure still fails open (exit 0), noted in the handover | (e7) | `scripts/check_backlog_hygiene.py` bare (Phase 1) | (fail-open noted in handover) |
