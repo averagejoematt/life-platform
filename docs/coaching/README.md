@@ -14,6 +14,13 @@ prefix, owner-credential access only). Relocated there 2026-08-23 (#3043):
 - `PROVEN_BLUEPRINT.md` — the empirical anchor (owner's own history, mined)
 - `TRAINING_CALIBRATION.md` — how the coach calibrates the owner
 - `TRAINING_PROGRAM.md` — the current plan
+- `TRAINING_CONTEXT.md` — standing injury + equipment constraints, each dated (#3715).
+  **Not yet uploaded** (no AWS write access from this agent) — render it from the
+  registry with `python3 scripts/render_training_context_md.py`, then pipe to
+  `aws s3 cp - s3://matthew-life-platform/config/coaching/TRAINING_CONTEXT.md`.
+  **UNCONFIRMED by the owner** (`gate:owner`, #3715) until he reviews the list in
+  `lambdas/training/training_context_registry.py`'s `RECORDED_CONSTRAINTS` and flips
+  `CONFIRMED_BY_OWNER` there — a coach must not treat it as cleared before that.
 - `WORKORDER_BENCH1_benchmarking.md` — the BENCH-1 work order (ADR-089)
 - `WORKORDER_DI1_movement_integrity.md` — the DI-1 work order (ADR-091)
 
@@ -33,6 +40,6 @@ tracked file ever declares itself PRIVATE again.
 `WORKORDER_HEVY_COMMIT_HARDENING.md`, and `routines/` were reviewed 2026-08-23
 (#3043) and stay public on purpose: they document *how the coaching system works*
 (session protocol, chat-mode registry, calibration philosophy, engineering work
-orders, routine specs) without the owner-personal specifics that made the five
+orders, routine specs) without the owner-personal specifics that made the six
 files above Tier-2. Anything Tier-2 that a public page could serve is governed by
 `docs/DATA_GOVERNANCE.md`, not by this directory.
