@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 423** — feedback 24 · reference 236 · security 1 · project 159 · user 1 · index 2
+**Files in the memory index snapshot: 429** — feedback 24 · reference 241 · security 1 · project 160 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 261** — homed-here 68 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
+**Rule-class files (feedback + reference + security): 266** — homed-here 73 · already-homed 169 · superseded 7 · narrative 15 · off-repo 2
 
-**Program/session files (project): 159** — already-homed 14 · superseded 1 · narrative 141 · off-repo 2 · index 1
+**Program/session files (project): 160** — already-homed 14 · superseded 1 · narrative 142 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -210,6 +210,7 @@ project_session_a_2026_08_25.md
 project_session_ab_2026_09_13.md
 project_session_ac_2026_09_13.md
 project_session_ad_2026_09_14.md
+project_session_ae_2026_09_14.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -253,6 +254,7 @@ project_wiki_program_2026_07_10.md
 project_wrong_day_and_wrong_gauge_2026_08_18.md
 reference_a_band_is_not_a_contiguous_window.md
 reference_a_behavioral_threshold_cannot_see_a_same_day_miss.md
+reference_a_byte_diff_is_not_a_visible_change.md
 reference_a_cancelled_ci_rollup_hides_real_failures.md
 reference_a_check_after_truncation_launders_the_defect.md
 reference_a_check_that_measures_nothing_returns_clean.md
@@ -264,6 +266,7 @@ reference_a_correct_rule_with_a_narrow_denominator.md
 reference_a_dependency_missing_makes_a_gate_dark.md
 reference_a_derived_artifact_needs_its_lane.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
+reference_a_generated_artifact_with_a_committed_twin.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
 reference_a_page_of_logs_is_not_the_latest.md
@@ -279,6 +282,7 @@ reference_a_sweep_that_restores_a_directory.md
 reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
+reference_a_well_formed_citation_is_not_a_true_one.md
 reference_a_writer_that_ignores_the_wipe_tombstone.md
 reference_absence_read_as_success.md
 reference_absent_check_invisible_to_fail_filter.md
@@ -288,6 +292,7 @@ reference_agent_commit_and_the_throughput_fix.md
 reference_agent_commit_directory_arg_destroys.md
 reference_agent_commit_directory_is_not_a_name.md
 reference_ai_gate_blocking_deploys.md
+reference_all_settled_over_an_incomplete_check_set.md
 reference_an_epic_can_pass_every_box_and_fail_its_outcome.md
 reference_api_before_frontend_autodeploy_race.md
 reference_api_schema_capture_wholesale.md
@@ -477,6 +482,7 @@ reference_swallowed_push_no_runs_at_all.md
 reference_task_notification_exit_codes_lie.md
 reference_test_importing_aws_cdk_reds_ci.md
 reference_test_layer_dep_import_collection_red.md
+reference_the_doc_literal_merge_treadmill.md
 reference_the_rubric_can_be_the_finding_generator.md
 reference_time_dependent_gate_outside_its_window.md
 reference_token_overlap_misses_structural_cloning.md
@@ -917,7 +923,7 @@ carries an operating rule.
 | `reference_attest_never_backfill.md` | reference | `lambdas/training/attested_training.py` module docstring (missing history gets a declared, labelled attestation layer that never merges into a measured field — never synthetic rows written into `SOURCE#hevy`/`SOURCE#strava`, which are indistinguishable from measured ones and sit under delete-protected `raw/*`) | homed-here |
 | `reference_a_band_is_not_a_contiguous_window.md` | reference | `lambdas/compute/episode_detect_lambda.py` (`build_reference` + `weekly_covariates` — bucket a re-entrant series by its in-band DAY SET, never `min..max`; `n_eff` per contiguous visit, then summed) | homed-here |
 | `reference_one_cause_two_red_workflows.md` | reference | `docs/CONVENTIONS.md` §7 (a red `lint` SKIPS CI/CD's `test`/`Plan`/`Deploy` — a skipped test job is not a passing one; two workflows red together usually share one cause; read the boot brief's main line at session START) | homed-here |
-| `reference_a_byte_diff_is_not_a_visible_change.md` | reference | `tests/test_recap_coach_line_3749.py::test_every_layout_DRAWS_the_line_on_a_real_day` — counts LIT PIXELS against a dense fixture built from a real logged day, parametrised over all four layouts; reverting the placement reds exactly `dense-session`. The byte-equality assertion is kept, deliberately, for the ABSENCE case only | homed-here |
+| `reference_a_byte_diff_is_not_a_visible_change.md` | reference | `tests/test_recap_coach_line_3749.py` (`test_every_layout_DRAWS_the_line_on_a_real_day`) — counts LIT PIXELS against a dense fixture built from a real logged day, parametrised over all four layouts; reverting the placement reds exactly `dense-session`. The byte-equality assertion is kept, deliberately, for the ABSENCE case only | homed-here |
 | `reference_all_settled_over_an_incomplete_check_set.md` | reference | `deploy/wait_pr_green.sh` — the only sanctioned waiter (#3103); it derives the expected check set from the PR's changed paths and asserts each BY NAME, treating both 'no checks reported' and an absent expected check as failures rather than silent passes | homed-here |
 | `reference_a_well_formed_citation_is_not_a_true_one.md` | reference | `scripts/check_alarm_citations.py` (#2996 closed-issue leg + #3501 contradicted-cause leg) — and #3793's acceptance carries the open question this exposed: whether #3501 can compare a citation's named cause against the run's ACTUAL failing check | homed-here |
 | `reference_a_generated_artifact_with_a_committed_twin.md` | reference | `lambdas/training/hevy_template_index.py` — the producer's own module docstring names the key, the provenance fields (`_built_at`/`_sha256`) and the shrink guard, and its `INDEX_KEY` is the single literal both writer and reader derive from. The SET-level rule (classify every `config/*.json` generated-vs-hand-owned; no stale committed twin for a generated one) is filed as #3785 and has no home until it lands | homed-here |
