@@ -8,12 +8,32 @@ Inputs:
 
 Output:
   {
-    "overall_pct": float,           # 0..100
+    "overall_pct": float,           # 0..100 — SET COMPLETION ONLY (see below)
+    "overall_pct_dimension": "sets_only",
     "per_muscle": {muscle: pct},
-    "movements": [{movement_key, programmed_sets, performed_sets, pct}],
+    "movements": [{movement_key, programmed_sets, performed_sets, pct, intensity}],
     "missing": [movement_keys],
     "extra":   [exercise_template_ids],
+    "sets_adherence":      {...},   # #3714 — the set-count dimension, named
+    "intensity_adherence": {...},   # #3714 — the RPE-ceiling dimension
+    "as_prescribed":       {...},   # #3714 — the AND of the two, never their average
   }
+
+TWO DIMENSIONS, NEVER ONE NUMBER (#3714). Adherence used to be set-count overlap
+alone, so the 2026-09-07 push session read `overall_pct: 100.0` while its incline DB
+press was logged at RPE 10 — trained to failure on a day whose own plan said "No
+failure sets today". `intensity_adherence` is the missing half, graded against the
+ceiling the routine ITSELF named (see `training.intensity_prescription` — nothing
+there invents a cutoff). The two are reported SEPARATELY on purpose: averaging "he did
+every set" with "he blew the ceiling on five of them" back into one percentage would
+reproduce the same defect one level up, hiding which half failed. `as_prescribed` is
+the composite the story asks for, and it is an AND of two verdicts with its reasons
+named — not a blend of two percentages.
+
+`overall_pct` deliberately KEEPS its set-completion meaning: it is already stored on
+every pre-#3714 workout record, and silently redefining a number that is written down
+is its own lie. It gains `overall_pct_dimension` so no reader can mistake it for the
+whole story, and `sets_adherence.pct` is its named twin.
 
 Movement matching: by Hevy exercise_template_id when present; falls back to
 title prefix on the catalog title.
@@ -28,6 +48,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from common.repo_config import config_dir
+from training.intensity_prescription import grade_sets, resolve_ceiling
 from training.routine_ir import RoutineSpec
 
 logger = logging.getLogger("adherence_calc")
@@ -92,24 +113,103 @@ def _ir_movement_to_template(catalog: dict[str, Any], movement_key: str, cache: 
     return ((cache or {}).get("movements", {}).get(movement_key) or {}).get("hevy_template_id")
 
 
+def _intensity_rollup(movements: list[dict[str, Any]]) -> dict[str, Any]:
+    """Roll the per-movement intensity grades into the session's intensity dimension.
+
+    The denominator is GRADED working sets only — sets that carried both a prescribed
+    ceiling and a logged RPE. Sets with no logged RPE are reported in `sets_rpe_absent`
+    and never counted as within-ceiling (ADR-104: absence is absence, not compliance).
+
+    `status`:
+      graded       — at least one working set had a ceiling AND an RPE
+      unreadable   — a ceiling was prescribed but no working set carried an RPE
+      unprescribed — the routine named no intensity anywhere (pct is None, never 100)
+    """
+    grades = [m["intensity"] for m in movements if m.get("intensity")]
+    # Only movements that were actually PRESCRIBED an intensity contribute to the
+    # rollup. A movement with no ceiling has nothing to be compliant or non-compliant
+    # with; counting its sets as "graded" would silently manufacture a denominator.
+    prescribed = [g for g in grades if g["ceiling_rpe"] is not None]
+    graded = sum(g["sets_graded"] for g in prescribed)
+    over = sum(g["sets_over_ceiling"] for g in prescribed)
+    absent = sum(g["sets_rpe_absent"] for g in prescribed)
+    overages = [g["max_overage"] for g in prescribed if g.get("max_overage")]
+
+    if graded:
+        status = "graded"
+        pct: float | None = round((graded - over) / graded * 100, 1)
+    elif prescribed:
+        status, pct = "unreadable", None
+    else:
+        status, pct = "unprescribed", None
+
+    return {
+        "status": status,
+        "pct": pct,
+        "sets_graded": graded,
+        "sets_over_ceiling": over,
+        "sets_rpe_absent": absent,
+        "movements_with_ceiling": len(prescribed),
+        "max_overage": max(overages) if overages else (0.0 if graded else None),
+        "over_ceiling_movements": sorted(m["movement_key"] for m in movements if (m.get("intensity") or {}).get("sets_over_ceiling")),
+    }
+
+
+def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[dict[str, Any]]) -> dict[str, Any]:
+    """ "Did he train the session as prescribed?" — an AND of the two dimensions.
+
+    Never an average. `no` names which dimension failed; `unknown` is returned rather
+    than `yes` whenever the intensity half could not be read, because "we couldn't tell"
+    has never been the same claim as "he complied" (ADR-104).
+    """
+    reasons: list[str] = []
+    if sets_pct < 100.0:
+        reasons.append(f"sets: {sets_pct}% of programmed sets completed")
+    if intensity["sets_over_ceiling"]:
+        names = ", ".join(intensity["over_ceiling_movements"])
+        reasons.append(f"intensity: {intensity['sets_over_ceiling']} set(s) above the prescribed RPE ceiling ({names})")
+    if reasons:
+        return {"verdict": "no", "reasons": reasons}
+
+    if intensity["status"] != "graded":
+        return {"verdict": "unknown", "reasons": [f"intensity: {intensity['status']} — no RPE-vs-ceiling comparison was possible"]}
+    blind = sorted(
+        m["movement_key"]
+        for m in movements
+        if (m.get("intensity") or {}).get("sets_rpe_absent") and str((m["intensity"] or {}).get("basis") or "").startswith("exercise")
+    )
+    if blind:
+        return {
+            "verdict": "unknown",
+            "reasons": [f"intensity: RPE not logged on movements that carried their own ceiling ({', '.join(blind)})"],
+        }
+    return {"verdict": "yes", "reasons": []}
+
+
 def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str, Any]:
     catalog = _load_catalog()
     cache = _load_template_cache()
-    programmed = []
+    routine_notes = getattr(ir, "notes", "") or ""
+    recovery_branches = ((getattr(ir, "inputs_snapshot", None) or {}) or {}).get("recovery_branches")
+    programmed: list[dict[str, Any]] = []
     template_to_key: dict[str, str] = {}
     for ex in ir.exercises:
         tid = _ir_movement_to_template(catalog, ex.movement_key, cache)
         sets = len(ex.sets)
-        programmed.append({"movement_key": ex.movement_key, "template_id": tid, "sets": sets})
+        ceiling = resolve_ceiling(ex.movement_key, getattr(ex, "notes", "") or "", routine_notes, recovery_branches)
+        programmed.append({"movement_key": ex.movement_key, "template_id": tid, "sets": sets, "ceiling": ceiling})
         if tid:
             template_to_key[tid] = ex.movement_key
 
     performed_by_tid: dict[str, int] = {}
+    performed_sets_by_tid: dict[str, list[dict[str, Any]]] = {}
     for ex in performed.get("exercises", []):
         tid = ex.get("exercise_template_id")
         if not tid:
             continue
-        performed_by_tid[tid] = performed_by_tid.get(tid, 0) + len(ex.get("sets", []))
+        ex_sets = ex.get("sets", []) or []
+        performed_by_tid[tid] = performed_by_tid.get(tid, 0) + len(ex_sets)
+        performed_sets_by_tid.setdefault(tid, []).extend(ex_sets)
 
     movements: list[dict[str, Any]] = []
     per_muscle_programmed: dict[str, int] = {}
@@ -117,12 +217,15 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     for p in programmed:
         performed_sets = performed_by_tid.get(p["template_id"], 0)
         pct = round(min(1.0, performed_sets / p["sets"]) * 100, 1) if p["sets"] else 0.0
+        intensity = grade_sets(p["ceiling"]["rpe"], performed_sets_by_tid.get(p["template_id"], []))
+        intensity["basis"] = p["ceiling"]["basis"]
         movements.append(
             {
                 "movement_key": p["movement_key"],
                 "programmed_sets": p["sets"],
                 "performed_sets": performed_sets,
                 "pct": pct,
+                "intensity": intensity,
             }
         )
         muscle = catalog["movements"].get(p["movement_key"], {}).get("primary_muscle", "unknown")
@@ -141,8 +244,20 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     total_performed = sum(min(per_muscle_programmed[m], per_muscle_performed.get(m, 0)) for m in per_muscle_programmed)
     overall_pct = round((total_performed / total_programmed) * 100, 1) if total_programmed else 0.0
 
+    intensity_adherence = _intensity_rollup(movements)
+
     return {
         "overall_pct": overall_pct,
+        # #3714: name the dimension on the number so nothing can read set completion
+        # as "trained as prescribed". The two dimensions below are never averaged.
+        "overall_pct_dimension": "sets_only",
+        "sets_adherence": {
+            "pct": overall_pct,
+            "programmed_sets": total_programmed,
+            "performed_sets": total_performed,
+        },
+        "intensity_adherence": intensity_adherence,
+        "as_prescribed": _as_prescribed(overall_pct, intensity_adherence, movements),
         "per_muscle": per_muscle,
         "movements": movements,
         "missing": missing,
