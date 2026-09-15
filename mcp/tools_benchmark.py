@@ -495,8 +495,10 @@ def _benchmark_prescription(args: dict) -> dict:
     citable = bool(ev.get("volume_ok"))
     out["proven_target"] = {
         "band": proven["band"],
+        "band_requested": proven["band_requested"],
         "band_distance_lb": proven["band_distance_lb"],
         "exact": proven["exact"],
+        "widened_reason": proven.get("widened_reason"),
         "walk_mi_wk": proven.get("walk_mi_wk"),
         "walk_hr_wk": proven.get("walk_hr_wk"),
         "target_walk_bpm": proven.get("walk_bpm"),
@@ -531,9 +533,22 @@ def _benchmark_prescription(args: dict) -> dict:
 
     dist = proven["band_distance_lb"]
     where = "at this weight" if proven["exact"] else f"{dist} lb lighter"
+    # #3756 — name which band it fell to and why, whenever the answer did not
+    # come from the containing band.
+    fell_to = ""
+    if not proven["exact"]:
+        reason = {
+            "volume_floor": (
+                f"the containing band ({proven['band_requested']}) doesn't clear the "
+                f"{ev.get('volume_floor_days')}-day volume evidence floor"
+            ),
+            "insufficient_weighins": f"the containing band ({proven['band_requested']}) has too few weigh-ins to use",
+            "no_data": f"there is no proven data in the containing band ({proven['band_requested']})",
+        }.get(proven.get("widened_reason"), f"the containing band ({proven['band_requested']}) is not usable")
+        fell_to = f"Fell to band {proven['band']} because {reason}. "
     if citable:
         out["signal"] = (
-            f"Walking {where} ran {proven.get('walk_mi_wk')} mi/wk "
+            f"{fell_to}Walking {where} ran {proven.get('walk_mi_wk')} mi/wk "
             f"({proven.get('walk_hr_wk')} hr/wk @ {proven.get('target_walk_bpm') or proven.get('walk_bpm')} bpm) "
             f"during a losing phase; the trailing 28d is {now['walk_mi_wk']} mi/wk."
         )

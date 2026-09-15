@@ -135,37 +135,75 @@ def resolve_band(
       band_requested    — the band the weight actually falls in
       band_distance_lb  — 0 when exact; >0 when the answer came from elsewhere
       exact             — whether the containing band was the one used
+      widened_reason    — None when exact; else why the containing band was
+                           passed over ('volume_floor', 'insufficient_weighins',
+                           or 'no_data') — #3756
       confidence        — 'low' when dwell or n is thin, else the band's own
 
     Never invents a band and never averages two of them together: a blended
     answer would have no window and no `n`, which is exactly the property that
     made the v1 table unciteable.
+
+    Widening (#3756): a containing band with enough weigh-ins to be "usable"
+    can still fail the volume evidence floor (`VOLUME_FLOOR_DAYS`) — enough
+    readings, too few effective days to prescribe volume from. That must not
+    win over an adjacent band that DOES clear the floor, so widening is tried
+    twice: first restricted to floor-clearing bands, and only if NONE exists
+    within `max_widening` does it fall back to the old min-weigh-ins-only rule
+    (preserving the truly-empty case — the containing band, `volume_citable:
+    false`, exactly as before #3756).
     """
     if not bands or weight_lb is None:
         return None
     target = band_key(weight_lb)
 
-    def _usable(key: str) -> bool:
+    def _band(key: str) -> dict[str, Any] | None:
         b = bands.get(key)
-        if not isinstance(b, dict):
+        return b if isinstance(b, dict) else None
+
+    def _effective_days(key: str) -> float:
+        b = _band(key)
+        if b is None:
+            return 0.0
+        n_eff = b.get("n_eff")
+        return float(n_eff) if n_eff is not None else float(b.get("n_days") or 0)
+
+    def _usable(key: str) -> bool:
+        b = _band(key)
+        if b is None:
             return False
         return int(b.get("n_weighins") or 0) >= min_weighins
 
-    candidates = [target] if _usable(target) else []
-    if not candidates:
-        # Widen outward one band at a time, preferring the closer side; ties go
-        # to the heavier band, which is the more conservative reference when
-        # prescribing at a weight above the record.
+    def _clears_volume_floor(key: str) -> bool:
+        return _usable(key) and _effective_days(key) >= VOLUME_FLOOR_DAYS
+
+    def _widen(predicate) -> list[str]:
         for step in range(1, max_widening + 1):
             ring = []
             for direction in (1, -1):
                 low = band_low(target) + direction * step * BAND_WIDTH_LB
                 key = f"{low}-{low + BAND_WIDTH_LB - 1}"
-                if _usable(key):
+                if predicate(key):
                     ring.append(key)
             if ring:
-                candidates = sorted(ring, key=lambda k: (_distance_lb(weight_lb, k), -band_low(k)))
-                break
+                # Ties go to the heavier band, the more conservative reference
+                # when prescribing at a weight above the record.
+                return sorted(ring, key=lambda k: (_distance_lb(weight_lb, k), -band_low(k)))
+        return []
+
+    # Pass 1: prefer a band — containing or widened — that clears the volume
+    # floor outright. A containing band that fails the floor must yield here.
+    candidates = [target] if _clears_volume_floor(target) else []
+    if not candidates:
+        candidates = _widen(_clears_volume_floor)
+
+    # Pass 2 (fallback, preserves pre-#3756 behaviour): nothing within
+    # `max_widening` clears the volume floor at all — return the nearest band
+    # usable by weigh-in count alone, same as before this fix.
+    if not candidates:
+        candidates = [target] if _usable(target) else []
+        if not candidates:
+            candidates = _widen(_usable)
     if not candidates:
         return None
 
@@ -175,6 +213,14 @@ def resolve_band(
     out["band_requested"] = target
     out["band_distance_lb"] = _distance_lb(weight_lb, key)
     out["exact"] = key == target
+    if out["exact"]:
+        out["widened_reason"] = None
+    elif _band(target) is None:
+        out["widened_reason"] = "no_data"
+    elif not _usable(target):
+        out["widened_reason"] = "insufficient_weighins"
+    else:
+        out["widened_reason"] = "volume_floor"
     ev = evidence(out)
     out["evidence"] = ev
     # The tier is the ruling; `confidence` stays for existing readers.
