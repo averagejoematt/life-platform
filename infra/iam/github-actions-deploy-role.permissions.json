@@ -98,6 +98,19 @@
       "Resource": "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"
     },
     {
+      "Sid": "KMSDecryptViaDynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt"
+      ],
+      "Resource": "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d",
+      "Condition": {
+        "StringEquals": {
+          "kms:ViaService": "dynamodb.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
       "Sid": "EventBridge",
       "Effect": "Allow",
       "Action": [

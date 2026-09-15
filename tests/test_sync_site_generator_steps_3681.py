@@ -318,3 +318,39 @@ def test_the_deploy_role_grants_the_query_the_theme_river_step_needs():
         "the deploy role's DynamoDB grant must stay READ-ONLY and Query-shaped; a write or a Scan "
         "here is a different decision than #3681 made"
     )
+
+
+def test_the_deploy_role_can_decrypt_the_table_cmk_but_only_through_dynamodb():
+    """#3681, the SECOND hidden denial — a Query grant alone is not a readable table.
+
+    The `life-platform` table is encrypted with a customer-managed CMK
+    (`444438d1-…`, "Life Platform DynamoDB encryption — health data at rest"). DynamoDB
+    decrypts on the CALLER's behalf, so `dynamodb:Query` without `kms:Decrypt` on that key
+    is an AccessDenied the first grant could not reveal: the Query denial masked it, and
+    the site deploy failed a second time on a permission nobody had seen.
+
+    The grant is deliberately NOT unconditional. `kms:ViaService` pins it to DynamoDB, so
+    the deploy role can decrypt only as a side effect of a read it is already allowed to
+    make — it can never call `kms:Decrypt` against the health-data key directly. That
+    condition is the whole reason this is a separate statement from the plain-`DescribeKey`
+    `KMS` Sid rather than one more action on it; asserting it here is what keeps a future
+    narrowing-or-widening pass from collapsing the two.
+    """
+    doc = json.loads((ROOT / "infra" / "iam" / "github-actions-deploy-role.permissions.json").read_text(encoding="utf-8"))
+    key_arn = "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"
+
+    def _as_list(v):
+        return v if isinstance(v, list) else [v]
+
+    decrypt = [s for s in doc["Statement"] if s.get("Effect") == "Allow" and "kms:Decrypt" in _as_list(s.get("Action"))]
+    assert len(decrypt) == 1, f"expected exactly one kms:Decrypt statement on the deploy role, got {len(decrypt)}"
+    stmt = decrypt[0]
+    assert _as_list(stmt["Resource"]) == [key_arn], "the Decrypt grant must name the one health-data CMK — no wildcard, no alias"
+    via = stmt.get("Condition", {}).get("StringEquals", {}).get("kms:ViaService")
+    assert via == "dynamodb.us-west-2.amazonaws.com", (
+        "the deploy role's kms:Decrypt must stay conditioned on kms:ViaService=dynamodb.us-west-2.amazonaws.com. "
+        "Without it CI holds direct decrypt on the health-data key, which is a bigger decision than #3681 made."
+    )
+    assert not [a for a in _as_list(stmt["Action"]) if a not in ("kms:Decrypt",)], (
+        "this statement exists for the DynamoDB read path only — kms:Encrypt/GenerateDataKey/re-encrypt " "belong to a different decision"
+    )
