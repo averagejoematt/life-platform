@@ -97,6 +97,31 @@ def test_no_comparable_proven_period_declines_rather_than_substituting(monkeypat
     assert "say so rather than substituting" in out["signal"]
 
 
+# ── #3756 — the containing band must yield to a floor-clearing neighbour ───
+
+_THIN_CONTAINING_STRONG_NEIGHBOUR = {
+    "300-309": {"n_days": 37.0, "n_eff": 25.7, "n_weighins": 37, "walk_mi_wk": 4.67, "walk_hr_wk": 3.17, "walk_bpm": 119.0},
+    "310-319": {"n_days": 4.0, "n_eff": 4.0, "n_weighins": 4, "walk_mi_wk": 0.0, "walk_hr_wk": 0.0, "walk_bpm": None},
+}
+
+
+def test_prescription_falls_to_the_neighbour_that_clears_the_floor_and_names_why(monkeypatch):
+    """The must-fail test for #3756 at the tool boundary: pins the live shape
+    (weight 319.7, containing band 310-319 at 4.0 effective days) and asserts
+    the prescription cites the 300-309 neighbour instead."""
+    _patch(monkeypatch, _ref(proven=_THIN_CONTAINING_STRONG_NEIGHBOUR), weight=319.7)
+    out = tb.tool_get_benchmark({"view": "prescription"})
+    pt = out["proven_target"]
+    assert pt["band"] == "300-309", f"cited {pt['band']} — the thin containing band won again"
+    assert pt["band_requested"] == "310-319"
+    assert pt["exact"] is False
+    assert pt["volume_citable"] is True
+    assert pt["widened_reason"] == "volume_floor"
+    assert "Fell to band 300-309" in out["signal"]
+    assert "310-319" in out["signal"], "signal must name the band it fell FROM"
+    assert "volume evidence floor" in out["signal"]
+
+
 def test_intake_is_declared_incomparable_on_every_output(monkeypatch):
     _patch(monkeypatch, _ref(proven=_STRONG))
     for view in ("prescription", "campaign"):
