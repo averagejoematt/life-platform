@@ -163,8 +163,34 @@ OPERATIONS: dict[str, dict[str, Any]] = {
 }
 
 
+_LIST_ITEM_START = re.compile(r"^\s{0,3}\d+[a-z]?\.\s", re.M)
+
+
 def _paragraphs(text: str) -> list[str]:
-    return re.split(r"\n\s*\n", text)
+    """Split into proximity units the reason-marker check treats as one blob.
+
+    A blank-line split ALONE is not fine enough for this repo's own lane docs: the
+    numbered lists in `worktree-implementer.md`/`SKILL.md` do not put a blank line
+    between sibling items (`1.`/`2.`/`3.` run on consecutive lines), so a naive
+    blank-line paragraph swallows the WHOLE list into one blob. Found live, running
+    this guard's own must-fail mutation against the real doc for #3804: removing the
+    word "Never" from the stash item still passed, because item 1's unrelated
+    "Never `cd` into the main checkout" sat in the SAME blob and satisfied the
+    prohibition-marker check for a completely different operation. So every
+    blank-line block is further split at each top-level numbered-list-item boundary
+    (`1.`, `3b.`, `6.`, ...) — the unit this repo actually writes one rule per.
+    """
+    units: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        starts = [m.start() for m in _LIST_ITEM_START.finditer(block)]
+        if len(starts) < 2:
+            units.append(block)
+            continue
+        if starts[0] > 0:
+            units.append(block[: starts[0]])
+        bounds = starts + [len(block)]
+        units.extend(block[bounds[i] : bounds[i + 1]] for i in range(len(starts)))
+    return units
 
 
 def _doc_texts(paths: tuple[Path, ...] | None = None) -> dict[str, str]:

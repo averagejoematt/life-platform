@@ -70,6 +70,27 @@ def test_one_doc_permissive_one_doc_correct_still_reds():
     assert any(DOC_B in v for v in violations), f"expected {DOC_B} to be flagged, got: {violations}"
 
 
+def test_an_unrelated_bullets_never_does_not_satisfy_a_different_bullets_missing_rule():
+    """The real bug this issue's own must-fail run found (2026-09-14), before this proof
+    could be honestly recorded: this repo's numbered lane-doc lists put NO blank line
+    between sibling items (`1.`/`2.`/`3.` run on consecutive lines). A blank-line-only
+    paragraph split lumps them into one blob, so item 1's unrelated 'Never `cd` into the
+    main checkout' satisfied the prohibition-marker check for a completely different
+    item's stash mention. Shaped exactly like the real doc: no blank line between the
+    unrelated 'never' bullet and the permissive stash bullet."""
+    shaped_like_the_real_doc = (
+        "1. **Stay in your assigned worktree.** Never `cd` into the main checkout.\n"
+        "2. `git stash` (or `stash pop`) is handy for parking work in a lane. `refs/stash` "
+        "is a repository-level ref shared by every worktree.\n"
+        "3. **Never merge, never deploy, never mutate AWS.**\n"
+    )
+    violations = guard.check_operation("stash", _docs(shaped_like_the_real_doc))
+    assert violations, (
+        "an unrelated bullet's 'never' must not satisfy a different bullet's missing prohibition — "
+        "this is the exact false negative found running #3804's own must-fail proof against the real doc"
+    )
+
+
 # ── the other three FORBIDDEN_IN_LANE members (gc / prune / config) ───────────────
 
 
