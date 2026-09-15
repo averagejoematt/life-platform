@@ -110,6 +110,11 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         "surge_threshold_rule": None,
         "surge_threshold_floor": gov.SURGE_UNIQUES_THRESHOLD,
         "surge_flips_30d": None,
+        # #3661: which rule holds surge on, and the bar that minted the engaged state.
+        # None at this call site because it passes neither — and None means "this run did
+        # not say", never a manufactured "bar".
+        "surge_held_by": None,
+        "surge_engaged_at_bar": None,
         # #1999: the ADR-133 envelope the effective ceiling was drawn from, so no
         # consumer has to hardcode the base literal to describe it.
         "base_ceiling": gov._active_ceilings()[0],

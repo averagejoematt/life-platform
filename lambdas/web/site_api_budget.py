@@ -671,6 +671,14 @@ def receipts() -> dict:
             "ceiling_usd": ceiling,
             "surge_active": surge_active,
             "surge_threshold_uniques": (breakdown or {}).get("surge_threshold"),
+            # #3661: WHICH rule is holding surge on. `surge_active: true` alone cannot
+            # distinguish "the reading cleared the bar" from "the reading is inside the
+            # hysteresis band below it" — a 17% difference in the ceiling and in all three
+            # tier bands, previously legible only by reading the governor source. Null on
+            # a pre-#3661 breakdown payload, which is what a reader should see rather than
+            # a manufactured "bar".
+            "surge_held_by": (breakdown or {}).get("surge_held_by"),
+            "surge_engaged_at_bar": (breakdown or {}).get("surge_engaged_at_bar"),
             "recent_uniques": (breakdown or {}).get("recent_uniques"),
             "month_to_date_usd": mtd,
             "projected_month_end_usd": projected,
