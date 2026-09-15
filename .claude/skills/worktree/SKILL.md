@@ -55,6 +55,33 @@ deleted). It enforces rules 1–3 below rather than asking you to recall them.
    falsely auto-closed #3222 while its work sat unmerged.
 5. **Never deploy from a worktree branch** — the tell is a deceptive 0-diff. Deploy from
    `main`, after merge.
+6. **Never run `git stash` (or `stash pop`/`stash apply`) in a lane.** `refs/stash` is
+   a repository-level ref — per `git help worktree` §DETAILS, refs are shared across
+   all worktrees except `refs/bisect`, `refs/worktree` and `refs/rewritten`, and
+   `refs/stash` is not on that exception list — so every worktree of this one `.git`
+   pushes and pops the SAME stash stack. Two concurrent lanes did exactly this in both
+   directions on 2026-09-14 (#3804): one lane's `stash pop` returned another lane's
+   uncommitted WIP, and only a filename the receiving lane didn't recognise caught it.
+   Park work instead with a lane-unique `git diff > <scratchpad>/issue-N-<slug>.patch`,
+   or a commit on your own branch.
+
+   The same shared-state hazard reaches three more git operations, so don't stop at
+   stash: **never run `git gc` or `git prune` in a lane** — both operate on the ONE
+   shared object store under `$GIT_COMMON_DIR` (a linked worktree has no `objects/`
+   directory of its own), and `git-gc(1)`'s own NOTES section documents the risk
+   directly — "when git gc runs concurrently with another process, there is a risk of
+   it deleting an object that the other process is using ... may corrupt the
+   repository." A lane never has a legitimate reason to run either by hand.
+   **Never write repo-level `git config` from a lane** either (an alias, `user.email`,
+   unsetting a hook) — a plain `git config` write targets `$GIT_DIR/config`, and for
+   every worktree of this repo that IS the shared file (there is no per-worktree local
+   config); `--worktree` is git's escape hatch but is inert here because this repo does
+   not set `extensions.worktreeConfig`, so even a `--worktree`-scoped write still lands
+   in the shared file today. `git worktree prune` / `git worktree remove` are also
+   repository-level, but already governed structurally — `scripts/worktree_reaper.py`
+   owns reaping and `scripts/lane_worktree.py` owns locking, so a lane never runs
+   either by hand. `git rebase`/`merge`, `HEAD`, and the index stay per-worktree
+   (`git help worktree` §DETAILS) and need no special care.
 
 **Release when the lane is done** (after the PR merges — not when the PR opens; a pushed
 branch awaiting merge is still live work):

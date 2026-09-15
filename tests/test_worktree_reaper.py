@@ -237,6 +237,31 @@ def test_same_dir_sees_through_a_case_twin(tmp_path):
     assert not r._same_dir(d, tmp_path)
 
 
+# ── #3804: `lane_worktree.py new` prints the git-ops prohibition at creation time ──
+#
+# A rule stated only in a SKILL.md is a rule the agent may never load. This is where a
+# lane actually reads it — right after it is told where its worktree lives.
+
+
+def test_new_lane_cli_prints_the_git_ops_prohibition(tmp_path, monkeypatch, capsys):
+    """`main(["new", ...])` must print the prohibition, unconditionally — this is where a
+    lane actually reads it (#3804), not just a SKILL.md it may never load. `new_lane`
+    itself is faked (no real git calls) so this is a pure test of the CLI wiring."""
+    fake_path = tmp_path / "issue-3804-banner-check"
+    monkeypatch.setattr(lane, "new_lane", lambda issue, slug, base="origin/main": fake_path)
+    rc = lane.main(["new", "3804", "banner-check"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "git stash" in out, f"creation-time output did not mention git stash: {out!r}"
+    assert "REPOSITORY-LEVEL" in out or "repository-level" in out, f"creation-time output gave no reason: {out!r}"
+
+
+def test_prohibition_banner_is_nonempty_and_names_the_safe_alternative():
+    assert lane.PROHIBITION_BANNER
+    joined = "\n".join(lane.PROHIBITION_BANNER)
+    assert "git diff" in joined or "patch" in joined, "the banner must name a safe alternative, not just forbid"
+
+
 def test_the_lock_is_git_enforced_too(sandbox):
     """Defence in depth: even if the classifier were wrong, `git worktree remove` refuses a
     locked tree without force — and this tool never passes force."""
