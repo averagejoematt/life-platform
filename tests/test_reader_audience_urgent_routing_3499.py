@@ -34,7 +34,8 @@ pre-#3499 inputs (digest-only AlarmActions; `45 14 * * 1,3,5`) and assert it red
 
 WHY THE PRIMARY DERIVATION IS AST, NOT `cdk synth`
 `.github/workflows/ci-test.yml` installs pytest/boto3/hypothesis/pyyaml/pillow — NOT
-`aws-cdk-lib`. A synth-only gate would ImportError (or, worse, skip) in the lane that
+`aws-cdk-lib` — and several modules in the suite register a bare
+`types.ModuleType("aws_cdk")` in `sys.modules` so `role_policies.py` imports without it. A synth-only gate would ImportError (or, worse, skip) in the lane that
 actually runs on every PR, which is the same "instrument that cannot fire" family this
 file exists to close. So the always-running derivation is an AST read of the CDK source —
 the established shape here (`tests/test_urgent_alarm_routing.py`,
@@ -64,6 +65,7 @@ v1.0.0 — 2026-09-14 (#3499, epic #3489)
 from __future__ import annotations
 
 import ast
+import importlib
 import os
 import re
 import sys
@@ -221,21 +223,58 @@ def test_the_routing_derivation_can_fail():
 
 
 # ── The synth cross-check: the same property, from the real template ──────────
-try:  # pragma: no cover - environment-dependent
-    import aws_cdk as _cdk  # noqa: F401
-
-    _HAS_CDK = True
-except Exception:  # pragma: no cover
-    _HAS_CDK = False
 
 
-@pytest.mark.skipif(
-    not _HAS_CDK,
-    reason="aws-cdk-lib not installed in this lane (ci-test.yml pins pytest/boto3/hypothesis/pyyaml/pillow only) — the AST derivation above is the gate; this is the cross-check",
-)
+def _real_cdk_available() -> bool:
+    """True only for the REAL aws-cdk-lib — and answered LAZILY, at call time.
+
+    NOT `import aws_cdk`. Several modules in this suite install a bare
+    `types.ModuleType("aws_cdk")` into `sys.modules` so `role_policies.py` can be imported
+    with no CDK present (tests/test_iam_secrets_consistency.py, test_grant_enumeration,
+    test_put_metric_data_grant_lockstep, …). In a WHOLE-SUITE run that stub is already
+    registered by the time this file is collected, so `import aws_cdk` SUCCEEDS against a
+    non-package and the real import then dies with
+    `ModuleNotFoundError: No module named 'aws_cdk.assertions'; 'aws_cdk' is not a
+    package`. That is not hypothetical — it is how PR #3815's first CI run went red while
+    the same file was green in isolation: the capability probe tested a different thing
+    than the code under it used. Probe the submodule this test actually imports, and probe
+    it inside the test so collection ORDER cannot decide the answer.
+    """
+    try:
+        importlib.import_module("aws_cdk.assertions")
+        return True
+    except Exception:
+        return False
+
+
+def test_the_cdk_probe_is_not_fooled_by_the_suites_aws_cdk_stub(monkeypatch):
+    """REGRESSION (PR #3815, run 34925386669): the probe must answer for the REAL package.
+
+    The first version asked `import aws_cdk`, which is True against the bare
+    `types.ModuleType("aws_cdk")` that several modules in this suite register in
+    `sys.modules`. The test then did `from aws_cdk.assertions import Template` and the
+    whole-suite lane went red on a check that was green in isolation — a capability probe
+    that tested something other than the capability. This plants that exact stub and
+    asserts the probe says NO.
+    """
+    import types
+
+    monkeypatch.setitem(sys.modules, "aws_cdk", types.ModuleType("aws_cdk"))
+    monkeypatch.delitem(sys.modules, "aws_cdk.assertions", raising=False)
+    assert _real_cdk_available() is False, "the probe accepts a stubbed aws_cdk — the #3815 defect, restored"
+
+
 def test_the_synthesized_template_agrees_with_the_ast_derivation():
     """ACCEPTANCE (1), literally: every member's AlarmActions in the SYNTHESIZED template
-    include the urgent topic. Runs wherever aws-cdk-lib exists."""
+    include the urgent topic. Runs wherever the real aws-cdk-lib is importable."""
+    if not _real_cdk_available():
+        pytest.skip(
+            "the real aws-cdk-lib is not importable here — either it is not installed "
+            "(.github/workflows/ci-test.yml pins pytest/boto3/hypothesis/pyyaml/pillow only) "
+            "or another test in this run has stubbed `aws_cdk` in sys.modules. The AST "
+            "derivation above is the gate; this is the cross-check, and it ran green "
+            "locally on 2026-09-14 (output in this module's docstring)."
+        )
     import aws_cdk as cdk
     import stacks.reader_audience as ra
     from aws_cdk.assertions import Template
