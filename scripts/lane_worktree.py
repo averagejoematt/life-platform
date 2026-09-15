@@ -48,6 +48,22 @@ ROOT = Path(__file__).resolve().parent.parent
 
 LOCK_REASON_PREFIX = "lane in use"
 
+# #3804: this is where a lane actually reads the prohibition — a rule stated only in a
+# SKILL.md is a rule the agent may never load. `refs/stash`, the shared object store
+# (`git gc`/`git prune`), and a repo-level `git config` write are all reachable from
+# every worktree of this one `.git` (git-worktree(1) §DETAILS); two concurrent lanes
+# traded uncommitted work in both directions via `git stash` on 2026-09-14. Full
+# citations + the enumeration of the whole set live in
+# `scripts/check_repo_level_git_ops.py` and `.claude/skills/worktree/SKILL.md`.
+PROHIBITION_BANNER: tuple[str, ...] = (
+    "",
+    "do NOT run `git stash` (or gc/prune, or a non---worktree `git config` write) in this lane —",
+    "refs/stash and the object store are REPOSITORY-LEVEL, shared by every worktree of this .git;",
+    "a `stash pop` here can silently return ANOTHER lane's uncommitted work (#3804, fired twice",
+    "2026-09-14). Park work instead with `git diff > <scratchpad>/issue-N-<slug>.patch`, or a",
+    "commit on this branch.",
+)
+
 
 def _git(args: list[str], cwd: Path) -> tuple[int, str]:
     r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=120)
@@ -122,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"created + LOCKED {path}")
         print(f"branch issue-{args.issue}-{args.slug} off {args.base}")
         print(f"release when done:  python3 scripts/lane_worktree.py release {path}")
+        for line in PROHIBITION_BANNER:
+            print(line)
         return 0
     release_lane(Path(args.path))
     print(f"released {args.path} — the reaper may now retire it once it is clean, merged and idle")

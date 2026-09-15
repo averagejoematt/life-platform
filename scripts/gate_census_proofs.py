@@ -912,6 +912,53 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    # #3804: the guard entered the census the moment it was committed (639 -> 640, both
+    # `discover_gate_census_count()` and a bare `scripts/gate_census.py` run — confirmed
+    # to be the SAME derivation, not two disagreeing ones; see the PR thread). The
+    # mutation below is not synthetic decoration: it is the actual defect this guard's
+    # own must-fail unit test models, run for real against the real doc it guards, and
+    # it FOUND a real bug in the checker's first cut (a too-coarse paragraph split that
+    # let one bullet's "never" satisfy a completely different bullet's missing
+    # prohibition) before this proof could be honestly recorded.
+    "guard::scripts/check_repo_level_git_ops.py": {
+        "gate_name": "scripts/check_repo_level_git_ops.py",
+        "command": "python3 -m pytest tests/test_repo_level_git_ops_3804.py -q   # 20 tests; baseline 20 passed",
+        "mutation": (
+            "The real prohibition sentence in .claude/agents/worktree-implementer.md's item "
+            "3b was softened from 'Never run `git stash` (or `stash pop`/`stash apply`) in a "
+            "lane.' to '`git stash` (or `stash pop`/`stash apply`) is handy for parking work "
+            "in a lane.' — the reason sentence right after it (refs/stash is a "
+            "repository-level ref...) was left untouched, which is the realistic drift mode: "
+            "a later doc edit keeps the explanation and quietly drops the rule."
+        ),
+        "observed": (
+            "PRE-FIX (the checker's first cut, paragraph = blank-line-delimited blocks only): "
+            "GREEN — `python3 scripts/check_repo_level_git_ops.py` printed 'OK' and exit 0 "
+            "even with the prohibition removed, because items 1-3b share one blank-line block "
+            "with no separating blank lines, so item 1's unrelated 'Never `cd` into the main "
+            "checkout' satisfied the prohibition-marker check for the stash item too — a real "
+            "false negative, not a hypothetical one. Checker fixed same-session to also split "
+            "on numbered-list-item boundaries (`_LIST_ITEM_START`). "
+            "POST-FIX, MUTATED: `python3 -m pytest tests/test_repo_level_git_ops_3804.py -q` -> "
+            "'2 failed, 18 passed' (test_live_lane_docs_pass_the_guard, "
+            "test_main_exits_zero_against_real_docs); `python3 scripts/check_repo_level_git_ops.py` "
+            "-> exit 1, 'check_repo_level_git_ops: FAIL - stash: .../worktree-implementer.md "
+            "mentions git stash / stash pop / stash apply but no single paragraph states BOTH "
+            "the prohibition ... AND the reason'. REVERTED (`git checkout -- "
+            ".claude/agents/worktree-implementer.md`, diffed empty against the committed file "
+            "first): `20 passed`; CLI -> exit 0, 'OK — 6 repository-level git operations "
+            "enumerated'. Both watched 2026-09-14."
+        ),
+        "scope": (
+            "Proximity is paragraph/list-item level, not sentence level: two unrelated rules "
+            "sharing one numbered item would still cross-satisfy each other. Only the two lane "
+            "docs named in LANE_DOC_PATHS are read — a THIRD place stating a rule (e.g. "
+            "CLAUDE.md prose) is invisible to this guard by construction. `lane_worktree.py`'s "
+            "creation-time PROHIBITION_BANNER is a separate surface, covered by its own test "
+            "(tests/test_worktree_reaper.py), not by this guard."
+        ),
+        "proved_on": "2026-09-14",
+    },
 }
 
 # ── #3529/#3534: the reset sweep's two declared-exemption registries ──────────────────

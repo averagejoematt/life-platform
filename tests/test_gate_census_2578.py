@@ -611,7 +611,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # — ARMED: exit 1, printing the `source`/`supplements` finding it normally
         # suppresses; RESTORED: exit 0. Not a new unproven entrant (the census's
         # per-entrant test now sees it as proven, not ledgered).
-        <= 96
+        # Upper bound raised 96 -> 97 (2026-09-15, #3804, PR #3811, rebased atop #3809's
+        # 96th): the 97th proof is `guard::scripts/check_repo_level_git_ops.py`. Not a
+        # synthetic plant — the real prohibition sentence in
+        # .claude/agents/worktree-implementer.md's item 3b was softened (the reason
+        # sentence right after it left untouched — the realistic drift mode) and watched
+        # RED (`python3 -m pytest tests/test_repo_level_git_ops_3804.py -q`: 2 failed, 18
+        # passed; CLI exit 1), then reverted and watched GREEN (20 passed; CLI exit 0).
+        # That run FOUND a real bug in the checker's own first cut — a too-coarse
+        # blank-line-only paragraph split let an unrelated bullet's "never" satisfy a
+        # completely different bullet's missing prohibition — fixed in the same PR before
+        # this proof was recorded. Full record in `scripts/gate_census_proofs.py`.
+        <= 97
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
