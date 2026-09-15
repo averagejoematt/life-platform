@@ -228,15 +228,23 @@ def test_header_lookup_is_case_insensitive():
 _ALLOWED = {"client_ip.py"}  # the one helper that is *allowed* to read the raw envelope
 
 
-def _raw_identity_reads() -> list:
+def _raw_identity_reads(tree_root=None) -> list:
     """Every place outside the helper that reads sourceIp or X-Forwarded-For.
 
     Derived by AST over the whole lambdas/ tree, so a newly added handler keying on
     either one fails this test the day it lands — the instance-by-instance version of
     this fix is what let site_api_ai_lambda stay the lone holdout for a month.
+
+    `tree_root` overrides the directory walked. It exists for the must-fail probe
+    below and for nothing else: the probe used to prove itself by planting a file
+    INSIDE `lambdas/`, which is shared mutable state every whole-tree sweep in the
+    suite walks. Under `pytest -n auto` that is a race, and it fired — two unrelated
+    tree scanners died on `FileNotFoundError: lambdas/tmp…/probe_handler.py` while
+    this probe was cleaning up (see tests/test_suite_parallel_safety_3025.py).
     """
+    base = pathlib.Path(tree_root) if tree_root else pathlib.Path(_REPO, "lambdas")
     hits = []
-    for p in pathlib.Path(_REPO, "lambdas").rglob("*.py"):
+    for p in base.rglob("*.py"):
         if p.name in _ALLOWED:
             continue
         try:
@@ -251,7 +259,11 @@ def _raw_identity_reads() -> list:
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in constructed:
                 if node.value in ("sourceIp", "x-forwarded-for", "X-Forwarded-For"):
-                    hits.append(f"{p.relative_to(_REPO)}:{node.lineno} → {node.value!r}")
+                    try:
+                        rel = p.relative_to(_REPO)
+                    except ValueError:  # a probe root outside the checkout
+                        rel = p.relative_to(base)
+                    hits.append(f"{rel}:{node.lineno} → {node.value!r}")
     return sorted(hits)
 
 
@@ -261,10 +273,15 @@ def test_no_handler_derives_its_own_client_identity():
 
 
 def test_the_set_guard_can_actually_fail():
-    """A mutation must actually mutate — proves the AST walk sees these literals."""
+    """A mutation must actually mutate — proves the AST walk sees these literals.
+
+    The probe tree is a private temp directory, NOT a directory under `lambdas/`.
+    Planting it in the real source tree made this test correct and the suite
+    unparallelisable: the same AST walk runs, over a root only this test can see.
+    """
     import tempfile
 
-    with tempfile.TemporaryDirectory(dir=os.path.join(_REPO, "lambdas")) as d:
+    with tempfile.TemporaryDirectory() as d:
         probe = pathlib.Path(d, "probe_handler.py")
         probe.write_text('def h(e):\n    return e["requestContext"]["http"]["sourceIp"]\n')
-        assert any("probe_handler.py" in h for h in _raw_identity_reads()), "the AST walk does not detect a raw sourceIp read"
+        assert any("probe_handler.py" in h for h in _raw_identity_reads(tree_root=d)), "the AST walk does not detect a raw sourceIp read"

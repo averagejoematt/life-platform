@@ -128,6 +128,7 @@ _GATED_TOOLS = (
     "hypothesis",
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "boto3",
     "botocore",
     "pyyaml",

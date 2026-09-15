@@ -219,7 +219,7 @@ jobs:
         # pytest-cov (no coverage here). Versions read from requirements-dev.txt
         # (CQ-01, #2609). tests/test_full_suite_premerge_3025.py asserts parity.
         run: |
-          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow)
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow pytest-xdist)
           pip install $PINS
 
       # The doc-sync literals (test_count et al.) are DRIVER-reconciled on main by
@@ -235,7 +235,7 @@ jobs:
 
       - name: Full unit suite (same selection as the post-merge coverage gate)
         if: always()
-        run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25
+        run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25 -n auto --dist loadfile
 
   # ════════════════════════════════════════════════════════════════
   # #2831 — API-before-frontend sequencing check.
