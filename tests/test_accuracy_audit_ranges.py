@@ -219,3 +219,78 @@ def test_the_two_classified_sets_do_not_overlap():
     silently signed, never achievement. Nothing would say so."""
     overlap = accuracy_audit._SIGNED_PCT_FIELDS & accuracy_audit._ACHIEVEMENT_PCT_FIELDS
     assert not overlap, f"classified in two domains at once: {sorted(overlap)}"
+
+
+# ── #3739 residual: the enumeration acceptance box ────────────────────────────────
+#
+# "Every `*_pct` the API can serve is enumerated and asserted classified, so the
+# fifth domain is caught by a test rather than by a blocked deploy." Four domains so
+# far were each discovered by a real deploy going red. This is the alternative: a
+# static sweep of `lambdas/web/` (the layer that shapes what `/api/*` serves) for
+# every `*_pct` string literal, run in CI on every PR.
+
+
+def test_no_classified_set_overlaps_the_share_default():
+    """A field in `_SHARE_PCT_FIELDS` AND one of the other two sets would be a
+    documentation lie: the comment says 'plain share', the classification says
+    otherwise. Mirrors `test_the_two_classified_sets_do_not_overlap` for the third set."""
+    overlap = accuracy_audit._SHARE_PCT_FIELDS & (accuracy_audit._SIGNED_PCT_FIELDS | accuracy_audit._ACHIEVEMENT_PCT_FIELDS)
+    assert not overlap, f"declared share AND classified elsewhere: {sorted(overlap)}"
+
+
+def test_every_served_pct_field_is_classified():
+    """THE residual acceptance box. `discover_served_pct_field_names` statically sweeps
+    `lambdas/web/*.py` for every `*_pct` string literal — the site-API layer, so a name
+    gated behind a branch a stale captured fixture wouldn't show (delta_pct's own
+    shape) is still found. Every name it finds must be a NAMED decision in one of the
+    three registries, not a fall-through to the silent share default — that
+    fall-through is exactly how `deficit_pct` sat unclassified until this sweep."""
+    discovered = accuracy_audit.discover_served_pct_field_names()
+    assert discovered, "the sweep found nothing — lambdas/web/*.py path is wrong, not a clean bill of health"
+    classified = accuracy_audit._SIGNED_PCT_FIELDS | accuracy_audit._ACHIEVEMENT_PCT_FIELDS | accuracy_audit._SHARE_PCT_FIELDS
+    unclassified = discovered - classified
+    assert not unclassified, (
+        f"{sorted(unclassified)} end in `_pct`, are read/served by lambdas/web/, and are not in ANY of "
+        "_SIGNED_PCT_FIELDS / _ACHIEVEMENT_PCT_FIELDS / _SHARE_PCT_FIELDS — classify each into its real "
+        "domain (checked against its own producer, not assumed) rather than letting it fall through to "
+        "the silent [0,100] default."
+    )
+
+
+def test_discover_finds_a_field_a_stale_schema_snapshot_would_miss():
+    """`delta_pct` is the load-bearing proof for why this sweep reads SOURCE, not the
+    committed `tests/api_schemas/*.json` shape snapshots: that snapshot for
+    `/api/deficit_sustainability` was captured on a day `available` was false, so it
+    has no `channels`/`delta_pct` key at all — a snapshot-only sweep would silently
+    miss the very field #3739 is about."""
+    assert "delta_pct" in accuracy_audit.discover_served_pct_field_names()
+
+
+# ── `deficit_pct`: found by this sweep, not (yet) by a red deploy ────────────────
+#
+# `site_api_nutrition._deficit_label` documents outright that "A NEGATIVE percentage
+# is a SURPLUS — eating above maintenance." deficit_pct = (tdee - intake) / tdee * 100
+# was sitting on the silent [0,100] default before this sweep — the exact shape of
+# the #3725/#3739 class, just caught here instead of by a real surplus day reaching
+# a live deploy.
+
+
+def test_a_surplus_day_is_not_impossible():
+    """A 600 kcal/day surplus (documented in `_deficit_label`'s own docstring) is
+    deficit_pct = -20, honest, not a computation failure."""
+    assert accuracy_audit.scan_impossible_pcts({"deficit": {"deficit_pct": -20.0}}, "live") == []
+
+
+def test_deficit_pct_near_zero_intake_is_not_impossible():
+    """intake -> 0 pushes deficit_pct -> 100 (the whole TDEE is the deficit); still
+    the honest ceiling, not a blowup."""
+    assert accuracy_audit.scan_impossible_pcts({"deficit": {"deficit_pct": 99.9}}, "live") == []
+
+
+@pytest.mark.parametrize("value", [150, -500])
+def test_deficit_pct_bounded_not_exempt(value):
+    """MUST-FAIL CONTROL: deficit_pct is capped at 100 from above (intake can't go
+    negative) and bounded below at a real-binge floor, not left open in either
+    direction."""
+    fields = [f["field"] for f in accuracy_audit.scan_impossible_pcts({"deficit": {"deficit_pct": value}}, "x")]
+    assert "deficit.deficit_pct" in fields
