@@ -1481,3 +1481,55 @@ def test_live_cause_read_still_degrades_honestly_on_an_aws_error(monkeypatch):
     _patch_boto(monkeypatch, _Boom())
     causes, err = cac.fetch_qa_smoke_causes()
     assert causes == {} and "AccessDenied" in err
+
+
+# ── undeclared_causes (#3793) ─────────────────────────────────────────────────
+#
+# The hole #3501 left: `cause` was optional, so the leg that compares a citation
+# against the live channel could be switched off simply by not writing the field.
+# On 2026-09-14 that is exactly what happened — `qa-smoke-failures` re-cited in
+# prose at a real, cured, and WRONG cause while the live channel said
+# `cross_surface:vitals` all day, and this gate printed a clean board.
+
+
+def test_a_live_cause_the_citation_does_not_declare_is_flagged():
+    """The 2026-09-14 specimen: prose citation, no `cause`, a live cause naming itself."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-14T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "the labs frames, verified cured"}}
+    live = {"qa-smoke-failures": ["cross_surface:vitals"]}
+    assert cac.undeclared_causes(alarms, citations, live) == [("qa-smoke-failures", "cross_surface:vitals")]
+
+
+def test_an_entry_that_declares_a_cause_is_left_to_cause_mismatches():
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-14T11:31:55-07:00")]
+    citations = {"qa-smoke-failures": {"citation": "#3793", "cause": "cross_surface:vitals"}}
+    assert cac.undeclared_causes(alarms, citations, {"qa-smoke-failures": ["cross_surface:vitals"]}) == []
+    # ...and a WRONG declaration is still the sibling's red, not a silent pass.
+    assert cac.cause_mismatches(alarms, citations, {"qa-smoke-failures": ["reader_truth:frozen_artifacts"]})
+
+
+def test_an_empty_live_cause_list_has_nothing_to_declare():
+    """The self-clearing case: the aggregate is still lit, nothing is failing now."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-14T11:31:55-07:00")]
+    assert cac.undeclared_causes(alarms, {"qa-smoke-failures": {"citation": "dated"}}, {"qa-smoke-failures": []}) == []
+
+
+def test_an_alarm_with_no_cause_channel_at_all_is_untouched():
+    """The 118 alarms that have no machine-readable cause keep prose citations."""
+    alarms = [_lit_episode("cost-metric-drift-sustained", "2026-09-14T11:31:55-07:00")]
+    assert cac.undeclared_causes(alarms, {"cost-metric-drift-sustained": {"citation": "prose"}}, {}) == []
+
+
+def test_a_missing_entry_entirely_is_flagged_too():
+    """No entry at all declares no cause either — the age bars answer it eventually,
+    this answers it on the first run that has a live cause to compare."""
+    alarms = [_lit_episode("qa-smoke-failures", "2026-09-14T11:31:55-07:00")]
+    assert cac.undeclared_causes(alarms, {}, {"qa-smoke-failures": ["cross_surface:vitals"]}) == [
+        ("qa-smoke-failures", "cross_surface:vitals")
+    ]
+
+
+def test_render_reds_and_names_the_field_to_add():
+    code, msg = cac.render([], None, undeclared=[("qa-smoke-failures", "cross_surface:vitals")])
+    assert code == 1
+    assert "cross_surface:vitals" in msg and '"cause"' in msg
