@@ -2051,7 +2051,7 @@ The operator was the middle-person for technical signals: alerts/QA/CI/DLQ email
 
 ### Decision
 
-A scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`) runs Claude (Sonnet 4.6 on Bedrock) ~07:45 PT on Mon/Wed/Fri (cron `45 14 * * 1,3,5`; urgent alarms still trigger it on-demand via `repository_dispatch`), gathers the last 24h of signals deterministically (boto3 + `gh`, no LLM), and hands them to the agent with `docs/REMEDIATION_TAXONOMY.md` as the classification rubric. The agent buckets each signal into A/B/C/D and acts:
+A scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`) runs Claude (Sonnet 4.6 on Bedrock) ~10:35 PT on Mon/Wed/Fri (cron `35 17 * * 1,3,5` — moved from `45 14` by #3499, which found the sweep running 95 minutes BEFORE the 16:20Z AI quality canary it is one of only two readers of; urgent alarms still trigger it on-demand via `repository_dispatch`), gathers the last 24h of signals deterministically (boto3 + `gh`, no LLM), and hands them to the agent with `docs/REMEDIATION_TAXONOMY.md` as the classification rubric. The agent buckets each signal into A/B/C/D and acts:
 
 - **A — auto-fix-safe:** open a PR labeled `auto-fix-safe` (deterministic gate merges if all guards pass — see ADR-065).
 - **B — fix-via-pr:** open a PR labeled `needs-review` (always human-merged).

@@ -38,6 +38,7 @@ from stacks.ingestion_stack import IngestionStack
 from stacks.mcp_stack import McpStack
 from stacks.monitoring_stack import MonitoringStack
 from stacks.operational_stack import OperationalStack
+from stacks.reader_audience import assert_facet_fully_routed
 from stacks.serve_stack import ServeStack
 from stacks.web_stack import WebStack
 
@@ -142,5 +143,20 @@ monitoring = MonitoringStack(app, "LifePlatformMonitoring", env=env, alerts_topi
 # cannot drift.
 backup = BackupStack(app, "LifePlatformBackup", env=cdk.Environment(account=account, region="us-east-2"))
 # backup stack wired ✅
+
+# ── #3499: the reader-audience routing dead-man ──
+# Every alarm tagged `audience: reader` in scripts/platform_model_alarms.py::
+# READER_AUDIENCE_ALARMS must have gained the urgent SNS action during the synth above.
+# The tag is what lowers an alarm's escalation bar to first-red (#3423) and what gives it
+# the immediate route (#3499); a member that is tagged but unrouted would look escalated
+# and in fact reach a human only at the next 15:00Z digest — the #3499 defect, restored
+# and invisible. This raises HERE, before `app.synth()`, so such a tree cannot deploy
+# (the #2846 "does not synthesize, so it cannot deploy" shape).
+#
+# Skipped under `-c serve_bootstrap=1`, which deliberately synthesizes an EMPTY ServeStack
+# for the `cdk refactor` migration — the site-api members genuinely do not exist in that
+# tree, and failing there would break a documented escape hatch rather than catch a defect.
+if not app.node.try_get_context("serve_bootstrap"):
+    assert_facet_fully_routed()
 
 app.synth()

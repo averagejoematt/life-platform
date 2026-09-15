@@ -88,6 +88,7 @@ from stacks.monitoring_prediction_alarms import (
 )  # #727/#3046/#3553: the science alarms, same seam
 from stacks.monitoring_silence_alarms import add_silence_alarms  # #2977: the fail-soft token alarms, same seam
 from stacks.monitoring_token_alarms import add_token_alarms  # #3505: the AI token/spend family, same seam
+from stacks.reader_audience import route_reader_audience  # #3499: the reader-audience facet decides the urgent route
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
@@ -154,6 +155,16 @@ class MonitoringStack(Stack):
                 treat_missing_data=treat_missing or NB,
             )
             a.add_alarm_action(cw_actions.SnsAction(digest if to_digest else topic))
+            # #3499: a reader-audience alarm (scripts/platform_model_alarms.py::
+            # READER_AUDIENCE_ALARMS) ALSO publishes to the urgent topic, so a broken
+            # reader-facing door reaches a human on the DETECTOR's clock rather than the
+            # next digest or the next session. Additive — the digest line is unchanged —
+            # and derived from the facet, never hand-wired per alarm. A no-op when the
+            # alarm is already urgent-routed is impossible here: the urgent branch above
+            # attached `topic` itself, so the facet call would duplicate the action; hence
+            # the `to_digest` guard.
+            if to_digest:
+                route_reader_audience(a, alarm_name, topic)
             return a
 
         # REL-01 (AUDIT 2026-06-30): a silent-failure DETECTOR that stops being
@@ -184,6 +195,10 @@ class MonitoringStack(Stack):
                 treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
             )
             a.add_alarm_action(cw_actions.SnsAction(digest))
+            # #3499: same facet-derived urgent route. This matters MOST here — a heartbeat
+            # alarm is the dead-man over a detector, so `ai-canary-heartbeat` firing means
+            # the reader-facing AI watch itself has gone dark.
+            route_reader_audience(a, alarm_name, topic)
             return a
 
         # ══════════════════════════════════════════════════════════════
@@ -948,7 +963,7 @@ class MonitoringStack(Stack):
         # the DLQ drainer, and the cost-governor, none of which had any alarm.
         # ══════════════════════════════════════════════════════════════
         # The self-healing remediation agent itself was unwatched — if its daily
-        # run (~07:45 PT) errors, nobody hears. Digest (not page-worthy same-hour).
+        # run (~10:35 PT, #3499) errors, nobody hears. Digest (not page-worthy same-hour).
         _alarm(
             "RemediationDispatcherErrors",
             "life-platform-remediation-dispatcher-errors",

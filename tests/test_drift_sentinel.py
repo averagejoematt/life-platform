@@ -2124,7 +2124,7 @@ def test_sentinel_cadence_paginates_list_objects_v2():
 
 
 # ── #3508: the cadence fact has ONE writer ────────────────────────────────────
-# The old version of this test asserted the literal string `cron: "45 14 * * 1,3,5"` and
+# The old version of this test asserted the literal string `cron: "35 17 * * 1,3,5"` and
 # `EXPECTED_WEEKDAYS == {0, 2, 4}` — and passed for weeks while the workflow's own run
 # guard said `date -u +%u == 1` (Mondays only). It pinned two of the three encodings and
 # was blind to the one that decided behaviour. These tests derive instead of pinning.
@@ -2147,14 +2147,14 @@ def test_changing_the_cron_moves_the_expectation(tmp_path):
     """NEGATIVE CONTROL: mutate the cron and the derived set MUST move. A test that only
     asserted the constant would pass unchanged here — which is how #3508 survived."""
     text = _workflow_text()
-    assert 'cron: "45 14 * * 1,3,5"' in text, "the cron literal moved — re-point this control"
+    assert 'cron: "35 17 * * 1,3,5"' in text, "the cron literal moved — re-point this control"
     mondays_only = tmp_path / "mondays.yml"
-    mondays_only.write_text(text.replace('cron: "45 14 * * 1,3,5"', 'cron: "45 14 * * 1"'), encoding="utf-8")
+    mondays_only.write_text(text.replace('cron: "35 17 * * 1,3,5"', 'cron: "45 14 * * 1"'), encoding="utf-8")
     assert scad.workflow_cron_weekdays(str(mondays_only)) == frozenset({0})
     assert scad.workflow_cron_weekdays(str(mondays_only)) != scad.EXPECTED_WEEKDAYS
 
     weekdays = tmp_path / "weekdays.yml"
-    weekdays.write_text(text.replace('cron: "45 14 * * 1,3,5"', 'cron: "45 14 * * 1-5"'), encoding="utf-8")
+    weekdays.write_text(text.replace('cron: "35 17 * * 1,3,5"', 'cron: "45 14 * * 1-5"'), encoding="utf-8")
     assert scad.workflow_cron_weekdays(str(weekdays)) == frozenset({0, 1, 2, 3, 4})
 
 
@@ -2184,7 +2184,7 @@ def test_the_workflow_guard_asks_the_module_and_carries_no_weekday_literal():
 
 def test_the_workflow_step_gate_does_not_re_state_the_cron():
     """A THIRD copy of the cadence. The step's `if:` used to read
-    `github.event.schedule == '45 14 * * 1,3,5'` — editing the cron would have silently
+    `github.event.schedule == '35 17 * * 1,3,5'` — editing the cron would have silently
     disabled the sentinel step entirely, with no test and no log line to say so."""
     text = _workflow_text()
     step = text[text.index("- name: Infra drift sentinel") :]

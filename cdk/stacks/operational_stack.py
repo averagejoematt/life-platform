@@ -428,7 +428,7 @@ class OperationalStack(Stack):
         cost_drift_alarm.add_ok_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── 3c. Remediation Dispatcher — SNS-subscribed urgent-alarm → GH dispatch
-        # Closes the urgent-alarm latency the daily 07:45 PT sweep can't cover.
+        # Closes the urgent-alarm latency the Mon/Wed/Fri ~10:35 PT sweep can't cover.
         # Subscribes to life-platform-alerts (urgent topic), filters to a narrow
         # urgent-pattern list, dedupes per 30-min window, calls GH repository_dispatch.
         # Operator step: populate life-platform/github-dispatch-token with a

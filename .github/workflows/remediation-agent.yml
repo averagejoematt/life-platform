@@ -9,10 +9,24 @@ name: Remediation Agent
 
 on:
   schedule:
-    # ~07:45 PT, Mon/Wed/Fri (was daily). Cost-OPT 2026-06-03: the routine sweep was
+    # ~10:35 PT, Mon/Wed/Fri (was daily). Cost-OPT 2026-06-03: the routine sweep was
     # an agentic Sonnet run that found nothing most days. Urgent alarms still trigger
     # it on-demand via repository_dispatch below, so responsiveness is preserved.
-    - cron: "45 14 * * 1,3,5"
+    #
+    # #3499 — THE TIME OF DAY IS LOAD-BEARING, not a preference. This was `45 14` (14:45
+    # UTC) from 2026-06-03 until 2026-09-14, which is 95 minutes BEFORE the AI quality
+    # canary it is one of only two readers of (`cron(20 16 ? * MON,WED,FRI *)` — 16:20
+    # UTC, cdk/stacks/operational_stack.py::AiQualityCanary). On the three days the two
+    # share, the responder read the alarm board before the probe that lights it had run,
+    # so a Friday `/api/board_ask` outage was agent-escalated on WEDNESDAY. Any future
+    # edit must keep this strictly AFTER the canary on every shared weekday;
+    # tests/test_reader_audience_urgent_routing_3499.py derives both crons and fails if
+    # the order inverts. 17:35Z also shares its minute with no scheduled producer (the
+    # nearest are strava-data-ingestion 17:20Z and whoop-data-ingestion / partner-weekly-
+    # email at 17:30Z, all now BEFORE it). GitHub's scheduler delay is one-directional
+    # (runs start late,
+    # never early), so "scheduled after" implies "actually after".
+    - cron: "35 17 * * 1,3,5"
   repository_dispatch:
     types: [urgent_alarm]           # from the remediation-dispatcher Lambda (Phase 2)
   workflow_dispatch: {}             # manual test

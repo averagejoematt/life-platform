@@ -266,13 +266,13 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 97 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 — of 129 alarms (4 composite)
+Routing: digest 86 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 — of 129 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
-| `ai-canary-blind` | monitoring_stack | metric | digest | factory:_alarm | reader |
-| `ai-canary-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm | reader |
-| `ai-canary-overall` | monitoring_stack | metric | digest | factory:_alarm | reader |
+| `ai-canary-blind` | monitoring_stack | metric | digest+urgent | factory:_alarm | reader |
+| `ai-canary-heartbeat` | monitoring_stack | metric | digest+urgent | factory:_heartbeat_alarm | reader |
+| `ai-canary-overall` | monitoring_stack | metric | digest+urgent | factory:_alarm | reader |
 | `ai-daily-spend-high` | monitoring_token_alarms | metric | via-composite | declaration |  |
 | `ai-daily-spend-high-genesis-window` | monitoring_token_alarms | composite ← `ai-daily-spend-high`, `token-alarm-genesis-window-active` | digest | declaration |  |
 | `ai-daily-spend-high-urgent` | monitoring_token_alarms | composite ← `ai-daily-spend-high`, `token-alarm-genesis-window-active` | urgent | declaration |  |
@@ -377,14 +377,14 @@ Routing: digest 97 · digest+paging 2 · paging 2 · urgent 25 · via-composite 
 | `recall-index-failed-chronicle-approve` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recall-index-failed-wednesday-chronicle` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recap-card-no-invocations-24h` | operational_stack | metric | digest | declaration |  |
-| `site-api-ai-errors` | serve_stack | metric | digest | declaration | reader |
-| `site-api-ai-throttles` | serve_stack | metric | digest | declaration | reader |
-| `site-api-content-filter-fallback` | serve_stack | metric | digest | declaration | reader |
-| `site-api-errors` | serve_stack | metric | digest | declaration | reader |
-| `site-api-handled-5xx` | serve_stack | metric | digest | declaration | reader |
-| `site-api-invocation-spike` | serve_stack | metric | digest | declaration | reader |
-| `site-api-p95-latency-high` | serve_stack | metric | digest | declaration | reader |
-| `site-api-throttles` | serve_stack | metric | digest | declaration | reader |
+| `site-api-ai-errors` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-ai-throttles` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-content-filter-fallback` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-errors` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-handled-5xx` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-invocation-spike` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-p95-latency-high` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-throttles` | serve_stack | metric | digest+urgent | declaration | reader |
 | `slo-ai-coaching-success` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `slo-daily-brief-delivery` | monitoring_stack | metric | urgent | factory:_alarm |  |
 | `slo-mcp-availability` | mcp_stack | metric | digest | declaration |  |
@@ -493,7 +493,7 @@ Field-level rulings (only non-default fields are declared):
 
 - Edge sites: 1168 total · 841 resolved · 327 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
-- Alarms: 129 literal-named declarations across three idioms, 4 composite; routing digest 97 · digest+paging 2 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 129 literal-named declarations across three idioms, 4 composite; routing digest 86 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 90 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `recap_cards`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
