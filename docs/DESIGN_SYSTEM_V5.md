@@ -601,17 +601,27 @@ HTML-text sibling of the #1210 SVG-text audit.
 
 One shared pattern: `.table-scroll` (tokens.css) — the block-scroll trick (`display:block;
 width:100%; overflow-x:auto`), no wrapper element needed, columns stay aligned. The shared
-`.rd-tbl` readout-table class inherits it at `≤820`. **Rule:** a wide data table must scroll inside
-its own box (`width:100%`, never `width:auto` — `auto` lets a `display:block` table size to content
-and blow out the page under real data, which auto-rolled-back a deploy on 2026-07-11) or reflow to
-cards; it must never squeeze columns until headers truncate. Wide **non-table** content (stat rows,
-strips) relies on the section-level `.rd-sec { overflow-x:auto }` scroll — keep it.
+`.rd-tbl` readout-table class inherits it **at every width** (#3733 — it was `≤820` only until a
+1216px `.rd-tbl` inside an `overflow-x: visible` `.rd-sec` blew `/method/` and `/method/cycles/` out
+sideways by 248px at a full 1440px desktop viewport: unbreakable cell content can outgrow a table's
+container at ANY width, not only a squeezed mobile one, so the primitive is no longer gated to one
+breakpoint). **Rule:** a wide data table must scroll inside its own box (`width:100%`, never
+`width:auto` — `auto` lets a `display:block` table size to content and blow out the page under real
+data, which auto-rolled-back a deploy on 2026-07-11) or reflow to cards; it must never squeeze
+columns until headers truncate, and it must never push the page body itself past the viewport at any
+width — `tests/visual_qa.py` now measures horizontal page overflow once at the desktop context's own
+viewport in addition to the pre-existing 390px check (#1013), so a table widened past its container
+reds the sweep by name instead of shipping silently. Wide **non-table** content (stat rows, strips)
+relies on the section-level `.rd-sec { overflow-x:auto }` scroll (still `≤820` — that catch-all is
+unchanged by #3733) — keep it.
 
 **Keyboard reach (#3277).** A box that scrolls horizontally must be focusable or a keyboard user
 can neither reach nor scroll it (axe `scrollable-region-focusable`, serious — 15 reader pages, 33
 nodes, measured live at 390px on 2026-08-31 while every gate audited desktop only). Scrollability is
-a layout fact, not a markup one (the same `.rd-tbl` scrolls at 390 and not at 1440, and most tables
-are rendered client-side), so it is decided at runtime: `motion.js`'s scroll-region primitive (the
+a layout fact, not a markup one (the same `.rd-tbl` overflow-x rule now applies at every width
+(#3733), but it only visibly *scrolls* — draws a scrollbar, becomes keyboard-reachable — on the
+subset of pages/widths where the table actually outgrows its box, and most tables are rendered
+client-side), so it is decided at runtime: `motion.js`'s scroll-region primitive (the
 fenced `SCROLL_REGION_START/END` block, run in Node by `tests/test_scroll_region_focus_3277.py`)
 gives any element whose computed `overflow-x` allows scrolling *and* whose content is wider than its
 box `tabindex="0"` plus an accessible name where its role permits one — `role="group"` on generic

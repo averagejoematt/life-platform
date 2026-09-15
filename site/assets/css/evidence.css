@@ -597,15 +597,25 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .scn-base { stroke: var(--ink-faint); stroke-width: 1.5; }
 .scn-meta { margin-top: var(--sp-1); color: var(--ink-faint); }
 
-/* #1008: the readout tables (.rd-tbl) + cross-device table (readout-tbl) inherit the
-   shared .table-scroll primitive (tokens.css) at ≤ tablet-wide — natural column widths
-   that scroll inside the box instead of squeezing headers to "FL". Replaces the three
-   ad-hoc per-class overflow patches (was .readout .rd-tbl @600, .rd-sec @820). */
-@media (max-width: 820px) {
-  .rd-tbl, table.readout-tbl {
-    display: block; max-width: 100%; width: 100%;
-    overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
-  }
+/* #1008/#3733: the readout tables (.rd-tbl) + cross-device table (readout-tbl) inherit
+   the shared .table-scroll primitive (tokens.css) at EVERY width, not only ≤ tablet.
+   This used to be gated to `@media (max-width: 820px)` on the premise that a table
+   only outgrows its container on a squeezed mobile viewport — false: unbreakable cell
+   content (long monospace values, a dense column set) can push a .rd-tbl past its
+   .rd-sec at ANY width, including a full 1440px desktop one. #3733 found a 1216px
+   .rd-tbl inside a .rd-sec sized for the page's own container blowing the whole page
+   out sideways by 248px on /method/ and /method/cycles/ — both use the exact same
+   .rd-tbl/.rd-sec markup every other readout page does, so the bug was a property of
+   this rule's breakpoint, not of those two pages. CLAUDE.md's responsive contract
+   (tables/diagrams/code may exceed the viewport only inside their OWN overflow-x:auto
+   container, never the page body) applies at every width — so this rule must too. Any
+   page whose table already fits its container is byte-for-byte unaffected: overflow-x
+   only draws a scrollbar when content actually overflows. Replaces the three ad-hoc
+   per-class overflow patches (was .readout .rd-tbl @600, .rd-sec @820, and the @820-only
+   form of this rule). */
+.rd-tbl, table.readout-tbl {
+  display: block; max-width: 100%; width: 100%;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
 }
 
 /* ── First-run orientation card — mirrors the Cockpit's .cockpit-intro (PG-02).

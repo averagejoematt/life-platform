@@ -1551,8 +1551,12 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
    Two ways to use it:
      • add class="table-scroll" to any <table> (or a wrapping <div>), OR
      • use the shared .rd-tbl readout-table class — it inherits this behaviour at
-       ≤ --bp-tw (820) automatically (see the readout-table rule in evidence.css).
-   Desktop is untouched: full column layout, no scrollbar, until the tablet width.
+       EVERY width (see the readout-table rule in evidence.css).
+   A table whose columns already fit its container draws no scrollbar at any width —
+   this is not visually distinguishable from the pre-#3733 "desktop untouched" behavior
+   until a table actually outgrows its box, which #3733 found happens on a full desktop
+   viewport too (a 1216px .rd-tbl inside a narrower .rd-sec on /method/, /method/cycles/),
+   so the primitive is no longer gated to ≤ --bp-tw (820).
    Documented in the mobile section of docs/DESIGN_SYSTEM_V5.md (#1011). */
 .table-scroll {
   display: block; max-width: 100%; width: 100%;
