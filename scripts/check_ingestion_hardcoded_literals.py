@@ -56,24 +56,41 @@ _STRUCTURAL_KEY_FIELDS = frozenset({"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "g
 # blanket/wildcard exemption.
 EXEMPTIONS: dict[str, dict[str, str]] = {
     "habitify_lambda.py": {
-        # The read (`existing.get("supplements", [])`'s entries `.get("source")`) is
-        # filtering PREVIOUSLY-STORED rows to find manual (non-bridge) entries; the
-        # hardcoded write is this Lambda stamping its own provenance tag on a NEW row.
-        # Same field name, disjoint payloads — not the #3662 shape (a same-ROW column
-        # thrown away).
-        "source": "provenance tag on a freshly-written row; the read is filtering OLD stored rows by their own tag, not a same-row CSV/API column (verified 2026-09-14, #3662)",
+        # VERIFIED DIFFERENT CLASS FROM #3662's `measured_by` (not the same defect
+        # under a different name): "supplements" here is the partition-type/table
+        # identity this Lambda writes to (`pk`-adjacent metadata, the same KIND of
+        # constant as `pk`/`sk` themselves — Habitify's API has no field that could
+        # ever report "which DDB partition this belongs to"). The read this collides
+        # with — `existing.get("supplements", [])`'s entries' `.get("source")` — is
+        # filtering PREVIOUSLY-STORED rows by a DIFFERENT semantic use of the string
+        # "source" (a per-ENTRY `"habitify_bridge"` provenance marker), read from the
+        # prior DDB item, not from the live Habitify API response this write is built
+        # from. Same field name, two disjoint meanings, two disjoint payloads.
+        "source": "partition-identity constant (same kind as pk/sk); the coincidentally-named read filters OLD stored rows by an unrelated per-entry marker, not this row's own API payload (verified 2026-09-14, #3662)",
     },
     "macrofactor_lambda.py": {
-        # `item.get("source", csv_type)` reads the value THIS SAME hardcode just wrote
-        # a few lines earlier (a self-referential default-label lookup), not an
-        # external column with a competing value.
-        "source": "self-referential — reads the value this Lambda's own hardcode just wrote onto the same item dict, not an external CSV/API column (verified 2026-09-14, #3662)",
+        # VERIFIED DIFFERENT CLASS: "macrofactor"/"macrofactor_workouts" are this
+        # Lambda's own Lambda-identity constant — checked against the real MacroFactor
+        # CSV headers (NUTRITION_HEADERS/WORKOUT_HEADERS/SUMMARY_HEADERS in
+        # tests/test_macrofactor_ingestion_behavior.py): there is no "source" column in
+        # any MacroFactor export, so the CSV could never supply a competing value in
+        # the first place. `item.get("source", csv_type)` reads the value THIS SAME
+        # hardcode just wrote onto the SAME item a few lines earlier (a get-with-
+        # fallback-default idiom for a log/validation label), not an external column.
+        "source": "Lambda-identity constant; MacroFactor's CSV export has no `source` column at all, and the read is self-referential (reads back this item's own just-written value) (verified 2026-09-14, #3662)",
     },
     "whoop_lambda.py": {
-        # `m["kind"]` / `missing.append({"kind": "daily", ...})` — a type discriminator
-        # this Lambda invents for its OWN internal "what's missing" bookkeeping list;
-        # there is no external "kind" column, Whoop's API never sends one.
-        "kind": "internal discriminator tag for a self-built bookkeeping list, not a field read from the Whoop API (verified 2026-09-14, #3662)",
+        # VERIFIED DIFFERENT CLASS, and weaker than a near-miss: the flagged dict
+        # (`missing.append({"kind": "daily"/"workout", ..., "sk": f"DATE#{d}"})`) is
+        # NEVER passed to put_item/update_item anywhere in this file — `missing` is a
+        # purely in-memory reconciliation report, only logged and counted as a metric
+        # (`_emit_reconciliation_metric`). It is not a database write at all. The
+        # `"sk"` key that made this guard's `_looks_like_ddb_item` heuristic treat it as
+        # one is a DISPLAY-ONLY string built to LOOK like a real DDB sort key in a log
+        # line — this is a false positive of the heuristic, not a near-miss of the
+        # #3662 shape. There is no "kind" field in Whoop's API; the tag is invented
+        # whole by this Lambda to label two shapes of missing-record report row.
+        "kind": "the flagged dict is never written to DynamoDB (a log-only reconciliation report); its `sk`-shaped key is a display mimic that fooled this guard's DDB-item heuristic, not a genuine item (verified 2026-09-14, #3662)",
     },
 }
 
