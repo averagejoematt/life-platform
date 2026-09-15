@@ -170,6 +170,23 @@ NOT git-tracked and is a separate step from the commit in (f).
   Code names it). Any `UNLEDGERED:` line means a rule was written
   to memory and not homed — add the row (and the rule, in its home) in the same wrap, or
   record the row's reason as `narrative`. Exit 2 means it could not look; that is not a pass.
+  **`--live` passing is NOT the same as the ledger being correct, and this step used to
+  imply it was (2026-09-14, Session AE).** They are two checks over two different sources:
+  `--live` compares ROWS against the live memory dir, while CI — which cannot see that dir —
+  compares the ledger against its own **committed snapshot**, the fenced filename block plus
+  the three coverage tallies near the top of the file. Adding a row satisfies the first and
+  leaves the second stale, so `--live` reported `0 unledgered` and the wrap commit **red-ed
+  main** on `tests/test_operating_knowledge_ledger_2848.py`. After adding any row, regenerate
+  the snapshot in the SAME commit and confirm with the test, which is the thing CI runs:
+  ```bash
+  python3 -m pytest tests/test_operating_knowledge_ledger_2848.py -q   # 18 tests; THIS is the CI check
+  ```
+  It names every drift precisely — missing filenames, and each tally that disagrees. Two
+  traps it catches that the prose above does not: a `homed-here` row whose home cell cites
+  `path.py::test_name` fails, because the `::` suffix does not parse as a repo path (cite the
+  path, name the test in parentheses); and the only valid statuses are `homed-here` /
+  `already-homed` / `superseded` (which must cite a path) and `narrative` / `off-repo` (which
+  must state a reason) — an invented status like `filed-#1234` is rejected.
 - **Rule of placement:** session-specific narrative → `HANDOVER_LATEST.md` → the
   `session-archive` branch at the next wrap (step a). Durable
   lessons/reflexes → memory topic files (this step) or `docs/CONVENTIONS.md` if it's a
