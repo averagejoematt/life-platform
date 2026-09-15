@@ -280,16 +280,21 @@ def physical_overview(*, _g) -> dict:
         except Exception:
             pass
 
-    # ── 2. Tape measurements (latest session) ──
+    # ── 2. Tape measurements (latest session, + the previous one for #3662's
+    #    measurer-change disclosure) ──
     meas_pk = f"{USER_PREFIX}measurements"
     # ADR-058: tape measurements are progress-tracking — hide pilot records
-    # (page shows an honest empty state until post-restart measurements exist)
+    # (page shows an honest empty state until post-restart measurements exist).
+    # No `Limit` here on purpose: DynamoDB applies Limit BEFORE a FilterExpression,
+    # so `Limit: 2` could silently return fewer than 2 phase-filtered sessions even
+    # when a second one exists further back. The partition is small (one session
+    # every 4-8 weeks, #3662) — reading it in full and slicing in Python is cheap
+    # and correct, where a Limit is cheap and occasionally wrong.
     meas_resp = table.query(
         **with_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(meas_pk),
                 "ScanIndexForward": False,
-                "Limit": 1,
             }
         )
     )
@@ -298,16 +303,8 @@ def physical_overview(*, _g) -> dict:
     tape_session_count = 0
     if meas_items:
         m = meas_items[0]
-        # Count total sessions
-        count_resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot measurements
-                    "KeyConditionExpression": Key("pk").eq(meas_pk),
-                    "Select": "COUNT",
-                }
-            )
-        )
-        tape_session_count = count_resp.get("Count", 1)
+        previous = meas_items[1] if len(meas_items) > 1 else None
+        tape_session_count = len(meas_items)
 
         # Build tape data from raw measurement fields
         raw = {}
@@ -320,15 +317,36 @@ def physical_overview(*, _g) -> dict:
             elif k.endswith("_in"):
                 raw[k] = v
 
+        # #3662: `measured_by` is served (it used to be silently dropped) and, when a
+        # prior session exists, a measurer change is surfaced explicitly rather than
+        # left for a consumer to infer from a raw delta — a narrowest-waist that
+        # SHRINKS while weight rises 20lb is a measurer artifact, not anatomy, and a
+        # surface differencing the two sessions must say so (ADR-104/ADR-105: a
+        # comparison whose stated method can't support it is the failure this closes).
+        measured_by = m.get("measured_by") or "unrecorded"
         tape = {
             "session_date": m.get("date", m.get("sk", "").replace("DATE#", "")),
             "session_number": m.get("session_number", 1),
+            "measured_by": measured_by,
             **raw,
             "derived": {
                 **derived,
                 "waist_height_ratio_target": 0.5,
             },
         }
+        if previous is not None:
+            previous_measured_by = previous.get("measured_by") or "unrecorded"
+            measurer_changed = previous_measured_by != measured_by
+            tape["previous_session"] = {
+                "session_date": previous.get("date", previous.get("sk", "").replace("DATE#", "")),
+                "measured_by": previous_measured_by,
+            }
+            tape["measurer_changed"] = measurer_changed
+            if measurer_changed:
+                tape["measurer_change_note"] = (
+                    f"Measured by {measured_by} this session vs {previous_measured_by} the prior session — "
+                    "treat the deltas below as two people's judgment calls, not one instrument's reading."
+                )
 
     # ── 3. Blood pressure (from apple_health) ──
     bp_data = None

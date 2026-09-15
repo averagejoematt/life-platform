@@ -491,8 +491,13 @@ export function physicalCaptureBacklog(d, pa) {
   const cards = [];
   // P2.1 — DEXA cadence / scan-two scheduling (drives the countdown; unlocks velocity).
   cards.push(`<div class="cap-card"><h3 class="cap-h">Scan two — scheduling <span class="cap-tag">unlocks velocity</span></h3><p class="rd-meta label">A second DEXA ~10 weeks into the cut turns every composition figure above from a dated snapshot into a real fat-vs-lean <em>trajectory</em>. Booking it is the single highest-value capture step — it's what the countdown at the top of the arc is waiting on. Not yet scheduled.</p></div>`);
-  // P2.2 — tape measurements (between-DEXA proxy).
-  cards.push(`<div class="cap-card"><h3 class="cap-h">Tape measurements <span class="cap-tag">${haveTape ? "flowing" : "needs capture"}</span></h3><p class="rd-meta label">${haveTape ? "Tape sessions are logging — a cheap, frequent proxy for the silhouette and segmental change between scans." : "Zero sessions yet. A monthly tape (waist, hips, limbs) is the cheap, frequent proxy that keeps the silhouette honest between the expensive scans. Awaiting the first measurement."}</p></div>`);
+  // P2.2 — tape measurements (between-DEXA proxy). #3662: when the API flags a
+  // measurer change between the latest and prior session, that note renders here —
+  // never left implicit in the raw deltas below.
+  const measurerNote = haveTape && d.tape_measurements.measurer_changed && d.tape_measurements.measurer_change_note
+    ? `<p class="rd-flag-note label">⚑ ${esc(d.tape_measurements.measurer_change_note)}</p>`
+    : "";
+  cards.push(`<div class="cap-card"><h3 class="cap-h">Tape measurements <span class="cap-tag">${haveTape ? "flowing" : "needs capture"}</span></h3><p class="rd-meta label">${haveTape ? "Tape sessions are logging — a cheap, frequent proxy for the silhouette and segmental change between scans." : "Zero sessions yet. A monthly tape (waist, hips, limbs) is the cheap, frequent proxy that keeps the silhouette honest between the expensive scans. Awaiting the first measurement."}</p>${measurerNote}</div>`);
   // P2.3 — progress photos (PRIVATE by default; explicit opt-in before any public render).
   cards.push(`<div class="cap-card"><h3 class="cap-h">Progress photos <span class="cap-tag cap-private">private by default</span></h3><p class="rd-meta label">The most powerful change signal and the most sensitive — so they're private by default, never rendered here without an explicit opt-in. The faceless silhouette above is the public-safe stand-in. No photo is shown.</p></div>`);
   // P2.4 — composition velocity (GATED on scan two + LSC).
