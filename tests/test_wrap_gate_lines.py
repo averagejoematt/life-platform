@@ -162,10 +162,19 @@ def test_verify_battery_asserts_the_handover_lines():
         assert any(script in c for c in cmds), f"#3006/#3007: the verify battery must run {script}"
 
 
-def test_no_gate_appears_in_both_phases():
+def test_only_the_derived_doc_leg_is_intentionally_re_run_in_both_phases():
+    """#3682: Phase 1 runs the derived doc leg BEFORE Phase 2 writes the docs it derives
+    from; Phase 3 now re-runs the SAME leg AFTER Phase 2 writes, so a block Phase 2 stales
+    reds the wrap instead of the next push. That is the ONE intentional overlap between the
+    phases — anything else shared between GATHER and VERIFY is accidental double-running,
+    the exact waste #3007 batched the gates to remove."""
     gather = {" ".join(g.cmd) for g in wg.GATHER}
     verify = {" ".join(g.cmd) for g in wg.VERIFY}
-    assert not gather & verify
+    overlap = gather & verify
+    rvg = wg.restart_verify_gates
+    derived = {" ".join(c) for c in rvg.docs_ci_gate_commands() if " ".join(c[1:]) not in rvg.MUTATING_GATES}
+    assert overlap == derived, f"unexpected gather/verify overlap: {sorted(overlap - derived)}"
+    assert overlap, "the derived doc leg must actually be non-empty in both phases"
 
 
 def test_draft_block_covers_every_derived_marker():

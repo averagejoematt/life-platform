@@ -138,12 +138,38 @@ GATHER = [
 ]
 
 # ── the verify battery: gates that read the finished handover (run after writing it) ──
+#
+# #3682: Phase 1's derived doc leg (`derived_doc_gates()`, above) runs BEFORE Phase 2
+# writes docs/INCIDENT_LOG.md (e3), docs/alarm_citations.json (e10), docs/PROPORTIONALITY.md
+# (e12), docs/** pages (e), and CLAUDE.md/handovers/HANDOVER_LATEST.md (a). A wrap that
+# only gathers can therefore pass its own battery over a derived block Phase 2 is about to
+# stale, and the very next push to main pays for it (PR #3680: the Incident-log Patterns
+# section said 204/169 while the rows it was written against said 205/170). So the SAME
+# derived leg — the one `docs_ci_gate_commands()` list, minus the declared
+# `MUTATING_GATES` — runs again here, generically: a thirteenth Docs CI gate joins this
+# re-run with no edit to this file, exactly as it already does for Phase 1. Never
+# special-case `incident_log_patterns.py`; the fix is re-running the whole leg.
+#
+# `tests/test_wrap_verify_doc_leg_3682.py` enumerates the Phase-2 writers named in
+# `.claude/skills/wrap/SKILL.md` against this leg and asserts every one is covered.
 VERIFY = [
     Gate("handover-lines", "f", ["python3", "scripts/check_handover_lines.py"]),
     Gate("residual-queue", "e4", ["python3", "scripts/check_residual_queue.py"]),
     Gate("proportionality-ledger", "e12", ["python3", "scripts/check_proportionality_ledger.py"]),
     Gate("content-policy", "d", ["python3", "scripts/content_policy_scan.py"]),
     Gate("beats-schema", "d", ["python3", "scripts/validate_beats.py"]),
+    # #2848/#3682's sixth Set member: step (c) regenerates docs/OPERATING_KNOWLEDGE_LEDGER.md's
+    # committed snapshot, but the ledger check is a pytest test, not a docs-ci.yml step, so
+    # it is not reachable through `derived_doc_gates()`. Same time-axis defect as the other
+    # five (Session AE, 2026-09-14: `--live` passing over a stale committed snapshot read as
+    # complete and red-ed main on `tests/test_operating_knowledge_ledger_2848.py`) — hand
+    # listed here for that reason, not derived, because its source is pytest, not the workflow.
+    Gate(
+        "operating-knowledge-ledger",
+        "c",
+        [sys.executable, "-m", "pytest", "tests/test_operating_knowledge_ledger_2848.py", "-q"],
+    ),
+    *derived_doc_gates(),  # #3682: the same Phase-1 derivation, re-run AFTER Phase 2 writes
 ]
 
 
