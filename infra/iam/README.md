@@ -178,7 +178,11 @@ the deploy-role steps of `site-deploy.yml`):
 
 **Kept (still consumed by a deploy-role job)** — `LambdaDeploy`/`LambdaListAccountLevel`
 (deploy + I1/I2), `S3DeployArtifacts` (deploy + I8), `DynamoDB` (plan assert + I4), `SNS`
-(notify/rollback), `SQS` (I9), `KMS DescribeKey` (plan assert), `EventBridge` (I6),
+(notify/rollback), `SQS` (I9), `KMS DescribeKey` (plan assert), `KMSDecryptViaDynamoDB`
+(#3681 — the health-data CMK encrypts the `life-platform` table, so the theme-river
+build's `dynamodb:Query` needs `kms:Decrypt`; conditioned on `kms:ViaService =
+dynamodb.us-west-2.amazonaws.com` so CI can decrypt only through a DynamoDB read it is
+already granted, never the key directly), `EventBridge` (I6),
 `CloudWatch DescribeAlarms` (I7), `SecretsManager` (I5), `CloudFormationDiff` (plan `cdk
 diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 
