@@ -361,6 +361,16 @@ _SCAN_FILES = ("tests/visual_ai_qa.py", "tests/visual_qa.py", "tests/visual_qa_v
 # folded onto BY NAME. A residual may not be silent — that is the #3652 box-1
 # failure mode this file exists to close.
 _RESIDUAL = {
+    "lambdas/training/training_notes_llm.py": (
+        "#3828",
+        "the training-notes Haiku extractor — #3699 made it RAISE `TruncatedResponse` with a cause "
+        "where it used to `return []`, so a broken extraction is no longer indistinguishable from a "
+        "quiet note. It does not retry, and retrying is the WRONG remedy here: `MAX_TOKENS` is a fixed "
+        "cap and the note text is fixed, so the truncation is DETERMINISTIC and N retries bill N times "
+        "for N identical failures. The module's own registry facet already says the right response — "
+        "`re_derive_when: '... or TruncatedResponse is ever observed live'` — i.e. re-derive the cap, "
+        "not re-invoke. Never observed live as of 2026-09-15. Folded onto #3828.",
+    ),
     "lambdas/ai/bedrock_client.py": (
         "#2893",
         "the fleet-wide truncation METER (_meter_truncation) — it WARNs and returns the response "

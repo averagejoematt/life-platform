@@ -116,6 +116,11 @@ def _haiku_call(note_text: str, taxonomy) -> list:
     # #3699: truncation is read from Bedrock's own stop_reason BEFORE the parse. A response
     # cut off at the cap is billed in full and yields a partial array; parsing it (or failing
     # to) and calling the result "no signals" is the silent undercount this issue is about.
+    # #3828: this is the 4th member of #3688's judge Set and it deliberately does NOT retry.
+    # The cap and the note text are both fixed, so a truncation here is DETERMINISTIC — a retry
+    # loop would bill N times for N identical failures. The right response is the `re_derive_when`
+    # facet above: re-derive MAX_TOKENS against observed note lengths. Registered as a residual in
+    # tests/test_judge_verdict_retry_3688.py::_RESIDUAL so the Set guard stays honest.
     if (resp.get("stop_reason") or "") == "max_tokens":
         out_tok = (resp.get("usage") or {}).get("output_tokens")
         raise TruncatedResponse(f"stop_reason=max_tokens at max_tokens={MAX_TOKENS} (output_tokens={out_tok}, {len(text)} chars of text)")
