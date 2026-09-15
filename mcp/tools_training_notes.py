@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training.training_notes import DEGRADE_UNRECORDED
 
 from mcp.config import table
 from mcp.core import LAYER_DARK, decimal_to_float, derived_layer_status
@@ -91,6 +92,14 @@ def tool_get_exercise_notes(args):
             "pain_flag": pain,
             "sentiment": (ov or {}).get("sentiment", r.get("sentiment")),
             "degraded": r.get("degraded", False),
+            # #3699: a degraded row says WHY on the row itself. A row with no reason field
+            # is not "unknown" — it is a record written before the extractor could say, and
+            # it is reported as such rather than re-extracted (a re-derived signal in a
+            # measured partition is indistinguishable from an original one, forever).
+            "degraded_reason": (
+                r.get("degraded_reason")
+                or (f"{DEGRADE_UNRECORDED}: written before #3699 added the reason field; not re-derived" if r.get("degraded") else None)
+            ),
             "corrected": bool(ov),
         }
         timeline.append(entry)

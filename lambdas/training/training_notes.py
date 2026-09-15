@@ -134,6 +134,62 @@ from common.numeric import floats_to_decimal
 
 logger = logging.getLogger(__name__)
 
+# ── Degrade vocabulary (#3699) ────────────────────────────────────────────────
+# A degraded record used to say THAT the semantic pass failed and never WHY, so three
+# months of impoverished records were indistinguishable from each other and from a note
+# with nothing semantic in it. Every degrade now carries one of these codes as the first
+# token of `degraded_reason`, which is PERSISTED on the record — a log line dies with the
+# retention window, and the record outlives it.
+DEGRADE_CODES = (
+    "truncated",  # Bedrock stop_reason == max_tokens; the array was cut off
+    "unparseable",  # no readable in-taxonomy JSON array came back
+    "cap_exceeded",  # the monthly Haiku call cap; no spend, no attempt
+    "llm_error",  # anything else that raised (AccessDenied, throttle, timeout, budget tier 3)
+)
+# Records written before #3699 carry `degraded: true` with NO reason field at all. That
+# absence is itself provenance — it is not "unknown for an unknown reason", it is "written
+# by an extractor that could not say". Consumers report it under this token and never
+# re-derive it (attest, never backfill).
+DEGRADE_UNRECORDED = "unrecorded"
+_REASON_MAX_CHARS = 300
+
+
+def degrade_reason(exc: BaseException) -> str:
+    """`<code>: <ExceptionClass>: <message>` — the persisted cause of one degrade.
+
+    The code is duck-typed off the exception (`degrade_code`), so this core module keeps
+    ZERO import dependency on the Bedrock tail; anything without one is `llm_error`.
+    """
+    code = getattr(exc, "degrade_code", "") or "llm_error"
+    msg = str(exc).strip() or type(exc).__name__
+    return f"{code}: {type(exc).__name__}: {msg}"[:_REASON_MAX_CHARS]
+
+
+def _redact_note(reason: str, raw: str) -> str:
+    """Never let the note text ride out on the reason (it rides a WARNING log line).
+
+    The reason is built from an exception message, which today can't contain the note —
+    this is the standing guarantee, not a known leak: a future caller that wraps the note
+    into an error string would otherwise publish an owner-private note to CloudWatch.
+    """
+    out = reason
+    probes = [p for p in ((raw or "").strip(), (raw or "").strip()[:24]) if len(p) >= 8]
+    for probe in probes:
+        if probe in out:
+            out = out.replace(probe, "<note redacted>")
+    return out
+
+
+def describe_degrade_reasons(reasons: dict) -> str:
+    """One human sentence from a {code: count} tally — the string every consumer prints."""
+    if not reasons:
+        return "no degraded records"
+    parts = [f"{code} x{n}" for code, n in sorted(reasons.items(), key=lambda kv: (-kv[1], kv[0]))]
+    sentence = ", ".join(parts)
+    if DEGRADE_UNRECORDED in reasons:
+        sentence += f" ({DEGRADE_UNRECORDED} = written before #3699, when no extractor recorded a cause; not re-derived)"
+    return sentence
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Pure helpers
@@ -272,18 +328,23 @@ def extract_signals(note_text: str, llm_fn=None) -> dict:
     pain_det = pain_lexicon_hit(raw)
     llm: list[dict[str, Any]] = []
     degraded, used_llm = False, False
+    degraded_reason = None
     if llm_fn is not None:
         try:
             llm = llm_fn(raw, TAXONOMY) or []
             used_llm = True
         except Exception as e:  # noqa: BLE001
             degraded = True  # keep deterministic, never drop (Invariant 4)
+            # #3699: the cause is PERSISTED, not only logged. `truncated` / `unparseable`
+            # now arrive here as exceptions too — they used to return [] and be recorded as
+            # a healthy extraction that found nothing.
+            degraded_reason = _redact_note(degrade_reason(e), raw)
             # #3768: degrading silently is how this layer stayed dark for months. An
             # AccessDenied from a missing bedrock grant looked exactly like a cap breach
             # looked exactly like a healthy note with nothing semantic in it — and 14 days
             # of Lambda logs carried no Bedrock line at all. Log the CLASS and message,
             # never the note text (raw notes are owner-private, ADR-104/Tier-2 discipline).
-            logger.warning("training_notes llm degraded: %s: %s", type(e).__name__, e)
+            logger.warning("training_notes llm degraded: %s", degraded_reason)
     signals, pain_flag = merge_signals(det, llm, pain_det)
     extracted_by = "hybrid" if (used_llm and det) else ("haiku" if used_llm else "deterministic")
     return {
@@ -293,6 +354,7 @@ def extract_signals(note_text: str, llm_fn=None) -> dict:
         "pain_flag": pain_flag,
         "sentiment": _sentiment_label(signals),
         "degraded": degraded,
+        "degraded_reason": degraded_reason,  # None when healthy; ABSENT on pre-#3699 records
         "extracted_by": extracted_by,
         "algo_version": ALGO_VERSION,
     }
@@ -356,6 +418,7 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
     have_record = 0
     degraded = 0
     missing = 0
+    reasons: dict[str, int] = {}  # #3699: WHY the degraded ones degraded, tallied by code
     try:
         wresp = table.query(
             KeyConditionExpression=_K("pk").eq(f"USER#{user}#SOURCE#{RAW_SOURCE}") & _K("sk").between(f"DATE#{start}", f"DATE#{today}~"),
@@ -375,7 +438,7 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
             try:
                 r = table.query(
                     KeyConditionExpression=_K("pk").eq(notes_pk(tid, user)) & _K("sk").begins_with(f"DATE#{wdate}#WORKOUT#"),
-                    ProjectionExpression="degraded",
+                    ProjectionExpression="degraded, degraded_reason",
                     Limit=1,
                 )
                 items = r.get("Items", [])
@@ -385,6 +448,8 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
                     have_record += 1
                     if items[0].get("degraded"):
                         degraded += 1
+                        code = str(items[0].get("degraded_reason") or "").split(":")[0].strip() or DEGRADE_UNRECORDED
+                        reasons[code] = reasons.get(code, 0) + 1
             except Exception:  # noqa: BLE001
                 missing += 1
 
@@ -395,10 +460,13 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
         "noted_exercise_sessions": noted,
         "records_found": have_record,
         "degraded": degraded,
+        "degraded_reasons": reasons,  # #3699: {code: count}; `unrecorded` = written before the reason field existed
+        "degraded_reasons_note": describe_degrade_reasons(reasons),
         "missing_records": missing,
         "extractor_dark": bool(dark),
         "note": (
-            "Notes present but the derived layer is dark (no records or all degraded) — check the on-ingest extractor / Haiku cap."
+            "Notes present but the derived layer is dark (no records or all degraded) — "
+            f"degrade reasons: {describe_degrade_reasons(reasons)}."
             if dark
             else "Training-note extractor healthy."
         ),
