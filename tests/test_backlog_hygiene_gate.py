@@ -68,6 +68,10 @@ def _issue(
     milestone="Now",
     body=None,
     updated="2026-07-27T00:00:00Z",
+    # After SET_SECTION_EFFECTIVE_FROM (2026-09-07) by default, so every existing
+    # fixture in this file exercises `rule_set_section` at full strength unless a
+    # test deliberately backdates it to prove the grandfather clause (#3594).
+    created="2026-09-08T00:00:00Z",
 ):
     return {
         "number": number,
@@ -76,6 +80,7 @@ def _issue(
         "milestone": {"title": milestone} if milestone else None,
         "body": _body() if body is None else body,
         "updatedAt": updated,
+        "createdAt": created,
     }
 
 
@@ -466,6 +471,48 @@ def test_set_section_does_not_apply_to_epics_or_chores():
         body=_body(set_section=None),
     )
     assert hy.rule_set_section(chore) == []
+
+
+def test_set_section_grandfathers_issues_filed_before_the_rule_existed():
+    """`rule_set_section` shipped 2026-09-06 (#3658) straight to PER_ISSUE_RULES with
+    no backfill pass — unlike every other rule in this linter (advisory -> backfilled
+    to zero -> blocking, #1867/#1868/#1872). Measured 2026-09-14: 51 open
+    review/incident-labelled issues violated it, every one filed before the rule
+    existed. An issue created before `SET_SECTION_EFFECTIVE_FROM` must not be asked
+    for a fact (the `## Set` heading) that was not yet a requirement when it was
+    filed — this is the must-fail case a corpus-wide regression would trip."""
+    ctx = _ctx(
+        labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2", "review:frontier-2026-07-18"),
+        body=_body(set_section=None),
+        created="2026-07-18T19:09:43Z",
+    )
+    assert hy.rule_set_section(ctx) == [], "an issue filed before the rule existed must be grandfathered, not reported"
+
+
+def test_set_section_does_not_grandfather_issues_filed_on_or_after_the_cutoff():
+    """The other half of the same must-fail case: the cutoff is a floor, not a
+    blanket exemption — a review/incident issue filed ON the effective date still
+    owes the `## Set` section."""
+    ctx = _ctx(
+        labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2", "review:overnight-drain-2026-09-06"),
+        body=_body(set_section=None),
+        created="2026-09-07T00:00:00Z",
+    )
+    hit = hy.rule_set_section(ctx)
+    assert [f.rule for f in hit] == ["set_section"]
+
+
+def test_set_section_treats_a_missing_created_at_as_not_grandfathered():
+    """An unset `created_at` (an offline fixture, or a live payload missing the
+    field) must widen the rule, not silently exempt the issue — the opposite
+    default would let a malformed fetch quietly void the whole rule."""
+    ctx = _ctx(
+        labels=("type:bug", "area:claude-workflow", "model:opus", "prio:P2", "review:overnight-drain-2026-09-06"),
+        body=_body(set_section=None),
+    )
+    ctx["created_at"] = None
+    hit = hy.rule_set_section(ctx)
+    assert [f.rule for f in hit] == ["set_section"]
 
 
 def test_set_section_text_and_has_count_parsers():
