@@ -1,0 +1,48 @@
+{
+  "_README": "REAL log lines captured read-only from CloudWatch on 2026-09-14 for #3563 \u2014 the wire, not a hand-written approximation (tests/... 'fixture must be the wire'). Each is a swallowed IAM denial from a fail-soft path in the email/operational family. tests/test_swallowed_denial_visibility_3563.py asserts the CDK filter pattern in cdk/stacks/monitoring_denial_alarms.py matches every one of them. Note the chronicle-email-sender line's level: INFO \u2014 that is why 'log it somewhere' is not the control, and why the alarm keys on the botocore text rather than on a log level. `healthy_lines` are real lines from the SAME log groups on a healthy day \u2014 the negative control, so 'the pattern matches' is not satisfied by a pattern that matches everything.",
+  "captured_at": "2026-09-14",
+  "lines": [
+    {
+      "log_group": "/aws/lambda/life-platform-freshness-checker",
+      "observed_at": "2026-08-16T02:21:12Z",
+      "message": "{\"timestamp\":\"2026-08-16T02:21:12.032Z\",\"level\":\"ERROR\",\"source\":\"freshness-checker\",\"lambda\":\"life-platform-freshness-checker\",\"lambda_version\":\"$LATEST\",\"correlation_id\":\"freshness-checker\",\"message\":\"notion alert-state write failed (non-fatal): An error occurred (AccessDeniedException) when calling the PutItem operation: User: arn:aws:sts::205930651321:assumed-role/LifePlatformOperational-FreshnessCheckerRoleB047E7D-fL6dpMsEmxSA/life-platform-freshness-checker is not authorized to perform: dynamodb:PutItem on resource: arn:aws:dynamodb:us-west-2:205930651321:table/life-platform because no identity-based policy allows the dynamodb:PutItem action\"}"
+    },
+    {
+      "log_group": "/aws/lambda/chronicle-email-sender",
+      "observed_at": "2026-08-21T18:00:46Z",
+      "message": "{\"timestamp\":\"2026-08-21T18:00:46.327Z\",\"level\":\"INFO\",\"source\":\"chronicle-email-sender\",\"lambda\":\"chronicle-email-sender\",\"lambda_version\":\"$LATEST\",\"correlation_id\":\"chronicle-email-sender\",\"message\":\"[status-tracking] Non-fatal write failure: An error occurred (AccessDeniedException) when calling the PutItem operation: User: arn:aws:sts::205930651321:assumed-role/LifePlatformEmail-ChronicleEmailSenderRole5A0F7C29-BqQqb62zwbMX/chronicle-email-sender is not authorized to perform: dynamodb:PutItem on resource: arn:aws:dynamodb:us-west-2:205930651321:table/life-platform because no identity-based policy allows the dynamodb:PutItem action\"}"
+    },
+    {
+      "log_group": "/aws/lambda/life-platform-qa-smoke",
+      "observed_at": "2026-08-16T03:43:33Z",
+      "message": "[QA] WARN [content_truth] [chronic] AI Canary / canary:grounded_precision: canary precision unreadable (An error occurred (AccessDenied) when calling the GetObject operation: User: arn:aws:sts::205930651321:assumed-role/LifePlatformOperational-QaSmokeRoleBDC805B8-CO0bpwGVPAVZ/life-platform-qa-smoke is not authorized to perform: s3:ListBucket on resource: \"arn:aws:s3:::matthew-life-platform\" because no identity-based policy allows the s3:ListBucket action) \u2014 fail-soft; needs s3:GetObject on ai-canary-log/* (#1956)"
+    },
+    {
+      "log_group": "/aws/lambda/coach-nudge",
+      "observed_at": "2026-09-14 15:10:21.804",
+      "message": "[ERROR] bedrock prompt-cache telemetry emit failed (non-fatal, datapoints DROPPED): An error occurred (AccessDenied) when calling the PutMetricData operation: User: arn:aws:sts::205930651321:assumed-role/LifePlatformEmail-CoachNudgeRoleF7D037BC-TfkPL66CkU3G/coach-nudge is not authorized to perform: cloudwatch:PutMetricData because no identity-based policy allows the cloudwatch:PutMetricData action"
+    },
+    {
+      "log_group": "/aws/lambda/coach-nudge",
+      "observed_at": "2026-09-14 15:10:21.781",
+      "message": "[ERROR] bedrock cost telemetry emit failed (non-fatal, datapoints DROPPED): namespace=LifePlatform/AI metrics=[AnthropicInputTokens, AnthropicOutputTokens, EstimatedCostUSD]: An error occurred (AccessDenied) when calling the PutMetricData operation: User: arn:aws:sts::205930651321:assumed-role/LifePlatformEmail-CoachNudgeRoleF7D037BC-TfkPL66CkU3G/coach-nudge is not authorized to perform: cloudwatch:PutMetricData because no identity-based policy allows the cloudwatch:PutMetricData action"
+    },
+    {
+      "log_group": "/aws/lambda/monday-compass",
+      "observed_at": "2026-09-14 15:01:17.956",
+      "message": "[ERROR] bedrock truncation telemetry emit failed (non-fatal, datapoints DROPPED): An error occurred (AccessDenied) when calling the PutMetricData operation: User: arn:aws:sts::205930651321:assumed-role/LifePlatformEmail-MondayCompassRole39CBEE63-uaGT3hzcGY1w/monday-compass is not authorized to perform: cloudwatch:PutMetricData because no identity-based policy allows the cloudwatch:PutMetricData action"
+    }
+  ],
+  "healthy_lines": [
+    {
+      "log_group": "/aws/lambda/coach-nudge",
+      "observed_at": "2026-09-15T02:10:17Z",
+      "message": "[INFO]\t2026-09-15T02:10:17.381Z\t6dadae7c-9040-4ac3-abe2-1b9e5406d8fd\tFound credentials in environment variables."
+    },
+    {
+      "log_group": "/aws/lambda/life-platform-freshness-checker",
+      "observed_at": "2026-09-14T18:19:11Z",
+      "message": "{\"timestamp\":\"2026-09-14T18:19:11.006Z\",\"level\":\"INFO\",\"source\":\"freshness-checker\",\"lambda\":\"life-platform-freshness-checker\",\"lambda_version\":\"$LATEST\",\"correlation_id\":\"freshness-checker\",\"message\":\"HAE datatype liveness stored: 1 dark of 6\"}"
+    }
+  ]
+}

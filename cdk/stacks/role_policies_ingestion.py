@@ -20,6 +20,7 @@ from stacks.role_policies_base import (
     REGION,
     TABLE_ARN,
     _bedrock_statement,
+    _bedrock_telemetry_statement,
     _s3,
     _secret_arn,
 )
@@ -543,6 +544,10 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
             resources=[_secret_arn("life-platform/ai-keys")],
         ),
         _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
+        # #3563: the only non-email role in the measured set. No live denial is on
+        # record for it (the function's Bedrock path did not run in the 30d window),
+        # so this is fixed as the same structural pairing, not as a measured incident.
+        _bedrock_telemetry_statement(),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],

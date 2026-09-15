@@ -84,6 +84,8 @@ def _bedrock_statement() -> iam.PolicyStatement:
     foundation-model id (no inference profile), routed through the same
     bedrock_client chokepoint (ADR-062). Region wildcard because the us. profile
     routes across us-east-1/us-east-2/us-west-2.
+
+    #3563: THIS GRANT HAS A COMPANION — see `_bedrock_telemetry_statement()`.
     """
     return iam.PolicyStatement(
         sid="BedrockInvoke",
@@ -94,4 +96,42 @@ def _bedrock_statement() -> iam.PolicyStatement:
             # #1384: Titan-v2 embeddings for semantic recall (bedrock_client.embed_text).
             "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0",
         ],
+    )
+
+
+def _bedrock_telemetry_statement() -> iam.PolicyStatement:
+    """#3563: the companion to `_bedrock_statement()` — the right to RECORD the call.
+
+    `lambdas/ai/bedrock_client.invoke()` emits three telemetry families to
+    CloudWatch on every single call — cost (`AnthropicInputTokens`,
+    `AnthropicOutputTokens`, `EstimatedCostUSD`), truncation (`TruncatedResponses`,
+    `TruncatedCostUSD`) and prompt-cache (`PromptCacheNoOp`) — and every emit is
+    wrapped in `except Exception: print("[ERROR] ... datapoints DROPPED")` so that
+    telemetry can never break an AI call. That fail-soft is correct (ADR-104) and it
+    is also, by construction, silent: a role that can `bedrock:InvokeModel` and
+    cannot `cloudwatch:PutMetricData` bills Bedrock in full and records nothing,
+    forever, with green tests.
+
+    That is not hypothetical. #2974 found it once on the visual-qa CI role. On
+    2026-09-14 a 30-day log sweep for #3563 found it again on TWELVE production
+    roles (8 with live dropped datapoints in the window, ongoing that morning:
+    ai-review-pack, chronicle-approve, coach-nudge, monday-compass, monthly-digest,
+    nutrition-review, weekly-digest, weekly-plate). Those are the same series
+    `cost_governor_lambda` reads to project Bedrock spend against the ADR-133
+    ceiling, so the undercount lands on the budget, not just a dashboard.
+
+    `resources=["*"]`: PutMetricData accepts no resource ARN (the account-level
+    registry in `tests/test_iam_twin_free_3336.py` records the probe).
+    Deliberately a SEPARATE sid from the ad-hoc `CloudWatchMetrics` /
+    `PublishedMetric` / `DeliveryHeartbeatMetric` grants some roles already carry:
+    those are a role's own feature metric and may be narrowed or dropped with that
+    feature, while this one is owed to every Bedrock caller as such. A role holding
+    both simply holds two Allows for the same call — valid, and honest about which
+    reason is which. `tests/test_bedrock_telemetry_iam_parity_3563.py` derives the
+    pairing from the role family and reds on the next role that skips it.
+    """
+    return iam.PolicyStatement(
+        sid="BedrockTelemetryMetric",
+        actions=["cloudwatch:PutMetricData"],
+        resources=["*"],
     )

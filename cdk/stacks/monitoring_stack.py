@@ -81,6 +81,7 @@ from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.monitoring_budget_alarms import add_budget_alarms  # #2824: budget-unreadable, same seam
 from stacks.monitoring_compute_alarms import add_compute_alarms  # #3473: compute-pipeline liveness pairs
 from stacks.monitoring_dashboards import add_dashboards  # #2610: the dashboards live in a sibling
+from stacks.monitoring_denial_alarms import add_denial_alarms  # #3563: the permission-denial CLASS alarm
 from stacks.monitoring_prediction_alarms import (
     add_commitment_alarms,
     add_prediction_alarms,
@@ -904,6 +905,16 @@ class MonitoringStack(Stack):
         # same construct ids: no deployed alarm is replaced.
         # ══════════════════════════════════════════════════════════════
         add_silence_alarms(self, digest)
+
+        # ══════════════════════════════════════════════════════════════
+        # #3563: the sibling ABOVE alarms on tokens a lambda deliberately logs.
+        # This one alarms on the denial nobody tokenized — one MetricFilter per
+        # email/operational log group, all publishing ONE metric, one alarm.
+        # stacks/monitoring_denial_alarms.py states why it is not in the silence
+        # module (no lambda-side constant to twin-pin) and why N filters cost
+        # $0.10/mo rather than the RCA-rejected $1.50–2.90.
+        # ══════════════════════════════════════════════════════════════
+        add_denial_alarms(self, digest)
 
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm (period 86400s, daily metric).

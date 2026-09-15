@@ -22,6 +22,7 @@ from stacks.role_policies_base import (
     SES_IDENTITY,
     TABLE_ARN,
     _bedrock_statement,
+    _bedrock_telemetry_statement,
     _s3,
     _secret_arn,
     _ses_reader_resources,
@@ -64,6 +65,10 @@ def _email_base(
         ),
         # ADR-062: all email Lambdas call AI → grant Bedrock invoke.
         _bedrock_statement(),
+        # #3563: …and the right to RECORD that invoke. bedrock_client emits cost/
+        # truncation/prompt-cache datapoints on every call and swallows the denial,
+        # so nine email roles built here billed Bedrock and reported nothing.
+        _bedrock_telemetry_statement(),
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
@@ -346,6 +351,9 @@ def email_ai_review_pack() -> list[iam.PolicyStatement]:
         # #1688: the tier-gated Haiku critic. Bedrock invoke (Anthropic Claude only,
         # per _bedrock_statement/ADR-062) + the budget-tier SSM read that gates it.
         _bedrock_statement(),
+        # #3563: 3 datapoint families per critic call were DROPPED here — this role
+        # emitted the last live denial of the measured set, 2026-09-13 18:00:28Z.
+        _bedrock_telemetry_statement(),
         iam.PolicyStatement(
             sid="BudgetTier",
             actions=["ssm:GetParameter"],
@@ -705,6 +713,8 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
         # (bedrock_client.embed_text) at publish time — the AccessDenied that left
         # 2026-08-18 out of the corpus. Same shared statement every AI-calling role uses.
         _bedrock_statement(),
+        # #3563: and its companion — the embed's cost datapoints were dropped too.
+        _bedrock_telemetry_statement(),
         iam.PolicyStatement(
             sid="SSMBudgetTier",
             # budget_guard.allow("semantic_recall") gates the embed (band 2, ADR-125);
