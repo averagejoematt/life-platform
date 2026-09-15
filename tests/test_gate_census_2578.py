@@ -599,7 +599,19 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ESCALATION, exit 1; reverted, exit 0), and separately blanking `--no-verify`
         # off deploy/agent_commit.sh's own commit line (EXECUTION site vanishes, exit 1;
         # reverted, exit 0). Unproven UNCHANGED — a proven entrant, not a new unproven one.
-        <= 95
+        # Upper bound raised 95 -> 96 (2026-09-14/15, #3662, rebased atop #3799's 95th):
+        # the 96th proof is `guard::scripts/check_ingestion_hardcoded_literals.py` —
+        # GUARD_PROOFS in scripts/gate_census_proofs.py. Two mutations, each planted
+        # directly in the real tracked tree and reverted with `git checkout --` right
+        # after: (1) the #3662 defect itself — measurements_ingestion_lambda.py's fixed
+        # `"measured_by": measured_by,` write replaced with the old unconditional
+        # `"measured_by": "partner",` literal — ARMED: exit 1, printing the finding;
+        # RESTORED: exit 0. (2) exemption load-bearingness — deleted the
+        # `EXEMPTIONS["habitify_lambda.py"]["source"]` entry from the guard script itself
+        # — ARMED: exit 1, printing the `source`/`supplements` finding it normally
+        # suppresses; RESTORED: exit 0. Not a new unproven entrant (the census's
+        # per-entrant test now sees it as proven, not ledgered).
+        <= 96
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

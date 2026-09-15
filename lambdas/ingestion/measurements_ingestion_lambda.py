@@ -9,6 +9,15 @@ Schema: USER#matthew#SOURCE#measurements / DATE#YYYY-MM-DD
 parser silently used rows[0] only), and session_number derives from the session's
 date rank among all stored sessions — stable and monotonic across re-imports (the
 old COUNT+1 drifted on every re-import). Records stamp phase (#482/X-6).
+
+#3662: `measured_by` is read from an optional `measured_by` CSV/Excel column
+(alongside `date`/`notes` — never a MEASUREMENT_FIELDS numeric). A row that
+doesn't carry the column falls back to the literal string `"unrecorded"` — never
+to a fabricated identity (ADR-104: an unknown measurer must read as unknown, not
+be papered over with a plausible-sounding default). The prior code hard-coded
+`"partner"` unconditionally, which the CSV parser could never override and which
+was flatly false on the one session actually ingested this way (self-measured,
+corrected by hand in DDB after the fact — see that row's own `notes`).
 """
 
 import csv
@@ -44,6 +53,7 @@ s3 = boto3.client("s3", region_name=REGION)
 PK = f"USER#{USER_ID}#SOURCE#measurements"
 
 REQUIRED_FIELDS = ["waist_narrowest_in", "waist_navel_in"]
+MEASURED_BY_UNRECORDED = "unrecorded"  # #3662: stated absence, never a fabricated identity (ADR-104)
 MEASUREMENT_FIELDS = [
     "neck_in",
     "chest_in",
@@ -86,6 +96,9 @@ def _row_to_session(row_dict: dict) -> dict:
             result[field] = val
     result["date"] = str(row_dict.get("date") or "").strip() or None
     result["notes"] = str(row_dict.get("notes") or "").strip() or None
+    # #3662: read from the row if the column exists; a blank/missing column is a
+    # stated "unrecorded", never the old hard-coded "partner" the CSV couldn't override.
+    result["measured_by"] = str(row_dict.get("measured_by") or "").strip() or MEASURED_BY_UNRECORDED
     return result
 
 
@@ -237,12 +250,13 @@ def lambda_handler(event, context):
             errors.append(f"row {idx + 1}: no date column and no filename date")
             continue
         notes = session.pop("notes", None)
+        measured_by = session.pop("measured_by", None) or MEASURED_BY_UNRECORDED
         missing = [f for f in REQUIRED_FIELDS if f not in session]
         if missing:
             errors.append(f"row {idx + 1} ({session_date}): missing required {missing}")
             continue
         all_dates.add(session_date)
-        written.append((session_date, session, notes))
+        written.append((session_date, session, notes, measured_by))
 
     if not written:
         return {"statusCode": 400, "body": json.dumps({"error": "no ingestible rows", "row_errors": errors})}
@@ -250,7 +264,7 @@ def lambda_handler(event, context):
     date_rank = {d: i + 1 for i, d in enumerate(sorted(all_dates))}
 
     results = []
-    for session_date, measurements, notes in written:
+    for session_date, measurements, notes, measured_by in written:
         derived = _compute_derived(measurements, height_in)
         item = {
             "pk": PK,
@@ -258,7 +272,7 @@ def lambda_handler(event, context):
             "date": session_date,
             "unit": "in",
             "session_number": date_rank[session_date],
-            "measured_by": "partner",
+            "measured_by": measured_by,
             **measurements,
             **derived,
             "ingested_at": datetime.now(timezone.utc).isoformat(),

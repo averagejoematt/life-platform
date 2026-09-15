@@ -1037,6 +1037,56 @@ GUARD_PROOFS.update(
     }
 )
 
+GUARD_PROOFS.update(
+    {
+        # #3662: watched RED and restored to GREEN twice, live, against the real repo tree
+        # (not a synthetic fixture) — once for the defect the guard exists to catch, once
+        # for an exemption being load-bearing rather than decorative.
+        "guard::scripts/check_ingestion_hardcoded_literals.py": {
+            "gate_name": "scripts/check_ingestion_hardcoded_literals.py",
+            "command": "python3 scripts/check_ingestion_hardcoded_literals.py   # plus python3 -m pytest tests/test_ingestion_hardcoded_literal_guard_3662.py -q for the offline must-fail/must-pass twin",  # noqa: E501
+            "mutation": (
+                "Two mutations, each planted directly in the real tracked file and reverted with "
+                "`git checkout --` immediately after observing the result (never left uncommitted): "
+                "(1) the #3662 defect itself — in the already-fixed "
+                "lambdas/ingestion/measurements_ingestion_lambda.py, replaced the write "
+                '`"measured_by": measured_by,` with the old unconditional literal '
+                '`"measured_by": "partner",`, i.e. the pre-fix regression, with the CSV read left '
+                "in place; (2) exemption load-bearingness — deleted the "
+                '`EXEMPTIONS["habitify_lambda.py"]["source"]` entry (with its reason comment) from '
+                "scripts/check_ingestion_hardcoded_literals.py itself, to confirm the finding it "
+                "suppresses is real rather than something the detector never reaches."
+            ),
+            "observed": (
+                "2026-09-14, watched in both directions, live against the real repo tree (no fixture): "
+                "M1 ARMED — `measurements_ingestion_lambda.py: field 'measured_by' is hard-coded to "
+                "'partner' but the file also reads a column named 'measured_by'`, exit 1. M1 "
+                "RESTORED (`git checkout --`) — `check_ingestion_hardcoded_literals: clean — no "
+                "un-exempted hard-coded literal fields`, exit 0. M2 ARMED (exemption removed) — "
+                "`habitify_lambda.py: field 'source' is hard-coded to 'supplements' but the file "
+                "also reads a column named 'source'`, exit 1 — confirming the exemption was actively "
+                "suppressing a real (correctly-judged-safe) finding, not dead weight. M2 RESTORED — "
+                "clean again, exit 0. The offline twin "
+                "(tests/test_ingestion_hardcoded_literal_guard_3662.py::test_guard_would_catch_the_original_measured_by_bug) "
+                "reproduces M1 deterministically against a tempfile copy; 3 tests, all passing."
+            ),
+            "scope": (
+                "Syntactic, single-file AST scan — a 'read name' is any string literal passed to "
+                "`.get(...)` or used as a Load-context subscript key ANYWHERE in the file, so a "
+                "same-named read in an unrelated function of the same file can still suppress a "
+                "genuine cross-payload finding (the M2 exemptions this PR registered are exactly "
+                "that judgment call, made explicit and reasoned rather than silently absorbed). "
+                "Detects only a plain-string-literal VALUE on a plain-string KEY inside a dict that "
+                "looks like a DDB item (has pk/sk) or is passed as `Item=`/`put_item`/`update_item` — "
+                "a hard-coded literal built from an f-string, a variable, or a nested structure is "
+                "invisible to it. Not wired into blocking CI as its own job; runs via the pytest wrapper "
+                "in the normal test suite."
+            ),
+            "proved_on": "2026-09-14",
+        },
+    }
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
 # GUARD_PROOFS above, only because `gate_census.py` sits at its 1,200-line ceiling
