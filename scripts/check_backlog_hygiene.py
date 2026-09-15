@@ -162,6 +162,21 @@ ACCEPTANCE_MIN, ACCEPTANCE_MAX = 3, 5
 NOW_LIVENESS_MIN = bc.NOW_LIVENESS_MIN
 LATER_STALE_DAYS = 60
 
+# #3594's `rule_set_section` shipped 2026-09-06 (#3658) as a straight PER_ISSUE_RULES
+# addition, unlike the rest of this linter's rules — those went advisory (#1867) ->
+# backfilled to zero (#1868) -> blocking (#1872), the ADR-108 promotion pattern this
+# file's own module docstring documents. This one skipped the backfill step. Measured
+# on the corpus the day this cutoff was added (2026-09-14): 51 open review/incident-
+# labelled type:bug/type:story issues violate it, and EVERY ONE was filed before
+# 2026-09-07 (earliest offending label family: review:frontier-2026-07-18, from
+# 2026-07-18) — there is no way an issue filed under the old contract could have
+# stated a fact (the `## Set` heading) that did not yet exist as a requirement. That
+# is the exact shape check_doc_facts.py's MOM_RULE_EFFECTIVE_FROM names: demanding a
+# retroactive fact of a row is worse than a dated start. The rule binds from this
+# timestamp forward; an issue created before it is grandfathered regardless of label
+# or type. A new review/incident filing on or after this date gets zero grace.
+SET_SECTION_EFFECTIVE_FROM = datetime(2026, 9, 7, tzinfo=timezone.utc)
+
 VIOLATION = "violation"
 ADVISORY = "advisory"
 
@@ -209,6 +224,7 @@ def build_ctx(issue: Dict[str, Any]) -> Dict[str, Any]:
         "set_section": bc.set_section_text(body),
         "set_section_has_count": bc.set_section_has_count(body),
         "updated_at": issue.get("updatedAt") or issue.get("updated_at"),
+        "created_at": issue.get("createdAt") or issue.get("created_at"),
         # The raw body, for the #3065 tracker rules only: an ops tracker's contract is
         # about text its own filer wrote, not about the ADR-099 grammar.
         "body": body,
@@ -508,10 +524,18 @@ def rule_set_section(ctx: Dict[str, Any]) -> List[Finding]:
     type:bug/type:story (not epic/chore) and to review:*/incident-labelled
     issues, per the acceptance criteria — an issue nobody filed from a review
     sweep has no class to enumerate.
+
+    Grandfathered for issues created before `SET_SECTION_EFFECTIVE_FROM` (see that
+    constant for why) — a missing `created_at` (an offline fixture, or a live
+    payload that omitted the field) is treated as "not grandfathered" rather than
+    silently exempted, so an unset field widens the rule instead of quietly voiding it.
     """
     if not any(n in ("type:bug", "type:story") for n in ctx["types"]):
         return []
     if not bc.filed_from_review_or_incident(ctx["labels"]):
+        return []
+    created = _parse_iso(ctx.get("created_at"))
+    if created and created < SET_SECTION_EFFECTIVE_FROM:
         return []
     if not ctx["set_section"]:
         return [
@@ -785,7 +809,7 @@ def _fetch_live_issues() -> Optional[List[Dict[str, Any]]]:
                 "--state",
                 "open",
                 "--json",
-                "number,title,labels,milestone,body,updatedAt",
+                "number,title,labels,milestone,body,updatedAt,createdAt",
                 "--limit",
                 "500",
             ],
@@ -822,7 +846,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "Without it the count includes work the running model cannot start (#3254).",
     )
     parser.add_argument(
-        "--issues-json", help="Offline fixture path (gh issue list --json number,title,labels,milestone,body,updatedAt output)."
+        "--issues-json", help="Offline fixture path (gh issue list --json number,title,labels,milestone,body,updatedAt,createdAt output)."
     )
     args = parser.parse_args(argv)
 
