@@ -73,6 +73,45 @@ dated registry in `tests/test_iam_twin_free_3336.py` (`_WILDCARD_OK_ACTIONS` —
 with `aws iam simulate-custom-policy`, and the same registry the 38 `resources=["*"]`
 statements in `cdk/stacks/role_policies_*.py` satisfy). The registry may only SHRINK.
 
+### APPLIED 2026-09-15 — the deploy role's `dynamodb:Query` (#3681)
+
+> Applied attended under `matthew-admin`, owner-approved as an ask-first IAM write.
+> Post-apply `python3 deploy/verify_oidc_iam.py --strict` → **CLEAN, 15/15 targets, exit 0**;
+> live re-read confirms 3 actions on the `DynamoDB` Sid and 14 statements. The
+> `github-actions-deploy-role` entry was deleted from `_PENDING_PERMISSIONS_APPLY`
+> (`tests/test_grant_enumeration_drift.py`) in the same lane, per the #2824 rule that the
+> queue stays a queue. A pre-change snapshot is kept outside the repo for rollback.
+
+| Sid | was | now |
+|---|---|---|
+| `DynamoDB` | `dynamodb:DescribeTable`, `dynamodb:DescribeContinuousBackups` | **+ `dynamodb:Query`**, same `table/life-platform` resource |
+
+Statement count UNCHANGED (14 → 14); the delta is one read-only action on the table ARN —
+no index, no `Scan`, no write.
+
+**Why.** `deploy/sync_site_to_s3.sh`'s theme-river step runs
+`scripts/v4_build_theme_river.py --live`, which `Query`s the notion journal partition
+(`lambdas/content/theme_river.py::list_enriched_entries`). The deploy role had never held
+that grant, so the live build had **never once succeeded** from CI — and the step's
+`|| echo "… skipped (offline?)"` reported the `AccessDeniedException` as a network blip
+while the deploy went green. `https://averagejoematt.com/data/theme_river.json` served
+`{"state": "empty"}` for the whole life of the feature. The swallow half is fixed in the
+same PR (`deploy/lib/generator_step.sh`): a denial now FAILS the sync by name, and in CI
+nothing degrades at all.
+
+**Live proof the grant works** — the first `Site deploy` after this apply must serve a
+`/data/theme_river.json` with `state != "empty"` and `n_days > 0`. (Measured under
+`matthew-admin` on the same window before the apply: `state=warming_up, n_days=2,
+n_entries=2, n_themes=8`, window `2026-09-06 → 2026-09-14`.) Note there is no
+`generated_at` field to check — schema `theme_river/1` nests provenance under
+`provenance`; the issue's acceptance box quotes a pre-#3721 flat shape the generator no
+longer emits.
+
+Rollback if ever needed: re-apply the pre-change snapshot with
+`aws iam put-role-policy --role-name github-actions-deploy-role --policy-name
+life-platform-cicd-permissions --policy-document file://<snapshot>.json`, then `git revert`
+the PR.
+
 ### Staged, NOT yet applied — the golden-eval role (#812)
 - `github-actions-golden-eval-role.trust.json` — trust policy (main-only subject from day one; no
   repo-wide grant to tighten later)

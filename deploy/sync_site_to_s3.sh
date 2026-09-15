@@ -27,6 +27,13 @@ else
   SED_INPLACE=(-i '')    # BSD/macOS
 fi
 
+# #3681 — every content-generation step below runs through run_site_generator, which
+# CLASSIFIES a non-zero exit instead of printing "(offline?)" over it. The idiom it
+# replaces reported an IAM AccessDenied as a network blip and shipped the stale
+# artifact with a green deploy. See deploy/lib/generator_step.sh.
+# shellcheck source=deploy/lib/generator_step.sh
+. "$(dirname "$0")/lib/generator_step.sh"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CLOBBER GUARD (Coherence Program Phase 3). sync_site_to_s3.sh pushes the WHOLE
 # site/ tree, so syncing from a branch that's MISSING site/ commits which are
@@ -51,35 +58,55 @@ if [ "${1:-}" != "--dry-run" ] && [ "${ALLOW_STALE_SITE:-0}" != "1" ] && git rev
   fi
 fi
 
-# Regenerate rss.xml from the live published chronicle (best-effort — never block a
-# deploy if offline). Keeps the feed's pubDates/lastBuildDate correct on every sync.
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTENT GENERATION (#3681). Every step below is `run_site_generator "<label>"
+# "<artifact>" <cmd>` or a BARE invocation. Both FAIL the sync on a non-zero exit;
+# the wrapper differs only in that it first reads the generator's output and NAMES
+# the cause, and will degrade — outside CI only — for the two causes a deploy can
+# do nothing about (`offline`, `no-credentials`). In CI nothing degrades.
+#
+# Read deploy/lib/generator_step.sh before adding a step. Do NOT reintroduce
+# `|| echo "… skipped (offline?)"`: that idiom reported a `dynamodb:Query`
+# AccessDenied as a network blip for the whole life of the theme-river feature,
+# and tests/test_sync_site_generator_steps_3681.py enumerates THIS file to keep it
+# out (the set is derived from the script, never hand-listed).
+#
+# Individual "best-effort / keeps the existing X if offline" notes below still hold
+# for a genuine connectivity failure on a laptop; they no longer mean "any failure".
+# ─────────────────────────────────────────────────────────────────────────────
 if [ "${1:-}" != "--dry-run" ]; then
-  python3 "$(dirname "$0")/../scripts/v4_build_rss.py" || echo "  ⚠️  rss build skipped (offline?) — keeping existing site/rss.xml"
+  run_site_generator "rss" "site/rss.xml" \
+    python3 "$(dirname "$0")/../scripts/v4_build_rss.py"
   # #733: regenerate sitemap.xml (every published post URL) + inject the dated post
   # link-list into the chronicle hub's <noscript> — so crawlers/LLMs/no-JS visitors
   # see the posts. Best-effort; keeps the existing sitemap if the live posts feed is
   # unreachable. Was NOT wired in before, so the sitemap silently drifted post-less.
-  python3 "$(dirname "$0")/../scripts/v4_build_sitemap.py" || echo "  ⚠️  sitemap build skipped (offline?) — keeping existing site/sitemap.xml"
+  run_site_generator "sitemap" "site/sitemap.xml" \
+    python3 "$(dirname "$0")/../scripts/v4_build_sitemap.py"
   # #788: bake the cockpit's static proof (character level + pillars + as-of stamp)
   # into /cockpit/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
   # effort; keeps the last baked block if the live API is unreachable.
-  python3 "$(dirname "$0")/../scripts/v4_build_cockpit_proof.py" || echo "  ⚠️  cockpit proof skipped (offline?) — keeping existing baked block"
+  run_site_generator "cockpit proof" "the baked /cockpit/ proof block" \
+    python3 "$(dirname "$0")/../scripts/v4_build_cockpit_proof.py"
   # #1395: bake Home's static core (baseline→goal + countdown/day + level) into `/`'s
   # <noscript> + refresh its data-driven OG tags — so the most-shared URL's crawler /
   # no-JS / link-unfurl view is real content, not a blank cinematic shell. Best-effort;
   # load_journey() falls back to the committed snapshot when the live API is unreachable.
-  python3 "$(dirname "$0")/../scripts/v4_build_home_proof.py" || echo "  ⚠️  home proof skipped (offline?) — keeping existing baked block"
+  run_site_generator "home proof" "the baked / proof block" \
+    python3 "$(dirname "$0")/../scripts/v4_build_home_proof.py"
   # #804: regenerate the /coaching/ shells with the board's live read baked into the
   # "read" landing's <noscript> (weekly priority + each coach's read) — the #729/#730/
   # #788 treatment for the core differentiator. The generator is the source of truth
   # for the coaching shells (editing the HTML alone drifts); running it here refreshes
   # the baked read every deploy. Best-effort — load_coaching_read() falls back to the
   # committed snapshot when the live API is unreachable, so the read never blanks.
-  python3 "$(dirname "$0")/../scripts/v4_build_coaching.py" || echo "  ⚠️  coaching build skipped (offline?) — keeping existing baked read"
+  run_site_generator "coaching" "the baked /coaching/ read" \
+    python3 "$(dirname "$0")/../scripts/v4_build_coaching.py"
   # #803: regenerate the story shells so the chronicle's <noscript> carries the
   # week-gap note + any pending-installment disclosure (a held week must say why
   # instead of going silent). Best-effort — keeps the existing shells if offline.
-  python3 "$(dirname "$0")/../scripts/v4_build_dispatches.py" || echo "  ⚠️  dispatches build skipped (offline?) — keeping existing story shells"
+  run_site_generator "dispatches" "the existing story shells" \
+    python3 "$(dirname "$0")/../scripts/v4_build_dispatches.py"
   # #3515: regenerate the Data + Protocols pillar hubs so their #1395 baked
   # <noscript> core + data-driven OG tags carry the CURRENT date, same as the
   # home/coaching/story proof steps above. This generator was previously
@@ -87,27 +114,32 @@ if [ "${1:-}" != "--dry-run" ]; then
   # days (two experiment resets) stale. Best-effort — load_data_sources()/
   # load_protocols() fall back to the committed proof_snapshot.json when the
   # live API is unreachable.
-  python3 "$(dirname "$0")/../scripts/v4_build_evidence.py" || echo "  ⚠️  evidence pillars build skipped (offline?) — keeping existing data/protocols shells"
+  run_site_generator "evidence pillars" "the existing data/protocols shells" \
+    python3 "$(dirname "$0")/../scripts/v4_build_evidence.py"
   # #1566: render the "In my own words" essay permalink pages from site/journal/blog.json +
   # each essay's body fragment (kills the hand-HTML step). --write is REQUIRED — the generator
   # is dry-run by default so a bare invocation never publishes Matt's words; this deploy step,
   # which Matthew triggers, is the manual publish gate. Best-effort: keeps existing pages if it
   # can't run. RSS already merges blog.json (v4_build_rss.py above).
-  python3 "$(dirname "$0")/../scripts/v4_build_journal.py" --write || echo "  ⚠️  journal essays build skipped — keeping existing essay pages"
+  run_site_generator "journal essays" "the existing essay pages" \
+    python3 "$(dirname "$0")/../scripts/v4_build_journal.py" --write
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
-  python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
+  run_site_generator "data_sources" "site/data/data_sources.json" \
+    python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py"
   # #1401: stack.json is the public instrument manifest ("fork the architecture, not the
   # data") — GENERATED from source_registry.py + the public protocol/supplement catalogues
   # + the same cost constants /method/cost/ serves. Runs AFTER data_sources.py because it
   # derives its source set from that generator. Never hand-edit; tests/test_stack_manifest_drift.py pins it.
-  python3 "$(dirname "$0")/../scripts/v4_build_stack_manifest.py" || echo "  ⚠️  stack manifest build skipped — keeping existing site/data/stack.json"
+  run_site_generator "stack manifest" "site/data/stack.json" \
+    python3 "$(dirname "$0")/../scripts/v4_build_stack_manifest.py"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
-  python3 "$(dirname "$0")/../scripts/v4_build_methods.py" || echo "  ⚠️  methods registry build skipped — keeping existing site/method/registry/index.html"
+  run_site_generator "methods registry" "site/method/registry/index.html" \
+    python3 "$(dirname "$0")/../scripts/v4_build_methods.py"
   # #3691: platform_state.json is the joined owner-facing read of the BUILD, GENERATED
-  # from the repo + `gh` + the public /api/receipts. Deliberately NOT wrapped in the
-  # `|| echo "skipped"` idiom its neighbours use: that idiom is exactly the #3681 defect
-  # (an IAM AccessDenied reported as "offline?" while the previous artifact shipped on),
-  # and this page's entire value is that its numbers are current. The generator already
+  # from the repo + `gh` + the public /api/receipts. Deliberately BARE rather than
+  # wrapped: this page's entire value is that its numbers are current, so not even the
+  # two degradable causes may skip it. (Until #3681 its neighbours used `|| echo
+  # "skipped (offline?)"`, which is the defect that fix removed.) The generator already
   # degrades per-section internally — an unreachable source becomes `{"error": ...,
   # "data": null}` rendered AS a gap — so a NON-ZERO exit here means the generator itself
   # broke, which must stop the sync rather than ship yesterday's board silently.
@@ -116,22 +148,28 @@ if [ "${1:-}" != "--dry-run" ]; then
   # enrichment partition (lambdas/theme_river.py) — previously a hand-run script wired
   # into NO deploy path, so the artifact could go stale for an entire experiment cycle
   # and (worse) falsely assert n=0 once fresh entries existed. Regenerate on every
-  # deploy like its v4_build_* siblings; --live reads the partition when AWS creds are
-  # present and best-effort keeps the existing artifact otherwise (matches the cockpit/
-  # home "proof" build steps above).
-  python3 "$(dirname "$0")/../scripts/v4_build_theme_river.py" --live || echo "  ⚠️  theme river build skipped (offline?) — keeping existing site/data/theme_river.json"
+  # deploy like its v4_build_* siblings. --live issues a `dynamodb:Query` against
+  # `life-platform`; the CI deploy role could not do that from the day this step was
+  # wired until #3681 granted it, and the `|| echo "(offline?)"` this step used to
+  # carry reported that AccessDenied as a network blip on every green deploy. A
+  # denial now FAILS the sync by name; only a real connectivity/no-credentials
+  # failure degrades, and only outside CI.
+  run_site_generator "theme river" "site/data/theme_river.json" \
+    python3 "$(dirname "$0")/../scripts/v4_build_theme_river.py" --live
   # #586/ADR-106: portrait_data.js is GENERATED from config/portraits/ (signed recipes
   # only) — never hand-edit. Validation failure BLOCKS the sync (a bad recipe must not ship).
   python3 "$(dirname "$0")/../scripts/v4_build_portraits.py"
   # #593/ADR-106: the signed portraits also travel off-site as email-ready PNGs under
   # site/assets/portraits/ (one source of truth with the site SVG). Re-render so a recipe
   # edit propagates here in the same sync; CI's parity guard fails if this is skipped.
-  python3 "$(dirname "$0")/../scripts/render_portraits.py" || echo "  ⚠️  portrait PNG render skipped — keeping existing site/assets/portraits/"
+  run_site_generator "portrait PNG render" "site/assets/portraits/" \
+    python3 "$(dirname "$0")/../scripts/render_portraits.py"
   # #1009: AUTHORITATIVE shared-chrome pass — flatten every page's doors nav + footer to
   # the single source (scripts/v4_chrome.py). MUST run LAST, after every v4_build_* above
   # (coaching/dispatches/methods emit their own chrome inline), so generator-local chrome
   # can't re-drift. Idempotent; detects & preserves each page's current door + follow pill.
-  python3 "$(dirname "$0")/../scripts/v4_apply_chrome.py" || echo "  ⚠️  chrome normalization skipped — pages keep their generator-emitted chrome"
+  run_site_generator "chrome normalization" "each page's generator-emitted chrome" \
+    python3 "$(dirname "$0")/../scripts/v4_apply_chrome.py"
 fi
 
 BUCKET="matthew-life-platform"

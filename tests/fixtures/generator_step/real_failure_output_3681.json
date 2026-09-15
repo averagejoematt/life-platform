@@ -1,0 +1,38 @@
+{
+  "_README": "Verbatim generator output captured from real runs, used as the wire for tests/test_sync_site_generator_steps_3681.py. Do not paraphrase these: the point of the fixture is that classify_generator_failure is asserted against what the platform actually prints, not against a reconstruction of it (the 'fixture must be the wire' rule).",
+  "denied_dynamodb_query": {
+    "source": "GitHub Actions run 34144388209, job 'Deploy public site', 2026-09-07T16:41:26Z — the step that printed '(offline?)' over this",
+    "expected_cause": "denied",
+    "text": "Traceback (most recent call last):\n  File \"/home/runner/work/life-platform/life-platform/scripts/v4_build_theme_river.py\", line 232, in <module>\n    raise SystemExit(main())\n  File \"/home/runner/work/life-platform/life-platform/scripts/v4_build_theme_river.py\", line 213, in main\n    artifact = build_artifact(live)\n  File \"/home/runner/work/life-platform/life-platform/scripts/v4_build_theme_river.py\", line 202, in build_artifact\n    entries = tr.list_enriched_entries(table, start, end)\nbotocore.exceptions.ClientError: An error occurred (AccessDeniedException) when calling the Query operation: User: arn:aws:sts::205930651321:assumed-role/github-actions-deploy-role/GitHubActions is not authorized to perform: dynamodb:Query on resource: arn:aws:dynamodb:us-west-2:205930651321:table/life-platform because no identity-based policy allows the dynamodb:Query action"
+  },
+  "denied_s3_list": {
+    "source": "the #3573 shape — an S3 List prefix denial, the spelling S3/CloudWatch use (bare 'AccessDenied', no 'Exception' suffix)",
+    "expected_cause": "denied",
+    "text": "botocore.exceptions.ClientError: An error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied"
+  },
+  "offline_endpoint": {
+    "source": "botocore with no network path to the regional endpoint — the cause '(offline?)' was always claiming",
+    "expected_cause": "offline",
+    "text": "botocore.exceptions.EndpointConnectionError: Could not connect to the endpoint URL: \"https://dynamodb.us-west-2.amazonaws.com/\""
+  },
+  "offline_urllib": {
+    "source": "the stdlib-urllib generators (v4_build_rss.py et al) with DNS down",
+    "expected_cause": "offline",
+    "text": "urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>"
+  },
+  "no_credentials": {
+    "source": "a laptop with no AWS profile exported — the legitimate local degrade",
+    "expected_cause": "no-credentials",
+    "text": "botocore.exceptions.NoCredentialsError: Unable to locate credentials"
+  },
+  "credentials_invalid": {
+    "source": "an expired assumed-role session",
+    "expected_cause": "credentials-invalid",
+    "text": "botocore.exceptions.ClientError: An error occurred (ExpiredToken) when calling the Query operation: The security token included in the request is expired"
+  },
+  "unclassified_bug": {
+    "source": "a plain generator defect — nothing to do with the network or IAM",
+    "expected_cause": "unclassified",
+    "text": "Traceback (most recent call last):\n  File \"scripts/v4_build_rss.py\", line 88, in main\n    items = sorted(posts, key=lambda p: p[\"published\"])\nKeyError: 'published'"
+  }
+}

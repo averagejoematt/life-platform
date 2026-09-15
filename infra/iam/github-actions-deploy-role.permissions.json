@@ -63,7 +63,8 @@
       "Effect": "Allow",
       "Action": [
         "dynamodb:DescribeTable",
-        "dynamodb:DescribeContinuousBackups"
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:Query"
       ],
       "Resource": "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform"
     },
