@@ -335,7 +335,25 @@ def test_the_chokepoint_does_not_mutate_the_callers_body():
 # quietly inheriting the no-retry default. (The issue's own `grep max_tokens`
 # query returns ~90 hits dominated by output-budget literals; this narrows to the
 # decision itself, which is the property that matters.)
-_DECIDES_ON_TRUNCATION = re.compile(r"""get\(\s*["']stop_reason["']\s*\)[^\n]*==\s*["']max_tokens["']""")
+#
+# THE PATTERN WAS WIDENED BY ITS OWN MUTATION RUN, which is worth recording. The first
+# draft matched only `get("stop_reason") … == "max_tokens"`. Mutation M4 rewrote the
+# COVERED site in tests/visual_ai_qa.py to `resp.get("stop_reason") in ("max_tokens",)`
+# — semantically identical, and the draft pattern went blind to it. So the rule now
+# requires the two names on one line with a COMPARISON between them (`==`, `!=`, or
+# membership), which catches the subscript, membership and negated forms alike, and
+# trailing `# …` is stripped first so a decision is never confused with a note about one.
+# Measured across the whole scan surface: the widened rule returns the SAME three sites,
+# no new false positives.
+# STILL INVISIBLE, stated rather than papered over: a two-line form
+# (`sr = resp.get("stop_reason")` … `if sr == "max_tokens":`), a helper that returns the
+# stop reason, and a parse failure reached without reading stop_reason at all. Those are
+# gaps, not passes — which is why the two covered sites ALSO carry behavioural tests
+# above rather than resting on this census.
+_DECIDES_ON_TRUNCATION = re.compile(
+    r"""stop_reason[^\n]*?(?:==|!=|\bin\b)[^\n]*?max_tokens|max_tokens[^\n]*?(?:==|!=|\bin\b)[^\n]*?stop_reason"""
+)
+_TRAILING_COMMENT = re.compile(r"\s#.*$")
 _SCAN_DIRS = ("lambdas", "mcp", "scripts", "deploy", "cdk")
 _SCAN_FILES = ("tests/visual_ai_qa.py", "tests/visual_qa.py", "tests/visual_qa_verdict.py")
 
@@ -368,7 +386,7 @@ def _enumerate_truncation_decision_sites():
             for i, line in enumerate(f, 1):
                 if line.lstrip().startswith("#"):
                     continue  # a comment ABOUT the decision is not the decision
-                if _DECIDES_ON_TRUNCATION.search(line):
+                if _DECIDES_ON_TRUNCATION.search(_TRAILING_COMMENT.sub("", line)):
                     hits.setdefault(rel, []).append(i)
     return hits
 
