@@ -638,18 +638,12 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # 2026-09-05: the #3562 remediation-role entry was applied live via
     # deploy/setup_remediation_role.sh (post-apply verifier: 15/15 CLEAN) and removed
     # here the same day, per the #2824 rule that this queue stays a queue.
-    "github-actions-deploy-role": (
-        "2026-09-14 (#3681): the DynamoDB statement gains `dynamodb:Query` on "
-        "table/life-platform — the grant deploy/sync_site_to_s3.sh's theme-river step has "
-        "needed since it was wired and has never held, so `scripts/v4_build_theme_river.py "
-        "--live` AccessDenied on every CI site deploy and /data/theme_river.json has only "
-        'ever served `{"state": "empty"}`. Read-only, one action, table-scoped, no index. '
-        "Statement count unchanged 14 -> 14. IAM is Bucket B (#2611): apply attended with "
-        "`aws iam put-role-policy --role-name github-actions-deploy-role --policy-name "
-        "life-platform-cicd-permissions --policy-document "
-        "file://infra/iam/github-actions-deploy-role.permissions.json`, then "
-        "`python3 deploy/verify_oidc_iam.py --strict`, then delete this entry."
-    ),
+    # 2026-09-15: the #3681 deploy-role entry (`dynamodb:Query` on table/life-platform for
+    # sync_site_to_s3.sh's theme-river build) was applied live with
+    # `aws iam put-role-policy --policy-document file://infra/iam/github-actions-deploy-role.permissions.json`
+    # and removed here in the same lane: post-apply `deploy/verify_oidc_iam.py --strict` reported
+    # CLEAN across all 15 targets, and live now carries 3 DynamoDB actions on 14 statements.
+    # Same #2824 rule as the #3562 entry above — this queue stays a queue.
 }
 
 
