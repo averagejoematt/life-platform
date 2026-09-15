@@ -273,7 +273,17 @@ def sanity_scan(run_dir):
 # baseline is honest negative progress (ADR-104 down-weeks-shown), bounded at -100 (the
 # full goal distance regained). Keep this set SMALL and evidence-driven — a broad
 # pre-exemption is how a real impossible number gets waved through.
-_SIGNED_PCT_FIELDS = frozenset({"progress_pct", "delta_pct"})
+#
+# `deficit_pct` (#3739 residual sweep, not live-red yet): `site_api_nutrition._deficit_label`
+# documents outright that "A NEGATIVE percentage is a SURPLUS — eating above
+# maintenance" (deficit_pct = (tdee - intake) / tdee * 100; a surplus day makes intake
+# > tdee, so the value goes negative with no natural floor other than how much a day
+# can physically be over-eaten). This was found by the SAME static sweep #3739 added
+# to stop discovering domains one red deploy at a time — it has not yet reached a real
+# surplus day live, unlike the other three rows in the class table below, but it is
+# reachable by an already-shipped code path and was sitting on the silent [0,100]
+# default the day this sweep ran.
+_SIGNED_PCT_FIELDS = frozenset({"progress_pct", "delta_pct", "deficit_pct"})
 
 # A signed DELTA's positive side is not bounded by 100 the way `progress_pct`'s is.
 # `progress_pct` is a share of a fixed goal distance, so 100 is the whole thing.
@@ -290,6 +300,21 @@ _SIGNED_PCT_FIELDS = frozenset({"progress_pct", "delta_pct"})
 # stays -100: for a positive metric you cannot lose more than all of it, so anything
 # past that is a computation failure, not a bad week.
 _SIGNED_DELTA_PCT_MAX = 1000
+
+# Per-field bound overrides WITHIN the "signed" domain, for the fields whose real
+# range isn't the generic open-positive/-100-floor delta shape above. A name absent
+# here gets the generic (-100, _SIGNED_DELTA_PCT_MAX) signed bounds.
+_SIGNED_PCT_BOUNDS_OVERRIDE = {
+    # A share of a FIXED goal distance: 100 IS the whole thing, so the ceiling stays
+    # tight even though the domain is signed.
+    "progress_pct": (-100, 100),
+    # The MIRROR shape of progress_pct: (tdee - intake) / tdee * 100 is capped at 100
+    # from above (intake -> 0), same as progress_pct, but the surplus side is open
+    # the way delta_pct's positive side is open — a big surplus day can push it well
+    # past -100 (intake at 4x maintenance = -300). -400 bounds a real binge day
+    # (roughly 4x maintenance intake), not a computation blowup.
+    "deficit_pct": (-400, 100),
+}
 
 # Percent fields that are a share OF A TARGET rather than of a whole: beating the
 # target is the point, so their legal domain runs above 100. 2026-09-12 (#3725):
@@ -317,6 +342,82 @@ _SIGNED_DELTA_PCT_MAX = 1000
 _ACHIEVEMENT_PCT_FIELDS = frozenset({"target_pct", "z2_pct"})
 _ACHIEVEMENT_PCT_MAX = 1000
 
+# Every OTHER `*_pct` name discovered live on `lambdas/web/` (#3739's residual sweep —
+# see `discover_served_pct_field_names` below) that really is a plain share-of-a-whole,
+# checked against its own producer rather than assumed: body-composition/lab shares
+# (`body_fat_pct`, `android_fat_pct`, `gynoid_fat_pct`, `trunk_pct`, `legs_pct`,
+# `arms_pct`, `lymphocyte_pct`, `rdw_pct`), sleep-stage shares (`deep_pct`, `light_pct`,
+# `rem_pct`, `sleep_efficiency_pct`), rate/hit-rate/accuracy shares that are all
+# `count / total * 100` by construction (`hit_rate_pct`, `target_hit_rate_pct`,
+# `protein_hit_pct`, `protein_floor_hit_pct`, `accuracy_pct`, `chance_accuracy_pct`,
+# `agreement_rate_pct`, `combined_agreement_rate_pct`, `resist_rate_pct`,
+# `meaningful_pct`, `completion_pct`, `compliance_pct`, `adherence_pct`, `avg_pct`,
+# `habit_pct`, `habit_completion_pct`, `keystone_group_pct`, `tier0_pct`, `tier01_pct`),
+# CGM time-in-range shares (`blood_glucose_time_in_range_pct`,
+# `blood_glucose_time_in_optimal_pct`, `blood_glucose_time_above_140_pct`,
+# `time_in_range_pct`, `time_in_optimal_pct`, `time_above_140_pct`), a
+# capped-at-the-producer nutrient-sufficiency ratio (`micronutrient_avg_pct`,
+# `potassium_pct` — `macrofactor_lambda.compute_micronutrient_sufficiency` computes
+# `min(actual/target*100, 100.0)`, capped BY THE PRODUCER, unlike z2_pct's deliberately
+# uncapped ratio), a bounded-by-construction reach probability
+# (`p_reach_pct`/`p_reach_ci95_pct`/`p_reach_ceiling_pct`/`p_reach_30_pct`/
+# `p_reach_30_ci95_pct`/`p_reach_30_ceiling_pct` — `(reached+1)/(n+2)*100` with
+# `reached <= n`, Wilson interval, always `<= 100`), `recovery_pct`/`avg_recovery_pct`
+# (Whoop's own 0-100 score), and `protein_cal_pct` (protein calories are a SUBSET of
+# total calories, so `<= 100` by construction).
+_SHARE_PCT_FIELDS = frozenset(
+    {
+        "accuracy_pct",
+        "adherence_pct",
+        "agreement_rate_pct",
+        "android_fat_pct",
+        "arms_pct",
+        "avg_pct",
+        "avg_recovery_pct",
+        "blood_glucose_time_above_140_pct",
+        "blood_glucose_time_in_optimal_pct",
+        "blood_glucose_time_in_range_pct",
+        "body_fat_pct",
+        "chance_accuracy_pct",
+        "combined_agreement_rate_pct",
+        "completion_pct",
+        "compliance_pct",
+        "deep_pct",
+        "gynoid_fat_pct",
+        "habit_completion_pct",
+        "habit_pct",
+        "hit_rate_pct",
+        "keystone_group_pct",
+        "legs_pct",
+        "light_pct",
+        "lymphocyte_pct",
+        "meaningful_pct",
+        "micronutrient_avg_pct",
+        "p_reach_30_ceiling_pct",
+        "p_reach_30_ci95_pct",
+        "p_reach_30_pct",
+        "p_reach_ceiling_pct",
+        "p_reach_ci95_pct",
+        "p_reach_pct",
+        "potassium_pct",
+        "protein_cal_pct",
+        "protein_floor_hit_pct",
+        "protein_hit_pct",
+        "rdw_pct",
+        "recovery_pct",
+        "rem_pct",
+        "resist_rate_pct",
+        "sleep_efficiency_pct",
+        "target_hit_rate_pct",
+        "tier01_pct",
+        "tier0_pct",
+        "time_above_140_pct",
+        "time_in_optimal_pct",
+        "time_in_range_pct",
+        "trunk_pct",
+    }
+)
+
 
 #: Every `*_pct` key this audit has classified, with the domain it belongs to. The
 #: registry is the point: `_pct` is a SUFFIX, not a semantic, and each new domain has
@@ -328,7 +429,8 @@ _ACHIEVEMENT_PCT_MAX = 1000
 #: found by a blocked pipeline.
 PCT_DOMAINS = {
     "share": "0..100 — a part of a whole; the strict default for anything unclassified",
-    "signed": "-100..%d — a signed change; negative is honest, the positive side is open" % _SIGNED_DELTA_PCT_MAX,
+    "signed": "-100..%d — a signed change; negative is honest, the positive side is open "
+    "(some fields override BOTH bounds — see _SIGNED_PCT_BOUNDS_OVERRIDE)" % _SIGNED_DELTA_PCT_MAX,
     "achievement": "0..%d — a share OF A TARGET; beating it is the point" % _ACHIEVEMENT_PCT_MAX,
 }
 
@@ -345,13 +447,48 @@ def pct_domain(key):
 def _pct_bounds(key):
     domain = pct_domain(key)
     if domain == "signed":
-        # `progress_pct` keeps its original 100 ceiling — it is a share of a fixed goal
-        # distance, so 100 IS the whole thing and more would be a defect. Only the open
-        # deltas get the wider positive side.
-        return (-100, 100 if key == "progress_pct" else _SIGNED_DELTA_PCT_MAX)
+        return _SIGNED_PCT_BOUNDS_OVERRIDE.get(key, (-100, _SIGNED_DELTA_PCT_MAX))
     if domain == "achievement":
         return (0, _ACHIEVEMENT_PCT_MAX)
     return (0, 100)
+
+
+# ── #3739 residual: enumerate every `*_pct` the site API layer can serve ─────────────
+#
+# Acceptance box this closes: "Every `*_pct` the API can serve is enumerated and
+# asserted classified, so the fifth domain is caught by a test rather than by a
+# blocked deploy." Four domains so far were each found the same way: real data
+# reached a live deploy and the gate turned red (2026-07-17, 2026-09-12, 2026-09-13
+# x2). That is discovery by production incident. This is the alternative: a static
+# sweep of `lambdas/web/` — the layer that actually shapes what `/api/*` serves — for
+# every `*_pct` string literal, checked in CI on every PR rather than waited for.
+#
+# Deliberately OVER-inclusive: a `.get("x_pct")` READ counts the same as a dict-literal
+# WRITE, so a name that is only ever read internally (never actually reaches a
+# response) still needs a one-line classification. The cost of that is one harmless
+# registry entry; the cost of under-inclusion is the class repeating a fifth time.
+_PCT_KEY_RE = re.compile(r"""["']([a-z][a-z0-9_]*_pct)["']""")
+_WEB_LAMBDA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas", "web")
+
+
+def discover_served_pct_field_names(web_dir=None):
+    """Every `*_pct` string literal anywhere in `lambdas/web/*.py`.
+
+    This is the ENUMERATION half of the #3739 residual: the site-API layer is where a
+    served field's name is decided, so a sweep here catches a new `_pct` name before
+    it ever reaches a live payload — including one gated behind an `available: false`
+    branch that a committed `tests/api_schemas/*.json` snapshot (captured on a day the
+    branch wasn't live) would silently miss. `delta_pct` itself is the proof: it is
+    present here and was ABSENT from the committed `api_deficit_sustainability.json`
+    shape snapshot (captured before the `channels`/`delta_pct` shape existed), so a
+    snapshot-only sweep would have missed the very field this issue is about.
+    """
+    names = set()
+    for fpath in sorted(glob.glob(os.path.join(web_dir or _WEB_LAMBDA_DIR, "*.py"))):
+        with open(fpath) as f:
+            src = f.read()
+        names.update(_PCT_KEY_RE.findall(src))
+    return names
 
 
 def scan_impossible_pcts(payload, source="payload"):
