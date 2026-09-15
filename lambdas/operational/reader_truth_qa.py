@@ -144,6 +144,15 @@ DEFAULT_BATCH_SIZE = 5
 # 6-surface batch stays comfortably inside a Haiku context + pennies per run.
 MAX_PROSE_CHARS = 6000
 
+# The judge's OUTPUT budget for one batch verdict. Named rather than inline (#3688)
+# for the same reason `visual_ai_qa._VERDICT_MAX_TOKENS` is — "every budget must be
+# a named, derived constant" (test_visual_ai_qa_max_tokens_3652) — and because the
+# #3688 positive control has to be able to force it below p50 to reproduce a real
+# truncation. The VALUE is unchanged from the inline literal it replaces; #3688
+# deliberately does not raise it again (#3652/#3656 already tried the raise, and
+# the raise is what did not hold — run 34907061838 truncated at 1500).
+BATCH_VERDICT_MAX_TOKENS = 1500
+
 
 # ── phase ground truth ─────────────────────────────────────────────────────────
 
@@ -615,6 +624,42 @@ def is_unevaluated(err) -> bool:
     return getattr(err, "kind", KIND_TRANSPORT) in UNEVALUATED_KINDS
 
 
+def response_text(resp) -> str:
+    """Concatenate the text blocks of a Bedrock Messages response; never raises."""
+    if not isinstance(resp, dict):
+        return ""
+    return "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
+
+
+def verdict_unreadable_kind(resp):
+    """The UNEVALUATED kind for a RAW judge response, or None if it is readable (#3688).
+
+    This is the #3540 routing decision lifted out of `assess_prose`'s loop so it
+    can also be handed to the retry chokepoint as a predicate — one definition,
+    consulted both to decide whether to re-ask and to record the final outcome.
+    `stop_reason` still outranks the parse result: a reply cut off at
+    `max_tokens` is incomplete even in the rare case its prefix closes into
+    valid JSON.
+    """
+    if isinstance(resp, dict) and (resp.get("stop_reason") or "") == "max_tokens":
+        return KIND_TRUNCATED
+    return parse_verdict(response_text(resp)).get(UNEVALUATED_FIELD)
+
+
+def _verdict_retry():
+    """The shared unreadable-verdict retry chokepoint (#3688).
+
+    Imported lazily, and ONLY here: this module advertises itself as stdlib-only
+    at import time (see the header) and `common.retry_utils` pulls boto3 for its
+    CloudWatch series. There is deliberately no try/except — a missing chokepoint
+    must be a loud ImportError, never a silent fallback to the no-retry path this
+    issue exists to remove.
+    """
+    from common.retry_utils import invoke_until_readable_verdict
+
+    return invoke_until_readable_verdict
+
+
 def parse_verdict(text):
     """Pull the JSON verdict out of the model reply, tolerating stray prose/fences.
 
@@ -715,25 +760,28 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
     phase = phase_context(today_iso)
     pages = [p for p in pages if (p.get("prose") or "").strip()]
     findings, errors = [], []
+    retry_invoke = _verdict_retry()
     for batch in _batches(pages, max(1, batch_size)):
         prompt = build_prompt(batch, phase, max_chars=max_chars)
         batch_paths = {p.get("path") for p in batch}
         try:
-            resp = invoke(
-                {"messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}], "max_tokens": 1500},
+            # #3688: an unreadable verdict gets ONE re-ask at a doubled budget
+            # before the batch is called UNEVALUATED, and the re-ask prints. The
+            # loop itself lives at the common/retry_utils chokepoint; the
+            # predicate stays here because the verdict schema does.
+            resp, unread, _attempts = retry_invoke(
+                invoke,
+                {"messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}], "max_tokens": BATCH_VERDICT_MAX_TOKENS},
+                unreadable=verdict_unreadable_kind,
                 model_name=model_name or DEFAULT_MODEL,
+                label="reader-truth batch [" + ", ".join(str(p.get("path")) for p in batch) + "]",
             )
-            text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
-            verdict = parse_verdict(text)
+            verdict = parse_verdict(response_text(resp))
             # #3540: the batch's own coverage verdict, decided BEFORE its findings
-            # are read. `stop_reason` outranks the parse result: a reply cut off at
-            # max_tokens is incomplete even in the rare case its prefix happens to
-            # close into valid JSON, so the batch is reported unevaluated and any
-            # findings that DID parse are still kept (an unreadable batch must never
-            # lose evidence, and must never claim coverage it does not have).
-            unread = verdict.get(UNEVALUATED_FIELD)
-            if isinstance(resp, dict) and (resp.get("stop_reason") or "") == "max_tokens":
-                unread = KIND_TRUNCATED
+            # are read — `unread` above is that decision, now taken on the LAST
+            # attempt rather than the first. The batch is reported unevaluated and
+            # any findings that DID parse are still kept (an unreadable batch must
+            # never lose evidence, and must never claim coverage it does not have).
             if unread:
                 errors.append(
                     BatchOutcome(

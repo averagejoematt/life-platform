@@ -328,7 +328,32 @@ _UNENROLLED_WRITING_LAMBDA_PY = (
 )
 
 
+# Assembled: tests/test_judge_verdict_retry_3688.py sweeps lambdas/ mcp/ scripts/ deploy/
+# cdk/ for any line that DECIDES on a truncated model reply, and THIS file is under
+# scripts/ — writing the idiom whole here would make the mutations module itself an
+# unregistered judge and red the guard with no plant at all. Same trap as _FIXED_OFFSET_PY
+# above, one gate later.
+_UNREGISTERED_JUDGE_PY = (
+    '"""probe — a synthetic AI judge that calls a truncated verdict terminal."""\n\n\n'
+    "def assess(resp):\n"
+    "    if (resp." + _lit('get("stop_re', 'ason") or "") == "max_', 'tokens"') + ":\n"
+    '        return "truncated"\n'
+    "    return None\n"
+)
+
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_judge_verdict_retry_3688.py": MutationSpec(
+        gate_id="structural::test_judge_verdict_retry_3688.py",
+        target="tests/test_judge_verdict_retry_3688.py",
+        detects=(
+            "a NEW AI-judge call site that records a truncated/unparseable verdict as terminal with no "
+            "retry — the #3688 class, which cannot surface post-merge because `ai-unevaluated` is a "
+            "DECLINE class in visual_qa_verdict.py, so the gate reds and the deploy is never reverted"
+        ),
+        plants=(("lambdas/operational/_census_probe_3688.py", _UNREGISTERED_JUDGE_PY),),
+        track=False,  # the guard walks the filesystem (os.walk), not the git index
+    ),
     "structural::test_role_family_write_scope.py": MutationSpec(
         gate_id="structural::test_role_family_write_scope.py",
         target="tests/test_role_family_write_scope.py",
@@ -585,6 +610,12 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_judge_verdict_retry_3688.py": _proof(
+        "structural::test_judge_verdict_retry_3688.py",
+        "M1 (harness, ARMED 1/1) baseline: 32 passed | mutated: 1 failed, 31 passed :: test_the_judge_call_site_set_is_enumerated_from_source_and_every_member_is_covered | reverted: 32 passed. M2 the same probe under mcp/ and M2b a SUBSCRIPT-form probe under scripts/: 1 failed each (the scan reaches all five dirs, and the subscript form is the one the FIRST DRAFT of the pattern missed). M3/M3b negative controls \u2014 the identical idiom as a leading and as a trailing comment: 32 passed, no cry-wolf. M4b the covered site in tests/visual_ai_qa.py stops deciding on truncation at all: 3 failed \u2014 the Set test naming the file, plus two behavioural tests. All watched 2026-09-14 and restored.",
+        "lambdas/ mcp/ scripts/ deploy/ cdk/ on disk (os.walk, .py only) plus tests/visual_ai_qa.py, tests/visual_qa.py and tests/visual_qa_verdict.py by name, so an UNTRACKED judge is in scope and the rest of tests/ deliberately is not \u2014 its stop-reason literals are FIXTURES implementing the wire, not decisions on it. THE PATTERN WAS WIDENED BY THIS MUTATION RUN and that is the record's most useful line: the first draft matched only the get-and-equality form, and mutation M4 \u2014 rewriting the covered site to the membership form, semantically identical code \u2014 went RED as a phantom new site while the real judge was still there. The rule now requires the two names on one line with a comparison between them and strips trailing comments first; re-measured over the whole scan surface it returns the SAME three sites with no new false positives, and M4 now correctly passes. STILL INVISIBLE, stated rather than papered over: a two-line form (bind the stop reason, compare it on the next line), a helper that returns it, and a parse failure reached without reading it at all \u2014 gaps, not passes, which is why the two covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live gate: whether the next Visual QA (standalone) run actually retries is an observation no offline gate can make (#3688 closes on that run, not on this test).",
+        proved_on="2026-09-14",
+    ),
     "structural::test_role_family_write_scope.py": _proof(
         "structural::test_role_family_write_scope.py",
         "baseline: 18 passed | mutated: 1 failed, 17 passed :: test_every_ddb_writing_entrypoint_is_enrolled_in_the_family | reverted: 18 passed",

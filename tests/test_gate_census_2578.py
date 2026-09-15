@@ -622,7 +622,27 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # blank-line-only paragraph split let an unrelated bullet's "never" satisfy a
         # completely different bullet's missing prohibition — fixed in the same PR before
         # this proof was recorded. Full record in `scripts/gate_census_proofs.py`.
-        <= 97
+        # Upper bound raised 97 -> 98 (2026-09-15, #3688, PR #3807, rebased atop #3804's
+        # 97th): the 98th proof is `structural::test_judge_verdict_retry_3688.py`, a
+        # MutationSpec ARMED 1/1 in scripts/gate_census_mutations.py. Its record is worth
+        # reading rather than counting: THE MUTATION RUN WIDENED THE DETECTOR IT WAS
+        # PROVING. M4 rewrote the covered call site to the membership form — semantically
+        # identical code — and the first-draft pattern reported it as a phantom NEW judge
+        # while the real one sat untouched. The rule now requires the two names on one line
+        # with a comparison between them and strips trailing comments first; re-measured over
+        # the whole scan surface it returns the SAME three sites with no new false positives.
+        # M1 planted an unregistered judge under lambdas/operational/ (1 failed of 32;
+        # reverted 32 passed); M2/M2b re-planted under mcp/ and in SUBSCRIPT form under
+        # scripts/ (1 failed each — the subscript form is what the first draft missed);
+        # M3/M3b are negative controls, the same idiom as a leading and as a trailing comment
+        # (32 passed, no cry-wolf); M4b stripped truncation handling from the covered site in
+        # tests/visual_ai_qa.py (3 failed). Three gaps are STATED in the record rather than
+        # papered over — a two-line bind-then-compare form, a helper that returns the stop
+        # reason, and a parse failure reached without reading it at all — which is why both
+        # covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live
+        # gate: whether a Visual QA run actually retries is an observation no offline gate can
+        # make, so #3688 closes on a run, not on this test.
+        <= 98
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -214,6 +214,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
+        # #3688: source sweep of lambdas/ mcp/ scripts/ deploy/ cdk/ + the three QA
+        # harness files for every site that DECIDES on `stop_reason == "max_tokens"`.
+        # A registry-join check, and pre-merge by construction: a NEW AI judge inherits
+        # the no-retry default silently, and its failure mode — `ai-unevaluated`, which
+        # tests/visual_qa_verdict.py routes to DECLINE — cannot revert a deploy, so
+        # post-merge there is nothing that would ever surface it. Nine days of a red
+        # Visual QA (standalone) is what that looks like.
+        "test_judge_verdict_retry_3688.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the
