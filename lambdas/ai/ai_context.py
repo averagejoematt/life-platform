@@ -12,7 +12,10 @@ from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
-from intelligence import weight_recency  # #1894/#1924: staleness defined once, used by both coach generators
+from intelligence import (
+    labs_facts,  # #3792: the labs window framing has ONE home — see _build_labs_data
+    weight_recency,  # #1894/#1924: staleness defined once, used by both coach generators
+)
 
 from ai.ai_summaries import _avg, _safe_float  # noqa: F401
 
@@ -1308,14 +1311,50 @@ def _build_glucose_data(data):
 
 
 def _build_labs_data(data):
-    """Extract labs-domain data for the labs coach."""
-    labs = data.get("labs") or {}
-    return {
-        "draw_date": labs.get("draw_date") or labs.get("date"),
-        "flagged_markers": labs.get("flagged_markers", []),
-        "flagged_count": labs.get("flagged_count", 0),
-        "total_draws": labs.get("total_draws", 0),
-    }
+    """Extract labs-domain data for the labs coach (#3792).
+
+    This is the producer behind `/api/coaching-dashboard`'s labs row —
+    `daily_brief_lambda` -> `ai_calls.call_labs_coach_v2` -> `_run_coach_v2_pipeline`,
+    whose prompt JSON-dumps whatever this returns under `LABS DATA:`. It used to
+    return a hand-built dict:
+
+        {"draw_date": "2026-04-03", "flagged_markers": [], "flagged_count": 0,
+         "total_draws": 0}
+
+    Two defects in four keys. `flagged_markers`/`flagged_count`/`total_draws` were read
+    off the top-level schema #1993 proved **has never existed** (a draw record stores a
+    nested `biomarkers` map plus `out_of_range` / `out_of_range_count` /
+    `total_biomarkers`), so all three were structurally constant — the exact ADR-104
+    breach #1993 fixed in the analyzer, still live here. And `draw_date` arrived as a
+    bare date with **no age and no statement that the draw is done**, so a model handed
+    `"2026-04-03"` beside `"total_draws": 0` reconciled the contradiction the only way
+    it could and narrated a 166-day-old panel as forthcoming — live on the public
+    dashboard: *"I'm coordinating a comprehensive April 3rd lab panel …"*.
+
+    Both halves now come from `intelligence.labs_facts`, which is the same builder
+    `#3737`'s analyzer and `#3792`'s `coach.coach_domain_facts._labs_pack` read. The
+    window framing keeps ONE home: re-typing the sentence into a second place is how
+    #3737's fix and this producer drifted apart in the first place.
+    """
+    # `labs_draws` (#3792) is the full chronological history; `labs` is the newest
+    # record alone and is the degraded fallback for any caller that has not been
+    # taught the new key — one draw is honest about the panel, so `total_draws` is
+    # dropped rather than asserted as 1.
+    draws = data.get("labs_draws")
+    single = data.get("labs") or {}
+    partial = False
+    if not draws:
+        draws = [single] if single else []
+        partial = bool(draws)
+    block = labs_facts.build_labs_fact_block(draws)
+    if partial:
+        block.pop("total_draws", None)
+    # The frame that says what those numbers mean and which direction time runs.
+    # Same function the analyzer's prompt uses; rendered into the domain dict here
+    # because this pipeline hands the coach `domain_data` as JSON, not as prose
+    # (`_build_physical_data`'s `weight_recency_note` is the same pattern).
+    block["labs_framing_note"] = labs_facts.labs_prompt_block(block)
+    return block
 
 
 def _build_explorer_data(data):

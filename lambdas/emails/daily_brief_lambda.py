@@ -672,6 +672,13 @@ def gather_daily_data(profile, yesterday):
     dexa = _latest_item("dexa")
     measurements = _latest_item("measurements")
     labs_latest = _latest_item("labs")
+    # #3792: the labs coach needs the WHOLE draw history, not just the newest record.
+    # `_latest_item` answers "what is the most recent panel"; `total_draws` and the
+    # "these are periodic draws over your full history" framing are properties of the
+    # LIST. Handing the coach one record let it read `total_draws: 0` beside a real
+    # 2026-04-03 date and narrate the completed panel as one still to be booked.
+    # Chronological (newest last) — the order `intelligence.labs_facts` expects.
+    labs_draws = fetch_range("labs", "1900-01-01", today.isoformat())
 
     # Strength workout detail — exercise-level (v2.2 MacroFactor; repointed to
     # Hevy per #485, macrofactor_workouts having gone dark ~4 months ago)
@@ -943,6 +950,7 @@ def gather_daily_data(profile, yesterday):
         "dexa": dexa,
         "measurements": measurements,
         "labs": labs_latest,
+        "labs_draws": labs_draws,  # #3792: full history; see gather_daily_data above
     }
 
 
