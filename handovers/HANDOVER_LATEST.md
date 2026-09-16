@@ -283,12 +283,20 @@ subsystem's posture, not a new subsystem with its own rent row.
 
 ## Residual / next picks
 
-- **#3834 is complete and blocked on a SWALLOWED PUSH, not on its diff.** `#3834` — two consecutive
-  pushes minted zero runs (`actions/runs?head_sha=<40>` → 0, `check-runs` → 0, `gh pr checks` → "no
-  checks reported") while the previous sha on the same branch has 6, and Actions itself was demonstrably
-  healthy (an approved deploy ran throughout). Its only red — the platform model's `timeout_seconds`
-  drift — is already fixed and `--check` reports current. **Recovery is one more new sha, or a
-  supersede-PR. NEVER a close/reopen** — that has wedged a branch permanently.
+- **#3836 is complete and blocked on a GitHub `pull_request` OUTAGE.** `#3836` — supersedes #3834
+  (closed; same commits, identical tree). **Diagnosed definitively, not inferred:** the last
+  `pull_request`-triggered run on ANY PR in this repo was `2026-09-16T01:06:01Z`; at 03:18Z that was
+  **2h12m with zero**, while `push` runs fired normally at 03:17Z and `workflow_dispatch` worked at
+  03:08Z. It is GitHub, repo-wide, and **no PR can merge until it recovers.**
+  Four local recoveries were tried and each ruled something out: re-push with a new sha (not a stuck
+  sha); a throwaway branch (**an INVALID test** — `pr-checks.yml` triggers on `pull_request`, so a
+  branch with no PR fires nothing; zero was the expected result and proved nothing, branch deleted);
+  a supersede-PR firing `opened` rather than `synchronize` (still zero, which is what made it
+  definitive); and the `push`-vs-`pull_request` comparison that settled it.
+  **NEVER close/reopen to mint checks** — it has wedged a branch permanently. If it has not recovered,
+  one more sha is the cheapest nudge, and after that the answer is to wait: every local option is now
+  tried and measured. Nothing in the diff needs revisiting.
+
 - **#3830 leg 2** — `#3830` a real vendor transient must be observed leaving `failed_deploy_health` at 0.
   Leg 1 is proven (deployed 01:26:13Z, verified in the bundle). **Do not plant one**; a synthetic
   transient injected to satisfy a proof bar is what the bar exists to prevent.

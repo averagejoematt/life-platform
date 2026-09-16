@@ -230,7 +230,6 @@ structurally invisible behind it; first successful theme-river live build in CI,
 my own work:** #3829's cause is a 47x STEP on 2026-08-31 (the budget tier un-paused the feature; its 90s
 ceiling had been sized while it was dark, reading as 68x headroom), not a creep; #3797's 2.1x speedup is
 really ~1.32x median (n=3 vs n=9, wrong denominator and generalising from one sample); and a mutation found a
-hole in my OWN guard (`"censor" in comment` matched the comment's own "UNCENSOR"). **Owner acts left:** #3834
-is complete and blocked on a swallowed push (recover with one more sha or a supersede-PR, NEVER a
-close/reopen) · #3830 leg 2 + box 3 · #3563's 15:10Z cron · #3835 the post-merge suite is still serial ·
+hole in my OWN guard (`"censor" in comment` matched the comment's own "UNCENSOR"). **Owner acts left:** #3836
+(superseding the closed #3834) is complete and blocked on a GitHub `pull_request` OUTAGE — repo-wide, zero such events for 2h12m while `push` fired normally, so NO PR can merge until it recovers; four local recoveries tried and measured, NEVER close/reopen · #3830 leg 2 + box 3 · #3563's 15:10Z cron · #3835 the post-merge suite is still serial ·
 #3832 · 2026-09-13's unexplained missing ensemble row.
