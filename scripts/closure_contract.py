@@ -211,6 +211,20 @@ CLOSURE_CONTRACT: tuple = (
         finding_codes=("no-live-proof",),
     ),
     Requirement(
+        id="close-the-shipped",
+        rule=(
+            "A merged commit that names an open issue in its SUBJECT has either closed it or said why not. "
+            "Detector B catches a PR closing too MUCH; this is the other direction — the fix ships, the keyword "
+            "is forgotten, and the issue sits open until a human re-reads it. Session AF swept 40 open issues by "
+            "hand and found 11 already fixed by a merged PR (open 7-17 days); TEN named the issue in the merge "
+            "subject with no closing keyword (#3812). An instrument held for its live proof "
+            "(`closure:live-proof`, or `**Closure class:** instrument`) and a `type:epic` are correctly unlinked "
+            "and are NOT findings. A finding is a question for a human, never a closure."
+        ),
+        detector="scripts/check_unlinked_closures.py",
+        finding_codes=("shipped-unlinked",),
+    ),
+    Requirement(
         id="partial-is-not-a-close",
         rule=(
             "A PR body that still carries an unchecked acceptance box (`- [ ]`) does not carry a closing "
@@ -225,12 +239,93 @@ CLOSURE_CONTRACT: tuple = (
 
 ALL_FINDING_CODES: frozenset = frozenset(code for r in CLOSURE_CONTRACT for code in r.finding_codes)
 
+
+# ── finding codes must not END in a GitHub closing keyword (#3812) ────────────────────────
+# Found the hard way: detector C shipped as `unlinked-shipped-fix`, so its own printed line
+#
+#     unlinked-shipped-fix  #3830  1 merged commit(s) name #3830 ...
+#
+# parses as `fix #3830` under CLOSING_REF_RE — GitHub's own grammar. A detector whose REPORT
+# is a closing-keyword injection is a live footgun: pasting the sweep output into a PR body
+# or a commit message would close every issue it names, which is the exact class detector B
+# exists to catch. Renamed to `shipped-unlinked` before it ever ran in anger; detector B is
+# what caught it, on this file's own PR.
+#
+# Dated, shrink-only exemption ledger (charter primitive 3). An entry comes OUT when the code
+# is renamed; nothing may be ADDED without renaming being considered first.
+CODE_KEYWORD_EXEMPTIONS: dict = {
+    "partial-acceptance-close": (
+        "2026-09-16 — PRE-EXISTING (#3318). Same defect: `partial-acceptance-close #2848` in a PR "
+        "body parses as `close #2848`. NOT renamed here because the code is cited as a historical "
+        "record in docs/PROPORTIONALITY.md's rent row (naming the live run that found PR #3253) and "
+        "in .claude/skills/land/SKILL.md; rewriting a past run's record to fix a forward-looking "
+        "naming rule is the wrong trade at the wrong time. Carried as its own issue."
+    ),
+}
+
+
+def codes_ending_in_a_closing_keyword(codes=None) -> dict:
+    """Pure. → {code: keyword} for every finding code whose trailing token is a closing keyword.
+
+    Excludes the dated ledger above. The check is on the TRAILING token because that is the
+    position CLOSING_REF_RE reads: `<kw>` immediately followed by whitespace and `#N`.
+    """
+    offenders = {}
+    for code in sorted(ALL_FINDING_CODES if codes is None else codes):
+        if code in CODE_KEYWORD_EXEMPTIONS:
+            continue
+        tail = code.rsplit("-", 1)[-1].lower()
+        if tail in CLOSING_KEYWORDS:
+            offenders[code] = tail
+    return offenders
+
+
 # ── the vocabulary detectors derive from ────────────────────────────────────────────────
 
 # GitHub's closing-keyword grammar (docs: "Linking a pull request to an issue"): one of the
 # nine keywords, an optional colon, whitespace, then `#N`, `owner/repo#N`, or an issue URL.
 # The keyword must sit IMMEDIATELY before the reference — `fixes the bug in #12` does not link.
 CLOSING_KEYWORDS = ("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved")
+# GitHub does NOT link a closing reference inside a code span or a code block — a
+# backticked `close #123` renders as literal text and closes nothing. The parser here did
+# not know that, and the consequence was a FALSE BLOCK: a PR whose commit messages
+# *explain* the closing-keyword grammar (quoting `close #2848` and `fix #3830` as examples)
+# had its whole closing set read as real, while GitHub's own `closingIssuesReferences`
+# correctly returned {} (#3812). Prose ABOUT a closing keyword was indistinguishable from
+# a closing keyword — which is a bad property for a detector whose whole job is to be read
+# and written about.
+#
+# The three code forms GitHub honours, stripped in this order (longest fence first, so a
+# ``` block containing backticks is not shredded by the span rule):
+#   ``` fenced blocks ```      · ~~~ fenced blocks ~~~
+#   indented blocks            · a line starting with 4 spaces or a tab
+#   `inline spans`             · one or more backticks, matched by run length
+#
+# Deliberately NOT a markdown parser: it strips more aggressively than GitHub in exotic
+# cases, and the failure direction of over-stripping is a MISSED finding rather than a
+# false close — detector B reads GitHub's own linked set alongside this parse and reports
+# any disagreement in both directions, so a miss here surfaces as `github-parse-disagree`
+# rather than sliding through.
+_FENCED_RE = re.compile(r"(?ms)^[ \t]*(`{3,}|~{3,}).*?(?:^[ \t]*\1[ \t]*$|\Z)")
+_INDENTED_RE = re.compile(r"(?m)^(?: {4,}|\t).*$")
+_SPAN_RE = re.compile(r"(`+)(?:.|\n)*?\1")
+
+
+def strip_code(text: str) -> str:
+    """Blank out code fences, indented blocks and inline spans, preserving newlines.
+
+    Newlines are kept so any position-based reporting a caller layers on top still lines
+    up with the original text.
+    """
+
+    def _blank(m):
+        return re.sub(r"[^\n]", " ", m.group(0))
+
+    out = _FENCED_RE.sub(_blank, text or "")
+    out = _INDENTED_RE.sub(_blank, out)
+    return _SPAN_RE.sub(_blank, out)
+
+
 CLOSING_REF_RE = re.compile(
     r"\b(?P<kw>" + "|".join(CLOSING_KEYWORDS) + r")\b:?\s+"
     r"(?:https?://github\.com/(?P<url_repo>[\w.-]+/[\w.-]+)/issues/(?P<url_num>\d+)"
@@ -522,7 +617,7 @@ def closing_refs(text: str, repo: str | None = None) -> list:
     refs (`owner/other#N`, or a URL into another repo) come back as "owner/other#N" strings so
     a caller can name them without mistaking them for a local issue."""
     out: list = []
-    for m in CLOSING_REF_RE.finditer(text or ""):
+    for m in CLOSING_REF_RE.finditer(strip_code(text or "")):
         num = m.group("num") or m.group("url_num")
         ref_repo = m.group("repo") or m.group("url_repo")
         if ref_repo and repo and ref_repo.lower() != repo.lower():

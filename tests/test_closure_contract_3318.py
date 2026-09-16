@@ -87,7 +87,7 @@ def test_every_finding_code_a_detector_can_emit_is_registered():
     import re
 
     emitted = set()
-    for script in (SCRIPTS / "closure_sweep.py", SCRIPTS / "check_pr_closing_set.py"):
+    for script in (SCRIPTS / "closure_sweep.py", SCRIPTS / "check_pr_closing_set.py", SCRIPTS / "check_unlinked_closures.py"):
         emitted |= set(re.findall(r"Finding\(\s*\"([a-z][a-z-]+)\"", script.read_text(encoding="utf-8")))
     assert emitted, "extractor found nothing — the Finding(...) idiom moved; fix the extractor, not the assertion"
     assert emitted <= cc.ALL_FINDING_CODES, f"unregistered finding code(s): {sorted(emitted - cc.ALL_FINDING_CODES)}"
