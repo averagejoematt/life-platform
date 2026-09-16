@@ -23,6 +23,7 @@ script and the unit test can call them without any AWS or LLM dependency.
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 # The enriched field this river is built from.
@@ -265,6 +266,33 @@ def list_enriched_entries(table, start_date: str, end_date: str):
     return out
 
 
+logger = logging.getLogger(__name__)
+
+
+class ProvenanceUnreadable(RuntimeError):
+    """The flourishing partition could not be READ (#3813 member (b)).
+
+    Distinct from "there are no flourishing rows yet", which is an honest absence that
+    legitimately yields the defaults. Raised so a caller must decide, rather than having
+    the two collapse into one silent tuple.
+    """
+
+
+def latest_provenance_or_degraded(table):
+    """(model, schema_version, degraded_reason|None) — the fail-soft caller contract.
+
+    Keeps the build up (a provenance read must never take the river down) while making the
+    difference visible: `degraded_reason` is None for a real read AND for an honest empty
+    partition, and carries the classified cause when the partition could not be read.
+    """
+    try:
+        model, sv = latest_provenance(table)
+        return model, sv, None
+    except ProvenanceUnreadable as exc:
+        logger.error("theme river provenance UNREADABLE — publishing defaults, stamped as degraded: %s", exc)
+        return DEFAULT_MODEL, DEFAULT_SCHEMA_VERSION, str(exc)
+
+
 def latest_provenance(table):
     """(model, schema_version) from the most recent flourishing row, else defaults.
 
@@ -286,6 +314,15 @@ def latest_provenance(table):
             model = row.get("enrichment_model") or DEFAULT_MODEL
             sv = row.get("enrichment_schema_version")
             return str(model), int(sv) if sv is not None else DEFAULT_SCHEMA_VERSION
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        # #3813 member (b): a bare `except: pass` here published DEFAULT provenance on a
+        # PUBLIC artifact as if it had been measured. "No flourishing rows yet" and "the
+        # Query was denied" are opposite facts and used to render identically — the exact
+        # #3681 shape ("(offline?)" over an AccessDenied), one module along.
+        #
+        # It stays FAIL-SOFT on purpose: the river is a reader artifact and a provenance
+        # read must never take the build down. What changes is that an unreadable partition
+        # is now LOUD and STAMPED, so the artifact carries `provenance_degraded` and a
+        # reader-facing consumer can tell a measured model from a fallback.
+        raise ProvenanceUnreadable(f"{type(exc).__name__}: {exc}") from exc
     return DEFAULT_MODEL, DEFAULT_SCHEMA_VERSION

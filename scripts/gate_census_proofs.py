@@ -705,6 +705,45 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-16",
     },
+    # #3812: detector C of the closure contract. The mutation is NOT synthetic — it is a
+    # LIVE STATE TRANSITION on real data, observed within the same session, which is the
+    # strongest form available to a gate that reads git history and the issue tracker.
+    "guard::scripts/check_unlinked_closures.py": {
+        "gate_name": "scripts/check_unlinked_closures.py",
+        "command": (
+            "python3 scripts/check_unlinked_closures.py --since 2026-08-01   # live, read-only (git log + gh issue list); "
+            "tests/test_unlinked_closures_3812.py covers the pure `evaluate`/`parse_refs` logic offline (20 cases)"
+        ),
+        "mutation": (
+            "the natural experiment, not a plant: the run quoted verbatim in commit 255466389's own message (committed 2026-09-16T03:38:16Z) reported 14 findings "
+            "INCLUDING `shipped-unlinked #3642` — commit cf281a65e names `#3642` in its subject with no "
+            "closing keyword. #3642 was then verified and CLOSED at 03:42:00Z (GitHub closedAt). The commit, its subject, the "
+            "window and the ref are all byte-identical across the two runs; the ONLY variable changed is the "
+            "issue's open/closed state."
+        ),
+        "observed": (
+            "BEFORE (03:36Z, #3642 open): `findings=14`, with the line "
+            '"shipped-unlinked  #3642  2 merged commit(s) name #3642 in the subject with no closing '
+            'keyword, and it is still open". AFTER (03:48:23Z, #3642 closed, same command, same ref '
+            "20a597d07, same window): `UNLINKED-CLOSURE VERDICT NONGREEN mode=warn window=origin/main "
+            "since 2026-08-01 commits=1694 findings=13 held=4` and `grep '#3642'` returns nothing. "
+            "The gate therefore measures OPEN-ness against the merge record, not the presence of a subject "
+            "ref — which is precisely the property a static reading of the source cannot establish. "
+            "Both watched 2026-09-16. The must-fail control (a planted merge commit naming an open issue IS "
+            "reported) and its matched positive control (the same commit with `Fixes #N` goes SILENT) are "
+            "carried offline in tests/test_unlinked_closures_3812.py, 20 cases including a MUTATION of the "
+            "DISPOSITIONED ledger that surfaces the issue it was hiding."
+        ),
+        "scope": (
+            "Reads commit SUBJECTS only, so a fix whose issue is named solely in the body (`Refs #N`, "
+            "`**Epic:** #N`) is invisible BY DESIGN — that is the precision trade recorded in the script "
+            "header (43 raw mentions collapse to 20 subject-level ones). It answers 'does this commit claim "
+            "to address an open issue', never 'does the defect still reproduce': the finding is a question "
+            "for a human and the closure is always a separate, evidenced act. It also cannot see a fix that "
+            "names its issue nowhere at all."
+        ),
+        "proved_on": "2026-09-16",
+    },
     "guard::scripts/check_raw_zone_drift.py": {
         "gate_name": "scripts/check_raw_zone_drift.py",
         "command": "python3 scripts/check_raw_zone_drift.py   # live read-only S3 check; tests/test_raw_zone_drift_3570.py covers the pure logic (check_coverage/expand_prefix/prefix_root/known_prefix_roots) offline",
@@ -1498,5 +1537,45 @@ REGISTRY_PROOFS.update(
             "proved_on": "2026-09-06",
         }
         for selector, (alpha, n, worst) in _DERIVED_DECOR_OBSERVED.items()
+    }
+)
+
+
+# ── #3812: the finding-code keyword ledger. ONE entrant, and it is hiding a real offender ──
+#
+# The rule it excuses exists because detector C shipped as `unlinked-shipped-fix`, whose own
+# printed report line parses as `fix #3830` under GitHub's closing grammar. The ledger's one
+# entry is the PRE-EXISTING twin of that defect, carried rather than renamed.
+REGISTRY_PROOFS.update(
+    {
+        "registry::scripts/closure_contract.py::CODE_KEYWORD_EXEMPTIONS::partial-acceptance-close": {
+            "gate_name": "CODE_KEYWORD_EXEMPTIONS[partial-acceptance-close]",
+            "command": "python3 -m pytest tests/test_unlinked_closures_3812.py -q   # 25 cases",
+            "mutation": (
+                "The entry deleted from CODE_KEYWORD_EXEMPTIONS in the REAL tracked file "
+                "(scripts/closure_contract.py), leaving `partial-acceptance-close` unexcused — the exact "
+                "drift mode, since an exemption ledger that has silently emptied looks identical to one "
+                "with nothing to excuse."
+            ),
+            "observed": (
+                "MUTATED: exit 1, `FAILED tests/test_unlinked_closures_3812.py::"
+                "test_no_finding_code_ends_in_a_GITHUB_CLOSING_KEYWORD`, 1 failed / 24 passed — the failure "
+                "names {'partial-acceptance-close': 'close'}, so the ledger is demonstrably hiding a real "
+                "offender rather than an empty set. REVERTED (file restored from a pre-mutation copy): "
+                "25 passed, exit 0. Watched 2026-09-16. A second, independent monkeypatch form of the same "
+                "mutation is carried in-test "
+                "(test_MUTATION_emptying_the_exemption_ledger_surfaces_the_known_pre_existing_one) so the "
+                "property is asserted even if this record goes stale."
+            ),
+            "scope": (
+                "It judges the TRAILING token of a finding code against CLOSING_KEYWORDS, which is the only "
+                "position CLOSING_REF_RE reads. A code with a closing keyword in the MIDDLE "
+                "(`close-the-shipped`, a requirement id in this same registry) is correctly not flagged, "
+                "because a keyword only links when it sits immediately before the `#N`. It says nothing "
+                "about where a code is printed — a detector that never emits its code next to an issue "
+                "number is not at risk, and one that does is, and this rule cannot tell them apart."
+            ),
+            "proved_on": "2026-09-16",
+        }
     }
 )

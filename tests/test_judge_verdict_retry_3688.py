@@ -47,8 +47,10 @@ What this file holds:
     the specimen is not fixing the class.
 """
 
+import importlib.util
 import json
 import os
+import pathlib
 import re
 import struct
 import sys
@@ -381,17 +383,60 @@ _RESIDUAL = {
 }
 
 
-def _enumerate_truncation_decision_sites():
+def _staging_roots(repo=None):
+    """Absolute bundle-staging roots, DERIVED (#3832) — never a literal list here.
+
+    The scan walks the filesystem rather than the git index (that `track=False` property is
+    deliberate: it is how a planted, untracked judge is caught). The cost is that on any
+    machine which has run a CDK deploy, `cdk/_bundle_staging/` and `cdk/_mcp_staging/` hold
+    byte-copies of files this guard ALREADY covers, and each copy reports as a new,
+    unregistered judge — six phantoms burying any real finding.
+
+    The roots come from deploy/bundle_and_mirror_registry.discover_bundle_staging_roots(),
+    which reads the CDK sources that construct those paths, so a renamed or newly added
+    staging directory moves this skip with it.
+
+    NB on the acceptance wording: #3832 box 1 names `discover_bundle_staging_sites()`. That
+    function answers a different question — which SCRIPTS can put code into a Lambda — and
+    returns deploy/*.sh and workflow paths, not directories. Following it literally would
+    skip nothing. The sibling `discover_bundle_staging_roots()` was added in the same
+    registry module to answer the question the box actually needs, keeping the derivation in
+    one home and out of this test.
+    """
+    repo = repo or _REPO
+    spec = importlib.util.spec_from_file_location("_bmr_3832", os.path.join(repo, "deploy", "bundle_and_mirror_registry.py"))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    roots = {os.path.join(repo, r) for r in mod.discover_bundle_staging_roots(repo)}
+    assert roots, "staging-root derivation returned nothing — the CDK path idiom moved; fix the derivation, not this assertion"
+    return roots
+
+
+def _enumerate_truncation_decision_sites(repo=None):
+    """`repo` lets a test drive this over a TEMP tree.
+
+    #3832 round 2: the first cut of the two mutation controls below planted a probe file
+    into the REAL lambdas/operational/. Under #3797's parallel pre-merge lane another
+    worker walking that directory caught the file mid-flight and died with
+    FileNotFoundError — a test that mutates the shared source tree is not safe once the
+    suite runs concurrently. The controls now build their own tree instead.
+    """
+    repo = repo or _REPO
     hits = {}
-    paths = [os.path.join(_REPO, f) for f in _SCAN_FILES]
+    skip_roots = tuple(os.path.normpath(r) + os.sep for r in _staging_roots(repo))
+    paths = [os.path.join(repo, f) for f in _SCAN_FILES]
     for d in _SCAN_DIRS:
-        for root, dirs, files in os.walk(os.path.join(_REPO, d)):
+        for root, dirs, files in os.walk(os.path.join(repo, d)):
             dirs[:] = [x for x in dirs if x not in ("node_modules", "cdk.out", "__pycache__", ".venv")]
+            if os.path.normpath(root).startswith(skip_roots) or any(os.path.normpath(root) + os.sep == r for r in skip_roots):
+                dirs[:] = []
+                continue
             paths.extend(os.path.join(root, f) for f in files if f.endswith(".py"))
     for p in paths:
         if not os.path.isfile(p):
             continue
-        rel = os.path.relpath(p, _REPO)
+        rel = os.path.relpath(p, repo)
         with open(p, encoding="utf-8", errors="replace") as f:
             for i, line in enumerate(f, 1):
                 if line.lstrip().startswith("#"):
@@ -436,3 +481,70 @@ def test_every_residual_names_the_issue_it_is_folded_onto_in_its_own_source():
     code will find. The named issue must appear in the module itself."""
     for rel, (issue, _why) in _RESIDUAL.items():
         assert issue in _read(rel), f"{rel} is folded onto {issue} but its source never names it"
+
+
+def _planted_judge_source():
+    """The SAME synthetic judge the census mutation harness plants (#3688's MutationSpec),
+    imported rather than re-typed so the two controls cannot drift apart."""
+    spec = importlib.util.spec_from_file_location("_gcm_3832", os.path.join(_REPO, "scripts", "gate_census_mutations.py"))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod._UNREGISTERED_JUDGE_PY
+
+
+# ── #3832: the staging-mirror false positives, and the property that must survive the fix ──
+def test_3832_staging_roots_are_DERIVED_not_a_literal_list_in_this_test():
+    """The skip must move when a staging directory is renamed or added. If this test file
+    ever grows a hard-coded "cdk/_bundle_staging", that has stopped being true."""
+    roots = {os.path.relpath(r, _REPO) for r in _staging_roots()}
+    assert roots == {"cdk/_bundle_staging", "cdk/_mcp_staging"}, roots
+    src = open(__file__, encoding="utf-8").read()
+    body = src.split("def _staging_roots", 1)[1].split("def _enumerate_truncation_decision_sites", 1)[0]
+    assert (
+        '"cdk/_bundle_staging"' not in body and "'cdk/_bundle_staging'" not in body
+    ), "_staging_roots() hard-codes a staging path — it must derive them from the registry (#3832 box 1)"
+
+
+def _temp_repo(tmp_path):
+    """A minimal tree the scan can walk: the CDK sources that DECLARE the staging roots,
+    plus the scanned dirs. Copied from the real repo so the derivation under test is the
+    real one, not a stand-in."""
+    for rel in ("cdk/stacks/lambda_helpers.py", "cdk/stacks/mcp_stack.py", "deploy/bundle_and_mirror_registry.py"):
+        dst = tmp_path / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes((pathlib.Path(_REPO) / rel).read_bytes())
+    for d in _SCAN_DIRS:
+        (tmp_path / d).mkdir(parents=True, exist_ok=True)
+    return str(tmp_path)
+
+
+def test_3832_the_temp_tree_derives_the_SAME_staging_roots_as_the_real_one(tmp_path):
+    """Without this, the two controls below could be measuring a tree whose roots differ
+    from production — passing for the wrong reason."""
+    repo = _temp_repo(tmp_path)
+    got = {os.path.relpath(r, repo) for r in _staging_roots(repo)}
+    assert got == {"cdk/_bundle_staging", "cdk/_mcp_staging"} == {os.path.relpath(r, _REPO) for r in _staging_roots()}
+
+
+def test_3832_MUTATION_a_judge_planted_INSIDE_a_staging_root_is_NOT_reported(tmp_path):
+    """Box 3. The phantom direction: a byte-copy of an already-covered file must be silent."""
+    repo = _temp_repo(tmp_path)
+    root = pathlib.Path(sorted(_staging_roots(repo))[0])
+    root.mkdir(parents=True, exist_ok=True)
+    planted = root / "_census_probe_3832.py"
+    planted.write_text(_planted_judge_source(), encoding="utf-8")
+    hits = _enumerate_truncation_decision_sites(repo)
+    assert os.path.relpath(str(planted), repo) not in hits, "a staging-root mirror is still reported (#3832 box 3)"
+
+
+def test_3832_MUTATION_a_judge_planted_OUTSIDE_the_staging_roots_is_STILL_caught(tmp_path):
+    """Box 2 — the property the fix must not cost. An untracked file under a scanned dir is
+    exactly what `track=False` exists to catch; if the skip were written as 'ignore
+    untracked files' instead of 'ignore staging roots', this would go quiet."""
+    repo = _temp_repo(tmp_path)
+    planted = pathlib.Path(repo) / "lambdas" / "operational" / "_census_probe_3832.py"
+    planted.parent.mkdir(parents=True, exist_ok=True)
+    planted.write_text(_planted_judge_source(), encoding="utf-8")
+    hits = _enumerate_truncation_decision_sites(repo)
+    assert os.path.relpath(str(planted), repo) in hits, "the fix silenced a REAL untracked judge — track=False was lost (#3832 box 2)"

@@ -907,7 +907,7 @@ td .evb .evb-tip { left: auto; right: 0; }
 /* ── /evidence/vitals/ — glance-first instrument panel (P0.1+) ───────────────────
    Component rings + status band. tone: ember=good, muted=neutral/forming, alert=RED STATE
    (reserved). Red never encodes a direction. */
-.vs-band { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-sm); border: var(--honest-border); }
+.vs-band { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; min-width: 0; margin: var(--sp-2) 0 var(--sp-3); padding: var(--sp-3); border-radius: var(--radius-sm); border: var(--honest-border); }
 .vs-band.vs-ember { border-color: var(--ember-line); background: var(--ember-wash); }
 .vs-band.vs-alert { border-color: var(--alert-line); background: var(--alert-wash); }
 .vs-word { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
@@ -916,7 +916,15 @@ td .evb .evb-tip { left: auto; right: 0; }
 .vs-alert .vs-w { color: var(--alert); }
 .vs-muted .vs-w { color: var(--ink); }
 .vs-line { color: var(--ink-muted); }
-.vs-stamp { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-small); white-space: nowrap; }
+/* #3734: the stamp is a SENTENCE ("10 days in — baseline still forming"), not a chip.
+   `white-space: nowrap` made it 372.4px inside a 353px band at 390w, so it clipped
+   mid-word with no ellipsis and no signal — and because the band does not scroll, the
+   page-level overflow measure read 0, which is why nine months of sweeps missed it.
+   The sibling bands are chips, not sentences (.lmk-band is an empty positioned span,
+   .vf-band and .rcp-band hold one word), so they keep nowrap correctly. `min-width: 0`
+   lets the flex child shrink below its content width — without it a flex item refuses
+   to go under min-content and wrapping alone would not save it. */
+.vs-stamp { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-small); min-width: 0; overflow-wrap: anywhere; }
 .vr-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin: var(--sp-3) 0; }
 .vr { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); position: relative; }
 .vr-svg { width: 100%; max-width: 92px; aspect-ratio: 1; }
