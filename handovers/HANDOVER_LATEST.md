@@ -165,7 +165,7 @@ labs surface has not regenerated yet; a beat would narrate a fix the reader cann
 **Docs:** `docs/CONVENTIONS.md` §4a2 (regenerated closure-contract block, +`close-the-shipped`),
 `docs/PROPORTIONALITY.md` (646→647 declared gates, by `sync_doc_metadata.py --apply`).
 **Decisions:** none needed — every posture call tonight narrows an existing rule rather than setting policy.
-**Main:** green (623b4cf0); HEAD c2ffd519 in flight at wrap.
+**Main:** green — `check_main_green.py` reads GREEN at HEAD 730059e0 (CI/CD success). **One red beside it, outside CI/CD and therefore outside that check: `Config twin drift` at 18:55Z on `config/hevy_template_index.json` — #3785, pre-existing, not this session's, evidence posted there.**
 **Incidents:** none — no rollback fired, no data gap, no >1h main-red. Auto-rollback SKIPPED on every deploy.
 **Stash/hooks:** clean — stash empty; 9 session lanes released and removed (118 → 113 worktrees); one
 incidental permission auto-add to `.claude/settings.local.json` reverted rather than committed.
@@ -191,8 +191,13 @@ but all three entrants are guards inside existing postures, not new rent rows.
   reaching for `merge_train.sh`, which documents that tax as *"serial by construction."* Reach for it at the
   second conflict, not the fifth. `not-work — a process correction, recorded here; no issue.`
 - **#3848 / #3849** — both fresh, both with must-fail controls specified in their acceptance.
-- **#3785's clobber** — self-heals at 13:40Z daily and is re-broken ~4h later by something matching no cron.
-  Box 3's provenance dead-man (`_built_at` within ~26h) would catch every instance within a day.
+- **#3785's clobber** — **the ~4h re-break claim did NOT hold today; do not inherit it.** Live was rebuilt
+  to 820 at 13:40:35Z and was still 820 at 19:26Z (5h45m). The **Config twin drift** workflow went RED at
+  18:55Z on this file after NINE green runs, and the reason it was green before is the real finding: while
+  the clobber was active BOTH sides read 789, so a comparison gate had nothing to report. It is
+  structurally blind in exactly the failing state. Box 3's provenance dead-man is not — it grades one
+  artifact against the clock, and only live carries `_built_at`. Measured and posted to #3785; the twin was
+  deliberately NOT refreshed, since committing 820 would green the gate and bury the question.
 - **#3833 has no ADR-099 verdict** — SUPERSEDED in the tail below. This line reasoned its way to the
   right answer (*"adding a verdict by hand would be a human asserting a bot's outcome"*) and then left the
   GATE believing otherwise. Fixed structurally by #3851/PR #3852. `not-work — the reasoning is now in
