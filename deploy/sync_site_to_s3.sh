@@ -237,14 +237,59 @@ else
   echo "⚠️  node not found — JS parse gate SKIPPED (install Node to enable the #377 gate)." >&2
 fi
 
-# Find CloudFront distribution ID for averagejoematt.com
-CF_DIST_ID=$(aws cloudformation describe-stacks \
+# ── Find the CloudFront distribution ID (#3813 member (a)) ───────────────────
+#
+# This used to be `... 2>/dev/null || echo ""`, which discarded the error text AND the
+# exit status. An AccessDenied on cloudformation:DescribeStacks, an expired token and a
+# us-east-1 outage all rendered as one sentence — and the deploy then pushed new bytes to
+# S3 and NEVER INVALIDATED THE CDN, so readers kept the old build for up to the cache TTL
+# while the run reported success. Same shape as #3681's "(offline?)", one step further
+# down the same script: the one diagnosis that is definitely wrong is the only one printed.
+#
+# Now it reuses classify_generator_failure — the SAME classifier the 14 content-generation
+# steps use, not a second copy — and the cause decides:
+#   denied / credentials-invalid / unclassified  -> FAIL the sync. These never self-heal.
+#   offline / no-credentials                     -> degrade, but only outside CI.
+#   a clean exit with an empty result            -> the stack genuinely has no such output;
+#                                                   degrade BY NAME (the honest absence).
+CF_LOOKUP_OUT=$(aws cloudformation describe-stacks \
   --stack-name LifePlatformWeb \
   --region us-east-1 \
   --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" \
-  --output text 2>/dev/null || echo "")
+  --output text 2>&1)
+CF_LOOKUP_RC=$?
+CF_DIST_ID=""
+CF_INVALIDATION_SKIPPED=""
 
-[[ -z "$CF_DIST_ID" ]] && echo "⚠️  CloudFront distribution ID not found — skipping invalidation."
+if [[ $CF_LOOKUP_RC -eq 0 ]]; then
+  CF_DIST_ID="$(printf '%s' "$CF_LOOKUP_OUT" | tr -d '[:space:]')"
+  [[ "$CF_DIST_ID" == "None" ]] && CF_DIST_ID=""
+  if [[ -z "$CF_DIST_ID" ]]; then
+    CF_INVALIDATION_SKIPPED="stack-has-no-distribution-output"
+    echo "⚠️  CloudFront distribution ID absent from LifePlatformWeb outputs (lookup succeeded, value empty) — skipping invalidation." >&2
+  fi
+else
+  CF_CAUSE="$(classify_generator_failure "$CF_LOOKUP_OUT")"
+  CF_INVALIDATION_SKIPPED="$CF_CAUSE"
+  echo "⛔ CloudFront distribution lookup FAILED — CAUSE: ${CF_CAUSE} (exit ${CF_LOOKUP_RC})." >&2
+  echo "   aws cloudformation describe-stacks --stack-name LifePlatformWeb --region us-east-1" >&2
+  printf '%s\n' "$CF_LOOKUP_OUT" | sed 's/^/   | /' >&2
+  # Degradable ONLY for a sanctioned cause AND outside CI — the same two-part test
+  # run_site_generator applies, read from the same exported list and helper rather than
+  # re-decided here. In CI nothing degrades: a deploy that skipped invalidation is not a
+  # deploy (#3813).
+  CF_DEGRADABLE=0
+  case " $SITE_GENERATOR_DEGRADABLE_CAUSES " in
+    *" $CF_CAUSE "*) CF_DEGRADABLE=1 ;;
+  esac
+  if [ "$CF_DEGRADABLE" = "1" ] && ! site_generators_are_strict; then
+    echo "   Degrading: '${CF_CAUSE}' is a sanctioned local-only cause — the CDN will NOT be invalidated, so readers keep the previous build until the cache TTL expires." >&2
+    echo "   This degrade is allowed OUTSIDE CI only. In CI it is a failure." >&2
+  else
+    echo "   A '${CF_CAUSE}' lookup never self-heals, and a deploy that silently skips invalidation is not a deploy (#3813)." >&2
+    exit 1
+  fi
+fi
 
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
   echo "DRY RUN — showing what would be synced:"
