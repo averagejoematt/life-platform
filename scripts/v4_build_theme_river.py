@@ -194,13 +194,23 @@ def build_artifact(live: bool) -> dict:
     entries: list[dict] = []
     model = None
     schema_version = None
+    degraded = None
     if live:
         import boto3
 
         table = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
         entries = tr.list_enriched_entries(table, start, end)
-        model, schema_version = tr.latest_provenance(table)
-    return tr.build_river(entries, start, end, model=model, schema_version=schema_version)
+        # #3813 member (b): distinguish an honest empty partition from one that could not be
+        # READ. The old call collapsed both into the defaults, so a denial published DEFAULT
+        # provenance on a public artifact as if it had been measured.
+        model, schema_version, degraded = tr.latest_provenance_or_degraded(table)
+        if degraded:
+            print(f"⚠️  theme river provenance UNREADABLE — CAUSE: {degraded}", file=sys.stderr)
+            print("   Publishing default provenance, STAMPED as degraded so it cannot read as measured (#3813).", file=sys.stderr)
+    river = tr.build_river(entries, start, end, model=model, schema_version=schema_version)
+    if live and degraded:
+        river["provenance_degraded"] = degraded
+    return river
 
 
 def main() -> int:
