@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -1004,6 +1005,10 @@ def lambda_handler(event, context):
 
     Returns the ensemble digest JSON.
     """
+    # #3829: one clock for the whole invocation. Every elapsed figure below is
+    # relative to this so a log line can be read against the 300s ceiling without
+    # subtracting timestamps by hand.
+    _t_start = time.monotonic()
     cycle_date = event.get("cycle_date") or pacific_today()
     coach_ids = event.get("coach_ids") or ALL_COACH_IDS
 
@@ -1090,18 +1095,41 @@ def lambda_handler(event, context):
                 "unanimous_flags": result.get("unanimous_flags", []),
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
+            # #3829: "produced" is TRUE and it is NOT a claim that anything was stored.
+            # On 2026-09-15 this line was the last thing the function logged before dying
+            # at its 90s ceiling, twice, and ENSEMBLE#digest had no CYCLE#2026-09-15 row.
+            # A reader scanning the log saw a success sentence for work that never landed.
+            # The word `stored=pending` is what stops that sentence from being read as an
+            # outcome: the only line that may claim persistence is _write_digest's own,
+            # after _put_item returns. The elapsed figure exists because nothing between
+            # here and the write emitted a timestamp, which is why the timeout could not
+            # be attributed without reading the source.
             logger.info(
-                "Ensemble digest produced — %d summaries, %d disagreements, %d unanimous flags",
+                "Ensemble digest produced — %d summaries, %d disagreements, %d unanimous flags "
+                "(stored=pending, %.1fs elapsed; the grounding gate and the write follow)",
                 len(digest["coach_summaries"]),
                 len(digest["active_disagreements"]),
                 len(digest["unanimous_flags"]),
+                time.monotonic() - _t_start,
             )
 
             # #2419 / ADR-104: gate the reader-bound prose against the digest's own
             # inputs. Regenerate ONCE; findings that survive HOLD the model digest —
             # the deterministic fallback (built from the coaches' stored, already-
             # gated records) is what persists, never text that failed the gate.
+            _t_gate = time.monotonic()
             digest, adr104_findings = _apply_grounding_gate(digest, user_message)
+            # #3829: the grounding gate makes ONE corrective regen — a second Bedrock
+            # call on the same 7-coach prompt. It was the prime suspect for the ~35s
+            # between "produced" and the 90s ceiling and nothing measured it. Now it is
+            # measured, so the next timeout re-derivation reads a number instead of a
+            # hypothesis.
+            logger.info(
+                "Grounding gate finished in %.1fs (%d finding(s); %.1fs elapsed total)",
+                time.monotonic() - _t_gate,
+                len(adr104_findings or []),
+                time.monotonic() - _t_start,
+            )
             if adr104_findings:
                 logger.warning(
                     "Ensemble digest failed the ADR-104 grounding gate after one regen "

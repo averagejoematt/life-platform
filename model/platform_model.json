@@ -5900,7 +5900,7 @@
       "module": "lambdas/coach/coach_ensemble_digest.py",
       "schedules": [],
       "stack": "compute_stack",
-      "timeout_seconds": 90
+      "timeout_seconds": 300
     },
     "coach-history-summarizer": {
       "declared_alarm": null,
