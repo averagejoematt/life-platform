@@ -116,11 +116,25 @@ def _zero_claim_is_framed(text):
     return True
 
 
-def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
+def assess_coach_labs_truth(labs, coaches, weekly_priority_text="", stored_narratives=None):
     """Pure assessor (#1993): (ok, message) for the served-coach-text vs
     /api/labs contradiction. `labs` is the /api/labs labs object ({} when the
     endpoint 404s, i.e. a genuinely empty store); `coaches` is
-    /api/coaching-dashboard's coaches list."""
+    /api/coaching-dashboard's coaches list.
+
+    `stored_narratives` (#3792 box 3) is an optional list of ``(label, text)`` pairs —
+    the FULL coach narratives behind those cards. It exists because every regex in this
+    module was being run over a ~200-character window.
+
+    Measured on 2026-09-16 with `/api/labs` serving `latest_draw_date: 2026-04-03`:
+
+        served position_summary (198 chars)  -> PASS
+        stored COACH#labs_coach/OUTPUT#...   -> FAIL, "schedule the April 3rd draw"
+
+    Same coach, same day, same defect, opposite verdicts. `position_summary` is
+    `audience_guard.public_blurb`'s truncation of the narrative, so a claim two
+    sentences in is outside everything this file can see. The detector was never wrong;
+    it was reading a window."""
     total_draws = labs.get("total_draws") if isinstance(labs, dict) else None
     try:
         total_draws = int(float(total_draws)) if total_draws is not None else None
@@ -135,6 +149,9 @@ def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
             texts.append((str(coach.get("coach_id") or coach.get("name") or "?"), str(coach["position_summary"])))
     if weekly_priority_text:
         texts.append(("weekly_priority", str(weekly_priority_text)))
+    for label, narrative in stored_narratives or []:
+        if narrative:
+            texts.append((str(label), str(narrative)))
 
     if total_draws is None:
         # Endpoint dark or unparseable: there is no count to compare against. Not a
@@ -182,6 +199,40 @@ def assess_coach_labs_truth(labs, coaches, weekly_priority_text=""):
     return True, f"no served coach text contradicts the labs store (total_draws={total_draws} all cycles, {len(texts)} texts scanned)"
 
 
+# #3792 box 3: the stored narrative behind the card. `position_summary` is a ~200-char
+# public blurb; the claim this file exists to catch routinely sits past the cut. Read
+# DIRECTLY rather than via a site endpoint — no public endpoint serves the full text, and
+# adding one to satisfy a check would publish more than the audience guard intends.
+_STORED_COACHES = (("labs", "labs_coach", "daily_brief_labs"),)
+
+
+def _latest_stored_narrative(coach_pk, output_type):
+    """Newest `COACH#<coach>/OUTPUT#<date>#<output_type>` content, or None.
+
+    Fail-soft by contract: this is a tripwire input, never the tripwire's spine. Any
+    DDB error yields None and the check falls back to the served blurbs — degraded
+    coverage, reported as such, never a red nightly from an unrelated table blip.
+    """
+    try:
+        import os
+
+        import boto3
+        from boto3.dynamodb.conditions import Key
+
+        table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+        r = table.query(
+            KeyConditionExpression=Key("pk").eq(f"COACH#{coach_pk}") & Key("sk").begins_with("OUTPUT#"),
+            ScanIndexForward=False,
+            Limit=25,
+        )
+        for item in r.get("Items", []):
+            if str(item.get("sk", "")).endswith("#" + output_type) and item.get("content"):
+                return str(item["sk"]), str(item["content"])
+    except Exception:
+        return None
+    return None
+
+
 def _fetch_site_json(path, timeout=15):
     req = urllib.request.Request(SITE_BASE_URL + path, headers={"User-Agent": "life-platform-qa-smoke"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -206,5 +257,19 @@ def check_coach_labs_truth():
         return [check.warn(f"/api/coaching-dashboard fetch failed (fail-soft): {str(e)[:120]}")]
     coaches = dash.get("coaches") or []
     priority_text = (dash.get("weekly_priority") or {}).get("text") or ""
-    ok, msg = assess_coach_labs_truth(labs, coaches, priority_text)
+
+    # #3792 box 3: scan the narratives as well as the blurbs. A `None` here is a
+    # DEGRADED scan, and the message says so — a green over an input that never
+    # arrived is the shape this whole module keeps being bitten by.
+    stored, degraded = [], []
+    for label, coach_pk, output_type in _STORED_COACHES:
+        got = _latest_stored_narrative(coach_pk, output_type)
+        if got:
+            stored.append((f"{label}:stored {got[0]}", got[1]))
+        else:
+            degraded.append(label)
+
+    ok, msg = assess_coach_labs_truth(labs, coaches, priority_text, stored_narratives=stored)
+    if degraded:
+        msg += f" [DEGRADED: stored narrative unavailable for {', '.join(degraded)} — blurbs only (#3792)]"
     return [check.ok(msg) if ok else check.fail(msg)]
