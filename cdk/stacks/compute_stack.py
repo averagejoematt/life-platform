@@ -528,7 +528,27 @@ class ComputeStack(Stack):
             function_name="coach-ensemble-digest",
             handler="coach.coach_ensemble_digest.lambda_handler",
             source_file="lambdas/coach/coach_ensemble_digest.py",
-            timeout_seconds=90,
+            # #3829: 90 -> 300. The old ceiling was not chosen badly; it was chosen
+            # while the feature was DARK. `budget_guard` pauses the ensemble at tier >= 1
+            # ("ensemble": 1), and SSM /life-platform/budget-tier sat at 1 or 2 from
+            # 2026-08-05 until 17:00:12 on 2026-08-31. Through that window this function
+            # returned the deterministic fallback in ~1.3s, so 90,000ms read as 68x
+            # headroom to anyone who checked. The tier dropped to 0 and the daily cron
+            # fired minutes later; measured duration stepped 47x overnight
+            # (2026-08-15..08-30 median 1,326ms, n=16 -> 2026-08-31..09-14 median
+            # 62,279ms, n=15) and has breached the ceiling on 3 of the last 4 cycles,
+            # costing 3 x 90s of billed Bedrock work per breach and landing no row.
+            #
+            # 300s is NOT a re-derived p95 and must not be recorded as one. The
+            # post-08-31 distribution is CENSORED at 90s — two observations sit exactly
+            # on the ceiling, so the true tail is unknown and no percentile over it is
+            # honest. This value is deliberately generous to UNCENSOR the measurement:
+            # let it run uncapped for a fortnight, then derive the real ceiling from an
+            # uncensored window the way #3678 does for CI jobs. Raising first and
+            # measuring second is the only order that can produce a true number.
+            # At 256MB a 300s worst case is ~$0.001/run; the cost of the wrong value in
+            # the other direction is a lost daily row plus 3x the Bedrock spend.
+            timeout_seconds=300,
             memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
