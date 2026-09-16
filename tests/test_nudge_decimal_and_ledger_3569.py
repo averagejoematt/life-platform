@@ -334,7 +334,33 @@ class _LedgerTable:
         self.puts = []
 
     def query(self, **kwargs):
-        return {"Items": list(self.ledger_rows)}
+        """Honours the sk FLOOR in KeyConditionExpression (#3651 round 2).
+
+        It used to return every row regardless of the condition. That is why the whole
+        suite was blind to this bug: the liveness leg queries `sk >= DAY#{today-7d}`, and a
+        fixture that ignores the floor cannot express a row falling OUTSIDE it — so a test
+        planting a 60-day-old stuck row passed for the wrong reason, while live, four such
+        rows sat unreached. A fixture that is not the wire is how a guard tests green
+        against a defect it structurally cannot see.
+
+        Parsed from the boto3 condition's own expression, not re-implemented: only the
+        `>=` floor matters here, so anything else falls through as "no floor".
+        """
+        floor = None
+        cond = kwargs.get("KeyConditionExpression")
+        fmt = getattr(cond, "get_expression", None)
+        if fmt:
+            pending = [cond.get_expression()]
+            while pending:
+                e = pending.pop()
+                vals = e.get("values", ())
+                if e.get("operator") == ">=" and len(vals) == 2 and isinstance(vals[1], str):
+                    floor = vals[1]
+                for v in vals:
+                    if hasattr(v, "get_expression"):
+                        pending.append(v.get_expression())
+        rows = [r for r in self.ledger_rows if floor is None or str(r.get("sk", "")) >= floor]
+        return {"Items": rows}
 
     def get_item(self, Key):  # noqa: N803
         item = self.records.get((Key["pk"], Key["sk"]))
@@ -513,3 +539,80 @@ def test_dead_man_is_wired_into_the_nightly_sweep():
 
     labels = [label for label, _fn in qa.check_steps()]
     assert "nudge_ledger_liveness" in labels
+
+
+# ── #3651 round 2: the reaper could not reach the rows it was written for ────────────────
+def test_MUST_FAIL_a_stuck_row_OUTSIDE_the_liveness_window_is_still_reaped():
+    """THE LIVE DEFECT, replayed.
+
+    On 2026-09-16 four rows sat at `attempting` — DAY#2026-07-26, DAY#2026-08-06,
+    DAY#2026-08-07 and DAY#2026-08-30, the last being the exact row #3651 was filed on and
+    by then ~400h stuck. The liveness floor that day was DAY#2026-09-08, so all four were
+    OUTSIDE the query meant to find them and `coach_nudge:ledger_liveness` reported clean.
+    The check was green BECAUSE the failure was old.
+    """
+    old = _row(60, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(60)}T15:10:29Z", coach_id="explorer_coach")
+    table = _LedgerTable([old])
+    check = _run(table)
+    assert [p["sk"] for p in table.puts] == [
+        f"{eng.LEDGER_SK_PREFIX}{_day(60)}"
+    ], "the stuck row outside the liveness window was never reaped — the scan is still bounded by retention_days"
+    assert table.puts[0]["status"] == eng.STATUS_EXPIRED
+    assert "reaped to 'expired'" in check.message and _day(60) in check.message
+
+
+def test_MUTATION_bounding_the_stuck_scan_by_the_liveness_floor_reds_that_control():
+    """Prove the control measures the WINDOW, not merely the reap.
+
+    Re-bound the scan to the liveness floor — the pre-fix behaviour — and the row must go
+    unseen. If this passed, the control above would be passing for the wrong reason.
+    """
+    old = _row(60, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(60)}T15:10:29Z")
+    floor = f"{eng.LEDGER_SK_PREFIX}{_day(dead_man.RETENTION_DAYS)}"
+    bounded = [r for r in [old] if str(r.get("sk", "")) >= floor]
+    assert bounded == [], "the 60-day-old row is inside the 7-day floor — the control is not testing the window"
+
+
+def test_a_quiet_liveness_window_does_not_hide_an_old_stuck_row():
+    """The interaction that made this invisible: a quiet week used to early-return OK before
+    anything looked further back. A quiet week is exactly when an ancient stuck row is the
+    only thing in the ledger worth saying."""
+    old = _row(45, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(45)}T15:10:29Z")
+    check = _run(_LedgerTable([old]))
+    assert "no coach-nudge ledger row in the last" not in check.message, "the quiet-week early return swallowed a stuck row"
+    assert "reaped to 'expired'" in check.message
+
+
+def test_the_stuck_scan_paginates():
+    """A scan that silently truncates at the first page is the same blindness one page out."""
+
+    class _Paged(_LedgerTable):
+        def __init__(self, pages):
+            super().__init__([])
+            self.pages, self.calls = pages, 0
+
+        def query(self, **kwargs):
+            page = self.pages[self.calls]
+            self.calls += 1
+            out = {"Items": page}
+            if self.calls < len(self.pages):
+                out["LastEvaluatedKey"] = {"pk": eng.LEDGER_PK, "sk": page[-1]["sk"]}
+            return out
+
+    a = _row(50, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(50)}T15:10:29Z")
+    b = _row(51, eng.STATUS_ATTEMPTING, attempted_at=f"{_day(51)}T15:10:29Z")
+    found = dead_man.scan_stuck_reservations(_Paged([[a], [b]]), AS_OF)
+    assert {r["sk"] for r, _age in found} == {a["sk"], b["sk"]}, "the scan stopped at page 1"
+
+
+def test_the_FIXTURE_itself_honours_the_sk_floor():
+    """The harness bug that hid all of this: the fake table used to ignore
+    KeyConditionExpression, so no test could express a row outside the window."""
+    from boto3.dynamodb.conditions import Key
+
+    t = _LedgerTable([_row(60, eng.STATUS_ATTEMPTING), _row(1, eng.STATUS_SENT)])
+    floor = f"{eng.LEDGER_SK_PREFIX}{_day(dead_man.RETENTION_DAYS)}"
+    bounded = t.query(KeyConditionExpression=Key("pk").eq(eng.LEDGER_PK) & Key("sk").gte(floor))
+    assert [r["sk"] for r in bounded["Items"]] == [f"{eng.LEDGER_SK_PREFIX}{_day(1)}"]
+    unbounded = t.query(KeyConditionExpression=Key("pk").eq(eng.LEDGER_PK) & Key("sk").begins_with(eng.LEDGER_SK_PREFIX))
+    assert len(unbounded["Items"]) == 2, "begins_with must not be treated as a floor"
