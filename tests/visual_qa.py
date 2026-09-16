@@ -418,6 +418,53 @@ def _mobile_overflow(page):
     return page.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
 
 
+# ── #3734: text that overflows its OWN container, invisibly ──────────────────
+# `_mobile_overflow` measures the DOCUMENT. That is the right question for a layout
+# break, and it is structurally blind to this one: on /data/vitals/ at 390w the
+# `.vs-stamp` sentence measured 372.4px inside a 353px band and its right edge sat at
+# 403.2 against the band's 372.3 — clipped mid-word, no ellipsis, no signal — while
+# `document.scrollWidth - clientWidth` read **0**, because the band does not scroll and
+# the overflow never reaches the viewport.
+#
+# Nine months of mobile sweeps ran over that page and none could see it. A page-level
+# measure cannot: the defect is entirely inside one box.
+#
+# So this measures CONTAINERS. The set is deliberately narrow — components that pair a
+# fixed-width stamp with flowing text, which is the shape that clips — rather than every
+# element on the page, because a general "nothing may exceed its parent" sweep would
+# drown in legitimate cases (sticky headers, negative margins, decorative overhangs)
+# and get muted within a week.
+TEXT_CONTAINER_SEL = (".vs-band", ".vf-wrap", ".rcp-tier", ".nut-lossrate")
+_CONTAINER_OVERFLOW_TOL = 1.0  # sub-pixel rounding only; a real clip is tens of px
+
+
+def _container_text_overflow(page, selectors=TEXT_CONTAINER_SEL):
+    """[(container, child, px)] for any child whose box escapes its container horizontally.
+
+    Reads getBoundingClientRect on both sides rather than scrollWidth: a child that
+    overflows a NON-scrolling parent does not move the parent's scrollWidth at all, which
+    is exactly how this class stayed invisible.
+    """
+    return page.evaluate(
+        """(args) => {
+        const [sels, tol] = args;
+        const out = [];
+        document.querySelectorAll(sels.join(',')).forEach(el => {
+          const pr = el.getBoundingClientRect();
+          if (pr.width === 0) return;
+          [...el.children].forEach(c => {
+            const cr = c.getBoundingClientRect();
+            if (cr.width === 0) return;
+            const over = Math.max(cr.right - pr.right, pr.left - cr.left);
+            if (over > tol) out.push([el.className, c.className || c.tagName.toLowerCase(), Math.round(over * 10) / 10]);
+          });
+        });
+        return out;
+      }""",
+        [list(selectors), _CONTAINER_OVERFLOW_TOL],
+    )
+
+
 # ── Mobile failure-class assertions (#1013) ───────────────────────────────────
 # These pin the EXACT classes the 2026-07-11 mobile review found live and Epic A
 # fixed (#1002 stuck reveals, #1003 app-bar overflow, #1004 missing viewport meta),
@@ -1380,6 +1427,14 @@ def capture_page(
         overflow = _mobile_overflow(page)
         if overflow and overflow > 4:
             issues.append(f"Horizontal overflow at 390px — content exceeds viewport by {overflow}px")
+        # (e) #3734 — text clipped inside its own container. Invisible to the measure
+        #     above: the band does not scroll, so the document never widens.
+        clipped = _container_text_overflow(page)
+        if clipped:
+            issues.append(
+                "Text overflows its own container @390px (#3734 class): "
+                + "; ".join(f"{child!r} escapes {parent!r} by {px}px" for parent, child, px in clipped[:4])
+            )
         # (b) #1002 — reveal-selector elements stuck at opacity:0 after scroll-through.
         stuck = _stuck_reveals(page, MOBILE_REVEAL_SEL)
         if stuck:
