@@ -359,6 +359,12 @@ def test_the_soft_timeout_returns_at_the_deadline_not_after_the_tool_finishes():
     shutdown(wait=True) on exit, so the `return` inside the block waited for the tool.
     Measured before the fix: a 3s task with timeout=1 returned after 3.01s."""
 
+    # 3849 (the Set's second member): this asserted `elapsed < 1.0`. The budget was
+    # healthier than the one that flaked — 3.3x above the passing cost, 2x below the
+    # failing one — but it is the same instrument, and a runner busy enough stretches the
+    # passing path past any fixed number. The property has a clock-free statement: if
+    # `shutdown(wait=False)` had blocked, the task would have FINISHED by the time it
+    # returned. So ask the future.
     def _slow():
         time.sleep(2.0)
         return "done"
@@ -373,7 +379,11 @@ def test_the_soft_timeout_returns_at_the_deadline_not_after_the_tool_finishes():
         pool.shutdown(wait=False)
     elapsed = time.time() - t0
 
-    assert elapsed < 1.0, f"shutdown(wait=False) still blocked for {elapsed:.2f}s"
+    assert not fut.done(), (
+        f"shutdown(wait=False) BLOCKED until the 2.0s task completed ({elapsed:.2f}s elapsed) — "
+        "the #3765 defect is back. This verdict reads the future's state, not the clock."
+    )
+    pool.shutdown(wait=True)  # let the fixture's thread finish before the process moves on
 
 
 def test_the_handler_uses_a_non_blocking_shutdown_on_timeout():
