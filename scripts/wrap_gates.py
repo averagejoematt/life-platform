@@ -135,6 +135,11 @@ GATHER = [
     # today still lacks its (e8) verdict, so `no-outcome-verdict` here IS the (e8) to-do list;
     # the session re-runs `--session` after commenting and pastes the summary line.
     Gate("closure-dod", "e8", ["python3", "scripts/closure_sweep.py", "--session"], marker="Closures"),
+    # #3812: detector C — the OTHER direction. A merged commit naming an open issue in its
+    # subject with no closing keyword is a fix that shipped and an issue nobody closed
+    # (Session AF: 11 of 40 swept, ten of them this exact shape). Advisory by design: its
+    # output is a re-read list for (e7), never a closure, so a finding never fails the wrap.
+    Gate("unlinked-closures", "e7", ["python3", "scripts/check_unlinked_closures.py"], marker="Backlog", ok_when=lambda rc, out: True),
 ]
 
 # ── the verify battery: gates that read the finished handover (run after writing it) ──

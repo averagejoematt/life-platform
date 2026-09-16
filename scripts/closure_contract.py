@@ -211,6 +211,20 @@ CLOSURE_CONTRACT: tuple = (
         finding_codes=("no-live-proof",),
     ),
     Requirement(
+        id="close-the-shipped",
+        rule=(
+            "A merged commit that names an open issue in its SUBJECT has either closed it or said why not. "
+            "Detector B catches a PR closing too MUCH; this is the other direction — the fix ships, the keyword "
+            "is forgotten, and the issue sits open until a human re-reads it. Session AF swept 40 open issues by "
+            "hand and found 11 already fixed by a merged PR (open 7-17 days); TEN named the issue in the merge "
+            "subject with no closing keyword (#3812). An instrument held for its live proof "
+            "(`closure:live-proof`, or `**Closure class:** instrument`) and a `type:epic` are correctly unlinked "
+            "and are NOT findings. A finding is a question for a human, never a closure."
+        ),
+        detector="scripts/check_unlinked_closures.py",
+        finding_codes=("unlinked-shipped-fix",),
+    ),
+    Requirement(
         id="partial-is-not-a-close",
         rule=(
             "A PR body that still carries an unchecked acceptance box (`- [ ]`) does not carry a closing "
