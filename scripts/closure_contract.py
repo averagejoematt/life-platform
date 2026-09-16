@@ -222,7 +222,7 @@ CLOSURE_CONTRACT: tuple = (
             "and are NOT findings. A finding is a question for a human, never a closure."
         ),
         detector="scripts/check_unlinked_closures.py",
-        finding_codes=("unlinked-shipped-fix",),
+        finding_codes=("shipped-unlinked",),
     ),
     Requirement(
         id="partial-is-not-a-close",
@@ -238,6 +238,47 @@ CLOSURE_CONTRACT: tuple = (
 )
 
 ALL_FINDING_CODES: frozenset = frozenset(code for r in CLOSURE_CONTRACT for code in r.finding_codes)
+
+
+# ── finding codes must not END in a GitHub closing keyword (#3812) ────────────────────────
+# Found the hard way: detector C shipped as `unlinked-shipped-fix`, so its own printed line
+#
+#     unlinked-shipped-fix  #3830  1 merged commit(s) name #3830 ...
+#
+# parses as `fix #3830` under CLOSING_REF_RE — GitHub's own grammar. A detector whose REPORT
+# is a closing-keyword injection is a live footgun: pasting the sweep output into a PR body
+# or a commit message would close every issue it names, which is the exact class detector B
+# exists to catch. Renamed to `shipped-unlinked` before it ever ran in anger; detector B is
+# what caught it, on this file's own PR.
+#
+# Dated, shrink-only exemption ledger (charter primitive 3). An entry comes OUT when the code
+# is renamed; nothing may be ADDED without renaming being considered first.
+CODE_KEYWORD_EXEMPTIONS: dict = {
+    "partial-acceptance-close": (
+        "2026-09-16 — PRE-EXISTING (#3318). Same defect: `partial-acceptance-close #2848` in a PR "
+        "body parses as `close #2848`. NOT renamed here because the code is cited as a historical "
+        "record in docs/PROPORTIONALITY.md's rent row (naming the live run that found PR #3253) and "
+        "in .claude/skills/land/SKILL.md; rewriting a past run's record to fix a forward-looking "
+        "naming rule is the wrong trade at the wrong time. Carried as its own issue."
+    ),
+}
+
+
+def codes_ending_in_a_closing_keyword(codes=None) -> dict:
+    """Pure. → {code: keyword} for every finding code whose trailing token is a closing keyword.
+
+    Excludes the dated ledger above. The check is on the TRAILING token because that is the
+    position CLOSING_REF_RE reads: `<kw>` immediately followed by whitespace and `#N`.
+    """
+    offenders = {}
+    for code in sorted(ALL_FINDING_CODES if codes is None else codes):
+        if code in CODE_KEYWORD_EXEMPTIONS:
+            continue
+        tail = code.rsplit("-", 1)[-1].lower()
+        if tail in CLOSING_KEYWORDS:
+            offenders[code] = tail
+    return offenders
+
 
 # ── the vocabulary detectors derive from ────────────────────────────────────────────────
 

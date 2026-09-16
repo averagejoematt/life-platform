@@ -49,7 +49,7 @@ SUPPRESSIONS — each one is a documented correct behaviour, not a mute
 POSTURE
   Advisory (`warn`) by design and not on a flip path. Its false positive is a re-read; its
   true positive is a closure nobody would otherwise make. Registered in
-  `closure_contract.CLOSURE_CONTRACT` as `close-the-shipped` / `unlinked-shipped-fix`.
+  `closure_contract.CLOSURE_CONTRACT` as `close-the-shipped` / `shipped-unlinked`.
 
 USAGE
   python3 scripts/check_unlinked_closures.py                  # live, read-only, 60-day window
@@ -182,7 +182,7 @@ def evaluate(commits: list, open_issues: dict) -> tuple:
         issue = open_issues[number]
         findings.append(
             Finding(
-                "unlinked-shipped-fix",
+                "shipped-unlinked",
                 number,
                 (
                     f"{len(wheres)} merged commit(s) name #{number} in the subject with no closing keyword, "
@@ -275,7 +275,7 @@ def main(argv=None) -> int:
             ),
             encoding="utf-8",
         )
-    mode = cc.arming_for("unlinked-shipped-fix")
+    mode = cc.arming_for("shipped-unlinked")
     print(
         f"UNLINKED-CLOSURE VERDICT {'OK' if not findings else 'NONGREEN'} mode={mode} "
         f"window={window} commits={len(commits)} findings={len(findings)} held={len(held)}"

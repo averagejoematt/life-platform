@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -61,7 +62,7 @@ def test_the_AF_regression_fixture_is_reported_every_one():
     commits = [commit(sha=sha, subject=subj) for sha, _n, subj in REAL_AF_COMMITS]
     open_issues = {n: issue(n) for _s, n, _t in REAL_AF_COMMITS}
     findings, held = uc.evaluate(commits, open_issues)
-    assert codes(findings) == sorted(f"unlinked-shipped-fix#{n}" for _s, n, _t in REAL_AF_COMMITS)
+    assert codes(findings) == sorted(f"shipped-unlinked#{n}" for _s, n, _t in REAL_AF_COMMITS)
     assert held == []
 
 
@@ -69,7 +70,7 @@ def test_MUTATION_a_planted_merge_commit_naming_an_open_issue_is_reported():
     """The must-fail control: plant one, it must be named."""
     planted = commit(subject="fix(nothing): a synthetic commit that names an open issue (#99001) (#99999)")
     findings, _held = uc.evaluate([planted], {99001: issue(99001, "a planted open issue")})
-    assert codes(findings) == ["unlinked-shipped-fix#99001"]
+    assert codes(findings) == ["shipped-unlinked#99001"]
     assert "99001" in findings[0].detail and "deadbeef1" in findings[0].detail
 
 
@@ -143,7 +144,7 @@ def test_the_dispositioned_ledger_suppresses_and_a_MUTATION_of_it_surfaces_the_i
     monkeypatch.setitem(uc.DISPOSITIONED, 99001, "2026-09-16 — context, not a fix")
     assert uc.evaluate([c], {99001: issue(99001)})[0] == []
     monkeypatch.delitem(uc.DISPOSITIONED, 99001)
-    assert codes(uc.evaluate([c], {99001: issue(99001)})[0]) == ["unlinked-shipped-fix#99001"]
+    assert codes(uc.evaluate([c], {99001: issue(99001)})[0]) == ["shipped-unlinked#99001"]
 
 
 def test_the_closing_grammar_is_IMPORTED_from_the_registry_not_re_typed():
@@ -154,8 +155,8 @@ def test_the_closing_grammar_is_IMPORTED_from_the_registry_not_re_typed():
 
 
 def test_the_finding_code_is_registered_in_the_contract():
-    assert "unlinked-shipped-fix" in cc.ALL_FINDING_CODES
-    owner = [r for r in cc.CLOSURE_CONTRACT if "unlinked-shipped-fix" in r.finding_codes]
+    assert "shipped-unlinked" in cc.ALL_FINDING_CODES
+    owner = [r for r in cc.CLOSURE_CONTRACT if "shipped-unlinked" in r.finding_codes]
     assert len(owner) == 1 and owner[0].detector == "scripts/check_unlinked_closures.py"
 
 
@@ -176,6 +177,49 @@ def test_cli_fixture_mode_runs_offline_and_prints_the_contract_line(tmp_path):
         text=True,
     )
     assert out.returncode == 0, out.stderr  # advisory posture: findings never exit nonzero
-    assert "unlinked-shipped-fix  #99001" in out.stdout
+    assert "shipped-unlinked  #99001" in out.stdout
     assert "UNLINKED-CLOSURE VERDICT NONGREEN mode=warn" in out.stdout
     assert "findings=1 held=0" in out.stdout
+
+
+# ── the footgun detector B found in detector C's own name (#3812) ────────────────────────
+def test_no_finding_code_ends_in_a_GITHUB_CLOSING_KEYWORD():
+    """A detector's REPORT must not be a closing-keyword injection.
+
+    Detector C shipped as `unlinked-shipped-fix`, so its own output line —
+        `unlinked-shipped-fix  #3830  1 merged commit(s) name #3830 ...`
+    parses as `fix #3830` under GitHub's grammar. Pasting a sweep report into a PR body
+    would have CLOSED every issue it names. Detector B caught it on this file's own PR.
+    """
+    offenders = cc.codes_ending_in_a_closing_keyword()
+    assert offenders == {}, (
+        "finding code(s) end in a GitHub closing keyword, so printing them next to an issue "
+        f"number is a closing reference: {offenders}. Rename, or add a dated ledger entry."
+    )
+
+
+def test_MUTATION_the_guard_reds_on_a_planted_bad_code():
+    planted = {"some-new-finding-fixes", "harmless-code"}
+    assert cc.codes_ending_in_a_closing_keyword(planted) == {"some-new-finding-fixes": "fixes"}
+
+
+def test_MUTATION_emptying_the_exemption_ledger_surfaces_the_known_pre_existing_one(monkeypatch):
+    """The ledger is hiding exactly one real offender, and it must stay visible as such."""
+    monkeypatch.setattr(cc, "CODE_KEYWORD_EXEMPTIONS", {})
+    assert cc.codes_ending_in_a_closing_keyword() == {"partial-acceptance-close": "close"}
+
+
+def test_every_exemption_is_dated_and_reasoned():
+    for code, reason in cc.CODE_KEYWORD_EXEMPTIONS.items():
+        assert re.match(r"^\d{4}-\d{2}-\d{2} — ", reason), f"{code}: undated exemption"
+        assert len(reason) >= 80, f"{code}: reason too thin to audit"
+
+
+def test_THE_REAL_OUTPUT_LINE_no_longer_parses_as_a_closing_reference():
+    """The end-to-end property, on a line the detector actually prints."""
+    line = "  shipped-unlinked  #3830  1 merged commit(s) name #3830 in the subject"
+    assert [m.group("num") for m in cc.CLOSING_REF_RE.finditer(line)] == []
+    bad = line.replace("shipped-unlinked", "unlinked-shipped-fix")
+    assert [m.group("num") for m in cc.CLOSING_REF_RE.finditer(bad)] == [
+        "3830"
+    ], "the old name no longer reproduces the defect — this control has stopped measuring it"
