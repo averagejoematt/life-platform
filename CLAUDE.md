@@ -211,25 +211,30 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-16 (Opus 5, **Session AF — the ~24h drain, the second permission the first one was
-hiding, and the rollback that took the fleet**; owner brief *"141 open issues, get it as low as it honestly
-goes"*, standing merge+deploy authority, **no `--deliver`, the cron hold STAYS**, every gate approved or
-REJECTED). **141 open -> 124: 30 closed (27 on evidence, 3 triage), 13 filed, 22 PRs merged, census 641 ->
-644, six CDK deploy runs, 6 leases approved / 11 rejected, none left waiting.** Read the net honestly: the
-gross is 30 and the net is 17 because five of the thirteen filings came from the last five hours, four of
-them from instruments firing rather than anyone auditing. **THE HEADLINE: an auto-rollback reverted 85
-Lambdas on a vendor 503.** The canary logged `Anthropic: ❌ Bedrock ServiceUnavailableException` with DDB,
-S3, MCP and subscribe all green — and one line above it, `Suppressed first-occurrence alert`. **One datapoint,
-three consumers, three confidences:** the alerter declined to email, the alarm fired and self-cleared in 15
-min, the deploy gate reverted the fleet. #2051 split the canary's lanes by CHECK and never by FAILURE MODE.
-Fixed by #3831 (`LANE_EXTERNAL_TRANSIENT`), deployed 01:26Z and verified in the bundle; recovered by the push
-run already at the gate (a shared-module change, so `fleet_changed` was true) rather than the `deploy_all`
-dispatch — 25 min sooner and ONE smoke gate instead of two. **#3681 earlier the same day was the same shape:
-the first denial MASKED the second** — `dynamodb:Query` was necessary and not sufficient, `kms:Decrypt` sat
-structurally invisible behind it; first successful theme-river live build in CI, ever. **Three corrections to
-my own work:** #3829's cause is a 47x STEP on 2026-08-31 (the budget tier un-paused the feature; its 90s
-ceiling had been sized while it was dark, reading as 68x headroom), not a creep; #3797's 2.1x speedup is
-really ~1.32x median (n=3 vs n=9, wrong denominator and generalising from one sample); and a mutation found a
-hole in my OWN guard (`"censor" in comment` matched the comment's own "UNCENSOR"). **Owner acts left:** #3836
-(superseding the closed #3834) is complete and blocked on a GitHub `pull_request` OUTAGE — repo-wide, zero such events for 2h12m while `push` fired normally, so NO PR can merge until it recovers; four local recoveries tried and measured, NEVER close/reopen · #3830 leg 2 + box 3 · #3563's 15:10Z cron · #3835 the post-merge suite is still serial ·
-#3832 · 2026-09-13's unexplained missing ensemble row.
+**Verified:** 2026-09-16 (Opus 5, **Session AG — the sweep that found nothing, and the ten gates that found
+me**; owner brief *"get open issues as low as it honestly goes"*, autonomous overnight, standing merge+deploy
+authority, **no `--deliver`**, the recap cron hold STAYS, every lease approved or REJECTED). **124 open -> 120:
+7 closed (ALL on demonstrated evidence, 1 on a LIVE PROOF), 2 filed, 11 PRs merged, 10 fixes built, census
+644 -> 647, 8 leases approved / 5 rejected by name, none left waiting.** **THE HEADLINE IS A NEGATIVE RESULT:
+the plan projected 9-18 closures from re-sweeping the addressable 92; six agents over all 73 non-epic issues
+yielded exactly ONE.** Not a weak sweep — verified reproductions throughout, and two agent findings REJECTED
+after checking (#3615's "cheapest fix" would have computed voice-fidelity ACROSS A RESET BOUNDARY; #3692's
+"hidden" baseline raise is documented in place as unearned debt). **The corpus is young work, not stale
+debt** — `Later` holds nothing older than 16 days and `check_backlog_hygiene` finds zero staleness over 120.
+So A4's triage yield is zero honestly, and **every closure came from SHIPPING**. **THE SECOND HEADLINE: ten
+times a gate caught THIS SESSION'S OWN work** — a census measured with the files untracked (invisible to a
+git-tracked walk); fabricated instants in a proof record; **my detector's own report line was a
+closing-keyword injection** (`...-fix #3830` parses as `fix #3830`, so pasting a sweep report into a PR body
+would have closed every issue it named); the gate then **blocked the PR with the very bug that PR fixes**
+(GitHub ignores code spans, the parser did not); a test that raced under #3797's four-day-old parallel lane;
+unhomed `## Residual` headings in my own closing comments; **a must-fail control that tested the pure
+function and never asserted the gate CALLS it** — the exact sentence I had written into #3830's PR hours
+earlier; a test passing only because my working copy has a `docs(wrap` commit that CI's shallow checkout
+lacks, which exposed a real ordering bug; and an `--is-ancestor` check that was the wrong instrument for
+squash-merges. **The inherited "GitHub outage" was a MERGE CONFLICT** — the reconcile bot's commit landed 60s
+after the last `pull_request` run, and `wait_pr_green.sh` already carries that discriminator (#3653); it
+recurred on #3839 and took one call to settle. **Owner acts left:** #2883 measures 4/4 satisfied and is
+`gate:owner` (numbers handed over, not closed around) · the 5 `acceptance_count` violations (#3607 #3611
+#3615 #3617 #3621) need splitting, not trimming · #3829's 2026-09-13 gap stays unexplained and must not be
+absorbed when today's row lands · #3848 (SBOM silently absent, shipped today, both steps green) and #3849
+(two wall-clock assertions measuring the machine) are fresh.
