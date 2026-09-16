@@ -1502,3 +1502,43 @@ REGISTRY_PROOFS.update(
         for selector, (alpha, n, worst) in _DERIVED_DECOR_OBSERVED.items()
     }
 )
+
+
+# ── #3812: the finding-code keyword ledger. ONE entrant, and it is hiding a real offender ──
+#
+# The rule it excuses exists because detector C shipped as `unlinked-shipped-fix`, whose own
+# printed report line parses as `fix #3830` under GitHub's closing grammar. The ledger's one
+# entry is the PRE-EXISTING twin of that defect, carried rather than renamed.
+REGISTRY_PROOFS.update(
+    {
+        "registry::scripts/closure_contract.py::CODE_KEYWORD_EXEMPTIONS::partial-acceptance-close": {
+            "gate_name": "CODE_KEYWORD_EXEMPTIONS[partial-acceptance-close]",
+            "command": "python3 -m pytest tests/test_unlinked_closures_3812.py -q   # 25 cases",
+            "mutation": (
+                "The entry deleted from CODE_KEYWORD_EXEMPTIONS in the REAL tracked file "
+                "(scripts/closure_contract.py), leaving `partial-acceptance-close` unexcused — the exact "
+                "drift mode, since an exemption ledger that has silently emptied looks identical to one "
+                "with nothing to excuse."
+            ),
+            "observed": (
+                "MUTATED: exit 1, `FAILED tests/test_unlinked_closures_3812.py::"
+                "test_no_finding_code_ends_in_a_GITHUB_CLOSING_KEYWORD`, 1 failed / 24 passed — the failure "
+                "names {'partial-acceptance-close': 'close'}, so the ledger is demonstrably hiding a real "
+                "offender rather than an empty set. REVERTED (file restored from a pre-mutation copy): "
+                "25 passed, exit 0. Watched 2026-09-16. A second, independent monkeypatch form of the same "
+                "mutation is carried in-test "
+                "(test_MUTATION_emptying_the_exemption_ledger_surfaces_the_known_pre_existing_one) so the "
+                "property is asserted even if this record goes stale."
+            ),
+            "scope": (
+                "It judges the TRAILING token of a finding code against CLOSING_KEYWORDS, which is the only "
+                "position CLOSING_REF_RE reads. A code with a closing keyword in the MIDDLE "
+                "(`close-the-shipped`, a requirement id in this same registry) is correctly not flagged, "
+                "because a keyword only links when it sits immediately before the `#N`. It says nothing "
+                "about where a code is printed — a detector that never emits its code next to an issue "
+                "number is not at risk, and one that does is, and this rule cannot tell them apart."
+            ),
+            "proved_on": "2026-09-16",
+        }
+    }
+)

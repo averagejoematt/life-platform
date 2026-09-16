@@ -658,7 +658,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # goes SILENT) are carried in tests/test_unlinked_closures_3812.py, 20 cases including a
         # MUTATION of the DISPOSITIONED ledger that surfaces the issue it was hiding. Full
         # record in scripts/gate_census_proofs.py::GUARD_PROOFS.
-        <= 99
+        # 99 -> 100 (2026-09-16, #3812): the 100th proof is
+        # registry::scripts/closure_contract.py::CODE_KEYWORD_EXEMPTIONS::partial-acceptance-close,
+        # proved by deleting the entry from the REAL tracked file and watching
+        # test_no_finding_code_ends_in_a_GITHUB_CLOSING_KEYWORD red naming
+        # {'partial-acceptance-close': 'close'} (1 failed / 24 passed), then restoring (25 passed).
+        <= 100
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
