@@ -265,10 +265,15 @@ the 5 standing `acceptance_count` issues (owner's, deliberately untouched) and #
 
 ### The three proofs — one realized, one partial, one that corrected my own work
 
-**#3830 — the canary retry.** Its wrapper runs in `ci-cd.yml`'s smoke-test job, so #3852's own
-merge produces the proof; at handover time that run is still pre-deploy. Expected line, assert it
-by name: `Verify canary decision: PASS — PASS on the first look`, with **no**
-`::warning:: … needed N attempts`.
+**#3830 — PARTIAL, left open.** #3852's own merge produced the proof at 17:31:25Z:
+`Canary decision: PASS — PASS on the first look — attempt 1: PASS (200)`, no retry warning —
+the wrapper's *"does not retry a PASS"* property observed in the real gating path. **Box 3 —
+retry-before-gate parity, which this thread twice said "stays open regardless" — is now implemented
+and live.** But **a healthy PASS never exercises the retry path**: it proves the good path and says
+nothing about a transient being tolerated. **Leg 2 (one real Bedrock 503 observed passing through
+non-gating) is still outstanding and still not forceable** — the issue itself forbids planting one,
+and none arrived. Treating the green gate as evidence about the failing direction would be the
+exact error this issue exists to fix.
 
 **#3829 — PARTIAL, left open.** `coach-ensemble-digest` ran **103.7s** and wrote
 `CYCLE#2026-09-16`. That is the proof in one direction and it is airtight: the old ceiling was 90s,
@@ -304,5 +309,6 @@ it. The fix is not worthless (the chat grounding path genuinely had no labs fact
 them); it simply is not this issue. The true target is recorded on #3792 for whoever takes it, with
 an explicit instruction not to re-verify via the bundle.
 
-**Net for the tail: 1 closed (#3851), 2 filed (#3851, #3853), 1 partial and 1 not-realized left
-open with their evidence. The count did not fall here and should not have.**
+**Net for the tail: 1 closed (#3851), 2 filed (#3851, #3853), TWO partials (#3829, #3830) and one
+not-realized (#3792) left open with their evidence. The count did not fall here and should not have
+— three fixes were graded honestly rather than closed around.**
