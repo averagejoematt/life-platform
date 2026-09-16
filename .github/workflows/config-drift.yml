@@ -102,3 +102,23 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py boto3 botocore)   # versions from requirements-dev.txt (#2760)
           pip install --quiet $PINS
           python3 deploy/config_mirror_audit.py --strict
+
+      # #3785 box 3 — the third question, and the one the other two structurally cannot
+      # answer. Both steps above COMPARE two artifacts: repo vs live, or live vs an owner
+      # that asserts it. On 2026-09-14 a repo copy was pushed over the generated
+      # hevy_template_index and the drift check was green for NINE runs, because while
+      # the clobber was active both sides read 789 and agreed. A comparison gate is blind
+      # in exactly the state that matters.
+      #
+      # This step grades ONE artifact against the CLOCK. Only the generated object carries
+      # `_built_at`; the moment a hand-owned copy lands on top of it, the stamp is gone and
+      # this reds — no peer needed, and no way for the two to be wrong together.
+      #
+      # Also `if: always()`, for the reason stated above the previous step: three different
+      # questions, and masking any behind another is how #2019's residue stayed invisible.
+      - name: Generated-artifact provenance dead-man (read-only, blocking)
+        if: always()
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
+          python3 deploy/config_provenance_audit.py --strict

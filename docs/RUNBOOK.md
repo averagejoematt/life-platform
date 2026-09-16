@@ -1859,12 +1859,32 @@ aws ssm get-parameter --name /life-platform/pause-mode --region us-west-2 \
   || aws ssm put-parameter --name /life-platform/pause-mode \
        --value active --type String --region us-west-2
 
-# 4. Sync static configs to S3.
+# 4. Sync static configs to S3. These four are HAND-OWNED: the repo copy is the
+#    authority, so pushing it is a publish.
 aws s3 cp config/training_landmarks.json s3://matthew-life-platform/config/
 aws s3 cp config/movement_catalog.json   s3://matthew-life-platform/config/
 aws s3 cp config/training_week.json      s3://matthew-life-platform/config/
 aws s3 cp config/board_of_directors.json s3://matthew-life-platform/config/
 ```
+
+> **NEVER run `aws s3 cp` on a GENERATED `config/` object** (#3785). For those the repo
+> copy is a stale ARTIFACT, not the authority, and pushing it is a silent revert. On
+> 2026-09-14 one such push replaced the live `config/hevy_template_index.json` (820
+> templates, rebuilt at 13:40Z) with a June-1 copy of 789 — `draft_custom` lost 39
+> templates and the daily **Config twin drift** workflow stayed green for nine runs,
+> because while the clobber was active both sides read 789 and agreed.
+>
+> **The current list is derived, not written here** — ask it, because a list in a
+> runbook drifts and this one would drift silently:
+>
+> ```bash
+> python3 -c "import sys; sys.path.insert(0,'deploy'); from config_provenance_audit import declared_generated; print(*sorted(declared_generated()), sep=chr(10))"
+> ```
+>
+> A generated object is repaired by **re-running its producer**, never by uploading the
+> repo copy. `deploy/config_provenance_audit.py` is the standing check: it grades the live
+> object's own `_built_at` against the clock, so it sees the revert within a day even
+> though a comparison against the committed twin cannot.
 
 ### Post-deploy verification
 

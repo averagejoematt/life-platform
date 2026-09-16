@@ -32,7 +32,7 @@ This guard mirrors tests/test_coverage_floor_ratchet.py's shape exactly:
 "agreement-only" turned out to be the defect. See the class record below.
 
 ═══════════════════════════════════════════════════════════════════════════════
-THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224 → #3265)
+THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224 → #3265 → #3835)
 ═══════════════════════════════════════════════════════════════════════════════
 Every instance of this class has been answered by re-deriving the budget UPWARD, and
 the trend line between instances has been steeper than the raises — until #3224 broke
@@ -46,6 +46,44 @@ that streak, and #3265 kept it broken:
   #3106   2026-08-24  1507s       1500 → 1950       raise
   #3224   2026-08-27  1994s       1950 → 1950       SHED — the first non-raise
   #3265   2026-08-30  2244s       1950 → 1950       SHED — the second non-raise
+  #3835   2026-09-16  2850s med    1950 → 1950       SHED — the third, and the first
+                      (n=9)                          where the shed was ALREADY BUILT
+
+#3835 (2026-09-16) — THE SHED WAS ALREADY MERGED AND APPLIED TO THE WRONG JOB. #3797
+split the full unit suite into a parallel pass + a serial pass for the four modules that
+mutate the checkout, and it landed in `pr-checks.yml` ONLY. `ci-test.yml`'s
+`test / Unit Tests` — the job raising this warning — was still one serial invocation:
+
+    $ grep -nE "n auto|dist loadfile|serial" .github/workflows/ci-test.yml
+    (no matches)
+
+MEASURED FIRST, nine consecutive green-main `test / Unit Tests` durations (the #1966
+instruction: never re-derive a raise on a single reading):
+
+    3201 2745 2850 2862 2910 2182 2444 1656 2860
+    n=9   median 2850s   mean 2634s   min 1656   max 3201
+    spread 1.93x   budget 1950s -> median is 1.46x   over budget: 8 of 9
+
+The 1.93x spread echoes #3265's finding (88.5% wall-clock spread against 3.3% test
+growth, r=0.257 — mostly CI-queueing noise), so no single reading proves anything. But
+8 of 9 over, with the median at 1.46x, is not noise around a correct ceiling.
+
+THE BUDGET IS NOT MOVED, and that is the point. Raising would be the third raise after
+two successful sheds, for a job whose remedy was sitting merged one file away.
+
+WHAT IS DELIBERATELY NOT CLAIMED HERE: the post-change number. The pre-merge lane's own
+before/after is median 1525s (n=9, single-pass) -> 1151s (n=3, two-pass), ~1.32x — and
+n=3 is thin, the lanes overlap, and #3797 recorded that caveat itself. Applying ~1.3x to
+this job's 2850s median lands near 2160s, still above 1950s. **That estimate is not
+written into the budget and must not be.** The residual is stated with its number: if
+post-change green-main runs still sit over 1950s, the next instance measures THEM and
+decides, rather than inheriting an arithmetic projection made before the change ran once.
+
+The second copy of the two-pass idiom brought its own hazard, which is not a duration
+question at all: coverage is now produced by two invocations, so the 80% floor could be
+graded on a subset (floor on the parallel pass) or on the ~48 serial tests alone (no
+`--cov-append`) — the second passing trivially and gating nothing. Both are asserted
+against in tests/test_full_suite_premerge_3025.py, and both mutations were watched red.
 
 #3265 (2026-08-30) — ATTRIBUTION, METHOD NAMED (so the next instance repeats it rather
 than re-deriving from scratch). The 2244s in this file's own trigger issue is the
