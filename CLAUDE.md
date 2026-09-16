@@ -214,7 +214,7 @@ silent omission is not an outcome.**
 **Verified:** 2026-09-16 (Opus 5, **Session AG — the sweep that found nothing, and the eleven gates that
 found me**; owner brief *"get open issues as low as it honestly goes"*, autonomous overnight, standing
 merge+deploy authority, **no `--deliver`**, the recap cron hold STAYS, every lease approved or REJECTED).
-**124 open -> 122: 8 closed (ALL on demonstrated evidence, 1 on a LIVE PROOF), 4 filed, 12 PRs merged,
+**124 open -> 121 (89 addressable, both MEASURED not derived): 8 closed (ALL on demonstrated evidence, 1 on a LIVE PROOF), 4 filed, 12 PRs merged,
 census 644 -> 647, 9 leases approved / 6 rejected by name, none left waiting.** **THE HEADLINE IS A
 NEGATIVE RESULT: the plan projected 9-18 closures from re-sweeping the addressable 92; six agents over all
 73 non-epic issues yielded exactly ONE.** Not a weak sweep — verified reproductions throughout, and two

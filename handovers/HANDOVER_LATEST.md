@@ -171,7 +171,7 @@ labs surface has not regenerated yet; a beat would narrate a fix the reader cann
 incidental permission auto-add to `.claude/settings.local.json` reverted rather than committed.
 **Closures:** #3642 #3832 #3813 #3812 #3784 #3805 #3651 #3851 · DoD: `closure_sweep.py --session` scanned 10,
 **blocking=none**; the single residual hit is #3833, a bot-filed alert closed by its own watcher.
-**Backlog:** **122 open / 90 addressable** (120 + #3851 + #3853; #3851 then closed on its merge — see the tail). **Residual, stated not hidden: 5 `acceptance_count` violations**
+**Backlog:** **121 open / 89 addressable** — MEASURED at 17:33Z via the search API + a union exclusion, not derived by arithmetic. My first pass said 122/90 and was wrong twice: the headline was stale by one (#3851 closed on its own merge), and the three exclusions OVERLAP — the union is 32, not 21+13+3=37. The same rule the census moves by. **Residual, stated not hidden: 5 `acceptance_count` violations**
 (#3607 #3611 #3615 #3617 #3621) — substantive requirements, not padding; trimming them to hit a number is
 what the brief ruled out. They need their owner.
 **Alarms:** unchanged — no alarm added, retuned or silenced this session.
@@ -310,5 +310,10 @@ them); it simply is not this issue. The true target is recorded on #3792 for who
 an explicit instruction not to re-verify via the bundle.
 
 **Net for the tail: 1 closed (#3851), 2 filed (#3851, #3853), TWO partials (#3829, #3830) and one
-not-realized (#3792) left open with their evidence. The count did not fall here and should not have
-— three fixes were graded honestly rather than closed around.**
+not-realized (#3792) left open with their evidence. Three fixes graded honestly rather than closed
+around.**
+
+**Final measured count: 124 → 121 open, 92 → 89 addressable** (search API + union exclusion at
+17:33Z). A last-minute check caught me reporting `gh issue list`'s default page size of **30** as
+the open count, and then caught my arithmetic-derived 122/90 as well. Count by measurement, never
+by addition — the rule the census already runs on, applied one level up.
