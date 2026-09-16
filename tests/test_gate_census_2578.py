@@ -663,7 +663,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # proved by deleting the entry from the REAL tracked file and watching
         # test_no_finding_code_ends_in_a_GITHUB_CLOSING_KEYWORD red naming
         # {'partial-acceptance-close': 'close'} (1 failed / 24 passed), then restoring (25 passed).
-        <= 100
+        # 100 -> 101 (2026-09-16, #3830): the 101st proof is
+        # guard::deploy/lib/canary_gate_retry.py, the deploy gate whose false NEGATIVE is a
+        # fleet rollback. Proved by TWO real-tree mutations, not a monkeypatch: removing
+        # "FAIL" from GATING_VERDICTS reds 7 of 15 including the must-fail control, and
+        # reverting ci-cd.yml's Verify canary step to the single un-retried call reds the
+        # seam test by name. Both restored to 15 passed, git diff empty.
+        <= 101
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
