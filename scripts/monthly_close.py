@@ -344,6 +344,60 @@ def _attribution_stability(start: date) -> tuple[dict | None, list[str]]:
 
 
 # ── Assembly ─────────────────────────────────────────────────────────────────
+def reset_cadence(month_start: date, month_end: date, today: date | None = None) -> dict:
+    """Reset cadence for the close (#3601), derived from CYCLE_GENESES — never hand-typed.
+
+    The reset is the platform's most expensive recurring EVENT and no row priced it. Row 86
+    of `docs/PROPORTIONALITY.md` said "a few times a quarter" against a measured 9.2, and
+    that figure is the denominator every reset-machinery demote trigger is judged against.
+
+    The owner ruled a 30-day minimum cycle length on 2026-09-05 (#3606 ruling 1), enforced
+    from 2026-09-16 by `restart_pipeline.py`'s `[0a]` preflight. Printing the cadence every
+    month is how that ruling stays observed rather than merely recorded.
+
+    PARTIAL, and stated as such rather than left to look complete: this returns the COUNT
+    and the GAPS. `$ per reset` and the DEMOTE-candidate list — the other two lines #3601's
+    box 2 asks for — need a measured per-reset cost model and a per-instrument
+    zero-output ledger; neither is derivable from this registry and neither is invented here.
+    """
+    import re as _re
+
+    today = today or date.today()
+    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "web", "site_api_data.py")
+    try:
+        src = open(src_path, encoding="utf-8").read()
+        blk = src[src.index("CYCLE_GENESES = {") :]
+        blk = blk[: blk.index("\n}")]
+        pairs = sorted((int(a), b) for a, b in _re.findall(r'(\d+):\s*"(\d{4}-\d{2}-\d{2})"', blk))
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"CYCLE_GENESES unreadable: {e}"}
+    if not pairs:
+        return {"error": "CYCLE_GENESES parsed EMPTY — a vacuous zero is not a cadence"}
+
+    dates = [date.fromisoformat(d) for _, d in pairs]
+    in_month = [d for d in dates if month_start <= d <= month_end]
+    gaps = [(b - a).days for a, b in zip(dates, dates[1:])]
+    span = (dates[-1] - dates[0]).days
+    current_age = (today - dates[-1]).days
+    return {
+        "in_month": len(in_month),
+        "in_month_dates": [d.isoformat() for d in in_month],
+        "lifetime_reanchors": len(dates) - 1,
+        "lifetime_span_days": span,
+        "per_quarter": (len(dates) - 1) / span * 91 if span else None,
+        # statistics.median, not sorted(gaps)[n//2]. With an even n the index form returns
+        # the UPPER of the two middles — 6 where the true median is 5.5 — and this number is
+        # quoted in docs/PROPORTIONALITY.md row 86. Two spellings of "median" disagreeing by
+        # half a day is how a doc literal and its source drift.
+        "median_gap": statistics.median(gaps) if gaps else None,
+        "min_gap": min(gaps) if gaps else None,
+        "current_cycle": pairs[-1][0],
+        "current_genesis": pairs[-1][1],
+        "current_age_days": current_age,
+        "under_minimum": [g for g in gaps if g < 30],
+    }
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="PRINT-ONLY monthly cost-close assembler (#3375). Writes nothing, anywhere.")
     ap.add_argument("--month", help="calendar month YYYY-MM (default: the month that just ended)")
@@ -361,7 +415,7 @@ def main(argv=None) -> int:
     print(f"\nMonthly close assembler — {label}  (print-only: this script writes NOTHING)\n")
 
     # 1. CE actual
-    print("[1/5] CE actual by service (unblended)")
+    print("[1/6] CE actual by service (unblended)")
     actuals = _ce_actuals(ce, start, end)
     top = sorted(actuals["services"].items(), key=lambda kv: -kv[1])[:8]
     for svc, amt in top:
@@ -381,7 +435,7 @@ def main(argv=None) -> int:
         print(f"  Bedrock daily: {spike_note}")
 
     # 2. Days at tier ≥1
-    print("\n[2/5] Days at tier >=1 (LifePlatform/Budget::BudgetTier daily max)")
+    print("\n[2/6] Days at tier >=1 (LifePlatform/Budget::BudgetTier daily max)")
     tier_days = _days_at_tier(cw, start, end)
     if tier_days is not None:
         print(f"  {tier_days} / {days_in_month} days")
@@ -397,7 +451,7 @@ def main(argv=None) -> int:
     )
 
     # 3. Cost per reader-week
-    print("\n[3/5] Cost per reader-week (LifePlatform/Traffic::UniqueVisitors7d)")
+    print("\n[3/6] Cost per reader-week (LifePlatform/Traffic::UniqueVisitors7d)")
     readers = _reader_week(cw, start, end)
     reader_week = None
     if readers and total:
@@ -409,7 +463,7 @@ def main(argv=None) -> int:
         )
 
     # 4. CallerClass split
-    print("\n[4/5] CallerClass split (LifePlatform/AI::EstimatedCostUSD, #2892)")
+    print("\n[4/6] CallerClass split (LifePlatform/AI::EstimatedCostUSD, #2892)")
     by_class = _caller_class(cw, start, end)
     stamped = sum(by_class.values())
     episodic = sum(by_class[c] for c in EPISODIC_CLASS_NAMES)
@@ -472,7 +526,7 @@ def main(argv=None) -> int:
     # 5. The per-feature AI budget ledger (#3374 R3) — graded on the SAME
     # attribution run the stability check just validated; a budgeted feature over
     # its ledger budget, or `unknown` over the down-only ratchet, FAILS the close.
-    print("\n[5/5] AI budget ledger (#3374 R3, scripts/ai_budget_ledger.py)")
+    print("\n[5/6] AI budget ledger (#3374 R3, scripts/ai_budget_ledger.py)")
     import ai_budget_ledger  # sibling module — scripts/ is this file's own directory
 
     ledger_structural = ai_budget_ledger.validate()
@@ -494,6 +548,32 @@ def main(argv=None) -> int:
                 f"  ok: {budgeted} budgeted features within budget; unknown within the down-only ratchet "
                 f"(${ai_budget_ledger.LEDGER[ai_budget_ledger.UNKNOWN_KEY]['monthly_budget_usd']})"
             )
+
+    # #3601: the reset cadence, printed every month so the owner's 30-day ruling stays
+    # OBSERVED rather than merely recorded. Derived from CYCLE_GENESES, never hand-typed.
+    print("\n[6/6] Reset cadence (#3601 — CYCLE_GENESES, derived)")
+    rc = reset_cadence(start, end)
+    if rc.get("error"):
+        _problem(rc["error"], "RESET-CADENCE")
+    else:
+        dates = ", ".join(rc["in_month_dates"]) or "none"
+        print(f"  resets this month              : {rc['in_month']}  ({dates})")
+        print(
+            f"  lifetime cadence              : {rc['lifetime_reanchors']} re-anchors / {rc['lifetime_span_days']}d "
+            f"= {rc['per_quarter']:.1f} per quarter   (median gap {rc['median_gap']}d, min {rc['min_gap']}d)"
+        )
+        print(
+            f"  current cycle                 : {rc['current_cycle']} since {rc['current_genesis']}, " f"running {rc['current_age_days']}d"
+        )
+        print(
+            f"  gaps under the 30d minimum    : {len(rc['under_minimum'])} of {rc['lifetime_reanchors']} "
+            "(historic; the [0a] preflight has enforced the rule since 2026-09-16)"
+        )
+        print(
+            "  NOT PRINTED, and not invented : $ per reset, and the DEMOTE-candidate list. Both are #3601 box 2\n"
+            "                                  and both need a measurement this registry does not hold — a per-reset\n"
+            "                                  cost model, and a per-instrument zero-output ledger."
+        )
 
     # The candidate row
     fmt = lambda v, spec=".2f": format(v, spec) if v is not None else "??"  # noqa: E731
