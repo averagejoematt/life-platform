@@ -668,6 +668,43 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
     # #3570: same idiom as check_proof_freshness.py directly above — the mutation is
     # the REAL pre-fix registry (origin/main, before this PR's source_registry.py
     # additions), not a synthetic plant, watched against the actual live bucket.
+    # #3830 box 3: retry-before-gate on the canary. The gate whose false NEGATIVE is a
+    # fleet rollback, so both directions are proved on the real tree, not monkeypatched.
+    "guard::deploy/lib/canary_gate_retry.py": {
+        "gate_name": "deploy/lib/canary_gate_retry.py",
+        "command": "python3 -m pytest tests/test_canary_gate_retry_3830.py -q   # 15 cases, fully offline (invoke is injected, no AWS)",
+        "mutation": (
+            "TWO real-tree mutations, each edited in place in the tracked file and then restored. "
+            'M1 removed "FAIL" from GATING_VERDICTS in deploy/lib/canary_gate_retry.py — the realistic '
+            "drift mode, since a retry wrapper that stops treating FAIL as gating is indistinguishable "
+            'from a disabled gate at a glance. M2 reverted the ci-cd.yml "Verify canary" step to the '
+            "pre-#3830 single un-retried `smoke_oracle_decision.py /tmp/canary.json` call — the other way "
+            "this dies, by the wrapper staying in the tree while nothing calls it."
+        ),
+        "observed": (
+            "M1 MUTATED: 7 failed, 8 passed — the must-fail control "
+            "(test_MUST_FAIL_a_persistent_failure_across_every_attempt_STILL_GATES) reds, and so do the "
+            "AccessDenied opposite-direction control, the [FAIL]-parametrized case, the stop-at-first-pass "
+            "case and the CLI contract. REVERTED: 15 passed. M2 MUTATED: 1 failed "
+            "(test_the_ci_workflow_gates_the_canary_THROUGH_this_wrapper, naming the seam), 14 passed. "
+            "REVERTED: 15 passed, `git diff --stat` empty. Both watched 2026-09-16. The in-test "
+            "monkeypatch control (test_MUTATION_treating_a_gating_verdict_as_non_gating...) is a THIRD, "
+            "weaker proof kept because it proves the must-fail control is not passing for the wrong reason."
+        ),
+        "scope": (
+            "It counts oracle verdicts and nothing else — it never reads a check name, a failure message "
+            'or an exception class (a test asserts "AccessDenied" does not appear in the source), so the '
+            "lane/failure classification stays in lambdas/operational/canary_lanes.py alone per #3830 box 4. "
+            "It cannot distinguish a transient from a persistent fault on ONE observation and does not try: "
+            "the permissive direction is bought with repetition, so a fault that survives the retry still "
+            "gates. It therefore does not protect against a fault that is intermittent on the SAME timescale "
+            "as the retry delay — a 50/50 flapping dependency can still pass on the second look. Its live "
+            "path is exercised by a real deploy run; the canary was deliberately NOT invoked by hand to "
+            "smoke it, because the canary writes a synthetic subscriber row and that residue is what caused "
+            "the #2051 rollback."
+        ),
+        "proved_on": "2026-09-16",
+    },
     # #3812: detector C of the closure contract. The mutation is NOT synthetic — it is a
     # LIVE STATE TRANSITION on real data, observed within the same session, which is the
     # strongest form available to a gate that reads git history and the issue tracker.

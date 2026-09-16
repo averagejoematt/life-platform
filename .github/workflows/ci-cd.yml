@@ -1120,16 +1120,7 @@ jobs:
 
       - name: Verify canary
         run: |
-          echo "Checking canary Lambda..."
-          aws lambda invoke \
-            --function-name life-platform-canary \
-            --payload '{}' \
-            --region ${{ env.AWS_REGION }} \
-            --cli-binary-format raw-in-base64-out \
-            /tmp/canary.json
-
-          echo "Canary result:"
-          python3 -m json.tool /tmp/canary.json 2>/dev/null || cat /tmp/canary.json
+          echo "Checking canary Lambda (retry-before-gate, #3830)..."
 
           # #1345: same shared decision as the smoke step; canary additionally
           # accepts "healthy". PARSE_ERROR is GATING (exit 1), no longer fail-open.
@@ -1146,7 +1137,25 @@ jobs:
           # just the one that noticed. The lane mapping lives in ONE place,
           # lambdas/operational/canary_lanes.py; nothing here string-matches
           # check names.
-          python3 deploy/lib/smoke_oracle_decision.py /tmp/canary.json "Canary" --ok-extra healthy
+          # #3830 box 3: RETRY BEFORE GATE. On 2026-09-15T19:55Z a single Bedrock
+          # ServiceUnavailableException in this step reverted 85 Lambdas while the
+          # alerter, looking at the SAME datapoint, suppressed it as a first
+          # occurrence and the alarm self-cleared in 15 minutes. The most
+          # destructive consumer was the most confident, on the least evidence.
+          #
+          # #3831 demoted RECOGNISED vendor transients out of the gating lane
+          # (canary_lanes.py). This is the backstop for the failure modes nobody
+          # has named yet: no single observation may revert a fleet. A persistent
+          # fault — a real IAM denial, a broken deploy — fails the second look too
+          # and still gates, so the permissive direction is bought with repetition
+          # rather than with a suppression list. Nothing here string-matches a
+          # check name (box 4); the wrapper calls the SAME smoke_oracle_decision
+          # and simply counts its verdict.
+          python3 deploy/lib/canary_gate_retry.py \
+            --function life-platform-canary \
+            --region ${{ env.AWS_REGION }} \
+            --out /tmp/canary.json \
+            --label "Canary" --ok-extra healthy
 
   # ════════════════════════════════════════════════════════════════
   # Job 5c: Visual + AI-vision QA (Playwright → Claude). GATING.
