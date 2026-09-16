@@ -211,30 +211,32 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-16 (Opus 5, **Session AG — the sweep that found nothing, and the ten gates that found
-me**; owner brief *"get open issues as low as it honestly goes"*, autonomous overnight, standing merge+deploy
-authority, **no `--deliver`**, the recap cron hold STAYS, every lease approved or REJECTED). **124 open -> 120:
-7 closed (ALL on demonstrated evidence, 1 on a LIVE PROOF), 2 filed, 11 PRs merged, 10 fixes built, census
-644 -> 647, 8 leases approved / 5 rejected by name, none left waiting.** **THE HEADLINE IS A NEGATIVE RESULT:
-the plan projected 9-18 closures from re-sweeping the addressable 92; six agents over all 73 non-epic issues
-yielded exactly ONE.** Not a weak sweep — verified reproductions throughout, and two agent findings REJECTED
-after checking (#3615's "cheapest fix" would have computed voice-fidelity ACROSS A RESET BOUNDARY; #3692's
-"hidden" baseline raise is documented in place as unearned debt). **The corpus is young work, not stale
-debt** — `Later` holds nothing older than 16 days and `check_backlog_hygiene` finds zero staleness over 120.
-So A4's triage yield is zero honestly, and **every closure came from SHIPPING**. **THE SECOND HEADLINE: ten
-times a gate caught THIS SESSION'S OWN work** — a census measured with the files untracked (invisible to a
-git-tracked walk); fabricated instants in a proof record; **my detector's own report line was a
-closing-keyword injection** (`...-fix #3830` parses as `fix #3830`, so pasting a sweep report into a PR body
-would have closed every issue it named); the gate then **blocked the PR with the very bug that PR fixes**
-(GitHub ignores code spans, the parser did not); a test that raced under #3797's four-day-old parallel lane;
-unhomed `## Residual` headings in my own closing comments; **a must-fail control that tested the pure
-function and never asserted the gate CALLS it** — the exact sentence I had written into #3830's PR hours
-earlier; a test passing only because my working copy has a `docs(wrap` commit that CI's shallow checkout
-lacks, which exposed a real ordering bug; and an `--is-ancestor` check that was the wrong instrument for
-squash-merges. **The inherited "GitHub outage" was a MERGE CONFLICT** — the reconcile bot's commit landed 60s
-after the last `pull_request` run, and `wait_pr_green.sh` already carries that discriminator (#3653); it
-recurred on #3839 and took one call to settle. **Owner acts left:** #2883 measures 4/4 satisfied and is
-`gate:owner` (numbers handed over, not closed around) · the 5 `acceptance_count` violations (#3607 #3611
-#3615 #3617 #3621) need splitting, not trimming · #3829's 2026-09-13 gap stays unexplained and must not be
-absorbed when today's row lands · #3848 (SBOM silently absent, shipped today, both steps green) and #3849
-(two wall-clock assertions measuring the machine) are fresh.
+**Verified:** 2026-09-16 (Opus 5, **Session AG — the sweep that found nothing, and the eleven gates that
+found me**; owner brief *"get open issues as low as it honestly goes"*, autonomous overnight, standing
+merge+deploy authority, **no `--deliver`**, the recap cron hold STAYS, every lease approved or REJECTED).
+**124 open -> 122: 8 closed (ALL on demonstrated evidence, 1 on a LIVE PROOF), 4 filed, 12 PRs merged,
+census 644 -> 647, 9 leases approved / 6 rejected by name, none left waiting.** **THE HEADLINE IS A
+NEGATIVE RESULT: the plan projected 9-18 closures from re-sweeping the addressable 92; six agents over all
+73 non-epic issues yielded exactly ONE.** Not a weak sweep — verified reproductions throughout, and two
+agent findings REJECTED after checking. **The corpus is young work, not stale debt** (`Later` holds nothing
+older than 16 days), so A4's triage yield is zero honestly and **every closure came from SHIPPING**. **THE
+SECOND HEADLINE: eleven times a gate caught THIS SESSION'S OWN work** — a census measured with the files
+untracked; fabricated instants in a proof record; **my detector's own report line was a closing-keyword
+injection**; the gate then **blocked the PR with the very bug that PR fixes**; a test that raced under
+#3797's parallel lane; unhomed `## Residual` headings; **a must-fail control that tested the pure function
+and never asserted the gate CALLS it**; a test passing only because my working copy has a `docs(wrap`
+commit CI's shallow checkout lacks; an `--is-ancestor` check wrong for squash-merges; and **the eleventh,
+which is a different kind — a PRECEDENCE error: I let PR #3852 carry the `Generated with Claude Code`
+footer because my runtime instructions said to append it, when this file's Authorship section bans it and
+says in terms that it OVERRIDES that instruction.** The other ten were reasoning errors; that one recurs by
+construction, because the wrong instruction arrives fresh every session. **The tail found the costliest
+thing:** #3792's fix is **INERT on the surface the issue names** — `_labs_pack` is correct and emits *"it
+is COMPLETE ... do not narrate it as upcoming"*, but `ai_calls.py` (which writes the dashboard row via
+`coach_state_updater`) **never imports `coach_domain_facts`**. I verified the code was in the deployed
+bundle and treated that as landing: **in the bundle is not on the path** — the #3713 shape, reproduced
+while holding a memory that names it. **Owner acts left:** #3829 is PARTIAL not closed (103.7s proves the
+90s->300s raise, but the row is `_fallback`+`_grounding_hold`, a missing cycle is still invisible, and
+09-13's 52.4s stays unexplained and unabsorbed) · #3792 open with its true target recorded · #2883 measures
+4/4 and is `gate:owner` · the 5 `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621) need
+splitting, not trimming · #3853 (44% of remaining hygiene violations come from one bot-filed throttle
+marker) · #3848 / #3849 fresh.

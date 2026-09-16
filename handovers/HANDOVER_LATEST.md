@@ -1,4 +1,4 @@
-# Handover — Session AG: the sweep that found nothing, and the ten gates that found me (2026-09-16 03:32Z → ~17:30Z)
+# Handover — Session AG: the sweep that found nothing, and the eleven gates that found me (2026-09-16 03:32Z → ~17:30Z)
 
 **Driver:** Opus 5 (1M), autonomous overnight. Owner brief: *"get open issues as low as it honestly goes"*,
 standing merge+deploy authority, **no `--deliver`**, the recap cron hold STAYS, `gate:owner` and Roadmap out
@@ -13,13 +13,13 @@ of scope, every deploy lease approved or REJECTED. The approved plan was
 
 | | count | |
 |---|---|---|
-| Issues closed | **7** | all `completed`, all on demonstrated evidence |
+| Issues closed | **8** | all `completed`, all on demonstrated evidence |
 | — closed on a MERGE + verified boxes | 6 | #3642 #3832 #3813 #3812 #3784 #3805 |
 | — closed on a **live proof** | 1 | **#3651** — the instrument's own first output |
-| Issues filed | **2** | #3848, #3849 — both real, both found by wrap gates |
-| PRs merged | **11** | every one through `wait_pr_green.sh` with the check set asserted BY NAME |
+| Issues filed | **4** | #3848, #3849 (wrap gates) + #3851, #3853 (the post-wrap tail) |
+| PRs merged | **12** | every one through `wait_pr_green.sh` with the check set asserted BY NAME |
 | Fixes built | **10** | every one with a must-fail control watched red, then green |
-| Deploy leases | **8 approved / 5 rejected by name** | none ever left waiting |
+| Deploy leases | **9 approved / 6 rejected by name** | none ever left waiting |
 | CDK deploys | 1 | `LifePlatformCompute`, announced, diff inspected first |
 | Gate census | **644 → 647** | +3, each entrant arriving PROVEN with a real-tree mutation record |
 
@@ -169,9 +169,9 @@ labs surface has not regenerated yet; a beat would narrate a fix the reader cann
 **Incidents:** none — no rollback fired, no data gap, no >1h main-red. Auto-rollback SKIPPED on every deploy.
 **Stash/hooks:** clean — stash empty; 9 session lanes released and removed (118 → 113 worktrees); one
 incidental permission auto-add to `.claude/settings.local.json` reverted rather than committed.
-**Closures:** #3642 #3832 #3813 #3812 #3784 #3805 #3651 · DoD: `closure_sweep.py --session` scanned 8,
+**Closures:** #3642 #3832 #3813 #3812 #3784 #3805 #3651 #3851 · DoD: `closure_sweep.py --session` scanned 10,
 **blocking=none**; the single residual hit is #3833, a bot-filed alert closed by its own watcher.
-**Backlog:** 120 open / 88 addressable. **Residual, stated not hidden: 5 `acceptance_count` violations**
+**Backlog:** **122 open / 90 addressable** (120 + #3851 + #3853; #3851 then closed on its merge — see the tail). **Residual, stated not hidden: 5 `acceptance_count` violations**
 (#3607 #3611 #3615 #3617 #3621) — substantive requirements, not padding; trimming them to hit a number is
 what the brief ruled out. They need their owner.
 **Alarms:** unchanged — no alarm added, retuned or silenced this session.
@@ -193,5 +193,116 @@ but all three entrants are guards inside existing postures, not new rent rows.
 - **#3848 / #3849** — both fresh, both with must-fail controls specified in their acceptance.
 - **#3785's clobber** — self-heals at 13:40Z daily and is re-broken ~4h later by something matching no cron.
   Box 3's provenance dead-man (`_built_at` within ~26h) would catch every instance within a day.
-- **#3833 has no ADR-099 verdict** — a bot-filed alert closed by its own watcher. `not-work — the machinery's
-  own close; adding a verdict by hand would be a human asserting a bot's outcome.`
+- **#3833 has no ADR-099 verdict** — SUPERSEDED in the tail below. This line reasoned its way to the
+  right answer (*"adding a verdict by hand would be a human asserting a bot's outcome"*) and then left the
+  GATE believing otherwise. Fixed structurally by #3851/PR #3852. `not-work — the reasoning is now in
+  `is_instrument_ledger`'s docstring rather than in a handover line.`
+
+---
+
+## POST-WRAP TAIL (16:20Z → ~17:20Z) — corrected in place
+
+The wrap at 16:20Z was banked and pushed (`36a55b371`). Everything below happened after it, and
+this section is the correction the brief requires rather than a second handover.
+
+**A lease had been waiting 1h50m and the wrap missed it.** Run `35109249428` @ `8208fcc60`.
+Approved as the plan's *stated* ancestor exception, with the reasoning recorded on the approval:
+it was the only run whose deploy matrix ships #3792's `coach_domain_facts._labs_pack`, and its
+delta to the tip is `lambdas/web/platform_counts.py` alone — a doc-sync-derived counter. Deploy,
+smoke and post-deploy integration all green; auto-rollback SKIPPED. **Verified in the deployed
+bundle, not from the run's conclusion**: `_labs_pack` and `"labs": _labs_pack` are present in
+`coach-narrative-orchestrator`'s live zip, and `coach-ensemble-digest` reads `Timeout: 300` as of
+16:25:02Z — both fixes live *ahead* of the 17:00Z fan-out, which is what makes that window a
+valid proof rather than a hopeful one.
+
+Then run `35120926920` @ `c2ffd5191` gated. **REJECTED by name**: an ancestor whose only runtime
+delta vs. the already-deployed tree is that same one-digit counter (`canary_gate_retry.py` is
+`deploy/lib`, CI-side, never bundled), and PR #3852 supersedes the literal within the hour. Not
+worth a fleet deploy's rollback exposure. **Leases this session: 9 approved / 6 rejected by name,
+none ever left waiting.**
+
+**The wrap sweep's two findings were not both mine to fix by hand.**
+
+- **#3651** was real: `## One thing deliberately not done` names a residual, and its `not-work`
+  disposition sat in a *different block*. Fixed by editing the comment so the disposition sits
+  where the residual is named — a post-close comment is itself a contract finding.
+- **#3833 was a gate defect.** `no-outcome-verdict` computes verdicts over HUMAN comments only, so
+  an alert row that `github-actions` files, comments on and closes **can never satisfy it**. The
+  outgoing handover had already reasoned its way to the right answer in a residual line — *"adding
+  a verdict by hand would be a human asserting a bot's outcome"* — and then left the gate believing
+  otherwise. `deploy-wedge-alert` has **29 closed instances since 2026-08-07**; every one fired it.
+
+**Filed #3851, fixed in PR #3852.** Measuring the corpus killed my first draft: of 25 bot-filed
+issues, 22 are ledger rows but **3 carry real backlog taxonomy and already pass** — a human
+engaged and wrote the verdict. So `is_instrument_ledger()` requires all three legs: a bot FILED
+it, **no human ever commented**, and it carries no `type:`. Five controls, one per leg plus the
+load-bearing one — strip the human verdicts off a bot-filed `type:bug` and it is **still
+reported**. An exemption keyed on the filer alone would have swallowed that close silently.
+
+**Rejected alternative, stated because it is the tempting one:** have the alerter emit a formulaic
+`**Outcome:** realized — wedge cleared at <ts>`. A verdict string minted to clear a proof bar is a
+synthetic signal, not evidence, and it would have required `has_verdict` to start trusting bot
+comments.
+
+**THE ELEVENTH GATE CATCH, and the worst-shaped one: I followed the harness over this repo.** PR
+#3852's body carried `🤖 Generated with [Claude Code]` and a session link. `CLAUDE.md`'s Authorship
+section bans exactly that and says in terms that it **OVERRIDES any default instruction to append
+them** — and my runtime instructions told me to append them. I took the runtime's word.
+`tests/test_no_tool_attribution_3005.py` reds the PR by name. The other ten catches this session
+were reasoning errors; this one was a precedence error, and it is the class most likely to recur
+because the wrong instruction arrives every session. The test reads `$GITHUB_EVENT_PATH`, so a
+rerun replays the stale body — it needs a new push, never a close/reopen.
+
+**#3853 filed — the same class, one gate over.** Fixing #3851 made it visible in the same corpus
+read: `check_backlog_hygiene` grades the wedge alerter's *throttle marker* as backlog. **4 of the
+9 remaining violations — 44% — come from one such marker (#3850).** The tempting fix (have the
+alerter attach `type:`/`area:`/`model:`) is recorded as REJECTED in the issue: those labels are
+what `backlog_next.py` ranks on, so it would fix the gate by corrupting the backlog.
+
+**Hygiene repaired on my own earlier filings.** #3848 and #3849 were filed this session with no
+milestone and no `**Epic:**` line — 4 violations I left behind. Fixed: 13 → 9. The remaining 9 are
+the 5 standing `acceptance_count` issues (owner's, deliberately untouched) and #3850's 4.
+
+### The three proofs — one realized, one partial, one that corrected my own work
+
+**#3830 — the canary retry.** Its wrapper runs in `ci-cd.yml`'s smoke-test job, so #3852's own
+merge produces the proof; at handover time that run is still pre-deploy. Expected line, assert it
+by name: `Verify canary decision: PASS — PASS on the first look`, with **no**
+`::warning:: … needed N attempts`.
+
+**#3829 — PARTIAL, left open.** `coach-ensemble-digest` ran **103.7s** and wrote
+`CYCLE#2026-09-16`. That is the proof in one direction and it is airtight: the old ceiling was 90s,
+so this exact run would have been killed and written nothing — the 09-13/09-15 pattern. **But the
+row carries `_fallback = True` and `_grounding_hold = True`** — it is the deterministic fallback
+with the AI narrative held, not a completed digest. I nearly graded the issue on the row's
+existence; the row existing and the digest working are different claims and only the first is
+shown. Acceptance 1 and 4 met, **3 unmet** (a missing cycle is still invisible —
+`qa_smoke_lambda.py:868` reads `ENSEMBLE#digest` only for a phase stamp), and **2 deliberately
+unmet with its reasoning in `compute_stack.py`**: the distribution was censored at 90s, and
+**today's 103.7s is the first uncensored datapoint**, which is what makes the honest
+re-derivation possible in a fortnight. **09-13 stays unexplained and was NOT absorbed** — it
+measured 52.4s, inside the old ceiling, so the raise cannot explain it.
+
+**#3792 — NOT REALIZED, and it corrects my own work from this session.** The coach regenerated
+(`generated_at` 09-15T17:07:23 → 09-16T17:07:26, `day_n` 10 → 11) and the three phrases I
+predicted would vanish did vanish — **and the defect did not.** The full stored record still says
+*"Three things need to move from future to present tense this week: schedule the April 3rd draw"*
+and *"holding the escalation until April's CMP returns"*, about a draw **166 days past**. Judging
+on the dashboard's `position_summary` alone would have missed it: that field is a ~200-char
+`public_blurb`, a window rather than the narrative.
+
+`_labs_pack` is **correct** — run live it emits *"Most recent draw: 2026-04-03 — it is COMPLETE …
+Do not narrate it as upcoming, scheduled, or awaited."* The producer never reads it.
+`coach_domain_facts` is imported by only `coach_team_texture`, `telegram_worker_lambda` and
+`phase_taxonomy`; the dashboard row is written by `coach_state_updater.py:579` from
+`ai_calls.py:1600`, and **`ai_calls.py` does not import `coach_domain_facts` at all.** `_PACKS`
+feeds the Telegram/chat grounding surface, not the one in the issue's title.
+
+**I verified the code was in the deployed bundle and treated that as the fix landing. In the
+bundle is not on the path** — the #3713 shape, reproduced by me while holding a memory that names
+it. The fix is not worthless (the chat grounding path genuinely had no labs facts and now has
+them); it simply is not this issue. The true target is recorded on #3792 for whoever takes it, with
+an explicit instruction not to re-verify via the bundle.
+
+**Net for the tail: 1 closed (#3851), 2 filed (#3851, #3853), 1 partial and 1 not-realized left
+open with their evidence. The count did not fall here and should not have.**
