@@ -413,6 +413,62 @@ def _weekly_priority_lines(table) -> list:
     return [f"This week's one priority ({label}): {analysis}"]
 
 
+def _labs_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
+    """Dr. Adaeze Obi (labs): the real draw record, read from the SAME facts the analyzer uses.
+
+    #3792: there was no `labs` entry in _PACKS at all, so the labs coach received NO domain
+    facts and narrated its own window from persona memory. Live on 2026-09-15T17:07Z, five
+    and a half months after the panel completed, it was still writing:
+
+        "I'm coordinating a comprehensive April 3rd lab panel to establish clean baselines
+         before any protein escalation ... the draw must fall at least 48 hours after"
+
+    — present/future tense about a draw that happened on 2026-04-03. A reader lands on the
+    coaching dashboard and is told a coach is *arranging* an appointment and *waiting* on
+    blood that was taken in April.
+
+    #3737 fixed the ANALYZER (`ai_expert_analyzer_lambda`) and is proven live there. It
+    reached a different set of consumers: `coach_state_updater` imports none of its modules,
+    so the corrected framing never arrived on this surface. This pack closes that by reading
+    `intelligence.labs_facts.build_labs_fact_block` — the same builder, not a second
+    derivation — so the window framing has ONE home (#3792 box 2).
+    """
+    lines: list = []
+    try:
+        from intelligence.labs_facts import build_labs_fact_block
+    except Exception as e:  # pragma: no cover — bundle edge
+        logger.warning("[domain_facts] labs facts unavailable: %s", e)
+        return lines
+
+    items = _query_source(table, "labs", "0000-00-00", "9999-99-99")
+    block = build_labs_fact_block(items)
+
+    if block.get("store_empty"):
+        # The ONLY honest "no labs yet" — the builder's own words, not this module's guess.
+        lines.append(str(block.get("note") or "The labs store holds zero draw records."))
+        return lines
+
+    draw_date = str(block.get("draw_date") or "")
+    lines.append(
+        f"Most recent draw: {draw_date} — it is COMPLETE and its results are below. "
+        "Do not narrate it as upcoming, scheduled, or awaited."
+    )
+    if draw_date:
+        try:
+            age = (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(draw_date, "%Y-%m-%d")).days
+            lines.append(f"That draw is {age} days old as of {today} — say its age rather than implying recency.")
+        except ValueError:
+            pass
+    lines.append(f"Lifetime draws on record: {block.get('total_draws')} (labs is CROSS_PHASE — a reset never trims this).")
+    flagged = block.get("flagged_markers") or []
+    lines.append(f"Biomarkers on the latest draw: {block.get('total_biomarkers')}, of which {block.get('flagged_count')} out of range.")
+    for marker in flagged[:6]:
+        lines.append(f"Out of range: {marker}")
+    if block.get("extraction_incomplete"):
+        lines.append(str(block["extraction_incomplete"]))
+    return lines
+
+
 def _lead_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
     """Eli Marsh (Principal Investigator): the week's one priority, nothing else."""
     return _weekly_priority_lines(table)
@@ -423,6 +479,7 @@ _PACKS = {
     "sleep": _sleep_pack,
     "physical": _physical_pack,
     "training": _physical_pack,  # merged Performance seat serves both routes
+    "labs": _labs_pack,  # #3792 — was ABSENT, so the labs coach had no facts at all
     "eli_marsh": _lead_pack,  # chat-tier lead — pack key == persona id (no _coach suffix)
 }
 
