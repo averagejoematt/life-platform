@@ -89,13 +89,32 @@ def test_check_is_clean_on_repo_head():
     gate — if this test ever reds, a doc literal has drifted from the value
     sync_doc_metadata.py auto-discovers and `--apply` needs to be rerun.
     """
-    result = subprocess.run(
-        [sys.executable, os.path.join(_REPO, "deploy", "sync_doc_metadata.py"), "--check"],
-        cwd=_REPO,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, os.path.join(_REPO, "deploy", "sync_doc_metadata.py"), "--check"],
+            cwd=_REPO,
+            capture_output=True,
+            text=True,
+            # #3849, the Set's third member. This was 30s, and on 2026-09-16 it
+            # TimeoutExpired in the pre-merge lane on a branch whose diff could not slow a
+            # doc-sync scan. The checker measures ~11s locally; 30s was ~2.7x that, which
+            # reads like headroom and is not — under #3797's parallel lane the whole suite
+            # is competing for the same runner, and the first member of this Set failed at
+            # 2.73s against a budget built on the same reasoning.
+            #
+            # The distinction that fixes it: THIS NUMBER IS NOT AN ASSERTION. The property
+            # under test is `--check` exits 0 on repo HEAD; how long it takes is not a
+            # claim this test makes. So the timeout is sized as a HANG DETECTOR — large
+            # enough that only a genuinely wedged subprocess reaches it, never as a
+            # performance budget that a busy machine can trip. ~27x the measured cost.
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired as e:  # pragma: no cover — only a real hang reaches this
+        raise AssertionError(
+            "sync_doc_metadata.py --check did not finish in 300s. That is a HANG, not slowness: "
+            "the checker measures ~11s and this ceiling is ~27x that. Do not raise it — find what "
+            "is blocking (a network read that should not be there, a lock, an infinite walk). (#3849)"
+        ) from e
     assert result.returncode == 0, (
         "sync_doc_metadata.py --check found drift on repo HEAD — run "
         f"`python3 deploy/sync_doc_metadata.py --apply` and commit the fix.\n{result.stdout}\n{result.stderr}"
