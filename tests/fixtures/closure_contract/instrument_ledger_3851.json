@@ -1,0 +1,133 @@
+{
+  "_captured": "2026-09-16 from the live repo via gh api graphql (GraphQL Issue nodes \u2014 the wire shape).",
+  "_why": "#3851. Three bot-FILED closed issues, chosen to separate the instrument's own ledger row from real backlog a bot happened to file. #3833 is a deploy-wedge-alert: filed, commented and closed by github-actions, no human ever touched it. #3394 carries type:bug and a human wrote the ADR-099 verdict. #3724 is an auto-filed infra row a human engaged with and verdicted. Only #3833 tripped no-outcome-verdict before the exemption; the other two PASSED both before and after, which is the point \u2014 the exemption changes exactly one class.",
+  "issues": [
+    {
+      "author": {
+        "login": "github-actions"
+      },
+      "closedAt": "2026-09-16T03:09:13Z",
+      "comments": {
+        "nodes": [
+          {
+            "author": {
+              "login": "github-actions"
+            },
+            "body": "Recovered \u2014 2026-09-16T03:09:12Z. Deploy wedge cleared; re-armed for the next episode.",
+            "createdAt": "2026-09-16T03:09:13Z"
+          }
+        ],
+        "totalCount": 1
+      },
+      "labels": {
+        "nodes": [
+          {
+            "name": "deploy-wedge-alert"
+          }
+        ]
+      },
+      "number": 3833,
+      "stateReason": "COMPLETED",
+      "title": "[auto-filed] CI/CD deploy wedge \u2014 production deploys are stalled"
+    },
+    {
+      "author": {
+        "login": "github-actions"
+      },
+      "closedAt": "2026-09-02T00:29:49Z",
+      "comments": {
+        "nodes": [
+          {
+            "author": {
+              "login": "averagejoematt"
+            },
+            "body": "## Diagnosis \u2014 the 14 failures are one window, not 14 defects\n\nPulled the run artifact (`visual-qa-standalone-screenshots/report.json`, run 33451827346) rather than reading the truncated log line, per the judge-flake rule.\n\n**Shape:** `79 passed, 14 failed, 0 unevaluated, 84 warnings across 93 pages`. Every one of the 14 is a **reader-truth `temporal_contradiction`**, and every one is the same claim: the page shows cycle-14 data (\"ATTEMPT #14\", \"day 15\", \"SINCE 2026-08-17\", \"start \u00b7 Aug 17 \u00b7 326 \u2192 now \u00b7 321\") while the phase ground truth says cycle 15 has not begun.\n\n**Window:** the sweep ran 23:42Z\u201300:00Z. The reset applied ~20:1xZ and the serving path was still answering with the previous cycle's anchor until ~02:3xZ \u2014 the divergence #3396 carries. The sweep landed inside that window, so it was reading a genuinely stale surface.\n\n**Live now** (all three re-checked directly):\n- `/api/wall` \u2192 cycle 14 `alive=false ended=2026-08-31`, cycle 15 `staged=true`\n- `/api/survival` \u2192 cycle 14 `is_current=false`\n- `/api/calibration` \u2192 `n=0, confirmed=0, refuted=0, calibration=insufficient_data`\n- `/api/source_freshness` \u2192 `genesis=2026-09-01, cycle=15`\n\nSo the cycle-14 residue is gone from the data plane. Per the owner's call this session, **no paid re-run tonight** \u2014 the scheduled sweep re-fires at 23:42Z on Day 1 and this issue auto-closes on green.\n\n**Worth knowing before reading that run:** the site-deploy gate does *not* run `--reader-truth` (removed by #3251, owner decision), so a green site deploy was never evidence about any of this. The standalone sweep is the only prose-truth check on the live site.\n\n## One finding here is a separate defect, not a stale page\n\n`/method/voicefidelity/` is counted as a FAIL, and the judge's own finding text ends:\n\n> *\"Re-examining: the page does explicitly say 'The tally accumulates across every cycle and is never reset at a restart' and 'cross-phase measurement.' This is correctly framed as historical. **Withdrawing this finding.**\"*\n\nThe judge reasoned its way to \"no finding\" and the gate counted it as one anyway. That is a gate defect independent of anything the site was serving, and it is not fixable by phrase-matching \"withdrawing\" \u2014 every phrase-matched suppressor in the #2959/#3003/#3199/#3379 family has failed in the field. Filed separately with a structural framing.",
+            "createdAt": "2026-09-01T03:27:55Z"
+          },
+          {
+            "author": {
+              "login": "github-actions"
+            },
+            "body": "Still failing \u2014 2026-09-01T22:48:56Z (trigger: `schedule`): https://github.com/averagejoematt/life-platform/actions/runs/33566711740\n\nThe daily live-site sweep (Playwright deterministic + reader-truth, plus the Sunday/manual full-surface AI-vision pass and the accuracy gate) failed against https://averagejoematt.com. Screenshots + report are attached to the run as the visual-qa-standalone-screenshots artifact. This run gates nothing and rolls back nothing \u2014 investigate and fix forward.",
+            "createdAt": "2026-09-01T22:48:57Z"
+          },
+          {
+            "author": {
+              "login": "averagejoematt"
+            },
+            "body": "**Outcome verdict (ADR-099) \u2014 cured on its own terms; closed by Session R on tonight's run artifact rather than the auto-close (which requires a fully green run \u2014 the run was red for an unrelated, separately-owned reason).**\n\nThe issue's cure condition is met. Tonight's Day-1 sweep (run 33566711740, 2026-09-01 22:31Z, artifact `report.json` read per the judge-flake rule): **92 passed \u00b7 1 failed \u00b7 0 unevaluated \u2014 and ZERO of the 14 cycle-14 `temporal_contradiction` findings this issue tracked.** The 08-31 window's stale surface (\"ATTEMPT #14\", \"SINCE 2026-08-17\", the old anchor) is gone from every judged page, confirming the data-plane cure the diagnosis comment predicted.\n\nThe single remaining FAIL is a different defect with a different owner, already fixed: `/data/sleep/` was flagged `temporal_contradiction (high)` by a judge whose own note ENDS \"Re-examined: this is CORRECT behavior, not a contradiction\" \u2014 a self-withdrawn finding that gated anyway, which is precisely the #3399 class. Tonight's run executed ~30 minutes BEFORE #3399's fix merged (PR #3426, 6e439f039, moves `basis` after the note so a withdrawal has a structured place to land); the next scheduled sweep runs with the fix and its emission measurement belongs to #3399's acceptance, not to this issue.",
+            "createdAt": "2026-09-02T00:29:49Z"
+          },
+          {
+            "author": {
+              "login": "averagejoematt"
+            },
+            "body": "**Shipped:** see the outcome-verdict comment above (this session's PR + live evidence). \n**Outcome:** realized \u2014 the `## Outcome` sentence came true per the evidence cited above.",
+            "createdAt": "2026-09-02T00:54:46Z"
+          }
+        ],
+        "totalCount": 4
+      },
+      "labels": {
+        "nodes": [
+          {
+            "name": "area:infra"
+          },
+          {
+            "name": "model:opus"
+          },
+          {
+            "name": "auto-filed"
+          },
+          {
+            "name": "prio:P3"
+          },
+          {
+            "name": "type:bug"
+          }
+        ]
+      },
+      "number": 3394,
+      "stateReason": "COMPLETED",
+      "title": "[auto-filed] Visual QA (standalone): scheduled advisory run failing"
+    },
+    {
+      "author": {
+        "login": "github-actions"
+      },
+      "closedAt": "2026-09-13T04:25:33Z",
+      "comments": {
+        "nodes": [
+          {
+            "author": {
+              "login": "github-actions"
+            },
+            "body": "Recovered \u2014 green run at 2026-09-13T04:25:32Z: https://github.com/averagejoematt/life-platform/actions/runs/34736956459\n\nAuto-closing per the close policy (one green run of the same workflow closes the auto-filed issue).",
+            "createdAt": "2026-09-13T04:25:32Z"
+          },
+          {
+            "author": {
+              "login": "averagejoematt"
+            },
+            "body": "**Shipped:** nothing directly \u2014 this was auto-filed for a post-deploy gate red on a surface the rollback cannot reach, and the underlying cause was found and fixed this session.\n\n**Outcome:** realized \u2014 the advisory run's red was the accuracy audit's `impossible_value` rule firing on honest numbers. Root cause identified as the `_pct`-suffix-is-not-one-semantic class (third and fourth specimens: `delta_pct` and `z2_pct`), filed as **#3739** and fixed in PR #3740, merged `1937867c` and deploying. The rollback correctly declined to revert \u2014 the failing surface was `api`, not `site/**`-reachable, which is #3652's mechanism working on a real case rather than a drill.",
+            "createdAt": "2026-09-13T21:09:37Z"
+          }
+        ],
+        "totalCount": 2
+      },
+      "labels": {
+        "nodes": [
+          {
+            "name": "area:infra"
+          },
+          {
+            "name": "auto-filed"
+          }
+        ]
+      },
+      "number": 3724,
+      "stateReason": "COMPLETED",
+      "title": "[auto-filed] Site deploy \u2014 post-deploy gate red on a surface the rollback cannot reach: scheduled advisory run failing"
+    }
+  ]
+}

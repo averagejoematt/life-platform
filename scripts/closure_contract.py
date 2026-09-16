@@ -143,7 +143,9 @@ CLOSURE_CONTRACT: tuple = (
         rule=(
             "Every close carries the ADR-099 closing comment — `**Shipped:** …` + "
             "`**Outcome:** <realized|partial|not-realized> — …` — written by the session that merged "
-            "(wrap step (e8)). A close with no verdict is a silent close."
+            "(wrap step (e8)). A close with no verdict is a silent close. EXEMPT: an instrument's own "
+            "ledger row (`is_instrument_ledger`) — a bot filed it, no human ever commented, and it "
+            "carries no `type:` taxonomy, so there is no human closure for a verdict to describe."
         ),
         detector="scripts/closure_sweep.py",
         finding_codes=("no-outcome-verdict",),
@@ -550,6 +552,30 @@ DISPOSITIONED_ESCAPES: dict = {
 # ── pure predicates shared by the detectors ─────────────────────────────────────────────
 def is_bot(login: str | None) -> bool:
     return bool(login) and bool(BOT_LOGIN_RE.search(login or ""))
+
+
+def is_instrument_ledger(author: str | None, labels, comment_logins) -> bool:
+    """True for an instrument's own alert row — NOT a backlog issue ADR-099 binds.
+
+    Three conditions, all required. A bot FILED it (nobody chose to open it); no human ever
+    COMMENTED (nobody engaged, so no one authored the closure a verdict would describe); and it
+    carries no `type:` taxonomy (a bot-filed `type:bug` is real backlog, and a silent close of
+    one is exactly what `no-outcome-verdict` exists to catch).
+
+    Measured on the live corpus 2026-09-16: of 25 bot-filed issues, the 22 self-closing alert
+    rows (`deploy-wedge-alert`, the `area:infra,auto-filed` site-deploy rows) can never satisfy
+    the verdict requirement, because the only participant is the instrument. The 3 that carry
+    backlog taxonomy already pass it — a human wrote the verdict (#3394, #3724). A gate that
+    fires on a class it cannot be satisfied for teaches its readers to skip it.
+
+    The alternative — have the alerter emit a formulaic `**Outcome:**` line — was rejected: a
+    generated verdict string minted to clear a proof bar is a synthetic signal, not evidence.
+    """
+    if not is_bot(author):
+        return False
+    if any(str(lbl).lower().startswith("type:") for lbl in labels or ()):
+        return False
+    return not any(not is_bot(login) for login in comment_logins or ())
 
 
 def has_verdict(text: str) -> bool:
