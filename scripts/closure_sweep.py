@@ -75,6 +75,7 @@ class Issue:
     state_reason: str
     labels: tuple
     comments: list  # [(created_at: datetime, login: str, body: str)] in ascending time
+    author: str = ""  # the FILER's login — "" when a fixture predates the field (graded as human)
 
 
 def _ts(s: str | None) -> datetime | None:
@@ -98,6 +99,7 @@ def parse_issue(node: dict) -> Issue:
         state_reason=(node.get("stateReason") or "").upper(),
         labels=labels,
         comments=comments,
+        author=((node.get("author") or {}).get("login")) or "",
     )
 
 
@@ -120,8 +122,12 @@ def evaluate_issue(issue: Issue, open_children: tuple = ()) -> list:
         if m:
             findings.append(Finding("post-close-assertion", issue.number, f"+{mins}m after close says {m.group(0)!r}"))
 
+    # An instrument's own ledger row has no human closure for a verdict to describe (#3851).
+    # Scoped narrowly on purpose: a bot-filed `type:` issue, or one a human engaged with, is
+    # graded exactly as before — both already PASS on the live corpus by writing the verdict.
+    ledger = cc.is_instrument_ledger(issue.author, issue.labels, [login for (_t, login, _b) in issue.comments])
     if issue.state_reason == "COMPLETED" and issue.closed_at.date().isoformat() >= cc.CONTRACT_SINCE:
-        if not verdicts:
+        if not verdicts and not ledger:
             findings.append(Finding("no-outcome-verdict", issue.number, "no comment carries the ADR-099 `**Outcome:**` verdict"))
 
     # The closing verdict = the LAST verdict-shaped comment (a correction supersedes).
@@ -204,6 +210,7 @@ def render(result: dict, window: str, mode: str) -> tuple:
 # ── live fetch (read-only) ───────────────────────────────────────────────────────────────
 _ISSUE_FIELDS = """
   number title closedAt stateReason
+  author { login }
   labels(first: 20) { nodes { name } }
   comments(last: 30) { totalCount nodes { createdAt author { login } body } }
 """

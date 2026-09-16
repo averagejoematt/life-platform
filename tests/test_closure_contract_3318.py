@@ -470,3 +470,78 @@ def test_the_rule_is_not_restated_as_a_second_copy_elsewhere():
         text = (ROOT / rel).read_text(encoding="utf-8")
         assert "scripts/closure_contract.py" in text, f"{rel} must point at the registry"
         assert "`outcome-verdict`" not in text, f"{rel} re-lists the registry's requirement ids — that is a second copy"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 8. THE INSTRUMENT'S OWN LEDGER ROW — a class the verdict rule cannot bind (#3851)
+#
+# Measured 2026-09-16: 25 bot-filed issues exist. 22 are self-closing alert rows
+# (`deploy-wedge-alert` x10, the `area:infra,auto-filed` site-deploy rows x12) whose only
+# participant is the instrument — they can NEVER carry a human verdict, so the gate fired on
+# every one of them, every episode, forever. The 3 carrying backlog taxonomy already pass.
+#
+# The exemption is deliberately narrow: bot FILED it, AND no human ever commented, AND it
+# carries no `type:` label. The four mutations below break one leg each.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _ledger_fixture() -> dict:
+    return _issues("instrument_ledger_3851.json")
+
+
+def test_3833_the_alert_row_the_verdict_rule_could_never_bind_is_exempt():
+    """#3833: filed by github-actions, one github-actions recovery comment, closed COMPLETED by
+    the same bot. Nobody chose to open it and nobody engaged with it — there is no human closure
+    for an `**Outcome:**` verdict to describe."""
+    issue = _ledger_fixture()[3833]
+    assert cc.is_bot(issue.author), "the fixture's filer must be the instrument"
+    assert all(cc.is_bot(login) for _t, login, _b in issue.comments), "no human may have commented"
+    assert "no-outcome-verdict" not in _codes(sweep.evaluate_issue(issue))
+
+
+def test_NEGATIVE_CONTROL_bot_filed_issues_a_human_verdicted_are_unchanged():
+    """#3394 (type:bug) and #3724 (auto-filed infra): both bot-filed, both engaged with by a
+    human who wrote the verdict. They passed before the exemption and pass after — the exemption
+    moved exactly one class, which is the claim this control defends."""
+    fx = _ledger_fixture()
+    for number in (3394, 3724):
+        assert "no-outcome-verdict" not in _codes(sweep.evaluate_issue(fx[number])), number
+
+
+def test_MUTATION_a_ledger_row_carrying_backlog_taxonomy_is_still_graded():
+    """Leg 1: `type:` means someone triaged it into the backlog. A silent close of one is
+    exactly what `no-outcome-verdict` exists to catch."""
+    issue = _ledger_fixture()[3833]
+    issue.labels = issue.labels + ("type:bug",)
+    assert "no-outcome-verdict" in _codes(sweep.evaluate_issue(issue))
+
+
+def test_MUTATION_a_ledger_row_a_human_engaged_with_is_still_graded():
+    """Leg 2: once a human comments, a human is participating in the closure and owes the verdict."""
+    issue = _ledger_fixture()[3833]
+    issue.comments = issue.comments + [(issue.closed_at + timedelta(minutes=45), "averagejoematt", "looked at this one")]
+    assert "no-outcome-verdict" in _codes(sweep.evaluate_issue(issue))
+
+
+def test_MUTATION_a_human_filed_issue_is_never_a_ledger_row():
+    """Leg 3: the filer is the discriminator. Same body, same labels, same bot comment — a human
+    opened it, so it is backlog."""
+    issue = _ledger_fixture()[3833]
+    issue.author = "averagejoematt"
+    assert "no-outcome-verdict" in _codes(sweep.evaluate_issue(issue))
+
+
+def test_MUTATION_the_exemption_cannot_swallow_a_real_backlog_close():
+    """The load-bearing one. #3394 is bot-FILED and carries `type:bug`; strip the human comments
+    that verdicted it and it must STILL be reported. If the exemption keyed on the filer alone,
+    this close would vanish silently — and it is a real bug someone fixed."""
+    issue = _ledger_fixture()[3394]
+    issue.comments = [(t, login, body) for (t, login, body) in issue.comments if cc.is_bot(login)]
+    assert "no-outcome-verdict" in _codes(sweep.evaluate_issue(issue))
+
+
+def test_a_fixture_predating_the_author_field_is_graded_as_human():
+    """`Issue.author` defaults to "" so every pre-#3851 fixture keeps its old verdict. Fail open
+    toward GRADING: an unknown filer must never be mistaken for an instrument."""
+    assert not cc.is_instrument_ledger("", (), [])
+    assert _codes(sweep.evaluate_issue(_issues("session_k_escapes.json")[3208])) == {"no-outcome-verdict"}
