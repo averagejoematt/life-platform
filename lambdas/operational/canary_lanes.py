@@ -44,8 +44,12 @@ stay importable with no AWS clients constructed.
 
 LANE_INFRA = "infra"
 LANE_STORED_STATE = "stored_state"
+#: #3830 — a live round-trip that failed for a reason the deploy cannot have
+#: caused and a rollback cannot fix: the dependency on the far end of it was
+#: transiently unavailable. Loud, alarmed, named in the CI log — never gating.
+LANE_EXTERNAL_TRANSIENT = "external_transient"
 
-LANES = (LANE_INFRA, LANE_STORED_STATE)
+LANES = (LANE_INFRA, LANE_STORED_STATE, LANE_EXTERNAL_TRANSIENT)
 
 # The single source of truth for what gates a rollback. Adding a check here is
 # the ONLY place a lane is decided — nothing downstream string-matches check
@@ -84,6 +88,62 @@ CHECK_LABELS = {
 }
 
 
+#: #3830 — THE FAILURE MODE, not the check. Keyed by check, valued by the set of
+#: failure codes that move THAT check out of its declared lane and into
+#: LANE_EXTERNAL_TRANSIENT.
+#:
+#: Why this exists. #2051 split lanes by CHECK and that was right as far as it
+#: went: `anthropic` belongs in `infra` because a broken inference path IS a
+#: plausible deploy cause — a lost `bedrock:InvokeModel`, a wrong model id, a
+#: bundling break. What it never split was the FAILURE MODE. One check fails in
+#: both deploy-plausible and deploy-impossible ways, and on 2026-09-15 the
+#: deploy-impossible one reverted 85 Lambdas: Bedrock answered
+#: `ServiceUnavailableException` — a vendor 503 — while DDB, S3, MCP and the
+#: subscribe flow all round-tripped clean.
+#:
+#: The bar for an entry here is the lane docstring's own test, read backwards:
+#: a code belongs in this set only when the code or config that just shipped
+#: CANNOT be a cause and a rollback CANNOT be a fix. `AccessDeniedException`
+#: fails that test in both halves and is deliberately absent — losing an IAM
+#: grant is exactly what a bad deploy looks like, and it must keep gating.
+TRANSIENT_FAILURE_CODES = {
+    # Bedrock. Codes are botocore `Error.Code` values, matched exactly.
+    "anthropic": frozenset(
+        {
+            "ServiceUnavailableException",  # the 2026-09-15 incident: Bedrock 503
+            "ThrottlingException",  # account throughput, not our deploy
+            "ModelTimeoutException",
+            "RequestTimeout",
+            "RequestTimeoutException",
+        }
+    ),
+}
+
+
+def transient_codes_for(check_key: str) -> frozenset:
+    """The failure codes that are transient FOR THIS CHECK. Empty by default."""
+    return TRANSIENT_FAILURE_CODES.get(check_key, frozenset())
+
+
+def lane_for_result(check_key: str, entry) -> str:
+    """Lane for one RESULT — the check's declared lane unless its failure code
+    says the far end was transiently unavailable.
+
+    Conservative in the same direction as `lane_for`, and for the same reason:
+    a failure with NO recorded code, or a code nobody has classified, keeps its
+    declared lane and keeps gating. Only an explicitly-enumerated code demotes,
+    so the failure mode of this function is a rollback that still fires, never
+    one that silently stops firing.
+    """
+    lane = lane_for(check_key)
+    if lane != LANE_INFRA or not isinstance(entry, dict) or entry.get("ok") is not False:
+        return lane
+    code = entry.get("failure_code")
+    if isinstance(code, str) and code in transient_codes_for(check_key):
+        return LANE_EXTERNAL_TRANSIENT
+    return lane
+
+
 def lane_for(check_key: str) -> str:
     """Lane for a check key. An UNREGISTERED key is treated as ``infra``.
 
@@ -116,7 +176,7 @@ def lane_counts(results: dict) -> dict:
     for key, entry in (results or {}).items():
         if not isinstance(entry, dict) or entry.get("ok") is not False:
             continue
-        lane = lane_for(key)
+        lane = lane_for_result(key, entry)
         counts[lane] = counts.get(lane, 0) + 1
     return counts
 
@@ -127,5 +187,5 @@ def lane_summary(results: dict) -> dict:
     summary = {lane: {"failed": counts.get(lane, 0), "failed_checks": []} for lane in LANES}
     for key, entry in sorted((results or {}).items()):
         if isinstance(entry, dict) and entry.get("ok") is False:
-            summary.setdefault(lane_for(key), {"failed": 0, "failed_checks": []})["failed_checks"].append(key)
+            summary.setdefault(lane_for_result(key, entry), {"failed": 0, "failed_checks": []})["failed_checks"].append(key)
     return summary
