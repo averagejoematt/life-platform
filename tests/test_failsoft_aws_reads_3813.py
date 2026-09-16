@@ -220,3 +220,18 @@ def test_the_SET_is_2_of_2_and_the_enumeration_query_still_returns_only_those():
         "(genuine not-a-git-repo defaults, #3681 excluded them too); if they were removed, "
         "re-read the Set rather than deleting this assertion"
     )
+
+
+def test_a_skipped_invalidation_is_a_NON_GREEN_outcome_at_the_END_of_the_run():
+    """Box 2, the half a mid-script warning does not satisfy.
+
+    A `⚠️` line two hundred lines up scrolls off. If the CDN was not invalidated, the
+    deploy pushed new bytes that readers cannot see — the run must say so where a human
+    reads the result, and must not exit 0.
+    """
+    code = _code_only(SYNC.read_text(encoding="utf-8"))
+    assert 'if [[ -n "${CF_INVALIDATION_SKIPPED:-}" ]]; then' in code
+    assert "INVALIDATION SKIPPED — CAUSE:" in code
+    assert "exit 3" in code, "a skipped invalidation still exits 0 — it is not a non-green outcome"
+    tail = code.rsplit("Site live at", 2)
+    assert len(tail) == 3, "expected the skipped-invalidation branch to precede the success line"

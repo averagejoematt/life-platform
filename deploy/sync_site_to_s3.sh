@@ -460,5 +460,19 @@ if [[ -n "$CF_DIST_ID" ]]; then
   fi
 fi
 
+# ── #3813 box 2: a skipped invalidation is a NAMED outcome of the run ────────
+# Not a "⚠️" line 200 lines up that scrolls off. The deploy pushed new bytes and the
+# CDN was not invalidated, so readers keep the previous build until the cache TTL —
+# the run must say that at the END, where a human reads the result.
+if [[ -n "${CF_INVALIDATION_SKIPPED:-}" ]]; then
+  echo ""
+  echo "⛔ INVALIDATION SKIPPED — CAUSE: ${CF_INVALIDATION_SKIPPED}"
+  echo "   New bytes are in S3 and the CDN was NOT invalidated. Readers keep the"
+  echo "   PREVIOUS build until the cache TTL expires. This deploy is not complete (#3813)."
+  echo ""
+  echo "Site live at: https://averagejoematt.com  (serving the PREVIOUS build at the edge)"
+  exit 3
+fi
+
 echo ""
 echo "Site live at: https://averagejoematt.com"
