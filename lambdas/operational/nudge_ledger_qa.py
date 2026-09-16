@@ -99,6 +99,45 @@ def _stamped_age_hours(row: dict, as_of):
     return (as_of - end_of_day).total_seconds() / 3600.0
 
 
+def scan_stuck_reservations(table, now, stuck_hours=STUCK_HOURS):
+    """Every `attempting` row in the WHOLE partition, regardless of age (#3651 round 2).
+
+    WHY THIS IS NOT BOUNDED BY retention_days, which is the entire bug it fixes:
+
+    One query was answering two questions that need opposite windows.
+
+      "is the nudge system alive?"     -> a RECENT window is correct. Scanning all
+                                          history would make a long-dead system look busy.
+      "is any reservation stuck?"      -> a recent window is WRONG. A dead reservation does
+                                          not become acceptable by ageing; it becomes worse.
+                                          Bounding this scan by recency means the longer a row
+                                          is stuck, the LESS likely anything is to notice.
+
+    Measured consequence before this split (live, 2026-09-16): four rows sat at `attempting`
+    — DAY#2026-07-26, DAY#2026-08-06, DAY#2026-08-07 and DAY#2026-08-30, the last being the
+    exact row #3651 was filed on, by then ~400h stuck. The liveness floor that day was
+    DAY#2026-09-08, so ALL FOUR were outside the query meant to find them, and
+    `coach_nudge:ledger_liveness` reported clean. The check was green BECAUSE the failure was
+    old.
+
+    Paginated: the partition is small today, but a scan that silently truncates at the first
+    page is the same class of blindness one page further out.
+    """
+    stuck, kwargs = [], {"KeyConditionExpression": Key("pk").eq(LEDGER_PK) & Key("sk").begins_with(LEDGER_SK_PREFIX)}
+    while True:
+        resp = table.query(**kwargs)
+        for row in resp.get("Items") or []:
+            if str(row.get("status") or "") != STATUS_ATTEMPTING:
+                continue
+            age = _stamped_age_hours(row, now)
+            if age is None or age > stuck_hours:
+                stuck.append((row, age))
+        last = resp.get("LastEvaluatedKey")
+        if not last:
+            return stuck
+        kwargs["ExclusiveStartKey"] = last
+
+
 def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK_HOURS, retention_days=RETENTION_DAYS):
     c = Check("coach_nudge:ledger_liveness", "Data Freshness", tier)
     now = pt_now()  # aware PACIFIC instant — the frame the DAY# sk is written in
@@ -110,33 +149,43 @@ def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK
         c.fail(f"coach-nudge ledger — DDB error: {exc}")
         return [c]
 
-    if not rows:
-        # Honest absence: no nudge was ATTEMPTED in the window. Nudges are rare
-        # by design (≤1/day, and only when a trigger fires), so this is a normal
-        # quiet week — it is deliberately not read as either health or fault.
-        c.ok(f"no coach-nudge ledger row in the last {retention_days}d — no nudge attempted (the feature is quiet, not dark)")
-        return [c]
-
+    # #3651 round 2: the stuck scan runs on its OWN window (the whole partition) and must
+    # run BEFORE the quiet-week early return. A quiet week is exactly when a stuck row from
+    # two months ago is most likely to be the only thing in the ledger worth saying.
     stuck, reaped, orphaned, failed, terminal = [], [], [], [], 0
+    try:
+        for row, age in scan_stuck_reservations(table, now, stuck_hours):
+            sk = str(row.get("sk") or "?")
+            if age is None:
+                # Can't confirm it is past the bar — conservative: report, never reap
+                # something whose age is unknown.
+                stuck.append(f"{sk} (undateable, coach={row.get('coach_id')!r})")
+                continue
+            # A dead reservation with no path to a terminal status is a PERMANENT red
+            # otherwise — reap it on the same scheduled run that found it. Fail-soft: if the
+            # write does not land, this degrades to a report, never to silence.
+            try:
+                table.put_item(Item=build_expired_ledger_item(row, now, stuck_hours, age))
+                reaped.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r})")
+            except Exception as exc:  # noqa: BLE001 — reap must never crash the sweep
+                stuck.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r}, reap failed: {str(exc)[:120]})")
+    except Exception as exc:  # noqa: BLE001 — the stuck scan must never crash the liveness leg
+        stuck.append(f"(stuck scan failed: {str(exc)[:160]})")
+
+    if not rows:
+        # Honest absence: no nudge was ATTEMPTED in the LIVENESS window. Nudges are rare by
+        # design (≤1/day, and only when a trigger fires), so this is a normal quiet week — it
+        # is deliberately not read as either health or fault. But a stuck row found by the
+        # unbounded scan above still gets said out loud.
+        if not stuck and not reaped:
+            c.ok(f"no coach-nudge ledger row in the last {retention_days}d — no nudge attempted (the feature is quiet, not dark)")
+            return [c]
+        rows = []
     for row in rows:
         sk = str(row.get("sk") or "?")
         status = str(row.get("status") or "")
         if status == STATUS_ATTEMPTING:
-            age = _stamped_age_hours(row, now)
-            if age is None:
-                # Can't confirm it's actually past the bar — conservative: report,
-                # never reap something whose age is unknown.
-                stuck.append(f"{sk} (undateable, coach={row.get('coach_id')!r})")
-            elif age > stuck_hours:
-                # #3651: a dead reservation with no path to a terminal status is a
-                # PERMANENT red otherwise — reap it on the same scheduled run that
-                # found it. Fail-soft: if the write itself doesn't land, this
-                # degrades to the pre-#3651 report, never to silence.
-                try:
-                    table.put_item(Item=build_expired_ledger_item(row, now, stuck_hours, age))
-                    reaped.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r})")
-                except Exception as exc:  # noqa: BLE001 — reap must never crash the sweep
-                    stuck.append(f"{sk} ({age:.0f}h, coach={row.get('coach_id')!r}, reap failed: {str(exc)[:120]})")
+            # Handled by the UNBOUNDED scan below, not here — see scan_stuck_reservations.
             continue
         if status == STATUS_FAILED:
             failed.append(f"{sk} ({str(row.get('error') or 'no error recorded')[:160]})")
