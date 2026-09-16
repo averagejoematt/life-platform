@@ -157,6 +157,43 @@ def discover_bundle_staging_sites(repo_root: str = REPO_ROOT) -> set[str]:
     )
 
 
+# The staging ROOTS — where the staging SITES above put their output (#3832).
+#
+# `discover_bundle_staging_sites()` answers "what can put code into a Lambda". This answers
+# the different question a source-scanning guard needs: "which directories are MIRRORS of
+# files the guard already covers". A guard that walks the filesystem (rather than the git
+# index) sees those mirrors as new, independent findings — six phantoms on any machine that
+# has run a CDK deploy, every one a copy of a file already registered.
+#
+# Derived from the CDK sources that CREATE the roots, so a renamed or added staging dir
+# moves this set with it. NOT read from .gitignore: being ignored is a consequence of being
+# a staging root, not the definition of one, and a guard keyed on .gitignore would also
+# skip any other ignored path that happened to match.
+_STAGING_ROOT_DECL = re.compile(r'["\']\.\.["\']\s*,\s*["\'](_[A-Za-z0-9_]*staging)["\']')
+_STAGING_ROOT_SOURCES = ("cdk/stacks",)
+
+
+def discover_bundle_staging_roots(repo_root: str = REPO_ROOT) -> set[str]:
+    """Repo-relative staging output directories, e.g. {"cdk/_bundle_staging", "cdk/_mcp_staging"}.
+
+    Derived by reading the CDK sources that build the paths (`os.path.join(dirname(__file__),
+    "..", "_bundle_staging")`), never a literal list in a consumer.
+    """
+    roots: set = set()
+    for rel_dir in _STAGING_ROOT_SOURCES:
+        base = os.path.join(repo_root, rel_dir)
+        if not os.path.isdir(base):
+            continue
+        parent = os.path.relpath(os.path.join(base, ".."), repo_root)
+        for name in sorted(os.listdir(base)):
+            if not name.endswith(".py"):
+                continue
+            text = open(os.path.join(base, name), encoding="utf-8", errors="replace").read()
+            for m in _STAGING_ROOT_DECL.finditer(text):
+                roots.add(os.path.normpath(os.path.join(parent, m.group(1))))
+    return roots
+
+
 # The registry itself — frozen 2026-09-06, #3608. Status meanings:
 #   sanctioned       — stages via deploy/build_bundle.py (grep-verified below).
 #   known_violation  — does NOT stage via build_bundle.py. Dated, issue-tagged,

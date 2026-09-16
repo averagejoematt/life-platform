@@ -723,7 +723,27 @@ _enrich_wiki_drift_checks_json() {
     return 0
   fi
 
-  raw_log=$(gh api "repos/${REPO}/actions/jobs/${jobid}/logs" 2>/dev/null) || {
+  # #3659: gh 2.100.0 REFUSES to print a log body containing terminal escape
+  # sequences unless --allow-escape-sequences is passed. Actions logs are full of
+  # them (the ANSI colouring in every ::group:: header), so the bare call returns
+  # ZERO BYTES on stdout and writes only a warning to stderr:
+  #
+  #   the response contains terminal escape sequences; pass --allow-escape-sequences
+  #   to output it anyway
+  #
+  # Measured live on this repo, 2026-09-16: bare -> 0 bytes; with the flag -> 49,934
+  # bytes on the same job. And the failure is SILENT by construction: the enrichment
+  # below finds no drift files in an empty string, returns the checks unchanged, and a
+  # reconcile-owned literal drift degrades from RECONCILE-OWNED-RED (exit 4, mergeable)
+  # to a plain FAIL. The watcher does not get louder when it goes blind; it gets quieter.
+  #
+  # Tried WITH the flag first, falling back without it: the flag is recent, and an older
+  # gh both lacks it and does not need it (it never refused). Probing the flag rather
+  # than the version number keeps this working in both directions without parsing
+  # `gh --version`.
+  raw_log=$(gh api --allow-escape-sequences "repos/${REPO}/actions/jobs/${jobid}/logs" 2>/dev/null) \
+    || raw_log=$(gh api "repos/${REPO}/actions/jobs/${jobid}/logs" 2>/dev/null) \
+    || {
     printf '%s' "${checks_json}"
     return 0
   }
