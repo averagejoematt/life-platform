@@ -226,13 +226,38 @@ jobs:
           # lines this flag exists to produce were the ones most likely to be cut —
           # a measurement that silently truncates reports nothing, which is the
           # failure mode this repo keeps re-learning.
+          # #3835: TWO passes, the same lane #3797 already proved on pr-checks.yml.
+          # This job was a single serial invocation and ran over its 1950s budget on
+          # 8 of 9 consecutive green-main runs (median 2850s = 1.46x). The remedy was
+          # already built and merged — it just landed in pr-checks.yml only.
+          #
+          # Coverage is COMBINED across the two passes, not measured on either alone:
+          # pass 1 writes the data and asserts NO floor, pass 2 appends and is the only
+          # step carrying --cov-fail-under and the report. Putting the floor on pass 1
+          # would grade the suite on a subset and red a correct build.
+          #
+          # The partition is safe only because the two -m expressions are exact
+          # complements over one registered marker; tests/test_full_suite_premerge_3025.py
+          # asserts that for BOTH lanes, so a test cannot fall into neither pass while
+          # both steps stay green.
+          echo "::group::Coverage — parallel pass (-m 'not serial')"
           python3 -m pytest tests/ \
               --ignore=tests/test_integration_aws.py \
               --cov=lambdas --cov=mcp \
+              --cov-report= \
+              --durations=25 \
+              -n auto --dist loadfile -m "not serial" \
+              -q 2>&1 | tail -60
+          echo "::endgroup::"
+          echo "::group::Coverage report + gate — serial pass (-m serial, appends)"
+          python3 -m pytest tests/ \
+              --ignore=tests/test_integration_aws.py \
+              --cov=lambdas --cov=mcp --cov-append \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
               --cov-fail-under=80 \
               --durations=25 \
+              -m serial \
               -q 2>&1 | tail -160
           echo "::endgroup::"
 

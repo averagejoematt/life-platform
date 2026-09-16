@@ -50,6 +50,29 @@ def _full_suite_pytest_line():
     return _full_suite_pytest_lines()[0]
 
 
+def _coverage_gate_pytest_lines():
+    """EVERY pytest invocation in ci-test.yml's coverage-gate step, continuations joined.
+
+    #3835: this job ran ONE serial pytest and was over its 1950s duration budget on 8 of
+    9 consecutive green-main runs. #3797's two-pass lane — the remedy — had landed in
+    `pr-checks.yml` only. Now that a SECOND copy of the two-pass idiom exists, the
+    partition assertion has to cover it: two passes over one selection with no
+    complement check is how a test falls into NEITHER pass while both steps stay green,
+    and that failure mode is indistinguishable from a healthy run from the outside.
+
+    ci-test.yml writes its invocations across backslash-continued lines, so they are
+    joined here rather than matched line-wise — a line-wise regex silently reads only
+    the first fragment, which carries no `-m` at all.
+    """
+    src = _read(CI_TEST)
+    block = src[src.index("      - name: Test coverage gate") :]
+    block = block[: block.index("      - name: Coverage regression gate")]
+    joined = re.sub(r"\\\n\s*", " ", block)
+    lines = [re.sub(r"\s+", " ", m).strip() for m in re.findall(r"(python3 -m pytest[^\n]*)", joined)]
+    assert lines, "ci-test.yml coverage gate no longer runs a pytest command"
+    return lines
+
+
 def _coverage_gate_ignores():
     """The --ignore set of ci-test.yml's coverage-gate pytest invocation."""
     src = _read(CI_TEST)
@@ -164,8 +187,17 @@ def test_the_two_passes_partition_the_suite_exactly():
     suite had grown by five tests between them. The partition itself was always exact,
     and this test is what keeps saying so without anyone re-running the measurement.
     """
-    lines = _full_suite_pytest_lines()
-    assert len(lines) == 2, f"expected exactly two full-suite pytest passes, found {len(lines)}: {lines}"
+    _assert_exact_complement_partition(_full_suite_pytest_lines(), "pr-checks.yml full-suite")
+
+
+def _assert_exact_complement_partition(lines, where):
+    """The partition contract, ONE definition, applied to every lane that runs two passes.
+
+    #3835 added a second copy of the two-pass idiom (ci-test.yml's coverage gate). A
+    second copy of the IDIOM with only one copy of the ASSERTION is the same shape as the
+    defect this whole file guards — so this is shared, not duplicated.
+    """
+    assert len(lines) == 2, f"expected exactly two full-suite pytest passes in {where}, found {len(lines)}: {lines}"
 
     exprs = []
     for line in lines:
@@ -177,7 +209,7 @@ def test_the_two_passes_partition_the_suite_exactly():
         exprs.append(next(g for g in m[0] if g).strip())
 
     assert sorted(exprs) == ["not serial", "serial"], (
-        f"the two passes must select on exact complements of ONE marker; got {exprs!r}. "
+        f"[{where}] the two passes must select on exact complements of ONE marker; got {exprs!r}. "
         "Anything else (a second marker, an `and`/`or` clause, a renamed marker on one "
         "side only) breaks the partition and a test can fall into neither pass while "
         "both steps stay green."
@@ -189,3 +221,75 @@ def test_the_two_passes_partition_the_suite_exactly():
     with open(os.path.join(REPO, "pytest.ini"), encoding="utf-8") as fh:
         ini = fh.read()
     assert re.search(r"^\s*serial:", ini, re.M), "the `serial` marker is not registered in pytest.ini — see #3025"
+
+
+# ── #3835: the POST-MERGE lane gets the same guarantees ─────────────────────
+
+
+def test_the_postmerge_coverage_gate_also_runs_the_two_pass_lane():
+    """#3797's remedy landed in `pr-checks.yml` only, so the post-merge job stayed a
+    single serial invocation and sat over its 1950s duration budget on 8 of 9 consecutive
+    green-main runs (median 2850s, 1.46x; measured on #3835). This asserts the shed was
+    applied rather than the budget raised — the class record is explicit that it was
+    "raised every time up to #3106 then SHED twice running"."""
+    lines = _coverage_gate_pytest_lines()
+    assert len(lines) == 2, f"the coverage gate is not running the two-pass lane: {lines}"
+    assert "-n auto --dist loadfile" in lines[0], f"the parallel pass is not parallel: {lines[0]}"
+    assert "-n auto" not in lines[1], f"the serial pass must be single-process — that is the whole point: {lines[1]}"
+
+
+def test_the_postmerge_passes_partition_the_suite_exactly():
+    """The SAME contract as the pre-merge lane, through the same helper.
+
+    A second copy of the two-pass idiom with only one copy of the partition assertion is
+    exactly the shape #3835 exists to fix, one level up."""
+    _assert_exact_complement_partition(_coverage_gate_pytest_lines(), "ci-test.yml coverage gate")
+
+
+def test_the_coverage_FLOOR_is_measured_over_BOTH_passes_not_one():
+    """The splitting hazard that has nothing to do with the partition.
+
+    Coverage is now produced by two invocations. If the floor rode the parallel pass it
+    would grade the suite on a SUBSET and red a correct build; if neither pass appended,
+    the second would overwrite the first and the floor would be graded on the ~48 serial
+    tests alone — which would pass trivially and gate nothing. So: exactly one pass
+    carries `--cov-fail-under`, it is the LAST one, and it is the one that appends.
+    """
+    lines = _coverage_gate_pytest_lines()
+    with_floor = [i for i, ln in enumerate(lines) if "--cov-fail-under" in ln]
+    assert with_floor == [len(lines) - 1], (
+        f"--cov-fail-under must appear on exactly the LAST pass, found it on pass(es) {with_floor}. "
+        "On an earlier pass it grades a subset of the suite; on none, the floor is not enforced at all."
+    )
+    assert "--cov-append" in lines[-1], (
+        "the floor-carrying pass does not --cov-append, so it OVERWRITES the parallel pass's data and "
+        "the 80% floor is measured over the ~48 serial tests alone — a gate that passes trivially"
+    )
+    assert "--cov-append" not in lines[0], "the first pass must START the coverage data, not append to a stale file"
+    # And the report is written once, by the pass that has all the data.
+    assert "--cov-report=xml:coverage.xml" in lines[-1]
+    assert "xml:coverage.xml" not in lines[0], "a partial-coverage xml would be published as if it were the run's result"
+
+
+def test_every_postmerge_pass_keeps_pipefail_in_its_step():
+    """#2259: GitHub's default shell is `bash -e {0}` and `-e` does not imply pipefail, so
+    `pytest … | tail` exits with tail's status — always 0. That defect made this exact
+    gate unable to fail for its whole life. Splitting one piped invocation into two does
+    not double the risk; it doubles the number of pipes one `set -o pipefail` has to
+    cover, so assert the line is still there and still ABOVE both."""
+    src = _read(CI_TEST)
+    block = src[src.index("      - name: Test coverage gate") :]
+    block = block[: block.index("      - name: Coverage regression gate")]
+    pipefail = block.index("set -o pipefail")
+    for ln in re.finditer(r"python3 -m pytest", block):
+        assert ln.start() > pipefail, "a pytest pass runs BEFORE `set -o pipefail` — its exit code is tail's (#2259)"
+    # Counted off the PARSED commands, not off the step's text. Counting `"| tail -"`
+    # occurrences in the block reads the prose too — this step's own comments quote the
+    # #2259 defect (`pytest … | tail -100`) and the `tail widened 100 -> 160` note, so a
+    # text count returns 4 for two commands. Same shape as #3785's enrolment leg, which
+    # matched `_built_at` on a comment line.
+    piped = [ln for ln in _coverage_gate_pytest_lines() if re.search(r"\|\s*tail -", ln)]
+    assert len(piped) == len(_coverage_gate_pytest_lines()), (
+        "a coverage pass is not piped to tail — harmless on its own, but this step's whole "
+        "history is about a pipe swallowing an exit code; keep the shape uniform (#2259)"
+    )
