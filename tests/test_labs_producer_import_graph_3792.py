@@ -29,7 +29,7 @@ from __future__ import annotations
 import ast
 import collections
 import sys
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +39,7 @@ if str(LAMBDAS) not in sys.path:
     sys.path.insert(0, str(LAMBDAS))
 
 from ai import ai_context  # noqa: E402
+from common.pacific_time import pacific_now  # noqa: E402
 
 # The April panel exactly as DynamoDB holds it (verified against
 # `USER#matthew#SOURCE#labs / DATE#2026-04-03`, 2026-09-16): a nested `biomarkers`
@@ -64,7 +65,7 @@ _OLDER_DRAW = {
 
 
 def _brief_data(**over):
-    d = {"labs": _REAL_DRAW, "labs_draws": [_OLDER_DRAW, _REAL_DRAW]}
+    d = {"labs": [_OLDER_DRAW, _REAL_DRAW]}
     d.update(over)
     return d
 
@@ -82,7 +83,10 @@ def test_MUST_FAIL_the_draw_is_stated_as_ALREADY_DRAWN_with_its_age():
     out = ai_context._build_labs_data(_brief_data())
     blob = " ".join(str(v) for v in out.values())
     assert "ALREADY DRAWN AND RESULTED" in blob, "the completed draw is not stated as complete — the coach can narrate it as upcoming"
-    age = (date.today() - datetime.strptime("2026-04-03", "%Y-%m-%d").date()).days
+    # #3222: the producer stamps the age off `pacific_now()` (labs_facts), so the
+    # expectation must read the SAME clock — a naive UTC `date.today()` disagrees with it
+    # for the seven hours after 17:00 PT.
+    age = (pacific_now().date() - datetime.strptime("2026-04-03", "%Y-%m-%d").date()).days
     assert f"{age} days ago" in blob, f"the draw's age ({age}d) must be stated, not left for the model to infer"
     assert "scheduled, upcoming, or still to be booked" in blob, "the instruction forbidding the live wording is absent"
 
@@ -104,17 +108,18 @@ def test_the_PHANTOM_schema_read_is_gone():
 
 def test_an_EMPTY_store_is_still_narrated_honestly():
     """The control in the opposite direction: the fix must not assert a draw that is not there."""
-    out = ai_context._build_labs_data({"labs": None, "labs_draws": []})
+    out = ai_context._build_labs_data({"labs": []})
     assert out["store_empty"] is True
     blob = " ".join(str(v) for v in out.values())
     assert "zero draw records" in blob.lower()
     assert "ALREADY DRAWN AND RESULTED" not in blob, "an empty store must not claim a completed draw"
 
 
-def test_a_caller_without_labs_draws_DEGRADES_rather_than_asserting_a_wrong_total():
-    """Any caller that predates the `labs_draws` key still gets the framing, but
-    `total_draws` is DROPPED rather than published as 1 — one record is honest about the
-    panel and says nothing about the history."""
+def test_a_caller_handing_ONE_record_DEGRADES_rather_than_asserting_a_wrong_total():
+    """Any caller predating the list shape still gets the framing, but `total_draws` is
+    DROPPED rather than published as 1 — one record is honest about the panel and says
+    nothing about the history. A bare "0 total blood draws" beside a real date is the
+    contradiction #3728 traced the defect to, so silence is the only honest option."""
     out = ai_context._build_labs_data({"labs": _REAL_DRAW})
     assert "total_draws" not in out, "a single-record fallback must not claim it has seen the whole history"
     assert "ALREADY DRAWN AND RESULTED" in " ".join(str(v) for v in out.values())
@@ -122,10 +127,17 @@ def test_a_caller_without_labs_draws_DEGRADES_rather_than_asserting_a_wrong_tota
 
 def test_the_framing_comes_from_the_SHARED_builder_not_a_second_derivation():
     """Box 2: ONE home for the window framing. Re-typing the sentence into a second place
-    is how #3737's analyzer fix and this producer drifted apart."""
+    is how #3737's analyzer fix and this producer drifted apart.
+
+    Asserted as a DELEGATION, not as the presence of a call: `_build_labs_data` must hand
+    the whole question to `labs_facts` and derive nothing of its own. A producer that
+    calls the shared builder and then adds a sentence beside it is the same drift with an
+    import in front of it."""
     src = (LAMBDAS / "ai" / "ai_context.py").read_text(encoding="utf-8")
-    assert "labs_facts.build_labs_fact_block" in src, "the producer derives its own facts instead of reading the shared builder"
-    assert "labs_facts.labs_prompt_block" in src, "the window framing is re-typed rather than read from labs_facts"
+    body = src[src.index("def _build_labs_data(data):") : src.index("def _build_explorer_data(data):")]
+    assert "labs_facts.coach_domain_block" in body, "the producer does not read the shared builder"
+    for derived in ("flagged_count", "flagged_markers", "draw_date", "total_draws", "ALREADY DRAWN"):
+        assert derived not in body.split('"""')[-1], f"{derived!r} is re-derived in the producer instead of read from labs_facts"
 
 
 # ── 2. The path (the load-bearing half) ───────────────────────────────────────
