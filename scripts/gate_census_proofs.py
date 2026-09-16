@@ -517,6 +517,54 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    "guard::deploy/config_provenance_audit.py": {
+        "gate_name": "deploy/config_provenance_audit.py",
+        "command": (
+            "python3 deploy/config_provenance_audit.py --strict   # live, read-only, against "
+            "s3://matthew-life-platform/config/; plus the offline suite "
+            "python3 -m pytest tests/test_config_provenance_audit_3785.py -q (14 tests)"
+        ),
+        "mutation": (
+            "Two defects planted one at a time in the REAL tracked tree — not a copy — each the plausible drift "
+            "of one derivation leg, and each graded against the LIVE object. M1: "
+            "`lambdas/training/hevy_template_index.py:INDEX_KEY` repointed at an object that does not exist "
+            "(`config/hevy_template_index_M1.json`), i.e. a producer whose declared key no longer matches what it "
+            "writes. M2: the EventBridge rule's description in `cdk/stacks/ingestion_stack.py` stopped naming the "
+            "config key, i.e. the cadence derivation losing its only honest input. A THIRD mutation was run against "
+            "the offline suite: the producer stops stamping `_built_at` at all (the self-erasure the enrolment "
+            "ratchet exists for)."
+        ),
+        "observed": (
+            "2026-09-16, watched in both directions against live S3. BASELINE exit 0, "
+            "'every declared generated artifact carries a fresh provenance stamp'. "
+            "M1 exit 1: `🔴 config/hevy_template_index_M1.json: live object absent or not JSON — nothing to grade`, "
+            "AND — unplanned, and the better half of the result — the INVERSE arm simultaneously fired on the real "
+            "object it had just stopped watching: `🟡 WARN config/hevy_template_index.json: carries _built_at but no "
+            "producer under lambdas/mcp declares it — ageing unwatched`. "
+            "M2 exit 1: `cadence UNDERIVABLE` in the header and "
+            "`🔴 … stamped 8.4h ago but NO producer cadence is derivable … Name the key in the rule's description "
+            "rather than picking a number here` — the refusal-to-guess arm, not a silent default. "
+            "REVERTED (git diff --stat clean) exit 0. "
+            "M3 (offline) RED 3 of 14: test_the_enrolment_is_DERIVED_and_finds_the_real_producer, "
+            "test_THE_RATCHET_enrolment_can_only_grow, test_BOTH_legs_are_required_for_enrolment. "
+            "M3 IS WORTH READING: on its FIRST run it PASSED. The enrolment stamp leg was "
+            "`'\"_built_at\"' not in src` — a substring read over the whole file — and `_built_at` survived on a "
+            "COMMENT line after the payload key was renamed away, so the ratchet passed over the exact removal it "
+            "exists to catch. The leg now reads the AST (a `_built_at` key in a dict the module actually "
+            "constructs) and the mutation reds by name."
+        ),
+        "scope": (
+            "Covers the three per-artifact assertions (stamp present / stamp fresh / `_sha256` recomputes), the "
+            "inverse arm (a stamped live object no producer declares), the vacuity guard (empty enrolment is an "
+            "error, not a pass), and BOTH derivation legs. The no-stamp arm additionally carries a REPLAY rather "
+            "than a synthetic case: the bytes live during the 2026-09-14 clobber "
+            "(versionId JWxBiDofQ0vfxPzjoUj_ij5ZDZqQsVa_, ETag 8b2b0e11…, count 789, no `_built_at`) were fetched "
+            "from S3 version history and run through `assess()` → FAIL [no-stamp]. "
+            "NOT covered: whether an actual future clobber is caught within a day — that is a scheduled-run "
+            "observation this offline+live-read proof cannot make, and #3785 keeps boxes 1 and 2 open regardless."
+        ),
+        "proved_on": "2026-09-16",
+    },
     "guard::lambdas/content/recap_gate.py": {
         "gate_name": "lambdas/content/recap_gate.py",
         "command": "python3 -m pytest tests/test_recap_gate_3746.py -q   # 11 tests; baseline 11 passed",
