@@ -155,3 +155,31 @@ biomarker was in range — an unremarkable panel, never a data failure. If
 extraction_incomplete appears, name it as a platform extraction gap on real draws,
 not as missing labs.
 """
+
+
+def coach_domain_block(raw: Any) -> Dict[str, Any]:
+    """The labs coach's `LABS DATA:` block — facts AND the frame, in one object (#3792).
+
+    `ai_context._build_labs_data` used to hand-build this dict, reading
+    `flagged_markers` / `flagged_count` / `total_draws` off top-level keys that #1993
+    proved no draw record carries, and emitting `draw_date` as a bare date with no age
+    and no statement that the draw is done. Handed `"2026-04-03"` beside
+    `"total_draws": 0`, the model narrated a 166-day-old panel as forthcoming, live on
+    `/api/coaching-dashboard`. It lives here so the window framing has ONE home: re-typing
+    the sentence into a second place is how #3737's analyzer and that producer drifted.
+
+    `raw` is the brief's `data["labs"]` — the chronological draw list, or a single record
+    from a caller predating that shape. The single-record path still renders the frame but
+    DROPS `total_draws`: one record is honest about the panel and says nothing about the
+    history, and a bare "0 total blood draws" beside a real date is the exact
+    contradiction #3728 traced the defect to.
+
+    Pure: no DDB, no clock beyond `pacific_now()`. Proof in
+    `tests/test_labs_producer_import_graph_3792.py`.
+    """
+    draws = raw if isinstance(raw, list) else ([raw] if raw else [])
+    block = build_labs_fact_block(draws)
+    if draws and not isinstance(raw, list):
+        block.pop("total_draws", None)
+    block["labs_framing_note"] = labs_prompt_block(block)
+    return block

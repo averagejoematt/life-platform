@@ -12,7 +12,10 @@ from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
-from intelligence import weight_recency  # #1894/#1924: staleness defined once, used by both coach generators
+from intelligence import (
+    labs_facts,  # #3792: the labs window framing has ONE home — see _build_labs_data
+    weight_recency,  # #1894/#1924: staleness defined once, used by both coach generators
+)
 
 from ai.ai_summaries import _avg, _safe_float  # noqa: F401
 
@@ -1308,14 +1311,14 @@ def _build_glucose_data(data):
 
 
 def _build_labs_data(data):
-    """Extract labs-domain data for the labs coach."""
-    labs = data.get("labs") or {}
-    return {
-        "draw_date": labs.get("draw_date") or labs.get("date"),
-        "flagged_markers": labs.get("flagged_markers", []),
-        "flagged_count": labs.get("flagged_count", 0),
-        "total_draws": labs.get("total_draws", 0),
-    }
+    """Extract labs-domain data for the labs coach (#3792).
+
+    A delegate on purpose. The facts AND the window framing are built by
+    `intelligence.labs_facts.coach_domain_block` — the same module #3737's analyzer and
+    `coach.coach_domain_facts._labs_pack` read — so the sentence that says a completed
+    draw is completed has exactly one home. See that function for the defect it fixes.
+    """
+    return labs_facts.coach_domain_block(data.get("labs"))
 
 
 def _build_explorer_data(data):
