@@ -678,16 +678,16 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
             "tests/test_unlinked_closures_3812.py covers the pure `evaluate`/`parse_refs` logic offline (20 cases)"
         ),
         "mutation": (
-            "the natural experiment, not a plant: at 2026-09-16T03:36Z the detector reported 14 findings "
+            "the natural experiment, not a plant: the run quoted verbatim in commit 255466389's own message (committed 2026-09-16T03:38:16Z) reported 14 findings "
             "INCLUDING `unlinked-shipped-fix #3642` — commit cf281a65e names `#3642` in its subject with no "
-            "closing keyword. #3642 was then verified and CLOSED at 03:50Z. The commit, its subject, the "
+            "closing keyword. #3642 was then verified and CLOSED at 03:42:00Z (GitHub closedAt). The commit, its subject, the "
             "window and the ref are all byte-identical across the two runs; the ONLY variable changed is the "
             "issue's open/closed state."
         ),
         "observed": (
             "BEFORE (03:36Z, #3642 open): `findings=14`, with the line "
             '"unlinked-shipped-fix  #3642  2 merged commit(s) name #3642 in the subject with no closing '
-            'keyword, and it is still open". AFTER (04:00Z, #3642 closed, same command, same ref '
+            'keyword, and it is still open". AFTER (03:48:23Z, #3642 closed, same command, same ref '
             "20a597d07, same window): `UNLINKED-CLOSURE VERDICT NONGREEN mode=warn window=origin/main "
             "since 2026-08-01 commits=1694 findings=13 held=4` and `grep '#3642'` returns nothing. "
             "The gate therefore measures OPEN-ness against the merge record, not the presence of a subject "

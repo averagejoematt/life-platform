@@ -646,9 +646,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # `guard::scripts/check_unlinked_closures.py`, closure-contract detector C — a merged
         # commit that names an open issue in its SUBJECT with no closing keyword. Its proof is
         # NOT a synthetic plant but a LIVE STATE TRANSITION on real data, which is the strongest
-        # form available to a gate reading git history + the issue tracker: at 03:36Z the
-        # detector reported 14 findings INCLUDING #3642; that issue was then verified and closed
-        # at 03:50Z; the same command on the same ref (20a597d07) and the same window returned
+        # form available to a gate reading git history + the issue tracker: the run quoted in commit 255466389's own
+        # message (committed 03:38:16Z) reported 14 findings INCLUDING #3642; that issue was then verified and closed
+        # at 03:42:00Z; the same command on the same ref (20a597d07) and the same window returned
         # findings=13 with #3642 absent. Commit cf281a65e, its subject, the ref and the window
         # are byte-identical across both runs — the ONLY variable changed is the issue's state,
         # so the gate demonstrably measures OPEN-ness against the merge record rather than the
