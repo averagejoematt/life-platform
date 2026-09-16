@@ -25,6 +25,7 @@ This guard:
 import json
 import os
 import sys
+import threading
 import time
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
@@ -42,12 +43,24 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as api  # noqa: E402
 
-# Per-query artificial latency. Sequential: 8 coach partitions (+1 ledger on
-# /api/calibration) → ≥ 8×DELAY = 1.2s. Concurrent: ~1×DELAY. The 0.7s budget
-# sits > 4×DELAY above the concurrent cost and > 5×DELAY below the sequential
-# cost, so scheduler jitter can't flip it either way.
-QUERY_DELAY = 0.15
-WALL_CLOCK_BUDGET = 0.7
+# #3849: this file used to assert WALL CLOCK — `elapsed < 0.7s for 9 queries`. That is a
+# proxy for concurrency, and after #3797 made the pre-merge suite parallel
+# (`-n auto --dist loadfile`) the proxy started measuring the runner instead of the code.
+# It failed a PR whose whole diff was `deploy/lib/canary_gate_retry.py`; reproduced under
+# deliberate CPU load it failed at **2.73s**, which is WORSE than the sequential path the
+# budget exists to exclude (~1.35s) — the tell that the pool was being starved, not that
+# the fetch had lost its concurrency. The hazard arrived underneath a test that did not
+# change, exactly like #3832.
+#
+# The property is "the N partition reads are IN FLIGHT AT THE SAME TIME", and that is
+# directly observable. `_ConcurrencyProbe` counts queries concurrently open and records
+# the peak. There is no budget anywhere: a sequential walk can only ever reach peak 1,
+# however fast the machine, and a concurrent dispatch reaches at least 2 however slow it
+# is — the threads are all submitted before the first sleep returns.
+#
+# The sleep that remains is not an assertion. It holds each query open long enough for
+# overlap to be *observable*; shortening or lengthening it cannot change a verdict.
+QUERY_DELAY = 0.05
 
 
 def _body(resp):
@@ -77,29 +90,99 @@ def _slow_hook(table, **kw):
     return {"Items": [_full_pred()]} if "sleep" in str(kw.get("ExpressionAttributeValues", "")) + _pk_of(kw) else {"Items": []}
 
 
+class _ConcurrencyProbe:
+    """Counts partition queries open AT THE SAME INSTANT. No clock is asserted (#3849).
+
+    `peak` is the most queries ever simultaneously in flight. It is a structural
+    property of the dispatch, not of the machine:
+
+      * a SEQUENTIAL walk can only ever reach `peak == 1` — the next query is not issued
+        until the previous returns, on any hardware at any speed;
+      * a CONCURRENT dispatch submits every job before the first returns, so `peak >= 2`
+        even on a runner so starved that the wall clock looks sequential.
+
+    That asymmetry is what the old wall-clock budget did not have: 0.7s was ~4.7x the
+    ideal concurrent time but only ~0.5x the sequential time, so it had plenty of
+    headroom against the property and almost none against a busy machine.
+    """
+
+    def __init__(self, delay=QUERY_DELAY):
+        self._lock = threading.Lock()
+        self._delay = delay
+        self.in_flight = 0
+        self.peak = 0
+        self.calls = 0
+
+    def hook(self, table, **kw):
+        with self._lock:
+            self.calls += 1
+            self.in_flight += 1
+            self.peak = max(self.peak, self.in_flight)
+        try:
+            time.sleep(self._delay)
+            return _slow_hook(table, **kw)
+        finally:
+            with self._lock:
+                self.in_flight -= 1
+
+
 def _pk_of(kw):
     cond = kw["KeyConditionExpression"]
     return cond._values[0]._values[1]
 
 
 class TestConcurrentPartitionFetch:
-    """The red-pre-#1527 guard: wall-clock ≈ one query, not the sum of nine."""
+    """The red-pre-#1527 guard: the partition reads OVERLAP, not "they finished fast".
+
+    #3849 converted both assertions from a wall-clock budget to an in-flight count. See
+    the note above `QUERY_DELAY` for the measurement that forced it.
+    """
 
     def test_calibration_fetches_partitions_concurrently(self, monkeypatch):
-        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_slow_hook))
-        t0 = time.monotonic()
+        probe = _ConcurrencyProbe()
+        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=probe.hook))
         body = _body(api.handle_calibration({}))
-        elapsed = time.monotonic() - t0
-        assert elapsed < WALL_CLOCK_BUDGET, f"calibration fetch not concurrent: {elapsed:.2f}s for 9 queries"
+        assert probe.calls >= 8, f"the fan-out shrank — only {probe.calls} partition queries were issued"
+        assert probe.peak > 1, (
+            f"calibration fetch is SEQUENTIAL: {probe.calls} queries issued and never more than "
+            f"{probe.peak} in flight at once (#1527 regressed; this verdict does not depend on the clock)"
+        )
         assert len(body["coaches"]) == 8  # all coaches still scored
 
     def test_predictions_fetches_partitions_concurrently(self, monkeypatch):
-        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_slow_hook))
-        t0 = time.monotonic()
+        probe = _ConcurrencyProbe()
+        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=probe.hook))
         body = _body(api.handle_predictions({}))
-        elapsed = time.monotonic() - t0
-        assert elapsed < WALL_CLOCK_BUDGET, f"predictions fetch not concurrent: {elapsed:.2f}s for 8 queries"
+        assert probe.calls >= 8, f"the fan-out shrank — only {probe.calls} partition queries were issued"
+        assert probe.peak > 1, (
+            f"predictions fetch is SEQUENTIAL: {probe.calls} queries issued and never more than "
+            f"{probe.peak} in flight at once (#1527 regressed; this verdict does not depend on the clock)"
+        )
         assert len(body["by_coach"]) == 8
+
+    def test_MUST_FAIL_a_sequential_walk_is_still_caught(self, monkeypatch):
+        """The control #3849's acceptance names: with the concurrent dispatch reverted to
+        a sequential walk, the probe must still red. This is what makes the conversion a
+        fix rather than a relaxation — the old budget caught this too, and so must the
+        new assertion, on a machine of any speed."""
+
+        def _sequential_fetch(jobs, *, failures=None):
+            return {key: fn() for key, fn in (jobs or {}).items()}
+
+        probe = _ConcurrencyProbe()
+        # The handler resolves `_parallel_fetch` out of `site_api_coach.globals()` (it is
+        # `_g["_parallel_fetch"]`, not a module-local of the ledger), so THIS is the name
+        # the revert has to replace. Patching the ledger's copy leaves the real dispatch
+        # running and the control passes over its own mutation — which is what the first
+        # draft of this test did, and it reported peak 8.
+        monkeypatch.setattr(api, "_parallel_fetch", _sequential_fetch)
+        monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=probe.hook))
+        _body(api.handle_predictions({}))
+        assert probe.calls >= 8, "the control did not exercise the fan-out at all"
+        assert probe.peak == 1, (
+            f"a deliberately SEQUENTIAL walk reported peak {probe.peak} — the probe is not measuring "
+            "dispatch, and the two assertions above would pass over a #1527 regression"
+        )
 
     def test_coach_filter_still_single_fetch(self, monkeypatch):
         """One coach, one QUERY — still true after #3553.
