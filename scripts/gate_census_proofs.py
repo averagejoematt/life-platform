@@ -668,6 +668,45 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
     # #3570: same idiom as check_proof_freshness.py directly above — the mutation is
     # the REAL pre-fix registry (origin/main, before this PR's source_registry.py
     # additions), not a synthetic plant, watched against the actual live bucket.
+    # #3812: detector C of the closure contract. The mutation is NOT synthetic — it is a
+    # LIVE STATE TRANSITION on real data, observed within the same session, which is the
+    # strongest form available to a gate that reads git history and the issue tracker.
+    "guard::scripts/check_unlinked_closures.py": {
+        "gate_name": "scripts/check_unlinked_closures.py",
+        "command": (
+            "python3 scripts/check_unlinked_closures.py --since 2026-08-01   # live, read-only (git log + gh issue list); "
+            "tests/test_unlinked_closures_3812.py covers the pure `evaluate`/`parse_refs` logic offline (20 cases)"
+        ),
+        "mutation": (
+            "the natural experiment, not a plant: at 2026-09-16T03:36Z the detector reported 14 findings "
+            "INCLUDING `unlinked-shipped-fix #3642` — commit cf281a65e names `#3642` in its subject with no "
+            "closing keyword. #3642 was then verified and CLOSED at 03:50Z. The commit, its subject, the "
+            "window and the ref are all byte-identical across the two runs; the ONLY variable changed is the "
+            "issue's open/closed state."
+        ),
+        "observed": (
+            "BEFORE (03:36Z, #3642 open): `findings=14`, with the line "
+            '"unlinked-shipped-fix  #3642  2 merged commit(s) name #3642 in the subject with no closing '
+            'keyword, and it is still open". AFTER (04:00Z, #3642 closed, same command, same ref '
+            "20a597d07, same window): `UNLINKED-CLOSURE VERDICT NONGREEN mode=warn window=origin/main "
+            "since 2026-08-01 commits=1694 findings=13 held=4` and `grep '#3642'` returns nothing. "
+            "The gate therefore measures OPEN-ness against the merge record, not the presence of a subject "
+            "ref — which is precisely the property a static reading of the source cannot establish. "
+            "Both watched 2026-09-16. The must-fail control (a planted merge commit naming an open issue IS "
+            "reported) and its matched positive control (the same commit with `Fixes #N` goes SILENT) are "
+            "carried offline in tests/test_unlinked_closures_3812.py, 20 cases including a MUTATION of the "
+            "DISPOSITIONED ledger that surfaces the issue it was hiding."
+        ),
+        "scope": (
+            "Reads commit SUBJECTS only, so a fix whose issue is named solely in the body (`Refs #N`, "
+            "`**Epic:** #N`) is invisible BY DESIGN — that is the precision trade recorded in the script "
+            "header (43 raw mentions collapse to 20 subject-level ones). It answers 'does this commit claim "
+            "to address an open issue', never 'does the defect still reproduce': the finding is a question "
+            "for a human and the closure is always a separate, evidenced act. It also cannot see a fix that "
+            "names its issue nowhere at all."
+        ),
+        "proved_on": "2026-09-16",
+    },
     "guard::scripts/check_raw_zone_drift.py": {
         "gate_name": "scripts/check_raw_zone_drift.py",
         "command": "python3 scripts/check_raw_zone_drift.py   # live read-only S3 check; tests/test_raw_zone_drift_3570.py covers the pure logic (check_coverage/expand_prefix/prefix_root/known_prefix_roots) offline",

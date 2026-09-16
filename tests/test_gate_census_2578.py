@@ -642,7 +642,23 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live
         # gate: whether a Visual QA run actually retries is an observation no offline gate can
         # make, so #3688 closes on a run, not on this test.
-        <= 98
+        # Upper bound raised 98 -> 99 (2026-09-16, #3812): the 99th proof is
+        # `guard::scripts/check_unlinked_closures.py`, closure-contract detector C — a merged
+        # commit that names an open issue in its SUBJECT with no closing keyword. Its proof is
+        # NOT a synthetic plant but a LIVE STATE TRANSITION on real data, which is the strongest
+        # form available to a gate reading git history + the issue tracker: at 03:36Z the
+        # detector reported 14 findings INCLUDING #3642; that issue was then verified and closed
+        # at 03:50Z; the same command on the same ref (20a597d07) and the same window returned
+        # findings=13 with #3642 absent. Commit cf281a65e, its subject, the ref and the window
+        # are byte-identical across both runs — the ONLY variable changed is the issue's state,
+        # so the gate demonstrably measures OPEN-ness against the merge record rather than the
+        # presence of a subject ref. That is precisely the property no static read of the source
+        # can establish. The offline must-fail control (a planted merge commit naming an open
+        # issue IS reported) and its MATCHED positive control (the same commit with `Fixes #N`
+        # goes SILENT) are carried in tests/test_unlinked_closures_3812.py, 20 cases including a
+        # MUTATION of the DISPOSITIONED ledger that surfaces the issue it was hiding. Full
+        # record in scripts/gate_census_proofs.py::GUARD_PROOFS.
+        <= 99
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
