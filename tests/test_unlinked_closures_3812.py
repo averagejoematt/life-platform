@@ -223,3 +223,47 @@ def test_THE_REAL_OUTPUT_LINE_no_longer_parses_as_a_closing_reference():
     assert [m.group("num") for m in cc.CLOSING_REF_RE.finditer(bad)] == [
         "3830"
     ], "the old name no longer reproduces the defect — this control has stopped measuring it"
+
+
+# ── the parser blind spot this PR tripped over (#3812) ───────────────────────────────────
+def test_a_BACKTICKED_closing_reference_is_not_a_closing_reference():
+    """GitHub does not link inside a code span. The parser did not know that, and the
+    consequence was a FALSE BLOCK on this PR: commit messages EXPLAINING the grammar had
+    their quoted examples read as a real closing set, while GitHub's own
+    closingIssuesReferences correctly returned {}.
+
+    Prose about a closing keyword must not be indistinguishable from a closing keyword.
+    """
+    assert cc.closing_refs("parses as `fix #3830` under the grammar") == []
+    assert cc.closing_refs("`partial-acceptance-close #2848` in a PR body") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "```\ncloses #3830\n```",
+        "~~~\ncloses #3830\n~~~",
+        "    unlinked-shipped-fix  #3830  1 merged commit(s)",
+        "\tfixes #3830",
+    ],
+)
+def test_code_BLOCKS_are_stripped_too(text):
+    assert cc.closing_refs(text) == []
+
+
+def test_MUST_STILL_CATCH_a_bare_closing_reference():
+    """The control without which the fix above is just a disabled detector."""
+    assert cc.closing_refs("Fixes #3830 for real") == [(3830, "fixes")]
+    assert cc.closing_refs("  * CLOSE   #3642 closedAt 2026-09-16") == [(3642, "close")]
+
+
+def test_strip_code_preserves_newlines_so_positions_still_line_up():
+    src = "a\n`fix #1`\nb"
+    out = cc.strip_code(src)
+    assert out.count("\n") == src.count("\n") and len(out) == len(src)
+    assert "fix #1" not in out and out.startswith("a\n") and out.endswith("\nb")
+
+
+def test_a_fence_containing_backticks_is_not_shredded_by_the_span_rule():
+    """Order matters: the fence must be consumed before inline spans are considered."""
+    assert cc.closing_refs("```\nsee `fix #3830` here\n```") == []

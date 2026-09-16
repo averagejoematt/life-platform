@@ -286,6 +286,46 @@ def codes_ending_in_a_closing_keyword(codes=None) -> dict:
 # nine keywords, an optional colon, whitespace, then `#N`, `owner/repo#N`, or an issue URL.
 # The keyword must sit IMMEDIATELY before the reference — `fixes the bug in #12` does not link.
 CLOSING_KEYWORDS = ("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved")
+# GitHub does NOT link a closing reference inside a code span or a code block — a
+# backticked `close #123` renders as literal text and closes nothing. The parser here did
+# not know that, and the consequence was a FALSE BLOCK: a PR whose commit messages
+# *explain* the closing-keyword grammar (quoting `close #2848` and `fix #3830` as examples)
+# had its whole closing set read as real, while GitHub's own `closingIssuesReferences`
+# correctly returned {} (#3812). Prose ABOUT a closing keyword was indistinguishable from
+# a closing keyword — which is a bad property for a detector whose whole job is to be read
+# and written about.
+#
+# The three code forms GitHub honours, stripped in this order (longest fence first, so a
+# ``` block containing backticks is not shredded by the span rule):
+#   ``` fenced blocks ```      · ~~~ fenced blocks ~~~
+#   indented blocks            · a line starting with 4 spaces or a tab
+#   `inline spans`             · one or more backticks, matched by run length
+#
+# Deliberately NOT a markdown parser: it strips more aggressively than GitHub in exotic
+# cases, and the failure direction of over-stripping is a MISSED finding rather than a
+# false close — detector B reads GitHub's own linked set alongside this parse and reports
+# any disagreement in both directions, so a miss here surfaces as `github-parse-disagree`
+# rather than sliding through.
+_FENCED_RE = re.compile(r"(?ms)^[ \t]*(`{3,}|~{3,}).*?(?:^[ \t]*\1[ \t]*$|\Z)")
+_INDENTED_RE = re.compile(r"(?m)^(?: {4,}|\t).*$")
+_SPAN_RE = re.compile(r"(`+)(?:.|\n)*?\1")
+
+
+def strip_code(text: str) -> str:
+    """Blank out code fences, indented blocks and inline spans, preserving newlines.
+
+    Newlines are kept so any position-based reporting a caller layers on top still lines
+    up with the original text.
+    """
+
+    def _blank(m):
+        return re.sub(r"[^\n]", " ", m.group(0))
+
+    out = _FENCED_RE.sub(_blank, text or "")
+    out = _INDENTED_RE.sub(_blank, out)
+    return _SPAN_RE.sub(_blank, out)
+
+
 CLOSING_REF_RE = re.compile(
     r"\b(?P<kw>" + "|".join(CLOSING_KEYWORDS) + r")\b:?\s+"
     r"(?:https?://github\.com/(?P<url_repo>[\w.-]+/[\w.-]+)/issues/(?P<url_num>\d+)"
@@ -577,7 +617,7 @@ def closing_refs(text: str, repo: str | None = None) -> list:
     refs (`owner/other#N`, or a URL into another repo) come back as "owner/other#N" strings so
     a caller can name them without mistaking them for a local issue."""
     out: list = []
-    for m in CLOSING_REF_RE.finditer(text or ""):
+    for m in CLOSING_REF_RE.finditer(strip_code(text or "")):
         num = m.group("num") or m.group("url_num")
         ref_repo = m.group("repo") or m.group("url_repo")
         if ref_repo and repo and ref_repo.lower() != repo.lower():
