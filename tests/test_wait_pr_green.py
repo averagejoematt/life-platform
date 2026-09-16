@@ -628,3 +628,89 @@ def test_an_expected_check_keeps_its_stricter_treatment():
     p = _run(["--fixture", path, "--no-derive", "--expect", "Wiki drift gates"], path_override=_no_gh_path())
     assert p.returncode == 1, p.stdout + p.stderr
     assert "NONGREEN Wiki drift gates" in p.stdout
+
+
+# ── #3659: gh 2.100.0 refuses a log body with escape sequences ───────────────
+def _fake_gh(tmp_path, *, supports_flag: bool, body: str = "LOG BODY"):
+    """A `gh` stub reproducing 2.100.0's behaviour on an Actions log.
+
+    WITHOUT --allow-escape-sequences it prints NOTHING to stdout and writes only a
+    warning to stderr, exiting 0 — so a caller that reads stdout gets an empty string
+    and no error to notice. That silence is the whole defect.
+    """
+    gh = tmp_path / "gh"
+    gh.write_text(
+        "#!/usr/bin/env bash\n"
+        'for a in "$@"; do\n'
+        '  if [ "$a" = "--allow-escape-sequences" ]; then\n'
+        + (f'    printf "%s" {body!r}; exit 0\n' if supports_flag else '    echo "unknown flag: --allow-escape-sequences" >&2; exit 1\n')
+        + "  fi\n"
+        "done\n"
+        + (
+            'echo "the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway" >&2\n' "exit 0\n"
+            if supports_flag
+            else f'printf "%s" {body!r}; exit 0\n'
+        ),
+        encoding="utf-8",
+    )
+    gh.chmod(0o755)
+    return gh
+
+
+def _run_fetch(tmp_path, gh):
+    """Drive the script's own log-fetch idiom with `gh` stubbed on PATH."""
+    snippet = (
+        "REPO=owner/repo; jobid=1;\n"
+        'raw_log=$(gh api --allow-escape-sequences "repos/${REPO}/actions/jobs/${jobid}/logs" 2>/dev/null) '
+        '|| raw_log=$(gh api "repos/${REPO}/actions/jobs/${jobid}/logs" 2>/dev/null) || raw_log="";\n'
+        'printf "%s" "$raw_log"\n'
+    )
+    return subprocess.run(
+        ["bash", "-c", snippet],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": f"{gh.parent}:{os.environ['PATH']}"},
+    ).stdout
+
+
+def test_MUST_FAIL_without_the_flag_the_log_body_is_EMPTY_and_nothing_errors(tmp_path):
+    """The defect, reproduced: bare `gh api .../logs` yields zero bytes and exit 0.
+
+    Measured live on this repo 2026-09-16 — bare returned 0 bytes, the flag returned
+    49,934 bytes on the same job. Downstream, `_extract_wiki_drift_files` finds nothing
+    in an empty string, the enrichment returns the checks unchanged, and a
+    reconcile-owned literal drift degrades from RECONCILE-OWNED-RED (exit 4, mergeable)
+    to a plain FAIL. The watcher does not get louder when it goes blind; it gets quieter.
+    """
+    gh = _fake_gh(tmp_path, supports_flag=True)
+    bare = subprocess.run(
+        ["bash", "-c", 'gh api "repos/o/r/actions/jobs/1/logs" 2>/dev/null; printf "|END"'],
+        capture_output=True,
+        text=True,
+        # PATH is derived from the stub itself, so the dependency is explicit rather
+        # than an unused local that only matters for its side effect.
+        env={**os.environ, "PATH": f"{gh.parent}:{os.environ['PATH']}"},
+    )
+    assert bare.stdout == "|END", "the bare call should yield an EMPTY body — the stub does not reproduce gh 2.100.0"
+    assert bare.returncode == 0, "and it should not error, which is why the failure is silent"
+
+
+def test_WITH_the_flag_the_log_body_comes_back(tmp_path):
+    assert _run_fetch(tmp_path, _fake_gh(tmp_path, supports_flag=True)) == "LOG BODY"
+
+
+def test_an_OLDER_gh_that_lacks_the_flag_still_works_via_the_fallback(tmp_path):
+    """The flag is recent. An older gh both lacks it AND does not need it — it never
+    refused. Probing the flag rather than parsing `gh --version` keeps both directions
+    working, and this is the control that proves the fallback is live."""
+    assert _run_fetch(tmp_path, _fake_gh(tmp_path, supports_flag=False)) == "LOG BODY"
+
+
+def test_the_script_passes_the_flag_and_keeps_a_bare_fallback():
+    code = "".join(_non_comment_lines(_SCRIPT))
+    assert (
+        'gh api --allow-escape-sequences "repos/${REPO}/actions/jobs/${jobid}/logs"' in code
+    ), "the raw-log fetch does not pass --allow-escape-sequences (#3659)"
+    assert (
+        'gh api "repos/${REPO}/actions/jobs/${jobid}/logs"' in code
+    ), "the bare fallback for an older gh was removed — that breaks gh < 2.100"
