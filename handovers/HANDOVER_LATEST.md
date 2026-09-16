@@ -1,4 +1,10 @@
-# Handover — Session AF: the ~20h drain, and the second permission the first one was hiding (2026-09-15 ~01:30Z → ~22:10Z)
+# Handover — Session AF: the ~20h drain, the second permission the first one was hiding, and the rollback that took the fleet (2026-09-15 ~01:30Z → 2026-09-16 ~03:2xZ)
+
+> **This handover was written at 22:10Z and CORRECTED at 03:2xZ.** The wrap ran, then the session
+> continued for five more hours and invalidated three of its own headline claims — the open count,
+> the PR count, and `**Main:** stranded`. Corrected in place rather than appended to, because a
+> handover that contradicts itself is worse than one that is merely late. What the first version
+> got WRONG is kept visible below wherever it is instructive; what it got stale is replaced.
 
 **Driver:** Opus 5 (1M). Owner brief: *"141 open issues, get it as low as it honestly goes."* Work order was
 explicit — **Phase −1** a throughput spike, TIMEBOXED 90 min (`pytest-xdist`, counts must match the serial
@@ -19,21 +25,27 @@ is worse than an open issue."*
 
 ## The number, and the honest split
 
-**141 open → 122.** Nineteen net.
+**141 open → 124.** Seventeen net.
 
 | | count | |
 |---|---|---|
-| Issues closed | **28** | 25 `completed`, 3 `not-planned` |
-| — closed on live/measured evidence | 25 | each carries the evidence in its closing comment |
+| Issues closed | **30** | 27 `completed`, 3 `not-planned` |
+| — closed on live/measured evidence | 27 | each carries the evidence in its closing comment |
 | — triage (not-planned / superseded) | 3 | #3798, #3778, #3403 |
-| Issues filed | **9** | 2 of them closed in-session |
-| PRs merged | **19** | every one through `merge_train.sh --dry-run` first |
-| CDK stacks deployed | **6** | Email, Ingestion, Monitoring, Monitoring+Operational, Serve |
+| Issues filed | **13** | 3 closed in-session |
+| PRs merged | **22** | every one through `merge_train.sh --dry-run` first |
+| CDK deploy runs | six | Email, Ingestion, Monitoring ×2, Operational, Serve |
 | IAM grants applied | **2** | `dynamodb:Query`, then `kms:Decrypt` scoped by `kms:ViaService` |
-| Deploy leases disposed | **3 approved / 9 rejected** | every ancestor rejected BY NAME, none left waiting |
+| Deploy leases disposed | **6 approved / 11 rejected** | none left waiting |
+| Gate census | **641 → 644** | three PRs, each re-measured on its own rebased tree |
 
-The count moved 19 and 25 of the 28 closures carry evidence. **Three are triage and are counted as triage,
-not as fixes** — that split is the whole point of reporting it.
+**Read the net honestly: 30 closed against 13 filed.** The gross is 30; the net is 17 because the
+session kept finding things. Five of the thirteen (#3828, #3829, #3830, #3832, #3835) were found in
+the last five hours, four of them by instruments firing rather than by anyone auditing. A count that
+rises because defects were recorded rather than swallowed is moving the right way; it just does not
+flatter the headline.
+
+Three closures are triage and are counted as triage, not as fixes.
 
 ---
 
@@ -158,6 +170,75 @@ row, so the timeout does not cleanly predict the gap and I did not invent a caus
 
 ---
 
+---
+
+## After the wrap: the rollback that took the fleet, and the four hours that followed
+
+**The first version of this handover said `**Main:** stranded` and listed the auto-rollback as
+unresolved. It had fired.** Reading that job's steps — it reports `Auto-rollback … success`, which is
+the rollback working as designed, so nothing paged — showed `Rollback deployed Lambdas: success`.
+**85 Lambdas reverted to pre-17:46 bundles.** Verified rather than inferred: 9 of 10 sampled functions
+came back carrying `health/adherence_calc.py` stamped `09-15 04:00` with zero matches for a symbol
+that had nine at 19:15Z. `life-platform-mcp` was the sole survivor — separate artifact path.
+
+**Cause (#3830): a vendor 503.** The canary's own log, in full:
+
+```
+DDB ✅  S3 ✅  MCP ✅ (83 tools)  Subscribe ✅
+Anthropic: ❌ Bedrock ServiceUnavailableException
+Suppressed first-occurrence alert (1 new infra failure(s)); will alert if repeat next run
+Canary complete: 1 FAILURES ❌ (infra 1, stored-state 0)
+```
+
+Read the last two lines together. **ONE datapoint had three consumers with three different
+confidences:** the canary's email path suppressed it as a first occurrence, the CloudWatch alarm fired
+and self-cleared in 15 minutes, and the deploy gate reverted 85 functions. The most destructive
+consumer was the most confident. #2051 split the canary's lanes by CHECK and never by FAILURE MODE —
+`anthropic` belongs in the gating lane because a broken inference path IS a plausible deploy cause; a
+vendor 503 on the same check is not.
+
+Fixed by **#3831** (`LANE_EXTERNAL_TRANSIENT` + `lane_for_result`), mutation-proved four ways
+including the AccessDenied hole control, **deployed 01:26:13Z and verified in the bundle**.
+`smoke_oracle_decision.py` needed no change — `failed_deploy_health` now excludes transients by
+construction.
+
+**Recovery:** the `deploy_all` dispatch was NOT what restored it. The push run already at the gate
+touched `lambdas/common/retry_utils.py`, a shared bundle module, so `fleet_changed` was true and it
+deployed everything — 25 min sooner and one smoke gate instead of two. `12 current / 0 reverted`, and
+the live MCP adherence call returned the full payload again.
+
+## What else landed after the wrap
+
+- **#3661 closed** — found already fixed by #3820 *this same session*; I checked the code before
+  writing any and avoided duplicating it. The log showed the defect **ended because traffic fell, not
+  because the fix shipped**, and `surge_held_by=none` appeared for the first time tonight because the
+  rollback recovery deployed it. One incident's recovery deployed another issue's fix.
+- **#3797 merged** at 644 — and its own 2.1× claim **corrected to ~1.32× median (n=3 vs n=9)**. The
+  spike compared against the wrong denominator and generalised from one sample.
+- **#3834** (#3829, the ensemble timeout) — complete, blocked on a **swallowed push**.
+
+## Three corrections I made to my own work
+
+1. **#3829's cause.** I wrote "duration crept over eight days." Over thirty it is a **step function**:
+   median 1,326ms → 62,279ms, **47× overnight on 2026-08-31**, with no commit to the module.
+   `budget_guard` pauses the ensemble at tier ≥1 and the tier dropped to 0 at 17:00:12 that day. For
+   most of August the function was not fast — **it was not doing the work**. The 90s ceiling was sized
+   against an idle cost where it read as 68× headroom.
+2. **#3797's speedup**, above.
+3. **A hole in my own guard.** The mutation that stripped the censoring claim from #3829's timeout
+   comment **passed** — my assertion read `"censor" in comment`, and the comment's own "UNCENSOR the
+   measurement" kept satisfying it. A guard that matches a substring of its own escape hatch is not a
+   guard. Tightened, re-mutated, red.
+
+## And one bad test I nearly believed
+
+Chasing the swallow, I pushed the same commit to a throwaway branch to test whether the sha or the
+branch was at fault, got zero runs, and was about to treat that as evidence. It was not:
+`pr-checks.yml` triggers on `pull_request`, so a branch with no PR fires nothing. **Zero was the
+expected result and proved nothing.** Branch deleted, bad test recorded instead of its conclusion.
+
+---
+
 **Build beat:** none — the session's headline work (#3681's two-grant fix, #3499's routing) is merged and
 deployed, but the reader-visible half is a `state: warming_up` artifact with 2 of 14 days of data; a beat
 about it would be narrating machinery, not a shipped reader experience.
@@ -167,7 +248,7 @@ plain-`DescribeKey` Sid), `docs/alarm_citations.json` (three citations re-pointe
 **Decisions:** none needed — the one posture choice (scope CI's `kms:Decrypt` by `kms:ViaService` rather than
 granting it outright) is recorded in the statement itself, the IAM README, and a mutation-proved guard; it
 narrows an existing grant rather than setting new architecture policy.
-**Main:** stranded — CI/CD run `35013357326` on `14e8aaa93` has `Deploy: success` and `Post-deploy
+**Main:** green (919ad46a) — `check_main_green.py` exit 0, HEAD covered. **This line said `stranded` at 22:10Z and that is no longer true.** The R8-ST6 Plan-red strand cleared when the KMS grant and the CDK deploys landed, and the smoke red that followed was the auto-rollback episode below, now recovered and fixed. Superseded detail from the first version: CI/CD run `35013357326` on `14e8aaa93` has `Deploy: success` and `Post-deploy
 integration checks: success`, but `Smoke test: failure` on the **`Verify canary`** step (19:54:49→19:54:57Z,
 8 s). The same canary invoked live at **20:02:41Z returns `all_pass: true, failures: 0,
 failed_deploy_health: 0`** across DDB/S3/MCP/Bedrock — so the gating lane is healthy now and the failure is
@@ -188,20 +269,12 @@ now carries, and archived the patch to the session scratchpad anyway.
 the session · DoD: `closure_sweep.py --session` scanned 28, hits 17, **blocking=none** (the one blocking
 `no-live-proof` on #3793 was fixed by re-posting its proof in the parseable grammar); the residual warn-mode
 hits are `no-outcome-verdict`/`unhomed-residual` on issues closed in the session's first half.
-**Backlog:** Now live at 5 actionable in the opus lane (floor 3) — no promotion needed; 7 more `Now` stories
-are `gate:owner`/`blocked:*` and correctly not counted. `later_staleness` sweep: **zero** stale issues —
-`check_backlog_hygiene.py --rule later_staleness` returns OK over all 122 open. **Residual, stated not
-hidden:** 5 `acceptance_count` violations (#3607, #3611, #3615, #3617, #3621 — 6–8 boxes against a 3–5
-contract). I read #3607's seven: they are seven distinct substantive requirements, not padding. Trimming
-them to hit a count would degrade real acceptance criteria to satisfy a number, which is the one thing this
-session's brief ruled out. They need the issues' owner to split or re-scope them, not a wrap to shave them.
-**Alarms:** 0 uncited — `check_alarm_citations.py` exits 0 across all four legs. Three citations were
-re-pointed this session: `qa-smoke-failures` (had opened `#3793 —`, which became a violation the moment that
-issue closed on the cure; rewritten with **no `#N` anywhere**, citing the fixing PR by squash sha, the
-measured metric series, and a stated expiry of ~2026-09-16T00:00Z when the 24h Maximum bucket no longer
-contains a pre-deploy datapoint), and both DLQ siblings re-pointed from the closed #2912 to #3829.
-**CI warnings:** none to triage — `check_ci_warnings.py` reports the latest completed main run isn't green,
-so there is no green-run annotation set to read; that is the `**Main:**` line's business, not this gate's.
+**Backlog:** Now live at 5 actionable in the opus lane (floor 3) — no promotion needed; `later_staleness` returns OK over all 124 open. **Residual, stated not hidden: 5 `acceptance_count` violations** (#3607, #3611, #3615, #3617, #3621 — 6-8 boxes against a 3-5 contract). I read #3607's seven: seven distinct substantive requirements, not padding. Trimming them to hit a count would degrade real acceptance criteria to satisfy a number, which is the one thing this session's brief ruled out. They need their owner to split or re-scope them. **Cleared since the first version:** #3828 and #3833's violations. #3833 was an AUTO-FILED deploy-wedge alert (`[auto-filed] CI/CD deploy wedge`) about a run I had already approved and which completed green — I did NOT close it by hand, because the open issue IS the watcher's throttle marker; I dispatched `deploy-wedge-watch.yml` and let it close its own alert with its own `Recovered — 2026-09-16T03:09:12Z` comment. Use the machinery, don't bypass it.
+
+**Alarms:** 0 uncited — `check_alarm_citations.py` exits 0 across all four legs. **Four citations written this session**, the last one tonight: `life-platform-canary-anthropic-failure` fired-and-cleared 19:55:44Z → 20:10:44Z (15 min), which is the SAME Bedrock 503 that reverted the fleet 54 seconds earlier. Cited to #3830 with the full chain and the alarm deliberately NOT retuned — a 15-minute flap on a real vendor outage is this alarm doing its job, and it was the only one of the three consumers of that datapoint that got the confidence level right: loud without being destructive. Earlier: `qa-smoke-failures` rewritten with **no `#N` anywhere** (its owning issue closed on the cure, and the #2996 leg refuses a citation naming a closed issue), and both DLQ siblings re-pointed from the closed #2912 to #3829.
+
+**CI warnings:** 6 on the latest green main run (919ad46a), each triaged explicitly. **(1) `Unit Tests over its duration budget` — 3194s against 1950s. FILED as #3835 rather than raised.** Measured first, as the gate's own text demands: nine consecutive green-main samples give median 2850s, mean 2634s, **spread 1.93x** (1656–3201s), over budget on **8 of 9**. The spread is huge and echoes #3265's queueing-noise finding, so one 3194s reading proves little — but 8 of 9 over, at 1.46x the median, is a ceiling genuinely below where the job lives. The remedy is a SHED that ALREADY EXISTS and was not applied here: #3797 built the two-pass parallel lane and landed it in `pr-checks.yml` **only**; `ci-test.yml` is still a single serial invocation (`grep -E 'n auto|dist loadfile|serial' .github/workflows/ci-test.yml` returns nothing). The budget was raised every time up to #3106 and then shed twice; this would be the third raise after two successful sheds, with the shed sitting built and measured. **(2-6) five `SKIPPED in CI — no playwright/chromium` lines (#3640)** — deliberate no-action: that is the named-skip reporter working exactly as designed, and it is a reporter, never a gate. Re-run with `--decoded`, exit 0.
+
 **Ledger:** none — no standing machinery shipped. The census moved 641 → 643 across #3811 and #3807 and
 `docs/PROPORTIONALITY.md` was stamped to match, but every entrant is a guard/test inside an existing
 subsystem's posture, not a new subsystem with its own rent row.
@@ -210,31 +283,38 @@ subsystem's posture, not a new subsystem with its own rent row.
 
 ## Residual / next picks
 
-- **Read `Auto-rollback (smoke failure)` on run `35013357326` FIRST.** `not-work — a standing ops read, not
-  a backlog item.` If it fired, it stripped a verified-correct fleet deploy (#2051 shape) and needs a
-  re-deploy plus a `docs/INCIDENT_LOG.md` row that session.
-- **#3797 is GREEN and deliberately held.** `#3797` — it and #3807 both stamp the census at 643 from a
-  common base of 642; whichever lands second must read **644**. It needs a rebase, a re-measure on the
-  rebased tree (never by arithmetic, confirmed by id-set diff against a `git archive` of the merge-base) and
-  a re-stamp of two literals. The precise three-step recipe is on the PR.
-- **#3807 was mid-merge-train at wrap and is still OPEN.** `#3807` — it was green on `57734c469`, but `main`
-  moved under it (my two direct docs/chore commits), so the train reconciled it onto `b7e6bb598` and is
-  **re-watching checks** before merging. Stacked validation PASSED. Verify its disposition at source
-  (`gh pr view 3807 --json state,mergedAt`), **never from a monitor event** — Session AE reported a PR merged
-  that had actually been dropped, off exactly that mistake. If it landed, main's census is 643 and #3797 must
-  re-stamp to 644; if it did not, #3797 re-stamps to 643 and #3807 goes second.
-- **#3563 stays open on leg 1.** `#3563` — the bar is the next scheduled `coach-nudge` run emitting
-  `EstimatedCostUSD` where 30 days have none. That cron is 15:10Z daily. Do not hand-invoke it.
-- **#3829 is a live P1 filed this session.** `#3829` — `coach-ensemble-digest` times out daily, bills 3×90 s,
-  and drops rows. Its 09-13 gap is explicitly unexplained.
-- **#3828** — `#3828` the training-notes truncation residual, P3/Later, zero live observations.
-- **`Bash(bash deploy/cdk_deploy.sh:*)` is in the working tree and deliberately NOT committed.**
-  `not-work — an owner decision.` It was approved to unblock one deploy this session; committing it would
-  turn a one-time unblock into a durable repo-wide grant for an infrastructure mutation, which the standing
-  operator rule says is ask-first *even where a permission rule would allow it*. The ten read-only checker
-  entries beside it WERE committed (`78c8e71df`).
-- **Two commits went straight to main past branch protection** — `78c8e71df` (permissions chore) and
-  `76ec4d2bd` (alarm citations). `not-work — sanctioned by this session's brief ("wrap/docs commits go
-  straight to main — that's settled"), recorded here so the audit trail is explicit rather than discovered.`
-- **5 `acceptance_count` backlog violations** — `#3607`, `#3611`, `#3615`, `#3617`, `#3621`. Each needs its
-  acceptance list split or re-scoped by someone holding the issue's intent.
+- **#3836 is complete and blocked on a GitHub `pull_request` OUTAGE.** `#3836` — supersedes #3834
+  (closed; same commits, identical tree). **Diagnosed definitively, not inferred:** the last
+  `pull_request`-triggered run on ANY PR in this repo was `2026-09-16T01:06:01Z`; at 03:18Z that was
+  **2h12m with zero**, while `push` runs fired normally at 03:17Z and `workflow_dispatch` worked at
+  03:08Z. It is GitHub, repo-wide, and **no PR can merge until it recovers.**
+  Four local recoveries were tried and each ruled something out: re-push with a new sha (not a stuck
+  sha); a throwaway branch (**an INVALID test** — `pr-checks.yml` triggers on `pull_request`, so a
+  branch with no PR fires nothing; zero was the expected result and proved nothing, branch deleted);
+  a supersede-PR firing `opened` rather than `synchronize` (still zero, which is what made it
+  definitive); and the `push`-vs-`pull_request` comparison that settled it.
+  **NEVER close/reopen to mint checks** — it has wedged a branch permanently. If it has not recovered,
+  one more sha is the cheapest nudge, and after that the answer is to wait: every local option is now
+  tried and measured. Nothing in the diff needs revisiting.
+
+- **#3830 leg 2** — `#3830` a real vendor transient must be observed leaving `failed_deploy_health` at 0.
+  Leg 1 is proven (deployed 01:26:13Z, verified in the bundle). **Do not plant one**; a synthetic
+  transient injected to satisfy a proof bar is what the bar exists to prevent.
+- **#3830 box 3** — `#3830` retry-before-gate / first-occurrence parity with the alerter. This is the
+  half that would have prevented the outage on its own.
+- **#3563 leg 1** — `#3563` the 15:10Z `coach-nudge` cron emitting `EstimatedCostUSD`. Do not
+  hand-invoke it; it is an email Lambda and a regen-invoke sends real mail.
+- **#3829's live proof** — `#3829` needs #3834 merged AND a `cdk deploy LifePlatformCompute`, then the
+  next daily ensemble run either writes its row or does not. **And 2026-09-13 stays explicitly
+  unexplained:** 52.4s, one invocation, no row — inside the ceiling, inside the working era. A second
+  question; the timeout raise will not touch it.
+- **#3835** — `#3835` the post-merge suite is still serial; #3797's shed was applied to the pre-merge
+  lane only.
+- **#3832** — `#3832` the #3688 judge-Set guard's false positives on gitignored bundle-staging mirrors.
+- **5 `acceptance_count` backlog violations** — `#3607`, `#3611`, `#3615`, `#3617`, `#3621`.
+- **Three commits went straight to main past branch protection** — `78c8e71df`, `76ec4d2bd`,
+  `41dc02712`. `not-work — sanctioned by this session's brief ("wrap/docs commits go straight to main —
+  that's settled"), recorded here so the audit trail is explicit rather than discovered.`
+- **`Bash(bash deploy/cdk_deploy.sh:*)` is now COMMITTED** (`41dc02712`) — `not-work — an owner
+  decision, made deliberately after the session hit the classifier block, with the reasoning in the
+  commit message so a future reader does not mistake it for an accident.`

@@ -57,18 +57,19 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import boto3
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 from operational.canary_lanes import (  # #2051: one registry decides what gates a rollback
+    LANE_EXTERNAL_TRANSIENT,
     LANE_INFRA,
     LANE_STORED_STATE,
     label_for,
     lane_counts,
-    lane_for,
+    lane_for_result,
     lane_summary,
 )
 
@@ -337,7 +338,7 @@ def check_mcp(canary_ts: str) -> tuple[Optional[bool], str, float]:
 # ── Check 4: Anthropic API reachability (reentry sweep, 2026-05-03) ─────────
 
 
-def check_anthropic(canary_ts: str) -> tuple[Optional[bool], str, float]:
+def check_anthropic(canary_ts: str) -> tuple[Optional[bool], str, float, Optional[str]]:
     """Make a tiny (max_tokens=1) Bedrock call to verify Claude inference is live.
 
     ADR-062 (2026-05-27): migrated from direct Anthropic API to Bedrock. This
@@ -349,14 +350,21 @@ def check_anthropic(canary_ts: str) -> tuple[Optional[bool], str, float]:
       • ThrottlingException — account throughput limits.
       • ResourceNotFoundException — model/profile access revoked.
 
-    Returns (None, msg, 0) if Bedrock client can't init (skip — not a failure).
+    Returns (None, msg, 0, None) if Bedrock client can't init (skip — not a failure).
+
+    #3830: the fourth element is the botocore `Error.Code`, carried so
+    `canary_lanes.lane_for_result` can tell a vendor transient (503, throttle)
+    from a deploy-plausible break (AccessDenied) ON THE SAME CHECK. Before this,
+    every `anthropic` failure gated equally and a Bedrock 503 reverted 85
+    Lambdas (2026-09-15). The message already named the code; nothing machine-
+    readable carried it.
     """
     t0 = time.monotonic()
     try:
         import botocore.exceptions as _bce
         from ai.bedrock_client import invoke as _bedrock_invoke
     except Exception as e:
-        return None, f"bedrock_client import failed — skipping: {e}", 0.0
+        return None, f"bedrock_client import failed — skipping: {e}", 0.0, None
 
     body = {
         "model": ANTHROPIC_CANARY_MODEL,
@@ -368,22 +376,27 @@ def check_anthropic(canary_ts: str) -> tuple[Optional[bool], str, float]:
         latency = (time.monotonic() - t0) * 1000
         # Any well-formed response = inference path healthy.
         if resp.get("content"):
-            return True, f"Bedrock OK ({ANTHROPIC_CANARY_MODEL}, {len(str(resp))}B)", latency
-        return False, f"Bedrock returned no content: {str(resp)[:200]}", latency
+            return True, f"Bedrock OK ({ANTHROPIC_CANARY_MODEL}, {len(str(resp))}B)", latency, None
+        return False, f"Bedrock returned no content: {str(resp)[:200]}", latency, "EmptyContent"
     except _bce.ClientError as e:
         latency = (time.monotonic() - t0) * 1000
         code = e.response.get("Error", {}).get("Code", "Unknown")
         msg = e.response.get("Error", {}).get("Message", "")[:200]
         if code == "AccessDeniedException":
-            return False, f"Bedrock access denied (IAM lost bedrock:InvokeModel OR Anthropic use-case form not submitted): {msg}", latency
+            return (
+                False,
+                f"Bedrock access denied (IAM lost bedrock:InvokeModel OR Anthropic use-case form not submitted): {msg}",
+                latency,
+                code,
+            )
         if code == "ThrottlingException":
-            return False, f"Bedrock throttled: {msg}", latency
+            return False, f"Bedrock throttled: {msg}", latency, code
         if code == "ResourceNotFoundException":
-            return False, f"Bedrock model/profile not found (access revoked?): {msg}", latency
-        return False, f"Bedrock {code}: {msg}", latency
+            return False, f"Bedrock model/profile not found (access revoked?): {msg}", latency, code
+        return False, f"Bedrock {code}: {msg}", latency, code
     except Exception as e:
         latency = (time.monotonic() - t0) * 1000
-        return False, f"Bedrock error: {e}", latency
+        return False, f"Bedrock error: {e}", latency, type(e).__name__
 
 
 def count_canary_subscriber_rows(ddb_client) -> int:
@@ -609,20 +622,34 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         mode = "mcp-only" if mcp_only else "full"
         print(f"Canary run ({mode}): {canary_ts} | hash={payload_hash}")
 
-        results = {}
-        failures = []
+        results: dict[str, dict[str, Any]] = {}
+        # #3830: annotated because the entries now carry `failure_code: str | None`
+        # alongside `check: str`, and an unannotated literal would infer the VALUE
+        # type as `str | None` — which reds the tier-2 mypy gate on line ~727's
+        # `sorted({f["check"] for f in failures})`. The annotation states the shape
+        # rather than casting at the read site, so `check` stays a `str` to every
+        # consumer including `send_alert`.
+        failures: list[dict[str, Any]] = []
 
-        def record(check_key: str, ok, message: str, latency_ms: float = 0.0) -> None:
+        def record(check_key: str, ok, message: str, latency_ms: float = 0.0, failure_code: Optional[str] = None) -> None:
             """Store one check result + its lane, and enroll a failure.
 
             #2051: the lane comes from operational/canary_lanes.py — the ONLY
             place the gating question is answered. `ok is None` means skipped
             (never a failure in either lane).
             """
-            lane = lane_for(check_key)
-            results[check_key] = {"ok": ok, "message": message, "latency_ms": round(latency_ms), "lane": lane}
+            entry = {"ok": ok, "message": message, "latency_ms": round(latency_ms)}
+            if failure_code:
+                entry["failure_code"] = failure_code
+            # #3830: the lane is resolved from the RESULT, not the key alone — a
+            # vendor transient on an infra check is not a deploy-plausible cause.
+            lane = lane_for_result(check_key, entry)
+            entry["lane"] = lane
+            results[check_key] = entry
             if ok is False:
-                failures.append({"check": label_for(check_key), "check_key": check_key, "lane": lane, "message": message})
+                failures.append(
+                    {"check": label_for(check_key), "check_key": check_key, "lane": lane, "message": message, "failure_code": failure_code}
+                )
 
         if not mcp_only:
             # ── DynamoDB check ──────────────────────────────────────────────────────
@@ -655,9 +682,9 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         # frequent enough for billing/auth detection, and Anthropic per-key rate
         # limits could theoretically throttle a 15-min cadence.
         if not mcp_only:
-            ant_ok, ant_msg, ant_ms = check_anthropic(canary_ts)
+            ant_ok, ant_msg, ant_ms, ant_code = check_anthropic(canary_ts)
             if ant_ok is not None:
-                record("anthropic", ant_ok, ant_msg, ant_ms)
+                record("anthropic", ant_ok, ant_msg, ant_ms, ant_code)
                 print(f"  Anthropic: {'✅' if ant_ok else '❌'} {ant_msg}")
                 emit("CanaryAnthropicPass" if ant_ok else "CanaryAnthropicFail", 1)
                 emit("CanaryLatencyAnthropic_ms", ant_ms, "Milliseconds")
@@ -744,11 +771,25 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         counts = lane_counts(results)
         infra_failed = counts.get(LANE_INFRA, 0)
         stored_state_failed = counts.get(LANE_STORED_STATE, 0)
+        # #3830: a live round-trip that failed because the far end was
+        # transiently unavailable. Counted, printed and alarmed — deliberately
+        # NOT in `failed_deploy_health`, because a rollback cannot fix a vendor
+        # 503 and on 2026-09-15 one reverted 85 Lambdas.
+        transient_failed = counts.get(LANE_EXTERNAL_TRANSIENT, 0)
         all_ok = len(failures) == 0
         print(
             f"Canary complete: {'ALL PASS ✅' if all_ok else f'{len(failures)} FAILURES ❌'} "
-            f"(infra {infra_failed}, stored-state {stored_state_failed})"
+            f"(infra {infra_failed}, stored-state {stored_state_failed}, external-transient {transient_failed})"
         )
+        if transient_failed:
+            # Loud by design: this is the count that does NOT gate, so it has to
+            # be impossible to miss in the CI log, or it becomes a silent skip.
+            for _k, _e in sorted(results.items()):
+                if isinstance(_e, dict) and _e.get("lane") == LANE_EXTERNAL_TRANSIENT:
+                    print(
+                        f"  ⚠️  EXTERNAL TRANSIENT (not gating, #3830): {label_for(_k)} "
+                        f"[{_e.get('failure_code')}] — {_e.get('message')}"
+                    )
 
         return {
             # statusCode is the INFRA verdict: it is what the CI smoke oracle
@@ -767,6 +808,9 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                     "failed_deploy_health": infra_failed,
                     # Loud, alarmed, emailed — never gating.
                     "failed_stored_state": stored_state_failed,
+                    # #3830: same posture, different reason — the dependency on
+                    # the far end of a live round-trip was transiently down.
+                    "failed_external_transient": transient_failed,
                     "lanes": lane_summary(results),
                     "results": results,
                 }

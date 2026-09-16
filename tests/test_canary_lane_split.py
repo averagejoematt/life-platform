@@ -113,7 +113,11 @@ def _run_handler(monkeypatch, *, infra_ok=True, residue_rows=0, cleanup_ok=True)
     monkeypatch.setattr(canary, "check_dynamodb", lambda ts, p: (infra_ok, "ddb msg", 10.0))
     monkeypatch.setattr(canary, "check_s3", lambda ts, p: (True, "s3 msg", 10.0))
     monkeypatch.setattr(canary, "check_mcp", lambda ts: (True, "76 tools listed", 10.0))
-    monkeypatch.setattr(canary, "check_anthropic", lambda ts: (True, "Bedrock OK", 10.0))
+    # #3830: check_anthropic returns a FOURTH element, the botocore Error.Code, so
+    # `lane_for_result` can tell a vendor transient from a deploy-plausible break on
+    # this same check. The stub carries it too — a fixture that is not the wire is
+    # how a signature change passes its own tests and fails in production.
+    monkeypatch.setattr(canary, "check_anthropic", lambda ts: (True, "Bedrock OK", 10.0, None))
 
     extras = {
         "subscribe_cleanup": {"ok": cleanup_ok, "message": "cleanup" if cleanup_ok else "cleanup delete failed"},
