@@ -190,6 +190,15 @@ def ledger_diff_this_session(root: Path):
         porcelain = subprocess.run(["git", "status", "--porcelain", "--", LEDGER_REL], cwd=root, capture_output=True, text=True, timeout=30)
         if porcelain.returncode != 0:
             return None
+        # #3805: derive the sync-owned exclusions FIRST. If we cannot tell which lines the
+        # bot owns, we cannot tell a real row from a counter bump — and that is UNVERIFIED,
+        # not False. Ordering matters and CI caught it: in a shallow checkout there is no
+        # reachable `docs(wrap` commit, so an earlier version returned False here before the
+        # derivation was ever consulted, which is a VERDICT reached without the evidence.
+        patterns = _sync_owned_patterns(root)
+        if patterns is None:
+            return None  # the derivation is unavailable — UNVERIFIED, never a silent pass
+
         last_wrap = subprocess.run(
             ["git", "log", "--format=%H", "--grep", r"^docs(wrap", "-n", "1"], cwd=root, capture_output=True, text=True, timeout=30
         )
@@ -198,12 +207,6 @@ def ledger_diff_this_session(root: Path):
         boundary = last_wrap.stdout.strip()
         if not boundary and not porcelain.stdout.strip():
             return False  # no wrap commit in history — only the explicit line can pass
-
-        # #3805: read the DIFF TEXT, not the fact that a diff exists. A counter-only change
-        # is cosmetic and must not satisfy a claim that a row landed.
-        patterns = _sync_owned_patterns(root)
-        if patterns is None:
-            return None  # the derivation is unavailable — UNVERIFIED, never a silent pass
         chunks = []
         got = subprocess.run(["git", "diff", "HEAD", "--", LEDGER_REL], cwd=root, capture_output=True, text=True, timeout=30)
         if got.returncode == 0:

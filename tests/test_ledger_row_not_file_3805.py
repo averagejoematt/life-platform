@@ -85,12 +85,6 @@ def test_a_bare_date_restamp_is_also_cosmetic():
     assert g._substantive_ledger_lines(diff, pats) == []
 
 
-def test_an_UNAVAILABLE_derivation_is_UNVERIFIED_not_a_pass(monkeypatch):
-    """A gate whose evidence source is missing must not silently succeed."""
-    monkeypatch.setattr(g, "_sync_owned_patterns", lambda _root: None)
-    assert g.ledger_diff_this_session(ROOT) is None
-
-
 # ── box 2: the claim and the diff are anchored to the same session ───────────────────────
 def test_MUST_FAIL_a_previous_sessions_claim_cannot_be_validated_by_this_sessions_diff():
     ok, msgs = g.evaluate("**Ledger:** progress-photo capture row added\n", True, handover_is_this_session=False)
@@ -153,7 +147,7 @@ def test_the_gate_still_runs_end_to_end_on_the_real_repo():
 
 
 # ── THE SEAM: the gate must actually USE the row-level check ─────────────────────────────
-def _tmp_repo_with(tmp_path, ledger_body, extra_commit=None):
+def _tmp_repo_with(tmp_path, ledger_body, extra_commit=None, boundary=True):
     """A throwaway git repo carrying a `docs(wrap` boundary, then one ledger change."""
     import os
 
@@ -170,7 +164,7 @@ def _tmp_repo_with(tmp_path, ledger_body, extra_commit=None):
     run = lambda *a: subprocess.run(["git", *a], cwd=r, capture_output=True, text=True, env=env)  # noqa: E731
     run("init", "-q", ".")
     run("add", "-A")
-    run("commit", "-q", "-m", "docs(wrap): session boundary")
+    run("commit", "-q", "-m", "docs(wrap): session boundary" if boundary else "chore: initial, NO wrap boundary")
     if extra_commit is not None:
         (r / "docs" / "PROPORTIONALITY.md").write_text(extra_commit, encoding="utf-8")
         run("add", "-A")
@@ -179,6 +173,7 @@ def _tmp_repo_with(tmp_path, ledger_body, extra_commit=None):
 
 
 _BASE_LEDGER = "| Gate census | Load-bearing | rent | 646 declared gates with measured error bars |\n"
+_BASE_LEDGER_NO_WRAP = _BASE_LEDGER
 
 
 def test_SEAM_MUST_FAIL_ledger_diff_this_session_returns_False_on_a_counter_only_commit(tmp_path):
@@ -211,3 +206,18 @@ def test_SEAM_a_real_added_row_DOES_return_True(tmp_path):
 def test_SEAM_no_ledger_change_at_all_is_False(tmp_path):
     repo = _tmp_repo_with(tmp_path, _BASE_LEDGER)
     assert g.ledger_diff_this_session(repo) is False
+
+
+def test_an_UNAVAILABLE_derivation_is_UNVERIFIED_not_a_pass(monkeypatch, tmp_path):
+    """A gate whose evidence source is missing must not silently succeed.
+
+    Driven against a TEMP REPO WITH NO `docs(wrap` COMMIT, which is what CI actually has —
+    a shallow checkout reaches no wrap boundary. The first version of this test ran against
+    the real repo and passed locally while failing in CI with `assert False is None`,
+    because the no-boundary early return fired BEFORE the derivation was consulted. That is
+    a verdict reached without the evidence, and the ordering in the gate was the real bug;
+    this test now reproduces the condition that exposed it rather than the one that hid it.
+    """
+    repo = _tmp_repo_with(tmp_path, _BASE_LEDGER_NO_WRAP, boundary=False)
+    monkeypatch.setattr(g, "_sync_owned_patterns", lambda _root: None)
+    assert g.ledger_diff_this_session(repo) is None
