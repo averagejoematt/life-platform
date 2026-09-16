@@ -44,9 +44,9 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 432** — feedback 24 · reference 243 · security 1 · project 161 · user 1 · index 2
+**Files in the memory index snapshot: 434** — feedback 24 · reference 245 · security 1 · project 161 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 268** — homed-here 74 · already-homed 169 · superseded 7 · narrative 15 · off-repo 3
+**Rule-class files (feedback + reference + security): 270** — homed-here 75 · already-homed 169 · superseded 7 · narrative 15 · off-repo 4
 
 **Program/session files (project): 161** — already-homed 14 · superseded 1 · narrative 143 · off-repo 2 · index 1
 
@@ -257,6 +257,7 @@ reference_a_band_is_not_a_contiguous_window.md
 reference_a_behavioral_threshold_cannot_see_a_same_day_miss.md
 reference_a_byte_diff_is_not_a_visible_change.md
 reference_a_cancelled_ci_rollup_hides_real_failures.md
+reference_a_ceiling_sized_while_the_feature_was_dark.md
 reference_a_check_after_truncation_launders_the_defect.md
 reference_a_check_that_measures_nothing_returns_clean.md
 reference_a_ci_gate_that_cannot_fail.md
@@ -426,6 +427,7 @@ reference_no_tool_attribution_trailers.md
 reference_node_check_lazy_parse.md
 reference_og_card_fonts_tofu.md
 reference_one_cause_two_red_workflows.md
+reference_one_datapoint_three_consumers.md
 reference_orphan_gate_inline_writer_literal.md
 reference_package_import_breaks_sys_modules_stubs.md
 reference_partition_scoped_sweep_rots_when_partition_gains_classes.md
@@ -933,6 +935,8 @@ carries an operating rule.
 | `reference_the_doc_literal_merge_treadmill.md` | reference | `deploy/merge_train.sh` (#3104) — the batch path itself is the rule's home; `--dry-run` is a complete rehearsal that stops before every mutation and names each PR's disposition | homed-here |
 | `project_session_ae_2026_09_14.md` | project | n/a — session narrative, not a rule | narrative |
 | `project_session_af_2026_09_15.md` | project | n/a — session narrative, not a rule | narrative |
+| `reference_one_datapoint_three_consumers.md` | reference | `lambdas/operational/canary_lanes.py` — the lane registry's header states the failure-mode split and why `AccessDeniedException` is deliberately absent from `TRANSIENT_FAILURE_CODES`; the property is mutation-proved in `tests/test_canary_transient_lane_3830.py` (four directions, including the hole control) | homed-here |
+| `reference_a_ceiling_sized_while_the_feature_was_dark.md` | reference | n/a YET — its home is the `coach-ensemble-digest` timeout comment in the compute stack plus its assertions, both of which live on PR #3834 and are NOT on main: that PR is complete and blocked on a swallowed push (zero workflow runs minted on two consecutive shas). Citing a home the repo does not yet contain would be the false claim this ledger exists to refuse. Re-home this row to `homed-here` in the same commit that lands #3834 (2026-09-16) | off-repo |
 | `reference_the_first_denial_masks_the_second.md` | reference | `infra/iam/README.md` — the `KMSDecryptViaDynamoDB` entry in the Kept table states the layered-denial reason, the `kms:ViaService` scoping, and why it is a separate statement from the plain-`DescribeKey` Sid; the grant itself is pinned in `tests/test_sync_site_generator_steps_3681.py` (mutation-proved in both directions) | homed-here |
 | `reference_a_success_line_is_not_a_stored_row.md` | reference | n/a — the rule (a success line must sit after the write, or carry the write's outcome) is the acceptance criteria of open issue #3829 and has no repo home until that lands | off-repo |
 | `reference_a_private_artifact_under_a_public_prefix.md` | reference | `tests/test_public_write_prefix_registry_3741.py` (every `needs_s3_write`/`extra_s3_write` grant under an anonymously-readable prefix in `deploy/bucket_policy.json` must be declared intentional) + `tests/test_recap_card_private_3741.py` (the card's own prefix, with a must-fail control) | homed-here |

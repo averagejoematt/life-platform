@@ -211,28 +211,26 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-15 (Opus 5, **Session AF — the ~20h drain, and the second permission the first one was
-hiding**; owner brief *"141 open issues, get it as low as it honestly goes"*, standing merge+deploy authority,
-**no `--deliver`, the cron hold STAYS**, every deploy gate approved or REJECTED). **141 open -> 122: 28 closed
-(25 on evidence, 3 triage — the split is the point), 9 filed, 19 PRs merged, six CDK deploy runs, 3 lease
-tips approved / 9 ancestors rejected by name.** **#3681 is the session in miniature:** #3814's
-`dynamodb:Query` was necessary and NOT sufficient — the table's CMK means DynamoDB decrypts on the CALLER's
-behalf, and the Query denial short-circuits before KMS is consulted, so **the first denial masked the second
-and only the run after the first fix could reveal it**. Its own instrument is what made that legible
-(`theme river build FAILED — CAUSE: denied` where the old idiom printed `skipped (offline?)` and shipped
-green); after a `kms:Decrypt` scoped by `kms:ViaService`, `theme_river.json` went `empty/n_days 0` ->
-`warming_up/n_days 2/8 themes` — **the first successful theme-river live build in CI, ever**. **#3793 (Phase
-0): the coach was RIGHT** — the defect was the checker's framing, not the claim (`ContentTruthFailCount` 1.0
--> 0.0, sustained). **#3714's adherence found a real one on its first live session** (4 sets at RPE 8.0 under
-a 7.0 ceiling, scored 100% by set-count). **#3499 read 3/11 after deploying Monitoring** — the eight
-`site-api-*` alarms live in `serve_stack`, caught only because the check read AWS not the CDK tree; 11/11
-after Serve. **The guards caught me again:** the #3688 Set guard went red during its own rebase naming a 4th
-judge (#3699's, landed after that branch was cut -> #3828, registered as a residual because retrying a
-DETERMINISTIC truncation bills N times for N identical failures); I measured #3797's census at 644 and it was
-a #3315 registry-name **phantom**; and the 5-test arithmetic gap I had posted as open **does not exist**
-(proved by node-id diff, now a structural test). **Found at wrap, unlooked-for:** #3829 —
-`coach-ensemble-digest` logs *"Ensemble digest produced"* and then dies at its 90s ceiling, 3x90s billed,
-**no `CYCLE#2026-09-15` row** (the 09-13 gap is explicitly unexplained). **Owner acts left:** read
-`Auto-rollback` on run 35013357326 FIRST (smoke red on `Verify canary`; the canary is `all_pass: true` live) ·
-#3797 held, must re-stamp to 644 · whether `Bash(bash deploy/cdk_deploy.sh:*)` becomes a durable grant
-(deliberately uncommitted) · #3829.
+**Verified:** 2026-09-16 (Opus 5, **Session AF — the ~24h drain, the second permission the first one was
+hiding, and the rollback that took the fleet**; owner brief *"141 open issues, get it as low as it honestly
+goes"*, standing merge+deploy authority, **no `--deliver`, the cron hold STAYS**, every gate approved or
+REJECTED). **141 open -> 124: 30 closed (27 on evidence, 3 triage), 13 filed, 22 PRs merged, census 641 ->
+644, six CDK deploy runs, 6 leases approved / 11 rejected, none left waiting.** Read the net honestly: the
+gross is 30 and the net is 17 because five of the thirteen filings came from the last five hours, four of
+them from instruments firing rather than anyone auditing. **THE HEADLINE: an auto-rollback reverted 85
+Lambdas on a vendor 503.** The canary logged `Anthropic: ❌ Bedrock ServiceUnavailableException` with DDB,
+S3, MCP and subscribe all green — and one line above it, `Suppressed first-occurrence alert`. **One datapoint,
+three consumers, three confidences:** the alerter declined to email, the alarm fired and self-cleared in 15
+min, the deploy gate reverted the fleet. #2051 split the canary's lanes by CHECK and never by FAILURE MODE.
+Fixed by #3831 (`LANE_EXTERNAL_TRANSIENT`), deployed 01:26Z and verified in the bundle; recovered by the push
+run already at the gate (a shared-module change, so `fleet_changed` was true) rather than the `deploy_all`
+dispatch — 25 min sooner and ONE smoke gate instead of two. **#3681 earlier the same day was the same shape:
+the first denial MASKED the second** — `dynamodb:Query` was necessary and not sufficient, `kms:Decrypt` sat
+structurally invisible behind it; first successful theme-river live build in CI, ever. **Three corrections to
+my own work:** #3829's cause is a 47x STEP on 2026-08-31 (the budget tier un-paused the feature; its 90s
+ceiling had been sized while it was dark, reading as 68x headroom), not a creep; #3797's 2.1x speedup is
+really ~1.32x median (n=3 vs n=9, wrong denominator and generalising from one sample); and a mutation found a
+hole in my OWN guard (`"censor" in comment` matched the comment's own "UNCENSOR"). **Owner acts left:** #3834
+is complete and blocked on a swallowed push (recover with one more sha or a supersede-PR, NEVER a
+close/reopen) · #3830 leg 2 + box 3 · #3563's 15:10Z cron · #3835 the post-merge suite is still serial ·
+#3832 · 2026-09-13's unexplained missing ensemble row.
