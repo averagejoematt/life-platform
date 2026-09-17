@@ -140,6 +140,21 @@ GATHER = [
     # (Session AF: 11 of 40 swept, ten of them this exact shape). Advisory by design: its
     # output is a re-read list for (e7), never a closure, so a finding never fails the wrap.
     Gate("unlinked-closures", "e7", ["python3", "scripts/check_unlinked_closures.py"], marker="Backlog", ok_when=lambda rc, out: True),
+    # #3863: detector D — the FOURTH text. Detectors B and C both read pre-merge material; a
+    # squash message supplied at merge time (`--body-file`/`--subject`, or the web UI box) is
+    # seen by neither, and one retired an owner-gated issue on 2026-09-17. Wired HERE rather
+    # than left as a script, because a check that runs only when someone remembers to run it
+    # is the exact defect #3860 documents one layer down: its census was correct and invisible
+    # for ten days because nothing scheduled it. 7 days, not 30 — the wrap's question is "what
+    # did THIS session's merges close", and each audited commit costs a GitHub round trip.
+    # Advisory: a finding is a re-read for (e7), never a failed wrap.
+    Gate(
+        "merge-text-closures",
+        "e7",
+        ["python3", "scripts/check_merge_commit_closures.py", "--days", "7"],
+        marker="Backlog",
+        ok_when=lambda rc, out: True,
+    ),
 ]
 
 # ── the verify battery: gates that read the finished handover (run after writing it) ──
