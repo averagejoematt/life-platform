@@ -224,9 +224,23 @@ not added as a third comment.
 hidden: the 5 standing `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621), untouched by instruction.**
 They are the ONLY blocking hygiene findings — #3853's bot-marker class is gone, 9 → 5.
 **Alarms:** unchanged — none added, retuned or silenced.
-**CI warnings:** 6 in 2 classes, both triaged: the duration budget → **#3835, shipped tonight**, and it will
-re-measure itself on the next green main; 5× playwright named-skips → **#3640**, the reporter working as
-designed, deliberate no-action. **#3848's SBOM warning did not recur.**
+**CI warnings:** 12 in 4 classes, each triaged:
+(1) **1 smoke content-truth failure** — `coach_labs:truth`, MINE and PREDICTED. PR #3854's body forecast it in
+terms; it is now declared as the `qa-smoke-failures` alarm's machine-checkable `cause` with a stated expiry
+(the next ~17:07Z regeneration) and an explicit "if it survives a regeneration that is a NEW finding" clause.
+Deliberate no-action: the red names a real reader-facing wrong claim and suppressing it would be the wrong trade.
+(2) **5 per-test duration breaches >90s** — and they are a POPULATION, not five coincidences:
+`test_doc_facts_ops_2003` (92.8s), `test_doc_facts_ops_1957` (95.0s), `test_wiki_checkers::test_doc_facts_clean`
+(93.5s), `test_wiki_checkers::test_verified_advisory_is_warn_only` (95.9s) — **four of the five are whole-repo
+doc/wiki scanners**, plus `test_deploy_critical_lane_imports_2758` (100.1s). That is precisely the shape #3224
+and #3265 both diagnosed and SHED — *"the dominant term has twice been duplicated whole-repo scans, not test
+count"* — and it is #3731's stated remedy ("decompose, do not raise"). **Folded onto #3731 by name**, with the
+observation that a shared repo-scan cache across the doc-facts/wiki family is the obvious first cut.
+(3) **5 playwright named-skips** — #3640, the reporter working exactly as designed (this job installs no
+chromium). Deliberate no-action, as every prior session has called it.
+(4) **1 `[Reconcile derived artifacts] push to main rejected (attempt 1 of 2)`** — the reconcile bot losing a
+race and succeeding on its retry, which is the retry doing its job. No action; noted so it is not mistaken for
+a push failure.
 **Ledger:** `docs/PROPORTIONALITY.md` row 86 corrected (a cadence, not a new row); the census moved 647→648 with
 its entrant PROVEN. No new subsystem, no new rent row.
 
