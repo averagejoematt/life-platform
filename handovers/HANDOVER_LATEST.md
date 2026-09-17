@@ -220,7 +220,7 @@ re-run**; #3856's provenance step joins that workflow on its next 15:20Z fire.
 **Closures:** #3688 #3849 · DoD: `closure_sweep.py --session` re-run after fixing both findings it raised against
 #3849 — **hits=0, findings=0, blocking=none**. #3849's verdict was folded INTO its correction comment by editing,
 not added as a third comment.
-**Backlog (first half):** **119 open / 88 addressable** — measured 23:45Z two independent ways. **Residual, stated not
+**Backlog:** **119 open / 88 addressable** at 23:45Z (first half), **119 / 87 final** — each measured two independent ways. (Marker repaired 2026-09-17 by Session AI: this line read `**Backlog (first half):**`, which `tests/test_wrap_gate_lines.py` does not match, so the checked-in handover gate was RED on main and nothing reported it — the gate's own rule is that an outcome is written either way.) **Residual, stated not
 hidden: the 5 standing `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621), untouched by instruction.**
 They are the ONLY blocking hygiene findings — #3853's bot-marker class is gone, 9 → 5.
 **Alarms:** unchanged — none added, retuned or silenced.

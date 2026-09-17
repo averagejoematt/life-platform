@@ -7097,7 +7097,7 @@
       "lambdas": 105,
       "mcp_tool_modules": 30,
       "mcp_tools": 83,
-      "partitions": 106,
+      "partitions": 107,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 14,
@@ -7107,9 +7107,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 328,
+        "sites_dynamic": 330,
         "sites_resolved": 841,
-        "sites_total": 1169
+        "sites_total": 1171
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7122,7 +7122,6 @@
       "intelligence_quality",
       "journal",
       "platform_memory",
-      "recap_cards",
       "zone2_efficiency"
     ],
     "scope_cuts": [
@@ -7571,6 +7570,11 @@
     },
     "recall_embeddings": {
       "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "recap_cards": {
+      "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
     },

@@ -360,6 +360,22 @@ SOURCE_CLASS: dict[str, str] = {
     "decisions": EXPERIMENT_SCOPED,
     "rewards": EXPERIMENT_SCOPED,
     "coach_actions": EXPERIMENT_SCOPED,
+    "recap_cards": EXPERIMENT_SCOPED,  # #3860 (owner ruling 2026-09-17): the #3741 daily recap
+    # card's render/delivery log — one DATE# row per day carrying day_n, beat, grade, outcome,
+    # delivered and the rendered card's s3_key. EXPERIMENT_SCOPED because every row is day_n-scoped
+    # to ONE cycle (the live partition reads day_n 1..10 across cycle 17): a cycle-17 card says
+    # "Day 6" and is meaningless against cycle 18's day numbering, so carrying it forward would make
+    # a fresh cycle look like it has history — the exact failure the class exists to prevent.
+    # Contrast "journal_quotes" (RAW_TIMESERIES) above, which is the closest sibling and was the
+    # real argument on the other side: a quote is a frozen artifact of Matthew's own words, true
+    # forever; a recap card is a statement ABOUT a numbered day of a numbered run.
+    # THE S3 OBJECT (this issue's box 2, ruled explicitly): the card is KEPT, not deleted. The wipe
+    # tombstones (UpdateItem adds a flag) rather than deleting, so the archived row survives and
+    # still carries its s3_key — the object is REFERENCED by the archive, never orphaned, and
+    # deleting it would break exactly the cycle-N navigability tombstoning exists to preserve.
+    # There is no privacy leg to this: cards live under `recap/`, deliberately NOT `generated/`
+    # (recap_card_lambda.py:55-61, asserted in tests/test_recap_card_private_3741.py), and an
+    # unsigned GET of a live card returns 403 where generated/public_stats.json returns 200.
     # — SYSTEM_STATE: ops/infra/cache/dead (phase machinery ignores) —
     "journal_analysis": SYSTEM_STATE,  # regenerating Haiku cache (TTL 180d)
     "health_check": SYSTEM_STATE,

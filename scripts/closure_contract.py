@@ -237,6 +237,24 @@ CLOSURE_CONTRACT: tuple = (
         detector="scripts/check_pr_closing_set.py",
         finding_codes=("partial-acceptance-close", "negated-closing-keyword"),
     ),
+    Requirement(
+        id="validated-merge-text",
+        rule=(
+            "The closing set of the text that is ACTUALLY COMMITTED is validated, not only the PR body and "
+            "branch commits. Detector B's three texts are all pre-merge; `gh pr merge --squash --body-file` "
+            "(or `--subject`, or the web UI's editable squash box) supplies a fourth that no pre-merge guard "
+            "has seen. On 2026-09-17 that path retired an owner-gated issue because the custom body's note "
+            "explaining a removed closing phrase QUOTED the phrase. Two legs: guard_bash.py refuses a supplied "
+            "message on the sanctioned path, and detector D compares the merge commit's closing set against "
+            "the PR BODY plus GitHub's computed set — deliberately NOT the branch commits, since a commit-only "
+            "ref disagreeing with the body is the exact warn that was reasoned past. Each finding carries its "
+            "MEASURED effect (did this commit actually retire that issue), so a keyword written at an "
+            "already-closed issue is visibly not the same event as a live retirement."
+        ),
+        detector="scripts/check_merge_commit_closures.py",
+        finding_codes=("unvalidated-merge-closure",),
+        also_detected_by=("scripts/hooks/guard_bash.py",),
+    ),
 )
 
 ALL_FINDING_CODES: frozenset = frozenset(code for r in CLOSURE_CONTRACT for code in r.finding_codes)

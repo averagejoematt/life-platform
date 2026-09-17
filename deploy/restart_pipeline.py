@@ -126,7 +126,10 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))  # #2612: importable when loaded b
 # prereg_voids: the #1199/#1978 grade-or-void ledger, shared with reconcile_prereg_voids.py.
 # restart_hooks: the #1092 post-verify hook sequence, split out at #2612 (this module
 # sits against the 1200-line ceiling); re-exported so the public entrypoint never moved.
-from experiment import config_anchor_registry, phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
+from experiment import (
+    config_anchor_registry,
+    prereg_voids,
+)  # noqa: E402  (#3860: phase_taxonomy is no longer imported here — the census that used it moved to experiment.pk_census)
 from restart_cadence import (
     MIN_CYCLE_DAYS,  # noqa: E402  (#3601 — extracted, #1665)
     preflight as cadence_preflight,  # noqa: E402
@@ -204,95 +207,24 @@ def snapshot_outgoing_genesis() -> str:
 # experiment-scoped top-level family (the next COACH#-like tier) would silently
 # survive every reset, the exact divergence class ADR-077 was written to kill.
 #
-# This preflight closes it: at reset time it scans the LIVE table (pk+sk only),
-# reduces to distinct pk families, and runs phase_taxonomy.classify() on a
-# representative of each. Any family classify() cannot resolve FAILS the reset —
-# a new unknown top-level family becomes fail-loud instead of silently surviving.
-# ADR-103: extends the existing load-bearing reset tooling with zero standing cost
-# (no new infra; one paginated scan that runs ONLY when a reset runs — the table
-# is ~32k items / 46 MB, pennies).
-
-
-class CensusPreflightError(RuntimeError):
-    """A live pk family that phase_taxonomy.classify() cannot resolve (or an empty
-    scan that cannot certify totality). Raised to FAIL the reset before any step."""
-
-
-def _pk_family(pk: str) -> str:
-    """The family key at the granularity classify() itself decides at.
-
-    Mirrors classify()'s keying WITHOUT importing its private helper (#1233 is
-    concurrently editing phase_taxonomy.py): a USER#…#SOURCE#<source> pk folds to
-    its base <source> (the part before the first '#' after the marker — sub-keys
-    like email_log#<type> or training_notes#EXERCISE#<id> collapse to the base);
-    every other pk folds to its top-level prefix (segment before the first '#').
-    So a NEW source OR a NEW top-level family (the next COACH#-like tier) each
-    surface as a distinct family whose representative classify() must resolve.
-    """
-    marker = "#SOURCE#"
-    idx = pk.find(marker)
-    if idx != -1:
-        base = pk[idx + len(marker) :].split("#", 1)[0]
-        return f"SOURCE#{base}"
-    return pk.split("#", 1)[0]
-
-
-def scan_pk_sk_pages(table):
-    """Yield each page of a FULL-table scan projecting ONLY pk + sk. Paginated and
-    kept a generator so a unit test can feed synthetic pages with no AWS. The
-    projection keeps the scan cheap (two string attributes per item)."""
-    kwargs = {"ProjectionExpression": "pk, sk"}
-    while True:
-        resp = table.scan(**kwargs)
-        yield resp.get("Items", [])
-        lek = resp.get("LastEvaluatedKey")
-        if not lek:
-            break
-        kwargs["ExclusiveStartKey"] = lek
-
-
-def census_families(pages) -> dict:
-    """Reduce scanned (pk, sk) items to distinct pk families → one representative
-    (pk, sk) each (first seen wins). `pages` is an iterable of item-lists (the
-    scan_pk_sk_pages generator, or synthetic pages in a test)."""
-    reps: dict = {}
-    for page in pages:
-        for item in page:
-            fam = _pk_family(item.get("pk", ""))
-            reps.setdefault(fam, (item.get("pk", ""), item.get("sk", "")))
-    return reps
-
-
-def run_census_preflight(table=None) -> int:
-    """Scan the live table, reduce to distinct pk families, and classify() a
-    representative of each. Raise CensusPreflightError on ANY family classify()
-    cannot resolve — or on an EMPTY census (the vacuous-scan trap: a scan that
-    silently returns nothing must NOT be certified as 'all families covered').
-    Returns the number of families verified. READ-ONLY (never writes)."""
-    if table is None:
-        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
-    reps = census_families(scan_pk_sk_pages(table))
-    if not reps:
-        raise CensusPreflightError(
-            "restart_pipeline census preflight: the pk+sk scan returned ZERO pk families. "
-            "Refusing to certify taxonomy totality on an empty census (the vacuous-scan trap) — "
-            "the scan must actually classify live families, not silently pass an empty set."
-        )
-    unresolved: list[tuple[str, str, str, str]] = []
-    for fam, (pk, sk) in sorted(reps.items()):
-        try:
-            taxonomy.classify(pk, sk)
-        except KeyError as e:
-            unresolved.append((fam, pk, sk, str(e)))
-    if unresolved:
-        detail = "\n".join(f"    family={f!r}  rep_pk={p!r}  sk={s!r}  ::  {msg}" for f, p, s, msg in unresolved)
-        raise CensusPreflightError(
-            f"restart_pipeline census preflight: {len(unresolved)} live pk family/families are "
-            "UNCLASSIFIED by phase_taxonomy — a reset would let them silently survive (ADR-077 "
-            "totality violation). Add each to phase_taxonomy (SOURCE_CLASS or _PK_RULES) AND the "
-            "wipe's PARTITIONS/coverage before re-running:\n" + detail
-        )
-    return len(reps)
+# #3860 MOVED THE IMPLEMENTATION to lambdas/experiment/pk_census.py and left this
+# step delegating to it. The reason is the defect that issue reports: this file is
+# a deploy/ script and is never staged into the Lambda bundle, so the census could
+# only ever run when an operator typed a reset command — and SOURCE#recap_cards
+# went unclassified for ten days because the only instrument that could see it was
+# the one nobody had run. The nightly qa_smoke check now shares this exact
+# derivation (pk_census.unresolved_families), so the two can never disagree about
+# what is classified; only their VERDICTS differ (abort here, WARN nightly).
+#
+# Re-exported below so this module's public surface never moved: the #1234 tests
+# and every caller still reach run_census_preflight / CensusPreflightError here.
+from experiment.pk_census import (  # noqa: E402,F401
+    CensusPreflightError,
+    census_families,
+    pk_family as _pk_family,
+    run_census_preflight,
+    scan_pk_sk_pages,
+)
 
 
 def read_cycle_from_ssm() -> int | None:
