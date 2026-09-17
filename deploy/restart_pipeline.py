@@ -127,6 +127,10 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))  # #2612: importable when loaded b
 # restart_hooks: the #1092 post-verify hook sequence, split out at #2612 (this module
 # sits against the 1200-line ceiling); re-exported so the public entrypoint never moved.
 from experiment import config_anchor_registry, phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
+from restart_cadence import (
+    MIN_CYCLE_DAYS,  # noqa: E402  (#3601 — extracted, #1665)
+    preflight as cadence_preflight,  # noqa: E402
+)
 from restart_hooks import build_post_verify_hooks  # noqa: E402,F401
 from restart_work_contract import work_contract_rc  # noqa: E402 — #3598: per-step work contract (input>0 ∧ acted==0, unnamed → red)
 
@@ -796,6 +800,20 @@ def main():
         "any nonzero rc ABORTS the pipeline — a silent partial reset is worse than a loud stop)",
     )
     parser.add_argument(
+        "--reanchor-of",
+        metavar="YYYY-MM-DD",
+        help=(
+            "#3601: override the %dd minimum cycle length by NAMING the genesis this reset supersedes. "
+            "Required for any --apply inside the window. Deliberately not a bare --force: a mistyped "
+            "date cannot satisfy it." % MIN_CYCLE_DAYS
+        ),
+    )
+    parser.add_argument(
+        "--skip-cadence-preflight",
+        action="store_true",
+        help="#3601: bypass the minimum-cycle-length refusal entirely (escape hatch; prefer --reanchor-of)",
+    )
+    parser.add_argument(
         "--no-close-cycle",
         action="store_true",
         help="Skip the cycle bookkeeping (CYCLE_GENESES append, SSM cycle bump, RESET_LOG line). Default: ON.",
@@ -880,6 +898,16 @@ def main():
     print(f"║ close-cycle bookkeeping: {'ON' if close_cycle else 'off'}")
     print(f"║ mode: {'APPLY' if args.apply else 'DRY-RUN'}")
     print("╚══════════════════════╝")
+
+    # Step 0a (#3601): the MINIMUM CYCLE LENGTH refusal. Steps 0 and 0b ask whether the
+    # reset is COMPLETE; this one asks whether it should happen at all — owner ruling
+    # 2026-09-05 (#3606 ruling 1), a 30-day minimum overridable only by naming the genesis
+    # being superseded. RUNS FIRST, and the ordering is load-bearing: at [0c] in this
+    # change's first cut it never executed, because Step 0 aborted on an unclassified
+    # partition. The body lives in restart_cadence (#1665 — extraction, never a raise).
+    _rc = cadence_preflight(target, old_genesis, args.reanchor_of, apply=args.apply, skip=args.skip_cadence_preflight)
+    if _rc is not None:
+        sys.exit(_rc)
 
     # Step 0 (#1234): pk-family census PREFLIGHT — the ADR-077 totality guard.
     # Runs FIRST, in dry-run AND apply (a read-only scan), before anything is
