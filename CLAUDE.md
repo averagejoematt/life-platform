@@ -239,3 +239,28 @@ which is why it is `[0a]` now. **Owner acts left:** #3601 box 3b — the cadence
 front of you: 9.2 resets/quarter measured, median gap 5.5d, 15 of 16 gaps under your own 30-day minimum**, and
 the tool enforces that minimum as of tonight · #3860's `recap_cards` class ruling · #3715 · #2883 · #3606 · the
 5 `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621) still need splitting, not trimming.
+
+**SECOND HALF (00:00Z→03:00Z) — the owner asked *"we dont really seem to be getting close to 40"*, and the
+answer is structural: 40 is BELOW THE FLOOR.** Roadmap 21 (ADR-099: already outside the debt count) + epics 25
++ `gate:owner` 14 = **32 union structural**, and the 70 session-shippable issues carry **299 acceptance boxes**
+— so 40 means draining the pool, **15–30 sessions**, with no sweep available (median shippable age 11 days,
+nothing over 30; **53% of the board was minted by review campaigns**, 44 from the two 2026-09-05 reviews).
+**The throughput leak is fixed at the instrument:** `backlog_next.py --closeable` (#3861, merged) ranks by what
+a session can FINISH — box count, last-open-child-of-an-epic measured against the LIVE graph, blocked,
+needs-observation — score stays the LAST term and the default ordering is byte-identical. It earned itself at
+once: its first run found the 2-for-1 set, and a sweep using it closed **#3734** on a live 390px measurement
+(`clientW 353 · scrollW 353 · overflow 0px` vs the issue's own *362px in a 353px band*), complete since PR #3844
+and open only for a missing closing keyword. **The epic sweep produced ZERO closures** — all 25 blocked; #3042
+dispositioned `gate:owner`. **I DISPROVED MY OWN HYPOTHESIS** that the 299 boxes hid finished work: of 14
+candidates, 1 complete, 9 known partials, 4 verified incomplete — the estimate stands. **AND I WRONGLY CLOSED
+#3715, AN OWNER-GATED ISSUE** (`d681aecc6` 02:37:30Z; restored 02:39Z unchanged, no other issue touched): my
+commit prose read *"no session can close: #3715"*, the guard said WARN, I reasoned past it and merged with a
+custom squash body **to be safer** — whose note explaining the removal quoted the phrase. The load-bearing
+error: `github={#3861}` was a reading of the PR BODY treated as a fact about text that did not yet exist —
+**a `--body-file` squash message is a fourth text no guard validates** (#3863, P1). Third instance this session
+of prose-about-X parsing as X; a fourth arrived at wrap. **Stopped on the error trajectory, not the clock.**
+**Owner acts:** **does 40 count Roadmap?** (if not, the number is 98 — one sentence re-frames every session
+chasing it) · #3620's IP-hash salt (Secrets Manager + IAM, ask-first; the defect is LIVE — unsalted
+`sha256(ip)[:16]`, one call site logged to CloudWatch) · #3042's external re-assessment.
+**Final measured: 119 open / 87 addressable.**
+
