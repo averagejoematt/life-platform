@@ -86,9 +86,17 @@ def test_every_finding_code_a_detector_can_emit_is_registered():
     """Guard the SET: the codes the detectors' source strings emit ⊆ the registry's codes."""
     import re
 
+    # #3863: the file list is DERIVED from the registry's own `detector` fields, not hand-typed.
+    # It used to name three scripts; detector D was registered and this leg passed over it,
+    # because an enumeration written beside the registry is a member of the Set it enumerates
+    # and drifts the moment the registry grows. `also_detected_by` is excluded deliberately —
+    # guard_bash.py reports through the hook layer's `emit()`, not `Finding(...)`.
+    scripts = sorted({ROOT / r.detector for r in cc.CLOSURE_CONTRACT if r.detector.endswith(".py")})
+    assert len(scripts) >= 4, f"only {len(scripts)} detector scripts derived — the registry or this derivation is broken"
     emitted = set()
-    for script in (SCRIPTS / "closure_sweep.py", SCRIPTS / "check_pr_closing_set.py", SCRIPTS / "check_unlinked_closures.py"):
-        emitted |= set(re.findall(r"Finding\(\s*\"([a-z][a-z-]+)\"", script.read_text(encoding="utf-8")))
+    for script in scripts:
+        # Both call idioms: positional `Finding("code"` and keyword `Finding(code="code"`.
+        emitted |= set(re.findall(r"Finding\(\s*(?:code=)?\"([a-z][a-z-]+)\"", script.read_text(encoding="utf-8")))
     assert emitted, "extractor found nothing — the Finding(...) idiom moved; fix the extractor, not the assertion"
     assert emitted <= cc.ALL_FINDING_CODES, f"unregistered finding code(s): {sorted(emitted - cc.ALL_FINDING_CODES)}"
     assert cc.ALL_FINDING_CODES <= emitted, f"registered but never emitted: {sorted(cc.ALL_FINDING_CODES - emitted)}"
