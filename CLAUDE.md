@@ -254,7 +254,7 @@ and open only for a missing closing keyword. **The epic sweep produced ZERO clos
 dispositioned `gate:owner`. **I DISPROVED MY OWN HYPOTHESIS** that the 299 boxes hid finished work: of 14
 candidates, 1 complete, 9 known partials, 4 verified incomplete — the estimate stands. **AND I WRONGLY CLOSED
 #3715, AN OWNER-GATED ISSUE** (`d681aecc6` 02:37:30Z; restored 02:39Z unchanged, no other issue touched): my
-commit prose read *"no session can close: #3715"*, the guard said WARN, I reasoned past it and merged with a
+commit prose read *"no session can close: 3715"*, the guard said WARN, I reasoned past it and merged with a
 custom squash body **to be safer** — whose note explaining the removal quoted the phrase. The load-bearing
 error: `github={#3861}` was a reading of the PR BODY treated as a fact about text that did not yet exist —
 **a `--body-file` squash message is a fourth text no guard validates** (#3863, P1). Third instance this session

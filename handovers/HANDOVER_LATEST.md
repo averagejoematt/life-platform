@@ -301,12 +301,12 @@ Labelled `gate:owner` with the reasoning rather than closed on two of three clau
 **8 epics are one child away**, but only **4** are real 2-for-1s — I first said 7 and had missed the Roadmap
 filter in the pairing step. #3614 #3618 #3616 #3620.
 
-### I WRONGLY CLOSED #3715, AN OWNER-GATED ISSUE
+### I WRONGLY CLOSED 3715, AN OWNER-GATED ISSUE
 
 `d681aecc6` closed it at 02:37:30Z. Restored to OPEN at 02:39Z, unchanged; no other issue affected (checked
 eight by name).
 
-1. PR #3862's commit prose read *"...no session can **close: #3715**..."*.
+1. PR #3862's commit prose read *"...no session can **close: 3715**..."*.
 2. The pre-merge guard flagged `commits={#3715}` and reported `github={#3861}` — **warn, not blocking**.
 3. I read that as "GitHub does not parse the colon form" and merged with a custom squash body **to be safer**.
 4. **In the note explaining I had removed the phrase, I quoted the phrase.**
@@ -358,7 +358,7 @@ Secrets Manager salt + IAM grant. Both issues are epics wearing story scores.
 ### Why this session stopped here
 
 Three of the last four estimates were wrong in the same optimistic direction and corrected only by measuring,
-and the #3715 close came from reasoning past a warning at hour five and a half. That is a fatigue signature,
+and the 3715 close came from reasoning past a warning at hour five and a half. That is a fatigue signature,
 not a knowledge gap. Stopping on it rather than through it.
 
 ## Owner acts (a session cannot clear these)
