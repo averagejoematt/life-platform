@@ -161,6 +161,13 @@ PARTITIONS = [
     # (SOURCE#notion is RAW_TIMESERIES — his words are kept forever; only the forecast
     # bookkeeping resets).
     ("diary_claims", "pregenesis", {}),
+    # #3860: the #3741 daily recap card's render/delivery log, sk DATE#<date>. "pregenesis" like
+    # every other DATE#-keyed derived artifact — post-genesis cards accumulate from Day 1, and the
+    # closing cycle's cards are tombstoned + cycle-stamped so cycle N stays navigable in the
+    # archive. Tombstoned, NOT deleted, which is also the ruling on the rendered PNG: the archived
+    # row keeps its s3_key, so the `recap/` object stays referenced rather than orphaned and is
+    # deliberately left in place (see the class comment in phase_taxonomy.SOURCE_CLASS).
+    ("recap_cards", "pregenesis", {}),
 ]
 
 # Full-pk entries OUTSIDE the USER#matthew#SOURCE# namespace. The original tagger

@@ -946,6 +946,52 @@ def _blog_links_retired():
     return [Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(msg)]
 
 
+def check_pk_family_census():
+    """#3860: every live pk family must classify() under phase_taxonomy — checked NIGHTLY,
+    not only when someone types a reset.
+
+    THE DEFECT THIS EXISTS FOR, stated because it is the whole justification: the ADR-077
+    totality guard was real and correct, but it ran in exactly one place —
+    `deploy/restart_pipeline.py` Step [0]. `USER#matthew#SOURCE#recap_cards` was created
+    2026-09-06 and stayed unclassified for TEN DAYS with nothing reporting it; it surfaced
+    only when a reset was attempted on 2026-09-16 and aborted (exit 4). An unclassified
+    family is a latent reset-blocker AND a latent silent-survivor, and the operator met it
+    as the first error of an operation they needed to succeed.
+
+    SAME DERIVATION AS THE RESET GATE, different verdict. This calls
+    `experiment.pk_census.unresolved_families()` — the identical function
+    `run_census_preflight()` raises from — so the nightly and the reset can never disagree
+    about what is classified. The reset ABORTS; this WARNs, because an unclassified family
+    does not break anything serving today, it blocks the next reset.
+
+    The empty-census (vacuous-scan) case deliberately does NOT pass: a scan returning zero
+    families raises, and lands in the errored branch below. A nightly check that reports
+    "all clear" on a broken scan is worse than no check at all.
+
+    Read-only: one paginated pk+sk Scan. Measured 2026-09-17 at 44,397 items / 65 MB =>
+    ~7,982 eventually-consistent RRU => ~$0.001/run, ~$0.03/month nightly."""
+    from experiment.pk_census import format_unresolved, unresolved_families
+
+    c = Check("data:pk_family_census", "Taxonomy Totality", CONTENT_TRUTH)
+    try:
+        unresolved, family_count = unresolved_families(table)
+    except Exception as e:
+        return [c.warn(f"pk-family census errored (no totality verdict was reached): {e}")]
+
+    if unresolved:
+        names = ", ".join(f for f, _p, _s, _m in unresolved[:5])
+        more = f" (+{len(unresolved) - 5} more)" if len(unresolved) > 5 else ""
+        return [
+            c.warn(
+                f"{len(unresolved)} of {family_count} live pk family/families are UNCLASSIFIED by "
+                f"phase_taxonomy ({names}{more}) — the next experiment reset will ABORT at Step [0] "
+                "until each is added to SOURCE_CLASS or _PK_RULES AND to the wipe's PARTITIONS. "
+                "Detail:\n" + format_unresolved(unresolved)
+            )
+        ]
+    return [c.ok(f"all {family_count} live pk families classify under phase_taxonomy (ADR-077 totality holds).")]
+
+
 def check_steps():
     """The sweep's ordered run list: ``(label, zero-arg callable)`` pairs.
 
@@ -1001,6 +1047,8 @@ def check_steps():
         ("canary_precision", check_canary_precision),  # #1956: AI-canary grounded false-positive-rate (sensor on the sensor)
         ("edge_429_enforcement", qa_check_edge_429.checks),  # #2828: nightly real-edge 429 observation (the 08-14 class)
         ("phase_stamp_coverage", check_coach_ensemble_phase_stamp_coverage),  # #1970: tagger-blind COACH#/ENSEMBLE# gap
+        # #3860: an unclassified pk family blocks the NEXT reset — report it the day it appears, not at reset time
+        ("pk_family_census", check_pk_family_census),
         ("recall_freshness", lambda: recall_freshness_qa.checks(table, f"{USER_PREFIX}chronicle", Check, CONTENT_TRUTH)),  # #1384
         # #2367: sk is identity, `date` is display — mismatch legal only with the carry-forward marker
         ("chronicle_sk_invariant", lambda: check_chronicle_sk_date_invariant(table, Check, CONTENT_TRUTH)),

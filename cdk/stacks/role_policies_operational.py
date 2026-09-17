@@ -581,7 +581,14 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             # predict widget escalates WARN -> FAIL across nightly runs. The write
             # is fail-soft in the lambda (degrades to the single-day WARN without
             # the grant), but the >=2-day escalation only works once this deploys.
-            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            # #3860: + Scan — check_pk_family_census() runs the ADR-077 totality census
+            # nightly (experiment.pk_census), which is a full pk+sk table scan by nature:
+            # its whole job is to enumerate EVERY live pk family, so there is no key
+            # condition that could express it. Without this grant the scan
+            # AccessDenied's into the check's errored branch and the nightly reports
+            # "census errored" forever — a check that cannot pass, which is the #3563
+            # swallowed-denial class this platform has already paid for once.
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:Scan"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(

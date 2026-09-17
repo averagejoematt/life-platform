@@ -1292,6 +1292,39 @@ QA_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-05",
     },
+    "qa::lambdas/operational/qa_smoke_lambda.py::check_pk_family_census": {
+        "gate_name": "check_pk_family_census",
+        "command": (
+            "cd lambdas && S3_BUCKET=... TABLE_NAME=... EMAIL_RECIPIENT=... python3 -c "
+            '"from operational import qa_smoke_lambda as q; q.table = FakeScanTable(pages); '
+            'print(q.check_pk_family_census())"'
+        ),
+        "mutation": (
+            "THREE arms against a paginated fake table, so the detect leg and the cannot-observe leg "
+            "are both watched (the #3112 two-half bar): (A) two classified families as the NEGATIVE "
+            "control; (B) the same two PLUS a planted USER#matthew#SOURCE#__planted_unclassified__ row "
+            "— the exact shape of the #3860 defect, a live partition phase_taxonomy cannot classify; "
+            "(C) a scan returning zero items, the vacuous-scan trap."
+        ),
+        "observed": (
+            "ARMED 2026-09-17. (A) passed=True, 'all 2 live pk families classify under phase_taxonomy'. "
+            "(B) passed=None (WARN) naming the planted family BY NAME — '1 of 3 live pk family/families "
+            "are UNCLASSIFIED ... family='SOURCE#__planted_unclassified__'' plus the classifier's own "
+            "remediation line. (C) passed=None (WARN) 'the pk+sk scan returned ZERO pk families. Refusing "
+            "to certify taxonomy totality on an empty census' — it does NOT fall through to the OK line. "
+            "Also run once against the LIVE table: passed=True, 'all 100 live pk families classify'."
+        ),
+        "scope": (
+            "Shares ONE derivation with the reset-time gate (experiment.pk_census.unresolved_families), so "
+            "the nightly and restart_pipeline Step [0] cannot disagree about what is classified — asserted "
+            "structurally in tests/test_pk_census_one_home_3860.py, which reds by name on a real-tree "
+            "mutation that makes the check re-implement the loop instead of delegating. What the green does "
+            "NOT cover: it needs dynamodb:Scan on the qa-smoke role (granted #3860, role_policies_operational "
+            "sid=DynamoDB) — without it the scan AccessDenies into the errored branch, which WARNs rather "
+            "than passing, but WARNs about the instrument rather than about the taxonomy."
+        ),
+        "proved_on": "2026-09-17",
+    },
 }
 
 
