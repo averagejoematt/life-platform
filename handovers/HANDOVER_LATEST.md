@@ -1,4 +1,4 @@
-# Handover — Session AH: five instruments shipped, and the night's real lesson was a text match (2026-09-16 21:10Z → 2026-09-17 ~00:00Z)
+# Handover — Session AH: five instruments, one shape four times, and an owner-gated issue I closed by writing about closing it (2026-09-16 21:10Z → 2026-09-17 ~03:00Z)
 
 **Driver:** Opus 5 (1M), autonomous overnight. Owner brief: ship the ranked Now lane, standing merge+deploy
 authority, **no `--deliver`**, the recap cron hold STAYS, close only on demonstrated evidence, every deploy
@@ -220,7 +220,7 @@ re-run**; #3856's provenance step joins that workflow on its next 15:20Z fire.
 **Closures:** #3688 #3849 · DoD: `closure_sweep.py --session` re-run after fixing both findings it raised against
 #3849 — **hits=0, findings=0, blocking=none**. #3849's verdict was folded INTO its correction comment by editing,
 not added as a third comment.
-**Backlog:** **119 open / 88 addressable** — measured 23:45Z two independent ways. **Residual, stated not
+**Backlog (first half):** **119 open / 88 addressable** — measured 23:45Z two independent ways. **Residual, stated not
 hidden: the 5 standing `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621), untouched by instruction.**
 They are the ONLY blocking hygiene findings — #3853's bot-marker class is gone, 9 → 5.
 **Alarms:** unchanged — none added, retuned or silenced.
@@ -245,10 +245,119 @@ its entrant PROVEN. No new subsystem, no new rent row.
 - **The four text-match catches belong in one place.** `not-work — the lesson is written into each guard's own
   docstring and into the memory system; no issue.`
 
+
+---
+
+## SECOND HALF (00:00Z → 03:00Z) — the owner asked why we are not near 40, and the answer changed the work
+
+**The owner's question:** *"we dont really seem to be getting close to 40 open issues."* Correct, and the
+reason is structural rather than effort.
+
+### 40 is below the floor, measured
+
+| | count |
+|---|---|
+| Roadmap (parked vision — ADR-099 says **outside the debt count**) | 21 |
+| `type:epic` (close only when children do) | 25 |
+| `gate:owner` | 14 |
+| **union structural** | **32** |
+| **session-shippable** | **70**, carrying **299 acceptance boxes** |
+
+**Closing every shippable issue still leaves ~32-50.** 40 is reachable only by draining the whole pool:
+299 boxes at 10-20/session is **15-30 sessions**. There is no sweep that shortcuts it — median shippable age
+is **11 days**, nothing over 30. The board is *minted* faster than it is retired: **53% came from review
+campaigns**, 44 from the two 2026-09-05 reviews alone.
+
+### The throughput leak, and the fix (#3861, merged)
+
+Session AH's own first half is the specimen: **6 PRs merged, ~10 boxes satisfied across FOUR issues, none of
+them closed.** Both closures came from issues that happened to have one box left — luck.
+
+`backlog_next.py --closeable` now ranks by what a session can FINISH. Four derived inputs: box count,
+last-open-child-of-an-epic (live graph, never stored), blocked, needs-observation. **Score is the LAST term**,
+so it still breaks ties, and the default ordering is byte-identical (asserted both ways). It earned itself
+immediately — its first run found the 2-for-1 set, and a sweep using it closed #3734.
+
+### The epic sweep produced ZERO closures
+
+All 25 epics blocked: 24 by open children, and **#3042 — the only one with a clear child set — is
+owner-gated** (its Outcome needs an external re-assessment plus the restore drill and clinician review).
+Labelled `gate:owner` with the reasoning rather than closed on two of three clauses.
+
+**8 epics are one child away**, but only **4** are real 2-for-1s — I first said 7 and had missed the Roadmap
+filter in the pairing step. #3614 #3618 #3616 #3620.
+
+### I WRONGLY CLOSED #3715, AN OWNER-GATED ISSUE
+
+`d681aecc6` closed it at 02:37:30Z. Restored to OPEN at 02:39Z, unchanged; no other issue affected (checked
+eight by name).
+
+1. PR #3862's commit prose read *"...no session can **close: #3715**..."*.
+2. The pre-merge guard flagged `commits={#3715}` and reported `github={#3861}` — **warn, not blocking**.
+3. I read that as "GitHub does not parse the colon form" and merged with a custom squash body **to be safer**.
+4. **In the note explaining I had removed the phrase, I quoted the phrase.**
+
+**The load-bearing error is not the quote.** `github={#3861}` was a reading of *the PR body*, and I treated it
+as a fact about text that did not yet exist. `check_pr_closing_set` validates the PR body, the branch commits
+and GitHub's computed set — **all pre-merge**. `gh pr merge --squash --body-file` supplies a **fourth text no
+guard has ever seen**, and reaching for the bespoke path to avoid a hazard is exactly what left the coverage.
+Filed **#3863** (P1). Memory: `reference_the_squash_message_is_a_fourth_text`.
+
+**That is the THIRD instance tonight of prose-about-X parsing as X** — after #3785's `_built_at` on a comment
+line and #3835's pipe count reading its own explanation. A fourth arrived at wrap: the word "reopened" in a
+closing comment tripped `post-close-assertion`. Fixed by editing, not by a second comment.
+
+### The box-reconciliation sweep — and it disproved my own hypothesis
+
+I had told the owner the 299-box figure was probably inflated by secretly-finished work. **It is not.**
+
+```
+70 shippable scanned · 25 have any file naming them · 14 have a test NAMED for them
+  1 complete and wrongly open  -> #3734 CLOSED on live proof
+  9 known partials             -> correctly open
+  4 verified incomplete        -> #3608 #3609 #3563 #2978
+```
+
+**#3734 closed on a live measurement**: `/data/vitals/` at a 390px viewport, `clientW 353 · scrollW 353 ·
+child overflow 0px`, against the issue's own repro of *362px of text in a 353px band*. Complete since PR
+#3844; the merge subject named it with no closing keyword — the `close-the-shipped` shape.
+
+**#3563 is the best remaining pick and is ONE GRANT away.** Verified live: `ChronicleEmailSenderRole` has
+`PutItem` LeadingKeys-scoped to its own partition, and `/api/status` now reads **green, 5d ago** (the issue
+reproduces it RED, 44d). But the freshness checker's allowlist is still `["apple_health"]` only — so the
+title's second clause, *"the Notion dedup has NEVER worked"*, **is still true today**, and box 4's remaining
+clauses are unreachable by construction. Box 1 left explicitly **unresolved**: a test carrying an issue's
+number is not evidence it asserts that issue's criterion.
+
+**Scoping corrections recorded:** #3614 is **2 of 4 boxes already done** (the sealed adversarial corpus
+exists, 24 tests green) and its box 3 is a 32-call-site audit — I stopped rather than commit 32 declarations
+from a `fail_mode` deriver I had just disproved against `_run_coach_v2_pipeline`. #3620's box 5 is a
+**confirmed live privacy defect** (unsalted `sha256(ip)[:16]` at both call sites, one of them written to
+CloudWatch) — safe to fix, since both are TTL'd rate-limiter keys, but it needs an owner decision on a
+Secrets Manager salt + IAM grant. Both issues are epics wearing story scores.
+
+### Second-half ledger
+
+**Closed:** #3861 (the ranker), #3734 (live proof). **Filed:** #3861, #3863. **Restored to open:** #3715.
+**Merged:** PR #3862. **Final measured: 119 open / 87 addressable.**
+
+### Why this session stopped here
+
+Three of the last four estimates were wrong in the same optimistic direction and corrected only by measuring,
+and the #3715 close came from reasoning past a warning at hour five and a half. That is a fatigue signature,
+not a knowledge gap. Stopping on it rather than through it.
+
 ## Owner acts (a session cannot clear these)
 
 - **#3715** — confirm the drafted constraint list so `TRAINING_CONTEXT.md` stops reading `UNCONFIRMED`. The
-  implementation is merged and green; this is the only thing left.
+  implementation is merged and green; this is the only thing left. **NB: I closed this by accident at
+  02:37Z and restored it at 02:39Z. Nothing about it changed.**
+- **Does 40 count Roadmap?** ADR-099 already says Roadmap is outside the debt count. If it does not count, the
+  number today is **98**, not 119, and the target is far closer than the headline reads. One sentence from you
+  re-frames every session that chases it.
+- **#3620's IP-hash salt** — creating `life-platform/ip-hash-salt` + the `GetSecretValue` grant are AWS writes
+  and are ask-first. An in-repo constant is worse than useless; the repo is public.
+- **#3042** — the external re-assessment, the timed restore drill, the full clinician review.
 - **#3601 box 3b** — rule on reset cadence and record it in `DECISIONS.md`. **The number is now in front of
   you: 9.2/quarter measured, median gap 5.5d, 15 of 16 gaps under your own 30-day minimum.** The tool enforces
   the minimum as of tonight; the ADR amendment is yours.
