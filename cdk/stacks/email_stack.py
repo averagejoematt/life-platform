@@ -490,16 +490,36 @@ class EmailStack(Stack):
             "ChronicleDeliveryHeartbeat",
             alarm_name="chronicle-delivery-heartbeat",
             alarm_description=(
-                "#2820: no Wednesday chronicle delivery (ChronicleSent Sum < 1, no sanctioned "
-                "budget-pause datapoint) for 7 consecutive days — the subscriber promise was "
-                "silently missed. Check wednesday-chronicle generation, the unapproved-draft "
-                "queue (chronicle-approve), and chronicle-email-sender logs."
+                "#2820: no Wednesday chronicle delivery for 7 consecutive days — the subscriber "
+                "promise was silently missed. #3865: evaluates ChronicleSent + ChroniclePaused, "
+                "because the sanctioned budget pause used to be a `1` on ChronicleSent itself and "
+                "a real send to a SINGLE subscriber is also 1 — so a week of budget pauses read "
+                "here exactly like a week of successful delivery. The alarm's MEANING is "
+                "unchanged (a sanctioned pause still keeps it quiet); the two states are now "
+                "separable by anything that reads the metrics. Check wednesday-chronicle "
+                "generation, the unapproved-draft queue (chronicle-approve), and "
+                "chronicle-email-sender logs."
             ),
-            metric=cloudwatch.Metric(
-                namespace="LifePlatform/Email",
-                metric_name="ChronicleSent",
+            # #3865: SUM of the two, deliberately — NOT `ChronicleSent` alone. Dropping the
+            # pause term would page on every sanctioned budget pause (the #2490 emit-and-skip
+            # contract), and folding it back into ChronicleSent is the collision this fixes.
+            metric=cloudwatch.MathExpression(
+                expression="FILL(delivered, 0) + FILL(paused, 0)",
+                using_metrics={
+                    "delivered": cloudwatch.Metric(
+                        namespace="LifePlatform/Email",
+                        metric_name="ChronicleSent",
+                        period=Duration.seconds(86400),
+                        statistic="Sum",
+                    ),
+                    "paused": cloudwatch.Metric(
+                        namespace="LifePlatform/Email",
+                        metric_name="ChroniclePaused",
+                        period=Duration.seconds(86400),
+                        statistic="Sum",
+                    ),
+                },
                 period=Duration.seconds(86400),
-                statistic="Sum",
             ),
             threshold=1,
             evaluation_periods=7,

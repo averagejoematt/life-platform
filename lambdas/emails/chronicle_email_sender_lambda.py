@@ -98,30 +98,52 @@ cw = boto3.client("cloudwatch", region_name=REGION)
 # trailing 7 daily Sums are all < 1 — i.e. no delivery (and no sanctioned pause)
 # reached subscribers for a week. Value semantics (ADR-104 — honest numbers):
 #   N >= 1  actual SES sends delivered to subscribers this run
-#   1       sanctioned budget-pause datapoint (tier >= 2 pauses generation per
-#           ADR-125, so an absent installment is a sanctioned state, not a
-#           failure — the #2490 emit-and-skip pattern; logged loudly as such)
 #   0       the promise was NOT fulfilled by this run (no-op, kill-switch,
 #           zero subscribers, or a total send failure)
+#
+# #3865: the sanctioned budget pause USED TO be a `1` on this same metric, and that
+# collided with a real send to a single subscriber — byte-identical values for "a
+# subscriber received the chronicle" and "nobody did, deliberately". The subscriber
+# count has been 1, so this was not hypothetical. Worse, the heartbeat below fires on
+# a trailing-7d Sum < 1, so a WEEK of budget pauses read to the dead-man exactly like
+# a week of successful delivery: the alarm could be silenced by the very state it
+# exists to distinguish. The pause now has its own metric:
+#
+#   ChroniclePaused  1  sanctioned budget pause (tier >= 2 pauses generation per
+#                       ADR-125 — an absent installment is a sanctioned state, not a
+#                       failure; the #2490 emit-and-skip pattern, logged loudly)
+#
+# The alarm's MEANING is unchanged — a sanctioned pause still keeps the dead-man
+# quiet — because `chronicle-delivery-heartbeat` now evaluates the SUM of the two
+# metrics rather than one overloaded number. What changed is that the two states are
+# now separable by anything that reads them: the alarm, a dashboard, or a human.
+# tests/test_chronicle_delivery_deadman_2820.py pins both halves, and a derivation
+# guard there refuses any future non-zero LITERAL on the delivery metric, so this
+# collision cannot be re-opened by adding another emit-and-skip site.
 # A dead cron emits nothing at all — treat_missing=BREACHING makes that the
 # loudest state of all. These two names are the contract the email_stack alarm
 # is built against (tests/test_chronicle_delivery_deadman_2820.py).
 METRIC_NAMESPACE = "LifePlatform/Email"
 SENT_METRIC_NAME = "ChronicleSent"
+#: #3865: the sanctioned-pause datapoint, deliberately NOT a value on SENT_METRIC_NAME.
+PAUSED_METRIC_NAME = "ChroniclePaused"
 
 
-def _emit_sent_metric(value: float, reason: str) -> None:
-    """Emit the delivery-heartbeat datapoint. Fail-soft: a metrics outage must
+def _emit_sent_metric(value: float, reason: str, metric_name: str = SENT_METRIC_NAME) -> None:
+    """Emit a delivery-heartbeat datapoint. Fail-soft: a metrics outage must
     never fail (or retry-loop) an otherwise-successful send — but a failed emit
-    is exactly a missing datapoint, so the dead-man still pages if it persists."""
+    is exactly a missing datapoint, so the dead-man still pages if it persists.
+
+    `metric_name` exists so the sanctioned pause can be a datapoint on its OWN metric
+    instead of a magic value on this one (#3865). It is the only caller that passes it."""
     try:
         cw.put_metric_data(
             Namespace=METRIC_NAMESPACE,
-            MetricData=[{"MetricName": SENT_METRIC_NAME, "Value": float(value), "Unit": "Count"}],
+            MetricData=[{"MetricName": metric_name, "Value": float(value), "Unit": "Count"}],
         )
-        logger.info("[dead-man] %s=%s (%s)", SENT_METRIC_NAME, value, reason)
+        logger.info("[dead-man] %s=%s (%s)", metric_name, value, reason)
     except Exception as exc:
-        logger.warning("[dead-man] %s emit failed (non-fatal): %s", SENT_METRIC_NAME, exc)
+        logger.warning("[dead-man] %s emit failed (non-fatal): %s", metric_name, exc)
 
 
 def _chronicle_budget_paused() -> bool:
@@ -613,7 +635,11 @@ def lambda_handler(event, context):
             # (An already-delivered installment also lands here on the second
             # trigger — its 0 is absorbed by the real send's earlier datapoint.)
             if _chronicle_budget_paused():
-                _emit_sent_metric(1, "sanctioned budget pause — generation paused at tier >= 2")
+                _emit_sent_metric(
+                    1,
+                    "sanctioned budget pause — generation paused at tier >= 2",
+                    metric_name=PAUSED_METRIC_NAME,
+                )
             else:
                 _emit_sent_metric(0, "no deliverable installment this week")
             return {

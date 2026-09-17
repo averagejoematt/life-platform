@@ -119,11 +119,87 @@ def test_missed_wednesday_emits_zero_through_the_real_checker_path(monkeypatch):
 
 def test_missed_wednesday_on_budget_paused_week_emits_sanctioned_datapoint(monkeypatch):
     """Tier >= 2 pauses chronicle generation (ADR-125), so an absent installment
-    is a sanctioned state: the #2490 emit-and-skip datapoint (value 1) keeps the
-    dead-man quiet without inventing a delivery."""
+    is a sanctioned state: the #2490 emit-and-skip datapoint keeps the dead-man
+    quiet without inventing a delivery.
+
+    #3865: it lands on ChroniclePaused, NOT as a `1` on ChronicleSent. It used to be
+    the latter, which is indistinguishable from a real send to a single subscriber."""
     result, cw_mock = _run_chronicle(monkeypatch, ddb_items=[], tier=2)
     assert result["skipped"] is True
-    assert _emitted(cw_mock) == [("ChronicleSent", 1.0)]
+    assert _emitted(cw_mock) == [("ChroniclePaused", 1.0)]
+
+
+def test_MUTATION_a_pause_and_a_one_subscriber_send_are_DISTINGUISHABLE(monkeypatch):
+    """#3865's control, and the whole point of the issue: run the two states that used
+    to be byte-identical and assert the emissions differ.
+
+    Before this fix both produced ChronicleSent=1.0. The heartbeat fires on a trailing
+    7-day Sum < 1, so a week of sanctioned pauses was worth exactly as much to the
+    dead-man as a week of real delivery — the alarm could be silenced by the very state
+    it exists to tell apart."""
+    _, paused_cw = _run_chronicle(monkeypatch, ddb_items=[], tier=2)
+    subs = [{"email": "a@example.com", "status": "confirmed"}]
+    _, sent_cw = _run_chronicle(monkeypatch, ddb_items=[_published_installment()], tier=0, subscribers=subs)
+
+    paused, delivered = _emitted(paused_cw), _emitted(sent_cw)
+    assert paused == [("ChroniclePaused", 1.0)]
+    assert delivered == [("ChronicleSent", 1.0)]
+    # The VALUES are still both 1.0 — that is expected and is not the fix. The fix is
+    # that the metric NAMES differ, so every reader can separate them.
+    assert paused[0][1] == delivered[0][1] == 1.0
+    assert paused[0][0] != delivered[0][0], "the two states must not share a metric name"
+
+
+def test_no_call_site_may_put_a_non_zero_LITERAL_on_the_delivery_metric():
+    """#3865's derivation guard (acceptance box 2): the semantics are re-derived from the
+    CALL SITES rather than trusted to a hand-written comment, so the collision cannot be
+    re-opened silently by a future emit-and-skip site.
+
+    The rule: on the delivery metric, a non-zero value may only come from a computed send
+    count (a Name/expression), never from a hard-coded literal. `0` literals are fine —
+    zero is unambiguous. Anything else belongs on its own metric, as the pause now is."""
+    import ast as _ast
+
+    tree = _ast.parse(open(cel.__file__, encoding="utf-8").read())
+    offenders = []
+    for node in _ast.walk(tree):
+        if not (isinstance(node, _ast.Call) and getattr(node.func, "id", None) == "_emit_sent_metric"):
+            continue
+        routed_elsewhere = any(k.arg == "metric_name" for k in node.keywords)
+        if routed_elsewhere:
+            continue
+        first = node.args[0] if node.args else None
+        if isinstance(first, _ast.Constant) and isinstance(first.value, (int, float)) and first.value != 0:
+            offenders.append((node.lineno, first.value))
+    assert not offenders, (
+        f"non-zero literal(s) emitted on {cel.SENT_METRIC_NAME} at line(s) {offenders} — that is the #3865 "
+        "collision: a hard-coded 1 is indistinguishable from a real send to one subscriber. Give the state "
+        "its own metric (see PAUSED_METRIC_NAME) instead."
+    )
+
+
+def test_MUTATION_the_derivation_guard_catches_a_reintroduced_collision():
+    """The guard above must actually discriminate — asserted on synthetic sources rather
+    than trusted, since a guard that cannot fail reports the platform healthy."""
+    import ast as _ast
+
+    def offenders(source: str):
+        tree = _ast.parse(source)
+        out = []
+        for node in _ast.walk(tree):
+            if not (isinstance(node, _ast.Call) and getattr(node.func, "id", None) == "_emit_sent_metric"):
+                continue
+            if any(k.arg == "metric_name" for k in node.keywords):
+                continue
+            first = node.args[0] if node.args else None
+            if isinstance(first, _ast.Constant) and isinstance(first.value, (int, float)) and first.value != 0:
+                out.append(first.value)
+        return out
+
+    assert offenders("_emit_sent_metric(1, 'a re-introduced pause')") == [1], "the collision must be caught"
+    assert offenders("_emit_sent_metric(0, 'nothing delivered')") == [], "an honest zero must not red"
+    assert offenders("_emit_sent_metric(sent, 'real send')") == [], "a computed count must not red"
+    assert offenders("_emit_sent_metric(1, 'pause', metric_name=PAUSED_METRIC_NAME)") == [], "routing elsewhere is the FIX, not a finding"
 
 
 def test_real_send_emits_actual_send_count(monkeypatch):
@@ -277,9 +353,41 @@ def _alarm_calls():
 
 
 def _metric_kwargs(alarm_kw):
+    """The alarm's single inline cloudwatch.Metric(...) kwargs.
+
+    #3865: chronicle-delivery-heartbeat is a MathExpression now, so use
+    `_metric_terms` for anything that must handle both shapes. This helper stays
+    for the single-metric alarms (weekly-signal) and RAISES on an expression
+    rather than returning something plausible-but-wrong."""
     metric_call = alarm_kw["metric"]
-    assert isinstance(metric_call, ast.Call), "alarm metric must be an inline cloudwatch.Metric(...) call"
+    assert isinstance(metric_call, ast.Call), "alarm metric must be an inline cloudwatch call"
+    assert getattr(metric_call.func, "attr", None) == "Metric", "this alarm is not a single cloudwatch.Metric — use _metric_terms"
     return {k.arg: k.value for k in metric_call.keywords}
+
+
+def _metric_terms(alarm_kw):
+    """Every underlying cloudwatch.Metric(...) an alarm evaluates, as a list of kwarg
+    dicts, plus the MathExpression string when there is one (else None).
+
+    A single-metric alarm yields one term; a MathExpression yields one per entry in
+    `using_metrics`. Written so BOTH heartbeat shapes go through the same assertions —
+    the alternative was to exempt the chronicle alarm from its own shape test, which
+    would have dropped the guard at exactly the moment the alarm changed."""
+    metric_call = alarm_kw["metric"]
+    assert isinstance(metric_call, ast.Call), "alarm metric must be an inline cloudwatch call"
+    kind = getattr(metric_call.func, "attr", None)
+    if kind == "Metric":
+        return [{k.arg: k.value for k in metric_call.keywords}], None
+    assert kind == "MathExpression", f"unexpected alarm metric shape: {kind}"
+    kw = {k.arg: k.value for k in metric_call.keywords}
+    expression = kw["expression"].value
+    using = kw["using_metrics"]
+    assert isinstance(using, ast.Dict) and using.values, "a MathExpression with no using_metrics evaluates nothing"
+    terms = []
+    for v in using.values:
+        assert isinstance(v, ast.Call) and getattr(v.func, "attr", None) == "Metric"
+        terms.append({k.arg: k.value for k in v.keywords})
+    return terms, expression
 
 
 @pytest.mark.parametrize(
@@ -294,9 +402,18 @@ def test_alarm_watches_exactly_what_the_lambda_emits(alarm_name, lambda_module):
     own constants. A rename on either side reds this before it ships dark."""
     alarms = _alarm_calls()
     assert alarm_name in alarms, f"{alarm_name} not defined in email_stack.py"
-    mkw = _metric_kwargs(alarms[alarm_name])
-    assert mkw["namespace"].value == lambda_module.METRIC_NAMESPACE
-    assert mkw["metric_name"].value == lambda_module.SENT_METRIC_NAME
+    terms, _expr = _metric_terms(alarms[alarm_name])
+    for t in terms:
+        assert t["namespace"].value == lambda_module.METRIC_NAMESPACE
+    watched = {t["metric_name"].value for t in terms}
+    assert lambda_module.SENT_METRIC_NAME in watched, f"{alarm_name} does not watch {lambda_module.SENT_METRIC_NAME}"
+    # #3865: the pause metric is part of the SAME must-agree pair. If the sender emits a
+    # sanctioned pause on its own metric and the alarm does not evaluate it, every paused
+    # week pages — so the alarm must watch exactly the set the module emits, not a subset.
+    emitted = {lambda_module.SENT_METRIC_NAME} | (
+        {lambda_module.PAUSED_METRIC_NAME} if hasattr(lambda_module, "PAUSED_METRIC_NAME") else set()
+    )
+    assert watched == emitted, f"{alarm_name} watches {sorted(watched)} but the module emits {sorted(emitted)}"
 
 
 @pytest.mark.parametrize("alarm_name", ["chronicle-delivery-heartbeat", "weekly-signal-delivery-heartbeat"])
@@ -307,10 +424,19 @@ def test_alarm_shape_is_the_weekly_deadman(alarm_name):
     and a healthy fixed-UTC weekly send leaves at most 6 empty daily buckets,
     so the alarm cannot false-fire on cadence alone."""
     kw = _alarm_calls()[alarm_name]
-    mkw = _metric_kwargs(kw)
-    assert mkw["statistic"].value == "Sum"
-    period_call = mkw["period"]
-    assert isinstance(period_call, ast.Call) and period_call.args[0].value == 86400
+    terms, expression = _metric_terms(kw)
+    for t in terms:
+        assert t["statistic"].value == "Sum"
+        tp = t["period"]
+        assert isinstance(tp, ast.Call) and tp.args[0].value == 86400
+    if expression is not None:
+        # #3865: the two terms must be ADDED. A sanctioned pause has to keep the dead-man
+        # quiet exactly as it did when it was a value on the delivery metric — that is the
+        # property being preserved while the two states become separable. FILL(...,0) so a
+        # bucket with no datapoint on one metric does not void the whole expression.
+        assert "+" in expression, f"{alarm_name} must SUM its terms, not select between them: {expression!r}"
+        assert expression.count("FILL(") == len(terms), f"every term needs FILL(..., 0) or an empty bucket voids the sum: {expression!r}"
+    period_call = terms[0]["period"]
     assert kw["threshold"].value == 1
     assert kw["evaluation_periods"].value == 7
     assert kw["datapoints_to_alarm"].value == 7
