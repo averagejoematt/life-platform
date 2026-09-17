@@ -127,6 +127,10 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))  # #2612: importable when loaded b
 # restart_hooks: the #1092 post-verify hook sequence, split out at #2612 (this module
 # sits against the 1200-line ceiling); re-exported so the public entrypoint never moved.
 from experiment import config_anchor_registry, phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
+from restart_cadence import (
+    MIN_CYCLE_DAYS,  # noqa: E402  (#3601 — extracted, #1665)
+    preflight as cadence_preflight,  # noqa: E402
+)
 from restart_hooks import build_post_verify_hooks  # noqa: E402,F401
 from restart_work_contract import work_contract_rc  # noqa: E402 — #3598: per-step work contract (input>0 ∧ acted==0, unnamed → red)
 
@@ -143,81 +147,6 @@ SITE_API_DATA = REPO_ROOT / "lambdas" / "web" / "site_api_data.py"
 RESET_LOG = REPO_ROOT / "docs" / "restart" / "RESET_LOG.md"
 TOKEN_ALARM_WINDOW_FILE = REPO_ROOT / "lambdas" / "common" / "token_alarm_window.py"
 SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
-
-# ── #3601: the minimum cycle length, and the refusal that enforces it ─────────
-#
-# MEASURED 2026-09-16 off CYCLE_GENESES itself, not restated from the issue:
-#
-#     17 cycles on record, 16 re-anchors over 158 days (2026-04-01 -> 2026-09-06)
-#     gap days: median 5.5   mean 9.9   min 1   max 61
-#     rate: 9.2 per QUARTER  (3.04 per 30 days)
-#
-# `docs/PROPORTIONALITY.md` row 86 prices the reset machinery against "a few times a
-# quarter". The measured rate is ~3x that, and every reset-machinery demote trigger in
-# that ledger has therefore been judged against the wrong cadence.
-#
-# THE WINDOW IS AN OWNER RULING, NOT A NUMBER PICKED HERE. Owner, 2026-09-05 (recorded
-# on #3606, ruling 1): "Reset cadence: minimum cycle length 30 days. The reset tool
-# refuses a re-anchor inside 30 days without an explicit override flag (#3601)."
-#
-# Why a refusal rather than a warning: the 2026-09-04 typo cost a SECOND full reset
-# inside 24h (Session U), and cycle 15 lasted 3 days — so "Day 4 of cycle 15" never
-# existed and every clause written against it was unfalsifiable for a whole cycle. A
-# warning does not stop a typo; a non-zero exit does.
-#
-# The override is deliberately NOT a bare --force. `--reanchor-of <YYYY-MM-DD>` makes
-# the operator NAME the genesis being superseded, so an intended correction states what
-# it corrects and a mistyped date cannot satisfy it by accident.
-MIN_CYCLE_DAYS = 30
-
-
-class CadenceRefusal(Exception):
-    """A re-anchor inside MIN_CYCLE_DAYS with no --reanchor-of naming the prior genesis."""
-
-
-def check_cadence(new_genesis: str, prior_genesis: str, reanchor_of: str | None, *, today=None) -> str:
-    """Pure decision (#3601). Returns the line to print; raises CadenceRefusal to abort.
-
-    `prior_genesis` is the OUTGOING genesis — the one this reset supersedes. The age is
-    measured from it to TODAY, not to `new_genesis`: a future-dated genesis is sanctioned
-    (#931/#939) and the question is how long the cycle being ended actually ran.
-    """
-    import datetime as _dt
-
-    today = today or _dt.date.today()
-    try:
-        prior = _dt.date.fromisoformat(str(prior_genesis)[:10])
-    except (TypeError, ValueError):
-        return f"    cadence check SKIPPED — prior genesis {prior_genesis!r} is not a readable date"
-    age = (today - prior).days
-    if age >= MIN_CYCLE_DAYS:
-        return f"    OK — the outgoing cycle ({prior_genesis}) has run {age}d, at or past the {MIN_CYCLE_DAYS}d minimum"
-    if reanchor_of:
-        if str(reanchor_of)[:10] != prior.isoformat():
-            raise CadenceRefusal(
-                f"--reanchor-of {reanchor_of} does not name the genesis this reset supersedes.\n"
-                f"The outgoing genesis is {prior.isoformat()} (running {age}d, under the {MIN_CYCLE_DAYS}d minimum).\n"
-                "Name it exactly, or drop the flag and wait out the window. The flag exists so a deliberate\n"
-                "correction STATES what it corrects — a value that does not match is a typo, not an override."
-            )
-        return (
-            f"    OVERRIDE ACCEPTED — the outgoing cycle ({prior.isoformat()}) has run only {age}d, under the "
-            f"{MIN_CYCLE_DAYS}d minimum, and --reanchor-of names it explicitly. This reset is recorded as a "
-            "correction of that genesis, not as a new cycle's worth of evidence."
-        )
-    raise CadenceRefusal(
-        f"MINIMUM CYCLE LENGTH ({MIN_CYCLE_DAYS}d) NOT MET.\n"
-        f"  outgoing genesis : {prior.isoformat()}\n"
-        f"  age today        : {age}d\n"
-        f"  target genesis   : {new_genesis}\n"
-        f"\nThe owner ruled a 30-day minimum on 2026-09-05 (#3606 ruling 1, #3601). Measured cadence when that\n"
-        f"ruling was made: 16 re-anchors over 158d = 9.2/quarter, median gap 5.5d — and the 2026-09-04 typo cost\n"
-        f"a second full reset inside 24h.\n"
-        f"\nIf this IS a deliberate correction of {prior.isoformat()}, say so:\n"
-        f"    --reanchor-of {prior.isoformat()}\n"
-        f"Otherwise the cycle is still running and nothing here should be re-anchored."
-    )
-
 
 # #1962: how many days past genesis the compute-pipeline-stale ops alarm stays
 # suppressed. Derived from the writer's own cadence, not a guess: daily-metrics-
@@ -971,44 +900,14 @@ def main():
     print("╚══════════════════════╝")
 
     # Step 0a (#3601): the MINIMUM CYCLE LENGTH refusal. Steps 0 and 0b ask whether the
-    # reset is COMPLETE; this one asks whether it should happen at all. Owner ruling
-    # 2026-09-05 (#3606 ruling 1): a 30-day minimum, enforced by the tool, overridable
-    # only by naming the genesis being superseded.
-    #
-    # RUNS FIRST, ahead of the completeness preflights. Ordering is load-bearing and was
-    # wrong in this change's first cut: with it at [0c] the 2026-09-16 dry run never
-    # reached it, because Step 0 aborted on an unclassified partition. "Should this
-    # happen at all" is cheaper to answer and more fundamental than "is the machinery
-    # complete" — and a refusal an operator only meets after fixing two other things is
-    # a refusal they meet late.
-    #
-    # Gated on --apply. A dry run is how an operator INSPECTS a proposed re-anchor, and
-    # refusing to let them look is how the refusal gets routed around with
-    # --skip-cadence-preflight out of habit. The dry run says loudly what apply would do.
-    if args.skip_cadence_preflight:
-        print("\n[0a] Cadence preflight SKIPPED (--skip-cadence-preflight)")
-    else:
-        print(f"\n[0a] Minimum cycle length — {MIN_CYCLE_DAYS}d, owner ruling 2026-09-05 (#3606 ruling 1, #3601)")
-        try:
-            # A RE-CONVERGE (no --genesis, so target == old_genesis) is not a re-anchor —
-            # it re-runs the pipeline against the SAME genesis to fix a partial run, which
-            # is the documented recovery path and must never be refused. The ruling is
-            # about how often the experiment STARTS OVER, not about how often the tooling
-            # is re-run.
-            if target == old_genesis:
-                print(f"    N/A — re-converging the CURRENT genesis ({target}); no new cycle is being started")
-            else:
-                print(check_cadence(target, old_genesis, args.reanchor_of))
-        except CadenceRefusal as e:
-            if not args.apply:
-                print(f"    DRY-RUN — apply WOULD REFUSE:\n{e}")
-            else:
-                print(f"\n✗ CADENCE PREFLIGHT FAILED\n{e}")
-                print(
-                    "\n   ABORTING before any reset step — nothing was fetched, written or deployed.\n"
-                    "   (escape hatch: --skip-cadence-preflight, but --reanchor-of is the honest route)"
-                )
-                sys.exit(6)
+    # reset is COMPLETE; this one asks whether it should happen at all — owner ruling
+    # 2026-09-05 (#3606 ruling 1), a 30-day minimum overridable only by naming the genesis
+    # being superseded. RUNS FIRST, and the ordering is load-bearing: at [0c] in this
+    # change's first cut it never executed, because Step 0 aborted on an unclassified
+    # partition. The body lives in restart_cadence (#1665 — extraction, never a raise).
+    _rc = cadence_preflight(target, old_genesis, args.reanchor_of, apply=args.apply, skip=args.skip_cadence_preflight)
+    if _rc is not None:
+        sys.exit(_rc)
 
     # Step 0 (#1234): pk-family census PREFLIGHT — the ADR-077 totality guard.
     # Runs FIRST, in dry-run AND apply (a read-only scan), before anything is

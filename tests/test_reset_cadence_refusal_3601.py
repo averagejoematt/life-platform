@@ -41,7 +41,7 @@ if str(ROOT / "deploy") not in sys.path:
 if str(ROOT / "lambdas") not in sys.path:
     sys.path.insert(0, str(ROOT / "lambdas"))
 
-import restart_pipeline as rp  # noqa: E402
+import restart_cadence as rp  # noqa: E402  (#1665: extracted from restart_pipeline)
 
 _TODAY = datetime.date(2026, 9, 16)
 _PRIOR = "2026-09-06"  # cycle 17 genesis — 10 days old on _TODAY
@@ -103,7 +103,7 @@ def test_an_unreadable_prior_genesis_SKIPS_rather_than_refusing():
 def test_the_window_is_the_OWNER_RULING_not_a_number_chosen_in_the_code():
     """30 is not an engineering judgement and must not read like one."""
     assert rp.MIN_CYCLE_DAYS == 30
-    src = (ROOT / "deploy" / "restart_pipeline.py").read_text(encoding="utf-8")
+    src = (ROOT / "deploy" / "restart_cadence.py").read_text(encoding="utf-8")
     block = src[src.index("# ── #3601: the minimum cycle length") : src.index("MIN_CYCLE_DAYS = 30")]
     assert "#3606" in block and "2026-09-05" in block, "the ruling's provenance is not recorded beside the constant"
     assert "minimum cycle length 30 days" in block
@@ -118,8 +118,8 @@ def test_the_preflight_runs_BEFORE_the_completeness_preflights():
     meets after fixing two unrelated things is a refusal they meet late.
     """
     src = (ROOT / "deploy" / "restart_pipeline.py").read_text(encoding="utf-8")
-    assert src.index("[0a] Minimum cycle length") < src.index("[0] Census preflight"), "the cadence check no longer runs first"
-    assert src.index("[0a] Minimum cycle length") < src.index("[0b] Config anchor preflight")
+    assert src.index("# Step 0a (#3601)") < src.index("# Step 0 (#1234)"), "the cadence check no longer runs first"
+    assert src.index("# Step 0a (#3601)") < src.index("# Step 0b (#3671)")
 
 
 def test_a_RE_CONVERGE_of_the_current_genesis_is_never_refused():
@@ -127,8 +127,7 @@ def test_a_RE_CONVERGE_of_the_current_genesis_is_never_refused():
     documented recovery path for a partial run. The ruling is about how often the
     experiment STARTS OVER, not how often the tooling is re-run, so this must not be
     gated at all."""
-    src = (ROOT / "deploy" / "restart_pipeline.py").read_text(encoding="utf-8")
-    block = src[src.index("[0a] Minimum cycle length") : src.index("[0] Census preflight")]
+    block = (ROOT / "deploy" / "restart_cadence.py").read_text(encoding="utf-8")
     assert "if target == old_genesis:" in block, "a re-converge is not exempted — it would be refused as a re-anchor"
     assert "re-converging the CURRENT genesis" in block
 
