@@ -792,6 +792,43 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-16",
     },
+    "guard::scripts/check_merge_commit_closures.py": {
+        "gate_name": "scripts/check_merge_commit_closures.py",
+        "command": (
+            "python3 scripts/check_merge_commit_closures.py --sha d681aecc6   # live, read-only (git log + gh api); "
+            "tests/test_merge_commit_closures_3863.py covers the pure `evaluate`/`closing_set` logic offline (15 cases)"
+        ),
+        "mutation": (
+            "the natural experiment, not a plant — and the strongest available, because the defect this gate "
+            "exists for is IN THE REPO'S OWN HISTORY. d681aecc6 is the 2026-09-17 merge that retired "
+            "owner-gated issue 3715 from a `--body-file` squash message: its committed closing set is "
+            "{3715,3861} while PR 3862's body and GitHub's computed set both read {3861}. No synthetic case "
+            "was constructed; the gate was pointed at the real commit."
+        ),
+        "observed": (
+            "ARMED 2026-09-17: the run FAILED that commit — `[FINDING] d681aecc6  PR #3862  "
+            "committed={#3715,#3861} declared={#3861}` with `unvalidated-merge-closure: ... closed {#3715}, "
+            "which the PR never declared`, and the measured effect line `#3715:closed-by-this-commit`. The "
+            "matched NEGATIVE controls are live too: over the same 30-day window 94 of 100 merge commits "
+            "carrying a closing set report `ok`, and the offline suite pins the benign cases that must not "
+            "red (a declared ref, a merge closing nothing, and the squash `(#PR)` suffix — counting that "
+            "last one would make every merge fail). The run also proved the gate's own first cut wrong "
+            "twice, which is the control doing its job on its author: the obvious `body|commits|github` "
+            "comparison returns ZERO findings on this very commit, and reading only the LAST close event "
+            "reported `no-effect` on it because 3715 was reopened ninety seconds later."
+        ),
+        "scope": (
+            "Post-merge and advisory by construction: it reads what landed, so there is nothing left to "
+            "block — the blocking half is guard_bash.py refusing a supplied message pre-merge, which cannot "
+            "see the web UI or another machine. `declared` is deliberately the PR BODY plus GitHub's "
+            "computed set and NOT the branch commits; widening it to the union makes the gate agree with "
+            "the 2026-09-17 mistake by construction, which is asserted in both directions offline. It "
+            "resolves a commit's PR through GitHub's association rather than the subject's `(#N)`, because "
+            "a supplied --subject can write an ISSUE number in that slot (d681aecc6 does). It cannot see a "
+            "closure made by hand in the GitHub UI with no commit at all."
+        ),
+        "proved_on": "2026-09-17",
+    },
     "guard::scripts/check_raw_zone_drift.py": {
         "gate_name": "scripts/check_raw_zone_drift.py",
         "command": "python3 scripts/check_raw_zone_drift.py   # live read-only S3 check; tests/test_raw_zone_drift_3570.py covers the pure logic (check_coverage/expand_prefix/prefix_root/known_prefix_roots) offline",
@@ -1307,11 +1344,14 @@ QA_PROOFS: dict[str, dict[str, Any]] = {
             "(C) a scan returning zero items, the vacuous-scan trap."
         ),
         "observed": (
-            "ARMED 2026-09-17. (A) passed=True, 'all 2 live pk families classify under phase_taxonomy'. "
-            "(B) passed=None (WARN) naming the planted family BY NAME — '1 of 3 live pk family/families "
-            "are UNCLASSIFIED ... family='SOURCE#__planted_unclassified__'' plus the classifier's own "
-            "remediation line. (C) passed=None (WARN) 'the pk+sk scan returned ZERO pk families. Refusing "
-            "to certify taxonomy totality on an empty census' — it does NOT fall through to the OK line. "
+            "ARMED 2026-09-17, watched as three arms. This is a nightly CHECK, not a nonzero-exit gate, so "
+            "the recorded outcome is its Check verdict: `passed=True` is the pass and `passed=None` is the "
+            "FAIL (a WARN finding). (A) NEGATIVE control, passed=True, 'all 2 live pk families classify "
+            "under phase_taxonomy'. (B) FAILED as required: passed=None, naming the planted family BY NAME "
+            "— '1 of 3 live pk family/families are UNCLASSIFIED ... "
+            "family='SOURCE#__planted_unclassified__'' plus the classifier's own remediation line. "
+            "(C) FAILED likewise: passed=None, 'the pk+sk scan returned ZERO pk families. Refusing to "
+            "certify taxonomy totality on an empty census' — it does NOT fall through to the OK line. "
             "Also run once against the LIVE table: passed=True, 'all 100 live pk families classify'."
         ),
         "scope": (

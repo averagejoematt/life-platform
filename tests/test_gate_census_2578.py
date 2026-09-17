@@ -681,7 +681,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Worth recording: the offline mutation M3 caught the guard's OWN ratchet passing when
         # it should have failed — the enrolment stamp leg was a substring read over the file
         # and `_built_at` survived on a comment line; it reads the AST now.
-        <= 102
+        # 2026-09-17 (#3860/#3863): 102 -> 104. Two entrants, both arriving PROVEN rather than
+        # ledgered unproven — the #3860 nightly totality census (QA_PROOFS, three arms incl. the
+        # vacuous-scan trap) and #3863's detector D (GUARD_PROOFS, proven on the real d681aecc6
+        # merge rather than a plant). Measured, not incremented: the branch census reported
+        # {can-fail (proven) 104, unproven 537, not-applicable 6, attempted-unproven 3}.
+        <= 104
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
