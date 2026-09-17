@@ -402,6 +402,21 @@ def milestone_title(issue: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+EPIC_PARENT_RE = re.compile(r"^\s*\*\*Epic:\*\*\s*#(\d+)", re.M)
+
+
+def epic_parent(body: Optional[str]) -> Optional[int]:
+    """The `**Epic:** #N` this issue declares, or None (#3861).
+
+    Anchored to line start and to the bold literal the ADR-099 template uses, so a
+    prose mention of an epic number elsewhere in the body is not read as parentage —
+    the same scoping rule `acceptance_items` applies to checkboxes. `**Epic:** none`
+    and `**Epic:** none — <reason>` both correctly yield None.
+    """
+    m = EPIC_PARENT_RE.search(body or "")
+    return int(m.group(1)) if m else None
+
+
 def blocking_labels(labels: List[str]) -> List[str]:
     """The labels that make an issue un-startable by a session: gate:owner, blocked:*."""
     return [name for name in labels if name in BLOCKED_LABELS or any(name.startswith(p) for p in BLOCKED_LABEL_PREFIXES)]
