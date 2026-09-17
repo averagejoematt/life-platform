@@ -103,7 +103,86 @@ def build_row(issue: Dict[str, Any]) -> Dict[str, Any]:
         "model": bc.model_lane(labels),
         "prio_label": next((n for n in labels if n.startswith("prio:")), None),
         "areas": [n for n in labels if n.startswith("area:")],
+        # #3861: the two inputs CLOSEABILITY needs that score does not carry.
+        "epic_parent": bc.epic_parent(body),
+        "is_epic": any(n in EXCLUDED_TYPE_LABELS for n in labels),
     }
+
+
+# ── #3861: CLOSEABILITY — a second dimension, deliberately NOT folded into score ──
+#
+# THE MEASUREMENT THAT FORCED IT. Session AH merged 6 PRs and closed 2 issues. The 6
+# PRs satisfied roughly 10 acceptance boxes across FOUR issues — and closed none of
+# those four. Both closures came from issues that happened to have one box of work
+# left, which was luck, not selection.
+#
+# Measured over the 69 session-shippable open issues on 2026-09-17: 295 acceptance
+# boxes, mean 4.3 each, and **zero boxes are ever ticked** (0 of 401 open, 6 of 238
+# across the last 60 closed). So "remaining work" cannot be read off checkbox state —
+# it has to be derived from what the issue IS.
+#
+# WHY THIS IS NOT A NEW SCORE. #1866 exists because re-scoring at selection time was
+# the habit being fixed, and the score line states VALUE — what the work is worth.
+# Closeability states something different and equally real: whether ONE session can
+# finish it. Folding them into a single number would hide both. They are printed as
+# two columns and sorted by one at a time.
+#
+# The four inputs, all derived, none hand-maintained:
+#   boxes        fewer acceptance criteria = fewer things that must all land
+#   last_child   closing this also closes its epic — a 2-for-1, measured against the
+#                LIVE open set, never a stored flag
+#   blocked      gate:owner / blocked:* cannot be closed by merging at all
+#   live_proof   closure:live-proof closes on an OBSERVATION, not a merge, so a
+#                session can ship it and still not close it (#3671 is the worked
+#                example: implemented, merged, and correctly still open)
+CLOSEABILITY_BLOCKED = "blocked"
+CLOSEABILITY_OBSERVATION = "needs-observation"
+
+
+def annotate_closeability(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Add `boxes` / `last_child_of` / `closeability` to every row. Pure.
+
+    Takes the WHOLE row set because `last_child_of` is a property of the live graph:
+    an issue is the last open child of its epic only relative to the other open
+    issues. A stored flag would go stale the moment a sibling closed — which is the
+    class of defect this repo keeps re-learning.
+    """
+    open_children: Dict[int, int] = {}
+    for r in rows:
+        parent = r.get("epic_parent")
+        if parent and not r.get("is_epic"):
+            open_children[parent] = open_children.get(parent, 0) + 1
+    epics = {r["number"] for r in rows if r.get("is_epic")}
+
+    for r in rows:
+        r["boxes"] = len(r.get("acceptance") or [])
+        parent = r.get("epic_parent")
+        r["last_child_of"] = parent if (parent in epics and open_children.get(parent) == 1 and not r.get("is_epic")) else None
+        if r.get("blocking"):
+            r["closeability"] = CLOSEABILITY_BLOCKED
+        elif "closure:live-proof" in (r.get("labels") or []):
+            r["closeability"] = CLOSEABILITY_OBSERVATION
+        else:
+            r["closeability"] = "shippable"
+    return rows
+
+
+def closeability_key(row: Dict[str, Any]):
+    """Sort: finishable first, 2-for-1 ahead of 1-for-1, fewest boxes, then score.
+
+    Score is the LAST term, not the first — that inversion is the whole point. It
+    still breaks ties, so within a band of equally-finishable work the more valuable
+    item leads.
+    """
+    rank_by_class = {"shippable": 0, CLOSEABILITY_OBSERVATION: 1, CLOSEABILITY_BLOCKED: 2}
+    score = row.get("score")
+    return (
+        rank_by_class.get(row.get("closeability"), 3),
+        0 if row.get("last_child_of") else 1,
+        row.get("boxes", 99),
+        -(score.value if score else 0.0),
+        row.get("number") or 0,
+    )
 
 
 def sort_key(row: Dict[str, Any]):
@@ -126,6 +205,7 @@ def rank(
     milestone: Optional[str] = None,
     model: Optional[str] = None,
     include_blocked: bool = False,
+    by_closeability: bool = False,
 ) -> Dict[str, Any]:
     """Filter + sort one milestone's rows. Pure: no I/O, no fall-through policy.
 
@@ -137,7 +217,7 @@ def rank(
         pool = [r for r in pool if r["model"] == model]
     blocked = [r for r in pool if r["blocking"]]
     visible = pool if include_blocked else [r for r in pool if not r["blocking"]]
-    visible = sorted(visible, key=sort_key)
+    visible = sorted(visible, key=closeability_key if by_closeability else sort_key)
     return {
         "milestone": milestone,
         "rows": visible,
@@ -152,6 +232,7 @@ def select(
     milestone: str = "Now",
     model: Optional[str] = None,
     include_blocked: bool = False,
+    by_closeability: bool = False,
 ) -> Dict[str, Any]:
     """`rank`, plus the fall-through policy that makes finding 1 impossible.
 
@@ -161,7 +242,7 @@ def select(
     through to.
     """
     if milestone == "all":
-        result = rank(rows, None, model, include_blocked)
+        result = rank(rows, None, model, include_blocked, by_closeability)
         result["fell_through_from"] = []
         return result
 
@@ -169,14 +250,14 @@ def select(
     start = order.index(milestone) if milestone in order else 0
     tried: List[Dict[str, Any]] = []
     for candidate in order[start:]:
-        result = rank(rows, candidate, model, include_blocked)
+        result = rank(rows, candidate, model, include_blocked, by_closeability)
         if result["rows"]:
             result["fell_through_from"] = tried
             return result
         tried.append(result)
     # Nothing anywhere: report the originally-requested milestone, with the
     # whole walk attached so the caller can say what it looked at.
-    empty = dict(tried[0]) if tried else rank(rows, milestone, model, include_blocked)
+    empty = dict(tried[0]) if tried else rank(rows, milestone, model, include_blocked, by_closeability)
     empty["fell_through_from"] = tried
     empty["exhausted"] = True
     return empty
@@ -461,7 +542,20 @@ def format_row(row: Dict[str, Any]) -> List[str]:
     milestone = row["milestone"] or "no-milestone"
     blocked = f"  [{', '.join(row['blocking'])}]" if row["blocking"] else ""
 
-    lines = [f"#{row['number']:<5} · {score_cell} · {prio} · area:{area} · {model} · {milestone} · {row['title']}{blocked}"]
+    # #3861: the closeability cell. `2for1` is the one worth reading — closing that
+    # issue closes its epic too, and it is measured against the live open set.
+    if row.get("last_child_of"):
+        close_cell = f"2for1→#{row['last_child_of']}"
+    elif row.get("closeability") == CLOSEABILITY_OBSERVATION:
+        close_cell = "obs-close"
+    elif row.get("closeability") == CLOSEABILITY_BLOCKED:
+        close_cell = "blocked"
+    else:
+        close_cell = f"{row.get('boxes', '?')}box"
+
+    lines = [
+        f"#{row['number']:<5} · {score_cell} · {close_cell:<12} · {prio} · area:{area} · {model} · {milestone} · {row['title']}{blocked}"
+    ]
 
     if row["outcome"]:
         lines.append(f"        ↳ {row['outcome']}")
@@ -573,6 +667,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--model", choices=list(bc.MODEL_LANES), help="Filter to one fan-out lane (model:sonnet|opus|fable).")
     parser.add_argument("--limit", type=int, default=0, help="Show at most N ranked rows (0 = all).")
     parser.add_argument("--include-blocked", action="store_true", help="Show gate:owner / blocked:* issues instead of counting them.")
+    parser.add_argument(
+        "--closeable",
+        action="store_true",
+        help=(
+            "#3861: rank by what a session can FINISH, not by stored value. Score still breaks ties. "
+            "Reads: finishable-by-merge first, 2-for-1 (closes its epic too) ahead of 1-for-1, then fewest "
+            "acceptance boxes. Use it when the goal is closures; use the default when the goal is impact."
+        ),
+    )
     parser.add_argument("--issues-json", help="Offline fixture path (gh issue list --json number,title,labels,milestone,body output).")
     parser.add_argument(
         "--refill-now",
@@ -594,11 +697,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         if issues is None:
             return 0  # fail-open: no gh/network/auth available in this context
 
-    rows = [build_row(i) for i in issues if is_rankable(i)]
+    # #3861: build EVERY row first, epics included, then annotate, then drop the epics
+    # from the ranked pool. `last_child_of` is a property of the live graph — an issue is
+    # the last open child of its epic only relative to the other open issues — so the
+    # annotation cannot see it from a pool the epics have already been filtered out of.
+    # Ranking behaviour is unchanged: epics are still never ranked.
+    all_rows = annotate_closeability([build_row(i) for i in issues])
+    rows = [r for r in all_rows if not r["is_epic"]]
     if args.refill_now:
         print("\n".join(render_refill(plan_now_refill(rows, lane=args.lane))))
         return 0
-    result = select(rows, milestone=args.milestone, model=args.model, include_blocked=args.include_blocked)
+    result = select(rows, milestone=args.milestone, model=args.model, include_blocked=args.include_blocked, by_closeability=args.closeable)
     print("\n".join(render(result, rows, args)))
     return 0
 
