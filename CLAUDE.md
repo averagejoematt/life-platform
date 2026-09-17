@@ -213,10 +213,10 @@ silent omission is not an outcome.**
 
 **Verified:** 2026-09-17 (Opus 5, **Session AH — five instruments shipped, and the night's real lesson was a
 text match**; owner brief *"ship the ranked Now lane"*, autonomous overnight, standing merge+deploy authority,
-**no `--deliver`**, the recap cron hold STAYS, every lease disposed). **121 open -> 119 (89 -> 88 addressable,
-both MEASURED two ways at 23:45Z — search `total_count` AND a paginated id-set): 2 closed on demonstrated
-evidence, 1 filed, 5 PRs merged, census 647 -> 648, one deploy lease approved with its ancestor-exception
-reasoning stated.** Closures follow merges here, as the plan predicted: neither came from a sweep. **THE
+**no `--deliver`**, the recap cron hold STAYS, every lease disposed). **121 open -> 119 (89 -> 88 addressable, both MEASURED two ways at
+00:29Z — search `total_count` AND a paginated id-set, agreeing): 2 closed on demonstrated evidence, 1 filed, **6
+PRs merged and nothing of mine left open**, census 647 -> 648, one deploy lease approved with its
+ancestor-exception reasoning stated, DEPLOYED and verified by walking the import closure INSIDE the live zip.** Closures follow merges here, as the plan predicted: neither came from a sweep. **THE
 THROUGH-LINE IS ONE SHAPE ARRIVING FOUR TIMES — a text match reading a comment, three of them in my own new
 guards, each caught by its own control:** #3785's enrolment ratchet **passed its own must-fail control**
 (`'"_built_at"' not in src` survived on a comment line, so the guard passed over the exact removal it exists to

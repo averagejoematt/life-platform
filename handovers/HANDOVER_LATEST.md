@@ -14,8 +14,8 @@ lease disposed. Approved plan: `~/.claude/plans/toasty-mixing-pizza.md`.
 | Addressable | **89 → 88** | union exclusion: Roadmap 21 ∪ `gate:owner` 13 ∪ `blocked:*` 0 = **31**, not 34 |
 | Issues closed | **2** | #3688, #3849 — both on demonstrated evidence |
 | Issues filed | **1** | **#3860**, a live blocker found by running the thing I was building |
-| PRs merged | **5** | #3855, #3857, #3854, #3856, #3858 — each through `wait_pr_green.sh`, check set asserted BY NAME |
-| PRs open at wrap | **1** | #3859 (#3601), green-pending |
+| PRs merged | **6** | #3855, #3857, #3854, #3856, #3858, #3859 — each through `wait_pr_green.sh`, check set asserted BY NAME |
+| PRs open at wrap | **0** | all six landed; the only open PRs are dependabot's |
 | Gate census | **647 → 648** | measured by id-set diff against a disposable `git archive` of the merge-base |
 
 The plan said closures follow merges here, and they did: both closures came from shipping, neither from a sweep.
@@ -167,18 +167,59 @@ complete"*, and a refusal an operator meets only after fixing two unrelated thin
 
 ---
 
+## POST-WRAP TAIL (00:00Z → 00:30Z) — corrected in place
+
+**A FIFTH guard caught this session's own work, and it was not a text match.** #3601's push
+red the **module-size hard ceiling**: `deploy/restart_pipeline.py` went 974 → 1051 logical
+lines, past 1000 with no baseline. The standing rule there is **extraction, never a raise**,
+so the cadence logic moved to `deploy/restart_cadence.py` (995 / 87). It is the better home
+anyway — `check_cadence` is a pure decision over three dates and one flag. **One assertion
+had to move with it:** the ordering test keyed on the printed banner `[0a] Minimum cycle
+length`, and that string went into the extracted module — *an assertion that follows a
+string across a refactor is asserting the wrong thing.* Repointed to the step comment.
+Re-proven end to end after the move: exit 6 without the flag, OVERRIDE ACCEPTED with it.
+
+**The deploy landed and was verified ON THE PATH, not in the bundle.** Run `35163114422` @
+`27046d3c4`: Deploy success, Unit Tests success, Smoke success, post-deploy integration
+success, **auto-rollback SKIPPED**. Then the check AG's session lacked, run against the
+**deployed artifact**: `daily-brief`'s live zip unpacked, and the import closure walked
+*inside it* — `emails.daily_brief_lambda → ai.ai_calls → ai.ai_context →
+intelligence.labs_facts`, **REACHABLE: True**. A zip grep would have shown the module
+present in the previous attempt too, and it was inert.
+
+**#3835's first measurement arrived the same hour, and it is favourable — which is exactly
+when to be careful.** That deploy's `test / Unit Tests` ran **1944s against the 1950s
+budget** — under, and 1.47× the pre-change 2850s median, better than the 1.32× projection.
+**It does not close box 3.** *n*=1, the job's measured spread is 1.93×, and 6 seconds of
+headroom is inside that noise. The class rule "do not re-derive on a single reading" applies
+symmetrically; a favourable reading settles a budget no better than an unfavourable one.
+Recorded on the issue as one datapoint, not a conclusion.
+
+**The closure DoD caught my own #3849 close** — `no-outcome-verdict` (it closed by a PR
+keyword, so no human wrote the ADR-099 block) plus `post-close-comment` for my own
+correction. Fixed by **editing** the correction comment to open with
+`**Shipped:** / **Outcome:** / **Residual:**` rather than adding a third comment, since a
+post-close comment is itself a contract finding. Sweep re-run: **hits=0, findings=0**.
+
+**#3859 merged** (`48333418b`) after the extraction. **All six PRs landed; nothing of mine
+is left open.**
+
+---
+
 **Build beat:** none — the reader-visible work (#3792's labs prose) is merged but the labs surface has not
 regenerated; a beat would narrate a fix the reader cannot see. Same call as AG's, same reason, one day on.
 **Docs:** `docs/PROPORTIONALITY.md` (row 86 cadence corrected + the census 647→648 stamp), `docs/RUNBOOK.md`
 (the `aws s3 cp config/…` block now names what it may NOT be used on, and gives the DERIVED list command).
 **Decisions:** none needed — #3601's window implements an owner ruling already recorded on #3606; the ADR
 amendment is box 3b and is the owner's.
-**Main:** green at wrap — CI/CD success. **Config twin drift's pre-existing red is now addressed but not yet
+**Main:** green — the session's own deploy run `35163114422` completed Deploy/Smoke/post-deploy-integration
+all success with auto-rollback SKIPPED. **Config twin drift's pre-existing red is addressed but not yet
 re-run**; #3856's provenance step joins that workflow on its next 15:20Z fire.
 **Incidents:** none — no rollback fired, no data gap, no main-red window.
 **Stash/hooks:** clean — stash empty; one incidental `sed` mutation fully reverted with `git diff --stat` verified.
-**Closures:** #3688 #3849 · DoD: both carry `**Shipped:** / **Outcome:** / **Live proof:**`; #3849 additionally
-carries a self-correction comment rather than a wrong Set left standing on a closed issue.
+**Closures:** #3688 #3849 · DoD: `closure_sweep.py --session` re-run after fixing both findings it raised against
+#3849 — **hits=0, findings=0, blocking=none**. #3849's verdict was folded INTO its correction comment by editing,
+not added as a third comment.
 **Backlog:** **119 open / 88 addressable** — measured 23:45Z two independent ways. **Residual, stated not
 hidden: the 5 standing `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621), untouched by instruction.**
 They are the ONLY blocking hygiene findings — #3853's bot-marker class is gone, 9 → 5.
@@ -196,11 +237,11 @@ its entrant PROVEN. No new subsystem, no new rent row.
 - **Harvest the ~17:07Z window for #3792.** The before-measurement is anchored on the issue. Read
   `COACH#labs_coach / OUTPUT#{date}#daily_brief_labs` — **the full record, not `position_summary`**.
   `coach_labs:truth` will read FAIL until then, and that red is honest.
-- **#3859 is green-pending at wrap** — merge it, then #3601 is down to box 2's other half and box 3b (owner).
 - **#3860 blocks every reset today.** It is the cheapest high-value pick on the board and it is a ruling plus a
   registry line.
-- **#3835 box 3** — read n≥5 green-main durations of the NEW lane and decide the budget from them. If it still
-  does not fit, that is a finding about where the time goes, not an argument for a third raise.
+- **#3835 box 3** — **n=1 so far: 1944s, under the 1950s budget.** Read four more green-main runs of the NEW lane
+  before deciding. If the median hovers at the budget the answer is still not a raise — it is where the remaining
+  ~1900s goes.
 - **The four text-match catches belong in one place.** `not-work — the lesson is written into each guard's own
   docstring and into the memory system; no issue.`
 
