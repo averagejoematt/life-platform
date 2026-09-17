@@ -211,56 +211,37 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-17 (Opus 5, **Session AH — five instruments shipped, and the night's real lesson was a
-text match**; owner brief *"ship the ranked Now lane"*, autonomous overnight, standing merge+deploy authority,
-**no `--deliver`**, the recap cron hold STAYS, every lease disposed). **121 open -> 119 (89 -> 88 addressable, both MEASURED two ways at
-00:29Z — search `total_count` AND a paginated id-set, agreeing): 2 closed on demonstrated evidence, 1 filed, **6
-PRs merged and nothing of mine left open**, census 647 -> 648, one deploy lease approved with its
-ancestor-exception reasoning stated, DEPLOYED and verified by walking the import closure INSIDE the live zip.** Closures follow merges here, as the plan predicted: neither came from a sweep. **THE
-THROUGH-LINE IS ONE SHAPE ARRIVING FOUR TIMES — a text match reading a comment, three of them in my own new
-guards, each caught by its own control:** #3785's enrolment ratchet **passed its own must-fail control**
-(`'"_built_at"' not in src` survived on a comment line, so the guard passed over the exact removal it exists to
-catch); #3835's pipefail assertion counted 4 pipes for 2 commands because the step's comments quote the #2259
-defect; #3792's "one home" guard asserted a CALL where it needed to assert DELEGATION; and the inverse — **a
-macOS `sed -i ''` exits 0 on no-match**, so #3835's first mutation reported `12 passed` against a file that had
-never been mutated. *Source text is not source structure, and a check written over text will read the prose
-explaining the check.* **#3792's real defect was bigger than its title:** `_build_labs_data` read the phantom
-schema #1993 killed, so `flagged_count` served **0 against 26 real out-of-range biomarkers** — an ADR-104 breach
-nobody had filed, found only because I went to fix the date; verified by **import graph, not bundle grep**
-(`daily_brief -> ai_calls -> ai_context -> labs_facts`, `REACHABLE: False` pre-fix). **And box 3 contradicted its
-own issue usefully:** the nightly HAS watched that card since #1993 — **it was reading 198 characters of it**
-(blurb PASS, stored narrative FAIL, same coach same day). **#3785 box 3** grades ONE artifact against the clock,
-proven by **replaying the real 2026-09-14 clobber bytes out of S3 version history**, not a synthetic mutation.
-**#3688 CLOSED on a live forced-truncation run** (22:01:56Z, the control its own box 3 prescribes); **#3849
-CLOSED then self-corrected** — my Set was 3/4 because the issue's own grep cannot see a `subprocess(timeout=)`,
-and it blocked a PR 20 min later. **#3860 filed and it blocks every reset today:** `SOURCE#recap_cards` is
-unclassified, so Step 0 aborts `restart_pipeline` on main (exit 4) — found because my own `[0c]` check never ran,
-which is why it is `[0a]` now. **Owner acts left:** #3601 box 3b — the cadence ruling, **with the number now in
-front of you: 9.2 resets/quarter measured, median gap 5.5d, 15 of 16 gaps under your own 30-day minimum**, and
-the tool enforces that minimum as of tonight · #3860's `recap_cards` class ruling · #3715 · #2883 · #3606 · the
-5 `acceptance_count` violations (#3607 #3611 #3615 #3617 #3621) still need splitting, not trimming.
-
-**SECOND HALF (00:00Z→03:00Z) — the owner asked *"we dont really seem to be getting close to 40"*, and the
-answer is structural: 40 is BELOW THE FLOOR.** Roadmap 21 (ADR-099: already outside the debt count) + epics 25
-+ `gate:owner` 14 = **32 union structural**, and the 70 session-shippable issues carry **299 acceptance boxes**
-— so 40 means draining the pool, **15–30 sessions**, with no sweep available (median shippable age 11 days,
-nothing over 30; **53% of the board was minted by review campaigns**, 44 from the two 2026-09-05 reviews).
-**The throughput leak is fixed at the instrument:** `backlog_next.py --closeable` (#3861, merged) ranks by what
-a session can FINISH — box count, last-open-child-of-an-epic measured against the LIVE graph, blocked,
-needs-observation — score stays the LAST term and the default ordering is byte-identical. It earned itself at
-once: its first run found the 2-for-1 set, and a sweep using it closed **#3734** on a live 390px measurement
-(`clientW 353 · scrollW 353 · overflow 0px` vs the issue's own *362px in a 353px band*), complete since PR #3844
-and open only for a missing closing keyword. **The epic sweep produced ZERO closures** — all 25 blocked; #3042
-dispositioned `gate:owner`. **I DISPROVED MY OWN HYPOTHESIS** that the 299 boxes hid finished work: of 14
-candidates, 1 complete, 9 known partials, 4 verified incomplete — the estimate stands. **AND I WRONGLY CLOSED
-#3715, AN OWNER-GATED ISSUE** (`d681aecc6` 02:37:30Z; restored 02:39Z unchanged, no other issue touched): my
-commit prose read *"no session can close: 3715"*, the guard said WARN, I reasoned past it and merged with a
-custom squash body **to be safer** — whose note explaining the removal quoted the phrase. The load-bearing
-error: `github={#3861}` was a reading of the PR BODY treated as a fact about text that did not yet exist —
-**a `--body-file` squash message is a fourth text no guard validates** (#3863, P1). Third instance this session
-of prose-about-X parsing as X; a fourth arrived at wrap. **Stopped on the error trajectory, not the clock.**
-**Owner acts:** **does 40 count Roadmap?** (if not, the number is 98 — one sentence re-frames every session
-chasing it) · #3620's IP-hash salt (Secrets Manager + IAM, ask-first; the defect is LIVE — unsalted
-`sha256(ip)[:16]`, one call site logged to CloudWatch) · #3042's external re-assessment.
-**Final measured: 119 open / 87 addressable.**
+**Verified:** 2026-09-17 (Opus 5, **Session AI — the correction that was bigger than the correction**; owner
+brief *"close on demonstrated evidence, pick with `--closeable`"*, autonomous overnight, standing merge+deploy
+authority, **no `--deliver`**, issue numbers sigil-free near closing verbs, every lease disposed).
+**119 open -> 117 (87 -> 84 addressable, both MEASURED two ways at 06:26Z — search `total_count` AND a paginated
+id-set, agreeing): 3 closed on live proof (3860, 3863, 3865), 1 filed, 2 PRs merged, 2 production deploys, census
+648 -> 650 with BOTH entrants arriving PROVEN.** **Track 0 was two wrong statements Session AH left on issues —
+and verifying the first turned up a THIRD that was larger than either.** AH recorded 3563's box 1 as
+*"unresolved"*; `tests/test_role_family_write_scope.py` satisfies it almost clause for clause (18 passed, mutation
+controls with negative controls in BOTH arms), and **Session AG had named that file in the comment directly above
+AH's own.** The rule AH applied was right — *a file carrying an issue number is not evidence it asserts that
+issue's criterion* — but rejection was treated as the answer: **failing to find an instrument is not evidence it is
+absent.** The plan's whole Track 1 (write that test) was unnecessary and was skipped; 3563 went from "3 boxes open"
+to ONE clause. **3860's finding was never the ruling, it was WHERE the check lived:** the ADR-077 census was
+correct and caught `recap_cards` the moment it ran, but it sat in `deploy/`, which is **never staged into the
+Lambda bundle** — so nothing could execute it for ten days. Proved from the deployed artifact, and the control IS
+the issue: `pk_census.py PRESENT · REACHABLE True · deploy/ staged into the zip? **False**`. **3863's acceptance
+box was VACUOUS on its own incident** — implemented literally it returns ZERO findings on PR #3862, because the
+offending ref was in the branch commits; cut against `body ∪ github` it returns exactly `{3715}`. Both readings
+pinned. The build also found that **a supplied `--subject` can write an ISSUE number in the `(#N)` PR slot**
+(`d681aecc6` does), so the merge path that mints an unvalidated text also erases the handle back to what should
+have validated it. **Its first act was to flag its own merge** — predicted in the PR body BEFORE merging, effect
+`no-effect`, and deliberately NOT dispositioned. **3865 was filed and closed the same session:** `ChronicleSent`
+emitted `1` for both a sanctioned budget pause and a real 1-subscriber send, so **a week of pauses read to the
+delivery dead-man exactly like a week of delivery** — the alarm could be silenced by the state it exists to
+distinguish. **Three corrections to my OWN statements, two caught by machinery not by me:** the wipe TOMBSTONES so
+there is no S3 orphan (I had said delete); I measured the census at 649 then ADDED a gate, and CI caught the stale
+ceiling inside my own PR; and a `git archive` export cannot measure main's suite (no `.git`/`node_modules`) — I ran
+it, got 30 failures, and discarded the measurement rather than reporting it. **`test_wrap_gate_lines` was RED on
+unmodified main and nothing reported it** (AH wrote the Backlog marker with a parenthetical where the gate matches
+it exactly) — verified in a disposable export before claiming it was not mine; repaired. **Owner acts:**
+3563's scoped `logs:FilterLogEvents` grant — one sentence, yes or no, and no Lambda in the fleet reads CloudWatch
+Logs today · 3715 · 3601 box 3b · 3042 · 3606 · 2883 · the 5 standing `acceptance_count` violations (3607 3611
+3615 3617 3621) still need splitting, not trimming. **Final measured: 117 open / 84 addressable.**
 

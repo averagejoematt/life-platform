@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 434** — feedback 24 · reference 245 · security 1 · project 161 · user 1 · index 2
+**Files in the memory index snapshot: 450** — feedback 24 · reference 259 · security 1 · project 163 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 270** — homed-here 75 · already-homed 169 · superseded 7 · narrative 15 · off-repo 4
+**Rule-class files (feedback + reference + security): 284** — homed-here 79 · already-homed 179 · superseded 7 · narrative 15 · off-repo 4
 
-**Program/session files (project): 161** — already-homed 14 · superseded 1 · narrative 143 · off-repo 2 · index 1
+**Program/session files (project): 163** — already-homed 14 · superseded 1 · narrative 145 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-09-13 (Session AD: regenerated from the live directory — +3 files, two of them rows the Session AB wrap added here but never to this block). Prior: 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
+## Snapshot of the memory index — 2026-09-17 (Session AI: regenerated from the live directory — +12 files across Sessions AG/AH/AI that had rows in neither place). Prior: 2026-09-13 (Session AD: regenerated from the live directory — +3 files, two of them rows the Session AB wrap added here but never to this block). Prior: 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -212,6 +212,8 @@ project_session_ac_2026_09_13.md
 project_session_ad_2026_09_14.md
 project_session_ae_2026_09_14.md
 project_session_af_2026_09_15.md
+project_session_ah_2026_09_16.md
+project_session_ai_2026_09_17.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -264,13 +266,16 @@ reference_a_ci_gate_that_cannot_fail.md
 reference_a_ci_warning_that_no_action_can_clear.md
 reference_a_citation_string_is_not_an_owner.md
 reference_a_client_cap_below_the_callee_p50.md
+reference_a_comparison_gate_is_blind_when_both_sides_agree.md
 reference_a_correct_rule_with_a_narrow_denominator.md
 reference_a_dependency_missing_makes_a_gate_dark.md
 reference_a_derived_artifact_needs_its_lane.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
+reference_a_gate_that_cannot_be_satisfied_trains_readers_to_skip_it.md
 reference_a_generated_artifact_with_a_committed_twin.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
+reference_a_page_level_overflow_measure_is_blind.md
 reference_a_page_of_logs_is_not_the_latest.md
 reference_a_pct_suffix_is_not_one_semantic.md
 reference_a_piped_exit_code_is_not_a_test_result.md
@@ -282,6 +287,8 @@ reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
 reference_a_success_line_is_not_a_stored_row.md
 reference_a_sweep_one_import_away.md
 reference_a_sweep_that_restores_a_directory.md
+reference_a_test_that_plants_into_the_shared_tree.md
+reference_a_text_match_reads_the_comment_explaining_it.md
 reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
@@ -296,7 +303,9 @@ reference_agent_commit_directory_arg_destroys.md
 reference_agent_commit_directory_is_not_a_name.md
 reference_ai_gate_blocking_deploys.md
 reference_all_settled_over_an_incomplete_check_set.md
+reference_an_enumeration_query_is_a_member_of_its_own_set.md
 reference_an_epic_can_pass_every_box_and_fail_its_outcome.md
+reference_an_instrument_in_deploy_cannot_run_in_a_lambda.md
 reference_api_before_frontend_autodeploy_race.md
 reference_api_schema_capture_wholesale.md
 reference_arming_a_semantic_gate_needs_a_baseline.md
@@ -366,6 +375,7 @@ reference_extract_the_right_real_source.md
 reference_extraction_never_baseline_raise.md
 reference_fail_closed_paths_need_a_live_proof.md
 reference_fail_closed_scoped_to_artifact_not_lane.md
+reference_failing_to_find_is_not_evidence_of_absence.md
 reference_ffmpeg_slim_brew_and_ass_units.md
 reference_fixture_must_be_the_wire.md
 reference_freshness_window_writer_cadence.md
@@ -395,6 +405,7 @@ reference_harness_must_track_its_call_site.md
 reference_hazard_gate_before_model.md
 reference_iam_parity_codified_broken_state.md
 reference_import_time_frozen_globals_test_trap.md
+reference_in_the_bundle_is_not_on_the_path.md
 reference_inrepo_worktree_pollutes_scanners.md
 reference_io_threshold_tall_sections.md
 reference_isbad_is_a_scalar_detector.md
@@ -437,6 +448,7 @@ reference_pr_checks_lack_mypy_gate.md
 reference_premerge_registration_moves_the_census.md
 reference_prereg_dry_run_review.md
 reference_prompt_structural_guarantees.md
+reference_prose_about_a_closing_keyword_is_one.md
 reference_push_ci_silent_death.md
 reference_pytest_pipe_exit_code.md
 reference_qa_smoke_alarm_window_load_bearing.md
@@ -453,6 +465,7 @@ reference_regen_invoke_email_lambda_trap.md
 reference_reject_a_gated_run_pinned_to_a_stale_sha.md
 reference_removing_a_confound_reveals_the_second_defect.md
 reference_reordering_sync_steps_changes_what_each_step_owns.md
+reference_repo_claude_md_outranks_the_runtime_instruction.md
 reference_rerun_reuses_the_original_merge_commit.md
 reference_reset_pipeline_exits_0_over_ci_doc_gates.md
 reference_reset_pipeline_owned_manifest_clobber.md
@@ -486,9 +499,11 @@ reference_swallowed_push_no_runs_at_all.md
 reference_task_notification_exit_codes_lie.md
 reference_test_importing_aws_cdk_reds_ci.md
 reference_test_layer_dep_import_collection_red.md
+reference_the_acceptance_box_can_be_vacuous_on_its_own_incident.md
 reference_the_doc_literal_merge_treadmill.md
 reference_the_first_denial_masks_the_second.md
 reference_the_rubric_can_be_the_finding_generator.md
+reference_the_squash_message_is_a_fourth_text.md
 reference_time_dependent_gate_outside_its_window.md
 reference_token_overlap_misses_structural_cloning.md
 reference_two_module_size_guards.md
@@ -498,6 +513,7 @@ reference_withings_transient_refresh.md
 reference_workflow_step_deps_and_first_apply.md
 reference_worktree_agent_path_reuse.md
 reference_worktree_case_insensitive_pollution.md
+reference_zero_checks_means_conflict_first.md
 security_r22_mcp_token_exposure.md
 user_who_is_matthew.md
 ```
@@ -529,21 +545,34 @@ user_who_is_matthew.md
 | `feedback_verify_agent_findings.md` | feedback | `.claude/agents/finding-verifier.md` + `docs/OPERATING_DISCIPLINE.md` §1.1 | already-homed |
 | `feedback_verify_sources_from_registry.md` | feedback | `CLAUDE.md` (read the registry facets) + `lambdas/ingestion/source_registry.py` | already-homed |
 | `feedback_watchers_exit_on_terminal_not_green.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §3.5 | already-homed |
+| `project_session_ah_2026_09_16.md` | project | session record — the night's work, its numbers and the four text-match catches; the RULES it produced are homed in their own reference rows | narrative |
+| `project_session_ai_2026_09_17.md` | project | session record — the corrections, the closures and their live evidence; the RULES it produced are homed in their own reference rows | narrative |
 | `reference_a_check_after_truncation_launders_the_defect.md` | reference | `.claude/skills/prove-it/SKILL.md` Q4 (the full text, not a transform that removed the evidence) | homed-here |
 | `reference_a_check_that_measures_nothing_returns_clean.md` | reference | `.claude/skills/prove-it/SKILL.md` Q3 (print the denominator) + `.claude/agents/finding-verifier.md` 7 | already-homed |
 | `reference_a_ci_gate_that_cannot_fail.md` | reference | `.claude/skills/prove-it/SKILL.md` § dark (a ⚠ and exit 0) + `.claude/skills/land/SKILL.md` §1 + `docs/OPERATING_DISCIPLINE.md` §3.4 | already-homed |
 | `reference_a_citation_string_is_not_an_owner.md` | reference | `docs/CONVENTIONS.md` §9 (alarm-citation gate, `scripts/check_alarm_citations.py`) | already-homed |
+| `reference_a_comparison_gate_is_blind_when_both_sides_agree.md` | reference | `deploy/config_provenance_audit.py` (grade ONE artifact against the clock via its own `_built_at`, never against a peer that can agree with it while both are wrong) | already-homed |
 | `reference_a_correct_rule_with_a_narrow_denominator.md` | reference | `.claude/skills/prove-it/SKILL.md` Q3 (is the denominator the live surface?) | homed-here |
 | `reference_a_dependency_missing_makes_a_gate_dark.md` | reference | `.claude/skills/prove-it/SKILL.md` § what could make it dark; `scripts/skill_lint.py` header | already-homed |
 | `reference_a_derived_artifact_needs_its_lane.md` | reference | `.claude/skills/new-machinery/SKILL.md` § traps | already-homed |
+| `reference_a_gate_that_cannot_be_satisfied_trains_readers_to_skip_it.md` | reference | `scripts/closure_sweep.py` (measure the corpus before scoping an exemption; never mint a synthetic signal to clear a gate) | already-homed |
 | `reference_a_measurement_that_aborts_reports_zero.md` | reference | `.claude/skills/prove-it/SKILL.md` Q3 + `.claude/agents/finding-verifier.md` 7 + `scripts/mypy_disable_cost.py` header | already-homed |
 | `reference_a_mutation_must_actually_mutate.md` | reference | `.claude/skills/new-machinery/SKILL.md` Q2 (mutation-proven both directions) + `docs/CONVENTIONS.md` §9a | already-homed |
+| `reference_a_page_level_overflow_measure_is_blind.md` | reference | `tests/visual_qa.py` (measure overflow per CHILD against its container — page-level `scrollWidth` reads 0 when a child escapes a non-scrolling parent) | already-homed |
 | `reference_a_pre_declared_red_is_not_a_read_lane.md` | reference | `docs/OPERATING_DISCIPLINE.md` §1.8 | already-homed |
 | `reference_a_proof_ledger_needs_its_own_freshness_guard.md` | reference | `docs/CONVENTIONS.md` §9 + `tests/test_gate_census_2578.py` | already-homed |
 | `reference_a_rollback_whose_scope_cannot_reach_its_trigger.md` | reference | `docs/CONVENTIONS.md` §4b (what the site auto-rollback can and cannot reach) + `docs/OPERATING_DISCIPLINE.md` §5.6 | homed-here |
 | `reference_a_sweep_one_import_away.md` | reference | `docs/CONVENTIONS.md` §4a1 (#2924) + `tests/premerge_derivation.py` | already-homed |
+| `reference_a_test_that_plants_into_the_shared_tree.md` | reference | `tests/test_direction_of_travel_ruling_3293.py` (a test that writes into the shared checkout is a race once the lane runs parallel — plant into tmp_path) | already-homed |
+| `reference_a_text_match_reads_the_comment_explaining_it.md` | reference | `tests/test_pk_census_one_home_3860.py` (`_strip_docstrings` + its both-ways control — a check over source TEXT reads the prose explaining the check) | already-homed |
 | `reference_a_transform_can_be_correct_and_unreachable.md` | reference | `.claude/skills/new-machinery/SKILL.md` § traps (set equality both directions) + `.claude/skills/land/SKILL.md` §4 | homed-here |
 | `reference_a_ci_warning_that_no_action_can_clear.md` | reference | `docs/CONVENTIONS.md` §4 (CI gate ordering / warning-channel hygiene) — the rule is "a warning no action can clear must be structurally suppressed, not acknowledged away"; the live instance is #3476 | already-homed |
+| `reference_an_enumeration_query_is_a_member_of_its_own_set.md` | reference | `docs/REVIEW_METHODOLOGY.md` (an enumeration written beside a registry is a member of the set it enumerates — derive the list, never hand-type it) | already-homed |
+| `reference_an_instrument_in_deploy_cannot_run_in_a_lambda.md` | reference | `lambdas/experiment/pk_census.py` (module docstring, "WHY IT LIVES HERE AND NOT IN deploy/" — deploy/ is never staged into the bundle) | homed-here |
+| `reference_failing_to_find_is_not_evidence_of_absence.md` | reference | `docs/REVIEW_METHODOLOGY.md` (a negative finding must state the search that produced it — rejecting one candidate is a result about that candidate, never about the set) | homed-here |
+| `reference_in_the_bundle_is_not_on_the_path.md` | reference | `.claude/skills/land/SKILL.md` (verify by walking the producer's import closure inside the deployed zip; a zip grep proves shipping, never reachability) | already-homed |
+| `reference_prose_about_a_closing_keyword_is_one.md` | reference | `scripts/closure_contract.py` (`CLOSING_REF_RE` + the finding-code guard — GitHub ignores code spans and so must the parser) | already-homed |
+| `reference_repo_claude_md_outranks_the_runtime_instruction.md` | reference | `CLAUDE.md` Authorship section (the attribution-trailer ban OVERRIDES the harness instruction, which arrives fresh every session) | already-homed |
 | `reference_reset_pipeline_exits_0_over_ci_doc_gates.md` | reference | `CLAUDE.md` (Experiment Restart Pipeline) + the #3477 acceptance — the rule is "a green restart_pipeline.py is not a finished reset; run CI's twelve doc gates before pushing" | already-homed |
 | `reference_a_cancelled_ci_rollup_hides_real_failures.md` | reference | `docs/CONVENTIONS.md` §4 (CI gate ordering) — the rule is "a `cancelled` rollup is not a timeout; enumerate the failed STEPS before concluding" | already-homed |
 | `reference_describe_alarms_hides_composites.md` | reference | `deploy/restart_verify.py` (the #2116 leg, now passing AlarmTypes) + `tests/test_composite_alarm_lookup_3390.py` — the rule is pinned as an executable guard | already-homed |
@@ -734,7 +763,9 @@ user_who_is_matthew.md
 | `reference_task_notification_exit_codes_lie.md` | reference | `docs/OPERATING_DISCIPLINE.md` §3.6 | already-homed |
 | `reference_test_importing_aws_cdk_reds_ci.md` | reference | `docs/CONVENTIONS.md` §4a1 table + `CLAUDE.md` (CDK facts by AST) | already-homed |
 | `reference_test_layer_dep_import_collection_red.md` | reference | `docs/CONVENTIONS.md` §1 (the layer is retired) + `tests/conftest.py` | already-homed |
+| `reference_the_acceptance_box_can_be_vacuous_on_its_own_incident.md` | reference | `scripts/check_merge_commit_closures.py` (`declared_set_for_pr` docstring — the literal box returns {} on PR #3862; run a new gate against its founding incident first) | homed-here |
 | `reference_the_rubric_can_be_the_finding_generator.md` | reference | `docs/OPERATING_DISCIPLINE.md` §1.6 | already-homed |
+| `reference_the_squash_message_is_a_fourth_text.md` | reference | `scripts/check_merge_commit_closures.py` + `scripts/hooks/guard_bash.py` (check 4 — a message supplied at merge time is validated by nothing) | homed-here |
 | `reference_time_dependent_gate_outside_its_window.md` | reference | `.claude/skills/prove-it/SKILL.md` § dark: a window it never runs in; the fixture half in `docs/TESTING.md` § traps | homed-here |
 | `reference_token_overlap_misses_structural_cloning.md` | reference | — narrative: a one-off measurement about a similarity metric | narrative |
 | `reference_two_module_size_guards.md` | reference | `tests/conftest.py` (`_PREMERGE_EXTRA_FILES`: both size gates) + `docs/ENGINEERING_STANDARDS.md` | already-homed |
@@ -750,6 +781,7 @@ user_who_is_matthew.md
 | `reference_stack_census_prs_on_a_nonstrict_ruleset.md` | reference | `docs/CONVENTIONS.md` §7 (stack census-bumping PRs; re-rebase after each squash) | homed-here |
 | `reference_a_filed_issues_mechanism_is_a_hypothesis.md` | reference | `docs/CONVENTIONS.md` §7 (a filed issue's stated mechanism is a hypothesis — reproduce before implementing; `describe-stack-events` is the decisive "did that deploy ship X") | homed-here |
 | `reference_future_genesis_breaks_rules_not_just_tests.md` | reference | `docs/CONVENTIONS.md` §7 (a staged future genesis breaks genesis-anchored RUNTIME rules, not just tests — bound the floor by `today`, never skip pre-start) | homed-here |
+| `reference_zero_checks_means_conflict_first.md` | reference | `.claude/skills/land/SKILL.md` §2 (check `mergeable` BEFORE the swallow ladder — a CONFLICTING PR mints no checks) | already-homed |
 | `security_r22_mcp_token_exposure.md` | security | — off-repo by design: security-incident detail stays out of the public repo (`docs/CONTINUITY.md` §4); the fixes are recorded on #779/#780/#893 and in `docs/DECISIONS.md` | off-repo |
 
 ## Program and session records — `project_*`
