@@ -136,26 +136,45 @@ def test_the_ceiling_is_above_the_measured_working_median():
     )
 
 
-def test_the_ceiling_carries_its_measurement_and_its_censoring():
+def test_the_ceiling_carries_its_re_derivation():
     """A raised timeout with no recorded reasoning is indistinguishable from someone
-    rounding up until the red stopped. The comment must carry BOTH the step-change
-    evidence and the admission that this is not a derived percentile."""
+    rounding up until the red stopped. The comment must carry the derivation.
+
+    WHAT THIS TEST USED TO ASSERT, AND WHY IT CHANGED. Until 2026-09-17 it required
+    the comment to STATE that the distribution was censored at 90s and to DISCLAIM
+    300s as a derived p95 — the honest thing to demand while the only sample anyone
+    had was the whole-invocation series, which the old ceiling truncated. That fact
+    is now superseded, not inconvenient: the invocation is two sequential Bedrock
+    calls and the FIRST one completes on every run, including the runs the ceiling
+    killed in the second. That leg was never censored. n=19 of it is recoverable
+    from the log stream back to 2026-09-01, the gate leg adds two uncensored
+    observations, and 2 x max + overhead reproduces the observed 115.2s to within
+    2s. So the requirement flips from "admit you cannot derive this" to "show the
+    derivation", and the disclaimer it replaces would now be false.
+    """
     block = _ensemble_block()
     assert "#3829" in block, "the ceiling change cites no issue"
     assert "budget" in block.lower() or "tier" in block.lower(), (
         "the comment must name WHY the old ceiling looked generous — the feature was budget-paused, "
         "so 90s was sized against an idle cost, not against the work"
     )
-    # Deliberately NOT a bare `"censor" in ...`: the comment also says it wants to
-    # "UNCENSOR the measurement", and that substring alone kept this assertion green
-    # when the mutation run stripped the actual claim. Require the claim.
     low = block.lower()
-    assert "distribution is censored" in low or "is censored at" in low, (
-        "the comment must STATE that the post-08-31 distribution is censored at the old ceiling — not "
-        "merely mention censoring in passing. Recording 300s as a derived p95 over a censored sample "
-        "would be a fabricated statistic (ADR-105)."
+    # The censoring history must survive: it is the reason the derivation is per-LEG
+    # rather than per-invocation, and a reader who loses it will "simplify" the
+    # comment back into a percentile over a truncated sample.
+    assert "censored" in low, "the comment lost the censoring history — the per-leg derivation stops making sense without it"
+    # A sample size. A number with no n behind it is a feeling (ADR-105).
+    assert re.search(r"\bn=\d+", block), "the derivation states no sample size — an unqualified max is not a measurement"
+    # The arithmetic, both sides of it: the modelled worst case AND the independent
+    # observation that validates it. Either alone is assertable without measuring.
+    assert "117s" in block, "the modelled worst case (2 x the per-call max + overhead) is not written down"
+    assert "115.2s" in block, "the observed whole-invocation max that corroborates the model is not written down"
+    # Headroom as a horizon, not as a vibe: the per-call max is not stationary, so
+    # "2.5x" alone would be a number with no expiry.
+    assert "day" in low and re.search(r"\+?1\.3s/day|2\.6s/day", block), (
+        "the headroom must be justified against the measured GROWTH RATE, not as a bare multiple — the "
+        "per-call max moved 34.7s -> 57.0s over 17 days and a ceiling with no horizon silently expires"
     )
-    assert "not" in low and "p95" in low, "the comment must disclaim 300s as a derived percentile, in words"
 
 
 def test_the_feature_is_still_budget_paused_at_tier_one():

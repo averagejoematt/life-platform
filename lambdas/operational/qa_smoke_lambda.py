@@ -59,6 +59,7 @@ from operational import (
     acwr_liveness_qa,  # noqa: E402
     canary_precision_qa,  # noqa: E402  (#3485 size-split)
     chronicle_manifest_qa,  # noqa: E402  (#3485)
+    ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
     qa_check_edge_429,  # noqa: E402
@@ -1007,6 +1008,13 @@ def check_steps():
         ("acwr_liveness", lambda: acwr_liveness_qa.check_acwr_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now)),  # #3443 dead-man
         # #3569 dead-man: a nudge reservation must reach a terminal status and every terminal row must have its NUDGE# record
         ("nudge_ledger_liveness", lambda: nudge_ledger_qa.check_nudge_ledger_liveness(table, Check, CONTENT_TRUTH, pt_now)),
+        # #3829 dead-man: coach-ensemble-digest writes exactly one ENSEMBLE#digest row per cycle on EVERY
+        # non-crashing path (including the budget-tier pause), so a missing CYCLE# row is unambiguous. Two of
+        # four cycles were missing for eight days with nothing reporting it but a DLQ alarm a human read at wrap.
+        (
+            "ensemble_digest_liveness",
+            lambda: ensemble_digest_qa.check_ensemble_digest_liveness(table, Check, CONTENT_TRUTH, pt_now),
+        ),
         # #3666: a habit may not read `failed` on a Pacific day an independent instrument
         # measured the same behaviour on (Weigh In vs Withings, Food Journal vs MacroFactor)
         (

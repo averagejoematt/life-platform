@@ -539,15 +539,44 @@ class ComputeStack(Stack):
             # 62,279ms, n=15) and has breached the ceiling on 3 of the last 4 cycles,
             # costing 3 x 90s of billed Bedrock work per breach and landing no row.
             #
-            # 300s is NOT a re-derived p95 and must not be recorded as one. The
-            # post-08-31 distribution is CENSORED at 90s — two observations sit exactly
-            # on the ceiling, so the true tail is unknown and no percentile over it is
-            # honest. This value is deliberately generous to UNCENSOR the measurement:
-            # let it run uncapped for a fortnight, then derive the real ceiling from an
-            # uncensored window the way #3678 does for CI jobs. Raising first and
-            # measuring second is the only order that can produce a true number.
-            # At 256MB a 300s worst case is ~$0.001/run; the cost of the wrong value in
-            # the other direction is a lost daily row plus 3x the Bedrock spend.
+            # RE-DERIVED 2026-09-17 (#3829 box 2). The value is unchanged at 300; what
+            # changed is that it is now a measurement instead of a placeholder.
+            #
+            # The earlier note here said the distribution was CENSORED at 90s and that an
+            # honest number needed a fortnight of uncapped running. That was true of the
+            # whole-INVOCATION series and false of its parts. The invocation is two
+            # sequential Bedrock calls, and the FIRST one completes on every run — including
+            # the ones the ceiling killed, which died in the second. That leg was never
+            # censored, and it is measurable back to 2026-09-01 from the log stream
+            # (GEN-CACHE-MISS -> "Ensemble digest produced"):
+            #
+            #   one Bedrock call, max_tokens=6000, 7-coach prompt, n=19 (2026-09-01..09-17)
+            #     min 16.5s   median 36.0s   p90 52.1s   MAX 57.0s
+            #   the gate's corrective regen, the second call, n=2 uncensored (09-16, 09-17)
+            #     55.3s, 56.6s          <- same population, same prompt, same ceiling
+            #   fixed overhead measured on 09-17: init 0.7s + gather 0.6s + persist 1.1s
+            #
+            #   worst case = 2 x 57.0s + 3s = 117s
+            #   observed whole-invocation max under the raised ceiling: 115.2s (09-17)
+            #
+            # The model and the observation agree to 2s, which is what makes the 2-leg
+            # derivation usable at n=2 on the whole run: the leg sample is n=21.
+            #
+            # HEADROOM IS SIZED TO A HORIZON, NOT A FEELING. The per-call max is not
+            # stationary — it moved 34.7s (09-01) to 57.0s (09-17), about +1.3s/day, and
+            # both legs grow together, so the invocation grows ~+2.6s/day. From 117s a 300s
+            # ceiling absorbs (300-117)/2.6 ~= 70 days of that trend. That is the number
+            # 300 encodes: 2.56x the measured worst case, or one quarter of runway before
+            # this comment has to be re-measured. Re-derive when the per-call max passes
+            # ~115s, whichever comes first.
+            #
+            # Deliberately NOT lowered toward 117s. Lambda bills wall clock actually used,
+            # so a generous ceiling on a once-daily function costs nothing (~$0.001/run at
+            # 256MB in the worst case) while a tight one costs the cycle row plus 3x the
+            # Bedrock spend — the asymmetry that produced this issue. #3829 also added a
+            # deadline guard in the handler (_GATE_REGEN_BUDGET_S) so that even a breach of
+            # this ceiling's assumptions degrades to a stored fallback row rather than to
+            # nothing at all.
             timeout_seconds=300,
             memory_mb=256,
             environment={
