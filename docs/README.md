@@ -97,6 +97,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
 | [PROPORTIONALITY.md](PROPORTIONALITY.md) | The complexity-posture ledger — posture, rent, demote trigger per subsystem (ADR-103/144) |
 | [SECURITY.md](SECURITY.md) | Threat model, defense layers, accepted risks |
+| [CI_CONTINUE_ON_ERROR_REGISTRY.md](CI_CONTINUE_ON_ERROR_REGISTRY.md) | **Every `continue-on-error` site in `.github/workflows/`, with a dated verdict** — covered / accepted / residual / resolved; a swallowed step reports `success`, which is how one build shipped with no SBOM while both steps read green (3848). Guarded by `tests/test_continue_on_error_registry_3848.py` |
 | [LICENSES.md](LICENSES.md) | Third-party license inventory (3 binary layers · CDK · dev deps), the LGPL-LAME edge as a written non-issue, repo LICENSE posture + AI-content ownership stance (#1352) |
 | [REMEDIATION_TAXONOMY.md](REMEDIATION_TAXONOMY.md) | The self-healing agent's classifier rubric |
 | [MANAGED_WHERE_LEDGER.md](MANAGED_WHERE_LEDGER.md) | Out-of-IaC resources — what's managed where |
