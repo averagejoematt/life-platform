@@ -1295,6 +1295,66 @@ GUARD_PROOFS.update(
     }
 )
 
+GUARD_PROOFS.update(
+    {
+        # #3511: the pre-genesis prediction provenance contract. Four mutations planted
+        # ONE AT A TIME in the real tracked module and reverted immediately after the
+        # verdict was read — each the plausible "simplification" of one clause.
+        "guard::deploy/prereg_provenance_gate.py": {
+            "gate_name": "deploy/prereg_provenance_gate.py",
+            "command": (
+                "python3 -m pytest tests/test_prereg_pregenesis_contract_3511.py -q   # 20 tests, baseline 20 passed; "
+                "plus the live read-only run python3 deploy/prereg_provenance_gate.py"
+            ),
+            "mutation": (
+                "Four defects planted one at a time in the REAL tracked file (md5 asserted changed before each "
+                "verdict was read, and byte-identical again after each revert): "
+                "M1 — the write-instant clause disarmed (`if False and written is not None and written <= boundary`), "
+                "i.e. the founding specimen's whole class stops being reported. "
+                "M2 — `in_season()` requiring an explicit phase (`return phase == EXPERIMENT_PHASE_CURRENT`), i.e. an "
+                "unstamped row treated as out-of-season when `attribute_not_exists(phase)` passes "
+                "PHASE_FILTER_EXPRESSION forever and the row IS served. "
+                "M3 — the vacuity guard softened: `frozen_prediction_ids()` returning `set()` on a shapeless "
+                "artifact instead of raising, which inverts the gate (every pre-genesis row unsealed, every sealed "
+                "row present). "
+                "M4 — the mirror clause deleted (`for pid in sorted(set())`), i.e. a sealed bet stranded out of the "
+                "season stops being reported at all."
+            ),
+            "observed": (
+                "2026-09-17, watched one mutation at a time, each reverted before the next. BASELINE 20 passed, exit 0. "
+                "M1 RED (6 failed, 14 passed, exit 1) — test_the_founding_specimen_is_reported, "
+                "test_the_boundary_is_pacific_midnight_not_utc_midnight, test_an_unstamped_row_counts_as_in_season, "
+                "test_the_committed_capture_reproduces_the_live_verdict, and BOTH in-test mutation controls. "
+                "M2 RED (1 failed, 19 passed, exit 1) — test_an_unstamped_row_counts_as_in_season (and only that one, which is the right "
+                "blast radius for a clause about unstamped rows). "
+                "M3 RED (1 failed, 19 passed, exit 1) — test_a_shapeless_artifact_raises_rather_than_sealing_nothing. "
+                "M4 RED (4 failed, 16 passed, exit 1) — test_missing_seal_is_only_blocking_from_genesis_onward, "
+                "test_a_sealed_row_stranded_out_of_phase_is_reported_missing, "
+                "test_the_committed_capture_reproduces_the_live_verdict, test_as_of_accepts_a_date_object_too. "
+                "RESTORED: 20 passed, exit 0, `git diff --stat` empty — 0 failed. "
+                "The gate was ALSO watched reporting a real live defect on its first run, which is the stronger "
+                "half: against the live table on 2026-09-17 it returned "
+                "`{PRE_GENESIS_WRITE: 10, BACKDATED_UNSEALED: 0, SEALED_ROW_MISSING: 16}`, 26 blocking — the 16 "
+                "being every cycle-17 sealed bet, stranded at phase=pilot/cycle=16 by an attended seed that ran "
+                "the evening before Day 1. It found that on the run that introduced it."
+            ),
+            "scope": (
+                "The predicate is pure and is proved here against the committed frozen artifact plus a committed "
+                "read-only capture of the live ledger (tests/fixtures/prereg_season_rows_2026-09-17.json). What "
+                "that does NOT prove: that the credentialed callers actually reach it in anger — "
+                "restart_verify.py check 20 and genesis_prereg_stamp.py --apply are asserted only at the source "
+                "level here, and the seal-publish refusal has not been watched aborting a real publish (the next "
+                "attended seal is the first chance). Row COVERAGE is also bounded by "
+                "season_partitions(): predictions living outside a COACH#* pk would not be read at all. "
+                "BACKDATED_UNSEALED has no live specimen — zero rows in the corpus exercise it, so only the "
+                "synthetic case has been watched."
+            ),
+            "proved_on": "2026-09-17",
+        },
+    }
+)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
 # GUARD_PROOFS above, only because `gate_census.py` sits at its 1,200-line ceiling

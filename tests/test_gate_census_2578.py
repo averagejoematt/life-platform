@@ -686,7 +686,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # vacuous-scan trap) and #3863's detector D (GUARD_PROOFS, proven on the real d681aecc6
         # merge rather than a plant). Measured, not incremented: the branch census reported
         # {can-fail (proven) 104, unproven 537, not-applicable 6, attempted-unproven 3}.
-        <= 104
+        # 2026-09-17 (#3511): 104 -> 105. One entrant, arriving PROVEN — the pre-genesis
+        # prediction provenance contract (guard::deploy/prereg_provenance_gate.py), four
+        # mutations planted one at a time in the real tracked module plus the live run on
+        # which it reported 26 blocking findings against the real table. Measured, not
+        # incremented: the branch census reported {can-fail (proven) 105, unproven 537,
+        # not-applicable 6, attempted-unproven 3}, and the merge-base export reported 104.
+        <= 105
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
