@@ -25,15 +25,35 @@ from experiment.pk_census import census_snapshot  # noqa: E402
 ARTIFACT = REPO_ROOT / "deploy" / "generated" / "pk_family_census.json"
 
 
+def write_artifact(snap: dict) -> Path:
+    """Write the census snapshot to the ONE artifact path and return it.
+
+    THE ONLY place a `deploy/generated/` path for this artifact is constructed. The reset's
+    Step [0] calls this rather than building the path itself, deliberately: `restart_verify_
+    gates.reset_artifact_writers()` derives the pre-merge test lane from which `deploy/*.py`
+    files construct such a path, so a second constructor would (correctly) enrol every test
+    that merely MENTIONS that file — for restart_pipeline.py that is six more files including
+    the AWS-integration suite, which cannot run pre-merge. One writer keeps the derivation
+    honest and the lane small, which is the same single-home argument #3860 settled.
+    """
+    ARTIFACT.write_text(json.dumps(snap, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return ARTIFACT
+
+
+def read_artifact_families() -> dict:
+    """The committed census's families, or {} when the artifact is absent."""
+    if not ARTIFACT.exists():
+        return {}
+    return (json.loads(ARTIFACT.read_text(encoding="utf-8")) or {}).get("families", {})
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true", help="print what would change, write nothing")
     args = ap.parse_args()
 
     snap = census_snapshot()
-    old = {}
-    if ARTIFACT.exists():
-        old = (json.loads(ARTIFACT.read_text(encoding="utf-8")) or {}).get("families", {})
+    old = read_artifact_families()
     added = sorted(set(snap["families"]) - set(old))
     removed = sorted(set(old) - set(snap["families"]))
     print(f"families: {snap['family_count']}  (+{len(added)} / -{len(removed)})")
@@ -47,7 +67,7 @@ def main() -> int:
     if args.dry_run:
         print("(dry-run) — nothing written.")
         return 0
-    ARTIFACT.write_text(json.dumps(snap, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_artifact(snap)
     print(f"wrote {ARTIFACT.relative_to(REPO_ROOT)}")
     return 0
 

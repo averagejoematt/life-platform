@@ -45,9 +45,7 @@ from decimal import Decimal
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058
-from experiment.phase_taxonomy import (
-    experiment_stamp_for,
-)  # #2811: hoisted — it was imported locally in two functions; #3514: per-row class gate
+from experiment.phase_taxonomy import experiment_stamp_for  # #2811: hoisted from two functions; #3514: per-row class gate
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:

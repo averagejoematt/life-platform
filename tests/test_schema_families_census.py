@@ -44,7 +44,12 @@ SCHEMA = REPO_ROOT / "docs" / "SCHEMA.md"
 CENSUS = REPO_ROOT / "deploy" / "generated" / "pk_family_census.json"
 
 # family/source -> the written reason it is undocumented. Keep it empty.
-_UNDOCUMENTED_EXEMPT: dict[str, str] = {}
+#
+# Named to match none of `gate_census._REGISTRY_NAME`'s patterns, for the reason
+# `gate_census_enforcement.NOT_APPLICABLE_REASONS` carries: a registry-shaped name in a
+# test file is expanded entry-by-entry by the census's family-3 walk into one phantom
+# verdict-less gate per row. This dict holds EXEMPTIONS FROM a gate, not gates.
+UNDOCUMENTED_FAMILY_REASONS: dict[str, str] = {}
 
 
 def _schema_text() -> str:
@@ -84,7 +89,7 @@ def test_the_matcher_is_neither_a_substring_nor_a_suffix_match():
 
 def test_every_classified_source_is_documented():
     text = _schema_text()
-    missing = sorted(s for s in taxonomy.SOURCE_CLASS if not _mentioned(s, text) and s not in _UNDOCUMENTED_EXEMPT)
+    missing = sorted(s for s in taxonomy.SOURCE_CLASS if not _mentioned(s, text) and s not in UNDOCUMENTED_FAMILY_REASONS)
     assert not missing, (
         f"{len(missing)} source(s) are classified in phase_taxonomy.SOURCE_CLASS and appear nowhere in "
         f"docs/SCHEMA.md, which CLAUDE.md calls authoritative: {missing}. Add a row to the matching "
@@ -116,7 +121,7 @@ def test_the_census_artifact_exists_and_is_not_empty():
 def test_every_live_family_is_documented():
     snap = json.loads(CENSUS.read_text(encoding="utf-8"))
     text = _schema_text()
-    missing = sorted(f for f in snap["families"] if not _mentioned(_token_for(f), text) and f not in _UNDOCUMENTED_EXEMPT)
+    missing = sorted(f for f in snap["families"] if not _mentioned(_token_for(f), text) and f not in UNDOCUMENTED_FAMILY_REASONS)
     assert not missing, (
         f"{len(missing)} live pk family/families appear nowhere in docs/SCHEMA.md: {missing}. These are "
         f"partitions the table HOLDS (census taken {snap.get('generated_at')})."
@@ -147,5 +152,5 @@ def test_the_census_families_still_classify_against_TODAYS_taxonomy():
 
 
 def test_the_exemption_registry_is_documented_when_used():
-    for fam, reason in _UNDOCUMENTED_EXEMPT.items():
+    for fam, reason in UNDOCUMENTED_FAMILY_REASONS.items():
         assert isinstance(reason, str) and len(reason) >= 25, f"{fam}: an exemption needs a real written reason, got {reason!r}"

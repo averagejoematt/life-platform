@@ -1014,6 +1014,45 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
     # session that wrote it, not synthetic plants — M1 is the bug that shipped and was
     # caught by rendering against live data, M2 is the wrong read seam the plan itself
     # recommended before the audience registers were checked.
+    # #3514: the write-time provenance gate. The mutation is not synthetic — it is the
+    # EXACT code that was live on main, and the 22 rows it produced were measured on the
+    # real table the same day (deploy/reconcile_provenance_2026_09.py --only 3514).
+    "structural::test_phase_provenance_3514.py": {
+        "gate_name": "test_phase_provenance_3514.py",
+        "command": "python3 -m pytest tests/test_phase_provenance_3514.py -q   # 24 tests; baseline 24 passed",
+        "mutation": (
+            "`lambdas/coach/coach_state_updater._put_item` reverted to the shipped pre-#3514 line — "
+            "`{**experiment_stamp(), **item}` with the matching import — i.e. the literal state of main at "
+            "4b115435e, under which 7 COACH#*/RELATIONSHIP#state singletons and 15 CHAT# rows were carrying "
+            "phase=experiment / cycle=17 on partitions ADR-153 makes CROSS_PHASE. Real tree, not a fixture; the "
+            "file's md5 was read before (7e1384ca61d33ea858f0df402fea6021) and after "
+            "(19451a964cc5d29e2a1ece8257f3302d) and asserted DIFFERENT before the verdict was read, because a "
+            "macOS `sed -i ''` exits 0 on a no-match and a silently no-op control reports the guard working."
+        ),
+        "observed": (
+            "MUTATED: 5 failed, 19 passed — and the two legs failed independently, which is the point. "
+            "BEHAVIOURAL (3): test_the_real_writers_put_no_provenance_on_a_cross_phase_row reds once per "
+            "CROSS_PHASE sk (RELATIONSHIP#state, CHAT#<date>#<id>, CHAT#summary#<date>), each driven end to end "
+            "through the SHIPPED helper against a recording table, not a re-implementation of it. "
+            "AST (2): test_every_ungated_stamp_call_is_a_registered_exemption names the reverted module as an "
+            "unregistered direct caller, and test_the_ast_enumeration_is_not_vacuous reds on the Set drifting "
+            "from its exemption registry. Restored (md5 back to 7e1384ca…); 24 passed. Watched 2026-09-18."
+        ),
+        "scope": (
+            "Covers BOTH directions of the stamp decision, deliberately: that a CROSS_PHASE row gets no "
+            "provenance, AND — test_an_experiment_scoped_row_STILL_gets_one — that an EXPERIMENT_SCOPED row "
+            "still does. Without that second half a gate returning {} for everything would pass every "
+            "assertion here while silently creating the #3513 defect, where an unstamped scoped row satisfies "
+            "PHASE_FILTER_EXPRESSION forever and is served as current. "
+            "Does NOT cover the LIVE rows: the 22 already-stamped rows are the reconcile's job "
+            "(deploy/reconcile_provenance_2026_09.py --only 3514), and this file is why that reconcile holds — "
+            "all 22 were classed `writer-restamped`, so a data fix without the writer fix reverts within a day. "
+            "Does NOT cover the two registered exemptions' claim that SOURCE#achievements / "
+            "SOURCE#milestone_ledger hold no CROSS_PHASE sk class; that is phase_taxonomy's classification and "
+            "is graded by the totality census (experiment.pk_census), nightly and at every reset."
+        ),
+        "proved_on": "2026-09-18",
+    },
     "structural::test_recap_coach_line_3749.py": {
         "gate_name": "test_recap_coach_line_3749.py",
         "command": "python3 -m pytest tests/test_recap_coach_line_3749.py -q   # 51 tests; baseline 51 passed",

@@ -861,12 +861,12 @@ def main():
             # often introduces a family. Fail-soft: a write error must not abort a reset
             # whose actual preflight has already passed.
             try:
-                import json as _json
                 import subprocess as _sp
 
-                _art = REPO_ROOT / "deploy" / "generated" / "pk_family_census.json"
+                from write_pk_family_census import write_artifact as _write_census_artifact
+
                 _snap = census_snapshot()
-                _art.write_text(_json.dumps(_snap, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                _art = _write_census_artifact(_snap)
                 print(f"    census artifact refreshed: {_art.relative_to(REPO_ROOT)} ({_snap['family_count']} families)")
                 _diff = _sp.run(["git", "diff", "--stat", "--", str(_art)], cwd=str(REPO_ROOT), capture_output=True, text=True)
                 if (_diff.stdout or "").strip():

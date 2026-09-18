@@ -374,14 +374,9 @@ def _presence_signal():
 def _put_item(item):
     """Write an item to DynamoDB with float-to-Decimal conversion.
 
-    COACH#* rows (COMPRESSED#/STANCE#) are EXPERIMENT_SCOPED intelligence — stamp
-    write-time provenance (phase + cycle, #1233). The stamp is fail-soft and cached;
-    the item's own keys win, so it never clobbers or breaks the write.
-
-    #3514 (DA-6): gated per ROW via `experiment_stamp_for`, not per partition. This
-    helper takes an arbitrary item, so "the sks it writes today are all scoped" is a
-    fact about today's callers, not a property of the function — and the same sentence
-    in coach_state_updater's docstring was already false.
+    Write-time provenance (phase + cycle, #1233), fail-soft and cached; the item's own
+    keys win, so it never breaks the write. #3514 (DA-6) gates it per ROW, not per
+    partition — this helper takes an ARBITRARY item. See coach_state_updater._put_item.
     """
     from experiment.phase_taxonomy import experiment_stamp_for
 

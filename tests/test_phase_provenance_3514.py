@@ -137,7 +137,13 @@ def test_the_same_writers_STILL_stamp_a_scoped_row(monkeypatch, module_path, hel
 # Direct `experiment_stamp(...)` calls that remain ungated, each with the reason. A new
 # one reds this test: the point is that "which sks does this writer put?" stops being a
 # fact a reader has to re-derive per module.
-_UNGATED_EXEMPT = {
+#
+# The NAME deliberately matches none of `gate_census._REGISTRY_NAME`'s patterns (an
+# `*_EXEMPT*` binding here would be expanded entry-by-entry by the family-3 walk into one
+# phantom gate per ROW, injecting three verdict-less gates into the census — the #3315
+# class). Same reasoning, and the same fix, as `gate_census_enforcement.
+# NOT_APPLICABLE_REASONS`. The gate is the assertion below; these are its exemptions.
+UNGATED_STAMP_CALL_REASONS = {
     # Both compute ONE stamp and hand it to a helper that writes to
     # USER#matthew#SOURCE#{achievements,milestone_ledger} — SOURCE# partitions, which hold
     # no CROSS_PHASE sk class, so there is no row here the gate would change. Threading a
@@ -171,9 +177,9 @@ def _modules_calling_experiment_stamp_directly() -> dict:
 
 def test_every_ungated_stamp_call_is_a_registered_exemption():
     calls = _modules_calling_experiment_stamp_directly()
-    unregistered = {m: lines for m, lines in calls.items() if m not in _UNGATED_EXEMPT}
+    unregistered = {m: lines for m, lines in calls.items() if m not in UNGATED_STAMP_CALL_REASONS}
     assert not unregistered, (
-        "these writers call experiment_stamp() directly and are not in _UNGATED_EXEMPT — "
+        "these writers call experiment_stamp() directly and are not in UNGATED_STAMP_CALL_REASONS — "
         "use experiment_stamp_for(pk, sk) so the row's CLASS decides, or register the "
         f"exemption with the reason it is safe: {unregistered}"
     )
@@ -185,7 +191,7 @@ def test_the_ast_enumeration_is_not_vacuous():
     them proves the walker resolves real calls."""
     calls = _modules_calling_experiment_stamp_directly()
     assert calls, "the AST walk found ZERO experiment_stamp calls — the enumeration is broken, not clean"
-    assert set(calls) == set(_UNGATED_EXEMPT), f"exemption registry drifted from the live Set: found {sorted(calls)}"
+    assert set(calls) == set(UNGATED_STAMP_CALL_REASONS), f"exemption registry drifted from the live Set: found {sorted(calls)}"
 
 
 def test_the_gated_variant_is_actually_in_use():
