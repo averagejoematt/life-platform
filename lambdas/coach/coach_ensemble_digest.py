@@ -589,7 +589,28 @@ def _digest_prose_blob(digest):
     )
 
 
-def _apply_grounding_gate(digest, user_message):
+# #3829: what the grounding gate's corrective regen costs, MEASURED from the live
+# stream rather than assumed — it is a second full Bedrock call on the same 7-coach
+# prompt and it is the single largest consumer of the invocation:
+#
+#   2026-09-16  "Grounding gate finished in 55.3s (3 finding(s); 102.5s elapsed total)"
+#   2026-09-17  "Grounding gate finished in 56.6s (9 finding(s); 115.2s elapsed total)"
+#
+# plus the persist tail (gate -> END measured 1.1s on 09-17). 90s is that observed
+# maximum (56.6s) with the same margin again, rounded to the next 10s. Below this much
+# remaining time the regen CANNOT finish and write, so attempting it converts a
+# degraded-but-stored cycle into a stored-nothing cycle plus two async retries that
+# each redo the whole thing. At the current 300s ceiling the gate is reached with
+# ~240s left, so this branch does not fire today; it exists so the next latency step
+# (the produce leg has moved 34.7s -> 57.0s since 2026-09-01) costs a fallback row
+# instead of the row.
+# NB the name: `_GATE_REGEN_*` would match gate_census._REGISTRY_NAME's `GATE_.*`
+# pattern and enter the gate census as a phantom registry (#3315's class) — a float
+# budget is not a registry of gates. Renamed rather than ledgered as unproven.
+_REGEN_DEADLINE_BUDGET_S = 90.0
+
+
+def _apply_grounding_gate(digest, user_message, remaining_seconds=None):
     """#2419: the ADR-104 grounded-generation gate joins the digest writer.
 
     grounding_findings() runs the shared allow-list number + fabricated-date +
@@ -645,7 +666,35 @@ def _apply_grounding_gate(digest, user_message):
         return _digest_prose_blob(candidate)
 
     text = _digest_prose_blob(digest)
-    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn, surface="coach_ensemble_digest")
+
+    # #3829: findings are deterministic and cheap; the REGEN is the expensive half.
+    # Compute them here so the deadline decision can be made before paying for a call
+    # that cannot land, and memoise so regen_once's own first call is free.
+    _findings_cache = {text: _findings_fn(text)}
+
+    def _findings_cached(t):
+        if t not in _findings_cache:
+            _findings_cache[t] = _findings_fn(t)
+        return _findings_cache[t]
+
+    first = _findings_cache[text]
+    if first and remaining_seconds is not None:
+        left = remaining_seconds()
+        if left < _REGEN_DEADLINE_BUDGET_S:
+            # Hold on the findings we already have. The caller replaces the digest with
+            # the deterministic fallback, so nothing ungated is persisted — the gate is
+            # skipped, never bypassed — and the cycle ends with a ROW instead of a
+            # timeout. This is the failure mode the issue was filed on, made survivable.
+            logger.error(
+                "Grounding-gate regen SKIPPED — %.1fs remaining is under the %.0fs a regen+write needs; "
+                "holding %d finding(s) and writing the deterministic fallback so CYCLE# still lands (#3829)",
+                left,
+                _REGEN_DEADLINE_BUDGET_S,
+                len(first),
+            )
+            return digest, first
+
+    _best_text, findings, corrected = regen_once(text, _findings_cached, _regen_fn, surface="coach_ensemble_digest")
     best = holder["latest"] if corrected else digest
     return best, findings
 
@@ -955,6 +1004,27 @@ def _update_coach_compressed_states(digest, coach_data, cycle_date):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _remaining_seconds(context):
+    """A zero-arg "seconds left before Lambda kills us" probe, or None when unknowable.
+
+    #3829: returns None for a missing/odd context (unit tests, a direct call) rather
+    than a made-up number — a deadline guard that invents its own deadline is worse
+    than no guard. None disables the guard and leaves the pre-existing behaviour.
+    """
+    getter = getattr(context, "get_remaining_time_in_millis", None)
+    if not callable(getter):
+        return None
+
+    def _left():
+        try:
+            return float(getter()) / 1000.0
+        except Exception:
+            # Unknowable is not "plenty": refuse to skip, and let the ceiling decide.
+            return float("inf")
+
+    return _left
+
+
 def _finish_digest(digest, coach_data, cycle_date):
     """Steps 3-5: the persistence tail every digest takes, whatever produced it.
 
@@ -990,12 +1060,28 @@ def _finish_digest(digest, coach_data, cycle_date):
             logger.warning("dispute-docket open pass failed (non-fatal): %s", e)
 
     # Step 4: Write the digest — with the docket outcome, when there was one
-    _write_digest(digest, cycle_date)
+    stored = _write_digest(digest, cycle_date)
 
     # Step 5: Update each coach's compressed state with digest contribution
     _update_coach_compressed_states(digest, coach_data, cycle_date)
 
-    logger.info("Ensemble digest complete for cycle %s", cycle_date)
+    # #3829: this is the LAST line of the invocation and therefore the one an operator
+    # scanning the stream reads as the verdict. It said "complete" unconditionally —
+    # including when _write_digest had just returned False, i.e. when the cycle's row
+    # does not exist. #3836 fixed the "produced" line upstream; this line was the same
+    # defect one layer down and survived it. The outcome is now IN the sentence, in the
+    # acceptance criterion's own vocabulary, and a not-stored cycle logs at ERROR so it
+    # is reachable by a metric filter rather than only by reading prose.
+    if stored:
+        logger.info("Ensemble digest complete for cycle %s — stored ENSEMBLE#digest/CYCLE#%s", cycle_date, cycle_date)
+    else:
+        logger.error(
+            "Ensemble digest complete for cycle %s — NOT-STORED: the put_item for ENSEMBLE#digest/CYCLE#%s failed "
+            "(its exception is logged above by _put_item). Nothing consumes this cycle; the row cannot be honestly "
+            "backfilled later from today's coach state.",
+            cycle_date,
+            cycle_date,
+        )
     return _decimal_to_float(digest)
 
 
@@ -1050,7 +1136,9 @@ def lambda_handler(event, context):
             # two apart — see the PR note: the renderers do not check it YET.
             "_fallback": True,
         }
-        _write_digest(digest, cycle_date)
+        if not _write_digest(digest, cycle_date):
+            # #3829: the one write path that did not report its own outcome.
+            logger.error("Empty ensemble digest for cycle %s was NOT-STORED — put_item failed (see above)", cycle_date)
         return _decimal_to_float(digest)
 
     logger.info(
@@ -1121,7 +1209,7 @@ def lambda_handler(event, context):
             # the deterministic fallback (built from the coaches' stored, already-
             # gated records) is what persists, never text that failed the gate.
             _t_gate = time.monotonic()
-            digest, adr104_findings = _apply_grounding_gate(digest, user_message)
+            digest, adr104_findings = _apply_grounding_gate(digest, user_message, remaining_seconds=_remaining_seconds(context))
             # #3829: the grounding gate makes ONE corrective regen — a second Bedrock
             # call on the same 7-coach prompt. It was the prime suspect for the ~35s
             # between "produced" and the 90s ceiling and nothing measured it. Now it is
