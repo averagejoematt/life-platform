@@ -217,26 +217,79 @@ jobs:
       - name: Generate SBOM (syft — supply-chain provenance, #1661)
         # Syft produces a Software Bill of Materials over the checked-out tree in both
         # SPDX and CycloneDX JSON, uploaded as a build artifact for provenance. Version
-        # PINNED (CQ-01 style) — bump deliberately, not by drift. NON-gating
-        # (continue-on-error): a transient anchore.io download hiccup must not red-wall
-        # deploys, and SBOM capture is provenance, not a pass/fail security gate (that's
-        # pip-audit above). Trivy scan intentionally DEFERRED (#1661 optional item) —
-        # it adds meaningful CI time/complexity for little marginal signal over pip-audit
-        # on a stdlib-source Lambda runtime (the only third-party code shipped is the three
-        # pinned binary layers, manifest-scanned by pip-audit); revisit if container images
-        # enter the build.
+        # PINNED (CQ-01 style) — bump deliberately, not by drift. Trivy scan intentionally
+        # DEFERRED (#1661 optional item) — it adds meaningful CI time/complexity for little
+        # marginal signal over pip-audit on a stdlib-source Lambda runtime (the only
+        # third-party code shipped is the three pinned binary layers, manifest-scanned by
+        # pip-audit); revisit if container images enter the build.
+        #
+        # GATING since 2026-09-17 (#3848) — `continue-on-error: true` was REMOVED, and
+        # the reason it existed no longer holds. It read "a transient anchore.io download
+        # hiccup must not red-wall deploys". On 2026-09-16 exactly that hiccup happened
+        # (`curl: (35) Recv failure: Connection reset by peer`) and the step still
+        # reported SUCCESS, because `curl … | sh` without `pipefail` takes its exit status
+        # from `sh` — and `sh` fed an EMPTY script exits 0 having installed nothing. Two
+        # green steps, no SBOM, and the only surface trace was a `::warning::` on the
+        # upload. The pinned asset was never the problem: v1.49.0's release, its
+        # install.sh and syft_1.49.0_linux_amd64.tar.gz were all fetchable throughout,
+        # and the next day's runs generated the SBOM again unchanged.
+        #
+        # The transient is now absorbed where it belongs — retries across BOTH mirrors
+        # (github raw + get.anchore.io) with curl's own --retry on top — and what is left
+        # after that is a real outage, which is exactly what should be loud. Three
+        # explicit assertions replace the swallow, each with its own ::error:: title:
+        #   1. the installer script was fetched AND is non-empty (the 09-16 failure mode);
+        #   2. a binary actually exists at $RUNNER_TEMP/bin/syft after install.sh exits —
+        #      upstream's install.sh deliberately does not `set -e` and its install_asset()
+        #      `return`s 0 on an empty asset path, so exit 0 is NOT evidence of install;
+        #   3. both SBOM files exist and are non-empty after the scan.
+        # `tests/test_sbom_step_fails_loudly_3848.py` executes THIS step's own shell text
+        # against a broken installer and asserts each assertion fires non-zero.
         if: always()
-        continue-on-error: true
         env:
           SYFT_VERSION: v1.49.0
           SYFT_CHECK_FOR_APP_UPDATE: "false"
         run: |
-          curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
-            | sh -s -- -b "$RUNNER_TEMP/bin" "$SYFT_VERSION"
-          "$RUNNER_TEMP/bin/syft" version
-          "$RUNNER_TEMP/bin/syft" scan dir:. -q \
+          set -euo pipefail
+          SYFT_BIN="${RUNNER_TEMP}/bin/syft"
+          INSTALLER="${RUNNER_TEMP}/syft-install-${SYFT_VERSION}.sh"
+          rm -f "$INSTALLER"
+          # Two independent mirrors of the SAME pinned tag. get.anchore.io is anchore's
+          # own CDN; raw.githubusercontent.com is the origin the pin has always used.
+          for url in \
+            "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
+            "https://get.anchore.io/syft/${SYFT_VERSION}/install.sh" ; do
+            for attempt in 1 2 3; do
+              if curl -sSfL --connect-timeout 10 --max-time 120 \
+                   --retry 3 --retry-delay 2 --retry-all-errors \
+                   -o "$INSTALLER" "$url" && [ -s "$INSTALLER" ]; then
+                echo "syft installer fetched from ${url} (attempt ${attempt})"
+                break 2
+              fi
+              echo "::warning title=syft installer fetch retry::${url} attempt ${attempt} failed"
+              rm -f "$INSTALLER"
+              sleep $(( attempt * 3 ))
+            done
+          done
+          if [ ! -s "$INSTALLER" ]; then
+            echo "::error title=SBOM: syft installer unfetchable::No mirror served a non-empty install.sh for ${SYFT_VERSION} (3848)"
+            exit 1
+          fi
+          sh "$INSTALLER" -b "${RUNNER_TEMP}/bin" "${SYFT_VERSION}"
+          if [ ! -x "$SYFT_BIN" ]; then
+            echo "::error title=SBOM: syft not installed::install.sh exited 0 but there is no executable at ${SYFT_BIN} (3848)"
+            exit 1
+          fi
+          "$SYFT_BIN" version
+          "$SYFT_BIN" scan dir:. -q \
             -o "spdx-json=sbom.spdx.json" \
             -o "cyclonedx-json=sbom.cyclonedx.json"
+          for f in sbom.spdx.json sbom.cyclonedx.json; do
+            if [ ! -s "$f" ]; then
+              echo "::error title=SBOM: output missing::syft scan exited 0 but ${f} is absent or empty (3848)"
+              exit 1
+            fi
+          done
           echo "SBOM generated: sbom.spdx.json (SPDX) + sbom.cyclonedx.json (CycloneDX)"
 
       - name: Upload SBOM artifact (#1661)
@@ -248,7 +301,14 @@ jobs:
             sbom.spdx.json
             sbom.cyclonedx.json
           retention-days: 14
-          if-no-files-found: warn
+          # `error` since 2026-09-17 (#3848): a missing artifact used to be the ONLY
+          # surface trace of the whole failure, and it was a `::warning::` on a step that
+          # still read green. It can no longer fire on its own — the generate step above
+          # asserts both files exist and are non-empty before it exits 0, so reaching this
+          # step with no files means the generate step already failed and the job is
+          # already red. Two reds from one cause is the intended trade: there is now no
+          # path on which the SBOM is absent and every step reports success.
+          if-no-files-found: error
 
       - name: Check lambda_map coverage
         # R18-F03: Detect Lambda source files missing from ci/lambda_map.json.
