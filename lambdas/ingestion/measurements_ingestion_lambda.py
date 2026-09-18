@@ -18,6 +18,25 @@ be papered over with a plausible-sounding default). The prior code hard-coded
 `"partner"` unconditionally, which the CSV parser could never override and which
 was flatly false on the one session actually ingested this way (self-measured,
 corrected by hand in DDB after the fact — see that row's own `notes`).
+
+#3663: an unmodelled CSV/Excel column is a NAMED FAILURE, not a silent drop.
+`_row_to_session` reads only `MEASUREMENT_FIELDS`, so any other numeric column
+used to vanish with no warning and an exit-0 "success" — the 2026-09-06 session
+measured 19 sites into a 13-site schema and the six surplus values survived only
+because a human pasted them into `notes` by hand. Capture-unfiltered is the FIRST
+ordered step of docs/NEW_SIGNAL_PLAYBOOK.md (ADR-154), so the six measured sites
+are now modelled, and `_unmodelled_columns` names every header the parser cannot
+store; the handler refuses the file (422) listing them rather than writing a
+partial row and reporting a clean success. Nothing is written on that path, so
+re-uploading the same object after the schema is widened is a clean re-ingest.
+
+The derived fields that enumerate limbs now STATE their sites (`LIMB_AVG_SITES`,
+`BILATERAL_SYMMETRY_PAIRS`) instead of implying them from four inline locals, and
+each written row stamps `limb_avg_sites` so a stored average says what it averaged.
+Adding a site to MEASUREMENT_FIELDS (as #3663 does, twice for limbs) therefore
+cannot silently redefine `limb_avg_in`: the six new sites are deliberately NOT in
+`LIMB_AVG_SITES`, so the number stays the same four-site mean the 2026-03-29 and
+2026-09-06 rows already carry and the series remains comparable.
 """
 
 import csv
@@ -56,19 +75,53 @@ REQUIRED_FIELDS = ["waist_narrowest_in", "waist_navel_in"]
 MEASURED_BY_UNRECORDED = "unrecorded"  # #3662: stated absence, never a fabricated identity (ADR-104)
 MEASUREMENT_FIELDS = [
     "neck_in",
+    "shoulder_width_in",  # #3663
     "chest_in",
     "waist_narrowest_in",
     "waist_navel_in",
+    "waist_iliac_crest_in",  # #3663 — the third standard waist landmark
     "hips_in",
     "bicep_relaxed_left_in",
     "bicep_relaxed_right_in",
     "bicep_flexed_left_in",
     "bicep_flexed_right_in",
+    "forearm_max_left_in",  # #3663
+    "forearm_max_right_in",  # #3663
     "calf_left_in",
     "calf_right_in",
+    "thigh_left_in",  # mid-thigh
+    "thigh_right_in",  # mid-thigh
+    "thigh_upper_left_in",  # #3663 — a DIFFERENT site from thigh_left_in (mid)
+    "thigh_upper_right_in",  # #3663
+]
+
+# Columns a measurements file may carry that are NOT a stored numeric site.
+# Everything else in a header row must be a MEASUREMENT_FIELDS name or the file
+# is refused by name (#3663) — `_row_to_session` can only read the fields it knows.
+NON_MEASUREMENT_COLUMNS = frozenset({"date", "notes", "measured_by"})
+
+# ── The derived limb enumerations, STATED (#3663) ────────────────────────────
+# These four sites, and only these four, are what `limb_avg_in` averages. They
+# are named here rather than implied by four inline locals so that adding a site
+# to MEASUREMENT_FIELDS cannot silently change what an existing stored average
+# means. #3663 adds four limb sites (both forearms, both upper thighs) and
+# deliberately leaves them OUT: `limb_avg_in` stays the bicep-relaxed + mid-thigh
+# mean that every stored row already carries, so the series stays comparable.
+# Widening it is a deliberate act that must renumber history, not a side effect.
+# `tests/test_measurement_columns_3663.py` asserts both the membership (every
+# named site is a field actually stored) and the arithmetic.
+LIMB_AVG_SITES = (
+    "bicep_relaxed_left_in",
+    "bicep_relaxed_right_in",
     "thigh_left_in",
     "thigh_right_in",
-]
+)
+
+# Each bilateral-symmetry number names its own (left, right) pair — same reason.
+BILATERAL_SYMMETRY_PAIRS = {
+    "bilateral_symmetry_bicep_in": ("bicep_relaxed_left_in", "bicep_relaxed_right_in"),
+    "bilateral_symmetry_thigh_in": ("thigh_left_in", "thigh_right_in"),
+}
 
 
 def _parse_decimal_field(val):
@@ -102,12 +155,50 @@ def _row_to_session(row_dict: dict) -> dict:
     return result
 
 
+def _unmodelled_columns(headers) -> list[str]:
+    """Header names this parser cannot store, in file order (#3663).
+
+    A column that is neither a MEASUREMENT_FIELDS site nor one of the
+    NON_MEASUREMENT_COLUMNS is a value that was measured and would be dropped.
+    Blank/None header cells (trailing commas, empty spreadsheet columns) carry
+    no value and are not reported. Names are returned so the caller can say
+    WHICH columns it refused — a count alone is not a named failure.
+
+    Headers are compared EXACTLY as `_row_to_session` will key the row dict — no
+    case-folding or trimming here — because a header this function normalises
+    into a match that `row_dict.get(field)` then misses is the silent drop all
+    over again. `Neck_in` or `neck_in ` are genuinely unstorable and are named.
+    (`_parse_xlsx` lower-cases its headers before this call, so the spreadsheet
+    path is normalised once, in the place that also builds the row dict.)
+    """
+    seen, out = set(), []
+    for h in headers or []:
+        name = "" if h is None else str(h)
+        if not name.strip() or name in seen:
+            continue
+        seen.add(name)
+        if name not in NON_MEASUREMENT_COLUMNS and name not in MEASUREMENT_FIELDS:
+            out.append(name)
+    return out
+
+
+class UnmodelledColumnsError(ValueError):
+    """Raised when a file carries a column the schema cannot store (#3663)."""
+
+    def __init__(self, columns: list[str]):
+        self.columns = columns
+        super().__init__("unmodelled columns: " + ", ".join(columns))
+
+
 def _parse_csv(content: str) -> list[dict]:
     """Parse CSV content into a list of session dicts — ALL rows (#473/X-12)."""
     reader = csv.DictReader(io.StringIO(content))
     rows = list(reader)
     if not rows:
         raise ValueError("CSV has no data rows")
+    unmodelled = _unmodelled_columns(reader.fieldnames)
+    if unmodelled:
+        raise UnmodelledColumnsError(unmodelled)
     return [_row_to_session(row) for row in rows]
 
 
@@ -125,6 +216,9 @@ def _parse_xlsx(content_bytes: bytes) -> list[dict]:
         raise ValueError("Excel file needs header row + at least one data row")
 
     headers = [str(h).strip().lower() if h else "" for h in rows[0]]
+    unmodelled = _unmodelled_columns(headers)
+    if unmodelled:
+        raise UnmodelledColumnsError(unmodelled)
     sessions = []
     for values in rows[1:]:
         if values is None or all(v is None or str(v).strip() == "" for v in values):
@@ -137,7 +231,14 @@ def _parse_xlsx(content_bytes: bytes) -> list[dict]:
 
 
 def _compute_derived(measurements: dict, height_in: int) -> dict:
-    """Compute derived fields from raw measurements."""
+    """Compute derived fields from raw measurements.
+
+    The limb-enumerating numbers read their sites from LIMB_AVG_SITES /
+    BILATERAL_SYMMETRY_PAIRS (#3663) — the enumeration is the contract, not an
+    inline list of locals that a later schema addition could quietly widen.
+    `limb_avg_sites` is stamped alongside `limb_avg_in` so a stored average
+    carries the names of what it averaged.
+    """
     derived = {}
 
     waist_navel = float(measurements.get("waist_navel_in", 0))
@@ -146,19 +247,17 @@ def _compute_derived(measurements: dict, height_in: int) -> dict:
     if waist_navel > 0 and height_in > 0:
         derived["waist_height_ratio"] = Decimal(str(round(waist_navel / height_in, 4)))
 
-    bl = float(measurements.get("bicep_relaxed_left_in", 0))
-    br = float(measurements.get("bicep_relaxed_right_in", 0))
-    if bl > 0 and br > 0:
-        derived["bilateral_symmetry_bicep_in"] = Decimal(str(round(abs(br - bl), 2)))
+    for out_field, (left_field, right_field) in BILATERAL_SYMMETRY_PAIRS.items():
+        left = float(measurements.get(left_field, 0))
+        right = float(measurements.get(right_field, 0))
+        if left > 0 and right > 0:
+            derived[out_field] = Decimal(str(round(abs(right - left), 2)))
 
-    tl = float(measurements.get("thigh_left_in", 0))
-    tr = float(measurements.get("thigh_right_in", 0))
-    if tl > 0 and tr > 0:
-        derived["bilateral_symmetry_thigh_in"] = Decimal(str(round(abs(tr - tl), 2)))
-
-    limbs = [v for v in [bl, br, tl, tr] if v > 0]
-    if limbs:
+    limb_sites = [f for f in LIMB_AVG_SITES if float(measurements.get(f, 0)) > 0]
+    if limb_sites:
+        limbs = [float(measurements[f]) for f in limb_sites]
         derived["limb_avg_in"] = Decimal(str(round(sum(limbs) / len(limbs), 3)))
+        derived["limb_avg_sites"] = limb_sites
 
     if waist_navel > 0 and waist_narrow > 0:
         derived["trunk_sum_in"] = Decimal(str(round(waist_navel + waist_narrow, 2)))
@@ -219,10 +318,34 @@ def lambda_handler(event, context):
     content_bytes = resp["Body"].read()
 
     # Parse based on extension — ALL rows (#473/X-12)
-    if source_key.lower().endswith(".xlsx"):
-        sessions = _parse_xlsx(content_bytes)
-    else:
-        sessions = _parse_csv(content_bytes.decode("utf-8"))
+    # #3663: a column the schema cannot store ends the run by NAME. The old code
+    # dropped it in `_row_to_session` and still returned 200 with the remaining
+    # fields, so a measured value could disappear with nothing saying so. Nothing
+    # is written on this path — widen MEASUREMENT_FIELDS (+ docs/SCHEMA.md) and
+    # re-drop the same object to ingest it cleanly.
+    try:
+        if source_key.lower().endswith(".xlsx"):
+            sessions = _parse_xlsx(content_bytes)
+        else:
+            sessions = _parse_csv(content_bytes.decode("utf-8"))
+    except UnmodelledColumnsError as e:
+        named = ", ".join(e.columns)
+        logger.error(f"UNMODELLED COLUMNS in s3://{bucket}/{source_key} — refused, nothing written: {named}")
+        return {
+            "statusCode": 422,
+            "body": json.dumps(
+                {
+                    "error": "unmodelled columns",
+                    "unmodelled_columns": e.columns,
+                    "sessions_written": 0,
+                    "message": (
+                        f"{len(e.columns)} column(s) in {source_key} are not stored by this schema ({named}). "
+                        "Values were measured and would have been dropped — add them to MEASUREMENT_FIELDS "
+                        "and docs/SCHEMA.md, then re-upload. Nothing was written."
+                    ),
+                }
+            ),
+        }
 
     # Fetch height from profile
     try:
