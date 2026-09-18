@@ -55,7 +55,7 @@ the deploy in flight, and reverting the fleet cannot conjure a missing row (#192
 
 from __future__ import annotations
 
-from datetime import date, timedelta, timezone
+from datetime import timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
@@ -88,11 +88,13 @@ def _due_dates(now_utc):
     """
     cutoff = now_utc.replace(hour=DUE_HOUR_UTC, minute=0, second=0, microsecond=0) + timedelta(minutes=GRACE_MINUTES)
     latest = now_utc.date() if now_utc >= cutoff else now_utc.date() - timedelta(days=1)
-    genesis = date.fromisoformat(EXPERIMENT_START_DATE)
     dates = [latest - timedelta(days=i) for i in range(WINDOW_DAYS)]
     # Pre-genesis cycles are not expected: the reset tombstones the previous cycle's
     # rows and no digest is written before Day 1 (a future genesis runs a countdown).
-    return [d for d in dates if d >= genesis]
+    # The genesis bound is a LEXICOGRAPHIC compare on the ISO day string, not a
+    # `date.fromisoformat` — ISO-8601 calendar days sort correctly as text, and #3609's
+    # site registry only ever shrinks, so a new parse site here would have to grow it.
+    return [d for d in dates if d.isoformat() >= EXPERIMENT_START_DATE]
 
 
 def _present_cycles(table, first, last):
