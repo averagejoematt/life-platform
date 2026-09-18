@@ -731,28 +731,44 @@ Periodic (every 4-8 weeks) body tape measurements. Source: `USER#matthew#SOURCE#
 | Field | Type | Description |
 |-------|------|-------------|
 | `session_number` | number | Sequential session count |
-| `measured_by` | string | Person taking measurements (hardcoded `"partner"` in the ingestion Lambda) |
+| `measured_by` | string | Person taking measurements — read from the file's optional `measured_by` column, `"unrecorded"` when absent (#3662) |
 | `unit` | string | Always "in" (inches) |
 | `source_file` | string | `s3://` path of the source CSV |
 | `notes` | string | Optional free-text notes from the CSV |
 | `neck_in` | number | Neck circumference |
+| `shoulder_width_in` | number | Shoulder width, acromion to acromion (#3663) |
 | `chest_in` | number | Chest circumference |
 | `waist_narrowest_in` | number | Waist at narrowest point (Attia priority) |
 | `waist_navel_in` | number | Waist at navel (Attia priority — visceral fat proxy) |
+| `waist_iliac_crest_in` | number | Waist at the iliac crest — the third standard waist landmark (#3663) |
 | `hips_in` | number | Hip circumference |
 | `bicep_relaxed_left_in` | number | Left bicep relaxed |
 | `bicep_relaxed_right_in` | number | Right bicep relaxed |
 | `bicep_flexed_left_in` | number | Left bicep flexed |
 | `bicep_flexed_right_in` | number | Right bicep flexed |
+| `forearm_max_left_in` | number | Left forearm at its widest (#3663) |
+| `forearm_max_right_in` | number | Right forearm at its widest (#3663) |
 | `calf_left_in` | number | Left calf |
 | `calf_right_in` | number | Right calf |
 | `thigh_left_in` | number | Left thigh (mid-thigh) |
-| `thigh_right_in` | number | Right thigh |
+| `thigh_right_in` | number | Right thigh (mid-thigh) |
+| `thigh_upper_left_in` | number | Left thigh, upper — a DIFFERENT site from `thigh_left_in` (#3663) |
+| `thigh_upper_right_in` | number | Right thigh, upper (#3663) |
 | `waist_height_ratio` | number | Derived: waist_navel / height (target <0.5) |
 | `bilateral_symmetry_bicep_in` | number | Derived: abs(R-L) relaxed bicep |
-| `bilateral_symmetry_thigh_in` | number | Derived: abs(R-L) thigh |
-| `limb_avg_in` | number | Derived: avg of 4 limb measurements |
+| `bilateral_symmetry_thigh_in` | number | Derived: abs(R-L) thigh (mid-thigh) |
+| `limb_avg_in` | number | Derived: mean of the 4 sites in `LIMB_AVG_SITES` — relaxed biceps L/R + mid-thighs L/R. NOT widened by the #3663 forearm/upper-thigh sites, so the series stays comparable |
+| `limb_avg_sites` | list | The site names `limb_avg_in` actually averaged on this row (#3663) — a stored average that says what it averaged |
 | `trunk_sum_in` | number | Derived: waist_navel + waist_narrowest |
+
+**Unmodelled columns are refused by name, not dropped (#3663).** A column in an
+uploaded CSV/Excel file that is neither one of the numeric sites above nor
+`date`/`notes`/`measured_by` ends the run with HTTP 422 naming every offending
+header; nothing is written. Widen `MEASUREMENT_FIELDS` and this table together,
+then re-drop the same object. (Before #3663 the surplus column was silently
+discarded and the run returned 200 — the 2026-09-06 session measured 19 sites
+into a 13-site schema and six values survived only because a human pasted them
+into that row's `notes` by hand.)
 
 ### macrofactor_workouts (strength training from MacroFactor)
 
