@@ -266,6 +266,12 @@ _PREDICTION_PROJECTION_FIELDS = (
     "outcome_notes",
     "subdomain",
     "pre_registered_at",  # #3480: the freeze instant, served beside the effective date
+    # #3511: the BOOLEAN, not just the instant. `pre_registered_at` alone cannot answer
+    # "is this row sealed?" — it is absent on every in-cycle coach call AND on any sealed
+    # row written before #3480 stamped the instant, so absence conflates "not sealed"
+    # with "sealed, instant unrecorded". The ledger table has to distinguish a bet frozen
+    # before Day 1 from one logged mid-cycle, and the flag is the thing that says so.
+    "pre_registered",
 )
 
 
@@ -788,6 +794,9 @@ def handle_predictions(event, *, _g):
                             # when it was made). None for in-cycle coach calls, whose
                             # created_date IS the event time.
                             "pre_registered_at": rec.get("pre_registered_at"),
+                            # #3511: sealed vs in-cycle, as a boolean the table can render
+                            # without re-deriving it from a nullable timestamp.
+                            "pre_registered": bool(rec.get("pre_registered")),
                             "due_date": due,
                             "gradeable": not ungradeable,
                             "metric": ev.get("metric"),

@@ -1567,6 +1567,13 @@ an omission):
   seam that makes the *next* card honest is `intelligence/weight_recency.py`, which now filters
   weigh-ins to the current cycle — a pre-genesis reading is withheld from the fact set entirely
   rather than dated, so the grounded-generation allow-list catches a coach that cites it.
+  Check 20 (#3511) is the **pre-registration provenance** leg: check 15 proves a seal was
+  PUBLISHED, check 20 proves the live `PREDICTION#` ledger AGREES with it — no unsealed row
+  presenting as pre-genesis (written at/before PT-midnight of genesis, or dated before it),
+  and from genesis onward no sealed id missing from the season. The same pure predicate
+  (`deploy/prereg_provenance_gate.py`) also gates `genesis_prereg_stamp.py --apply`, so a
+  seal cannot publish over a ledger it contradicts. Repair: `deploy/reconcile_prereg_season_3511.py`
+  (dry-run default) re-stamps sealed rows an evening-before seed left on the closing cycle.
 - `deploy/restart_integration_check.py` (#1559) — the **behavioral** leg: where
   `restart_verify.py` proves STATE, this proves the pipelines still FLOW. Four legs: ingestion
   (every `source_registry.py` source really invokes — the same bounded gap-aware runs the crons

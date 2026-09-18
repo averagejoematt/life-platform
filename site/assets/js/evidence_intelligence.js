@@ -598,9 +598,18 @@ export function renderPredictions(d) {
     if (frozen && p.date && frozen !== p.date) return `${esc(frozen)} <span class="rd-unit">· from ${esc(p.date)}</span>`;
     return esc(frozen || p.date || "");
   };
-  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td class="num rd-range">${made(p)}</td></tr>`).join("");
-  const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
-  return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest.");
+  // #3511: sealed vs unsealed, in the table itself. The seal block above says a
+  // pre-registration EXISTS; until now no row said whether IT was in it, so a bet
+  // frozen before Day 1 and a call logged on Day 9 rendered identically. `sealed` is
+  // the API's `pre_registered` boolean (not a guess from the nullable timestamp);
+  // everything else is an ordinary in-cycle call, which is honest rather than damning
+  // — so it is labelled "in-cycle", not "unsealed", and the note below defines both.
+  const provenance = (p) => p.pre_registered
+    ? `<span class="rd-badge rd-badge-live" title="pre-registered before Day 1 and covered by the published seal">sealed</span>`
+    : `<span class="rd-badge" title="logged by the coach during the cycle — not part of the pre-registration">in-cycle</span>`;
+  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
+  const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>provenance</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest. <strong>sealed</strong> = pre-registered before Day 1 and covered by the published seal above; <strong>in-cycle</strong> = logged by the coach during the cycle.");
 }
 
 // Benchmarks — where the numbers sit vs age-band + centenarian-decathlon targets.
