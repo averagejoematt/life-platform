@@ -667,6 +667,25 @@ _QUANTIFIED_PATTERNS = (
 )
 
 
+# The residual, made VISIBLE rather than argued about. These are the cadence
+# words the assertion deliberately does not read as claims; the census below
+# prints each row that carries one next to its real cadence, so the un-automated
+# half of this rule is a list a human can audit in one screen instead of a
+# paragraph in a merged PR. Two false claims were found this way on the first
+# run — life-platform-pip-audit ("monthly" against a Monday cron) and
+# voice-fidelity-harness ("Weekly" against the 1st of the month).
+_BARE_CADENCE_RE = re.compile(
+    r"\b(daily|nightly|hourly|weekly|monthly|quarterly|yearly|annually"
+    r"|every[- ](?:day|week|month|hour|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\b",
+    re.IGNORECASE,
+)
+
+
+def bare_cadence_adverbs(reason: str) -> list:
+    """Unquantified cadence words in a reason — reported, never asserted on."""
+    return sorted({m.group(0).lower() for m in _BARE_CADENCE_RE.finditer(reason)})
+
+
 def stated_frequencies(reason: str) -> list:
     """[(phrase, fires_per_day)] for every QUANTIFIED cadence claim in a reason."""
     out = []
@@ -911,7 +930,11 @@ COVERAGE = {
     "voice-fidelity-harness": (
         EXEMPT,
         "2026-07-19",
-        "Weekly eval harness (portfolio class, ADR-103); a missed run is a missed eval datapoint, not a data-path failure.",
+        "Monthly blind voice-fidelity eval harness (portfolio class, ADR-103); a missed run is a missed eval datapoint, "
+        'not a data-path failure. #3506 CORRECTED this clause: it opened "Weekly eval harness" and this Lambda is not '
+        "weekly — compute_stack.py schedules cron(0 15 1 * ? *), the 1st of each month, which its own CDK comment calls "
+        "monthly four times over. Found by the #3506 bare-adverb enumeration printed by this file's census, not by the "
+        "cadence assertion (which reads quantified forms only).",
     ),
     "coach-history-summarizer": (
         EXEMPT,
@@ -1513,3 +1536,17 @@ if __name__ == "__main__":
     )
     for channel, entry in sorted(NON_SCHEDULED_EMITTERS.items()):
         print(f"non-scheduled emitter: {channel:60s} {entry[0]:6s} {entry[1]}")
+    # #3506: the un-asserted residual. Quantified claims are checked by
+    # test_exemptions_are_dated_and_reasoned; these are not. Printed with the
+    # real cadence beside them so the gap is auditable in one screen.
+    cadences = scheduled_lambda_cadences()
+    print("\nexemptions carrying an UNQUANTIFIED cadence word (reported, not asserted — read these by hand):")
+    for fn, entry in sorted(COVERAGE.items()):
+        if entry[0] != EXEMPT or stated_frequencies(entry[2]):
+            continue
+        words = bare_cadence_adverbs(entry[2])
+        if not words:
+            continue
+        rate = cadences.get(fn, (None, []))[0]
+        actual = f"{rate:g}/day" if rate is not None else "UNRESOLVED"
+        print(f"  {fn:34s} says {', '.join(words):28s} actual {actual}")
