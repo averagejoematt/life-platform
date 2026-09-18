@@ -7119,9 +7119,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 330,
+        "sites_dynamic": 333,
         "sites_resolved": 841,
-        "sites_total": 1171
+        "sites_total": 1174
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7476,9 +7476,12 @@
       "privacy_tier": "public"
     },
     "labs": {
+      "category": "Clinical",
       "class": "cross_phase",
-      "ingestion": false,
-      "privacy_tier": "owner_published"
+      "ingestion": true,
+      "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
+      "privacy_tier": "owner_published",
+      "stale_hours": 4320
     },
     "ledger": {
       "class": "experiment_scoped",

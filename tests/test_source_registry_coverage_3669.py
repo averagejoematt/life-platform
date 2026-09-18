@@ -45,6 +45,46 @@ this file says so rather than pretending otherwise:
     `MAX_CENSUS_AGE_DAYS`, so a frozen artifact eventually says so out loud instead of
     quietly grading a world that no longer exists.
 
+MUTATION EVIDENCE — why this file's green is worth something
+────────────────────────────────────────────────────────────
+It lives HERE rather than in `scripts/gate_census_proofs.py` because the census does not
+enumerate this file: `premerge_derivation.discover_tree_sweeping_test_files` selects
+tree-SWEEPING tests, and this one reads a committed artifact and a registry. A proof
+keyed to a gate id the census cannot see is the #3129 orphan-proof problem, and
+`test_gate_census_2578::test_no_recorded_proof_is_stale_against_the_live_census` says so
+out loud — watched, 2026-09-17. So the record sits where a reviewer of this file sees it.
+
+Four mutations, each applied to the REAL tracked tree (no copy, no synthetic fixture),
+each a state main has actually been in, each md5-verified changed before the verdict was
+read and md5-verified restored afterwards. Baseline: 36 passed.
+
+  M1  `web/site_api_status.py`: `labs: 3` back in the serving-layer literal and the
+      splice order flipped so the hardcode beats the registry — the pre-#3669 shape.
+      md5 0af2110c -> a1ac2684 -> 0af2110c. 2 FAILED: "assert 3 == 6" and "labs is back
+      in the serving-layer literal".
+  M2  `ingestion/source_registry.py`: the `dexa` UNREGISTERED_PARTITIONS entry deleted —
+      the planted unregistered partition the acceptance names.
+      md5 424ed21d -> b0daf1a0 -> 424ed21d. 3 FAILED, naming it: "1 live SOURCE#
+      partition(s) have NO disposition: ['dexa']". RE-RUN after `class_of` became an
+      injected parameter (the #3315 fix below changed this code path, so the old verdict
+      no longer covered it): md5 a6f070db -> c867e424 -> a6f070db, same 3 FAILED, same
+      message — watched again 2026-09-17.
+  M3  macrofactor's `capture_channel` + `capture_channel_reason` deleted — the literal
+      state of main before this PR, the specimen issue 3571 was filed on.
+      md5 424ed21d -> 62af2a58 -> 424ed21d. 2 FAILED: "macrofactor: no capture_channel
+      key at all".
+  M4  `deploy/generated/pk_family_census.json` truncated to 3 families / 12 items — the
+      vacuous-scan trap, i.e. the artifact state that would turn every assertion here
+      green by erasing what they grade.
+      md5 a9a24043 -> 0d5e2e07 -> a9a24043. 4 FAILED: "only 3 pk families — a truncated
+      scan, not the live table", "whoop absent from the census".
+
+Two defects in the first draft were found by running it, not by reading it:
+`test_the_serving_layer_no_longer_restates_a_registered_cadence` matched the COMMENT
+that explains the removal and reported the defect it exists to detect; and
+`PLATFORM_WRITTEN_TAXONOMY_CLASSES` matched `gate_census._REGISTRY_NAME`, minting two
+registry-phantom entrants on the #3000 lane (renamed `…_CLASS_IDS`, the #3315 remedy).
+
 SCOPE — what a green here does NOT say
 ──────────────────────────────────────
 A partition classified EXPERIMENT_SCOPED / SYSTEM_STATE by `phase_taxonomy` is
@@ -61,7 +101,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -76,6 +116,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
+from common.pacific_time import pacific_today  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
 from ingestion import source_registry as reg  # noqa: E402
 
@@ -118,6 +159,16 @@ def live_source_families(census: dict) -> list[str]:
 CENSUS = load_census()
 LIVE_SOURCES = live_source_families(CENSUS)
 
+# The real classifier, injected rather than defaulted inside the registry — see
+# `unregistered_source_partitions`'s docstring for why (a `phase_taxonomy` import there
+# hands every importer of the registry a boto3 edge, #3315).
+CLASS_OF = phase_taxonomy.SOURCE_CLASS.get
+
+
+def undisposed(live_sources, class_of=CLASS_OF) -> list:
+    """The guard's one call site, so every assertion and control below runs the same rule."""
+    return reg.unregistered_source_partitions(live_sources, class_of)
+
 
 class TestTheCensusArtifactIsNotVacuous:
     """A guard whose denominator can silently empty is a check that cannot fail."""
@@ -143,6 +194,9 @@ class TestTheCensusArtifactIsNotVacuous:
 
     def test_the_capture_date_is_parseable_recent_and_not_from_the_future(self):
         captured = datetime.strptime(CENSUS["_meta"]["captured_at"], "%Y-%m-%d").replace(tzinfo=timezone.utc).date()
+        # `captured_at` dates a SCAN — an instant stamped in UTC by
+        # deploy/write_pk_family_census.py, not a Pacific calendar day of Matthew's — so the
+        # utc-exempt(#3669): age arithmetic anchors in the frame that NAMED the key (#3257).
         today = datetime.now(timezone.utc).date()
         assert captured <= today, f"census captured_at {captured} is in the future — the artifact was hand-edited"
         age = (today - captured).days
@@ -318,9 +372,9 @@ PLANTED = "__planted_unregistered_partition_3669__"
 
 class TestEveryLivePartitionIsDispositioned:
     def test_the_set_is_empty(self):
-        undisposed = reg.unregistered_source_partitions(LIVE_SOURCES)
-        assert not undisposed, (
-            f"{len(undisposed)} live SOURCE# partition(s) have NO disposition: {undisposed}. Each is invisible to "
+        found = undisposed(LIVE_SOURCES)
+        assert not found, (
+            f"{len(found)} live SOURCE# partition(s) have NO disposition: {found}. Each is invisible to "
             "every freshness, staleness and coach-inventory check at once. Give it a SOURCE_REGISTRY entry (a "
             "cadence a check can enforce) or a dated UNREGISTERED_PARTITIONS reason naming what writes it."
         )
@@ -328,20 +382,20 @@ class TestEveryLivePartitionIsDispositioned:
     def test_a_planted_unregistered_partition_reds_the_guard(self):
         """THE MUST-FAIL CONTROL the acceptance names. Without it, 'the set is empty' and
         'the rule matched nothing' are the same green."""
-        found = reg.unregistered_source_partitions([*LIVE_SOURCES, PLANTED])
+        found = undisposed([*LIVE_SOURCES, PLANTED])
         assert found == [PLANTED], found
 
     def test_a_planted_platform_written_partition_is_not_flagged(self):
         """NEGATIVE CONTROL: the auto-disposition is real, not an accident of the data —
         a new partition the taxonomy calls platform-written passes without an exemption."""
-        assert reg.unregistered_source_partitions([PLANTED], class_of=lambda _n: "experiment_scoped") == []
-        assert reg.unregistered_source_partitions([PLANTED], class_of=lambda _n: "raw_timeseries") == [PLANTED]
+        assert undisposed([PLANTED], class_of=lambda _n: "experiment_scoped") == []
+        assert undisposed([PLANTED], class_of=lambda _n: "raw_timeseries") == [PLANTED]
 
     def test_the_auto_disposition_reads_the_real_taxonomy(self):
         """The default `class_of` must be phase_taxonomy itself — not a copy of its answers."""
         assert phase_taxonomy.SOURCE_CLASS["adaptive_mode"] in reg.PLATFORM_WRITTEN_TAXONOMY_CLASS_IDS
         assert phase_taxonomy.SOURCE_CLASS["whoop"] not in reg.PLATFORM_WRITTEN_TAXONOMY_CLASS_IDS
-        assert reg.unregistered_source_partitions(["adaptive_mode"]) == []
+        assert undisposed(["adaptive_mode"]) == []
 
     def test_dexa_and_genome_got_their_disposition_in_the_same_pass(self):
         """Named in the issue's own Set so the next pass does not rediscover them."""
@@ -354,7 +408,9 @@ class TestEveryLivePartitionIsDispositioned:
     def test_every_exemption_is_dated_reasoned_and_names_a_writer(self):
         for key, entry in reg.UNREGISTERED_PARTITIONS.items():
             assert _ISO_DATE.fullmatch(entry["dated"]), f"{key}: undated exemption {entry['dated']!r}"
-            assert datetime.strptime(entry["dated"], "%Y-%m-%d").date() <= date.today(), f"{key}: dated in the future"
+            # A human wrote this date, so it is a PACIFIC calendar day — the platform default
+            # (#3257). Read through the handler's own helper rather than a naive clock.
+            assert entry["dated"] <= pacific_today(), f"{key}: dated in the future"
             reason = entry["reason"]
             assert len(reason) >= 120, f"{key}: the reason is too short to be one ({reason!r})"
             assert re.search(r"(\.py\b|written by|no writer|frozen|hand-entered|imported once)", reason, re.IGNORECASE), (

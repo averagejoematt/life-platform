@@ -2117,16 +2117,22 @@ def manual_method_source_ids() -> list:
 PLATFORM_WRITTEN_TAXONOMY_CLASS_IDS = ("experiment_scoped", "system_state")
 
 
-def unregistered_source_partitions(live_sources, class_of=None) -> list:
+def unregistered_source_partitions(live_sources, class_of) -> list:
     """THE SET (#3669): live `SOURCE#<x>` partitions with no disposition at all.
 
     `live_sources`  an iterable of live source-partition names (the `SOURCE#` families
                     from `experiment.pk_census`, via the committed census artifact —
                     this function never scans; it takes the enumeration as input so the
                     CI gate and a live operator run share ONE rule).
-    `class_of`      `family -> phase_taxonomy class | None`. Defaults to
-                    `phase_taxonomy.SOURCE_CLASS.get`, imported lazily so this module
-                    keeps its zero-dependency posture.
+    `class_of`      `family -> phase_taxonomy class | None`. INJECTED, with no default,
+                    and that is deliberate: a `from experiment import phase_taxonomy`
+                    here — even inside the function body — gives this module the edge
+                    `source_registry -> phase_taxonomy -> coach.coach_checkin -> boto3`
+                    (phase_taxonomy.py:149's lazy SSM read). `tests/
+                    test_ci_dark_flag_sweep_3315.py` caught exactly that: three CI steps
+                    that import this registry with no boto3 installed — the site-deploy
+                    smoke job among them — started reaching a dependency their job never
+                    installs. Callers pass `phase_taxonomy.SOURCE_CLASS.get`.
 
     A partition is dispositioned when ANY of these is true:
       * it has a `SOURCE_REGISTRY` entry — a cadence and a staleness threshold every
@@ -2138,12 +2144,6 @@ def unregistered_source_partitions(live_sources, class_of=None) -> list:
     Everything else is returned, sorted. An empty return is the property this issue
     bought: no live partition is invisible to every check at once.
     """
-    if class_of is None:
-        from experiment import phase_taxonomy  # local: keeps source_registry import-free
-
-        def class_of(name):  # noqa: E306
-            return phase_taxonomy.SOURCE_CLASS.get(name)
-
     undisposed = []
     for name in live_sources:
         if name in SOURCE_REGISTRY or name in UNREGISTERED_PARTITIONS:
