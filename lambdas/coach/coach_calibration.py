@@ -426,11 +426,11 @@ def apply_conversation_calibration(
             conv_beta += w
         mean_after = alpha / (alpha + beta_val)
 
-        from experiment.phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
+        from experiment.phase_taxonomy import experiment_stamp_for  # fail-soft provenance (#1233), per-row gate (#3514)
 
         table.put_item(
             Item={
-                **experiment_stamp(),
+                **experiment_stamp_for(pk, conf_sk),
                 "pk": pk,
                 "sk": conf_sk,
                 "alpha": _dec(alpha),

@@ -1104,12 +1104,12 @@ def _cache_brief(coach_id, brief, today):
     coach_state_updater._put_item / deploy/seed_genesis_preregistration.py._stamped
     (#1970/#2119). experiment_stamp() is fail-soft; the item's own keys win.
     """
-    from experiment.phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3514: per-row class gate
 
     try:
         item = floats_to_decimal(
             {
-                **experiment_stamp(),
+                **experiment_stamp_for(f"COACH#{coach_id}", f"BRIEF#{today}"),
                 "pk": f"COACH#{coach_id}",
                 "sk": f"BRIEF#{today}",
                 "brief": brief,

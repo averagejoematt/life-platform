@@ -454,13 +454,20 @@ def _table():
     )
 
 
-def _stamp():
+def _stamp(pk="", sk=""):
     """The ADR-058/#1233 write-time provenance stamp (phase + cycle), fail-soft.
-    A missing stamp must never block the write, so this degrades to phase-only."""
-    try:
-        from experiment.phase_taxonomy import experiment_stamp
+    A missing stamp must never block the write, so this degrades to phase-only.
 
-        stamp = experiment_stamp()
+    #3514 (DA-6): takes the row it is stamping. The phase-only FALLBACK below is the
+    reason this matters here more than elsewhere — it hardcodes a phase with no class
+    check at all, so on a CROSS_PHASE row it would write the one attribute the class
+    forbids even when the primary path correctly wrote nothing."""
+    try:
+        from experiment.phase_taxonomy import experiment_stamp_for, should_phase_stamp
+
+        if pk and not should_phase_stamp(pk, sk):
+            return {}
+        stamp = experiment_stamp_for(pk, sk) if pk else {}
         if stamp.get("phase"):
             return stamp
     except Exception:  # noqa: BLE001 — provenance never breaks a write
@@ -483,7 +490,7 @@ def store_reaction(reaction, table_=None):
         table_ = _table()
 
     sk = reaction_sk(reaction["entry_date"], reaction.get("channel"), reaction.get("entry_uid", ""))
-    item = {"pk": DIARY_REACTIONS_PK, "sk": sk, **_stamp(), **reaction}
+    item = {"pk": DIARY_REACTIONS_PK, "sk": sk, **_stamp(DIARY_REACTIONS_PK, sk), **reaction}
     table_.put_item(Item=item)
     return sk
 

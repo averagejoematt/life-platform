@@ -890,27 +890,40 @@ def check_coach_ensemble_phase_stamp_coverage():
     Read-only: a paginated Query per known pk (no Scan). WARN, not FAIL — a known,
     low-severity gap with its own reviewed, dry-run-by-default operator tool."""
     from coach.persona_registry import OPERATIONAL_COACH_IDS
-    from experiment.phase_taxonomy import should_phase_stamp
+    from experiment.phase_taxonomy import PROVENANCE_ATTRS, forbidden_provenance, should_phase_stamp
 
     c = Check("data:coach_ensemble_phase_stamp_coverage", "Phase Stamping", CONTENT_TRUTH)
     pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
     unstamped = []
+    wrongly_stamped = []
     by_design = 0
     try:
         for pk in pks:
             lek = None
             while True:
+                # #3514: ONE unfiltered pass per partition, projected to the key plus the
+                # provenance attributes, answering BOTH directions. It replaced a
+                # FilterExpression pass that cost the same read units (a DynamoDB filter is
+                # applied AFTER the read) and could only ever see the missing-stamp half —
+                # so the inverse defect, a stamp on a row whose class forbids one, was
+                # invisible to the instrument built to audit stamping.
                 kw = {
                     "KeyConditionExpression": Key("pk").eq(pk),
-                    "FilterExpression": "attribute_not_exists(#phase)",
-                    "ExpressionAttributeNames": {"#phase": "phase"},
+                    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb",
+                    "ExpressionAttributeNames": {"#phase": "phase", "#cycle": "cycle", "#tomb": "tombstone"},
                 }
                 if lek:
                     kw["ExclusiveStartKey"] = lek
                 resp = table.query(**kw)
                 for it in resp.get("Items", []):
-                    if should_phase_stamp(pk, str(it.get("sk", ""))):
-                        unstamped.append(f"{pk}/{it.get('sk')}")
+                    sk = str(it.get("sk", ""))
+                    bad = forbidden_provenance(pk, sk, it)
+                    if bad:
+                        wrongly_stamped.append(f"{pk}/{sk}[{'+'.join(bad)}]")
+                    if it.get("phase") is not None:
+                        continue  # stamped; the missing-stamp leg has nothing to say about it
+                    if should_phase_stamp(pk, sk):
+                        unstamped.append(f"{pk}/{sk}")
                     else:
                         by_design += 1  # cross-phase / system-state: unstamped IS the correct state
                 lek = resp.get("LastEvaluatedKey")
@@ -920,6 +933,22 @@ def check_coach_ensemble_phase_stamp_coverage():
         return [c.warn(f"phase-stamp coverage check errored: {e}")]
 
     protected = f" {by_design} cross-phase/system-state row(s) are correctly unstamped and excluded." if by_design else ""
+    if wrongly_stamped:
+        # The INVERSE defect (#3514 DA-6), reported FIRST because it is the damaging one:
+        # an unstamped scoped row is invisible-as-current, a stamped CROSS_PHASE row is
+        # Matthew's coach conversation history marked as belonging to one cycle. No --apply
+        # line here either — the remediation is deploy/reconcile_provenance_2026_09.py
+        # --only 3514, which is dry-run by default and lists every row before it writes.
+        sample = ", ".join(wrongly_stamped[:5])
+        more = f" (+{len(wrongly_stamped) - 5} more)" if len(wrongly_stamped) > 5 else ""
+        return [
+            c.warn(
+                f"{len(wrongly_stamped)} CROSS_PHASE row(s) on COACH#/ENSEMBLE# partitions carry provenance their "
+                f"class forbids ({'/'.join(PROVENANCE_ATTRS)}): {sample}{more}. A cross-phase row is never tagged, "
+                "never wiped and never phase-filtered — a stamp on one marks durable relationship state as "
+                "belonging to a single cycle. Remediate with deploy/reconcile_provenance_2026_09.py --only 3514."
+            )
+        ]
     if unstamped:
         sample = ", ".join(unstamped[:5])
         more = f" (+{len(unstamped) - 5} more)" if len(unstamped) > 5 else ""

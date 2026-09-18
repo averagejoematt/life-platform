@@ -463,6 +463,25 @@ _PK_RULES: list = [
     # next sweep say the same thing twice. "I already said this" is not an
     # artifact of the cycle that produced it.
     (lambda pk, sk: pk == "COACH#outbound_events" and sk.startswith("EVENT#"), SYSTEM_STATE),
+    # #3514 (DA-2): the two DELIVERY ledgers on the COACH# namespace. Both were caught by
+    # the blanket COACH#* rule below and so classified EXPERIMENT_SCOPED — wipeable on
+    # paper — while sitting outside COACH_PARTITIONS, outside assert_registry_coverage and
+    # outside the nightly stamp audit. The result was the worst of both: rows the registry
+    # said a reset must archive, that no reset has ever touched, across three cycles.
+    #
+    # They are the SAME SHAPE as COACH#outbound_events directly above, which the registry
+    # already rules SYSTEM_STATE on exactly this reasoning, and the live rows say so:
+    #   COACH#nudge_ledger   DAY#<date>  {trigger_type, coach_id, status, attempted_at,
+    #                                     expired_at, graded, error}   — per-day nudge
+    #                                     attempt/outcome bookkeeping with an expiry.
+    #   COACH#outbound_ledger DAY#<date> {total, referrals, ttl}       — per-day outbound
+    #                                     send counters with a self-TTL.
+    # Neither holds coach INTELLIGENCE (no narrative, no forecast, no graded claim); both
+    # are rate-limit/delivery accounting whose whole purpose is "how much have I already
+    # sent today". Carrying a reset into them would either destroy a live send counter or
+    # re-open a spend window mid-day. "I already sent N today" is not an artifact of the
+    # cycle that produced it — the same sentence that settles outbound_events.
+    (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"), SYSTEM_STATE),
     # Coach intelligence tier — all experiment-scoped.
     (lambda pk, sk: pk.startswith("COACH#"), EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#digest", EXPERIMENT_SCOPED),
@@ -669,6 +688,92 @@ def should_phase_stamp(pk: str, sk: str = "") -> bool:
     attribute_not_exists(phase), so a wrong one is not reversible by re-running.
     """
     return is_taggable(classify(pk, sk))
+
+
+def experiment_stamp_for(pk: str, sk: str = "", **kwargs) -> dict:
+    """#3514 (DA-6): the write-time stamp for THIS row — `{}` when its class forbids one.
+
+    THE DEFECT THIS CLOSES
+      `should_phase_stamp()` above has said since #2520 which rows may carry a write-time
+      phase stamp. **No writer consulted it.** Every stamping writer called the unguarded
+      `experiment_stamp()` and merged the result into whatever it was putting, so a
+      CROSS_PHASE row got the same `phase`/`cycle` as an EXPERIMENT_SCOPED one. Live on
+      2026-09-17, before the fix: 7 `COACH#*/RELATIONSHIP#state` rows and 15 `CHAT#` rows
+      carried scoped provenance — a stamp that marks Matthew's coach conversation history
+      as belonging to one cycle, on the exact partitions ADR-153 made cross-phase so it
+      would survive every reset.
+
+      The predicate was right and unread. That is why this wrapper exists instead of a
+      per-writer `if`: an `if` at 10 call sites is 10 chances to forget the 11th.
+
+    WHY `{}` AND NOT A PARTIAL STAMP
+      The reconcile that cleaned the live rows (deploy/reconcile_provenance_2026_09.py,
+      group A) removes `phase` AND `cycle` AND every `tombstone*` attribute, because the
+      CROSS_PHASE contract is "never tagged, never wiped, never phase-filtered" — a bare
+      `cycle` on such a row is the same category error as a bare `phase`. The writer's
+      behaviour and the reconcile's must agree exactly, or the next write re-creates what
+      the reconcile just removed.
+
+    AN UNCLASSIFIABLE ROW
+      `classify()` raises KeyError on an unknown pk, deliberately, and `should_phase_stamp`
+      documents that a caller must make that visible and "never default it to True". This
+      returns `{}` and logs LOUD rather than propagating, because every caller is a
+      fail-soft writer whose `except` would swallow the KeyError as a failed PUT and LOSE
+      THE ROW — trading a provenance defect for a data-loss one. Unstamped-and-announced is
+      the recoverable direction: the #3513 class (an unstamped scoped row) is repairable by
+      a reconcile pass, a dropped write is not. The totality census
+      (experiment.pk_census) is the instrument that turns that log line into a verdict.
+
+    `kwargs` pass through to `experiment_stamp` (`include_phase`, `as_of`, `cycle_geneses`,
+    `ssm_client`) so this is a drop-in at every existing call site.
+    """
+    try:
+        if not should_phase_stamp(pk, sk):
+            return {}
+    except KeyError as e:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "[#3514] experiment_stamp_for: pk=%r sk=%r is UNCLASSIFIED by phase_taxonomy (%s) — "
+            "writing it WITHOUT provenance rather than guessing. Add it to SOURCE_CLASS/_PK_RULES; "
+            "experiment.pk_census reports this family nightly.",
+            pk,
+            sk,
+            e,
+        )
+        return {}
+    return experiment_stamp(**kwargs)
+
+
+# The attributes a reset (or a write-time stamp) puts on a row to say WHICH run it
+# belongs to. On a CROSS_PHASE row every one of them is wrong by construction — the
+# class is "never tagged, never wiped, never phase-filtered".
+PROVENANCE_ATTRS = ("phase", "cycle", "tombstone", "tombstoned_at", "tombstoned_reason")
+
+
+def forbidden_provenance(pk: str, sk: str, item: dict) -> list[str]:
+    """#3514: the provenance attributes on `item` that its CLASS forbids.
+
+    The single predicate three instruments share, so none of them can drift from the
+    others the way the writer and the audit already did:
+      * `experiment_stamp_for` (the writer) — never writes one of these.
+      * `deploy/reconcile_provenance_2026_09.py` group A (the one-off) — removes them.
+      * `qa_smoke_lambda.check_coach_ensemble_phase_stamp_coverage` (the nightly) — WARNs.
+
+    Scoped to CROSS_PHASE deliberately, which is exactly the reconcile's own group-A
+    selector. A stamp on a SYSTEM_STATE row is untidy but inert (the phase machinery
+    ignores that class entirely); a stamp on a CROSS_PHASE row marks Matthew's coach
+    conversation history as belonging to one cycle, which is the thing ADR-153 exists to
+    prevent. Returns [] rather than raising for an unclassifiable row — the totality
+    census (experiment.pk_census) is the instrument that reports those, and an audit that
+    raises on one row stops reporting the other ten thousand.
+    """
+    try:
+        if classify(pk, sk) != CROSS_PHASE:
+            return []
+    except KeyError:
+        return []
+    return [a for a in PROVENANCE_ATTRS if item.get(a) is not None]
 
 
 # ── #2113: the read-side companion to is_wipeable ────────────────────────────

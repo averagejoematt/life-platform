@@ -387,15 +387,22 @@ def _get_item(pk, sk):
 def _put_item(item):
     """Write an item to DynamoDB with float-to-Decimal conversion.
 
-    All COACH#* rows written here are EXPERIMENT_SCOPED intelligence — stamp them
+    Most COACH#* rows written here are EXPERIMENT_SCOPED intelligence — stamp them
     with write-time provenance (phase + cycle, #1233) so they're self-describing on
-    this tagger-blind partition. experiment_stamp() is fail-soft and cached, and the
-    item's own keys win, so it never clobbers or breaks the write.
+    this tagger-blind partition. The stamp is fail-soft and cached, and the item's own
+    keys win, so it never clobbers or breaks the write.
+
+    #3514 (DA-6): "ALL COACH#* rows here are EXPERIMENT_SCOPED" is what this docstring
+    used to say, and it stopped being true at ADR-153 — `RELATIONSHIP#state` and `CHAT#`
+    are CROSS_PHASE on this same partition, and this helper stamped them anyway. Live
+    before the fix: every one of the 7 RELATIONSHIP#state singletons carried
+    phase=experiment cycle=17. `experiment_stamp_for` asks the taxonomy per ROW instead
+    of per PARTITION, which is the granularity the classification has always had.
     """
-    from experiment.phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp_for
 
     try:
-        table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))
+        table.put_item(Item=floats_to_decimal({**experiment_stamp_for(item.get("pk", ""), item.get("sk", "")), **item}))
         return True
     except Exception as e:
         logger.error("put_item failed for %s/%s: %s", item.get("pk"), item.get("sk"), e)
