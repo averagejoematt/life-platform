@@ -686,7 +686,17 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # vacuous-scan trap) and #3863's detector D (GUARD_PROOFS, proven on the real d681aecc6
         # merge rather than a plant). Measured, not incremented: the branch census reported
         # {can-fail (proven) 104, unproven 537, not-applicable 6, attempted-unproven 3}.
-        <= 104
+        # 2026-09-17 (#3785 boxes 1+2): 104 -> 105. The 105th proof is
+        # guard::deploy/config_ownership_audit.py, the config/ ownership registry — every
+        # `config/**.json` ruled generated-vs-hand-owned, with the not-uploadable classes held
+        # out of the twin set site-deploy syncs. Proved by FOUR real-tree mutations, each
+        # plant's own md5 compared before/after so a no-op plant could not read as green:
+        # the stale-twin branch disabled while the incident's own file was planted back; the
+        # producer repointed at another key; the twin-set exclusion disabled; the sync's
+        # put_object refusal disabled. Measured, not incremented: the branch census reported
+        # {can-fail (proven) 105, unproven 537, not-applicable 6, attempted-unproven 3},
+        # against 650/104 on a disposable `git archive` export of the merge-base.
+        <= 105
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

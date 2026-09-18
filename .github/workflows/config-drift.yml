@@ -58,6 +58,13 @@ jobs:
       # whole issue is about. Assert it found twins before trusting a green.
       - name: Report the derived twin set
         run: |
+          # #3785: `config_twin_registry` now imports the ownership registry, whose own
+          # import chain reaches `config_provenance_audit`'s lazy boto3 import. Nothing on
+          # THIS step's path calls it — `derive()` is pure AST + git — but a reachable
+          # import that the job never installs is exactly what #3315's dark-flag sweep
+          # exists to stop being discovered at runtime, so the pins land here too.
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
           python3 - <<'PY'
           import sys
           sys.path.insert(0, "deploy")
