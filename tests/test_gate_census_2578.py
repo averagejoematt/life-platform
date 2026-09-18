@@ -706,7 +706,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # its behavioural and AST legs is in the proof record. Measured on the COMMITTED,
         # rebased tree: {can-fail (proven) 106, unproven 537, not-applicable 6,
         # attempted-unproven 3} over 652 rows.
-        <= 106
+        # 2026-09-18 (#3511): 106 -> 107. ONE entrant, arriving PROVEN —
+        # guard::deploy/prereg_provenance_gate.py, the pre-genesis prediction provenance
+        # contract. Its four mutations are planted in the real tracked module one at a time
+        # (write-instant clause disarmed; unstamped rows treated as out-of-season; the
+        # shapeless-artifact vacuity guard softened to `set()`; the mirror clause deleted),
+        # each reverted before the next, and the stronger half is not a plant at all: on its
+        # first live run it reported 26 blocking findings against the real table, 16 of them
+        # every cycle-17 sealed bet stranded at phase=pilot/cycle=16. Measured on the MERGED,
+        # COMMITTED tree: {can-fail (proven) 107, unproven 537, not-applicable 6,
+        # attempted-unproven 3} over 653 rows, against 652/106 on a `git archive origin/main`
+        # export.
+        <= 107
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

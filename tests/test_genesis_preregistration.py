@@ -315,11 +315,8 @@ def test_stamped_fails_soft_on_stamp_error(monkeypatch):
     assert seeder._stamped(rec) == rec
 
 
-def test_write_predictions_stamps_every_item(monkeypatch):
-    """The regression this issue exists to prevent: every PREDICTION# row
-    write_predictions() puts must carry the write-time phase (+cycle) stamp."""
+def _fake_put_table(monkeypatch):
     import boto3
-    import experiment.phase_taxonomy as taxonomy
 
     class _FakeTable:
         def __init__(self):
@@ -335,13 +332,62 @@ def test_write_predictions_stamps_every_item(monkeypatch):
             return fake_table
 
     monkeypatch.setattr(boto3, "resource", lambda *a, **kw: _FakeResource())
-    monkeypatch.setattr(taxonomy, "experiment_stamp", lambda **kw: {"phase": "experiment", "cycle": 12})
+    return fake_table
+
+
+def test_write_predictions_stamps_every_item(monkeypatch):
+    """The #1970 regression this test exists to prevent: every PREDICTION# row
+    write_predictions() puts must carry a phase (+cycle) stamp.
+
+    #3511 CHANGED WHICH STAMP. It used to be `_stamped()` — the WALL-CLOCK phase — and
+    the attended seed runs the EVENING BEFORE Day 1, so on 2026-09-06T02:13:38Z
+    (2026-09-05 19:13 PT) experiment_stamp() truthfully returned phase=pilot/cycle=16
+    and all 16 cycle-17 sealed bets went in stamped for the CLOSING cycle. Nothing
+    re-stamps a COACH#* row, so they failed PHASE_FILTER_EXPRESSION permanently:
+    verified live 2026-09-17, the whole pre-registration was absent from
+    /api/predictions. A pre-registration row's generation is the genesis it was frozen
+    for, not the clock — so the stamp is now derived from CYCLE_GENESES, and the
+    expected cycle here is derived the same way rather than hand-typed."""
+    import experiment.phase_taxonomy as taxonomy
+    from web.site_api_data import CYCLE_GENESES
+
+    fake_table = _fake_put_table(monkeypatch)
+    # Deliberately WRONG on purpose: if write_predictions still used the wall clock,
+    # every row below would carry cycle 12.
+    monkeypatch.setattr(taxonomy, "experiment_stamp", lambda **kw: {"phase": "pilot", "cycle": 12})
 
     records = seeder.build_prediction_records(FROZEN)
     seeder.write_predictions(records)
 
+    expected_cycle = max(c for c, g in CYCLE_GENESES.items() if g == FROZEN["genesis"])
     assert len(fake_table.puts) == len(records) and records, "the fixture must actually produce records to prove anything"
     for item in fake_table.puts:
         assert item.get("phase") == "experiment", f"{item.get('sk')} missing phase — the #1970 regression"
-        assert item.get("cycle") == 12
+        assert item.get("cycle") == expected_cycle, f"{item.get('sk')} stamped for the wrong cycle — the #3511 regression"
         assert item["pk"].startswith("COACH#") and item["sk"].startswith("PREDICTION#")
+
+
+def test_write_predictions_falls_back_to_the_wall_clock_for_an_unknown_genesis(monkeypatch):
+    """#3511's fail-soft direction: a genesis CYCLE_GENESES does not name must NOT get a
+    guessed cycle number. The seeder says so loudly and keeps the old behaviour, and the
+    #3511 gate then reports the row rather than it passing silently."""
+    import experiment.phase_taxonomy as taxonomy
+
+    fake_table = _fake_put_table(monkeypatch)
+    monkeypatch.setattr(taxonomy, "experiment_stamp", lambda **kw: {"phase": "pilot", "cycle": 12})
+    assert seeder.genesis_cycle_stamp("1999-01-01") is None
+
+    records = [dict(r, created_date="1999-01-01") for r in seeder.build_prediction_records(FROZEN)]
+    seeder.write_predictions(records)
+    assert fake_table.puts and all(i.get("cycle") == 12 and i.get("phase") == "pilot" for i in fake_table.puts)
+
+
+def test_genesis_cycle_stamp_is_derived_from_the_registry_not_hand_typed():
+    from web.site_api_data import CYCLE_GENESES
+
+    for cycle, genesis in CYCLE_GENESES.items():
+        stamp = seeder.genesis_cycle_stamp(genesis)
+        assert stamp is not None and stamp["phase"] == "experiment"
+        # Ties (a genesis reused by two cycle numbers) resolve to the LATER cycle.
+        assert stamp["cycle"] == max(c for c, g in CYCLE_GENESES.items() if g == genesis)
+        assert stamp["cycle"] >= cycle

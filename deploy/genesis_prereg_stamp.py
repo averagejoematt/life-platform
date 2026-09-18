@@ -20,6 +20,11 @@ freeze content-addressed — the receipts pattern (ADR-105):
      and tests/test_prereg_hash_stamp.py reds CI on the same mismatch. The S3
      upload additionally refuses to overwrite a published artifact with different
      bytes, so the public copy is immutable post-publish.
+  4. LEDGER PROVENANCE (--apply, #3511): a seal is a claim ABOUT the live rows, so
+     before the bytes go up, deploy/prereg_provenance_gate.py checks that the live
+     prediction ledger agrees with the frozen artifact — no unsealed row presenting
+     as pre-genesis, and (from genesis onward) no sealed id missing from the season.
+     Blocking findings abort the publish; a gate that cannot run aborts it too.
 
 HONESTY RULES (ADR-104, docs-current-truth-only):
   - stamped_at is ALWAYS the real stamping moment — never backdated to the freeze.
@@ -216,8 +221,38 @@ def main():
     print(f"Note: {stamp['stamp_note']}")
 
     if not args.apply:
-        print("\nDRY RUN for the publish step — re-run with --apply to upload the artifact + stamp to S3.")
+        print(
+            "\nDRY RUN for the publish step — re-run with --apply to upload the artifact + stamp to S3.\n"
+            "(the #3511 ledger-provenance gate runs on --apply, where it can read the live table)"
+        )
         return 0
+
+    # #3511 — "else the seal cannot publish". A published, hash-verified seal whose
+    # claims the live ledger contradicts is worse than no seal: it is a verifiable
+    # artifact vouching for rows that do not match it. So the LEDGER is checked before
+    # the bytes go up, using the same pure predicate restart_verify check 20 and the CI
+    # test call. Pre-genesis (the normal attended publish moment) the only applicable
+    # clauses are the two write classes — the missing-seal clause is not applicable
+    # until genesis — so this gate is satisfiable by construction at the moment it runs.
+    # Read-only: it queries the COACH#* PREDICTION# partitions and writes nothing.
+    if str(REPO_ROOT / "deploy") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "deploy"))
+    try:
+        import prereg_provenance_gate
+
+        offenders = prereg_provenance_gate.require_clean_for_publish()
+    except Exception as e:
+        # Fail CLOSED. "Could not tell" is not "fine" for the platform's central
+        # credibility claim — the same posture restart_verify.served_genesis takes.
+        raise SystemExit(f"#3511 provenance gate could not run ({e}) — refusing to publish a seal it cannot vouch for.")
+    if offenders:
+        raise SystemExit(
+            f"#3511 provenance gate: {len(offenders)} blocking finding(s) — the live prediction ledger "
+            "disagrees with the frozen pre-registration, so this seal would vouch for rows that do not "
+            "match it. Refusing to publish.\n  - " + "\n  - ".join(str(f) for f in offenders)
+        )
+    print(f"#3511 provenance gate: clean — the live ledger agrees with {FROZEN_PATH.name}.")
+
     publish_to_s3(stamp)
     return 0
 

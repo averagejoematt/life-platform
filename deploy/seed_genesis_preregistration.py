@@ -58,6 +58,7 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
 sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
+import prereg_provenance_gate  # noqa: E402  (#3511 — the ONE prediction-id derivation, shared with the gate)
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from experiment import prereg_effect  # noqa: E402  (#3552 — min_effect from personal variance)
 from experiment.measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
@@ -524,8 +525,13 @@ def freeze(coaches_out, hypotheses, goals=None):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _slug(claim: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", claim.lower()[:40]).strip("_")
+# #3511: the id derivation moved to deploy/prereg_provenance_gate.py and is IMPORTED
+# here, not re-stated. The #3511 contract gate has to reconstruct these ids from the
+# frozen artifact in order to ask "is this live row one of the sealed bets?", and two
+# copies of a slug rule is exactly how that question starts answering NO for a row that
+# is in fact sealed. One function, two callers, and a parity test that fails if this
+# module stops routing through it.
+_slug = prereg_provenance_gate.prereg_slug
 
 
 def _subdomain_for(metric: str, claim: str) -> str:
@@ -542,7 +548,6 @@ def build_prediction_records(frozen):
     from coach_state_updater import _build_prediction_eval_spec, _parse_confidence
 
     created_date = frozen["genesis"]
-    date_compact = created_date.replace("-", "")
     records = []
     for coach_id, block in frozen["coaches"].items():
         for pred in block["predictions"]:
@@ -551,7 +556,7 @@ def build_prediction_records(frozen):
             direction = pred.get("direction") if metric else None
             window = int(pred.get("window_days", 14))
             eval_spec = _build_prediction_eval_spec(metric or None, direction, window)
-            pred_id = f"pred_{date_compact}_{_slug(claim)}"
+            pred_id = prereg_provenance_gate.prediction_id_for(claim, created_date)
             records.append(
                 {
                     "pk": f"COACH#{coach_id}",
@@ -778,12 +783,54 @@ def _stamped(item):
         return item
 
 
+def genesis_cycle_stamp(genesis: str) -> dict | None:
+    """The phase/cycle a row seeded FOR `genesis` belongs to — or None if the registry
+    cannot say, in which case the caller keeps the wall-clock stamp (#3511).
+
+    WHY THE WALL-CLOCK STAMP IS WRONG HERE, MEASURED. `_stamped()` above is right for a
+    live writer and wrong for this one. `experiment_stamp()` answers "what phase/cycle is
+    it RIGHT NOW", and the attended seed runs the EVENING BEFORE Day 1 — so on
+    2026-09-06T02:13:38Z (2026-09-05 19:13 PT) it correctly answered `phase=pilot,
+    cycle=16`, and all 16 cycle-17 sealed bets went into DynamoDB stamped for the closing
+    cycle. Nothing re-stamps a COACH#* row (`restart_phase_tag.py` only reaches
+    `USER#matthew#SOURCE#*`), so they failed `PHASE_FILTER_EXPRESSION` forever: verified
+    live 2026-09-17, the entire cycle-17 pre-registration was absent from
+    /api/predictions while nine unsealed Day-1 coach calls were served. The seal existed,
+    was hash-verified, and graded nothing.
+
+    A pre-registration row's generation is not the clock — it is the genesis it was
+    frozen for. `CYCLE_GENESES` is the registry that maps one to the other (the same one
+    `prereg_seal_gate.py` iterates), inverted here rather than hand-typed, and a genesis
+    it does not know about returns None rather than a guessed cycle number.
+    """
+    try:
+        from common.constants import EXPERIMENT_PHASE_CURRENT
+        from web.site_api_data import CYCLE_GENESES
+
+        matches = sorted(c for c, g in CYCLE_GENESES.items() if g == genesis)
+        if not matches:
+            return None
+        return {"phase": EXPERIMENT_PHASE_CURRENT, "cycle": max(matches)}
+    except Exception:
+        return None
+
+
 def write_predictions(records):
     import boto3
 
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+    genesis = records[0]["created_date"] if records else None
+    # #3511: stamp for the genesis this pre-registration is FOR, not for the wall clock
+    # the attended seed happens to run at. Falls back to the live stamp when the registry
+    # cannot name the cycle — the #3511 gate then reports it rather than it being silent.
+    stamp = genesis_cycle_stamp(genesis) if genesis else None
+    if stamp:
+        print(f"stamping seeded rows for the genesis cycle: {stamp} (genesis {genesis})")
+    else:
+        print(f"WARNING: CYCLE_GENESES does not name a cycle for genesis {genesis!r} — falling back to the wall-clock stamp")
     for rec in records:
-        table.put_item(Item=_to_decimal(_stamped(rec)))  # fixed sk → overwrite, idempotent
+        item = {**stamp, **rec} if stamp else _stamped(rec)
+        table.put_item(Item=_to_decimal(item))  # fixed sk → overwrite, idempotent
         print(f"WROTE {rec['pk']} / {rec['sk']}")
 
 

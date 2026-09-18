@@ -82,6 +82,7 @@ def _full_pred(coach="sleep_coach"):
         "outcome_notes": "cleared Wednesday",
         "subdomain": "recovery",
         "pre_registered_at": "2026-07-18T22:00:00+00:00",  # #3480
+        "pre_registered": True,  # #3511 — the flag, not just the instant
     }
 
 
@@ -227,6 +228,10 @@ class TestProjectionCarriesEveryEmittedField:
             # #3480: the freeze instant rides the projection too — dropped from
             # _PREDICTION_PROJECTION_FIELDS it would silently serve None for every row.
             "pre_registered_at": "2026-07-18T22:00:00+00:00",
+            # #3511: and the BOOLEAN beside it — the instant alone cannot say "sealed"
+            # (absent on every in-cycle call AND on sealed rows written before #3480),
+            # and the ledger table renders sealed vs in-cycle off this field.
+            "pre_registered": True,
             # #3520: the walk includes RETIRED seats (their career records are real and
             # keep their real byline), and the scorecard used to render them beside the
             # live cast with nothing to say so. The flag is registry-derived.

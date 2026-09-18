@@ -62,6 +62,18 @@ Checks (each pass/fail):
      stamp_compute_staleness_window() declared a genesis suppression window
      that is still active (an expected, dated, auto-clearing red) — an ALARM
      with no active declared window is a real, unpredicted problem and fails.
+ 20. Pre-genesis prediction provenance (#3511): the live prediction ledger must
+     AGREE with the frozen pre-registration. Check 15 asserts a seal EXISTS; nothing
+     asserted the rows match it. Two directions, both blocking post-genesis: a season
+     PREDICTION# row that presents as pre-genesis (written at/before the PT-midnight
+     genesis boundary, or dated strictly before genesis) whose prediction_id is not in
+     the frozen artifact; and a sealed id with no live season row at all. The second
+     is not hypothetical — on 2026-09-17 all 16 cycle-17 sealed bets were stamped
+     phase=pilot/cycle=16 by an attended seed that ran the evening before Day 1, so the
+     whole pre-registration was invisible and ungradeable. Shares one PURE predicate
+     with the CI half (deploy/prereg_provenance_gate.py); repairs via
+     deploy/reconcile_prereg_season_3511.py.
+
  19. Cross-surface VITALS honesty (#2113): no coach card on
      /api/coaching-dashboard cites a recovery score, HRV, resting HR or sleep
      duration the cockpit disagrees with. The sibling of the weight check —
@@ -377,6 +389,32 @@ def main():
         )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("Every cycle has a published prereg seal or a dated grandfather record (#1979)", False, f"check could not run: {e}")
+
+    # 20. #3511 — the live prediction ledger must AGREE with the frozen seal.
+    # Check 15 above proves a seal was PUBLISHED. It says nothing about the rows: on
+    # cycle-16 Day 0 two gradeable directional bets with 14-day windows were written at
+    # 17:09Z before genesis, carried no `pre_registered`, were absent from the frozen
+    # artifact, and were on course to be machine-graded into the cycle scorecard beside
+    # the sealed ones. The mirror direction turned out to be live too — see the module
+    # docstring of deploy/prereg_provenance_gate.py, which holds the PURE predicate this
+    # check and the CI test (tests/test_prereg_pregenesis_contract_3511.py) both call.
+    try:
+        import prereg_provenance_gate  # noqa: E402  (REPO_ROOT/deploy already on sys.path)
+
+        _frozen = prereg_provenance_gate.load_frozen()
+        # as_of defaults to today (PT) inside audit_live — the missing-seal clause is
+        # only applicable from genesis onward, and this check runs post-genesis.
+        _findings, _rows = prereg_provenance_gate.audit_live(frozen=_frozen)
+        _blocking = prereg_provenance_gate.blocking(_findings)
+        _detail = (
+            f"{len(_rows)} PREDICTION# rows read, {len(prereg_provenance_gate.frozen_prediction_ids(_frozen))} sealed ids, "
+            f"findings {prereg_provenance_gate.summarize(_findings)}"
+        )
+        if _blocking:
+            _detail += "; " + " | ".join(str(f) for f in _blocking[:5]) + ("" if len(_blocking) <= 5 else f" | +{len(_blocking) - 5} more")
+        check("Live prediction ledger agrees with the frozen pre-registration (#3511)", not _blocking, _detail)
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("Live prediction ledger agrees with the frozen pre-registration (#3511)", False, f"check could not run: {e}")
 
     # 16. #2104 — coach cards must not narrate a pre-genesis body. The reset is the
     # exact moment a slow-regenerating narrative surface goes stale against a fast
