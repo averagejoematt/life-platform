@@ -222,6 +222,17 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # post-merge there is nothing that would ever surface it. Nine days of a red
         # Visual QA (standalone) is what that looks like.
         "test_judge_verdict_retry_3688.py",
+        # #3514: the write-time provenance gate. Pre-merge because its Set leg is an AST
+        # sweep of lambdas/ for direct `experiment_stamp(` calls — a NEW writer inherits
+        # the ungated call silently, and the defect it produces (a cycle stamp on a
+        # CROSS_PHASE row) is invisible to every read path, so nothing post-merge surfaces
+        # it. The failure mode is a reset marking Matthew's coach conversation history for
+        # the wipe: exactly the class that must red on the PR that introduces it.
+        "test_phase_provenance_3514.py",
+        # #3514: grades docs/SCHEMA.md against the committed pk-family census, which
+        # deploy/write_pk_family_census.py regenerates — a PR that lands a refreshed
+        # artifact must red on that PR, not on whoever pushes next (#2975).
+        "test_schema_families_census.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the

@@ -1881,12 +1881,27 @@ aws s3 cp config/board_of_directors.json s3://matthew-life-platform/config/
 > templates and the daily **Config twin drift** workflow stayed green for nine runs,
 > because while the clobber was active both sides read 789 and agreed.
 >
-> **The current list is derived, not written here** — ask it, because a list in a
-> runbook drifts and this one would drift silently:
+> **The push was not a hand command.** Measured 2026-09-17 against the run log: all three
+> clobbers (09-14 16:43Z, 09-14 18:13Z, 09-15 17:47Z) landed ~1m35s after a `site-deploy`
+> run started, and run `35003307196`'s own log reads `🔴 DRIFT
+> config/hevy_template_index.json` / `uploaded: 2` at 17:47:57.9Z against an S3 version
+> written at 17:47:58Z. The writer was the sanctioned deploy path — site-deploy's
+> `config_twin_sync.py --apply --strict` step — which had the generated index in its
+> derived twin set. The stale repo twin is deleted and the ownership registry now holds
+> every generated key out of that set, so the same command cannot repeat it.
+>
+> **Which files may NOT be pushed is a ruling, not a memory** — ask the registry, because
+> a list written into this runbook would drift silently:
 >
 > ```bash
-> python3 -c "import sys; sys.path.insert(0,'deploy'); from config_provenance_audit import declared_generated; print(*sorted(declared_generated()), sep=chr(10))"
+> python3 deploy/config_ownership_audit.py           # every config/ subject: class + upload=yes/NO
+> python3 deploy/config_ownership_audit.py --strict  # …and exit 1 on a stale twin or an unruled file
 > ```
+>
+> Today it prints `runtime_generated` / upload=**NO** for `config/hevy_template_index.json`
+> and `config/hevy_template_cache.json`, and `hand_owned` or `repo_generated` /
+> upload=yes for everything else — including the four files in the block above. A subject
+> nobody has ruled is **not** uploadable: the registry fails closed.
 >
 > A generated object is repaired by **re-running its producer**, never by uploading the
 > repo copy. `deploy/config_provenance_audit.py` is the standing check: it grades the live

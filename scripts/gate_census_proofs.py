@@ -517,6 +517,53 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    "guard::deploy/config_ownership_audit.py": {
+        "gate_name": "deploy/config_ownership_audit.py",
+        "command": (
+            "python3 deploy/config_ownership_audit.py --strict   # repo-side, NO AWS calls; plus the offline "
+            "suite python3 -m pytest tests/test_config_ownership_3785.py -q (15 tests, baseline 15 passed)"
+        ),
+        "mutation": (
+            "Four defects planted one at a time in the REAL tracked tree — not a copy — each one leg of the #3785 "
+            "fix, and each plant's own md5 compared before/after so a no-op plant could not be read as a green. "
+            "M1: the `stale-twin` branch in `findings()` disabled while the incident's own precondition was "
+            "planted (the generated `config/hevy_template_index.json` written back into the real config/ tree). "
+            "M2: `lambdas/training/hevy_template_index.py:INDEX_KEY` repointed at `config/hevy_template_index_M2.json` "
+            "— a producer that stops writing the key its ruling names. M3: the ownership exclusion in "
+            "`config_twin_registry.derive()` disabled, i.e. a generated key rejoining the deploy path. M4: the "
+            "put_object-level refusal in `config_twin_sync.apply_sync()` disabled."
+        ),
+        "observed": (
+            "2026-09-17. BASELINE `--strict` exit 0 and 15 passed on both sides of every plant, md5 restored each "
+            "time. M1 RED (1 failed, 13 passed): test_MUTATION_restoring_the_committed_twin_reds_the_audit, on "
+            "`Right contains one more item: 'config/hevy_template_index.json'` — the audit stayed silent over a "
+            "restored twin. M2 `--strict` exit 1 with BOTH arms: `🔴 producer-stale: config/hevy_template_index.json` "
+            "and `🔴 unruled-producer: config/hevy_template_index_M2.json`; RED (2 failed): "
+            "test_the_real_tree_audit_is_clean, test_the_producer_scan_enrols_the_next_generated_artifact. "
+            "M2 IS THE ONE WORTH READING: on its FIRST run the producer-identity leg was `key in src and const in "
+            "src`, and it stayed GREEN — the module's own docstring names the key on line 5, so the text still "
+            "matched after the code stopped writing it. That is #3856's enrolment-ratchet shape reappearing in a "
+            "file written by someone who had just read that write-up; the leg reads the AST now (`_assigns_key`) and "
+            "names the drift. Only the SET leg (`unruled-producer`) caught M2 in the meantime. "
+            "M3 RED, and it moved with the tree: BEFORE the twin's deletion was committed, 3 tests red; AFTER the "
+            "deletion — the steady state this PR ships — exactly 1, "
+            "test_a_checkout_that_HAS_the_generated_twin_still_never_deploys_it, while the real-tree assertion "
+            "test_the_twin_set_holds_out_every_not_uploadable_key stayed GREEN over an empty population. The "
+            "fixture test exists for that reason and the re-run is what proved it necessary. "
+            "M4 RED (2 failed): test_apply_sync_refuses_a_generated_key_even_when_handed_one and the mutation test."
+        ),
+        "scope": (
+            "This grades the REPO — the rulings, the producer identities, and whether any generated artifact has a "
+            "committed twin. It makes NO AWS call: whether the LIVE object is currently the producer's output is "
+            "`deploy/config_provenance_audit.py`'s question, graded against the clock, and the two are kept separate "
+            "so they cannot be wrong together. An `unknown` ruling is a WARN, not a fail — it is already fail-closed "
+            "for uploads, and making it fatal would push the next author to guess a class instead of recording what "
+            "they could not determine. Deleting the twin removes the AMMUNITION, not the capability: a human can "
+            "still `aws s3 cp` any file over a generated key, and that revert is caught by the provenance dead-man "
+            "on the next daily run rather than prevented."
+        ),
+        "proved_on": "2026-09-17",
+    },
     "guard::deploy/config_provenance_audit.py": {
         "gate_name": "deploy/config_provenance_audit.py",
         "command": (
@@ -967,6 +1014,45 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
     # session that wrote it, not synthetic plants — M1 is the bug that shipped and was
     # caught by rendering against live data, M2 is the wrong read seam the plan itself
     # recommended before the audience registers were checked.
+    # #3514: the write-time provenance gate. The mutation is not synthetic — it is the
+    # EXACT code that was live on main, and the 22 rows it produced were measured on the
+    # real table the same day (deploy/reconcile_provenance_2026_09.py --only 3514).
+    "structural::test_phase_provenance_3514.py": {
+        "gate_name": "test_phase_provenance_3514.py",
+        "command": "python3 -m pytest tests/test_phase_provenance_3514.py -q   # 24 tests; baseline 24 passed",
+        "mutation": (
+            "`lambdas/coach/coach_state_updater._put_item` reverted to the shipped pre-#3514 line — "
+            "`{**experiment_stamp(), **item}` with the matching import — i.e. the literal state of main at "
+            "4b115435e, under which 7 COACH#*/RELATIONSHIP#state singletons and 15 CHAT# rows were carrying "
+            "phase=experiment / cycle=17 on partitions ADR-153 makes CROSS_PHASE. Real tree, not a fixture; the "
+            "file's md5 was read before (7e1384ca61d33ea858f0df402fea6021) and after "
+            "(19451a964cc5d29e2a1ece8257f3302d) and asserted DIFFERENT before the verdict was read, because a "
+            "macOS `sed -i ''` exits 0 on a no-match and a silently no-op control reports the guard working."
+        ),
+        "observed": (
+            "MUTATED: 5 failed, 19 passed — and the two legs failed independently, which is the point. "
+            "BEHAVIOURAL (3): test_the_real_writers_put_no_provenance_on_a_cross_phase_row reds once per "
+            "CROSS_PHASE sk (RELATIONSHIP#state, CHAT#<date>#<id>, CHAT#summary#<date>), each driven end to end "
+            "through the SHIPPED helper against a recording table, not a re-implementation of it. "
+            "AST (2): test_every_ungated_stamp_call_is_a_registered_exemption names the reverted module as an "
+            "unregistered direct caller, and test_the_ast_enumeration_is_not_vacuous reds on the Set drifting "
+            "from its exemption registry. Restored (md5 back to 7e1384ca…); 24 passed. Watched 2026-09-18."
+        ),
+        "scope": (
+            "Covers BOTH directions of the stamp decision, deliberately: that a CROSS_PHASE row gets no "
+            "provenance, AND — test_an_experiment_scoped_row_STILL_gets_one — that an EXPERIMENT_SCOPED row "
+            "still does. Without that second half a gate returning {} for everything would pass every "
+            "assertion here while silently creating the #3513 defect, where an unstamped scoped row satisfies "
+            "PHASE_FILTER_EXPRESSION forever and is served as current. "
+            "Does NOT cover the LIVE rows: the 22 already-stamped rows are the reconcile's job "
+            "(deploy/reconcile_provenance_2026_09.py --only 3514), and this file is why that reconcile holds — "
+            "all 22 were classed `writer-restamped`, so a data fix without the writer fix reverts within a day. "
+            "Does NOT cover the two registered exemptions' claim that SOURCE#achievements / "
+            "SOURCE#milestone_ledger hold no CROSS_PHASE sk class; that is phase_taxonomy's classification and "
+            "is graded by the totality census (experiment.pk_census), nightly and at every reset."
+        ),
+        "proved_on": "2026-09-18",
+    },
     "structural::test_recap_coach_line_3749.py": {
         "gate_name": "test_recap_coach_line_3749.py",
         "command": "python3 -m pytest tests/test_recap_coach_line_3749.py -q   # 51 tests; baseline 51 passed",

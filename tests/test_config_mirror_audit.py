@@ -33,7 +33,7 @@ def _write(path, text):
 
 
 @pytest.fixture
-def mirror_repo(tmp_path):
+def mirror_repo(tmp_path, monkeypatch):
     """A repo with one of each owner class, all read by deployed code.
 
     * `config/widget_registry.json` — a plain repo twin.
@@ -42,6 +42,12 @@ def mirror_repo(tmp_path):
     * `seeds/imported_catalog.json` — a repo file outside `config/`.
     * `config/mystery.json` — nothing produces it.
     """
+    # #3785 — same reason as tests/test_config_twin_sync.py's `fake_repo`: `derive()`
+    # fails closed on a config file the ownership registry has no ruling for, and these
+    # filenames are fictional. Declared uploadable so this fixture keeps testing the
+    # MIRROR audit; the fail-closed behaviour is proved against the real tree in
+    # tests/test_config_ownership_3785.py.
+    monkeypatch.setattr(registry_mod, "uploadable", lambda key: True)
     root = str(tmp_path)
     _write(os.path.join(root, "config", "widget_registry.json"), json.dumps({"widgets": []}))
     _write(os.path.join(root, "seeds", "imported_catalog.json"), json.dumps({"items": []}))

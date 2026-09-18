@@ -268,11 +268,16 @@ def concession_text(loser_id, winner_id, topic, losing_claim, normalized, actual
 
 def _stamped(item):
     """Write-time experiment provenance (phase + cycle) — ENSEMBLE#docket is
-    EXPERIMENT_SCOPED (phase_taxonomy). Fail-soft like the summarizer's writer."""
-    try:
-        from experiment.phase_taxonomy import experiment_stamp
+    EXPERIMENT_SCOPED (phase_taxonomy). Fail-soft like the summarizer's writer.
 
-        return {**experiment_stamp(), **item}
+    #3514 (DA-6): asks the taxonomy per ROW (`experiment_stamp_for`). This helper takes
+    an arbitrary item, so the class of what it stamps is a property of its callers, not
+    of the function — the same shape that let coach_state_updater stamp CROSS_PHASE rows
+    for three cycles."""
+    try:
+        from experiment.phase_taxonomy import experiment_stamp_for
+
+        return {**experiment_stamp_for(item.get("pk", ""), item.get("sk", "")), **item}
     except Exception:
         return item
 

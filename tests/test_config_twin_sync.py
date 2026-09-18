@@ -30,8 +30,17 @@ def _write(path, text):
 
 
 @pytest.fixture
-def fake_repo(tmp_path):
+def fake_repo(tmp_path, monkeypatch):
     """A miniature repo: two config twins, one consumed, one runtime-written."""
+    # #3785 — `derive()` now asks the ownership registry whether each repo file may be
+    # pushed to S3 at all, and `uploadable()` fails CLOSED on a subject nobody has ruled.
+    # The rulings describe the real `config/` tree; this is a synthetic checkout whose
+    # filenames no ruling can honestly describe, so they are declared uploadable here
+    # rather than teaching the registry about fictional files. The real-tree behaviour —
+    # an UNRULED file is not uploadable and the audit reds on it by name — is asserted
+    # against the real repo in tests/test_config_ownership_3785.py.
+    monkeypatch.setattr(registry_mod, "uploadable", lambda key: True)
+    monkeypatch.setattr(sync_mod, "uploadable", lambda key: True)  # the second stop, at the put_object call
     root = str(tmp_path)
     _write(os.path.join(root, "config", "widget_registry.json"), json.dumps({"widgets": []}))
     _write(os.path.join(root, "config", "runtime_state.json"), json.dumps({"live": True}))

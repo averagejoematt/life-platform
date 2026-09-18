@@ -96,6 +96,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "board-verdict-silence-7d": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "declaration"
+    },
     "budget-tier-hardstop": {
       "kind": "metric",
       "routing": "urgent",
@@ -112,6 +118,12 @@
       "kind": "metric",
       "routing": "digest",
       "stack": "monitoring_budget_alarms",
+      "via": "declaration"
+    },
+    "canary-no-invocations-1h": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
       "via": "declaration"
     },
     "chronicle-delivery-heartbeat": {
@@ -911,7 +923,7 @@
   ],
   "cost_surface": {
     "ai_features": 18,
-    "alarms": 129,
+    "alarms": 131,
     "emf_namespaces": 31,
     "schedules": 90,
     "secrets": 28
@@ -7079,9 +7091,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 129,
+      "alarms": 131,
       "alarms_by_routing": {
-        "digest": 86,
+        "digest": 88,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,

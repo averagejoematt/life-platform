@@ -233,6 +233,22 @@ COACH_PARTITIONS = [
     # COACH#computation = daily prediction-evaluator output. Pre-genesis only;
     # post-genesis records accumulate from the next run.
     ("COACH#computation", "coach_compute", "pregenesis", {}),
+    # #3514: found by the live-census coverage check ON ITS FIRST RUN — this partition is
+    # not a coach and not a source, so no registry named it and nothing required it.
+    # COACH#commitments / TALLY#current is the SINGLETON follow-through rollup the public
+    # /api/predictions scorecard reads (commitment_grading.write_tally, #3553). It carries
+    # both a `lifetime` (career) and a `season` block, and the season block is per-cycle by
+    # construction — built by filtering the corpus through experiment.phase_filter.
+    # singleton_visible. Its class is therefore the blanket COACH#* one, EXPERIMENT_SCOPED,
+    # and until now nothing archived it.
+    #
+    # "all", not "pregenesis": the sk is a constant (TALLY#current), so there is no date to
+    # split on. The grader overwrites the row whole on its next daily run, so the archive
+    # window is short — but it is NOT zero, and for the length of it the public scorecard
+    # would serve the CLOSING cycle's season percentages under a pre-genesis `as_of`. The
+    # surface's own contract says an absent rollup renders nothing "never a zero it did not
+    # measure"; a stale season is the same error with a number attached.
+    ("COACH#commitments", "coach_commitments", "all", {}),
 ]
 
 # Per the §14 E decision: coach-running-state categories. ADR-077 finding 4:
@@ -432,7 +448,7 @@ def work_contract(grand: dict, apply: bool) -> dict:
     return {"input_count": in_scope, "acted_count": acted, "skipped_count": int(grand["skipped_already"]), "reason": reason}
 
 
-def assert_registry_coverage():
+def assert_registry_coverage(live_scoped_pks: dict | None = None):
     """ADR-077: every EXPERIMENT_SCOPED source in the registry must be wiped here,
     and the known non-SOURCE scoped pks must be covered. Fail loudly on a gap so a
     new scoped partition can never silently survive a restart (the root-cause bug).
@@ -473,9 +489,30 @@ def assert_registry_coverage():
         f"COACH#{c}"
         for c in OPERATIONAL_COACH_IDS
     }
+    # #3514 (DA-2): OPERATIONAL_COACH_IDS answers "which COACHES exist", which is not the
+    # same question as "which COACH#* PARTITIONS exist". COACH#nudge_ledger and
+    # COACH#outbound_ledger are neither coaches nor sources, so no registry named them and
+    # this check could not see them — they were EXPERIMENT_SCOPED on paper and unwiped in
+    # fact for three cycles. The LIVE table is the only registry that knows the real set,
+    # so the reset passes it in (experiment.pk_census.live_scoped_pks("COACH#")) and every
+    # live EXPERIMENT_SCOPED COACH#* partition becomes required.
+    #
+    # It stays OPTIONAL on purpose. CI has no table, and a coverage check that can only run
+    # with AWS credentials is one that never runs at PR time; the registry-derived set above
+    # is the offline floor and the census only ever ADDS to it. A caller that passes an
+    # empty dict is asserting "I enumerated and found none", which pk_census refuses to
+    # produce from a vacuous scan.
+    if live_scoped_pks is not None:
+        required_pks |= set(live_scoped_pks)
     gap = [pk for pk in required_pks if pk not in covered_pks]
     if gap:
-        raise SystemExit(f"restart_intelligence_wipe: scoped non-SOURCE pks not covered: {sorted(gap)}")
+        raise SystemExit(
+            "restart_intelligence_wipe: scoped non-SOURCE pks not covered: "
+            f"{sorted(gap)}. Each is EXPERIMENT_SCOPED (the taxonomy says a reset must "
+            "archive it) and absent from FULL_PK_PARTITIONS/COACH_PARTITIONS (nothing "
+            "does). Add it to the wipe, or reclassify it in phase_taxonomy if it is not "
+            "experiment-scoped after all."
+        )
 
 
 def main():
@@ -483,7 +520,20 @@ def main():
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run).")
     args = parser.parse_args()
 
-    assert_registry_coverage()
+    # #3514 (DA-2): the coverage check runs against the LIVE partition set, not only the
+    # registry-derived floor. Fail-soft on the enumeration itself — no credentials, a
+    # throttled scan or an empty table must not turn the wipe into a no-op — but NEVER
+    # fail-soft on the verdict: if the census resolves, its gaps are fatal exactly as the
+    # registry's are. A skipped census says so out loud rather than reading as a pass.
+    live_pks = None
+    try:
+        from experiment.pk_census import live_scoped_pks as _live_scoped_pks
+
+        live_pks = _live_scoped_pks("COACH#")
+        print(f"[coverage] live census: {len(live_pks)} EXPERIMENT_SCOPED COACH#* partition(s)")
+    except Exception as e:  # noqa: BLE001
+        print(f"[coverage] WARNING: live COACH#* census unavailable ({e}) — registry-derived floor only")
+    assert_registry_coverage(live_pks)
     cycle = current_cycle()
     mode_str = "APPLY" if args.apply else "DRY-RUN"
     print(f"[{mode_str}] intelligence wipe starting. genesis={EXPERIMENT_START_DATE} " f"cycle={cycle} reason={TOMBSTONE_REASON}")

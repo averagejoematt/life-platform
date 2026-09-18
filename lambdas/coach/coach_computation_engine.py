@@ -662,9 +662,11 @@ def _write_results(today_str, package):
 
         # Write-time provenance (#1233): COACH#computation is EXPERIMENT_SCOPED,
         # tagger-blind — stamp phase + cycle (fail-soft, cached, never clobbers).
-        from experiment.phase_taxonomy import experiment_stamp
+        # #3514: through the per-row gate, so a future sk on this partition is
+        # classified rather than assumed scoped because today's sks are.
+        from experiment.phase_taxonomy import experiment_stamp_for
 
-        table.put_item(Item={**experiment_stamp(), **item})
+        table.put_item(Item={**experiment_stamp_for(item.get("pk", ""), item.get("sk", "")), **item})
         logger.info("Wrote computation results for %s", today_str)
     except Exception as e:
         logger.error("Failed to write computation results: %s", e)
@@ -783,9 +785,9 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
     # tagger-blind, but its `phase` attribute is the narrative-arc STATE (not the
     # taxonomy phase) — stamp cycle ONLY (include_phase=False) so the arc semantic
     # is preserved. Fail-soft, cached; the item's own keys win.
-    from experiment.phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3514: per-row class gate
 
-    _arc_stamp = experiment_stamp(include_phase=False)
+    _arc_stamp = experiment_stamp_for("NARRATIVE#arc", "STATE#current", include_phase=False)
     try:
         table.put_item(
             Item=floats_to_decimal(

@@ -221,6 +221,7 @@ def snapshot_outgoing_genesis() -> str:
 from experiment.pk_census import (  # noqa: E402,F401
     CensusPreflightError,
     census_families,
+    census_snapshot,
     pk_family as _pk_family,
     run_census_preflight,
     scan_pk_sk_pages,
@@ -853,6 +854,25 @@ def main():
         try:
             fam_count = run_census_preflight()
             print(f"    OK — {fam_count} distinct pk families all resolve via phase_taxonomy.classify()")
+            # #3514 (DA-10): the same scan also REFRESHES the committed census artifact, so
+            # CI can grade docs/SCHEMA.md against a measured family list. Written here
+            # because this is the one moment the pipeline provably holds credentials AND
+            # has just certified the census, and because the reset is the event that most
+            # often introduces a family. Fail-soft: a write error must not abort a reset
+            # whose actual preflight has already passed.
+            try:
+                import subprocess as _sp
+
+                from write_pk_family_census import write_artifact as _write_census_artifact
+
+                _snap = census_snapshot()
+                _art = _write_census_artifact(_snap)
+                print(f"    census artifact refreshed: {_art.relative_to(REPO_ROOT)} ({_snap['family_count']} families)")
+                _diff = _sp.run(["git", "diff", "--stat", "--", str(_art)], cwd=str(REPO_ROOT), capture_output=True, text=True)
+                if (_diff.stdout or "").strip():
+                    print("    NOTE: the census artifact CHANGED — commit it, or the CI SCHEMA.md gate grades a stale one.")
+            except Exception as _e:  # noqa: BLE001
+                print(f"    WARNING: could not refresh the census artifact ({_e}) — the CI gate keeps grading the committed one.")
         except CensusPreflightError as e:
             print(f"\n✗ CENSUS PREFLIGHT FAILED\n{e}")
             if not args.continue_on_error:

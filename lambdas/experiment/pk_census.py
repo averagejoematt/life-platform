@@ -96,6 +96,63 @@ def census_families(pages) -> dict:
     return reps
 
 
+def census_pks_with_prefix(pages, prefix: str) -> dict:
+    """Distinct FULL pks under `prefix` -> a representative sk (first seen wins).
+
+    `pk_family()` above deliberately folds every `COACH#*` pk to the single family
+    "COACH". That is the right granularity for the TOTALITY question ("does classify()
+    resolve this family?") and the wrong one for the COVERAGE question ("is this
+    PARTITION in the wipe's covered set?"): a partition can classify perfectly and still
+    be one nothing wipes.
+
+    #3514 (DA-2) is exactly that gap. `COACH#nudge_ledger` and `COACH#outbound_ledger`
+    classified fine — the blanket `COACH#*` rule answered for them — and sat outside
+    COACH_PARTITIONS for three cycles, because the only live enumeration the reset ran
+    folded them into the same "COACH" family as the eight real coaches. This function is
+    the finer enumeration, over the SAME scan pages, so it costs no extra read units.
+
+    `pages` is the `scan_pk_sk_pages` generator or synthetic pages in a test.
+    """
+    reps: dict = {}
+    for page in pages:
+        for item in page:
+            pk = item.get("pk", "")
+            if pk.startswith(prefix):
+                reps.setdefault(pk, item.get("sk", ""))
+    return reps
+
+
+def live_scoped_pks(prefix: str, table=None) -> dict:
+    """The live pks under `prefix` whose class is EXPERIMENT_SCOPED -> representative sk.
+
+    The derivation `assert_registry_coverage` consumes: a partition in here that the wipe
+    does not cover is a partition a reset would silently leave behind. READ-ONLY.
+
+    A pk the taxonomy cannot classify is NOT silently dropped — it is left out of the
+    scoped set here (the totality census above is the instrument that reports it, and it
+    aborts the same reset), so this function never has to decide what an unknown class
+    means. Two instruments, one scan, neither guessing for the other.
+    """
+    if table is None:
+        import boto3
+
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    reps = census_pks_with_prefix(scan_pk_sk_pages(table), prefix)
+    if not reps:
+        raise CensusPreflightError(
+            f"pk census: the pk+sk scan returned ZERO pks under {prefix!r}. Refusing to certify "
+            "wipe coverage on an empty enumeration (the vacuous-scan trap)."
+        )
+    out: dict = {}
+    for pk, sk in sorted(reps.items()):
+        try:
+            if taxonomy.classify(pk, sk) == taxonomy.EXPERIMENT_SCOPED:
+                out[pk] = sk
+        except KeyError:
+            continue
+    return out
+
+
 def unresolved_families(table=None) -> tuple[list[tuple[str, str, str, str]], int]:
     """The census as DATA rather than as an exception: return
     ``(unresolved, family_count)`` where each unresolved entry is
@@ -129,6 +186,50 @@ def unresolved_families(table=None) -> tuple[list[tuple[str, str, str, str]], in
         except KeyError as e:
             unresolved.append((fam, pk, sk, str(e)))
     return unresolved, len(reps)
+
+
+def census_snapshot(table=None) -> dict:
+    """The census AS A COMMITTABLE ARTIFACT — `{generated_at, family_count, families}`
+    where each family carries its representative row and the class it resolved to.
+
+    #3514 (DA-10): `docs/SCHEMA.md` is named "authoritative" in CLAUDE.md and drifts from
+    the live table with nothing to stop it — the 2026-08-22 pass (#2810) hand-closed the
+    same gap and left no ratchet, so it reopened. A CI gate cannot ask DynamoDB (no
+    credentials at PR time), so the derivation is split: this writes the live family list
+    to `deploy/generated/pk_family_census.json` when someone HAS credentials (the reset's
+    Step [0], or `python3 deploy/write_pk_family_census.py`), and CI grades SCHEMA.md
+    against that committed artifact. The gate's number is therefore always a MEASURED one,
+    just not a live one — and the artifact carries `generated_at` so a reader can see how
+    old the measurement is instead of trusting a hand-typed list.
+
+    READ-ONLY against DynamoDB (the caller writes the file).
+    """
+    from datetime import datetime, timezone
+
+    if table is None:
+        import boto3
+
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    reps = census_families(scan_pk_sk_pages(table))
+    if not reps:
+        raise CensusPreflightError(
+            "pk-family census snapshot: the pk+sk scan returned ZERO pk families. Refusing to "
+            "write an empty census artifact (the vacuous-scan trap) — a gate graded against it "
+            "would pass by having nothing to check."
+        )
+    families = {}
+    for fam, (pk, sk) in sorted(reps.items()):
+        try:
+            cls = taxonomy.classify(pk, sk)
+        except KeyError:
+            cls = None  # unresolved; run_census_preflight is the instrument that RULES on this
+        families[fam] = {"rep_pk": pk, "rep_sk": sk, "class": cls}
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py.",
+        "family_count": len(families),
+        "families": families,
+    }
 
 
 def format_unresolved(unresolved: list[tuple[str, str, str, str]]) -> str:

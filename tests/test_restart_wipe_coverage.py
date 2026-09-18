@@ -120,3 +120,59 @@ def test_elena_rows_all_datable_for_pregenesis():
     ]
     for row in rows:
         assert wipe.extract_date(row) is not None, f"undatable PERSONA#elena row: {row['sk']}"
+
+
+# ── #3514 (DA-2): the LIVE-census leg of the coverage assertion ──────────────
+#
+# OPERATIONAL_COACH_IDS answers "which coaches exist", which is not the question the
+# wipe needs answered. COACH#nudge_ledger and COACH#outbound_ledger are neither coaches
+# nor sources, so nothing required them and nothing wiped them for three cycles, while
+# the taxonomy called them wipeable. The reset now passes the live partition set
+# (experiment.pk_census.live_scoped_pks("COACH#")) into the same assertion.
+#
+# These tests run OFFLINE — they inject a synthetic census rather than reaching AWS, so
+# the positive control is a property of the assertion, not of whatever the table holds
+# on the day CI runs.
+
+
+def test_the_live_census_leg_is_a_positive_control_a_new_coach_partition_reds():
+    """A brand-new EXPERIMENT_SCOPED COACH#* partition in the live census, absent from
+    COACH_PARTITIONS, must FAIL the coverage assertion. This is the control for the whole
+    census leg: without it, passing an empty or wrong census would read as a pass."""
+    import pytest
+
+    census = {"COACH#brand_new": "OUTPUT#2026-09-17"}
+    with pytest.raises(SystemExit) as exc:
+        wipe.assert_registry_coverage(census)
+    assert "COACH#brand_new" in str(exc.value)
+
+
+def test_the_census_leg_only_adds_it_never_subtracts():
+    """An EMPTY census must not weaken the registry-derived floor — the eight coaches are
+    still required. A check whose strictness depends on what a scan happened to return is
+    one that goes quiet exactly when the table is unreadable."""
+    wipe.assert_registry_coverage({})  # the offline floor still holds; no exception
+    covered = {pk for pk, *_ in wipe.COACH_PARTITIONS}
+    from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+    assert {f"COACH#{c}" for c in OPERATIONAL_COACH_IDS} <= covered
+
+
+def test_a_system_state_partition_in_the_census_is_not_required():
+    """The two delivery ledgers this issue reclassified are SYSTEM_STATE, so
+    live_scoped_pks filters them out before the assertion ever sees them — verified
+    through classify() rather than by asserting the filter's own output, so this fails if
+    the reclassification is reverted."""
+    for pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"):
+        assert taxonomy.classify(pk, "DAY#2026-09-01") == taxonomy.SYSTEM_STATE, pk
+    # and the partition they are modelled on, unchanged
+    assert taxonomy.classify("COACH#outbound_events", "EVENT#x#2026-08-12") == taxonomy.SYSTEM_STATE
+
+
+def test_the_commitments_rollup_is_covered():
+    """#3514: found by the census leg on its FIRST run — COACH#commitments/TALLY#current,
+    the singleton the public follow-through scorecard reads, was EXPERIMENT_SCOPED and
+    uncovered. Pinned so it cannot fall back out."""
+    covered = {pk for pk, *_ in wipe.COACH_PARTITIONS}
+    assert "COACH#commitments" in covered
+    assert taxonomy.classify("COACH#commitments", "TALLY#current") == taxonomy.EXPERIMENT_SCOPED

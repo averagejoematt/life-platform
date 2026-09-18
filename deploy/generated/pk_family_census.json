@@ -1,0 +1,497 @@
+{
+  "families": {
+    "BOOK": {
+      "class": "cross_phase",
+      "rep_pk": "BOOK#bd1540f875fbe0af",
+      "rep_sk": "META"
+    },
+    "CACHE": {
+      "class": "system_state",
+      "rep_pk": "CACHE#matthew",
+      "rep_sk": "TOOL#cgm_dashboard_today"
+    },
+    "COACH": {
+      "class": "cross_phase",
+      "rep_pk": "COACH#eli_marsh",
+      "rep_sk": "CHAT#2026-08-12#18818e69"
+    },
+    "COACHSIM": {
+      "class": "cross_phase",
+      "rep_pk": "COACHSIM#scoreboard",
+      "rep_sk": "LIMITATIONS"
+    },
+    "ENSEMBLE": {
+      "class": "experiment_scoped",
+      "rep_pk": "ENSEMBLE#docket",
+      "rep_sk": "OPEN#explorer_coach__nutrition_coach#calories"
+    },
+    "EVALRET": {
+      "class": "cross_phase",
+      "rep_pk": "EVALRET#state_of_matthew",
+      "rep_sk": "TS#2026-07-26T19:30:36.637151+00:00#4c20b46f"
+    },
+    "EVALUATOR": {
+      "class": "system_state",
+      "rep_pk": "EVALUATOR#coach_prediction",
+      "rep_sk": "STATE#last_decided"
+    },
+    "NARRATIVE": {
+      "class": "experiment_scoped",
+      "rep_pk": "NARRATIVE#arc",
+      "rep_sk": "HISTORY#2026-05-18"
+    },
+    "PERSONA": {
+      "class": "experiment_scoped",
+      "rep_pk": "PERSONA#elena",
+      "rep_sk": "CALLBACK#2026-06-30#what-happened-tuesday-to-sunday"
+    },
+    "PULSE": {
+      "class": "system_state",
+      "rep_pk": "PULSE",
+      "rep_sk": "DATE#2026-04-04"
+    },
+    "READING": {
+      "class": "cross_phase",
+      "rep_pk": "READING#9551158909c31d27",
+      "rep_sk": "NOTE#coach-why"
+    },
+    "SOURCE#achievements": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#achievements",
+      "rep_sk": "BADGE#first_level_up"
+    },
+    "SOURCE#adaptive_mode": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#adaptive_mode",
+      "rep_sk": "DATE#2026-02-26"
+    },
+    "SOURCE#ai_analysis": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#ai_analysis",
+      "rep_sk": "EXPERT#glucose"
+    },
+    "SOURCE#anomalies": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#anomalies",
+      "rep_sk": "DATE#2026-02-22"
+    },
+    "SOURCE#apple_health": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#apple_health",
+      "rep_sk": "ALERTSTATE#ah_activity_degraded"
+    },
+    "SOURCE#calibration": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#calibration",
+      "rep_sk": "CALIB#2026-07-06#forecast-recovery_pct-h1.0-2026-07-05"
+    },
+    "SOURCE#centenarian_progress": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#centenarian_progress",
+      "rep_sk": "WEEK#2026-W13"
+    },
+    "SOURCE#challenges": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#challenges",
+      "rep_sk": "CHALLENGE#5k-every-day_2026-03-29"
+    },
+    "SOURCE#character_receipt": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#character_receipt",
+      "rep_sk": "DATE#2026-07-18"
+    },
+    "SOURCE#character_sheet": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#character_sheet",
+      "rep_sk": "DATE#2026-03-27"
+    },
+    "SOURCE#chronicle": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#chronicle",
+      "rep_sk": "DATE#2026-02-22"
+    },
+    "SOURCE#chronicling": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#chronicling",
+      "rep_sk": "DATE#2025-10-20"
+    },
+    "SOURCE#circadian": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#circadian",
+      "rep_sk": "DATE#2026-03-17"
+    },
+    "SOURCE#coach_corrections": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#coach_corrections",
+      "rep_sk": "CORRECTION#2026-07-22#seed07a1"
+    },
+    "SOURCE#coach_gen_cache": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#coach_gen_cache",
+      "rep_sk": "COACH#ensemble#ensemble_digest"
+    },
+    "SOURCE#composite_scores": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#composite_scores",
+      "rep_sk": "DATE#2026-03-14"
+    },
+    "SOURCE#computed_insights": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#computed_insights",
+      "rep_sk": "DATE#2026-03-06"
+    },
+    "SOURCE#computed_metrics": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#computed_metrics",
+      "rep_sk": "DATE#2026-03-05"
+    },
+    "SOURCE#day_grade": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#day_grade",
+      "rep_sk": "DATE#2023-07-23"
+    },
+    "SOURCE#decisions": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#decisions",
+      "rep_sk": "DECISION#2026-06-24T03:09:54.692Z"
+    },
+    "SOURCE#deletion_log": {
+      "class": "system_state",
+      "rep_pk": "USER#admin#SOURCE#deletion_log",
+      "rep_sk": "DATE#2026-07-27T08:00:26.170666+00:00#USER#subscriber_retention_sweep"
+    },
+    "SOURCE#dexa": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#dexa",
+      "rep_sk": "DATE#2025-05-10"
+    },
+    "SOURCE#diary_reactions": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#diary_reactions",
+      "rep_sk": "DATE#2026-07-26#video_diary#ec9b171ed7a5"
+    },
+    "SOURCE#discovery_annotations": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#discovery_annotations",
+      "rep_sk": "EVENT#14c27dfa1d6dc049"
+    },
+    "SOURCE#dropbox_tracker": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#dropbox_tracker",
+      "rep_sk": "FILE#2026-02-25T02:32:21.476026+00:00#MacroFactor-20260224182840.csv"
+    },
+    "SOURCE#effect_fits": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#effect_fits",
+      "rep_sk": "FIT#2026-07-19"
+    },
+    "SOURCE#eightsleep": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#eightsleep",
+      "rep_sk": "DATE#2023-07-23"
+    },
+    "SOURCE#email_digest": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#email_digest",
+      "rep_sk": "STATE#between_chronicle"
+    },
+    "SOURCE#email_log": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#email_log#evening_nudge",
+      "rep_sk": "DATE#2026-08-26"
+    },
+    "SOURCE#engagement_state": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#engagement_state",
+      "rep_sk": "DATE#2026-06-30"
+    },
+    "SOURCE#evening_ritual": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#evening_ritual",
+      "rep_sk": "DATE#2026-07-29"
+    },
+    "SOURCE#experiment_suggestions": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#experiment_suggestions",
+      "rep_sk": "SUGGEST#636fe0190438"
+    },
+    "SOURCE#experiments": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#experiments",
+      "rep_sk": "EXP#breathwork-before-sleep"
+    },
+    "SOURCE#field_notes": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#field_notes",
+      "rep_sk": "WEEK#2026-W14"
+    },
+    "SOURCE#flourishing": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#flourishing",
+      "rep_sk": "DATE#2026-01-01"
+    },
+    "SOURCE#food_delivery": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#food_delivery",
+      "rep_sk": "DATE#2011-09-26#TXN#001"
+    },
+    "SOURCE#forecast": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#forecast",
+      "rep_sk": "DATE#2026-07-04"
+    },
+    "SOURCE#garmin": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#garmin",
+      "rep_sk": "DATE#2022-04-25"
+    },
+    "SOURCE#genome": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#genome",
+      "rep_sk": "GENE#ABCG8#SNP#rs6544713"
+    },
+    "SOURCE#google_calendar": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#google_calendar",
+      "rep_sk": "DATE#2026-03-08"
+    },
+    "SOURCE#habit_scores": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#habit_scores",
+      "rep_sk": "DATE#2026-02-23"
+    },
+    "SOURCE#habitify": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#habitify",
+      "rep_sk": "DATE#2026-02-23"
+    },
+    "SOURCE#health_check": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#health_check",
+      "rep_sk": "DATE#2026-03-29"
+    },
+    "SOURCE#hevy": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#hevy",
+      "rep_sk": "DATE#2021-04-12"
+    },
+    "SOURCE#hevy_id_map": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#hevy_id_map",
+      "rep_sk": "HEVY#0e69ec9f-863d-4a75-a449-0a29c0e913ae"
+    },
+    "SOURCE#hypotheses": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#hypotheses",
+      "rep_sk": "HYPOTHESIS#2026-05-10T19:01:01.432881+00:00"
+    },
+    "SOURCE#ingest_liveness": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#ingest_liveness",
+      "rep_sk": "DATE#2026-06-10"
+    },
+    "SOURCE#insights": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#insights",
+      "rep_sk": "INSIGHT#2026-02-23T02:13:57"
+    },
+    "SOURCE#journal_analysis": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#journal_analysis",
+      "rep_sk": "BEHAVIOR_REGISTRY#current"
+    },
+    "SOURCE#labs": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#labs",
+      "rep_sk": "DATE#2019-05-01"
+    },
+    "SOURCE#ledger": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#ledger",
+      "rep_sk": "CYCLE_TOTALS#002"
+    },
+    "SOURCE#macrofactor": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#macrofactor",
+      "rep_sk": "DATE#2025-11-24"
+    },
+    "SOURCE#macrofactor_meals": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#macrofactor_meals",
+      "rep_sk": "DATE#2025-11-24#MEAL#01"
+    },
+    "SOURCE#macrofactor_workouts": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#macrofactor_workouts",
+      "rep_sk": "DATE#2021-04-12"
+    },
+    "SOURCE#measurements": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#measurements",
+      "rep_sk": "DATE#2026-03-29"
+    },
+    "SOURCE#milestones": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#milestones",
+      "rep_sk": "DIGEST#genesis"
+    },
+    "SOURCE#notion": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#notion",
+      "rep_sk": "ALERTSTATE#notion_journal_dark"
+    },
+    "SOURCE#nutrition_review": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#nutrition_review",
+      "rep_sk": "DATE#2026-02-28"
+    },
+    "SOURCE#panelcast": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#panelcast",
+      "rep_sk": "SHOW#memory"
+    },
+    "SOURCE#personal_baselines": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#personal_baselines",
+      "rep_sk": "SNAPSHOT#LATEST"
+    },
+    "SOURCE#platform_memory": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#platform_memory",
+      "rep_sk": "MEMORY#baseline_snapshot#2026-05-03"
+    },
+    "SOURCE#protocols": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#protocols",
+      "rep_sk": "PROTOCOL#cgm"
+    },
+    "SOURCE#qa_predict_dark": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#qa_predict_dark",
+      "rep_sk": "STATE#predict_dark"
+    },
+    "SOURCE#recall_embeddings": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#recall_embeddings",
+      "rep_sk": "DOC#chronicle#2026-02-22"
+    },
+    "SOURCE#recap_cards": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#recap_cards",
+      "rep_sk": "DATE#2026-09-06"
+    },
+    "SOURCE#routine_index": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#routine_index",
+      "rep_sk": "DATE#2026-06-01#ROUTINE#08626dd0f66a495987542debda15b365"
+    },
+    "SOURCE#scenarios": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#scenarios",
+      "rep_sk": "DATE#2026-07-04"
+    },
+    "SOURCE#sick_days": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#sick_days",
+      "rep_sk": "DATE#2026-03-08"
+    },
+    "SOURCE#sleep_unified": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#sleep_unified",
+      "rep_sk": "DATE#2026-02-01"
+    },
+    "SOURCE#state_of_matthew": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#state_of_matthew",
+      "rep_sk": "DATE#2026-07-05"
+    },
+    "SOURCE#strava": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#strava",
+      "rep_sk": "DATE#2009-05-27"
+    },
+    "SOURCE#subscribers": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#subscribers",
+      "rep_sk": "EMAIL#423e832037bb3ae2162e5f25f29af96fcf4ba84a990fbbdc2802657b4be545c8"
+    },
+    "SOURCE#supplements": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#supplements",
+      "rep_sk": "DATE#2026-02-24"
+    },
+    "SOURCE#time_affluence": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#time_affluence",
+      "rep_sk": "EDGE#2026-08-02"
+    },
+    "SOURCE#todoist": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#todoist",
+      "rep_sk": "DATE#2022-03-17"
+    },
+    "SOURCE#training_notes": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#training_notes#EXERCISE#651F844C",
+      "rep_sk": "DATE#2026-06-22#WORKOUT#1a06d0c8-ba12-49ce-bd18-89dc6cc270ac"
+    },
+    "SOURCE#training_reference": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#training_reference",
+      "rep_sk": "DATE#2026-06-19"
+    },
+    "SOURCE#weather": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#weather",
+      "rep_sk": "DATE#2026-02-26"
+    },
+    "SOURCE#weekly_correlations": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#weekly_correlations",
+      "rep_sk": "WEEK#2026-W11"
+    },
+    "SOURCE#weight_episodes": {
+      "class": "cross_phase",
+      "rep_pk": "USER#matthew#SOURCE#weight_episodes",
+      "rep_sk": "DATE#2012-12-28"
+    },
+    "SOURCE#what_changed": {
+      "class": "experiment_scoped",
+      "rep_pk": "USER#matthew#SOURCE#what_changed",
+      "rep_sk": "SNAPSHOT#current"
+    },
+    "SOURCE#whoop": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#whoop",
+      "rep_sk": "DATE#2020-03-20"
+    },
+    "SOURCE#withings": {
+      "class": "raw_timeseries",
+      "rep_pk": "USER#matthew#SOURCE#withings",
+      "rep_sk": "DATE#2012-06-04"
+    },
+    "SYSTEM": {
+      "class": "system_state",
+      "rep_pk": "SYSTEM#dlq-ledger",
+      "rep_sk": "MSG#0de310717c378b22d46f616d17a287e9"
+    },
+    "USER": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#ROUTINE#32ec141860f64ad09d02d73993e10826",
+      "rep_sk": "VERSION#000001"
+    },
+    "VOICEFIDELITY": {
+      "class": "cross_phase",
+      "rep_pk": "VOICEFIDELITY#labs_coach",
+      "rep_sk": "JUDGMENT#2026-08#0"
+    },
+    "VOTES": {
+      "class": "system_state",
+      "rep_pk": "VOTES#ladder_replicator",
+      "rep_sk": "COUNT"
+    }
+  },
+  "family_count": 98,
+  "generated_at": "2026-09-18T01:08:22.857401+00:00",
+  "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py."
+}

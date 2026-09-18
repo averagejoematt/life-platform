@@ -58,6 +58,13 @@ jobs:
       # whole issue is about. Assert it found twins before trusting a green.
       - name: Report the derived twin set
         run: |
+          # #3785: `config_twin_registry` now imports the ownership registry, whose own
+          # import chain reaches `config_provenance_audit`'s lazy boto3 import. Nothing on
+          # THIS step's path calls it — `derive()` is pure AST + git — but a reachable
+          # import that the job never installs is exactly what #3315's dark-flag sweep
+          # exists to stop being discovered at runtime, so the pins land here too.
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
           python3 - <<'PY'
           import sys
           sys.path.insert(0, "deploy")
@@ -122,3 +129,20 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py boto3 botocore)
           pip install --quiet $PINS
           python3 deploy/config_provenance_audit.py --strict
+
+      # #3785 boxes 1+2 — the REPO-side half, and the only step here needing no AWS at
+      # all. The three steps above grade the LIVE objects; none of them can see the thing
+      # that actually fired the incident, which was a stale GENERATED artifact sitting in
+      # the repo as loadable ammunition for the deploy path (site-deploy's twin sync
+      # pushed it three times — see deploy/config_ownership_audit.py's docstring for the
+      # run ids). This asks: is every `config/**.json` ruled generated-vs-hand-owned, does
+      # every generated ruling still name a producer that ASSIGNS its key, and has any
+      # generated artifact acquired a committed twin again?
+      #
+      # `if: always()` for the same reason as the two steps above. Duplicated in the
+      # pytest lane by tests/test_config_ownership_3785.py on purpose: the PR lane is
+      # where a re-committed twin should be stopped, and this schedule is where one that
+      # arrived by some other path is found.
+      - name: config/ ownership registry (repo-side, no AWS, blocking)
+        if: always()
+        run: python3 deploy/config_ownership_audit.py --strict
