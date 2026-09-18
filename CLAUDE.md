@@ -211,37 +211,35 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-17 (Opus 5, **Session AI — the correction that was bigger than the correction**; owner
-brief *"close on demonstrated evidence, pick with `--closeable`"*, autonomous overnight, standing merge+deploy
-authority, **no `--deliver`**, issue numbers sigil-free near closing verbs, every lease disposed).
-**119 open -> 117 (87 -> 84 addressable, both MEASURED two ways at 06:26Z — search `total_count` AND a paginated
-id-set, agreeing): 3 closed on live proof (3860, 3863, 3865), 1 filed, 2 PRs merged, 2 production deploys, census
-648 -> 650 with BOTH entrants arriving PROVEN.** **Track 0 was two wrong statements Session AH left on issues —
-and verifying the first turned up a THIRD that was larger than either.** AH recorded 3563's box 1 as
-*"unresolved"*; `tests/test_role_family_write_scope.py` satisfies it almost clause for clause (18 passed, mutation
-controls with negative controls in BOTH arms), and **Session AG had named that file in the comment directly above
-AH's own.** The rule AH applied was right — *a file carrying an issue number is not evidence it asserts that
-issue's criterion* — but rejection was treated as the answer: **failing to find an instrument is not evidence it is
-absent.** The plan's whole Track 1 (write that test) was unnecessary and was skipped; 3563 went from "3 boxes open"
-to ONE clause. **3860's finding was never the ruling, it was WHERE the check lived:** the ADR-077 census was
-correct and caught `recap_cards` the moment it ran, but it sat in `deploy/`, which is **never staged into the
-Lambda bundle** — so nothing could execute it for ten days. Proved from the deployed artifact, and the control IS
-the issue: `pk_census.py PRESENT · REACHABLE True · deploy/ staged into the zip? **False**`. **3863's acceptance
-box was VACUOUS on its own incident** — implemented literally it returns ZERO findings on PR #3862, because the
-offending ref was in the branch commits; cut against `body ∪ github` it returns exactly `{3715}`. Both readings
-pinned. The build also found that **a supplied `--subject` can write an ISSUE number in the `(#N)` PR slot**
-(`d681aecc6` does), so the merge path that mints an unvalidated text also erases the handle back to what should
-have validated it. **Its first act was to flag its own merge** — predicted in the PR body BEFORE merging, effect
-`no-effect`, and deliberately NOT dispositioned. **3865 was filed and closed the same session:** `ChronicleSent`
-emitted `1` for both a sanctioned budget pause and a real 1-subscriber send, so **a week of pauses read to the
-delivery dead-man exactly like a week of delivery** — the alarm could be silenced by the state it exists to
-distinguish. **Three corrections to my OWN statements, two caught by machinery not by me:** the wipe TOMBSTONES so
-there is no S3 orphan (I had said delete); I measured the census at 649 then ADDED a gate, and CI caught the stale
-ceiling inside my own PR; and a `git archive` export cannot measure main's suite (no `.git`/`node_modules`) — I ran
-it, got 30 failures, and discarded the measurement rather than reporting it. **`test_wrap_gate_lines` was RED on
-unmodified main and nothing reported it** (AH wrote the Backlog marker with a parenthetical where the gate matches
-it exactly) — verified in a disposable export before claiming it was not mine; repaired. **Owner acts:**
-3563's scoped `logs:FilterLogEvents` grant — one sentence, yes or no, and no Lambda in the fleet reads CloudWatch
-Logs today · 3715 · 3601 box 3b · 3042 · 3606 · 2883 · the 5 standing `acceptance_count` violations (3607 3611
-3615 3617 3621) still need splitting, not trimming. **Final measured: 117 open / 84 addressable.**
+**Verified:** 2026-09-18 (Opus 5, **Session AJ — the gate that reads the comment, and the lease I left waiting**;
+owner brief *"close issues on demonstrated evidence, as many as honestly possible"*, autonomous all-day, standing
+merge+deploy authority, **no `--deliver`**, target 117 -> 100-104). **117 -> 110 open (66 -> 61 addressable, both
+MEASURED two ways — search `total_count` AND a paginated id-set, agreeing): 7 closed on live proof (3506 3514 3659
+3663 3785 3848 3853), 1 filed (3877), 6 PRs merged, 4 production deploys plus one `cdk deploy` covering LifePlatformOperational and LifePlatformMonitoring.** Short of target, and the
+reason is structural rather than a knowledge gap: roughly a third of the window went to background CI waits I did
+not overlap with work. **The session's own worst finding is about itself — I left a production-approval lease
+WAITING 12.5h.** Two superseded ancestors were rejected correctly and the TIP was never disposed; run 35301189491
+sat at the gate from 02:54Z while the `ci-cd-deploy-<ref>` concurrency group evicted every following merge's run,
+so six merged PRs sat undeployed and `Deploy wedge watch` went red every ten minutes into a log nobody read. The
+rule says *approve the tip, reject ancestors by name, never leave one waiting*; I did two of the three halves, and
+the wording has no case for what happened — **the tip's own run had been evicted, so there was no lease to approve
+and a fresh `workflow_dispatch` was needed.** Incident row filed. **The through-line in the technical work is that
+an instrument read the prose explaining it, four times in one night.** `gate_census` enumerates through git's
+TRACKED-file listing, so "measure the census after the tree is complete" is insufficient — it must be after the
+tree is complete **and committed**; I measured a finished tree, got a clean 17-passed, and CI contradicted it the
+moment `agent_commit.sh` tracked the new file. Two independent agent lanes hit the identical hole. Then my own
+ceiling COMMENT, containing the literal phrase `git ls-files`, made `premerge_derivation._SWEEP_PATTERN` classify
+that test file as a tree-sweeping gate — and my first measurement of that Set was WRONG (a tokenize round-trip
+split `.rglob(` apart and reported 82 false members; the true count is 1, mine). Three more were registry-shaped
+names expanded entry-by-entry into phantom verdict-less gates. **Three issues' own text was out of date and the
+work says so on the record:** 3785's cause was `site-deploy.yml`'s own config-twin step, not an ad-hoc `aws s3 cp`
+(the Site-deploy run started 17:46:03Z, the stale copy landed 17:47:58Z, three clobbers matching to the second and
+two non-clobbering deploys as the control); 3514's 26 tombstoned rows no longer exist and its count is 22; 3669's
+Set is 67 of 83 live `SOURCE#` families, not 4. **3552 was triaged and deliberately NOT closed** — its box 3 asks
+for a regeneration that would rewrite a PUBLISHED, hash-sealed pre-registration 12 days into the cycle it
+pre-registers (`curl … | shasum` matches the stamp byte for byte), so acting on the plan would have been the
+defect. **Owner acts:** the 8 `gate:owner` questions posted at 00:5xZ with recommended defaults (3716 3717 3750
+3753 3755 3761 3770 3771 — the last open children of five epics, 13 closures for near-zero engineering) · 3571's
+one-sentence `dropbox` ruling · the 5 standing `acceptance_count` violations (3607 3611 3615 3617 3621) still need
+splitting, not trimming. **Final measured: 110 open / 61 addressable.**
 

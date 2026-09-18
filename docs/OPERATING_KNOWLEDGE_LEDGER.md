@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 450** — feedback 24 · reference 259 · security 1 · project 163 · user 1 · index 2
+**Files in the memory index snapshot: 454** — feedback 24 · reference 262 · security 1 · project 164 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 284** — homed-here 79 · already-homed 179 · superseded 7 · narrative 15 · off-repo 4
+**Rule-class files (feedback + reference + security): 287** — homed-here 81 · already-homed 180 · superseded 7 · narrative 15 · off-repo 4
 
-**Program/session files (project): 163** — already-homed 14 · superseded 1 · narrative 145 · off-repo 2 · index 1
+**Program/session files (project): 164** — already-homed 14 · superseded 1 · narrative 146 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -214,6 +214,7 @@ project_session_ae_2026_09_14.md
 project_session_af_2026_09_15.md
 project_session_ah_2026_09_16.md
 project_session_ai_2026_09_17.md
+project_session_aj_2026_09_18.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -273,6 +274,7 @@ reference_a_derived_artifact_needs_its_lane.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_gate_that_cannot_be_satisfied_trains_readers_to_skip_it.md
 reference_a_generated_artifact_with_a_committed_twin.md
+reference_a_lease_steward_that_pauses_is_not_a_steward.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
 reference_a_page_level_overflow_measure_is_blind.md
@@ -282,6 +284,7 @@ reference_a_piped_exit_code_is_not_a_test_result.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
 reference_a_private_artifact_under_a_public_prefix.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
+reference_a_registry_shaped_name_in_a_test_mints_phantom_gates.md
 reference_a_repo_side_fix_to_an_s3_read_config.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
 reference_a_success_line_is_not_a_stored_row.md
@@ -500,6 +503,7 @@ reference_task_notification_exit_codes_lie.md
 reference_test_importing_aws_cdk_reds_ci.md
 reference_test_layer_dep_import_collection_red.md
 reference_the_acceptance_box_can_be_vacuous_on_its_own_incident.md
+reference_the_census_enumerates_tracked_files.md
 reference_the_doc_literal_merge_treadmill.md
 reference_the_first_denial_masks_the_second.md
 reference_the_rubric_can_be_the_finding_generator.md
@@ -984,6 +988,10 @@ carries an operating rule.
 | `reference_a_pct_suffix_is_not_one_semantic.md` | reference | `tests/accuracy_audit.py` (the `_SIGNED_PCT_FIELDS` / `_ACHIEVEMENT_PCT_FIELDS` comment block states the three percent domains and why the achievement class is bounded rather than exempt) | homed-here |
 | `project_session_z_2026_09_08.md` | project | — narrative: a session record, not a repo rule | narrative |
 | `reference_a_sweep_that_restores_a_directory.md` | reference | `docs/CONVENTIONS.md` §7 (a verification sweep that ends in `git checkout -- <dir>` restores the WHOLE directory to HEAD, including your own uncommitted edits — commit before sweeping, or scope the restore to the paths the loop writes) | homed-here |
+| `reference_the_census_enumerates_tracked_files.md` | reference | `tests/test_gate_census_lane_3000.py` (the `BASELINE_TOTAL_GATES` note records that gate_census enumerates through git's tracked-file listing, so an untracked new test file is invisible and the census must be measured after the tree is complete AND committed) and `tests/test_gate_census_2578.py` (the same reason at the proven-verdict ceiling) | homed-here |
+| `reference_a_registry_shaped_name_in_a_test_mints_phantom_gates.md` | reference | `scripts/gate_census_enforcement.py` (the comment above `NOT_APPLICABLE_REASONS` already states that a registry-shaped name is expanded entry-by-entry into phantom gates and that the name deliberately matches none of `_REGISTRY_NAME`'s patterns) | already-homed |
+| `reference_a_lease_steward_that_pauses_is_not_a_steward.md` | reference | `docs/INCIDENT_LOG.md` (the 2026-09-18 P3 row carries the 12.5h stranded-lease mechanism, the three-clause rule and the evicted-tip recovery) | homed-here |
+| `project_session_aj_2026_09_18.md` | project | session narrative — the durable rules it points at are homed in their own rows above | narrative |
 | `project_session_ab_2026_09_13.md` | project | — narrative: a session record (landing Session Z's held campaign and finding it inert), not a repo rule; its extracted rules are the two reference rows above and in [[reference_conflicting_pr_mints_no_checks]] | narrative |
 | `project_session_ac_2026_09_13.md` | project | — narrative: a session record (the owner's week-one feature review — three epics filed, then the training-tools investigation), not a repo rule; its extracted rules are the two reference rows above | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
