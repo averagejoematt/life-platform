@@ -40,8 +40,20 @@ import ast
 import fnmatch
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from typing import Iterable
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# #3785 — the ownership ruling. The AST writer scan below can only see a `config/` key
+# handed straight to a boto3 write call; `hevy_template_index.py` passes its key to an
+# INJECTED `put_json_fn`, so the scan classified the GENERATED index as an ordinary
+# hand-owned twin and `--apply` pushed the June-1 copy over the live catalogue on three
+# site deploys. The registry is the second, independent answer to "who owns this
+# object", and it is a written ruling rather than a derivation precisely because intent
+# is not inferable from source.
+from config_ownership_audit import owner_of, uploadable  # noqa: E402
 
 # The repo directory whose files are twins of bucket-root `config/` objects.
 REPO_CONFIG_DIR = "config"
@@ -119,6 +131,11 @@ class Registry:
     read_patterns: dict[str, tuple[str, ...]] = field(default_factory=dict)
     # Bare filename read edges (`_load_json("training_week.json")`).
     bare_reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # #3785 — repo `config/` files held OUT of the twin set because the ownership
+    # registry rules them not-uploadable (a generated artifact whose authority is the
+    # live object, or an unruled subject). key -> ownership class. Reported, never
+    # silently dropped: a file in here is one a deploy would otherwise have pushed.
+    not_uploadable: dict[str, str] = field(default_factory=dict)
 
     def by_key(self) -> dict[str, Twin]:
         return {t.key: t for t in self.twins}
@@ -563,6 +580,13 @@ def derive(repo_root: str, consumer_roots: Iterable[str] = CONSUMER_ROOTS) -> Re
         key = rel_path  # repo `config/x` ↔ S3 `config/x` — same relative path
         if any(fnmatch.fnmatch(key, pattern) for pattern in writes):
             # Runtime-written: syncing repo bytes over it would clobber live state.
+            continue
+        if not uploadable(key):
+            # #3785 — ruled not-uploadable by the ownership registry. Same hazard as the
+            # line above, caught one level up: the writer scan missed this class because
+            # the producer injects its put function, and the miss cost three live reverts
+            # of the Hevy template index. Recorded, not silently dropped.
+            registry.not_uploadable[key] = owner_of(key)
             continue
         consumers: set[str] = set()
         for pattern, modules in reads.items():

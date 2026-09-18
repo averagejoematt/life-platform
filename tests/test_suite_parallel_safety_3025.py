@@ -88,6 +88,12 @@ IN_TREE_WRITERS = {
         "plants _planted_day_key_{writer,reader}_3666.py inside the REAL lambdas/ingestion/ "
         "to prove the scan covers that package rather than a synthetic tree."
     ),
+    "tests/test_config_ownership_3785.py": (
+        "plants the generated `config/hevy_template_index.json` back into the REAL config/ tree "
+        "— the incident's own precondition — to prove the ownership audit reds on a restored "
+        "committed twin. A temp copy would prove only that the audit can read a temp copy; the "
+        "claim is about THIS checkout's config/ directory."
+    ),
     "tests/test_qa_smoke_fault_isolation_2307.py": (
         "plants a synthetic offender in EVERY real NULL_COERCION_SCAN_ROOTS entry (lambdas/ "
         "included) to prove each root is wired (#2336's own mutation proof). This is the "
