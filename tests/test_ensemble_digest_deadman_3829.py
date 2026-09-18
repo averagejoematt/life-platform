@@ -343,7 +343,7 @@ def test_the_budget_is_above_every_measured_regen():
 
     for measured in (55.3, 56.6):
         assert (
-            ced._GATE_REGEN_BUDGET_S > measured
+            ced._REGEN_DEADLINE_BUDGET_S > measured
         ), "the budget is below a regen that really happened — the guard would fire on a healthy run"
 
 

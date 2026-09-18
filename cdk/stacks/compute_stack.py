@@ -574,7 +574,7 @@ class ComputeStack(Stack):
             # so a generous ceiling on a once-daily function costs nothing (~$0.001/run at
             # 256MB in the worst case) while a tight one costs the cycle row plus 3x the
             # Bedrock spend — the asymmetry that produced this issue. #3829 also added a
-            # deadline guard in the handler (_GATE_REGEN_BUDGET_S) so that even a breach of
+            # deadline guard in the handler (_REGEN_DEADLINE_BUDGET_S) so that even a breach of
             # this ceiling's assumptions degrades to a stored fallback row rather than to
             # nothing at all.
             timeout_seconds=300,

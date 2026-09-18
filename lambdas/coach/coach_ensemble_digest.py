@@ -601,7 +601,10 @@ def _digest_prose_blob(digest):
 # ~240s left, so this branch does not fire today; it exists so the next latency step
 # (the produce leg has moved 34.7s -> 57.0s since 2026-09-01) costs a fallback row
 # instead of the row.
-_GATE_REGEN_BUDGET_S = 90.0
+# NB the name: `_GATE_REGEN_*` would match gate_census._REGISTRY_NAME's `GATE_.*`
+# pattern and enter the gate census as a phantom registry (#3315's class) — a float
+# budget is not a registry of gates. Renamed rather than ledgered as unproven.
+_REGEN_DEADLINE_BUDGET_S = 90.0
 
 
 def _apply_grounding_gate(digest, user_message, remaining_seconds=None):
@@ -674,7 +677,7 @@ def _apply_grounding_gate(digest, user_message, remaining_seconds=None):
     first = _findings_cache[text]
     if first and remaining_seconds is not None:
         left = remaining_seconds()
-        if left < _GATE_REGEN_BUDGET_S:
+        if left < _REGEN_DEADLINE_BUDGET_S:
             # Hold on the findings we already have. The caller replaces the digest with
             # the deterministic fallback, so nothing ungated is persisted — the gate is
             # skipped, never bypassed — and the cycle ends with a ROW instead of a
@@ -683,7 +686,7 @@ def _apply_grounding_gate(digest, user_message, remaining_seconds=None):
                 "Grounding-gate regen SKIPPED — %.1fs remaining is under the %.0fs a regen+write needs; "
                 "holding %d finding(s) and writing the deterministic fallback so CYCLE# still lands (#3829)",
                 left,
-                _GATE_REGEN_BUDGET_S,
+                _REGEN_DEADLINE_BUDGET_S,
                 len(first),
             )
             return digest, first
