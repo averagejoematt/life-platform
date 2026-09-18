@@ -119,6 +119,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import backlog_contract as bc  # noqa: E402
 import backlog_next as bn  # noqa: E402
+import closure_contract as cc  # noqa: E402  (#3853: ONE instrument-ledger discriminator, not a second predicate)
 
 REPO = "averagejoematt/life-platform"
 
@@ -221,6 +222,11 @@ def build_ctx(issue: Dict[str, Any]) -> Dict[str, Any]:
         "epic_link": bc.parse_epic_link(body),
         "raw_epic_line": bc.find_epic_line(body),
         "story_refs": bc.story_refs(body),
+        # #3853: absent in an offline fixture that predates this field, and the
+        # discriminator below is written so that ABSENT means "grade it" — an exemption
+        # must never be something a missing field can grant.
+        "author": ((issue.get("author") or {}) or {}).get("login"),
+        "comment_logins": [((c or {}).get("author") or {}).get("login") for c in (issue.get("comments") or [])],
         "set_section": bc.set_section_text(body),
         "set_section_has_count": bc.set_section_has_count(body),
         "updated_at": issue.get("updatedAt") or issue.get("updated_at"),
@@ -257,6 +263,39 @@ def is_tracker(ctx: Dict[str, Any]) -> bool:
     if TRACKER_MARKER not in ctx["body"]:
         return False
     return not ctx["types"]
+
+
+def is_instrument_marker(ctx: Dict[str, Any]) -> bool:
+    """True for an instrument's own throttle/alert row — #3853, the #3851 class one gate over.
+
+    `check_deploy_wedge.py:605` files its dedup marker with exactly ONE label
+    (`deploy-wedge-alert`). That issue exists to hold throttle state (#2149) and is
+    auto-closed on recovery; nobody will ever rank, schedule or do it. Graded as backlog it
+    produced FOUR violations — `one_type_label`, `one_area_label`, `one_model_label`,
+    `outcome_audience` — i.e. **44% of the 9 the corpus carried on 2026-09-16**, and the class
+    recurs on every wedge episode (`deploy-wedge-alert` has 29 closed instances since
+    2026-08-07). It cleared only because the marker self-closed, never because anything was
+    fixed. A gate that fires on a class it cannot be satisfied for teaches its readers to skip
+    it — the argument #3851 settled for `closure_sweep.py`.
+
+    THE DISCRIMINATOR IS BORROWED, NOT REWRITTEN. `closure_contract.is_instrument_ledger` is
+    the one already deciding this exact question on the closure side; a second predicate here
+    would be two definitions of "instrument row" free to disagree. Its three conditions are all
+    required: a bot FILED it, no human ever COMMENTED, and it carries no `type:*` — so the
+    exemption is about the FILER and the absence of human engagement, never about the labels
+    being absent. A human filing the identical body is still graded, which is box 2 of this
+    issue and is pinned by a must-fail control in tests/test_backlog_hygiene_instrument_3853.py.
+
+    REJECTED ALTERNATIVE (from the issue): have the alerter attach `type:`/`area:`/`model:` at
+    filing time — a one-line change at the call site. It fixes the gate by corrupting the
+    backlog: those labels are what `backlog_next.py` RANKS on, so a throttle marker carrying
+    them would surface as schedulable work in every ranked query.
+
+    FAIL TOWARD GRADING. `author` is None on any corpus fetched without it (an older offline
+    fixture), and `is_bot(None)` is False, so a missing field grades the issue rather than
+    exempting it. An exemption a missing field can grant is not an exemption.
+    """
+    return cc.is_instrument_ledger(ctx.get("author"), ctx["labels"], ctx.get("comment_logins") or [])
 
 
 # ── rule helpers (string ops only — the grammar lives in backlog_contract) ──────
@@ -745,13 +784,33 @@ def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None, lane: Op
     now = now or datetime.now(timezone.utc)
     ctxs = [build_ctx(issue) for issue in issues]
     findings: List[Finding] = []
+    exempt_instruments: List[int] = []
     for ctx in ctxs:
+        # #3853: an instrument's own throttle row is not backlog and answers to NO
+        # per-issue rule — not even TRACKER_RULES, which would still demand an area label
+        # and a close-policy line the alerter does not write. It is never SILENT, though:
+        # every exempted number is listed as an advisory below, so the reader can see what
+        # the gate declined to grade and on what grounds.
+        if is_instrument_marker(ctx):
+            exempt_instruments.append(ctx["number"])
+            continue
         # #3065: an auto-filed ops tracker answers to TRACKER_RULES instead of the
         # ADR-099 backlog contract. The corpus/queue rules below need no carve-out —
         # `now_liveness` selects on `type:story` and `later_staleness` on a milestone,
         # neither of which a tracker can have and still be one (see `is_tracker`).
         for rule in TRACKER_RULES if is_tracker(ctx) else PER_ISSUE_RULES:
             findings.extend(rule(ctx))
+    if exempt_instruments:
+        findings.append(
+            Finding(
+                "instrument_marker_exempt",
+                exempt_instruments[0],
+                f"{len(exempt_instruments)} instrument-filed throttle row(s) not graded as backlog "
+                f"(#3853): {sorted(exempt_instruments)} — bot-filed, no human comment, no `type:*`. "
+                "A human filing the same body is still graded.",
+                ADVISORY,
+            )
+        )
     findings.extend(rule_epic_story_coverage(ctxs))
     findings.extend(rule_now_liveness(ctxs, lane=lane))
     findings.extend(rule_now_lane_coverage(ctxs))
@@ -809,7 +868,10 @@ def _fetch_live_issues() -> Optional[List[Dict[str, Any]]]:
                 "--state",
                 "open",
                 "--json",
-                "number,title,labels,milestone,body,updatedAt,createdAt",
+                # #3853: `author` and `comments` carry the instrument-ledger discriminator
+                # (who FILED it, and whether any human ever engaged). Measured 2026-09-18:
+                # adding both cost 3.3s over 117 open issues in one call.
+                "number,title,labels,milestone,body,updatedAt,createdAt,author,comments",
                 "--limit",
                 "500",
             ],

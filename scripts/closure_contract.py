@@ -568,8 +568,24 @@ DISPOSITIONED_ESCAPES: dict = {
 
 
 # ── pure predicates shared by the detectors ─────────────────────────────────────────────
+def normalize_login(login: str | None) -> str:
+    """One spelling for a login that GitHub hands back in two (#3853).
+
+    A GitHub App appears as `github-actions` through the GraphQL `author { login }` field
+    (what `closure_sweep.py` reads) and as **`app/github-actions`** through
+    `gh issue list --json author` (what `check_backlog_hygiene.py` reads). `BOT_LOGIN_RE`
+    is anchored (`^github-actions$`), so the `app/` form did not match and the SAME issue
+    read as bot-filed to one caller and human-filed to the other.
+
+    Stripping the prefix is unambiguous rather than a guess: `/` is not a legal character
+    in a GitHub login, so nothing that reaches here with one is a username.
+    """
+    s = (login or "").strip()
+    return s.split("/", 1)[1] if s.startswith("app/") else s
+
+
 def is_bot(login: str | None) -> bool:
-    return bool(login) and bool(BOT_LOGIN_RE.search(login or ""))
+    return bool(login) and bool(BOT_LOGIN_RE.search(normalize_login(login)))
 
 
 def is_instrument_ledger(author: str | None, labels, comment_logins) -> bool:
