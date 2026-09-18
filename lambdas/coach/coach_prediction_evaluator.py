@@ -45,7 +45,7 @@ from decimal import Decimal
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058
-from experiment.phase_taxonomy import experiment_stamp  # #2811: hoisted — it was imported locally in two functions
+from experiment.phase_taxonomy import experiment_stamp_for  # #2811: hoisted from two functions; #3514: per-row class gate
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
@@ -870,7 +870,7 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
         )
 
         new_item = {
-            **experiment_stamp(),
+            **experiment_stamp_for(pk, sk),
             "pk": pk,
             "sk": sk,
             "alpha": _scalar_to_decimal(alpha),
@@ -931,7 +931,7 @@ def _write_learning_record(coach_id, today_str, evaluation):
 
     try:
         item = {
-            **experiment_stamp(),
+            **experiment_stamp_for(pk, sk),
             "pk": pk,
             "sk": sk,
             "coach_id": coach_id,

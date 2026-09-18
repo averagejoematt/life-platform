@@ -345,11 +345,11 @@ def _write_memoir_record(table, coach_id, quarter, text, facts):
     #2119: COACH#* is a tagger-blind partition — stamp write-time provenance
     (experiment_stamp(), #1233) so this row self-describes its reset generation,
     matching every other writer on this partition."""
-    from experiment.phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3514: per-row class gate
 
     item = floats_to_decimal(
         {
-            **experiment_stamp(),
+            **experiment_stamp_for(f"COACH#{coach_id}", f"MEMOIR#{quarter}"),
             "pk": f"COACH#{coach_id}",
             "sk": f"MEMOIR#{quarter}",
             "quarter": quarter,

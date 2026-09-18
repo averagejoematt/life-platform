@@ -729,15 +729,17 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
     except Exception as e:  # noqa: BLE001 — the archive is never load-bearing
         logger.warning(f"[board_ask] qa_archive failed for {pid} (non-fatal): {e}")
     try:
-        from experiment.phase_taxonomy import experiment_stamp
+        from experiment.phase_taxonomy import experiment_stamp_for  # #3514: per-row class gate
 
         now = datetime.now(timezone.utc)  # created_at stays a UTC instant; the sk DAY is Pacific (#2414)
         qid = hashlib.sha256(question.encode()).hexdigest()[:8]
+        _pk = f"COACH#{pid}"
+        _sk = f"INTERACTION#{now.astimezone(PT).strftime('%Y-%m-%d')}#{qid}"
         table.put_item(
             Item={
-                **experiment_stamp(),
-                "pk": f"COACH#{pid}",
-                "sk": f"INTERACTION#{now.astimezone(PT).strftime('%Y-%m-%d')}#{qid}",
+                **experiment_stamp_for(_pk, _sk),
+                "pk": _pk,
+                "sk": _sk,
                 "interaction_type": "board_qa",
                 "channel": "public_board",
                 "question": question[:500],

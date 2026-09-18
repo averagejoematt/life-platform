@@ -696,7 +696,17 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # put_object refusal disabled. Measured, not incremented: the branch census reported
         # {can-fail (proven) 105, unproven 537, not-applicable 6, attempted-unproven 3},
         # against 650/104 on a disposable `git archive` export of the merge-base.
-        <= 105
+        # 2026-09-18 (#3514): 105 -> 106. ONE entrant, arriving PROVEN rather than ledgered
+        # unproven — structural::test_phase_provenance_3514.py, the write-time provenance gate.
+        # Its mutation is not synthetic: coach_state_updater._put_item reverted to the shipped
+        # pre-#3514 `experiment_stamp()` line, i.e. the literal state of main at 4b115435e,
+        # under which 22 live rows (7 RELATIONSHIP#state, 15 CHAT#) were measured carrying
+        # cycle-17 provenance on CROSS_PHASE partitions the same day. The file's md5 was
+        # asserted CHANGED before the verdict was read, and the observed 5-failed split across
+        # its behavioural and AST legs is in the proof record. Measured on the COMMITTED,
+        # rebased tree: {can-fail (proven) 106, unproven 537, not-applicable 6,
+        # attempted-unproven 3} over 652 rows.
+        <= 106
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

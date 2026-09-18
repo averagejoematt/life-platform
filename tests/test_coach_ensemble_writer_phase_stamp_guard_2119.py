@@ -129,17 +129,30 @@ def _module_functions(tree: ast.AST) -> dict[str, ast.AST]:
     return out
 
 
+# The stamping calls that satisfy this guard. `experiment_stamp_for(pk, sk)` (#3514) is
+# the CLASS-AWARE form: it consults phase_taxonomy.should_phase_stamp and returns {} when
+# the row's own class forbids a stamp, then delegates to experiment_stamp for every row
+# that may carry one. Recognising it does not widen what this guard permits — a writer
+# using it still stamps every EXPERIMENT_SCOPED row it writes, and additionally stops
+# stamping the CROSS_PHASE rows (CHAT#, RELATIONSHIP#) that ADR-153 put on these same
+# partitions, which this guard's own premise ("all COACH#* rows are experiment-scoped")
+# silently assumed away. Which writers actually use the gated form is pinned separately
+# by tests/test_phase_provenance_3514.py, so recognising it here cannot become a way to
+# pass by writing the bare call and never converting.
+_STAMP_CALLS = ("experiment_stamp", "experiment_stamp_for")
+
+
 def _stamps_directly(node: ast.AST) -> bool:
-    """True iff an `experiment_stamp(...)` call appears anywhere in node's
+    """True iff a stamping call (see _STAMP_CALLS) appears anywhere in node's
     subtree. AST-based (not a source-text substring search) so a docstring or
     comment that merely MENTIONS experiment_stamp() can't produce a false
     "stamped" verdict — only an actual Call node counts."""
     for n in ast.walk(node):
         if isinstance(n, ast.Call):
             f = n.func
-            if isinstance(f, ast.Name) and f.id == "experiment_stamp":
+            if isinstance(f, ast.Name) and f.id in _STAMP_CALLS:
                 return True
-            if isinstance(f, ast.Attribute) and f.attr == "experiment_stamp":
+            if isinstance(f, ast.Attribute) and f.attr in _STAMP_CALLS:
                 return True
     return False
 

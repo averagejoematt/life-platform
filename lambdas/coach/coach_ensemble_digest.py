@@ -244,13 +244,16 @@ def _put_item(item):
     """Write an item to DynamoDB with float-to-Decimal conversion.
 
     ENSEMBLE#*/COACH#* rows are EXPERIMENT_SCOPED intelligence — stamp write-time
-    provenance (phase + cycle, #1233). experiment_stamp() is fail-soft and cached;
-    the item's own keys win, so it never clobbers or breaks the write.
+    provenance (phase + cycle, #1233). The stamp is fail-soft and cached; the item's
+    own keys win, so it never clobbers or breaks the write.
+
+    #3514 (DA-6): gated per ROW via `experiment_stamp_for`. This helper also takes an
+    arbitrary item, and COACH#* is a partition namespace that holds CROSS_PHASE rows.
     """
-    from experiment.phase_taxonomy import experiment_stamp
+    from experiment.phase_taxonomy import experiment_stamp_for
 
     try:
-        table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))
+        table.put_item(Item=floats_to_decimal({**experiment_stamp_for(item.get("pk", ""), item.get("sk", "")), **item}))
         return True
     except Exception as e:
         logger.error("put_item failed for %s/%s: %s", item.get("pk"), item.get("sk"), e)

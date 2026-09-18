@@ -355,6 +355,16 @@ def _commitment_block(*, _g):
     if not item:
         logger.info("[/api/predictions] no commitment tally yet — serving null, not zeros")
         return None
+    # #3514: this read was unfiltered, so a tombstoned rollup was served as current. The
+    # row is EXPERIMENT_SCOPED and the reset archives it (restart_intelligence_wipe
+    # COACH_PARTITIONS), which did nothing at all while the only reader ignored the flag —
+    # the wipe and the surface disagreed about whether a reset had happened. Deferring to
+    # singleton_visible (the same predicate the GRADER uses to build the season block)
+    # makes the post-genesis window render nothing rather than the closing cycle's
+    # follow-through percentage under a pre-genesis `as_of`.
+    if not singleton_visible(item):
+        logger.info("[/api/predictions] commitment tally is archived (pre-genesis) — serving null, not a stale season")
+        return None
     out = _decimal_to_float(item)
     return {"as_of": out.get("as_of"), "lifetime": out.get("lifetime") or {}, "season": out.get("season") or {}}
 
