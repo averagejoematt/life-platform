@@ -1,5 +1,7 @@
 # CI `continue-on-error` registry — every swallowed step, with a verdict
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-17
+
 **Owner:** whoever edits `.github/workflows/`.
 **Guarded by:** `tests/test_continue_on_error_registry_3848.py` (CI, blocking).
 **Opened:** 2026-09-17, by 3848.
