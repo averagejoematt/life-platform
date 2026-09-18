@@ -797,6 +797,105 @@ class MonitoringStack(Stack):
         add_token_alarms(self, topic, digest)
 
         # ══════════════════════════════════════════════════════════════
+        # #3506 (AIQ-7): the board's voice-verdict channel is OBSERVED, and the
+        # observation itself now has a dead-man.
+        #
+        # THE PROBLEM. ADR-108's quality gate was withdrawn from the reader path
+        # by #3413; #3414 recovered the verdict on a fire-and-forget async
+        # channel (web/board_verdict_observer -> coach-quality-gate ->
+        # LifePlatform/AI::BoardQualityGateVerdict{Surface=board_ask}). That
+        # channel had NO alarm and no heartbeat row. Its failure mode is pure
+        # silence, and silence on a low-traffic reader surface is
+        # indistinguishable from "no readers asked" — the board's only remaining
+        # voice-fidelity signal could stop and read as a quiet week.
+        #
+        # THE SHAPE. A math expression, because a bare absence alarm on the
+        # verdict metric WOULD false-fire on every genuinely quiet week. The
+        # denominator is board traffic measured on a DIFFERENT Lambda through a
+        # DIFFERENT code path: site-api-ai's per-generation token telemetry
+        # (LifePlatform/AI::AnthropicOutputTokens{Endpoint=api_board_ask},
+        # SampleCount = one datapoint per coach generation, emitted by
+        # site_api_ai_lambda._emit_token_metrics on BOTH the initial-panel and
+        # follow-up paths). If the observer dies, traffic keeps counting and
+        # verdicts stop -> gap opens -> ALARM. If readers stop asking, both go to
+        # zero -> gap 0 -> quiet. That independence is the whole design: a
+        # comparison gate whose two sides share a failure is blind.
+        #
+        # THE TOLERANCE IS MEASURED, NOT CHOSEN (ADR-105). Generations exceed
+        # verdicts by construction — an ungrounded answer is a canned refusal
+        # that is deliberately not judged, and a grounding-gate regeneration
+        # emits a second token datapoint for one answer. Live, since the channel
+        # went live 2026-09-01 through 2026-09-16, every rolling 7-day window:
+        #   gen 23/9/9/10/10/10/12/12/12/12/8/8/8/3/3  vs
+        #   verd 21/9/9/ 9/ 9/ 9/ 9/ 9/ 9/ 9/6/6/6/3/3
+        #   gap    2/0/0/ 1/ 1/ 1/ 3/ 3/ 3/ 3/2/2/2/0/0   -> MAX honest gap 3
+        # Threshold 5 leaves 2 of margin over the measured maximum.
+        #
+        # THE BLIND BAND, STATED RATHER THAN HIDDEN. Because the tolerance is
+        # absolute, this cannot fire on a week with fewer than 5 board
+        # generations even if the observer is completely dead. 11 of the 16
+        # rolling windows above carried 8 or more; the quietest carried 3. It is
+        # a detector for a stopped observer over a normal week, not a proof of
+        # liveness on the quietest one. The honest fix for the residual is more
+        # board traffic, not a smaller tolerance that false-fires.
+        #
+        # Digest-only, per the issue: a stopped MEASUREMENT of an observe-only
+        # channel is a next-morning finding, not a page. Nothing enforces on this
+        # channel and this alarm does not change that (the #3414 30-day-measurement
+        # posture is untouched).
+        #
+        # Period is 7 days in ONE evaluation period: 1 x 604800 is exactly
+        # CloudWatch's EvaluationPeriods x Period ceiling for periods >= 3600
+        # (tests/test_alarm_evaluation_window_3685.py holds the whole stack set
+        # to it after commitments-ungraded CREATE_FAILED on 14 x 86400).
+        board_verdict_silence = cloudwatch.Alarm(
+            self,
+            "BoardVerdictSilence",
+            alarm_name="board-verdict-silence-7d",
+            alarm_description=(
+                "#3506/AIQ-7: over the last 7 days, board_ask coach generations exceeded "
+                "BoardQualityGateVerdict{Surface=board_ask} datapoints by 5 or more. The #3414 "
+                "observe-only voice-verdict channel has stopped producing verdicts while the board "
+                "kept answering readers — a stopped observer otherwise reads exactly like 'no readers "
+                "asked'. Check web/board_verdict_observer.observe() (Event invoke), the "
+                "coach-quality-gate Lambda, and the emit_verdict opt-in key. Measured honest gap over "
+                "2026-09-01..16: max 3 in any rolling 7d window. NOTE: cannot fire on a week with "
+                "fewer than 5 board generations."
+            ),
+            metric=cloudwatch.MathExpression(
+                expression="FILL(generated, 0) - FILL(verdicts, 0)",
+                label="board_ask generations without a voice verdict (7d)",
+                using_metrics={
+                    "generated": cloudwatch.Metric(
+                        namespace="LifePlatform/AI",
+                        metric_name="AnthropicOutputTokens",
+                        dimensions_map={"LambdaFunction": "life-platform-site-api-ai", "Endpoint": "api_board_ask"},
+                        period=Duration.days(7),
+                        statistic="SampleCount",
+                    ),
+                    "verdicts": cloudwatch.Metric(
+                        namespace="LifePlatform/AI",
+                        metric_name="BoardQualityGateVerdict",
+                        dimensions_map={"Surface": "board_ask"},
+                        period=Duration.days(7),
+                        statistic="Sum",
+                    ),
+                },
+                period=Duration.days(7),
+            ),
+            evaluation_periods=1,
+            threshold=5,
+            comparison_operator=GTE,
+            # NOT_BREACHING, deliberately and unlike the canary dead-man above: a
+            # week with no board traffic at all emits neither metric, and that is a
+            # sanctioned state on a reader-driven surface. The signal here is a
+            # DIVERGENCE between two live series, not the absence of one.
+            treat_missing_data=NB,
+        )
+        board_verdict_silence.add_alarm_action(cw_actions.SnsAction(digest))
+        board_verdict_silence.add_ok_action(cw_actions.SnsAction(digest))
+
+        # ══════════════════════════════════════════════════════════════
         # SS-03: budget-tier HARD-STOP alarm — the kill-switch can't be silent.
         # cost_governor writes a tier 0-3 to SSM AND emits LifePlatform/Budget
         # BudgetTier (the computed tier, even in observe mode). Tier >= 2 (website AI

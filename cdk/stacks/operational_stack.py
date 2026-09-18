@@ -786,6 +786,79 @@ class OperationalStack(Stack):
         _canary_alarm("CanarySubscribeResidueAlarm", "life-platform-canary-subscribe-residue", "CanarySubscribeResidueFail")
         _canary_alarm("CanarySubscribeCleanupFailureAlarm", "life-platform-canary-subscribe-cleanup-failure", "CanarySubscribeCleanupFail")
 
+        # ── The canary's own dead-man (#3506) ──
+        # Every alarm above is treat_missing_data=NOT_BREACHING on a
+        # LifePlatform/Canary metric the canary itself publishes. That is the
+        # right posture for a failure counter and it is also, by construction,
+        # unfalsifiable: disable the canary's EventBridge rules and all six go
+        # quiet and stay OK forever — including life-platform-canary-ddb-failure
+        # and -s3-failure, which PAGE. The prober that backs the serving path's
+        # two true-outage detectors had no detector of its own; it was waived in
+        # the heartbeat ledger on 2026-07-19 as "the 4x-daily synthetic prober",
+        # a description that was wrong by ~20x.
+        #
+        # MEASURED CADENCE (AWS/Lambda Invocations, us-west-2, 2026-09-09→15):
+        # 102/102/106/113/114/116/124 per day — TWO rules feed this function,
+        # only one of them CDK-owned:
+        #   * this stack's `rate(4 hours)`                         -> 6/day
+        #   * life-platform-mcp-canary-15min, `rate(15 minutes)`   -> 96/day,
+        #     created by deploy/create_mcp_canary_15min.sh (R13-F14), outside CDK
+        # Hourly SampleCount over the same 7 days: 175 of 175 buckets populated,
+        # MINIMUM 4, median 4. Never once below 4.
+        #
+        # WHY threshold=2 RATHER THAN THE LITERAL "no invocations". Two reasons,
+        # both arithmetic rather than taste:
+        #   (a) At threshold=1 this alarm would FLAP every four hours whenever
+        #       the 15-min rule alone is missing: `rate(4 hours)` leaves exactly
+        #       three empty hourly buckets between runs by construction, so a
+        #       3-period evaluation trips, clears, and trips again forever.
+        #   (b) The 15-min rule's own death matters and is otherwise invisible.
+        #       The six alarms above are Period=300 — they are only worth five
+        #       minutes of detection latency BECAUSE the canary probes every
+        #       15 minutes. With the 4h rule alone, every hourly bucket holds at
+        #       most 1, so this alarm goes to ALARM and STAYS there (no flap),
+        #       which is the honest report: the canary is running, at 1/16th of
+        #       the cadence its downstream alarms are sized for.
+        # 4 consecutive periods, not 3: `rate(4 hours)` guarantees at least one
+        # invocation in any 4 consecutive hourly buckets, so 4-of-4 can only
+        # breach when the cadence is genuinely degraded — never on rule jitter.
+        # Margin against the measured floor is 2x (min 4 vs threshold 2).
+        #
+        # Digest, not paging (ADR-050): a dead schedule is not itself an outage,
+        # and every no-invocations dead-man in the fleet (daily-brief,
+        # mcp-warmer, recap-card, hae-webhook) routes to the digest. What it
+        # restores is the ability of the SIX alarms above to be believed.
+        canary_no_invocations_alarm = cloudwatch.Alarm(
+            self,
+            "CanaryNoInvocations",
+            alarm_name="canary-no-invocations-1h",
+            alarm_description=(
+                "#3506: life-platform-canary has run fewer than 2 times in each of 4 consecutive hours. "
+                "Expected >= 4/hour from two rules (this stack's rate(4 hours) + the script-managed "
+                "life-platform-mcp-canary-15min rate(15 minutes)); measured min 4/hour over 175 of 175 "
+                "hourly buckets, 2026-09-09..15. This is the dead-man for the six LifePlatform/Canary "
+                "notBreaching alarms (ddb/s3/mcp/anthropic/subscribe-cleanup/subscribe-residue, two of "
+                "them paging) — while it is lit, their OK state means nothing. Check both EventBridge "
+                "rules first: `aws events list-rule-names-by-target --target-arn <canary arn>`."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": "life-platform-canary"},
+                period=Duration.seconds(3600),
+                statistic="SampleCount",
+            ),
+            evaluation_periods=4,
+            datapoints_to_alarm=4,
+            threshold=2,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            # BREACHING, deliberately: a function with no invocations publishes no
+            # Invocations datapoint at all, so "missing" IS the failure here.
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        canary_no_invocations_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+        canary_no_invocations_alarm.add_ok_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── DLQ depth alarm ──
         dlq_depth = cloudwatch.Alarm(
             self,

@@ -44,6 +44,7 @@ v1.0.0 — 2026-07-19 (#1455, QA strategy G4)
 
 import ast
 import os
+import re
 import sys
 from datetime import date, datetime
 
@@ -284,6 +285,406 @@ def cdk_alarm_names() -> set:
         "below is hollow until this returns a real set."
     )
     return names
+
+
+# ── Cadence resolution (#3506): what the CDK actually schedules ──────────────
+#
+# WHY THIS EXISTS. test_exemptions_are_dated_and_reasoned() below checked an
+# exemption's DATE and the LENGTH of its reason — never whether the reason was
+# TRUE. The specimen: `life-platform-canary` was exempted on 2026-07-19 as "the
+# 4x-daily synthetic prober", and it is not 4x-daily. It is fed by TWO
+# EventBridge rules — operational_stack's `rate(4 hours)` (6/day) plus the
+# script-managed `life-platform-mcp-canary-15min` rate(15 minutes) rule
+# (96/day) — and measured 102–124 invocations/day over 2026-09-09→15. The
+# waiver's own premise ("a low-rate prober whose silence is cheap") was false
+# by a factor of ~20, while six `LifePlatform/Canary` notBreaching alarms, two
+# of them paging, sat downstream of it and would have stayed green forever if
+# its rules were disabled.
+#
+# So a stated frequency is now a machine-checked claim: it must equal the
+# cadence the CDK sources actually declare for that Lambda.
+#
+# WHAT COUNTS AS A STATED FREQUENCY — deliberately the QUANTIFIED forms only
+# ("4x-daily", "4x/day", "3 times a week", "every 4 hours", "every 15 minutes").
+# BARE cadence adverbs ("daily", "weekly", "nightly") are NOT read as claims
+# about the Lambda, because in this ledger they overwhelmingly modify something
+# ELSE in the same sentence. Four live counterexamples, all of which a
+# bare-adverb rule would have mis-flagged:
+#   * chronicle-approve — runs `cron(0 18 * * ? *)` (daily) and its reason says
+#     "pages at the weekly promise boundary" (the CHRONICLE's promise)
+#   * dashboard-refresh — "whose daily anchor writer is daily-metrics-compute"
+#     (a different Lambda) and "FAIL-gated nightly by qa_smoke" (a third one)
+#   * between-chronicle — "the every-Wednesday promise" (the chronicle again)
+#   * life-platform-data-reconciliation — "the daily freshness/liveness/
+#     interior-gap alarms independently cover the data it audits"
+# A guard that reds on true prose trains readers to delete the guard (#3851).
+# The residual is named rather than hidden: a FALSE bare adverb is still
+# uncaught. `life-platform-pip-audit` carried one — "within its monthly
+# cadence" against a `cron(0 15 ? * MON *)` weekly cron — found by this work
+# and corrected in the ledger below, not by this assertion.
+#
+# FAIL-CLOSED. If a row states a quantified frequency and this resolver cannot
+# read that Lambda's schedule out of cdk/stacks/, the test FAILS. An unverifiable
+# claim is not a verified one.
+
+_DOW_NAMES = {"SUN": 1, "MON": 2, "TUE": 3, "WED": 4, "THU": 5, "FRI": 6, "SAT": 7}
+_MONTH_NAMES = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6, "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
+_DAYS_PER_MONTH = 365.0 / 12.0
+# Cadences are compared as fires-per-day floats, so the comparison needs a
+# tolerance: "weekly" is 1/7 = 0.142857… and `cron(0 14 ? * MON *)` resolves to
+# the same value through different arithmetic. 1% is far tighter than the gap
+# between any two cadences a human would write (4/day vs 6/day is 50%).
+CADENCE_REL_TOLERANCE = 0.01
+
+
+def _cron_field_count(field: str, lo: int, hi: int, names: dict = None):
+    """How many values a single AWS-cron field matches over [lo, hi]. None = unreadable."""
+    matched = set()
+    for part in field.split(","):
+        step = 1
+        if "/" in part:
+            part, raw_step = part.split("/", 1)
+            if not raw_step.isdigit():
+                return None
+            step = int(raw_step)
+        if part in ("*", "?"):
+            a, b = lo, hi
+        elif "-" in part:
+            lo_s, hi_s = part.split("-", 1)
+            a = names.get(lo_s.upper()) if names else None
+            b = names.get(hi_s.upper()) if names else None
+            if a is None:
+                a = int(lo_s) if lo_s.isdigit() else None
+            if b is None:
+                b = int(hi_s) if hi_s.isdigit() else None
+            if a is None or b is None:
+                return None
+        elif names and part.upper() in names:
+            a = b = names[part.upper()]
+        elif part.isdigit():
+            # AWS reads "0/8" as start-at-0-then-every-8 (0, 8, 16) — an
+            # OPEN-ENDED step, not the single value 0. Without this branch
+            # `cron(0 0/8 * * ? *)` reads as once a day instead of 3x.
+            a = int(part)
+            b = hi if step > 1 else a
+        else:
+            return None
+        matched.update(range(a, b + 1, step))
+    return len(matched)
+
+
+def cron_fires_per_day(expr: str):
+    """Average fires per day for an AWS 6-field cron(...) expression. None = unreadable."""
+    inner = expr.strip()[len("cron(") : -1]
+    fields = inner.split()
+    if len(fields) != 6:
+        return None
+    minute, hour, dom, month, dow, year = fields
+    if year not in ("*", "?"):
+        return None
+    n_min = _cron_field_count(minute, 0, 59)
+    n_hour = _cron_field_count(hour, 0, 23)
+    n_month = _cron_field_count(month, 1, 12, _MONTH_NAMES)
+    if n_min is None or n_hour is None or n_month is None:
+        return None
+    per_matching_day = n_min * n_hour
+    month_fraction = n_month / 12.0
+    dom_restricted = dom not in ("*", "?")
+    dow_restricted = dow not in ("*", "?")
+    if dom_restricted and dow_restricted:
+        return None  # AWS forbids restricting both
+    if dow_restricted:
+        if "#" in dow or dow.upper().endswith("L"):
+            return per_matching_day * month_fraction / _DAYS_PER_MONTH  # once a month
+        n_dow = _cron_field_count(dow, 1, 7, _DOW_NAMES)
+        if n_dow is None:
+            return None
+        return per_matching_day * month_fraction * (n_dow / 7.0)
+    if dom_restricted:
+        if dom.upper() in ("L", "LW") or "W" in dom.upper():
+            n_dom = 1
+        else:
+            n_dom = _cron_field_count(dom, 1, 31)
+            if n_dom is None:
+                return None
+        return per_matching_day * month_fraction * (n_dom / _DAYS_PER_MONTH)
+    return per_matching_day * month_fraction
+
+
+def rate_fires_per_day(expr: str):
+    """Fires per day for an AWS rate(...) expression. None = unreadable."""
+    m = re.fullmatch(r"rate\(\s*(\d+)\s+(minute|minutes|hour|hours|day|days)\s*\)", expr.strip())
+    if not m:
+        return None
+    n = int(m.group(1))
+    if n <= 0:
+        return None
+    unit = m.group(2).rstrip("s")
+    return {"minute": 1440.0 / n, "hour": 24.0 / n, "day": 1.0 / n}[unit]
+
+
+def schedule_fires_per_day(expr: str):
+    e = (expr or "").strip()
+    if e.startswith("cron(") and e.endswith(")"):
+        return cron_fires_per_day(e)
+    if e.startswith("rate(") and e.endswith(")"):
+        return rate_fires_per_day(e)
+    return None
+
+
+def _loop_bindings(node: ast.For):
+    """Bindings for a `for <targets> in <literal list/tuple>:` loop, or None.
+
+    site-stats-refresh's four EventBridge rules are minted by one such loop
+    (`for utc_hour, label in [(15, "8amPT"), ...]`). Without binding the loop
+    variable its `hour=str(utc_hour)` is an unreadable expression and the whole
+    Lambda's cadence goes unresolvable — which, under the fail-closed rule
+    above, would red its (TRUE) "4x-daily" claim.
+    """
+    if not isinstance(node.iter, (ast.List, ast.Tuple)):
+        return None
+    if isinstance(node.target, ast.Name):
+        names = [node.target.id]
+    elif isinstance(node.target, ast.Tuple) and all(isinstance(t, ast.Name) for t in node.target.elts):
+        names = [t.id for t in node.target.elts]
+    else:
+        return None
+    out = []
+    for elt in node.iter.elts:
+        vals = elt.elts if isinstance(elt, (ast.Tuple, ast.List)) else [elt]
+        if len(vals) != len(names) or not all(isinstance(v, ast.Constant) for v in vals):
+            return None
+        out.append({n: v.value for n, v in zip(names, vals)})
+    return out
+
+
+def _walk_env(node, env):
+    """ast.walk, but a `for` over a literal list is UNROLLED with its loop
+    variables bound — so a construct minted N times in a loop is seen N times."""
+    if isinstance(node, ast.For):
+        for binding in _loop_bindings(node) or [{}]:
+            inner = {**env, **binding}
+            for stmt in node.body:
+                yield from _walk_env(stmt, inner)
+        for stmt in node.orelse:
+            yield from _walk_env(stmt, env)
+        yield from _walk_env(node.iter, env)
+        return
+    yield node, env
+    for child in ast.iter_child_nodes(node):
+        yield from _walk_env(child, env)
+
+
+def _static_str(node, env):
+    """Resolve an AST node to a string using constants and bound loop vars.
+
+    JoinedStr is handled because ingestion_stack.py builds nine of its schedules
+    that way — `schedule=f"cron(0 {WHOOP_HOURS} * * ? *)"` with WHOOP_HOURS a
+    module-level string constant. Without it those nine Lambdas have no readable
+    cadence at all, and the fail-closed rule would red the first honest quantified
+    claim anyone wrote about one of them.
+    """
+    if isinstance(node, ast.Constant):
+        return str(node.value)
+    if isinstance(node, ast.Name) and node.id in env:
+        return str(env[node.id])
+    if isinstance(node, ast.Call) and _is_call_to(node, "str") and node.args:
+        return _static_str(node.args[0], env)
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for piece in node.values:
+            if isinstance(piece, ast.Constant):
+                parts.append(str(piece.value))
+            elif isinstance(piece, ast.FormattedValue):
+                if piece.format_spec is not None or piece.conversion not in (-1, None):
+                    return None
+                resolved = _static_str(piece.value, env)
+                if resolved is None:
+                    return None
+                parts.append(resolved)
+            else:
+                return None
+        return "".join(parts)
+    return None
+
+
+def _schedule_expression(node, env):
+    """The cron(...)/rate(...) string a `schedule=` value denotes, or None.
+
+    Handles the three shapes cdk/stacks/ uses: a plain string literal,
+    `events.Schedule.expression("...")`, and `events.Schedule.cron(...)`
+    keyword form (CDK's own defaults: unset fields are "*", and day/week_day
+    default to the "?" the other one does not use).
+    """
+    if isinstance(node, (ast.Constant, ast.JoinedStr)):
+        return _static_str(node, env)
+    if not isinstance(node, ast.Call):
+        return None
+    if _is_call_to(node, "expression") and node.args:
+        return _static_str(node.args[0], env)
+    if _is_call_to(node, "rate") and node.args:
+        arg = node.args[0]
+        if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Attribute) and arg.args:
+            n = _static_str(arg.args[0], env)
+            if n is not None and n.isdigit():
+                return f"rate({n} {arg.func.attr})"
+        return None
+    if _is_call_to(node, "cron"):
+        kw = {}
+        for k in node.keywords:
+            if k.arg is None:
+                return None
+            v = _static_str(k.value, env)
+            if v is None:
+                return None
+            kw[k.arg] = v
+        if "day" in kw and "week_day" in kw:
+            return None  # AWS forbids restricting both; CDK would reject it too
+        minute = kw.get("minute", "*")
+        hour = kw.get("hour", "*")
+        month = kw.get("month", "*")
+        year = kw.get("year", "*")
+        if "week_day" in kw:
+            day, week_day = "?", kw["week_day"]
+        else:
+            day, week_day = kw.get("day", "*"), "?"
+        return f"cron({minute} {hour} {day} {month} {week_day} {year})"
+    return None
+
+
+def scheduled_lambda_cadences() -> dict:
+    """{function_name: (fires_per_day, ["<expr>  cdk/stacks/<file>:<line>", ...])}.
+
+    SUMS every enabled schedule pointed at the same function — a Lambda with
+    two rules runs at the sum of their rates, which is exactly the fact the
+    canary's waiver got wrong (it named one of its two rules, and not the
+    fast one).
+
+    NOTE ON THE CANARY, stated so the number here is not mistaken for the whole
+    truth: only ONE of its two rules is CDK-owned. The `rate(15 minutes)` rule
+    (`life-platform-mcp-canary-15min`) is created by deploy/create_mcp_canary_15min.sh
+    and lives outside cdk/stacks/, so this resolver sees 6/day where AWS runs
+    ~119/day. That does not weaken the assertion — 6 != 4 either — and the
+    canary's exemption is retired below in favour of a real alarm.
+    """
+    out = {}
+    for fname in sorted(os.listdir(CDK_STACKS_DIR)):
+        if not fname.endswith(".py") or fname.startswith("__") or fname in _SKIP_FILES:
+            continue
+        path = os.path.join(CDK_STACKS_DIR, fname)
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+
+        const_map = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                for t in node.targets:
+                    if isinstance(t, ast.Name):
+                        const_map[t.id] = node.value.value
+
+        def _fn_of(call):
+            fn_kw = _kw(call, "function_name")
+            if isinstance(fn_kw, ast.Constant) and isinstance(fn_kw.value, str):
+                return fn_kw.value
+            if isinstance(fn_kw, ast.Name):
+                return const_map.get(fn_kw.id)
+            return None
+
+        var_to_fn = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and _is_call_to(node.value, "create_platform_lambda"):
+                name = _fn_of(node.value)
+                if name:
+                    for t in node.targets:
+                        if isinstance(t, ast.Name):
+                            var_to_fn[t.id] = name
+
+        # One ordered pass. `rule = events.Rule(...)` then `rule.add_target(...)`
+        # is the shape every stack uses, and _walk_env replays it once per loop
+        # iteration, so a rule var re-bound in a loop is read per iteration.
+        rule_state = {}
+        for node, env in _walk_env(tree, dict(const_map)):
+            if isinstance(node, ast.Call) and _is_call_to(node, "create_platform_lambda"):
+                name = _fn_of(node)
+                sched = _kw(node, "schedule")
+                if name and sched is not None and not (isinstance(sched, ast.Constant) and sched.value is None):
+                    expr = _schedule_expression(sched, env)
+                    out.setdefault(name, []).append((expr, f"{fname}:{node.lineno}"))
+            elif isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and _is_call_to(node.value, "Rule"):
+                call = node.value
+                en = _kw(call, "enabled")
+                enabled = not (isinstance(en, ast.Constant) and en.value is False)
+                sched = _kw(call, "schedule")
+                expr = _schedule_expression(sched, env) if sched is not None else None
+                for t in node.targets:
+                    if isinstance(t, ast.Name):
+                        rule_state[t.id] = (expr, enabled, call.lineno)
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_target":
+                base = node.func.value
+                if not (isinstance(base, ast.Name) and base.id in rule_state):
+                    continue
+                expr, enabled, lineno = rule_state[base.id]
+                if not enabled:
+                    continue
+                target = None
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Call) and _is_call_to(sub, "LambdaFunction") and sub.args and isinstance(sub.args[0], ast.Name):
+                        target = sub.args[0].id
+                name = var_to_fn.get(target) if target else None
+                if name:
+                    out.setdefault(name, []).append((expr, f"{fname}:{lineno}"))
+
+    resolved = {}
+    for name, entries in out.items():
+        rates = [schedule_fires_per_day(e) if e else None for e, _ in entries]
+        sites = [f"{e!r}  cdk/stacks/{site}" for e, site in entries]
+        resolved[name] = (None if any(r is None for r in rates) else sum(rates), sites)
+    return resolved
+
+
+# ── Stated-frequency parsing ─────────────────────────────────────────────────
+# Quantified forms ONLY — see the block comment above for why bare adverbs are
+# deliberately out of scope, with the four live false positives they would mint.
+_UNIT_PER_DAY = {
+    "day": 1.0,
+    "daily": 1.0,
+    "week": 1 / 7.0,
+    "weekly": 1 / 7.0,
+    "month": 12 / 365.0,
+    "monthly": 12 / 365.0,
+    "hour": 24.0,
+    "hourly": 24.0,
+}
+_INTERVAL_PER_DAY = {"minute": 1440.0, "min": 1440.0, "hour": 24.0, "hr": 24.0, "day": 1.0, "week": 1 / 7.0}
+
+_QUANTIFIED_PATTERNS = (
+    # "4x-daily", "4x/day", "4x daily", "3×/week", "5x per day"
+    r"(?P<n>\d+)\s*[x×]\s*[-/ ]?\s*(?:per\s+)?(?P<unit>day|daily|week|weekly|month|monthly|hour|hourly)\b",
+    # "3 times a day", "4 times per week"
+    r"(?P<n>\d+)\s+times?\s+(?:a|per|each)\s+(?P<unit>day|week|month|hour)\b",
+    # "every 4 hours", "every 15 minutes", "every 2 days"
+    r"every\s+(?P<n>\d+)\s*(?P<unit>minutes?|mins?|hours?|hrs?|days?|weeks?)\b",
+)
+
+
+def stated_frequencies(reason: str) -> list:
+    """[(phrase, fires_per_day)] for every QUANTIFIED cadence claim in a reason."""
+    out = []
+    for pat in _QUANTIFIED_PATTERNS:
+        for m in re.finditer(pat, reason, re.IGNORECASE):
+            n = int(m.group("n"))
+            unit = m.group("unit").lower().rstrip("s") if not m.group("unit").lower().endswith("ly") else m.group("unit").lower()
+            if n <= 0:
+                continue
+            if pat.startswith("every"):
+                per = _INTERVAL_PER_DAY.get(unit)
+                if per is not None:
+                    out.append((m.group(0), per / n))
+            else:
+                per = _UNIT_PER_DAY.get(unit)
+                if per is not None:
+                    out.append((m.group(0), n * per))
+    return out
 
 
 # ── The coverage ledger ───────────────────────────────────────────────────────
@@ -612,15 +1013,31 @@ COVERAGE = {
         EXEMPT,
         "2026-08-29",
         "#2835: advisory dependency audit, now artifact-only (pip-audit/latest.json) embedded in the Monday ops pack — a dead "
-        "cron renders as a loud dated STALE line there within its monthly cadence, and a terminal failure lands in the DLQ "
-        "digest. Findings are advisory by design; absence = a missed advisory section, not a data-path failure.",
+        "cron renders as a loud dated STALE line there within a week, and a terminal failure lands in the DLQ digest. "
+        "Findings are advisory by design; absence = a missed advisory section, not a data-path failure. "
+        "#3506 CORRECTED this clause: it used to say 'within its monthly cadence', and this Lambda is not monthly — "
+        "operational_stack.py schedules cron(0 15 ? * MON *), every Monday. The cadence assertion above does not catch a "
+        "bare adverb like this one (see its block comment for why); a human reading the row for #3506 did.",
     ),
-    "life-platform-canary": (
-        EXEMPT,
-        "2026-07-19",
-        "Accepted residual: the 4x-daily synthetic prober alerts on FAILING paths (metric + SES) but its own silent death is "
-        "uncaught; every path it probes (DDB, S3, MCP) also has independent alarms. Revisit with a heartbeat if canary scope grows.",
-    ),
+    # #3506: this row was a dated EXEMPT from 2026-07-19 until the cadence assertion
+    # above red it. The waiver read "the 4x-daily synthetic prober ... its own silent
+    # death is uncaught; every path it probes (DDB, S3, MCP) also has independent
+    # alarms", and BOTH of its clauses were false:
+    #
+    #   * 4x-daily. TWO EventBridge rules feed this function — operational_stack's
+    #     rate(4 hours) (6/day) and the script-managed life-platform-mcp-canary-15min
+    #     rate(15 minutes) (96/day, deploy/create_mcp_canary_15min.sh). Measured
+    #     AWS/Lambda Invocations 2026-09-09..15: 102/102/106/113/114/116/124 per day.
+    #   * "every path it probes also has independent alarms". The paths it probes are
+    #     alarmed BY THIS CANARY: six LifePlatform/Canary alarms, all
+    #     treat_missing_data=NOT_BREACHING, two of them paging
+    #     (canary-{ddb,s3}-failure). Disable its rules and all six stay OK forever.
+    #     The "independent" alarms were the canary's own output.
+    #
+    # canary-no-invocations-1h (operational_stack.py) is the real signal: hourly
+    # SampleCount < 2 for 4 consecutive hours, BREACHING. The derivation of both
+    # numbers — and why 2/4 rather than the literal 1/3 — is at the alarm.
+    "life-platform-canary": (ALARM, "canary-no-invocations-1h"),
     # #2820 re-dated the whole chronicle family. The 2026-07-19 "noticed by its
     # reader" rationales predated 2026-08-03, when #1951 lifted the senders to
     # real subscriber delivery — a reader who never gets an issue notices
@@ -824,8 +1241,54 @@ def test_ingest_liveness_claims_are_registry_backed():
     )
 
 
+# #3506: an exemption is a DATED judgement, not a permanent one. A year is the
+# re-attestation interval: long enough that the ledger is not busywork, short
+# enough that no waiver outlives the system it describes by more than a cycle.
+# The canary's waiver was 60 days old and already false about its own subject
+# when #3506 found it — the cap is a floor on attention, never a substitute for
+# the cadence check above.
+EXEMPTION_MAX_AGE_DAYS = 365
+
+
+def _age_days(datestr):
+    try:
+        return (date.today() - datetime.strptime(datestr, "%Y-%m-%d").date()).days
+    except ValueError:
+        return None
+
+
+def _cadence_problems(fn, reason, cadences):
+    """#3506: every QUANTIFIED frequency an exemption states must equal the
+    cadence cdk/stacks/ actually schedules for that Lambda.
+
+    Fail-closed twice over: an unreadable schedule is a problem (the claim
+    cannot be verified), and a claim that disagrees with the resolved cadence is
+    a problem (the claim is false)."""
+    claims = stated_frequencies(reason)
+    if not claims:
+        return []
+    entry = cadences.get(fn)
+    if entry is None or entry[0] is None:
+        sites = "; ".join(entry[1]) if entry else "no schedule found in cdk/stacks/"
+        return [
+            f"  {fn}: exemption states a frequency ({', '.join(repr(p) for p, _ in claims)}) but this Lambda's "
+            f"CDK cadence is not resolvable ({sites}) — the claim cannot be checked, so it is not accepted. "
+            "Teach scheduled_lambda_cadences() the wiring shape, or drop the frequency from the reason."
+        ]
+    actual, sites = entry
+    problems = []
+    for phrase, claimed in claims:
+        if abs(claimed - actual) > CADENCE_REL_TOLERANCE * max(claimed, actual):
+            problems.append(
+                f"  {fn}: exemption claims {phrase!r} (= {claimed:g}/day) but cdk/stacks/ schedules "
+                f"{actual:g}/day — {', '.join(sites)}. The reason is not true; fix the reason or the schedule."
+            )
+    return problems
+
+
 def test_exemptions_are_dated_and_reasoned():
     problems = []
+    cadences = scheduled_lambda_cadences()
     for fn, entry in sorted(COVERAGE.items()):
         if entry[0] == ALARM:
             if len(entry) != 2:
@@ -846,6 +1309,14 @@ def test_exemptions_are_dated_and_reasoned():
                 problems.append(f"  {fn}: exemption date {d!r} is not YYYY-MM-DD")
             if not isinstance(reason, str) or len(reason.strip()) < 40:
                 problems.append(f"  {fn}: exemption reason too thin — state WHY silent absence is acceptable (≥ 40 chars)")
+            else:
+                problems.extend(_cadence_problems(fn, reason, cadences))
+            if isinstance(reason, str) and _age_days(d) is not None and _age_days(d) > EXEMPTION_MAX_AGE_DAYS:
+                problems.append(
+                    f"  {fn}: exemption dated {d} is {_age_days(d)} days old (cap {EXEMPTION_MAX_AGE_DAYS}) — "
+                    "RE-ATTEST it: re-read the reason against today's system, correct anything that is no longer "
+                    "true, and re-date the row. An exemption is a dated judgement, not a permanent one."
+                )
             if len(entry) == 4:
                 cited_control = entry[3]
                 if not isinstance(cited_control, str) or not cited_control.strip():
@@ -853,6 +1324,152 @@ def test_exemptions_are_dated_and_reasoned():
         else:
             problems.append(f"  {fn}: unknown entry kind {entry[0]!r}")
     assert not problems, "Malformed COVERAGE entries:\n" + "\n".join(problems)
+
+
+# ── #3506: the non-scheduled emitter census ──────────────────────────────────
+# COVERAGE above asks its question of SCHEDULED (and SES-triggered) Lambdas,
+# because those are the things with a cron that can silently stop. That domain
+# has a hole: a metric channel whose emitter is driven by READER TRAFFIC has no
+# schedule for scheduled_lambdas() to find, so this ledger never even asks about
+# it — and a reader-driven channel going silent is the HARDER case to notice,
+# because silence is also what a quiet week looks like.
+#
+# The specimen (#3414/AIQ-7): after #3413 withdrew ADR-108's gate from the board
+# reader path, `BoardQualityGateVerdict{Surface=board_ask}` became the board's
+# only voice-fidelity signal. It is emitted by coach-quality-gate, invoked
+# fire-and-forget from site-api-ai per grounded board answer. `grep -rn
+# BoardQualityGate cdk/stacks/ tests/test_heartbeat_completeness.py` returned
+# nothing: no alarm, no row, nobody asking.
+#
+# Entries are ("alarm", <alarm-name>, <why this channel matters>). The alarm name
+# is checked against the real CDK alarm set, exactly like an ALARM row above.
+NON_SCHEDULED_EMITTERS = {
+    "LifePlatform/AI::BoardQualityGateVerdict{Surface=board_ask}": (
+        ALARM,
+        "board-verdict-silence-7d",
+        "#3414's observe-only voice-verdict channel for the public coaching board, and the board's ONLY remaining "
+        "voice-fidelity signal after #3413 withdrew ADR-108 enforcement from the reader path. Emitted by "
+        "coach-quality-gate on a reader-driven async Event invoke (web/board_verdict_observer.observe), so it has no "
+        "schedule and is invisible to scheduled_lambdas(). A stopped observer reads exactly like 'no readers asked' — "
+        "board-verdict-silence-7d (monitoring_stack.py) separates the two by comparing verdicts against board "
+        "generations counted on a different Lambda's telemetry. The ENFORCEMENT question is #3414's 30-day-measurement "
+        "posture and is deliberately untouched here; this is a silence detector only.",
+    ),
+}
+
+
+def test_non_scheduled_emitter_census_is_not_empty():
+    """A census with no rows is a census that asks nothing — the vacuous-sweep class.
+    This floor is 1 because #3506 added the first row; raise it as rows are added,
+    never delete it."""
+    assert len(NON_SCHEDULED_EMITTERS) >= 1, "NON_SCHEDULED_EMITTERS emptied — the #3506 census asks nothing now."
+
+
+def test_non_scheduled_emitter_alarms_are_real():
+    names = cdk_alarm_names()
+    bad = []
+    for channel, entry in sorted(NON_SCHEDULED_EMITTERS.items()):
+        assert entry[0] == ALARM, f"{channel}: only ALARM-kind rows belong in NON_SCHEDULED_EMITTERS"
+        assert isinstance(entry[2], str) and len(entry[2].strip()) >= 40, f"{channel}: state WHY the channel matters"
+        if entry[1] not in names:
+            bad.append(f"  {channel} -> {entry[1]}")
+    assert not bad, (
+        "NON_SCHEDULED_EMITTERS names an alarm cdk/stacks/*.py does not create — the channel is uncovered "
+        "and the row says otherwise:\n" + "\n".join(bad)
+    )
+
+
+# ── #3506: the cadence assertion's own must-fail control ─────────────────────
+
+
+def test_cadence_assertion_catches_a_false_frequency():
+    """A guard that cannot fail is not a guard (#3200). This drives _cadence_problems()
+    against the REAL resolved cadence table with a planted claim, both ways.
+
+    `site-stats-refresh` is the specimen because its real cadence (4/day, via four
+    EventBridge rules minted in one `for` loop) is resolved through every hard part
+    of the resolver: loop unrolling, events.Schedule.cron keyword form, and summing
+    multiple rules onto one function.
+    """
+    cadences = scheduled_lambda_cadences()
+    actual = cadences.get("site-stats-refresh")
+    assert actual is not None and actual[0] is not None, "site-stats-refresh cadence unresolvable — the resolver rotted"
+    assert abs(actual[0] - 4.0) < 1e-9, f"site-stats-refresh resolves to {actual[0]}/day, expected 4.0 (4 rules x 1/day)"
+
+    true_claim = "4x-daily intraday top-up; " + "x" * 40
+    false_claim = "6x-daily intraday top-up; " + "x" * 40
+    assert stated_frequencies(true_claim), "the quantified-frequency parser stopped matching '4x-daily'"
+    assert not _cadence_problems("site-stats-refresh", true_claim, cadences), "a TRUE cadence claim was rejected"
+    caught = _cadence_problems("site-stats-refresh", false_claim, cadences)
+    assert caught, "a FALSE cadence claim ('6x-daily' against a 4/day schedule) was NOT caught — the assertion is vacuous"
+    assert "6x-daily" in caught[0] and "4/day" in caught[0], f"the failure message does not name the disagreement: {caught}"
+
+    # And the fail-CLOSED half: a claim about a Lambda with no readable schedule
+    # is a problem, not a pass.
+    unreadable = _cadence_problems("no-such-lambda-anywhere", false_claim, cadences)
+    assert unreadable and "not resolvable" in unreadable[0], f"an unverifiable claim was accepted: {unreadable}"
+
+
+def test_cadence_resolver_population_floor():
+    """The resolver must keep reading the real tree. A resolver that resolves
+    nothing makes every cadence claim pass — the silent-pass class. Measured
+    2026-09-17: 82 scheduled Lambdas, all 82 with a fully readable cadence."""
+    cadences = scheduled_lambda_cadences()
+    assert len(cadences) >= 70, f"only {len(cadences)} Lambdas have a resolvable schedule — scheduled_lambda_cadences() rotted"
+    unreadable = sorted(fn for fn, (rate, _) in cadences.items() if rate is None)
+    assert not unreadable, (
+        "Scheduled Lambdas whose CDK cadence this resolver can no longer read. A cadence claim about any of "
+        "them would now fail CLOSED, which is right but useless — teach the resolver the new wiring shape:\n  " + "\n  ".join(unreadable)
+    )
+
+
+# ── #3506: the EXEMPT ratchet ────────────────────────────────────────────────
+# The census below prints LIVENESS / ALARM / EXEMPT of N. EXEMPT is the number
+# of scheduled Lambdas whose silent death is ACCEPTED rather than detected, and
+# it is the only one of the three that is a debt. It may only shrink.
+#
+# Measured on the completed #3506 tree (2026-09-17): 83 scheduled/event-triggered
+# Lambdas, LIVENESS 10 / ALARM 22 / EXEMPT 51 (61.4%). The entering tree was
+# EXEMPT 52 / ALARM 21 — life-platform-canary moved from a false exemption to
+# canary-no-invocations-1h. (The #3506 issue text says 52 of 82; the denominator
+# grew by one when recap-card-generator landed, which is why the FRACTION is
+# recorded as commentary and the COUNT is what ratchets — a ratchet on a fraction
+# can be satisfied by adding Lambdas, which is not paying anything down.)
+#
+# TO ADD A NEW SCHEDULED LAMBDA: give it a real absence signal and an ALARM row,
+# or convert an existing exemption to pay for the new one. Raising this number is
+# not a sanctioned move; that is the whole point of a ratchet (see #3853 — never
+# lower a ratchet, and never raise a numerator).
+EXEMPT_CEILING = 51
+
+
+def coverage_census() -> dict:
+    """{kind: count} over every enumerated Lambda, plus 'total' and 'uncovered'."""
+    found = {**scheduled_lambdas(), **ses_triggered_lambdas()}
+    census = {ALARM: 0, LIVENESS: 0, EXEMPT: 0}
+    for fn in found:
+        entry = COVERAGE.get(fn)
+        if entry:
+            census[entry[0]] = census.get(entry[0], 0) + 1
+    census["total"] = len(found)
+    census["uncovered"] = len(found) - sum(census[k] for k in (ALARM, LIVENESS, EXEMPT))
+    return census
+
+
+def test_exempt_count_only_shrinks():
+    census = coverage_census()
+    exempt = census[EXEMPT]
+    assert exempt <= EXEMPT_CEILING, (
+        f"EXEMPT rose to {exempt} of {census['total']} (ceiling {EXEMPT_CEILING}). An exemption is an ACCEPTED "
+        "silent death, and this numerator may only shrink (#3506). Give the new Lambda a real absence alarm and an "
+        "ALARM row, or convert an existing exemption to pay for it. Do not raise EXEMPT_CEILING."
+    )
+    if exempt < EXEMPT_CEILING:
+        pytest.fail(
+            f"EXEMPT fell to {exempt} of {census['total']} — good. TIGHTEN the ratchet: set "
+            f"EXEMPT_CEILING = {exempt} (was {EXEMPT_CEILING}). A ceiling left above the measured value "
+            "licenses a silent regrow back to it, which is the hole this class of guard exists to close."
+        )
 
 
 def test_exemption_cited_controls_reference_real_alarms():
@@ -884,6 +1501,15 @@ if __name__ == "__main__":
     for fn in sorted(found):
         status = COVERAGE.get(fn, ("MISSING",))[0]
         print(f"{fn:55s} {status:16s} {found[fn]}")
+    census = coverage_census()
+    pct = 100.0 * census[EXEMPT] / census["total"] if census["total"] else 0.0
     print(
         f"\n{len(found)} scheduled/event-triggered · {sum(1 for f in found if f in COVERAGE)} covered · {len(set(found) - set(COVERAGE))} gaps"
     )
+    # #3506: EXEMPT is the ratchet numerator — printed explicitly so the number
+    # this file is held to is the number it reports, not one derived elsewhere.
+    print(
+        f"LIVENESS {census[LIVENESS]} / ALARM {census[ALARM]} / EXEMPT {census[EXEMPT]} of {census['total']}  (EXEMPT {pct:.1f}%, ceiling {EXEMPT_CEILING})"
+    )
+    for channel, entry in sorted(NON_SCHEDULED_EMITTERS.items()):
+        print(f"non-scheduled emitter: {channel:60s} {entry[0]:6s} {entry[1]}")
