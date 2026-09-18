@@ -517,6 +517,53 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    "guard::deploy/config_ownership_audit.py": {
+        "gate_name": "deploy/config_ownership_audit.py",
+        "command": (
+            "python3 deploy/config_ownership_audit.py --strict   # repo-side, NO AWS calls; plus the offline "
+            "suite python3 -m pytest tests/test_config_ownership_3785.py -q (15 tests, baseline 15 passed)"
+        ),
+        "mutation": (
+            "Four defects planted one at a time in the REAL tracked tree — not a copy — each one leg of the #3785 "
+            "fix, and each plant's own md5 compared before/after so a no-op plant could not be read as a green. "
+            "M1: the `stale-twin` branch in `findings()` disabled while the incident's own precondition was "
+            "planted (the generated `config/hevy_template_index.json` written back into the real config/ tree). "
+            "M2: `lambdas/training/hevy_template_index.py:INDEX_KEY` repointed at `config/hevy_template_index_M2.json` "
+            "— a producer that stops writing the key its ruling names. M3: the ownership exclusion in "
+            "`config_twin_registry.derive()` disabled, i.e. a generated key rejoining the deploy path. M4: the "
+            "put_object-level refusal in `config_twin_sync.apply_sync()` disabled."
+        ),
+        "observed": (
+            "2026-09-17. BASELINE `--strict` exit 0 and 15 passed on both sides of every plant, md5 restored each "
+            "time. M1 RED (1 failed, 13 passed): test_MUTATION_restoring_the_committed_twin_reds_the_audit, on "
+            "`Right contains one more item: 'config/hevy_template_index.json'` — the audit stayed silent over a "
+            "restored twin. M2 `--strict` exit 1 with BOTH arms: `🔴 producer-stale: config/hevy_template_index.json` "
+            "and `🔴 unruled-producer: config/hevy_template_index_M2.json`; RED (2 failed): "
+            "test_the_real_tree_audit_is_clean, test_the_producer_scan_enrols_the_next_generated_artifact. "
+            "M2 IS THE ONE WORTH READING: on its FIRST run the producer-identity leg was `key in src and const in "
+            "src`, and it stayed GREEN — the module's own docstring names the key on line 5, so the text still "
+            "matched after the code stopped writing it. That is #3856's enrolment-ratchet shape reappearing in a "
+            "file written by someone who had just read that write-up; the leg reads the AST now (`_assigns_key`) and "
+            "names the drift. Only the SET leg (`unruled-producer`) caught M2 in the meantime. "
+            "M3 RED, and it moved with the tree: BEFORE the twin's deletion was committed, 3 tests red; AFTER the "
+            "deletion — the steady state this PR ships — exactly 1, "
+            "test_a_checkout_that_HAS_the_generated_twin_still_never_deploys_it, while the real-tree assertion "
+            "test_the_twin_set_holds_out_every_not_uploadable_key stayed GREEN over an empty population. The "
+            "fixture test exists for that reason and the re-run is what proved it necessary. "
+            "M4 RED (2 failed): test_apply_sync_refuses_a_generated_key_even_when_handed_one and the mutation test."
+        ),
+        "scope": (
+            "This grades the REPO — the rulings, the producer identities, and whether any generated artifact has a "
+            "committed twin. It makes NO AWS call: whether the LIVE object is currently the producer's output is "
+            "`deploy/config_provenance_audit.py`'s question, graded against the clock, and the two are kept separate "
+            "so they cannot be wrong together. An `unknown` ruling is a WARN, not a fail — it is already fail-closed "
+            "for uploads, and making it fatal would push the next author to guess a class instead of recording what "
+            "they could not determine. Deleting the twin removes the AMMUNITION, not the capability: a human can "
+            "still `aws s3 cp` any file over a generated key, and that revert is caught by the provenance dead-man "
+            "on the next daily run rather than prevented."
+        ),
+        "proved_on": "2026-09-17",
+    },
     "guard::deploy/config_provenance_audit.py": {
         "gate_name": "deploy/config_provenance_audit.py",
         "command": (

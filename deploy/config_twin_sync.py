@@ -38,6 +38,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from config_ownership_audit import owner_of, uploadable  # noqa: E402
 from config_twin_registry import S3_CONFIG_PREFIX, Twin, derive, expand_alias_twins  # noqa: E402
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
@@ -139,12 +140,23 @@ def run_check(twins: list[Twin], s3) -> dict:
 
 
 def apply_sync(report: dict, twins: list[Twin], s3, cloudfront=None, lambda_client=None) -> dict:
-    """Upload the drifted twins — explicit files only, never a prefix sync."""
+    """Upload the drifted twins — explicit files only, never a prefix sync.
+
+    #3785: the ownership registry is consulted AGAIN here, at the put_object call, even
+    though `derive()` already dropped every not-uploadable key from the twin set. This
+    step is what actually fired the 2026-09-14 incident — it pushed a June-1 copy of the
+    generated Hevy template index over the live catalogue on three separate site deploys
+    — so the stop belongs at the mutation, not only at the set that feeds it. A caller
+    assembling its own twin list (a test, a future script) gets the refusal too.
+    """
     by_key = {t.key: t for t in twins}
-    uploaded, failed = [], []
+    uploaded, failed, refused = [], [], []
 
     for key in report["drifted"]:
         twin = by_key[key]
+        if not uploadable(twin.alias_of or key):
+            refused.append({"key": key, "owner": owner_of(twin.alias_of or key)})
+            continue
         try:
             with open(twin.repo_path, "rb") as handle:
                 body = handle.read()
@@ -159,7 +171,7 @@ def apply_sync(report: dict, twins: list[Twin], s3, cloudfront=None, lambda_clie
         except Exception as exc:
             failed.append({"key": key, "error": str(exc)})
 
-    actions = {"uploaded": uploaded, "failed": failed, "invalidated": None, "recycled": None}
+    actions = {"uploaded": uploaded, "failed": failed, "refused": refused, "invalidated": None, "recycled": None}
     if not uploaded:
         return actions
 
@@ -210,6 +222,13 @@ def _print_human(report: dict, registry) -> None:
     else:
         print(f"\n  {len(report['drifted'])} drifted / {len(report['serving_drift'])} on the public serving path")
         print("  fix: python3 deploy/config_twin_sync.py --apply")
+    if registry.not_uploadable:
+        # #3785 — stated every run, never silent. These are repo files a deploy WOULD
+        # have pushed before the ownership registry existed; one of them was pushed
+        # three times.
+        print("\n  🔒 held out of the twin set by the ownership registry (deploy/config_ownership_audit.py):")
+        for key, owner in sorted(registry.not_uploadable.items()):
+            print(f"     {key}  [{owner}] — S3 is the authority; repair by re-running its producer")
     if registry.unresolved_writers:
         print("\n  🟡 unresolvable config/ write sites (review — may need excluding):")
         for site in registry.unresolved_writers:
@@ -261,9 +280,11 @@ def main() -> int:
             print(f"\n  uploaded: {len(actions['uploaded'])} · invalidated: {actions['invalidated']} · recycled: {actions['recycled']}")
             for failure in actions["failed"]:
                 print(f"  🔴 FAILED {failure['key']}: {failure['error']}")
+            for refusal in actions.get("refused", []):
+                print(f"  🔴 REFUSED {refusal['key']}: ruled {refusal['owner']} — S3 is the authority for it (#3785)")
 
     if args.apply:
-        return 1 if report["apply"]["failed"] else 0
+        return 1 if (report["apply"]["failed"] or report["apply"].get("refused")) else 0
     if args.strict and not report["clean"]:
         return 1
     return 0
