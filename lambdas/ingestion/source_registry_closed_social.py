@@ -24,6 +24,24 @@ from typing import Any
 # facet block). Defined here, next to its only users, and re-exported by the parent.
 INBOUND_PASTE_ONLY = "paste-only"
 
+# #3571/#3669: the DATED, machine-readable answer to "this source's method says
+# 'manual' — where is its capture_channel?". It used to be a COMMENT on `x` alone (and
+# nothing at all on instagram/tiktok), which reads identically to nobody having looked:
+# `manual_method_source_ids()` derives the question from each source's own method text,
+# so the answer has to be a facet. The substance is unchanged from that comment —
+# `capture_channel` drives the evening "you forgot to log" nudge and the public
+# "dark Nd" chip, and a paste is opportunistic, not a daily obligation, so it must not
+# nag — plus the standing fact that the #746 channel set ('hae'|'notion'|'mcp') is an
+# OWNER decision, still open on issue 3571 for macrofactor's dropbox drop and for any
+# other channel. `inbound_mode: 'paste-only'` (#1677) remains the facet that models HOW
+# a post arrives; this one models whether its absence should nag.
+_PASTE_CAPTURE_CHANNEL_REASON = (
+    "2026-09-17: paste-only by inbound_mode (#1677). Deliberately NOT one of the #746 capture channels "
+    "('hae'|'notion'|'mcp'): that facet arms the evening 'you forgot to log' nudge and the public "
+    "'dark Nd' chip, and a paste is opportunistic rather than a daily obligation — it must not nag. "
+    "Whether a paste channel ever joins the #746 set is the same open OWNER ruling as 'dropbox' on issue 3571."
+)
+
 CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
     # "Registered" here does NOT mean "polling": a future session that wants polling must
     # flip `inbound_mode`, which is the review moment that decision deserves.
@@ -49,9 +67,8 @@ CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
         "method": "Manual paste (no token) — staged to PASTE# and ingested through the SIMP-2 framework",
         "metrics": "Posts — the outbound public voice, pasted back in",
         "posture": "portfolio",
-        # Deliberately NO capture_channel: that facet drives the evening "you forgot to
-        # log" nudges and is reserved for Matthew's three logging channels (#746/#1682).
-        # A paste is opportunistic, not a daily obligation, and must not nag.
+        "capture_channel": None,
+        "capture_channel_reason": _PASTE_CAPTURE_CHANNEL_REASON,
         "catalog": False,
         # No raw/ tree, and the ingestion config sets enable_raw_archive=False to match:
         # nothing is FETCHED, so there is no API response to archive. The staged
@@ -77,6 +94,8 @@ CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
         "method": "Manual paste (no token) — staged to PASTE# and ingested through the SIMP-2 framework",
         "metrics": "Posts and reels — the outbound public voice, pasted back in",
         "posture": "portfolio",
+        "capture_channel": None,
+        "capture_channel_reason": _PASTE_CAPTURE_CHANNEL_REASON,
         "catalog": False,
         # No raw/ tree, and the ingestion config sets enable_raw_archive=False to match:
         # nothing is FETCHED, so there is no API response to archive. The staged
@@ -102,6 +121,8 @@ CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
         "method": "Manual paste (no token) — staged to PASTE# and ingested through the SIMP-2 framework",
         "metrics": "Videos — the outbound public voice, pasted back in",
         "posture": "portfolio",
+        "capture_channel": None,
+        "capture_channel_reason": _PASTE_CAPTURE_CHANNEL_REASON,
         "catalog": False,
         # No raw/ tree, and the ingestion config sets enable_raw_archive=False to match:
         # nothing is FETCHED, so there is no API response to archive. The staged

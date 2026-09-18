@@ -26,6 +26,7 @@ from typing import Any
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
+from ingestion.source_registry import due_months  # #3669: the cadence is DERIVED, never restated here
 
 from web.site_api_common import (
     DDB_REGION,
@@ -36,6 +37,21 @@ from web.site_api_common import (
     _ok,
     logger,
 )
+
+# ── #3669: due-date cadences for the "manual" (infrequent) data-source rows ───
+# This dict used to be written inline inside the render loop as
+# `DUE_MONTHS = {"labs": 6, "dexa": 12, …}` — a cadence living in the SERVING layer while
+# `SOURCE_REGISTRY`, which every freshness, staleness and coach surface derives from, had
+# no `labs` row at all. Two homes for one number, and nothing able to notice them
+# disagreeing. `due_months()` is spliced in LAST so the registry always wins: a source
+# that declares `cadence_months` owns its cadence outright, and the literals below are
+# only the rows the registry does not hold yet — each a candidate for the same treatment
+# (dexa's 12-month cadence is the named residual on #3669).
+# `tests/test_source_registry_coverage_3669.py` asserts the two are the same number, in
+# both directions: the panel's months AND the registry's derived `stale_hours`.
+_DUE_MONTHS_UNREGISTERED = {"dexa": 12, "food_delivery": 3, "bp_readings": 3, "measurements": 2}
+DUE_MONTHS = {**_DUE_MONTHS_UNREGISTERED, **due_months()}
+DUE_MONTHS_DEFAULT = 6
 
 # ── Module-owned cache state for /api/status ─────────────────────────────────
 # Originally globals in site_api_lambda.py, then on site_api_intelligence.py;
@@ -648,10 +664,11 @@ def status(*, _g) -> dict:
             comment = "One-time import \u2014 data on file" if has_data else "Awaiting initial import"
             uptime: list[Any] = []  # No daily bars for one-time sources
         elif category == "manual":
-            # Labs / DEXA / Food Delivery — due-date tracking
-            # Board recommendation: labs every 6mo, DEXA every 12mo, food delivery every 3mo
-            DUE_MONTHS = {"labs": 6, "dexa": 12, "food_delivery": 3, "bp_readings": 3, "measurements": 2}
-            due_mo = DUE_MONTHS.get(sid, 6)
+            # Labs / DEXA / Food Delivery — due-date tracking.
+            # Cadences come from the module-level DUE_MONTHS above, whose registered rows
+            # are DERIVED from SOURCE_REGISTRY's `cadence_months` facet (#3669) — labs is
+            # 6 months because the registry says so, not because this line repeats it.
+            due_mo = DUE_MONTHS.get(sid, DUE_MONTHS_DEFAULT)
             # #2221: this was the SECOND unguarded strptime (the finding named only the
             # one in _comp_status). A malformed DATE# key on a manual source would raise
             # straight out of the handler exactly the same way.

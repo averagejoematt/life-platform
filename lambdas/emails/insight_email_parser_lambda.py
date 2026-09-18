@@ -459,6 +459,17 @@ def lambda_handler(event, context):
                 mail = ses_info.get("mail", {})
                 message_id = mail.get("messageId", "")
                 if message_id:
+                    # #3669 — reconciled, deliberately NOT removed. `inbound_email` is
+                    # RETIRED as a data SOURCE (source_registry.RETIRED_SOURCES: zero DDB
+                    # rows in its entire life, 8 S3 objects that are the same 4 written
+                    # twice, one of them the SES setup notification, owner ruling
+                    # 2026-09-06). This line is not that: it is the S3 LANDING KEY for an
+                    # inbound message on the live insight-reply loop, whose output lands
+                    # in USER#matthew#SOURCE#insights — a different, healthy partition.
+                    # A landing prefix for a message the parser consumes is not a source
+                    # with a cadence, which is exactly the distinction the retirement
+                    # records. raw/* is delete-protected (ADR-032/033/046), so the entry
+                    # in RETIRED_SOURCES is the tombstone.
                     key = f"raw/inbound_email/{message_id}"
                 else:
                     print("[WARN] No S3 key or SES messageId found, skipping")

@@ -1,7 +1,7 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-09-12",
+    "updated": "2026-09-18",
     "count": 21
   },
   "sources": [
@@ -11,6 +11,14 @@
       "category": "Wearables",
       "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
       "method": "Health Auto Export webhook, near-real-time",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "labs",
+      "name": "Blood labs",
+      "category": "Clinical",
+      "metrics": "Blood biomarkers (episodic panels), ASCVD 10-year risk, clinician notes",
+      "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
       "posture": "load-bearing"
     },
     {
@@ -124,14 +132,6 @@
       "metrics": "Stress, body battery, steps",
       "method": "OAuth API pull, 4x daily — paused (ADR-074)",
       "posture": "paused"
-    },
-    {
-      "id": "labs",
-      "name": "Blood labs",
-      "category": "Clinical",
-      "metrics": "Blood biomarkers (episodic panels)",
-      "method": "Manual entry from lab PDFs",
-      "posture": "load-bearing"
     },
     {
       "id": "dexa",

@@ -64,6 +64,7 @@ MCP and site-api Lambdas resolve it; stacks that bundle lambdas/ get the same
 file at /var/task, which shadows the layer copy harmlessly.
 """
 
+import re
 from datetime import date
 from typing import Any, cast
 
@@ -87,7 +88,19 @@ DEFAULT_STALE_HOURS = 48
 #   desc           public board description
 #   category       public board grouping (Wearables / Inputs / Manual logs)
 #   behavioral     True = staleness is a logging lapse, never pages
-#   stale_hours    override of DEFAULT_STALE_HOURS (None = default)
+#   stale_hours    override of DEFAULT_STALE_HOURS (None = default). On a source
+#                  carrying `cadence_months` this value is COMPUTED, never typed.
+#   cadence_months (#3669) the declared cadence of an EPISODIC source, in months rather
+#                  than hours: a clinical panel drawn "every 6 months or so", not a daily
+#                  pipe. It is THE number for such a source — `stale_hours` is derived
+#                  from it by `_derive_cadence_stale_hours()` immediately after the
+#                  registry literal (months × `DAYS_PER_CADENCE_MONTH` × 24), and
+#                  `/api/status`'s manual due-date panel reads `due_months()` instead of
+#                  restating a cadence in the serving layer. That restatement is the drift
+#                  #3669 closes: `DUE_MONTHS = {"labs": 6, …}` sat in
+#                  `web/site_api_status.py` while the registry every freshness, staleness
+#                  and coach surface derives from had no `labs` row at all — so "is this
+#                  source healthy?" had a different answer depending on who was asked.
 #   paused         intentionally off — shown as "paused", never counted stale
 #   monitored      False = MCP-visibility only; excluded from the checker and
 #                  the public board (currently just notion)
@@ -113,7 +126,9 @@ DEFAULT_STALE_HOURS = 48
 #                  review: 'load-bearing' | 'portfolio' | 'paused' | 'archive'.
 #   raw_layout     the ACTUAL raw-S3 shape: {prefix, scheme, filename[, filename_legacy]
 #                  [, note]} where scheme is 'date-tree' ({prefix}/{YYYY}/{MM}/{filename}),
-#                  'flat-uuid' ({prefix}/{id}.json), or 'timestamped'; None = no raw archive.
+#                  'flat-uuid' ({prefix}/{id}.json), 'timestamped', or 'date-folder'
+#                  ({prefix}/{YYYY-MM-DD}/{filename} — one folder per EVENT date holding
+#                  N documents, #3669's labs); None = no raw archive.
 #                  filename names the CURRENT leaf form — do NOT assume {DD}.json. Every
 #                  current date-tree write is 'YYYY-MM-DD.json'; the 2026-05-17 SIMP-2
 #                  migration (ADR-056) flipped the legacy 'DD.json' form to the full date
@@ -210,16 +225,37 @@ DEFAULT_STALE_HOURS = 48
 #                  per-source alarm set from it, so a NEW credentialed source with
 #                  no alarm fails CI instead of dying silently.
 #   capture_channel  the manual capture channel that fills this source by hand
-#                  (#746, Matthew's decision — the three manual channels are HAE,
-#                  Notion, MCP conversation): 'hae' (Health Auto Export webhook —
+#                  (#746, Matthew's decision — originally THREE manual channels, HAE,
+#                  Notion and MCP conversation; 'telegram' joined with progress_photos in
+#                  #3757 and this comment's "three" went un-updated, which is the text
+#                  issue 3571's premise ends up quoting. The live set is measured by
+#                  `tests/test_source_registry_coverage_3669.py`, which pins it so a new
+#                  value is a reviewed edit; whether 'dropbox' joins for macrofactor is an
+#                  OWNER ruling still open on 3571 — do not extend the set here):
+#                  'hae' (Health Auto Export webhook —
 #                  CGM / water / BP / State of Mind), 'notion' (journal), 'mcp'
-#                  (logged in an MCP conversation — measurements, food delivery).
+#                  (logged in an MCP conversation — measurements, food delivery),
+#                  'telegram' (sent to the headcoach bot — progress photos, #3757).
 #                  Absent = an automatic pipe (worn device / scheduled API pull)
 #                  with no human in the capture loop. Only capture_channel sources
 #                  are eligible for the evening nudge's gentle "gone quiet" mention
 #                  and the public "manual source dark N days" degraded stamp — a
 #                  dead Whoop token is a device outage the nudge can't fix, so it
 #                  never lands here. Read by manual_capture_sources().
+#   capture_channel_reason
+#                  (#3571) the DATED written reason a source whose own `method`/`desc`
+#                  text says "manual" nonetheless carries `capture_channel: None`. The
+#                  #746 channel set is an OWNER decision, so a manual source whose channel
+#                  isn't in it has exactly two honest states: a channel, or an explicit
+#                  None with a reason saying why — never a missing key, which reads
+#                  identically to "nobody looked". MacroFactor is the specimen: its method
+#                  is 'Manual CSV export via Dropbox poller' and it has been dark for
+#                  months, but `site/assets/js/evidence_meta.js` gates the public
+#                  "dark Nd" chip on the manual facet, so the one load-bearing manual
+#                  source that needed the disclosure was the one that could not render it.
+#                  `tests/test_source_registry_coverage_3669.py` derives the denominator
+#                  from the registry's own text — never a hand-listed set — so a NEW
+#                  manual source cannot enter without answering the same question.
 #   engagement_channel  (#914) the presence / quiet-stretch channel this source
 #                  feeds (engagement_core.compute_presence — the "is Matthew still
 #                  logging?" instrument, a DIFFERENT axis from freshness):
@@ -771,6 +807,20 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "method": "Manual CSV export via Dropbox poller, ~24h behind by design",
         "metrics": "Calories, macros, meals",
         "posture": "load-bearing",
+        # #3571: EXPLICIT None, not an absent key. The facet was simply missing, which
+        # reads identically to "nobody looked" — and because evidence_meta.js gates the
+        # public "dark Nd" chip on the manual facet, the one load-bearing manual source
+        # that had been dark for months was the one source that could not disclose it.
+        # Whether 'dropbox' JOINS the #746 channel set ('hae'|'notion'|'mcp', Matthew's
+        # decision) is an owner ruling, not an engineering one, and it is still open on
+        # issue 3571 — so this records the honest state instead of pre-empting it.
+        "capture_channel": None,
+        "capture_channel_reason": (
+            "2026-09-17: the Dropbox CSV drop is a manual capture channel in fact, but the #746 channel set "
+            "('hae'|'notion'|'mcp') is an OWNER decision and whether 'dropbox' joins it is still open on "
+            "issue 3571 (acceptance box 1). Until that ruling lands, macrofactor is deliberately NOT "
+            "nudge-eligible and renders no 'dark Nd' chip — stated here rather than left as a missing key."
+        ),
         # The facet said None ("CSVs land via the dropbox transport, not a raw/
         # archive") while macrofactor_lambda.archive_raw() has written a raw/ copy of
         # EVERY upload since 2026-02 — verified 2026-08-08: 48 objects under this
@@ -1201,6 +1251,64 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "posture": "load-bearing",  # medication-safety — never hide (ADR-077 dec A)
         "raw_layout": None,
     },
+    # ── #3669: the clinical panel, registered ─────────────────────────────────────
+    # 9 live DATE# records (2019-05-01 … 2026-04-03, read-only query 2026-09-17) plus a
+    # PROVIDER#function_health#2025-spring row, carrying biomarkers, ASCVD 10-year risk,
+    # clinician notes, the Galleri key and a biological-age delta. Until this entry the
+    # partition was ABSENT from the registry that every freshness, staleness, coach-
+    # inventory and MCP surface derives from — invisible to all of them — while
+    # `/api/status` carried its own `DUE_MONTHS = {"labs": 6, …}`. A `raw_layout`-shaped
+    # note existed in NON_INGESTION_RAW_PREFIXES, which is exactly why
+    # scripts/check_raw_zone_drift.py passed over the gap: describing where the PDFs land
+    # is not declaring a cadence, and a raw-layout facet is not a registry entry.
+    # Owner ruling 2026-09-06: "labs i just do every 6 months or so and upload."
+    "labs": {
+        "label": "Blood labs",
+        "checker_label": "Blood labs",
+        "desc": "Blood biomarker panels — drawn and uploaded roughly every 6 months",
+        "category": "Clinical",
+        "behavioral": True,  # a draw happens when he books one; silence is never breakage
+        "cadence_months": 6,  # THE cadence — `stale_hours` below is DERIVED from it
+        "stale_hours": None,  # computed by _derive_cadence_stale_hours(); never typed here
+        # freshness: False — DELIBERATE, and the reason is the instrument's own design.
+        # freshness_checker_lambda's early-warning tier is a GLOBAL 24h constant
+        # (WARNING_HOURS), so a source whose healthy state is ~4,000 hours old would sit
+        # permanently 🟡 and put a permanent +1 floor under the WarningSourceCount metric —
+        # an early-warning count that can never read 0 is the "train the operator to ignore
+        # it" failure this module's own header was written about. The cadence is enforced
+        # where an episodic cadence belongs: `/api/status`'s manual due-date panel, which
+        # since #3669 derives its months from `due_months()` here. `availability_facet()`
+        # also now reports labs LAGGING BY DESIGN, so a coach narrative can no longer read
+        # a 5-month-old panel as a sync failure.
+        "freshness": False,
+        "active_api": False,
+        "expected_days": None,  # episodic — a week with no draw is not a gap
+        "qa_tier": None,
+        "method": "Manual upload of the lab PDF/report after each draw (~6-month cadence)",
+        "metrics": "Blood biomarkers (episodic panels), ASCVD 10-year risk, clinician notes",
+        "posture": "load-bearing",  # clinical truth — the deepest evidence the platform holds
+        # #3571: manual-by-method, so the explicit answer is required rather than optional.
+        "capture_channel": None,
+        "capture_channel_reason": (
+            "2026-09-17: a lab upload is manual capture, but the #746 channel set "
+            "('hae'|'notion'|'mcp') is an OWNER decision and whether a direct-upload channel joins it is the "
+            "same open ruling as 'dropbox' on issue 3571. Nudge-eligibility for a 6-month clinical cadence is "
+            "also a separate question from the daily manual channels the nudge was built for — a 'you have not "
+            "uploaded labs' nudge on day 3 of 180 would be noise. Stated, not left as a missing key."
+        ),
+        "raw_layout": {
+            "prefix": "raw/matthew/labs",
+            "scheme": "date-folder",
+            "filename": "<draw-date>/<document>.pdf|.md",
+            "note": (
+                "one folder per DRAW DATE holding N documents (the PDF plus a markdown transcription), "
+                "hand-uploaded — not written by any lambda in this file. 7 objects live-confirmed 2026-09-06 "
+                "(#3570). The prefix also holds hand-uploaded DEXA documents, whose DDB partition is SOURCE#dexa "
+                "(see UNREGISTERED_PARTITIONS below) — the S3 prefix and the DDB partition do not partition the "
+                "same way. No per-day key: raw_date_key() raises for a non-date-tree scheme by design."
+            ),
+        },
+    },
     "dropbox": {
         "label": "Dropbox poller",
         "checker_label": "Dropbox poll",
@@ -1221,13 +1329,263 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     },
 }
 
+# ── #3669: an episodic cadence is declared ONCE, in months ────────────────────────
+# A "month" here is 30 days — the convention `/api/status`'s manual due-date panel has
+# always used (`due_date = last + timedelta(days=due_mo * 30)`), kept identical so the
+# derivation changes no reader-facing date.
+DAYS_PER_CADENCE_MONTH = 30
+
+
+def _derive_cadence_stale_hours() -> None:
+    """Fill `stale_hours` from `cadence_months` on every source that declares one.
+
+    DERIVED, not restated. Two numbers for one cadence is precisely the drift #3669
+    closes — `DUE_MONTHS["labs"] = 6` in the serving layer and a staleness threshold in
+    the registry could disagree, and nothing would say so. The dict literal above cannot
+    reference a sibling key, so the computation happens here, once, immediately after it;
+    any `stale_hours` typed alongside a `cadence_months` is overwritten, never honoured.
+    """
+    for row in SOURCE_REGISTRY.values():
+        months = row.get("cadence_months")
+        if months is not None:
+            row["stale_hours"] = int(months) * DAYS_PER_CADENCE_MONTH * 24
+
+
+_derive_cadence_stale_hours()
+
+
+# ── #3669: retired sources — a claim the live table can CONTRADICT ────────────────
+# A source that is dead is not the same as a source that was never registered, and the
+# difference has to be written down or the next audit rediscovers it. Each entry is a
+# dated ruling with the evidence it rests on.
+#
+# The guard (`tests/test_source_registry_coverage_3669.py`) treats a retirement as a
+# FALSIFIABLE claim: a retired key that shows up in the live pk-family census reds, so
+# "retired" can never quietly become "actually still writing".
+RETIRED_SOURCES: dict[str, dict[str, Any]] = {
+    "inbound_email": {
+        "dated": "2026-09-06",
+        "owner_ruling": "agree on inbound email, i dont know what that is really",
+        "reason": (
+            "SES receiving setup residue, retired rather than registered. Evidence: ZERO DynamoDB rows in its "
+            "entire life (no SOURCE#inbound_email family in the live pk census, re-confirmed 2026-09-17), and "
+            "8 S3 objects total — the SAME 4 written twice by the old and new raw layouts "
+            "(raw/inbound_email/ 2026-02-27, raw/matthew/inbound_email/ 2026-03-08), one of which is literally "
+            "AMAZON_SES_SETUP_NOTIFICATION. Nothing has arrived in six months and the owner did not recognise "
+            "the name. #3669."
+        ),
+        "raw_prefixes": ("raw/inbound_email", "raw/matthew/inbound_email"),
+        "code_reference": (
+            "lambdas/emails/insight_email_parser_lambda.py builds `raw/inbound_email/{messageId}` as its "
+            "SES-direct-invocation fallback key. That reference is NOT removed: the insight-reply loop "
+            "(reply to any platform email -> SES -> S3 -> parser) is live and writes its output to "
+            "USER#matthew#SOURCE#insights, a different, healthy partition (1,505 rows). What is retired is the "
+            "idea that `inbound_email` is a DATA SOURCE with a cadence — it is a landing prefix for a message "
+            "the parser consumes, and it has never normalized a metric."
+        ),
+        "s3_disposition": (
+            "The 8 objects are NOT deleted and cannot be: raw/* is delete-protected by bucket policy "
+            "(ADR-032/033/046) for exactly this principal. This entry IS the tombstone — the durable, dated "
+            "record that the prefix is dead, which is the only tombstone available."
+        ),
+    },
+}
+
+
+# ── #3669: live SOURCE# partitions that are deliberately NOT registry sources ─────
+# THE SET this issue closes. `SOURCE_REGISTRY` is the derivation point for how a source
+# arrives, how often, and how stale is too stale — so a live `USER#…#SOURCE#<x>`
+# partition that is absent from it is invisible to every derived check. The 2026-09-06
+# ingestion audit named four such partitions; the live pk-family census run for #3669
+# (2026-09-17, 99 families / 44,543 items) measured 83 live SOURCE# families, of which 67
+# had no registry entry — the audit's set was scoped to ingestion-shaped names and missed
+# the rest.
+#
+# Most of those 67 need no entry and no exemption, and saying so is a DERIVATION rather
+# than a list: a partition `phase_taxonomy` classifies EXPERIMENT_SCOPED or SYSTEM_STATE
+# is written BY the platform (compute output, caches, ledgers, tracker rows). It has no
+# capture cadence to declare and no staleness a freshness checker could enforce — the
+# class IS its disposition. See `unregistered_source_partitions()`.
+#
+# What is left is this dict: live partitions in the CAPTURED classes (raw_timeseries /
+# cross_phase) that still are not ingestion sources. Each carries a dated reason naming
+# WHAT WRITES IT, because "I could not find a writer" is not evidence there isn't one.
+UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
+    "dexa": {
+        "dated": "2026-09-17",
+        "reason": (
+            "Body-composition scans, 2 rows. Episodic clinical capture on a ~12-month cadence (last scan "
+            "2026-03-30), hand-entered per scan with no ingestion pipe — no lambda writes this partition. "
+            "Named by #3669 so the set is complete. A registry entry with `cadence_months: 12` is the obvious "
+            "follow-on and is deliberately NOT taken here: `/api/status` renders dexa from its own DUE_MONTHS "
+            "row, and #3669's box 1 ruled on labs only. Tracked as the residual on 3669's PR."
+        ),
+    },
+    "genome": {
+        "dated": "2026-09-17",
+        "reason": (
+            "SNP clinical interpretations, 111 rows (GENE# sort keys). A ONE-OFF import, not a recurring "
+            "source: there is no cadence to declare and no staleness that could mean anything — /api/status "
+            "models it as category 'onetime' (green once data exists, blue before). Tier-2 owner-only "
+            "(#1943), read by web/site_api_biomarkers.py and health/genome_coaching.py, written by no lambda."
+        ),
+    },
+    "chronicling": {
+        "dated": "2026-09-17",
+        "reason": (
+            "Pre-platform habit history, 16 rows. A FROZEN archive with no writer — imported once, read by "
+            "mcp/helpers.py (habit source-of-truth) and emails/monthly_digest_lambda.py. Already public as "
+            "posture 'archive' in site/data/data_sources.json. Nothing can go stale that nothing writes."
+        ),
+    },
+    "calibration": {
+        "dated": "2026-09-17",
+        "reason": (
+            "Forecast-calibration records, 2,479 rows, written by compute/forecast_engine_lambda.py and "
+            "compute/hypothesis_engine_lambda.py (read by experiment/prereg_voids.py). Platform-derived "
+            "grading of the platform's own predictions — cross_phase because calibration must survive a "
+            "reset (ADR-105), not because anything captures it."
+        ),
+    },
+    "coach_corrections": {
+        "dated": "2026-09-17",
+        "reason": (
+            "6 rows, written by coach/coach_corrections.py — the owner's corrections to coach output, "
+            "captured through the coach surface itself, not through an ingestion pipe. cross_phase because a "
+            "correction outlives the cycle it was made in."
+        ),
+    },
+    "day_grade": {
+        "dated": "2026-09-17",
+        "reason": (
+            "1,147 rows, written by compute/daily_metrics_compute_lambda.py and "
+            "compute/daily_insight_compute_lambda.py. A DERIVED daily grade over sources that ARE registered; "
+            "its freshness is the freshness of its inputs plus its own cron, both already monitored."
+        ),
+    },
+    "effect_fits": {
+        "dated": "2026-09-17",
+        "reason": (
+            "1 row, written by experiment/effect_fitter.py — stored curve fits (ADR-105) over sources that ARE "
+            "registered. Derived output, not captured data: nothing arrives from outside, so there is no cadence "
+            "to declare and staleness would only restate its inputs."
+        ),
+    },
+    "evening_ritual": {
+        "dated": "2026-09-17",
+        "reason": (
+            "1 row (DATE#2026-07-29). Written by web/site_api_social_engage.py — the reader-facing one-tap "
+            "connection widget (ADR-124), read by web/site_api_fulfillment.py and emails/evening_nudge_lambda.py. "
+            "An interactive site write, not an ingested feed: there is no vendor to break and no cadence to "
+            "enforce, and its ONE row is itself the honest answer about how much the widget is used."
+        ),
+    },
+    "flourishing": {
+        "dated": "2026-09-17",
+        "reason": (
+            "22 rows, written by health/flourishing.py + health/fulfillment_index.py from journal enrichment "
+            "(ingestion/journal_enrichment_lambda.py). A derived wellbeing index over notion/journal data that "
+            "IS registered."
+        ),
+    },
+    "macrofactor_meals": {
+        "dated": "2026-09-17",
+        "reason": (
+            "780 rows, written by health/meal_projection.py — a PROJECTION of the registered `macrofactor` "
+            "source into per-meal records. Its staleness is macrofactor's staleness; a second registry entry "
+            "would mint a second, disagreeable answer to one question."
+        ),
+    },
+    "macrofactor_workouts": {
+        "dated": "2026-09-17",
+        "reason": (
+            "431 rows, written by ingestion/macrofactor_lambda.py from the same Dropbox CSV drop as "
+            "`macrofactor`. A FROZEN pre-Hevy strength archive (public posture 'archive' in "
+            "site/data/data_sources.json); the live strength source is `hevy`, which is registered."
+        ),
+    },
+    "milestones": {
+        "dated": "2026-09-17",
+        "reason": (
+            "30 rows, written by health/milestone_ledger.py via compute/daily_metrics_compute_lambda.py — "
+            "derived achievement records over registered sources, cross_phase so a reset cannot erase what "
+            "was earned."
+        ),
+    },
+    "platform_memory": {
+        "dated": "2026-09-17",
+        "reason": (
+            "48 rows, written by ai/platform_memory.py (and consumed by daily_insight/weekly_plate/"
+            "failure_pattern compute). The platform's own memory store — the one partition phase_taxonomy "
+            "classifies PER CATEGORY at classify() time rather than in SOURCE_CLASS, so it has no single "
+            "class to disposition it by. Written by the platform, never captured from outside."
+        ),
+    },
+    "recall_embeddings": {
+        "dated": "2026-09-17",
+        "reason": (
+            "944 rows, written by ai/semantic_recall.py — vector embeddings computed over content the "
+            "platform already holds. Derived; cross_phase so recall survives a reset."
+        ),
+    },
+    "sick_days": {
+        "dated": "2026-09-17",
+        "reason": (
+            "8 rows, written by health/sick_day_checker.py and mcp/tools_sick_days.py — episodic illness "
+            "marks captured in conversation. Their absence is the healthy state, so no cadence and no "
+            "staleness threshold could be honest: a stale sick_days partition means he has not been ill."
+        ),
+    },
+    "subscribers": {
+        "dated": "2026-09-17",
+        "reason": (
+            "3 rows, written by web/email_subscriber_lambda.py + the social-ladder endpoints. Reader "
+            "audience state, not a health data source; its liveness question is the subscribe endpoint's, "
+            "which has its own checks."
+        ),
+    },
+    "time_affluence": {
+        "dated": "2026-09-17",
+        "reason": (
+            "22 rows, written by health/time_affluence.py (#1408) — a weekly derived Time-Affluence proxy "
+            "(PROXY#/EDGE#) plus its probe, computed from todoist/calendar data that is already registered."
+        ),
+    },
+    "training_notes": {
+        "dated": "2026-09-17",
+        "reason": (
+            "43 rows, written by training/training_notes.py + training_notes_llm.py — the DERIVED note layer "
+            "over hevy. #3768 already gave this layer its own dead-man in freshness_checker_lambda (it was "
+            "dark for weeks while hevy reported fresh), which is the right instrument for a derived layer; a "
+            "registry entry would duplicate it."
+        ),
+    },
+    "training_reference": {
+        "dated": "2026-09-17",
+        "reason": (
+            "14 rows, written by compute/episode_detect_lambda.py — reference episodes derived from the "
+            "registered training sources, kept cross_phase so comparisons outlive a cycle."
+        ),
+    },
+    "weight_episodes": {
+        "dated": "2026-09-17",
+        "reason": (
+            "29 rows, written by compute/episode_detect_lambda.py — detected weight episodes derived from "
+            "the registered `withings` source. Derived, cross_phase."
+        ),
+    },
+}
+
 # ── Non-ingestion / accidental raw/ prefixes (#3570) ──────────────────────────────
 # Top-level prefixes live under `raw/` or `raw/matthew/` that are NOT accounted for by
 # any source's `raw_layout` (or its `sub_layouts`/`unmodeled_legacy`) above, but ARE
 # real, live S3 content a drift walker must not flag as an unexplained gap. Two kinds:
-#   - a real non-ingestion capture prefix (labs, inbound_email): no SOURCE_REGISTRY
-#     entry because nothing in this file ingests it — a human uploads the object
-#     directly, or it is intake-side capture rather than a normalized metric source.
+#   - a real non-ingestion capture prefix (inbound_email): no SOURCE_REGISTRY entry
+#     because nothing in this file ingests it — a human uploads the object directly, or
+#     it is intake-side capture rather than a normalized metric source. (`raw/matthew/labs`
+#     LEFT this dict in #3669: labs is now a registry source and owns its own `raw_layout`,
+#     so keeping a second description here would be the restatement the registry exists to
+#     end. `known_prefix_roots()` picks it up from the facet either way.)
 #   - a dated, explained ACCIDENT (matthew/matthew): a real generation gets a
 #     `raw_layout`/`unmodeled_legacy` entry on its OWN source instead — this dict is
 #     for content that isn't a source's history at all.
@@ -1238,22 +1596,18 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
 # `unmodeled_legacy` (nothing to resolve; it exists so a reader sees an honest,
 # explained gap instead of silently inferring one doesn't exist).
 NON_INGESTION_RAW_PREFIXES: dict[str, dict[str, str]] = {
-    "raw/matthew/labs": {
-        "dated": "2026-09-06",
-        "note": "raw/matthew/labs/<draw-date>/*.pdf|.md — hand-uploaded lab documents (DEXA, bloodwork), 7 objects "
-        "live-confirmed 2026-09-06 via read-only aws s3 ls. No SOURCE_REGISTRY ingestion entry: nothing in this "
-        "file writes here, a human uploads the PDF/markdown pair directly. #3570.",
-    },
     "raw/inbound_email": {
         "dated": "2026-09-06",
         "note": "Legacy no-user-segment inbound-email capture prefix, 4 objects live-confirmed 2026-09-06 — see "
         "raw/matthew/inbound_email below for the current one. Intake-side message capture, not a normalized "
-        "SOURCE_REGISTRY metric source. #3570.",
+        "SOURCE_REGISTRY metric source. #3570. RETIRED 2026-09-06 by owner ruling — the dated disposition and "
+        "the evidence it rests on are in RETIRED_SOURCES['inbound_email'] above (#3669); these objects stay "
+        "because raw/* is delete-protected.",
     },
     "raw/matthew/inbound_email": {
         "dated": "2026-09-06",
         "note": "Current inbound-email capture prefix, 4 objects live-confirmed 2026-09-06. Same non-metric "
-        "posture as raw/inbound_email above. #3570.",
+        "posture as raw/inbound_email above. #3570. Same RETIRED_SOURCES['inbound_email'] disposition (#3669).",
     },
     "raw/matthew/matthew": {
         "dated": "2026-09-06",
@@ -1273,7 +1627,10 @@ NON_INGESTION_RAW_PREFIXES: dict[str, dict[str, str]] = {
 # partition-bearing keys by mcp_source_ids() — was mcp/config.SOURCES (X-10).
 EXTRA_QUERYABLE_PARTITIONS = (
     "chronicling",
-    "labs",
+    # "labs" left this tuple in #3669 — it is a SOURCE_REGISTRY source now, so
+    # mcp_source_ids() already derives it from the registry's partition-bearing keys.
+    # Listing it twice would be the restatement this registry exists to end (the union
+    # made it invisible, which is how a restatement survives).
     "dexa",
     "genome",
     "state_of_mind",
@@ -1714,6 +2071,93 @@ def raw_year_prefix(source: str, year: int, sub: str | None = None) -> str:
             f"raw_year_prefix: {source!r}{'/' + sub if sub else ''} is {scheme!r}, not a date tree — it has no per-year prefix"
         )
     return f"{layout['prefix']}/{int(year):04d}/"
+
+
+# ── #3669: episodic cadence + partition-coverage derivations ──────────────────
+
+
+def due_months() -> dict:
+    """{key: months} for every source with a declared episodic cadence.
+
+    THE source of the number `/api/status`'s manual due-date panel renders. It used to
+    carry `DUE_MONTHS = {"labs": 6, …}` in the serving layer, restating a cadence the
+    registry did not hold at all — two places to change, no way to notice when only one
+    changed. `web/site_api_status.py` now starts from this dict, so the registry's
+    `stale_hours` and the reader-facing "next due" date are the same number by
+    construction (`tests/test_source_registry_coverage_3669.py` asserts it).
+    """
+    return {k: int(v["cadence_months"]) for k, v in SOURCE_REGISTRY.items() if v.get("cadence_months") is not None}
+
+
+def manual_method_source_ids() -> list:
+    """Every source whose OWN registry text says it is captured by hand (#3571).
+
+    Derived from the `method`/`desc` prose, never a hand-listed set — that is the whole
+    point: a new manual source enters this set by describing itself honestly, and must
+    then answer the capture-channel question (a channel, or an explicit None with a dated
+    `capture_channel_reason`) before the guard goes green. A hand list would have to be
+    remembered, and the specimen that made #3571 — macrofactor, manual in its own method
+    string, dark for months, no `capture_channel` key at all — is exactly what gets
+    forgotten.
+    """
+    out = []
+    for k, v in SOURCE_REGISTRY.items():
+        text = " ".join(str(v.get(f) or "") for f in ("method", "desc"))
+        if re.search(r"manual", text, re.IGNORECASE):
+            out.append(k)
+    return sorted(out)
+
+
+# Taxonomy classes that ARE a disposition on their own: a partition the platform itself
+# writes (compute output, cache, ledger, tracker row) has no capture cadence to declare.
+# Named `..._CLASS_IDS` rather than `..._CLASSES` deliberately (#3315): the latter matches
+# `gate_census._REGISTRY_NAME`, which would enrol these two taxonomy-class NAMES in the
+# gate inventory as if they were exempted gates — a registry-name phantom. Watched: the
+# `_CLASSES` spelling minted two unproven entrants on the #3000 lane.
+PLATFORM_WRITTEN_TAXONOMY_CLASS_IDS = ("experiment_scoped", "system_state")
+
+
+def unregistered_source_partitions(live_sources, class_of=None) -> list:
+    """THE SET (#3669): live `SOURCE#<x>` partitions with no disposition at all.
+
+    `live_sources`  an iterable of live source-partition names (the `SOURCE#` families
+                    from `experiment.pk_census`, via the committed census artifact —
+                    this function never scans; it takes the enumeration as input so the
+                    CI gate and a live operator run share ONE rule).
+    `class_of`      `family -> phase_taxonomy class | None`. Defaults to
+                    `phase_taxonomy.SOURCE_CLASS.get`, imported lazily so this module
+                    keeps its zero-dependency posture.
+
+    A partition is dispositioned when ANY of these is true:
+      * it has a `SOURCE_REGISTRY` entry — a cadence and a staleness threshold every
+        derived check can enforce;
+      * `phase_taxonomy` classifies it EXPERIMENT_SCOPED or SYSTEM_STATE — the platform
+        writes it, so there is nothing to capture and nothing to page about;
+      * it carries a dated `UNREGISTERED_PARTITIONS` entry with a written reason.
+
+    Everything else is returned, sorted. An empty return is the property this issue
+    bought: no live partition is invisible to every check at once.
+    """
+    if class_of is None:
+        from experiment import phase_taxonomy  # local: keeps source_registry import-free
+
+        def class_of(name):  # noqa: E306
+            return phase_taxonomy.SOURCE_CLASS.get(name)
+
+    undisposed = []
+    for name in live_sources:
+        if name in SOURCE_REGISTRY or name in UNREGISTERED_PARTITIONS:
+            continue
+        if class_of(name) in PLATFORM_WRITTEN_TAXONOMY_CLASS_IDS:
+            continue
+        undisposed.append(name)
+    return sorted(undisposed)
+
+
+def retired_source_ids() -> list:
+    """Sources explicitly RETIRED with a dated reason (#3669) — a falsifiable claim:
+    one of these appearing in a live pk census means the retirement is wrong."""
+    return sorted(RETIRED_SOURCES)
 
 
 # ── #914: presence / quiet-stretch channels — registry-owned ───────────────────
