@@ -4,13 +4,18 @@
 honestly possible"*, target 117 → 100-104 measured, standing merge+deploy authority, no `--deliver`, issue numbers
 sigil-free near closing verbs, every deploy lease disposed. Plan: `~/.claude/plans/declarative-brewing-lantern.md`.
 
-**117 → 110 open (MEASURED two ways at 17:0xZ — `search total_count` AND a paginated id-set, agreeing;
-addressable 66 → 61 by union exclusion). 7 closed on demonstrated evidence, 1 filed, 6 PRs merged, 4 production
-deploys, 2 CDK stacks.** Short of the 100-104 target and the reason is in the log below: roughly a third of the
-window went to background waits I did not overlap with work, and one of those waits is the incident this session
-filed against itself.
+**117 → 112 open, FINAL and measured two ways at 19:5xZ (`search total_count` AND a paginated id-set, agreeing).
+7 closed on demonstrated evidence, **3 filed** (3877, 3878 and the auto-filed wedge row 3876), 6 PRs merged, 4
+production deploys plus one `cdk deploy`.** The intermediate 110 quoted in an earlier draft of this line was
+measured before the last two filings — 7 closed minus 2 filed by me is the net 5, and the count is the count.
+Addressable went 66 → 61 at that same instant. Short of the 100-104 target, and the reason is in the log below:
+roughly a third of the window went to background waits I did not overlap with work, and one of those waits is the
+incident this session filed against itself.
 
-**Main:** red — CI/CD run 35363793749 on tip `52388b1ed` concluded `failure` on `Visual + AI-vision QA` alone:
+**Main:** green (`0f8370d4`) — but read the next sentence before trusting it. The latest completed CI/CD run is
+the docs-only wrap fix, on which `Deploy` and `Visual + AI-vision QA` are both SKIPPED by path filter, so its green
+says nothing about the visual gate. The last run that DID execute visual QA — 35363793749 on `52388b1ed`, the one
+that deployed this session's fleet — concluded `failure` on `Visual + AI-vision QA` alone:
 two labels below the 11px type floor, `span.chart-spine-v.mono '327.3 lb'` at 9.6px on `/` and
 `span.rt-flag.label 'early = water'` at 10.56px on `/data/`, both reproduced on the #2978 confirm re-probe. **Not
 this session's:** none of the six commits in the window touches `site/**`, verified per-commit. Deploy, Smoke and

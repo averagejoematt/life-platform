@@ -213,9 +213,11 @@ silent omission is not an outcome.**
 
 **Verified:** 2026-09-18 (Opus 5, **Session AJ — the gate that reads the comment, and the lease I left waiting**;
 owner brief *"close issues on demonstrated evidence, as many as honestly possible"*, autonomous all-day, standing
-merge+deploy authority, **no `--deliver`**, target 117 -> 100-104). **117 -> 110 open (66 -> 61 addressable, both
-MEASURED two ways — search `total_count` AND a paginated id-set, agreeing): 7 closed on live proof (3506 3514 3659
-3663 3785 3848 3853), 1 filed (3877), 6 PRs merged, 4 production deploys plus one `cdk deploy` covering LifePlatformOperational and LifePlatformMonitoring.** Short of target, and the
+merge+deploy authority, **no `--deliver`**, target 117 -> 100-104). **117 -> 112 open, FINAL and measured two ways at 19:5xZ
+(search `total_count` AND a paginated id-set, agreeing): 7 closed on live proof (3506 3514 3659 3663 3785 3848
+3853), 3 filed (3877, 3878, plus the auto-filed wedge row 3876), 6 PRs merged, 4 production deploys plus one
+`cdk deploy` covering LifePlatformOperational and LifePlatformMonitoring. The 110 measured at 17:0xZ predated the
+last two filings; 66 -> 61 addressable is that same instant.** Short of target, and the
 reason is structural rather than a knowledge gap: roughly a third of the window went to background CI waits I did
 not overlap with work. **The session's own worst finding is about itself — I left a production-approval lease
 WAITING 12.5h.** Two superseded ancestors were rejected correctly and the TIP was never disposed; run 35301189491
@@ -241,5 +243,5 @@ pre-registers (`curl … | shasum` matches the stamp byte for byte), so acting o
 defect. **Owner acts:** the 8 `gate:owner` questions posted at 00:5xZ with recommended defaults (3716 3717 3750
 3753 3755 3761 3770 3771 — the last open children of five epics, 13 closures for near-zero engineering) · 3571's
 one-sentence `dropbox` ruling · the 5 standing `acceptance_count` violations (3607 3611 3615 3617 3621) still need
-splitting, not trimming. **Final measured: 110 open / 61 addressable.**
+splitting, not trimming. **Final measured: 112 open.**
 
