@@ -24,7 +24,7 @@ WHAT THE FIXTURE IS NOT
   It is not the whole 121-issue corpus. The corpus/queue rules (`now_liveness`,
   `epic_story_coverage`, `later_staleness`, `now_lane_coverage`) grade the SHAPE of a full
   backlog and cannot be satisfied by six issues, so the counts below are over the per-issue
-  rules — which are the only rules this change touches. `_CORPUS_RULES` names them explicitly
+  rules — which are the only rules this change touches. `CORPUS_SHAPE_RULE_NAMES` names them explicitly
   rather than filtering by "whatever fires", so a new corpus rule cannot quietly join the
   exclusion.
 """
@@ -47,7 +47,13 @@ FIXTURE = REPO_ROOT / "tests" / "fixtures" / "backlog_hygiene_3853" / "corpus_20
 MARKER_NUMBER = 3850
 
 # Rules that grade the whole backlog's shape, not one issue. Named, not inferred.
-_CORPUS_RULES = {"now_liveness", "now_lane_coverage", "epic_story_coverage", "later_staleness"}
+#
+# The NAME matches none of `gate_census._REGISTRY_NAME`'s patterns on purpose. A `*_RULES`
+# binding here is expanded entry-by-entry by the census's family-3 walk into one phantom
+# verdict-less gate per member — four of them, in this case — which is the #3315 class and
+# the same trap `gate_census_enforcement.NOT_APPLICABLE_REASONS` carries a note about. This
+# is a set of rule NAMES to exclude from a count; it is not a registry of gates.
+CORPUS_SHAPE_RULE_NAMES = {"now_liveness", "now_lane_coverage", "epic_story_coverage", "later_staleness"}
 
 
 def _corpus() -> list:
@@ -55,7 +61,7 @@ def _corpus() -> list:
 
 
 def _per_issue_violations(issues) -> list:
-    return [f for f in h.check(issues) if f.severity == h.VIOLATION and f.rule not in _CORPUS_RULES]
+    return [f for f in h.check(issues) if f.severity == h.VIOLATION and f.rule not in CORPUS_SHAPE_RULE_NAMES]
 
 
 # ── the fixture is the real thing ────────────────────────────────────────────
@@ -82,7 +88,7 @@ def test_the_marker_is_recognised_as_an_instrument_row():
 
 def test_the_marker_produces_no_violation():
     findings = [f for f in h.check([next(i for i in _corpus() if i["number"] == MARKER_NUMBER)]) if f.severity == h.VIOLATION]
-    assert [f.rule for f in findings if f.rule not in _CORPUS_RULES] == []
+    assert [f.rule for f in findings if f.rule not in CORPUS_SHAPE_RULE_NAMES] == []
 
 
 def test_the_exemption_is_reported_never_silent():
