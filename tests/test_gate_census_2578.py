@@ -717,7 +717,32 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # COMMITTED tree: {can-fail (proven) 107, unproven 537, not-applicable 6,
         # attempted-unproven 3} over 653 rows, against 652/106 on a `git archive origin/main`
         # export.
-        <= 107
+        # 2026-09-18 (#3614 boxes 3+4): 107 -> 108. ONE entrant, arriving PROVEN rather than
+        # ledgered unproven — structural::test_grounding_sets_3614.py, the two SETs the #1967
+        # grounding registry did not carry: the per-surface audience/fail-mode facet, AST-read
+        # at each surface's own disposition site, and the derived phase-prose census over every
+        # prompt builder. It carries TWO controls, one per box, and neither is a monkeypatch.
+        # (1) The phase census is mechanised as a MutationSpec, re-runnable by anyone:
+        # `python3 scripts/gate_census_mutations.py --run --gate test_grounding_sets_3614.py`
+        # plants a synthetic narrative door under lambdas/web that hand-types 'Today is Day {n}
+        # of the experiment, restarted on {start}' instead of obtaining the phase from
+        # ai_context — ARMED 1/1, baseline 27 passed, mutated 3 failed, reverted 27 passed, the
+        # plant removed before the verdict was recorded. (2) The facet control is a DECLARATION
+        # rather than a file, so it cannot be a plant: flipping
+        # lambdas/web/site_api_ai_lambda.py::_handle_explain from fail_closed to keep_best in the
+        # real tests/grounding_wiring.py (diff against a pre-mutation copy asserted CHANGED first
+        # — one line, FAIL_CLOSED -> KEEP_BEST) gave 2 failed / 25 passed on two independent
+        # edges (the pinned public keep-best residual gained a member it does not name, AND the
+        # AST reported the call site still branching and holding), then reverted byte-for-byte to
+        # 27 passed. Both controls also run on every build against a deepcopy of the registry,
+        # including the INVERSE flip — which is the assertion that matters most: the derivation
+        # reads acts=False on 4 of the 32 surfaces, so it is not a constant-true detector.
+        # Measured on the REBASED, COMMITTED tree (a0cfa6a91, rebased onto 9258da37f):
+        # {can-fail (proven) 108, unproven 537, not-applicable 6, attempted-unproven 3} over 654
+        # rows, against 653/107 on a disposable `git archive origin/main` export. Unproven is
+        # UNCHANGED at 537 and BASELINE_UNPROVEN_GATES is not touched — the entrant spends no
+        # headroom.
+        <= 108
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
