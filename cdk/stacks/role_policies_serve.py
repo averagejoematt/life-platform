@@ -125,6 +125,16 @@ def site_api() -> list[iam.PolicyStatement]:
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
         iam.PolicyStatement(
+            sid="IpHashSalt",  # #3620 (security ROW4): salt for the reader ip_hash on every engagement door.
+            # site_api_social_engage._salted_ip_hash reads this through common/secret_cache (15 min TTL).
+            # Without the grant the doors answer 503 by design — fail-closed, never an unsalted digest —
+            # so this statement and the secret itself are both load-bearing for /api/nudge,
+            # /api/submit_finding, /api/board_question, /api/predict, /api/ritual_log and
+            # /api/verify_subscriber.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ip-hash-salt")],
+        ),
+        iam.PolicyStatement(
             sid="RitualTokenSecret",  # #769 (ADR-124): HMAC signing key for evening-ritual one-tap links.
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ritual-token-secret")],

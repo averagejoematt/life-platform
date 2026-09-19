@@ -762,3 +762,25 @@ def _write_day_is_genesis_day(monkeypatch):
         return
     monkeypatch.setattr(phase_taxonomy, "_write_date", lambda: EXPERIMENT_START_DATE)
     yield
+
+
+# ── #3620 (security ROW4): the suite gets a deterministic ip_hash salt ────────
+# `web/site_api_social_engage._salted_ip_hash` reads `life-platform/ip-hash-salt`
+# through common/secret_cache and returns None when it cannot — at which point
+# every engagement door answers 503 and writes nothing. That fail-closed arm is
+# the fix, not a defect, but it would otherwise short-circuit every pre-existing
+# door test before it reached the behaviour it was written to pin (and in CI
+# there is no Secrets Manager to read).
+#
+# So the suite pins a fixed salt. The fail-closed arm is NOT left unasserted:
+# tests/test_ip_hash_salt_3620.py overrides this by patching `_get_secret` again
+# inside the test, and asserts the None return AND a real handler's 503.
+@pytest.fixture(autouse=True)
+def _ip_hash_salt_3620(monkeypatch):
+    try:
+        from web import site_api_social_engage as _engage
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    monkeypatch.setattr(_engage, "_get_secret", lambda secret_id, client: "conftest-ip-hash-salt")
+    yield
