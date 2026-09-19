@@ -124,12 +124,39 @@ def test_every_experiment_scoped_source_family_is_audited(monkeypatch):
 
     scoped_sources = sorted(s for s, cls in SOURCE_CLASS.items() if cls == EXPERIMENT_SCOPED)
     assert "insights" in scoped_sources
-    rows = [{"pk": f"USER#matthew#SOURCE#{src}", "sk": "X#1"} for src in scoped_sources]
+    # Dated BEFORE genesis: a tagger-reachable row the wipe missed and the tagger never
+    # reached (the #3513 shape) — that is the reachable case that IS a finding.
+    rows = [{"pk": f"USER#matthew#SOURCE#{src}", "sk": "X#2020-01-01"} for src in scoped_sources]
     monkeypatch.setattr(qa, "table", _FakeTable(rows, page_size=7))
     (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
     assert c.passed is None
     assert f"{len(rows)} row(s) across {len(rows)} of {len(rows)} EXPERIMENT_SCOPED pk families" in c.message
     assert "SOURCE#insights" in c.message
+
+
+def test_a_tagger_reachable_in_cycle_row_is_reported_not_a_finding(monkeypatch):
+    """#3877 split: the reset tagger reaches USER#matthew#SOURCE#* pks, so an unstamped row
+    written THIS cycle on such a family is the correct state until the next reset — visible in
+    the message, never the chronic finding. The first widened nightly (2026-09-19) counted 159
+    such rows on 13 families as chronic; that is the #3851 class (a gate nobody can clear)."""
+    from common.constants import EXPERIMENT_START_DATE
+
+    in_cycle = [{"pk": "USER#matthew#SOURCE#insights", "sk": f"INSIGHT#{EXPERIMENT_START_DATE}#daily_brief#tldr"}]
+    monkeypatch.setattr(qa, "table", _FakeTable(in_cycle))
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+    assert c.passed is True
+    assert "1 in-cycle row(s) on 1 tagger-reachable SOURCE# families" in c.message
+    assert "--apply" not in c.message
+
+
+def test_a_tagger_blind_row_is_a_finding_whatever_its_date(monkeypatch):
+    """The other half of the split: PERSONA#/NARRATIVE#/bare-USER rows have no tagger, so an
+    unstamped one dated this cycle is still served as current across every future reset."""
+    rows = [{"pk": "PERSONA#elena", "sk": "CALLBACK#2099-01-01#x"}]
+    monkeypatch.setattr(qa, "table", _FakeTable(rows))
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+    assert c.passed is None
+    assert "PERSONA#elena/CALLBACK#2099-01-01#x" in c.message
 
 
 def test_a_cross_phase_source_family_is_not_a_finding(monkeypatch):
