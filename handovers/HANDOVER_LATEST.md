@@ -173,7 +173,7 @@ Four more, each one sentence:
 And the **5 standing `acceptance_count` violations** (3607 3611 3615 3617 3621) still red `check_backlog_hygiene` all
 day. They need splitting, not trimming — untouched by instruction.
 
-## Residuals, named precisely
+## Residual / next picks
 
 - **`docs/PROPORTIONALITY.md` rows for Session AJ's four subsystems** — the two #3506 alarms (the AI-canary dead-man
   and the cadence assertion), #3785's config-ownership registry, #3514's SCHEMA census gate. I wrote rows for **this**
@@ -191,10 +191,12 @@ day. They need splitting, not trimming — untouched by instruction.
 - **#3546's shrink list has grown 11 → 50 across 48 pages**, measured by this session's own sweep. Every stale entry is
   a live (page, rule) pair that has stopped gating. Do not harvest before its box 2 `phase_dependent` flag exists.
 - **122 worktrees**, and two agent lanes from prior sessions flagged their own locks still present
-  (`issue-3688-judge-truncation-retry`, `issue-3699-training-notes-degrade-reason`). `/worktree` inventory is overdue.
-- **`#3699` owes three deploys** from a prior session's lane (per its own agent's report) — `cdk_deploy.sh
-  LifePlatformIngestion`, then `deploy_lambda.sh life-platform-mcp`, then the freshness checker. Not this session's,
-  surfaced because the agent reported it here.
+  (`issue-3688-judge-truncation-retry`, `issue-3699-training-notes-degrade-reason`) — **not-work — the `/worktree`
+  inventory ritual, which the boot brief already flags every session and which no issue tracks by design.** Both lanes
+  reported their own lock rather than clearing it, which is the lane rule working; the reaping is the driver's.
+- **#3699 owes three deploys** from a prior session's lane, reported by that lane's own agent in this session:
+  `cdk_deploy.sh LifePlatformIngestion`, then `deploy_lambda.sh life-platform-mcp`, then the freshness checker. Until
+  the first runs, nothing writes a `degraded_reason`; until the second, the read surface cannot show it.
 
 ---
 
