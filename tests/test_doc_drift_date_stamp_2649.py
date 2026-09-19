@@ -48,12 +48,26 @@ pytestmark = pytest.mark.serial
 
 
 _REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO / "deploy"))
+
+import doc_drift_verdict as _verdict  # noqa: E402 — #3646: the verdict codes, read not copied
+
 _SCRIPT = _REPO / "deploy" / "sync_doc_metadata.py"
 _DOC = _REPO / "docs" / "ARCHITECTURE.md"
 
 
 def _check() -> int:
-    """Run the real gate exactly as CI does, and return its exit code."""
+    """Run the real gate exactly as CI does, and return its exit code.
+
+    #3646 moved the non-zero code these tests assert from 1 to 3. The drift they plant
+    is a `~` rewrite `--apply` regenerates — BOT-OWNED — so the gate now reports
+    `pending-reconcile`. The property under test is unchanged and is still enforced:
+    the gate is NOT green, and `EXIT_PENDING_RECONCILE` is read from the shipped module
+    rather than hard-coded, so the two can never drift apart again. `_check()` runs the
+    script in a subprocess with no `GITHUB_EVENT_NAME`, so the push-to-main tolerance
+    (exit 0) cannot reach it — a test asserting "the guard is gone" must never be able
+    to pass because of a CI-only exemption.
+    """
     return subprocess.run(  # nosec B603 — fixed argv
         [sys.executable, str(_SCRIPT), "--check"],
         cwd=str(_REPO),
@@ -120,7 +134,7 @@ def test_b_a_substantive_drift_still_fails(doc_text):
     """The fix must not buy green by weakening the gate."""
     phrase = _live_lambda_phrase(doc_text)
     _DOC.write_text(doc_text.replace(phrase, "999 Lambdas", 1), encoding="utf-8")
-    assert _check() == 1, "a wrong Lambda count no longer fails the gate — the guard is gone"
+    assert _check() == _verdict.EXIT_PENDING_RECONCILE, "a wrong Lambda count no longer fails the gate — the guard is gone"
 
 
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
@@ -129,7 +143,7 @@ def test_c_a_stale_date_does_not_hide_a_substantive_drift(doc_text):
     not mask the count that shares it."""
     both = _stale_the_date(doc_text).replace(_live_lambda_phrase(doc_text), "999 Lambdas", 1)
     _DOC.write_text(both, encoding="utf-8")
-    assert _check() == 1, "a stale date stamp masked a real drift on the same line (#2649)"
+    assert _check() == _verdict.EXIT_PENDING_RECONCILE, "a stale date stamp masked a real drift on the same line (#2649)"
 
 
 def test_the_date_masker_is_not_a_blanket_line_ignore():

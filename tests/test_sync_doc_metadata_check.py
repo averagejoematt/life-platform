@@ -28,6 +28,7 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "deploy"))
 
+import doc_drift_verdict as _verdict  # noqa: E402 — #3646: the bot-owned/human-owned partition
 import sync_doc_metadata as sync  # noqa: E402
 
 
@@ -48,16 +49,138 @@ def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
     return doc
 
 
-def test_check_exits_nonzero_on_drift(tmp_path, monkeypatch):
-    """A deliberately-wrong literal (doc says 99, truth is 42) fails --check."""
+def test_check_exits_pending_reconcile_on_bot_owned_drift(tmp_path, monkeypatch):
+    """A deliberately-wrong literal (doc says 99, truth is 42) is BOT-OWNED drift.
+
+    #3646 changed this expectation from 1 to 3, deliberately. `--apply` — the exact
+    command the reconcile job runs — rewrites this literal, so on a merge commit the
+    bot's own next commit carries the fix and a `failure` verdict names the bot's
+    future commit as a defect. The run is PENDING, not red. The exit code is still
+    non-zero, so nothing that treats "not 0" as "not clean" silently loosens; only a
+    caller that explicitly knows a reconcile bot follows may tolerate 3.
+    """
     doc = _isolate(monkeypatch, tmp_path, "Header: v1 (99 Widgets)\n", widget_count=42)
     monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
 
     with pytest.raises(SystemExit) as exc:
         sync.main()
 
-    assert exc.value.code == 1
+    assert exc.value.code == _verdict.EXIT_PENDING_RECONCILE
     assert doc.read_text(encoding="utf-8") == "Header: v1 (99 Widgets)\n", "--check must never write"
+
+
+def test_push_to_main_tolerates_pending_reconcile_but_nothing_else_does(tmp_path, monkeypatch):
+    """The event branch (#3646): exit 0 + a ::warning:: ONLY on a push to refs/heads/main.
+
+    Deliberately narrow. A pull_request, a branch push, a workflow_dispatch and a laptop
+    all still get the distinct non-zero 3 — nothing follows them that would commit the
+    regenerated literals, so the author must run `--apply` exactly as before. The branch
+    lives in the script rather than in a `run: |` block because
+    `deploy/restart_verify_gates.py` derives Docs CI's gate list from single-line
+    `run: python3 …` steps, and a block scalar would delete this gate from the reset
+    pipeline's and the wrap battery's lists (#3477/#3534).
+    """
+    doc = _isolate(monkeypatch, tmp_path, "Header: v1 (99 Widgets)\n", widget_count=42)
+    assert doc.exists()
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    for env, expected in (
+        ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_SUCCESS),
+        ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/issue-1-x"}, _verdict.EXIT_PENDING_RECONCILE),
+        ({"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF": "refs/pull/1/merge"}, _verdict.EXIT_PENDING_RECONCILE),
+        ({"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_PENDING_RECONCILE),
+        ({}, _verdict.EXIT_PENDING_RECONCILE),  # a laptop
+    ):
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+        monkeypatch.delenv("GITHUB_REF", raising=False)
+        for k, v in env.items():
+            monkeypatch.setenv(k, v)
+        with pytest.raises(SystemExit) as exc:
+            sync.main()
+        assert exc.value.code == expected, f"{env or 'no CI env'} expected exit {expected}, got {exc.value.code}"
+
+
+def test_human_owned_drift_is_not_tolerated_even_on_a_push_to_main(tmp_path, monkeypatch):
+    """The event branch must never reach un-repairable drift — the bot cannot clear it."""
+    _isolate(monkeypatch, tmp_path, "Header: v1 (no widget line here at all)\n", widget_count=42)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+
+    assert exc.value.code == _verdict.EXIT_FAILURE
+
+
+def test_check_exits_failure_on_human_owned_drift(tmp_path, monkeypatch):
+    """THE NEGATIVE CONTROL (#3646). Drift `--apply` cannot repair still fails, exit 1.
+
+    The doc no longer carries the shape the rule guards at all, so the rule matches
+    NOTHING — the "133 tools" class (#wiki-pr1), where a literal quietly stops being
+    guarded. `--apply` rewrites nothing for it, so the reconcile bot's commit would
+    NOT clear it: tolerating this as pending-reconcile would mint a gate that can never
+    red over a doc that stays broken forever. This is the control the partition exists
+    to keep failing, and it is the assertion the mutation below must break.
+    """
+    doc = _isolate(monkeypatch, tmp_path, "Header: v1 (no widget line here at all)\n", widget_count=42)
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+
+    assert exc.value.code == _verdict.EXIT_FAILURE, (
+        "a rule whose pattern matched NOTHING is not repairable by --apply and must never " "be classified pending-reconcile (#3646)"
+    )
+    assert doc.read_text(encoding="utf-8") == "Header: v1 (no widget line here at all)\n"
+
+
+def test_mixed_drift_is_failure_not_pending_reconcile(tmp_path, monkeypatch):
+    """One human-owned record alongside bot-owned ones outranks them: the whole run fails.
+
+    Partitioning must not be a majority vote — the bot's commit clears its own records and
+    leaves the human's, so a run whose set is mixed is still red after the reconcile lands.
+    """
+    doc = tmp_path / "FAKE_DOC.md"
+    doc.write_text("Header: v1 (99 Widgets)\n", encoding="utf-8")
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        sync,
+        "RULES",
+        [
+            ("FAKE_DOC.md", r"\d+ Widgets", "{widget_count} Widgets"),  # bot-owned: --apply rewrites it
+            ("FAKE_DOC.md", r"\d+ Gadgets", "{widget_count} Gadgets"),  # human-owned: matches nothing
+        ],
+    )
+    monkeypatch.setattr(sync, "PLATFORM_FACTS", {**sync.PLATFORM_FACTS, "widget_count": 42})
+    monkeypatch.setattr(sync, "_apply_auto_discovered", lambda facts: facts)
+    monkeypatch.setattr(sync, "_sync_platform_counts", lambda facts, dry_run: [])
+    monkeypatch.setattr(sync._alarm_inv, "sync", lambda dry_run, by_stack: [])
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+
+    assert exc.value.code == _verdict.EXIT_FAILURE
+
+
+def test_partition_is_fail_closed_for_an_unrecognised_record():
+    """A drift record the partition cannot prove bot-owned counts as human-owned.
+
+    Guards the default for a drift source added to --check later: `human = total - bot`,
+    so a new record shape is red until someone deliberately teaches the partition about it.
+    """
+    assert _verdict.classify(3, 3) == (_verdict.VERDICT_PENDING_RECONCILE, 0)
+    assert _verdict.classify(3, 2) == (_verdict.VERDICT_FAILURE, 1)
+    assert _verdict.classify(0, 0) == (_verdict.VERDICT_SUCCESS, 0)
+    # The shapes the checker actually emits, classified by the shipped helper.
+    assert _verdict.bot_owned(
+        [
+            "  ~ '99 Widgets'\n    → '42 Widgets'",
+            "  ! rule pattern matched NOTHING (doc or rule drifted — fix one): '\\d+ Gadgets'",
+            "  SKIP (not found): docs/GONE.md",
+        ]
+    ) == ["  ~ '99 Widgets'\n    → '42 Widgets'"]
 
 
 def test_check_exits_zero_when_current(tmp_path, monkeypatch):
@@ -117,7 +240,10 @@ def test_check_is_clean_on_repo_head():
         ) from e
     assert result.returncode == 0, (
         "sync_doc_metadata.py --check found drift on repo HEAD — run "
-        f"`python3 deploy/sync_doc_metadata.py --apply` and commit the fix.\n{result.stdout}\n{result.stderr}"
+        "`python3 deploy/sync_doc_metadata.py --apply` and commit the fix. NB #3646: exit 3 "
+        "(pending-reconcile) is not clean HERE — the reconcile bot only follows a push to "
+        "main, so a branch must carry its own regenerated literals as it always has."
+        f"\n{result.stdout}\n{result.stderr}"
     )
 
 

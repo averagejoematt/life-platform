@@ -314,7 +314,10 @@ BASELINE = {
     # BELOW its old baseline even after the fixes landed. The pure-subset
     # ratchet allows tightening a shrunk entry.
     "lambdas/ingestion/health_auto_export_lambda.py": 1258,
-    "deploy/sync_doc_metadata.py": 1007,  # 2026-08-31: shrank again — the #3101 counts sync extracted to deploy/doc_platform_counts.py (#3384)
+    # 2026-09-19 (#3646): 1007 -> 1002. The --check verdict block extracted to
+    # deploy/doc_drift_verdict.py; measured 1001. Net 6 handed back, 1 kept as earned
+    # headroom (N/5, #2610) — never a grant.
+    "deploy/sync_doc_metadata.py": 1002,
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
     # #3728: extracted the inventory WINDOW half (75 lines: the episodic registry,

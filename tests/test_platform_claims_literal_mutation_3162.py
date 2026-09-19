@@ -25,6 +25,7 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "deploy"))
 
+import doc_drift_verdict as _verdict  # noqa: E402 — #3646: the verdict codes, read not copied
 import sync_doc_metadata as sync  # noqa: E402
 
 ESSAY_PATH = "docs/content/ESSAY_ORG_CHART_OF_ONE.md"
@@ -91,7 +92,11 @@ def test_planted_stale_count_reds_check_and_apply_heals_it(monkeypatch, tmp_path
     monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
     with pytest.raises(SystemExit) as exc:
         sync.main()
-    assert exc.value.code == 1, f"planted stale count did not red --check for {rel_path}"
+    # #3646: 3, not 1. The planted "99 Lambdas" is exactly a literal `--apply` heals —
+    # the next assertion in this test PROVES it does — so it is bot-owned drift and the
+    # verdict is `pending-reconcile`. Still non-zero, still not green; the code is read
+    # from the shipped module so the two cannot drift apart.
+    assert exc.value.code == _verdict.EXIT_PENDING_RECONCILE, f"planted stale count did not red --check for {rel_path}"
     assert "99" in doc.read_text(encoding="utf-8"), "--check must never write"
 
     # --apply must heal it to the live truth. (main() falls through with no sys.exit on

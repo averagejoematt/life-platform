@@ -64,6 +64,7 @@ on:
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'deploy/doc_platform_counts.py'     # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
+      - 'deploy/doc_drift_verdict.py'       # #3646 — the bot-owned/human-owned partition sync_doc_metadata.py's --check verdict delegates to
       - 'deploy/emf_namespace_ledger.py'    # #3374 R1 — the EMF-namespace registry generate_platform_model.py's cost_surface plane counts
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
@@ -111,6 +112,7 @@ on:
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'deploy/doc_platform_counts.py'     # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
+      - 'deploy/doc_drift_verdict.py'       # #3646 — the bot-owned/human-owned partition sync_doc_metadata.py's --check verdict delegates to
       - 'deploy/emf_namespace_ledger.py'    # #3374 R1 — the EMF-namespace registry generate_platform_model.py's cost_surface plane counts
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
@@ -201,6 +203,27 @@ jobs:
           pip install --quiet $PINS
 
       # Each gate reports independently (#749 pattern) so one red doesn't mask the rest.
+      #
+      # #3646 — THE PENDING-RECONCILE BRANCH, and why it is NOT a `run: |` block here.
+      # Since #3533 keyed the push-to-main concurrency group on the commit sha, this run
+      # is no longer cancelled mid-flight by the reconcile bot's follow-up push, so every
+      # merge commit concluded an honest `failure` on literals the bot's own NEXT commit
+      # rewrites ~60 s later (specimens 2026-09-06: 6fedae2dd, 1efec2f99, d20a0e959).
+      #
+      # The checker now partitions its drift by owner (`deploy/doc_drift_verdict.py`) and,
+      # when EVERY stale record is one `--apply` regenerates, exits 3 with
+      # `VERDICT: pending-reconcile` — or, on a push to main where the reconcile job is
+      # the very next thing to run, prints `::warning::` and exits 0.
+      #
+      # THE EVENT BRANCH LIVES IN THE SCRIPT, NOT IN A SHELL BLOCK HERE, and that is
+      # load-bearing: `deploy/restart_verify_gates.py` DERIVES this workflow's doc-gate
+      # list by parsing single-line `run: python3 …` steps (#3477/#3534), and both the
+      # reset pipeline and `scripts/wrap_gates.py` consume that derivation. A `run: |`
+      # block is invisible to it, so rewriting this step as shell would silently DELETE
+      # the literal gate from the reset's and the wrap battery's gate list — the exact
+      # "derived silently as nothing" rot those two issues exist to stop. The step stays
+      # one line; `GITHUB_EVENT_NAME`/`GITHUB_REF` carry the event, exactly as
+      # `deploy/doc_platform_counts.py` already reads them for its PR exemption (#3384).
       - name: Literal-drift gate (sync_doc_metadata --check)
         if: always()
         run: python3 deploy/sync_doc_metadata.py --check
