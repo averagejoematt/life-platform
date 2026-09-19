@@ -612,6 +612,25 @@ regenerated page would be merged-but-not-deployed); and `plan` diffs from
 `${GITHUB_SHA}~1` to the reconciled HEAD, so the merged PR's own changes stay in the
 deploy plan even with a reconcile commit stacked on top.
 
+**The merge commit's own gate is `pending-reconcile`, not `failure` (#3646).** The
+ordering on a push to main is **regenerate → gate → the bot commits**, and the gate
+runs on the *pre*-reconcile tree — so between the merge and the bot's commit the
+literals are stale by construction. Since #3533 keyed the push concurrency group on the
+commit sha, that run is no longer cancelled mid-flight, and every merge concluded an
+honest `failure` naming the bot's own future commit (specimens 2026-09-06: merge
+`6fedae2dd` → reconcile `5d9173f9e`, `1efec2f99` → `b99394e3e`, `d20a0e959` →
+`689c07d56`). `deploy/sync_doc_metadata.py --check` now partitions its drift by owner
+and exits **3** (`VERDICT: pending-reconcile`) when every stale record is one `--apply`
+regenerates — the `  ~` rewrites. A record `--apply` cannot repair (`  !` a rule
+matched nothing, a marker pair missing, a named doc gone) is **human-owned** and still
+exits 1: the bot's commit would not clear it, so tolerating it would mint a gate that
+can never red. The partition is *not* "is the rule in `RULES`" — a `!` comes from a
+rule in `RULES` too. Docs CI's literal-gate step tolerates 3 **on `push` only**; on a
+`pull_request` no bot follows, so a stale literal still reds and the author runs
+`--apply` exactly as before. Branch on the exit code, never on the step's stdout —
+`--check` prints the drifted doc text verbatim, so a grep over it is a text matcher
+reading content it does not own.
+
 ### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052/#2590)
 
 Three pipeline states leave main's deploy path wedged while nothing looks obviously

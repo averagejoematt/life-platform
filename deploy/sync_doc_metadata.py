@@ -50,6 +50,7 @@ DOCS = ROOT / "docs"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import doc_alarm_inventory as _alarm_inv  # noqa: E402 — #2649: extracted sibling (MONITORING.md inventory)
+import doc_drift_verdict as _verdict  # noqa: E402 — #3646: the --check verdict, partitioned bot-owned vs human-owned
 import doc_platform_counts as _counts  # noqa: E402 — #3384: extracted sibling (the #3101 literal sync + the PR-event exemption)
 import doc_restamp_guard as _restamp  # noqa: E402 — #2986/#2838: the generic re-stamp rule
 import endpoint_registry  # noqa: E402 — the shared /api/* enumerator (#1436)
@@ -1189,12 +1190,14 @@ def main():
     # Get unique docs to process
     docs_to_process = sorted(set(doc for doc, _, _ in RULES))
     total_changes = len([c for c in stats_changes if c.startswith("  ~")])
+    bot_drift = total_changes  # #3646: every stats '  ~' IS a rewrite --apply performs
     drifted_docs = [str(_PLATFORM_COUNTS_PATH.relative_to(ROOT))] if any(c.startswith("  ~") for c in stats_changes) else []
     # A "~" (regenerated) or "!" (markers missing / discovery failed) both count as drift
     # that --check must fail on and --apply must resolve.
     alarm_inv_drift = [c for c in alarm_inv_changes if c.startswith("  ~") or c.startswith("  !")]
     if alarm_inv_drift:
         total_changes += len(alarm_inv_drift)
+        bot_drift += len(_verdict.bot_owned(alarm_inv_drift))  # a '  !' here (markers gone) is human-owned (#3646)
         drifted_docs.append("docs/MONITORING.md")
 
     for rel_path in docs_to_process:
@@ -1207,6 +1210,7 @@ def main():
                 print(c)
             print()
             total_changes += len(drift)
+            bot_drift += len(_verdict.bot_owned(drift))  # #3646: '  !' / SKIP records are NOT repairable by --apply
             if drift:
                 drifted_docs.append(rel_path)
         else:
@@ -1214,17 +1218,8 @@ def main():
 
     print(f"\n{'='*60}")
     if is_check:
-        if total_changes == 0:
-            print("  ✅ CHECK PASSED — every literal above matches its discovered value.")
-            print(f"{'='*60}\n")
-            sys.exit(0)
-        else:
-            print(f"  ❌ CHECK FAILED — {total_changes} stale literal(s) across {len(drifted_docs)} file(s):")
-            for d in drifted_docs:
-                print(f"       - {d}")
-            print("  Fix: python3 deploy/sync_doc_metadata.py --apply")
-            print(f"{'='*60}\n")
-            sys.exit(1)
+        # #3646: 0 clean / 3 drift confined to what --apply regenerates / 1 anything else.
+        sys.exit(_verdict.report(total_changes, bot_drift, drifted_docs))
     elif total_changes == 0:
         print("  ✅ All docs already in sync with PLATFORM_FACTS.")
     elif dry_run:

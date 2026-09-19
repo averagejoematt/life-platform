@@ -76,6 +76,33 @@ fact about a pipeline that is no longer able to ship.
     cancelled — it is REPORTED, with its sha and the rejection reason, so the
     operator sees the lease was actioned rather than the gate being blind.
 
+#3646 — THE STATE THIS GATE DELIBERATELY DOES NOT MODEL, measured rather than
+assumed. A merge commit's doc-sync literals are stale by construction until the
+reconcile bot's `chore(reconcile)` commit lands ~60 s later, and #3533's sha-keyed
+concurrency group stopped that run being cancelled mid-flight — so three merges on
+2026-09-06 (6fedae2dd, 1efec2f99, d20a0e959) each left a red verdict naming the bot's
+own FUTURE commit. Two facts make it a no-op HERE, and both were checked against the
+live runs rather than inferred:
+
+  1. The literal gate lives in `docs-ci.yml`, never in `ci-cd.yml` (#1908 — a doc gate
+     in the deploy pipeline is a one-way trap). This gate reads `ci-cd.yml` runs ONLY
+     (`CI_CD_WORKFLOW_FILE` below), so it never saw those reds. The three specimens'
+     CI/CD failures were a DIFFERENT job — `Plan deployments :: CDK diff — detect
+     IAM/infra drift` — which is real, and which the issue's parenthetical
+     "(and CI/CD failure on the same literal gate)" misread.
+  2. CI/CD's own copy of the literal assertion (`test_sync_doc_metadata_check.py::
+     test_check_is_clean_on_repo_head`, in the `test` job) checks out
+     `needs.reconcile.outputs.build_sha` — the RECONCILED tree — so it is already
+     structurally immune to this class.
+
+The fix therefore lands where the verdict is minted: `sync_doc_metadata --check` exits
+3 and docs-ci's gate step converts that to a `::warning::` + step success on `push`, so
+the Docs CI RUN concludes `success` and every green-reader — the badge, the #3530
+cancelled-rollup reader, this file — reads it correctly with no new annotation parsing.
+If the literal gate ever moves into `ci-cd.yml`, this note is the reason a
+pending-reconcile classifier would then be needed here, and `VERDICT: pending-reconcile`
+on the step's log is the marker to read.
+
 #3530 corrects the oldest assumption in this file — that a `cancelled` rollup is
 a superseded push and therefore carries no signal:
 

@@ -64,6 +64,7 @@ on:
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'deploy/doc_platform_counts.py'     # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
+      - 'deploy/doc_drift_verdict.py'       # #3646 — the bot-owned/human-owned partition sync_doc_metadata.py's --check verdict delegates to
       - 'deploy/emf_namespace_ledger.py'    # #3374 R1 — the EMF-namespace registry generate_platform_model.py's cost_surface plane counts
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
@@ -111,6 +112,7 @@ on:
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'deploy/doc_platform_counts.py'     # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
+      - 'deploy/doc_drift_verdict.py'       # #3646 — the bot-owned/human-owned partition sync_doc_metadata.py's --check verdict delegates to
       - 'deploy/emf_namespace_ledger.py'    # #3374 R1 — the EMF-namespace registry generate_platform_model.py's cost_surface plane counts
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
@@ -201,9 +203,33 @@ jobs:
           pip install --quiet $PINS
 
       # Each gate reports independently (#749 pattern) so one red doesn't mask the rest.
+      #
+      # #3646 — THE PENDING-RECONCILE BRANCH. Since #3533 keyed the push-to-main
+      # concurrency group on the commit sha, this run is no longer cancelled mid-flight by
+      # the reconcile bot's follow-up push, so every merge commit concluded an honest
+      # `failure` on literals the bot's own NEXT commit rewrites ~60 s later (specimens
+      # 2026-09-06: 6fedae2dd, 1efec2f99, d20a0e959). The checker now partitions its drift
+      # by owner and exits 3 when EVERY stale literal is one `--apply` regenerates.
+      #
+      # Branching on the exit code, not on stdout: `--check` prints the drifted literals
+      # verbatim, so a grep over its output is a text matcher reading doc content it does
+      # not own. 3 cannot be forged by a doc that happens to contain the word.
+      #
+      # Tolerated on `push` ONLY. On a pull_request no reconcile bot follows, so 3 must
+      # still red and the author runs `--apply` — exactly today's behaviour.
       - name: Literal-drift gate (sync_doc_metadata --check)
         if: always()
-        run: python3 deploy/sync_doc_metadata.py --check
+        run: |
+          set +e
+          python3 deploy/sync_doc_metadata.py --check
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then exit 0; fi
+          if [ "$rc" -eq 3 ] && [ "${{ github.event_name }}" = "push" ]; then
+            echo "::warning title=pending-reconcile::Doc-sync literals are stale, and every one of them is a value the reconcile bot's next commit regenerates. Not a red main (#3646) — verify chore(reconcile) lands within ~60 s."
+            exit 0
+          fi
+          exit "$rc"
 
       - name: Dead-link gate
         if: always()
