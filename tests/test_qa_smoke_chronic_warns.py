@@ -359,12 +359,14 @@ def test_canary_unreadable_branch_is_no_longer_muted(monkeypatch):
 
 
 class _UnstampedTable:
-    def query(self, **kw):
-        return {"Items": [{"sk": "BRIEF#2026-08-03"}]}
+    # #3599: the check now reads ROWS via one provenance scan (experiment.pk_census), not
+    # a per-pk query, so the stub answers scan() with a row that carries its own pk.
+    def scan(self, **kw):
+        return {"Items": [{"pk": "COACH#sleep_coach", "sk": "BRIEF#2026-08-03"}]}
 
 
 class _ErroringTable:
-    def query(self, **kw):
+    def scan(self, **kw):
         raise RuntimeError("boom (simulated)")
 
 
