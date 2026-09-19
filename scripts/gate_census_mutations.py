@@ -48,6 +48,35 @@ to sit inside the gate's declared scope is "the gate could not fail" the finding
 then it gets an issue, per #2999's third acceptance box. Nothing here is allowed to
 report a verdict it did not watch.
 
+AN md5 ON THE SOURCE IS NOT A PROOF THE MUTATION RAN (#3599, 2026-09-18)
+────────────────────────────────────────────────────────────────────────
+The standing rule for a hand-driven control in this repo is "assert the file's md5
+CHANGED before you read the verdict", because a `sed -i ''` that matched nothing exits 0
+on macOS and a silent no-op reports the guard working. That rule is necessary and it is
+NOT sufficient, and #3599 is the specimen: its mutation M3 edited `_WEIGHT_MIN_LBS =
+100.0` to `400.0` in the real tracked module, the md5 duly changed, and the target still
+reported 39 passed. The gate was fine. The control was blind.
+
+`100.0` and `400.0` are the same number of bytes, and CPython validates a cached
+bytecode file on `(source mtime, source size)` — neither moved past the granularity the
+check uses, so the interpreter re-used the compiled copy under the target's
+`__pycache__` and ran the ORIGINAL module. **A hash over the source proves the FILE
+changed; it never proves the CODE UNDER TEST did.** With the cache purged, the same
+mutation reds 11 tests.
+
+`run_spec()` below is immune by construction — it plants a NEW file rather than editing
+an existing one, so there is no stale compiled copy to hit. A hand-driven control has no
+such protection, so it must do both:
+
+  * assert the md5 (or a diff) changed — the plant landed on disk at all; and
+  * make the compiled copy irrelevant — delete the target's `__pycache__` and run the
+    child interpreter with `-B` / `PYTHONDONTWRITEBYTECODE=1` before reading a verdict.
+
+Prefer a mutation that also changes the file's LENGTH where the choice is free; it makes
+the trap unreachable rather than merely handled. Do not rely on that as the guard,
+though — "I happened to pick a longer replacement" is not a property the next author
+inherits.
+
 THE PLANT LITERALS ARE ASSEMBLED, ON PURPOSE
 ────────────────────────────────────────────
 Several of the gates below sweep EVERY tracked file, including this one. Writing their
