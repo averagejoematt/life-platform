@@ -100,6 +100,12 @@ IN_TREE_WRITERS = {
         "one that was caught live: it reached test_mypy_clean_modules in ~1 parallel run "
         "in 3 as `first-party package(s) ['lambdas'] hold .py modules`."
     ),
+    "tests/test_repo_scan_cache_3224.py": (
+        "test_n/test_o write the REAL docs/PROPORTIONALITY.md (reverted in a `finally`) to "
+        "prove tests/repo_scan_cache.py's `_tree_fingerprint()` reacts to a genuine edit — "
+        "the fingerprint walks ROOT, not an argument, so a tmp_path copy would prove "
+        "nothing. #3731."
+    ),
 }
 
 # A checkout-root constant is MODULE-LEVEL and SHOUTY: `_REPO`, `ROOT`, `HERE`,

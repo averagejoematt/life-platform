@@ -28,6 +28,14 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "tests"))
 import repo_scan_cache  # noqa: E402
 
+# #3731: test_n / test_o write to the REAL docs/PROPORTIONALITY.md (reverted in a
+# `finally`) to prove `_tree_fingerprint()` reacts to a genuine edit — a tmp_path copy
+# would prove nothing, since the fingerprint walks ROOT, not an argument. That races
+# every other test's rglob sweep under `pytest -n auto --dist loadfile` (#3025);
+# registered in tests/test_suite_parallel_safety_3025.py's IN_TREE_WRITERS, whole-file
+# per that registry's own convention (`--dist loadfile` schedules by file anyway).
+pytestmark = pytest.mark.serial
+
 
 @pytest.fixture(autouse=True)
 def _private_cache(monkeypatch):
