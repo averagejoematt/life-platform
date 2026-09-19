@@ -66,3 +66,4 @@ off\s*\|\s*shadow\s*\|\s*auto	`auto` is a retired remediation-mode value (#2833,
 # The lookbehind keeps the rule off memory filenames that merely END in _deploy.md
 # (reference_gate_registration_before_deploy.md and friends in the knowledge ledger).
 (?<![\w-])deploy\.md	there is no deploy.md — the deploy playbook is .claude/skills/deploy/SKILL.md, whose function->source table is generated from ci/lambda_map.json (#3539)
+scripts/deploy\.command	retired 2026-09-19 by #3608 — it hand-zipped mcp_server.py alone outside the one-bundle rule (#781); use `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py`

@@ -25,6 +25,7 @@ not be caught. None does today; a genuinely obfuscated call site is its own,
 worse, incident class this guard does not claim to cover.
 """
 
+import json
 import os
 import sys
 
@@ -91,19 +92,35 @@ def test_sanctioned_bundle_sites_actually_reference_build_bundle():
 
 def test_known_bundle_violations_do_not_exceed_the_baseline():
     """Shrink-only ratchet (Charter primitive #3): the count of known
-    one-bundle violations may only go DOWN from the dated baseline. This PR
-    adds the guard without rewriting scripts/deploy.command (instrument
-    first) — it still enforces that no SECOND hand-zipped deploy path can
-    land without at minimum being registered and counted."""
+    one-bundle violations may only go DOWN from the dated baseline. It reached
+    ZERO on 2026-09-19 when #3608 box 1 deleted scripts/deploy.command, so the
+    claim 'all deploy paths verifiably stage through one bundle' is now TRUE
+    and this assertion is what keeps it true: a new hand-zipped deploy path
+    cannot be registered as an accepted violation, only fixed."""
     violations = sorted(p for p, m in reg.BUNDLE_STAGING_SITES.items() if m["status"] == "known_violation")
-    assert len(violations) <= reg.MAX_KNOWN_VIOLATIONS_2026_09_06, (
+    assert len(violations) <= reg.MAX_KNOWN_VIOLATIONS_2026_09_19, (
         f"known_violation count ({len(violations)}: {violations}) exceeds the frozen baseline "
-        f"({reg.MAX_KNOWN_VIOLATIONS_2026_09_06}) — a new one-bundle violation was registered without becoming "
+        f"({reg.MAX_KNOWN_VIOLATIONS_2026_09_19}) — a new one-bundle violation was registered without becoming "
         "the SUBJECT of a fix. The count only ever moves down."
     )
     for path in violations:
         meta = reg.BUNDLE_STAGING_SITES[path]
         assert "#" in meta["notes"], f"known_violation entry {path!r} has no issue reference in its notes"
+
+
+def test_the_one_bundle_claim_is_true_not_merely_ratcheted():
+    """#3608 box 1's actual outcome, asserted as a POSITIVE rather than as a
+    ceiling. `MAX_KNOWN_VIOLATIONS_2026_09_19 <= 0` would also pass if someone
+    lowered the ceiling and left the violation registered under a different
+    status word; this reads the statuses themselves."""
+    assert reg.MAX_KNOWN_VIOLATIONS_2026_09_19 == 0, "the ratchet is shrink-only and reached 0 on 2026-09-19 — it may not be raised"
+    violations = [p for p, m in reg.BUNDLE_STAGING_SITES.items() if m["status"] == "known_violation"]
+    assert violations == [], f"a one-bundle violation is registered again: {violations}"
+    assert not os.path.exists(os.path.join(REPO_ROOT, "scripts", "deploy.command")), (
+        "scripts/deploy.command is back. It hand-zips mcp_server.py alone and replaces the WHOLE "
+        "life-platform-mcp function with one file (the 2026-03 outage). Use "
+        "`bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` — #3608 box 1."
+    )
 
 
 def test_exempt_bundle_sites_state_a_reason():
@@ -178,6 +195,34 @@ def test_shell_discovery_ignores_a_commented_out_example():
         assert found == set(), f"scanner false-positived on a comment-only mention: {found}"
 
 
+def test_shell_discovery_ignores_a_trailing_comment_and_a_quoted_string(tmp_path):
+    """The two shapes the 2026-09-06 first-character-is-# test could not tell
+    apart from a real call (#3608 box 1). Both are MENTIONS; neither runs
+    anything. If this test ever goes green by the scanner matching them, the
+    registry's equality assertion starts failing on doc files instead of on
+    deploy paths and people learn to edit the registry to silence it."""
+    fake_root = tmp_path / "repo"
+    (fake_root / "deploy").mkdir(parents=True)
+    (fake_root / "scripts").mkdir(parents=True)
+    (fake_root / "deploy" / "trailing.sh").write_text("#!/bin/bash\necho done  # aws lambda update-function-code --function-name x\n")
+    (fake_root / "deploy" / "quoted.sh").write_text('#!/bin/bash\necho "aws lambda update-function-code is the thing we do NOT do"\n')
+    found = reg.discover_shell_update_function_code_sites(str(fake_root))
+    assert found == set(), f"token scanner false-positived on a mention: {found}"
+
+
+def test_shell_discovery_still_catches_the_real_multiline_idiom(tmp_path):
+    """The must-not-over-narrow control for the test above: the backslash
+    continuation idiom every real deploy script uses is still a call site."""
+    fake_root = tmp_path / "repo"
+    (fake_root / "deploy").mkdir(parents=True)
+    (fake_root / "scripts").mkdir(parents=True)
+    (fake_root / "deploy" / "real.sh").write_text(
+        '#!/bin/bash\naws lambda update-function-code \\\n  --function-name "$FN" \\\n  --zip-file "fileb://$ZIP"\n'
+    )
+    found = reg.discover_shell_update_function_code_sites(str(fake_root))
+    assert found == {os.path.join("deploy", "real.sh")}, f"token scanner lost the real multi-line call site: {found}"
+
+
 def test_cdk_discovery_catches_a_planted_direct_code_asset(tmp_path):
     fake_root = tmp_path / "repo"
     (fake_root / "cdk" / "stacks").mkdir(parents=True)
@@ -196,3 +241,84 @@ def test_ci_mirror_discovery_catches_a_planted_claim(tmp_path):
     planted.write_text("#!/usr/bin/env python3\n# This script mirrors the CI checks exactly, run it before you push.\n")
     found = reg.discover_ci_mirror_sites(str(fake_root))
     assert found == {os.path.join("scripts", "sneaky_local_ci.py")}, f"CI-mirror scanner missed a planted claim: {found}"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 4. #3608 box 3 — the widened CI-mirror predicate (epic #3493 devex ROW5).
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_every_mirror_site_declares_which_clause_admitted_it():
+    for path, meta in reg.CI_MIRROR_SITES.items():
+        assert meta.get("clause") in ("A", "B", "C"), f"{path}: missing/unknown admitting clause {meta.get('clause')!r}"
+
+
+def test_mirror_clause_mix_matches_the_frozen_measurement():
+    """The widening is a measured fact, not a claim: 3 prose-claim members
+    became 30. If a later edit collapses the predicate back to prose-only (or
+    quietly widens it to bare filenames, the 60-file corpus #3608 rejected),
+    the mix moves and this reds with the real numbers."""
+    from collections import Counter
+
+    live = Counter(m["clause"] for m in reg.CI_MIRROR_SITES.values())
+    assert dict(live) == reg.MIRROR_CLAUSE_BASELINE_2026_09_19, (
+        f"CI-mirror clause mix moved: {dict(live)} vs frozen {reg.MIRROR_CLAUSE_BASELINE_2026_09_19}. "
+        "Re-measure and re-freeze deliberately — see #3608 box 3."
+    )
+
+
+def test_the_non_push_mirror_legs_epic_3493_named_are_members():
+    """ROW5's own two examples, asserted by name. The /qa battery joins under
+    clause A (it already boasted); restart_verify's NON-PUSH gate leg
+    (restart_verify_gates.py, which runs Docs CI's gate set locally) joins
+    under clause C and was invisible to the prose-only predicate.
+
+    Stated honestly: `deploy/restart_verify.py` itself is NOT a member and
+    should not be — its single workflow reference is running prose about
+    site-deploy auto-deploying a fix (`:309`), not a mirror of any check set.
+    Its two mirroring legs (`restart_verify_truth.py`, `restart_verify_gates.py`)
+    both are.
+    """
+    members = set(reg.CI_MIRROR_SITES)
+    for required in (
+        os.path.join(".claude", "skills", "qa", "SKILL.md"),
+        "deploy/restart_verify_gates.py",
+        "deploy/restart_verify_truth.py",
+    ):
+        assert required in members, f"{required} is not a registered CI-mirror site — #3608 box 3 requires it"
+
+
+def test_required_check_contexts_are_read_from_the_posture_file():
+    """Clause B's vocabulary must be DERIVED. A hand-typed context list would
+    go stale the first time the owner renames a required check, and every file
+    naming the new one would silently leave the registry."""
+    contexts = reg.required_check_contexts()
+    assert contexts, "no required-check contexts resolved from deploy/github_posture.json"
+    posture = json.loads(_read("deploy/github_posture.json"))
+    declared = [c["context"] for c in posture["main_required_checks_ruleset"]["required_status_checks"]]
+    assert list(contexts) == declared
+
+
+def test_mirror_discovery_admits_a_planted_workflow_path_reference(tmp_path):
+    """Clause C's positive control — the shape the prose-only predicate missed."""
+    fake_root = tmp_path / "repo"
+    (fake_root / "scripts").mkdir(parents=True)
+    (fake_root / "deploy").mkdir(parents=True)
+    os.makedirs(str(fake_root / ".claude" / "skills"))
+    (fake_root / "scripts" / "quiet_mirror.py").write_text("GATES = parse('.github/workflows/docs-ci.yml')\n")
+    found = reg.discover_ci_mirror_sites(str(fake_root))
+    assert found == {os.path.join("scripts", "quiet_mirror.py")}, f"clause C missed a planted workflow-path mirror: {found}"
+
+
+def test_mirror_discovery_does_not_admit_a_bare_filename_mention(tmp_path):
+    """The deliberate NON-member shape (#3608 box 3): a bare `site-deploy.yml`
+    in running prose. Admitting it measured 60 files on the 2026-09-19 tree
+    against the path form's 29 — a registry of everything that ever named a
+    workflow is the gate people learn to skip."""
+    fake_root = tmp_path / "repo"
+    (fake_root / "scripts").mkdir(parents=True)
+    (fake_root / "deploy").mkdir(parents=True)
+    os.makedirs(str(fake_root / ".claude" / "skills"))
+    (fake_root / "deploy" / "prose.py").write_text("# the standing site-deploy.yml auto-deploys it, so nothing to do here\n")
+    found = reg.discover_ci_mirror_sites(str(fake_root))
+    assert found == set(), f"bare-filename prose was admitted as a CI mirror: {found}"
