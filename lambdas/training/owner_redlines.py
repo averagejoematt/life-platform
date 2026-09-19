@@ -87,8 +87,9 @@ REDLINES: dict[str, dict[str, Any]] = {
         "note": (
             "PROVEN_BLUEPRINT's by-band table: at 300-309 lb during the campaign that worked he was walking ~10x/wk, "
             "~8.5 hrs/wk, from day one. The blueprint calls walking 'the single most replicable, highest-confidence "
-            "driver in the dataset'. Measured 2026-09-13: 0.78 mi/wk. This is the largest gap on the board and the "
-            "engine names it first for that reason."
+            "driver in the dataset'. Owner correction 2026-09-19: the planner's Strava-only read (5.09 hr/wk) undercounts — "
+            "treadmill and cycling blocks logged inside Hevy count too; 13–19 Sep measured >=8.79 hr, at or above the floor. "
+            "Apple Health steps are NOT a walking proxy. The engine names walking first because it is the proven driver."
         ),
     },
     "lifting_sessions_per_wk": {

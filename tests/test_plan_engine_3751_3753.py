@@ -13,7 +13,7 @@ hold it to:
   1. DETERMINISM — same inputs, same block. Otherwise "chat and Claude Code get the same
      answer" is a hope, not a property.
   2. ORDER — the walking gap is computed and reported FIRST, because it is the largest
-     lever on the board (0.78 mi/wk measured against a proven ~8.5 hrs/wk at this
+     lever on the board (the walking base, measured against a proven ~8.5 hrs/wk at this
      bodyweight) and an engine that buries it helps the coach have the wrong argument.
   3. UNKNOWN IS NOT CLEAR — a tripwire whose input is missing reports `unknown`. The
      #3767 lesson applied to safety conditions: a guard that reads clear because nobody

@@ -27,7 +27,8 @@ ORDERING IS A CLAIM
 
 The walking gap is computed and reported FIRST. Not for emphasis — because the blueprint
 mined from his own campaign says walking is "the single most replicable, highest-confidence
-driver in the dataset", and on 2026-09-13 he was at 0.78 mi/wk against a proven ~8.5 hrs/wk
+driver in the dataset", and the owner's 2026-09-19 correction: count Strava PLUS Hevy treadmill/cycling
+blocks (13–19 Sep measured >=8.79 hr against the proven ~8.5 hrs/wk; the Strava-only read said 5.09)
 at this bodyweight. A planner that argues about heavy-day conservatism while the engine
 that did the work last time sits near zero is having the wrong argument, and an engine that
 buries that line under six others is helping it.
