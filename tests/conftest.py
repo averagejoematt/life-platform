@@ -251,6 +251,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_platform_stats_honesty_3690.py",
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
+        # #3614: the two SETs the #1967 registry did not carry — the audience/fail-mode
+        # facet, AST-read at each surface's disposition site, and the derived phase-prose
+        # census over every prompt builder. Pure repo shape, and pre-merge for the reason
+        # both boxes exist: the defect is a NEW door (a surface that ships its best draft to
+        # readers, a builder that hand-types a Day-N line) and after the merge it is already
+        # in the bundle. The two per-door guards it generalises are both in this lane.
+        "test_grounding_sets_3614.py",
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
         "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
         # #3559: AST sweep of lambdas/ — every reader-input capture door keys through

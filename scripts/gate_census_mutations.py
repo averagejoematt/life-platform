@@ -342,7 +342,40 @@ _UNREGISTERED_JUDGE_PY = (
 )
 
 
+# #3614: a NEW narrative door that hand-types its own phase line instead of obtaining it
+# from ai_context. The census (tests/phase_prompt_census.py) keys on TWO structural facts
+# — an AST dict literal in the Bedrock/Anthropic request shape, and a non-docstring prose
+# string stating a day number / genesis / restart — so the plant must carry both or it
+# proves nothing about the gate. It is deliberately NOT git-added: the census walks
+# lambdas/ on disk, and an untracked module is exactly the shape a half-landed door has.
+_HAND_TYPED_PHASE_DOOR_PY = (
+    '"""probe — a synthetic narrative door that hand-types its own phase line."""\n\n\n'
+    "def build_probe_prompt(day_number, start_date, payload):\n"
+    "    return {\n"
+    '        "model": "claude-haiku",\n'
+    '        "max_tokens": 300,\n'
+    '        "messages": [\n'
+    "            {\n"
+    '                "role": "user",\n'
+    '                "content": f"Today is Day {day_number} of the experiment, restarted on {start_date}.",\n'
+    "            }\n"
+    "        ],\n"
+    "    }\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_grounding_sets_3614.py": MutationSpec(
+        gate_id="structural::test_grounding_sets_3614.py",
+        target="tests/test_grounding_sets_3614.py",
+        detects=(
+            "a NEW prompt builder that states what day of the experiment it is in its own prose instead "
+            "of obtaining it from ai_context.build_experiment_phase_context — the #1086 rule whose guard "
+            "was a per-door test plus a hand-typed list of eight modules, so it could not fail on the "
+            "door nobody added to it"
+        ),
+        plants=(("lambdas/web/_census_probe_3614.py", _HAND_TYPED_PHASE_DOOR_PY),),
+        track=False,  # the census walks lambdas/ on disk (os.walk), so an untracked module is in scope
+    ),
     "structural::test_judge_verdict_retry_3688.py": MutationSpec(
         gate_id="structural::test_judge_verdict_retry_3688.py",
         target="tests/test_judge_verdict_retry_3688.py",
@@ -610,6 +643,12 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_grounding_sets_3614.py": _proof(
+        "structural::test_grounding_sets_3614.py",
+        "M1 (harness, ARMED 1/1) baseline: 27 passed in 15.14s | mutated: 3 failed, 24 passed in 16.59s :: test_every_prompt_builder_with_its_own_phase_prose_is_decided; test_the_census_finds_the_modules_it_is_supposed_to_find; test_planting_a_fourth_hand_typed_phase_line_reds_the_census | reverted: 27 passed in 14.43s. Three tests red on one plant is the census working in all three of its directions: the live verdict, the member/decision key-parity check, and the in-file control's own 'the real tree is still clean' tail. M2, the OTHER box, hand-run on the real registry 2026-09-18 and not mechanisable as a file plant because the mutation is a DECLARATION: flipping lambdas/web/site_api_ai_lambda.py::_handle_explain from fail_closed to keep_best in tests/grounding_wiring.py (diff against a pre-mutation copy: one line, FAIL_CLOSED -> KEEP_BEST) gave 2 failed, 25 passed -- test_the_public_keep_best_residual_is_pinned_by_name ('the public keep-best residual moved ... Extra items in the left set: _handle_explain') AND test_every_surface_carries_the_facets_and_the_tree_agrees ('declared keep_best, but _handle_explain BRANCHES on grounding_findings and drops/falls back -- the declaration and the call site disagree'). Reverted byte-for-byte, 27 passed. The same flip runs on every build against a deepcopy of the registry (test_flipping_one_public_surface_to_keep_best_reds_the_facets), plus its inverse, which is the assertion that matters most here: the AST derivation reads acts=False on 4 of the 32 surfaces, so it is not a constant-true detector.",
+        "tests/test_grounding_sets_3614.py carries BOTH #3614 sets. The phase census walks lambdas/ on disk (os.walk, .py only), so an untracked door is in scope and tests/ deliberately is not -- this file and tests/phase_prompt_census.py both contain the literal words the scan looks for, and test_the_census_is_not_a_member_of_its_own_set MEASURES their non-membership rather than assuming it. Membership needs BOTH halves (a request-shaped dict literal AND non-docstring phase prose), which is what keeps a module that merely READS day_n/EXPERIMENT_START_DATE out: measured 3 members on 2026-09-18. STILL INVISIBLE, stated rather than papered over: a phase claim assembled from fragments at runtime, or one that reaches the prompt from S3/DDB rather than from a literal, is not prose this scan can see; and on the facet side the AST proves the DISPOSITION only -- it does not follow the findings value across a Lambda wire into the disposing function (coach_quality_gate) and has nothing to read at all for the two post-hoc auditors, which is why those two carry the auditor sentinel and a written reason instead of a call site.",
+        proved_on="2026-09-18",
+    ),
     "structural::test_judge_verdict_retry_3688.py": _proof(
         "structural::test_judge_verdict_retry_3688.py",
         "M1 (harness, ARMED 1/1) baseline: 32 passed | mutated: 1 failed, 31 passed :: test_the_judge_call_site_set_is_enumerated_from_source_and_every_member_is_covered | reverted: 32 passed. M2 the same probe under mcp/ and M2b a SUBSCRIPT-form probe under scripts/: 1 failed each (the scan reaches all five dirs, and the subscript form is the one the FIRST DRAFT of the pattern missed). M3/M3b negative controls \u2014 the identical idiom as a leading and as a trailing comment: 32 passed, no cry-wolf. M4b the covered site in tests/visual_ai_qa.py stops deciding on truncation at all: 3 failed \u2014 the Set test naming the file, plus two behavioural tests. All watched 2026-09-14 and restored.",
