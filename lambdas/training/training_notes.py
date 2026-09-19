@@ -470,11 +470,11 @@ def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list
     # calibration (#3817) — what a level MEANS for this athlete, not what happened today
     anchors = calibration_anchors(note_text)
     if anchors:
-        val = {"anchors": anchors}
+        cal_val: dict[str, Any] = {"anchors": anchors}
         basis = next((b for k, b in _CAL_BASIS.items() if k in t), None)
         if basis:
-            val["basis"] = basis
-        out.append(_signal("calibration", "what a level/load means for this athlete", 0.8, val))
+            cal_val["basis"] = basis
+        out.append(_signal("calibration", "what a level/load means for this athlete", 0.8, cal_val))
 
     # rpe_caveat — the note disagreeing with the day's recovery number (#3817)
     disc = recovery_discordance(note_text, date=date, user=user)
@@ -528,7 +528,7 @@ def merge_signals(deterministic: list, llm: list, pain_deterministic: bool) -> t
     pain_flag = deterministic pain OR any LLM pain. The deterministic hit can NEVER be
     cleared by the LLM (Invariant 5). Returns (signals, pain_flag).
     """
-    by_key = {}
+    by_key: dict[tuple, dict] = {}
     det_classes = set()
     for s in deterministic or []:
         cls = s.get("class")
