@@ -193,7 +193,6 @@ Usage:
 
 import json
 import os
-import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -208,6 +207,21 @@ if _SCRIPTS_DIR not in sys.path:
 
 import ci_job_timeouts  # noqa: E402 — #3678: the timeout-ceiling registry `scan_cancelled` feeds civ
 import ci_run_verdicts as civ  # noqa: E402 — must follow the sys.path insert above
+
+# #3608 box 2's EXPECTED-job derivation. It lives in a sibling module because this
+# file hit the #1665 hard ceiling of 1000 logical lines and the sanctioned payment
+# is extraction, not a baseline entry. The seam is real: that module reads ci-cd.yml's
+# jobs block and sentinel_github's PUSH_TRIGGER_GLOBS and mints no verdict; THIS file
+# owns the verdict and the operator-facing recovery prose. The names are re-exported
+# below so `classify_pipeline`'s callers and the tests import from one place.
+from main_green_expected_jobs import (  # noqa: E402,F401 — re-exported: consumers and tests import these from HERE
+    absent_expected_jobs,
+    ci_cd_expected_jobs,
+    ci_cd_push_paths,
+    commit_is_in_push_trigger_scope,
+    load_ci_cd_expected_jobs,
+    path_matches_ci_filter,
+)
 
 # A run parked at the production approval gate is normal right after a merge
 # (the approval is manual by design) — it becomes an incident when it ages.
@@ -237,6 +251,7 @@ STRANDED_APPROVAL = "stranded-approval"
 STRANDED_PLAN = "stranded-plan"
 STRANDED_DEPLOY_WEDGE = "stranded-deploy-wedge"
 NO_VERDICT = "no-verdict"
+MISSING_JOB = "missing-job"  # #3608 box 2: an EXPECTED job never attached to the run.
 
 
 def _parse_iso(ts: str | None) -> datetime | None:
@@ -365,66 +380,6 @@ def head_coverage(runs: list[dict], head_sha: str | None) -> dict:
 # real holder from a phantom.
 
 CI_CD_WORKFLOW_FILE = "ci-cd.yml"
-
-
-def ci_cd_push_paths(yaml_text: str) -> list[str]:
-    """The push `paths:` filter from ci-cd.yml's own trigger block. Pure —
-    parses YAML text the caller supplies (never reads the file itself, so this
-    is independently testable against a frozen fixture).
-
-    NB: PyYAML's default (YAML 1.1) resolver reads the bare `on:` key as the
-    boolean `True`, not the string `"on"` — a real gotcha every workflow-
-    parsing script in this repo (`gate_census.py`, `apply_branch_protection.py`)
-    has to account for. Both spellings are checked so this does not silently
-    return `[]` if PyYAML's behavior ever changes.
-    """
-    import yaml  # local: keeps the module importable where PyYAML is absent
-
-    try:
-        doc = yaml.safe_load(yaml_text) or {}
-    except yaml.YAMLError:
-        return []
-    on = doc.get("on")
-    if on is None:
-        on = doc.get(True)
-    push = (on or {}).get("push") or {}
-    return [p for p in (push.get("paths") or []) if isinstance(p, str)]
-
-
-def _pattern_to_regex(pattern: str) -> re.Pattern:
-    """Translate ONE GitHub Actions path-filter glob to a regex. Not a general
-    glob engine — covers exactly the constructs ci-cd.yml's filter actually
-    uses: `dir/**` (any depth under dir, including nothing), a bare `*` within
-    one path segment, and literal filenames/extensions."""
-    parts = []
-    i, n = 0, len(pattern)
-    while i < n:
-        if pattern.startswith("**", i):
-            parts.append(".*")
-            i += 2
-        elif pattern[i] == "*":
-            parts.append("[^/]*")
-            i += 1
-        elif pattern[i] == "?":
-            parts.append("[^/]")
-            i += 1
-        else:
-            parts.append(re.escape(pattern[i]))
-            i += 1
-    return re.compile("^" + "".join(parts) + "$")
-
-
-def path_matches_ci_filter(changed_paths: list[str], patterns: list[str]) -> bool:
-    """True iff any changed path matches any of ci-cd.yml's `paths:` globs. Pure.
-
-    An EMPTY `patterns` list means "could not read the filter" (not "the
-    filter matches nothing") — fail toward treating the push as IN-SCOPE, so a
-    parse failure can never manufacture a false path-filter-skip.
-    """
-    if not patterns:
-        return True
-    regexes = [_pattern_to_regex(p) for p in patterns]
-    return any(rx.match(path) for path in changed_paths for rx in regexes)
 
 
 # Verdict kinds for classify_zero_run_head — module constants so tests and the
@@ -660,6 +615,9 @@ def classify_pipeline(
     rejected: list[dict] | None = None,
     cancelled_verdicts: dict | None = None,
     cancelled_notes: list[dict] | None = None,
+    completed_jobs: list[dict] | None = None,
+    expected_jobs: dict[str, str] | None = None,
+    changed_paths: list[str] | None = None,
 ) -> dict:
     """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
@@ -705,8 +663,19 @@ def classify_pipeline(
     else:
         kind = RED
 
+    # #3608 box 2: an EXPECTED job that never attached outranks a `success`
+    # rollup. Only applied to an otherwise-GREEN verdict — a run already
+    # classified red/stranded has a louder finding, and re-labelling it would
+    # lose that finding's recovery instructions.
+    missing_jobs: list[str] = []
+    if kind == GREEN and (changed_paths is None or commit_is_in_push_trigger_scope(changed_paths)):
+        missing_jobs = absent_expected_jobs(completed_jobs, expected_jobs)
+        if missing_jobs:
+            kind = MISSING_JOB
+
     return {
         "kind": kind,
+        "missing_jobs": missing_jobs,
         "sha": (completed or {}).get("headSha"),
         "run": completed,
         "waiting": waiting,
@@ -779,6 +748,23 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             "   run, re-dispatches ci-cd.yml with deploy_all=true — a dispatch carries no push\n"
             "   diff, so change detection would otherwise deploy nothing). Do NOT salt the\n"
             "   concurrency group: three salts failed across recurrences 1-3 (CONVENTIONS §4d)."
+        )
+        return 1, "\n".join(lines + notices)
+
+    if kind == MISSING_JOB:
+        lines.append(
+            f"🛑 EXPECTED JOB ABSENT (#3608 box 2) — run {(state.get('run') or {}).get('databaseId')} sha {sha8} "
+            "rolled up `success` with a required job that NEVER ATTACHED:"
+        )
+        for job_id in state.get("missing_jobs", []):
+            lines.append(f"   `{job_id}` is declared in {CI_CD_WORKFLOW_FILE} with no job-level `if:` and produced no job record.")
+        lines.append(
+            "   A green rollup over an absent job is not a green main — nothing ran to fail.\n"
+            "   Causes, in likelihood order: a `paths:` filter was (re)introduced on ci-cd.yml or\n"
+            "   on the reusable workflow the job calls; a job-level `if:` was added; the job was\n"
+            "   renamed or deleted in the same push whose run this is.\n"
+            "   Read the run's job list (`gh run view <id> --json jobs`) against\n"
+            f"   `.github/workflows/{CI_CD_WORKFLOW_FILE}`'s jobs block before declaring main green."
         )
         return 1, "\n".join(lines + notices)
 
@@ -1035,6 +1021,22 @@ def main() -> int:
             f"⚠️  check_main_green: deploy-wedge detection unavailable ({e}) — run scripts/check_deploy_wedge.py by hand if a deploy looks stuck."
         )
 
+    # #3608 box 2: the winning run's OWN job list, so an EXPECTED job that never
+    # attached cannot hide behind a `success` rollup. Probed only for the run the
+    # walk selected (one extra `gh run view`), and only consulted when that run
+    # is otherwise green — a red already carries a louder finding.
+    winner = latest_completed_run(
+        runs,
+        rejected_ids={(e.get("run") or {}).get("databaseId") for e in rejected},
+        cancelled_verdicts=cancelled_verdicts,
+    )
+    winner_jobs = None
+    if winner is not None and winner.get("conclusion") == "success":
+        try:
+            winner_jobs = civ.fetch_run_jobs(_gh_json, REPO, winner.get("databaseId"))
+        except Exception as e:  # noqa: BLE001 — unreadable jobs means NO absence claim, never a false green-over-absence
+            print(f"⚠️  check_main_green: could not read jobs for the winning run ({e}) — absent-job check skipped (#3608).")
+
     state = classify_pipeline(
         runs,
         latest_failure_jobs=jobs,
@@ -1042,6 +1044,8 @@ def main() -> int:
         rejected=rejected,
         cancelled_verdicts=cancelled_verdicts,
         cancelled_notes=cancelled_notes,
+        completed_jobs=winner_jobs,
+        expected_jobs=load_ci_cd_expected_jobs(),
     )
     # #2762: the verdict must vouch for the sha main actually points at — read the
     # REMOTE head (never the local checkout, which may be stale or on a branch).

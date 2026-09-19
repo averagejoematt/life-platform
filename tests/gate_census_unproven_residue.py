@@ -627,4 +627,26 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "ci::.github/workflows/config-drift.yml::drift / config/ ownership registry + bucket-policy drift (blocking)": (
         "2026-09-19 (#3620) — live-AWS-only failing arm; repo-side twin is mutation-proven"
     ),
+    # 2026-09-19 (#3608 box 5): the CONVENTIONS §4 FAKE-creds parity run, made a real
+    # CI step and its assertion script. BOTH arrive unproven, for the SAME reason and
+    # it is a real one rather than a shrug: the gate's failing arm requires a machine on
+    # which REAL AWS credentials are resolvable, and CI by definition has none — on the
+    # runner there is nothing for boto3 to fall back TO, so no mutation run in the PR
+    # lane can make it red. (gate_census.ATTEMPTED_UNPROVEN records this exact shape for
+    # the ci-lint gitleaks gate, and #3620's bucket-policy leg for the live-AWS variant.)
+    #
+    # What IS observed, on this laptop, 2026-09-19, and is the reason the gate is not a
+    # no-op: run WITHOUT the §4 env prefix it exits 1 naming
+    # `method=shared-credentials-file` — i.e. it found a real, reachable credential and
+    # refused. Run WITH the prefix it exits 0. Both arms watched. That proof cannot be
+    # re-taken in CI, which is precisely why these two lines exist rather than a
+    # MutationSpec. tests/test_fake_creds_parity_step_3608.py is the proven half: it
+    # holds the workflow and docs/CONVENTIONS.md to the same invocation literal, and
+    # asserts the failure path redacts any real key it resolves.
+    "ci::.github/workflows/ci-cd.yml::test-critical / AWS creds parity — no real credentials resolvable (CONVENTIONS §4)": (
+        "2026-09-19 (#3608 box 5) — failing arm needs resolvable REAL creds, which CI never has; both arms watched locally"
+    ),
+    "guard::scripts/verify_fake_creds_parity.py": (
+        "2026-09-19 (#3608 box 5) — same gate, script half; exits 1 on a real credential, 0 under the §4 prefix (watched locally)"
+    ),
 }

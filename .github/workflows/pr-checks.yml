@@ -82,7 +82,18 @@ jobs:
       # tests/test_premerge_lane.py asserts the two stay in sync.
       - name: Install lane dependencies
         # Versions are READ from requirements-dev.txt, never copied here (CQ-01, #2609).
+        #
+        # #3608 box 4 folds the lane's own stopwatch in here rather than adding a
+        # step: LANE_START is stamped before the first gate and read by the LAST
+        # step below. "Green and fast" used to be graded from a comment — three
+        # numbers from three eras (the posture file's stored typical_seconds, a
+        # test-count-and-seconds pair in tests/conftest.py, and #3678's live p95)
+        # that nothing reconciled — all three are quoted, once, in
+        # tests/test_lane_wallclock_ratchet_3608.py, which is the only place that
+        # may hold them. The lane now measures itself and the measurement is
+        # written back by deploy/write_lane_posture.py.
         run: |
+          echo "LANE_START=$(date +%s)" >> "$GITHUB_ENV"
           PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore black hypothesis pyyaml mypy ruff pillow pytest-xdist)
           pip install $PINS
 
@@ -97,10 +108,13 @@ jobs:
       # #2258: the pre-merge lane must not be a strict SUBSET of the post-merge one.
       # `premerge` is applied automatically by tests/conftest.py to every
       # tests/*_behavior.py test PLUS everything deploy_critical — so this is a strict
-      # superset of the old ADR-117 subset, not a swap. 8,813 tests in 155s (measured
-      # locally 2026-08-21, #2924) against this job's timeout-minutes: 10. The prior
-      # "~6,075 in ~30s" here was an 2026-08-08 measurement left to go stale as the
-      # lane grew; re-measure before adding anything slow rather than trusting it.
+      # superset of the old ADR-117 subset, not a swap. #3608 box 4 removed the dated
+      # test-count-and-seconds literal that sat here: a 2026-08-21 reading (#2924)
+      # against a timeout-minutes that has since moved twice, and the second of three
+      # numbers for this lane that nothing reconciled. The lane now measures ITSELF
+      # (LANE_START above, the `lane-wallclock` ::notice:: below) and
+      # deploy/write_lane_posture.py writes the result into deploy/github_posture.json,
+      # where tests/test_lane_wallclock_ratchet_3608.py ratchets it.
       #
       # The marker's THIRD source (2026-08-09) is tests/conftest.py's
       # `_PREMERGE_EXTRA_FILES` — the structural gates (both size ceilings, the two
@@ -163,9 +177,21 @@ jobs:
       # this copy is the pre-merge early warning so the failure reaches a human first.
       # Measured 4.0s in exactly this lane's dependency set. --compare suppresses the 4
       # Pillow-from-a-layer modules this lane cannot import; see the baseline file.
+      #
+      # #3608 box 4: this step is also where the lane REPORTS its wall-clock. It
+      # is the last step and carries `if: always()`, so the duration is emitted
+      # even when a gate above went red — measuring only the green runs would
+      # measure the wrong distribution. The gate's own exit status is preserved
+      # (`status=$?` ... `exit $status`): a step that swallowed it would be the
+      # #2746 class this lane already learned once.
       - name: Bundle-boot gate (every module imports out of a STAGED bundle)
         if: always()
-        run: python3 scripts/verify_bundle_boot.py --compare deploy/bundle_boot_baseline.json
+        run: |
+          status=0
+          python3 scripts/verify_bundle_boot.py --compare deploy/bundle_boot_baseline.json || status=$?
+          python3 deploy/write_lane_posture.py --emit-wallclock-since "${LANE_START:-0}" \
+            --context "Collect + deploy-critical + format" || true
+          exit $status
 
   # ════════════════════════════════════════════════════════════════
   # FULL UNIT SUITE, PRE-MERGE (#3025) — the premerge marker selects 8,813 of
