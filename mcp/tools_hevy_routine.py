@@ -1090,16 +1090,10 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
     # folder move either: folder_id is create-only, to_update_body omits it, so the
     # archive_folder_id below is resolved but never reaches the wire. The rename is
     # what actually lands; the result says so rather than implying a move (#3670).
-    folders = wc.list_folders()
-    archive_folder_id = None
-    for f in folders.get("routine_folders") or folders.get("folders") or []:
-        if (f.get("title") or "").lower() == "archive":
-            archive_folder_id = f.get("id")
-            break
-    if not archive_folder_id:
-        created = wc.create_folder("Archive")
-        new_folder = created.get("routine_folder") or created
-        archive_folder_id = new_folder.get("id")
+    # Resolved through _ensure_folder so it walks EVERY page (Hevy caps pageSize at
+    # 10; a page-1-only scan creates a second "Archive" once the account passes 10
+    # folders) and stays fail-soft: a folder outage must not block the rename.
+    archive_folder_id = _ensure_folder("Archive")[0]
     ir.title = f"[archived {pacific_today()}] {ir.title or ir.archetype}"
     ir.hevy_folder_id = archive_folder_id
     body = to_update_body(ir, resolve_movement)

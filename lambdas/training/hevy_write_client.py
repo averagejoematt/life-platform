@@ -380,6 +380,46 @@ def list_folders(page: int = 1, page_size: int = HEVY_MAX_PAGE_SIZE) -> dict[str
     return _request("GET", "/v1/routine_folders", query={"page": page, "pageSize": page_size})
 
 
+#: Page ceiling for `list_all_folders` — 20 pages x 10 = 200 folders. A bound so a
+#: mis-reported `page_count` cannot spin the client, NOT an expectation about the
+#: account. A truncated sweep is reported by `folders_truncated`, never silently.
+FOLDER_PAGE_LIMIT = 20
+
+
+def list_all_folders(max_pages: int = FOLDER_PAGE_LIMIT) -> tuple[list[dict[str, Any]], bool]:
+    """Every routine folder, walked across pages. Returns ``(folders, truncated)``.
+
+    Why this exists (#3670, the half the page_size fix does NOT cover): capping
+    `pageSize` at 10 makes the call 200 instead of 400, but it also makes ONE page
+    a strictly smaller window than the broken `pageSize=50` ever asked for. A
+    caller that reads page 1 only is correct exactly while the account holds <= 10
+    folders; at 11 the target folder can sit on page 2, the find-or-create scan
+    misses it, and the "fix" quietly creates a DUPLICATE folder instead of filing
+    into the existing one. That is a worse failure than the 400, because it looks
+    like success in Hevy too.
+
+    Raises whatever `list_folders` raises — the fail-soft decision belongs to the
+    caller (`hevy_routine_commit_report.ensure_folder`), which must name the miss
+    in its own result rather than swallow it.
+    """
+    folders: list[dict[str, Any]] = []
+    page = 1
+    while True:
+        payload = list_folders(page=page)
+        batch = payload.get("routine_folders") or payload.get("folders") or []
+        folders.extend(batch)
+        try:
+            page_count = int(payload.get("page_count") or 1)
+        except (TypeError, ValueError):
+            page_count = 1
+        if not batch or page >= page_count:
+            return folders, False
+        if page >= max_pages:
+            logger.warning(f"list_all_folders stopped at the {max_pages}-page bound (page_count={page_count})")
+            return folders, True
+        page += 1
+
+
 def create_folder(title: str) -> dict[str, Any]:
     return _request("POST", "/v1/routine_folders", body={"routine_folder": {"title": title}})
 

@@ -18,6 +18,15 @@ Two things made it invisible rather than merely wrong, and both are guarded here
 The fix is a deletion, not a new writer: Y derives from `EXPERIMENT_START_DATE`, which
 every reset regenerates and which ships in every bundle (#781). These tests fail if the
 second copy is reintroduced, or if the derivation is routed back through config.
+
+AMENDMENT 2026-09-18 (#3670 box 4). #3671 fixed Y and left N reading the config's
+`current_started` on the ground that a phase may deliberately span cycles. #3670's
+acceptance is stronger and covers the same title: *the title counters* cannot reach
+behind EXPERIMENT_START_DATE regardless of what `training_phases.json` holds. Both
+windows are now floored by `routine_title.counter_anchor`; the phase NAME still spans
+cycles untouched. Two expectations in this file moved with that ruling and say so
+inline. The floor is a no-op against today's config (`current_started` == genesis) —
+it exists for the NEXT reset, which does not edit this file.
 """
 
 from __future__ import annotations
@@ -151,11 +160,21 @@ def test_the_measured_failure_day_one_of_a_cycle_renders_one_one():
     ):
         ctx = rt.build_title_context(_ir(archetype="upper", target_date="2026-09-07"))
 
-    # N still counts within the phase, which the owner has NOT advanced — all four
-    # prior sessions resolve to 'upper' and all four are on/after current_started,
-    # so this is the fifth. That is CORRECT and is the owner's ruling: a phase may
-    # deliberately span cycles, so N does not zero at genesis.
-    assert ctx["type_count_in_phase"] == 5
+    # N: AMENDED BY #3670 box 4 (2026-09-18). This assertion read 5 when only Y was
+    # derived — the reading being that a phase may deliberately span cycles, so N
+    # kept counting from the config's `current_started`. #3670 ruled on the other
+    # half of the same title: `Foundation - Push - 3 - 11` was wrong in BOTH
+    # numbers, and "the title counters cannot reach behind EXPERIMENT_START_DATE
+    # regardless of what training_phases.json holds" is the acceptance. What spans
+    # cycles is the phase NAME (asserted below, unchanged); what does not is the
+    # counter's window. Here `current_started` is the stale 2026-06-16, so the
+    # floor moves N's window to genesis and none of the four pre-genesis sessions
+    # counts — this is the first 'upper' of cycle 17.
+    assert ctx["type_count_in_phase"] == 1, "N must not reach behind genesis — #3670 box 4"
+    # The phase itself is untouched by the floor: the owner advances it by hand and
+    # a reset deliberately leaves it alone.
+    assert ctx["phase"] == "Foundation"
+    assert ctx["phase_started"] == EXPERIMENT_START_DATE, "the window is floored, not the phase"
     # Y is the number the owner actually asked for: nothing performed since genesis,
     # so this is workout 1 of the experiment.
     assert ctx["all_time_count"] == 1, "Y must zero at genesis — this is the #3671 defect"
@@ -171,7 +190,9 @@ def test_title_renders_the_derived_counters():
     ):
         ir = _ir(archetype="upper", target_date="2026-09-07")
         title = rt.format_title(ir, rt.build_title_context(ir))
-    assert title.endswith(" - 2 - 1"), title
+    # " - 1 - 1": the single performed workout is pre-genesis, so neither counter
+    # sees it. This read " - 2 - 1" until #3670 floored N's window too (box 4).
+    assert title.endswith(" - 1 - 1"), title
 
 
 # ── the reason the repo-side hand fix was inert ───────────────────────────────
