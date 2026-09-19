@@ -607,7 +607,21 @@ export function renderPredictions(d) {
   const provenance = (p) => p.pre_registered
     ? `<span class="rd-badge rd-badge-live" title="pre-registered before Day 1 and covered by the published seal">sealed</span>`
     : `<span class="rd-badge" title="logged by the coach during the cycle — not part of the pre-registration">in-cycle</span>`;
-  const rows = list.slice(0, 40).map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
+  // #3511 residue: the same newest-first truncation that hid the seal in the API hid
+  // it again here. `list` arrives date-descending and every sealed bet is dated at
+  // genesis, so a bare `slice(0, 40)` renders 40 in-cycle rows and zero sealed ones —
+  // the provenance column below would say "in-cycle" for the whole cycle. Sealed rows
+  // displace the OLDEST in-cycle rows, the row count stays 40, and the date order the
+  // table renders is unchanged.
+  const _ROW_CAP = 40;
+  const _sealedRows = list.filter((p) => p.pre_registered);
+  const _shown = (list.length > _ROW_CAP && _sealedRows.length)
+    ? list.filter((p) => !p.pre_registered).slice(0, Math.max(0, _ROW_CAP - _sealedRows.length))
+        .concat(_sealedRows.slice(0, _ROW_CAP))
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+        .slice(0, _ROW_CAP)
+    : list.slice(0, _ROW_CAP);
+  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>provenance</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest. <strong>sealed</strong> = pre-registered before Day 1 and covered by the published seal above; <strong>in-cycle</strong> = logged by the coach during the cycle.");
 }
