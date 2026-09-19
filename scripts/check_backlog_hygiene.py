@@ -98,6 +98,8 @@ USAGE
   python3 scripts/check_backlog_hygiene.py --rule score_line_canonical   # one rule at a time
   python3 scripts/check_backlog_hygiene.py --summary       # counts only, no per-issue lines
   python3 scripts/check_backlog_hygiene.py --issues-json FIXTURE.json --now 2026-07-27T00:00:00Z
+  python3 scripts/check_backlog_hygiene.py --rule grounding_specimen   # #3614: the corpus<->closure join
+  python3 scripts/check_backlog_hygiene.py --issues-json OPEN.json --closed-json CLOSED.json
 
 EXIT CODE: 1 by default when any severity=violation finding exists. 0 with
 `--advisory`, always. A live-fetch failure (no network/gh auth) is ALWAYS
@@ -120,6 +122,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import backlog_contract as bc  # noqa: E402
 import backlog_next as bn  # noqa: E402
 import closure_contract as cc  # noqa: E402  (#3853: ONE instrument-ledger discriminator, not a second predicate)
+import grounding_corpus_stamp as gcs  # noqa: E402  (#3614: ONE corpus loader — never a second glob over tests/grounding_corpus)
 
 REPO = "averagejoematt/life-platform"
 
@@ -177,6 +180,52 @@ LATER_STALE_DAYS = 60
 # timestamp forward; an issue created before it is grandfathered regardless of label
 # or type. A new review/incident filing on or after this date gets zero grace.
 SET_SECTION_EFFECTIVE_FROM = datetime(2026, 9, 7, tzinfo=timezone.utc)
+
+# ── #3614 box 2, third clause: a grounding finding cannot close until its specimen
+#    is in the frozen adversarial corpus (tests/grounding_corpus/).
+#
+# WHO IS A GROUNDING FINDING — the derivation, and why it is these five conjuncts.
+# `tests/grounding_corpus/` holds one fixture per SENTENCE the platform was caught
+# fabricating on a live surface, and each fixture already carries the join this rule
+# needs: `issue` (the finding the specimen was captured from) and, on a still-`open`
+# specimen, `closes_with` (the story that will land the class that catches it). So the
+# specimen key <-> finding id join exists in data; what did not exist was anything that
+# READ it at close time. Membership on the backlog side is:
+#
+#   1. CLOSED, and
+#   2. `area:ai`, and
+#   3. a `review:*` / `incident*` label (bc.filed_from_review_or_incident) — a finding
+#      nobody captured from a sweep has no specimen to capture, and
+#   4. `type:bug` — NOT `type:story`, and
+#   5. the body cites a review sweep's grounding-lens finding ID (`AIQ-3`, `NARR-1`).
+#
+# Measured over the 800 closed issues live on 2026-09-19: conjuncts 1-3 alone select 59
+# issues, most of which (latency, cost, IAM, judge plumbing) never served a reader a
+# sentence and so can never satisfy a specimen demand — a gate nobody can clear is the
+# #3851 class and is worse than no gate. Adding 4+5 selects exactly SIX — #3516 #3517
+# #3518 #3519 #3521 (all specimen-backed today) and #3540 (not). The lens ID is an
+# IDENTIFIER the review doc mints (docs/reviews/FULLREVIEW_2026-09-05.md numbers its
+# rows AIQ-1..8 / NARR-1..5), never a phrase, so this is not the text-match class.
+#
+# CONJUNCT 4 IS THE SELF-MEMBERSHIP CONTROL, and it was measured rather than assumed.
+# #3614 — the story that OWNS this corpus — carries `area:ai`, `review:forensic-rca-
+# 2026-09-05`, `type:story`, and its own body cites `AIQ-3` and `AIQ-4` (they are the
+# specimens it froze). Under conjuncts 1,2,3,5 alone this rule would refuse to let its
+# own issue close, the exact hazard that has bitten this repo four times in two sessions.
+# A review-filed BUG is the specimen-bearing shape ("a reader was served this"); a
+# review-filed STORY is the class shape ("build the gate that catches it") and is what a
+# specimen's `closes_with` points AT. Closed `type:story` members under 1,2,3,5 on the
+# measurement day: 0 — the narrowing costs nothing real today and removes the hazard.
+GROUNDING_LENS_PREFIXES = ("AIQ-", "NARR-")
+
+# The same dated-start argument SET_SECTION_EFFECTIVE_FROM makes, for the same reason:
+# demanding that an issue closed in September had captured a specimen under a rule that
+# did not exist is demanding a retroactive fact. Clause (b) binds from the day this rule
+# landed forward; a member closed before it is reported as an ADVISORY naming the gap,
+# never silently exempted (the `instrument_marker_exempt` precedent below). Clause (a) is
+# NOT dated, because it grades LIVE corpus state that is clearable today by one fixture
+# edit — not a fact the issue had to state at filing time.
+GROUNDING_SPECIMEN_EFFECTIVE_FROM = datetime(2026, 9, 19, tzinfo=timezone.utc)
 
 VIOLATION = "violation"
 ADVISORY = "advisory"
@@ -771,10 +820,193 @@ def rule_later_staleness(ctxs: List[Dict[str, Any]], now: datetime) -> List[Find
     return stale
 
 
+# ── the grounding corpus <-> backlog join (#3614 box 2, third clause) ──────────
+
+
+def _issue_number(ref: Any) -> Optional[int]:
+    """`"#3517"` / `" 3517 "` / `3517` -> `3517`; anything else -> None.
+
+    No regex: this module's contract (see `test_linter_imports_the_shared_contract_and_
+    compiles_no_regex`) is that it compiles no grammar of its own.
+    """
+    if isinstance(ref, int):
+        return ref
+    text = str(ref or "").strip().lstrip("#").strip()
+    return int(text) if text.isdigit() else None
+
+
+def names_grounding_lens_finding(body: Optional[str]) -> bool:
+    """True when the body cites a review sweep's grounding-lens finding ID (`AIQ-3`, `NARR-1`).
+
+    A prefix followed by a DIGIT, deliberately: bare "AIQ" appears in prose about the lens
+    itself ("the aiq lens found nothing"), and matching that would make this a phrase
+    detector. `AIQ-3` is a row ID the review document mints and the corpus fixtures cite
+    in their own `review` key — an identifier on both sides of the join.
+    """
+    text = body or ""
+    for prefix in GROUNDING_LENS_PREFIXES:
+        at = text.find(prefix)
+        while at != -1:
+            after = at + len(prefix)
+            if after < len(text) and text[after].isdigit():
+                return True
+            at = text.find(prefix, at + 1)
+    return False
+
+
+def is_grounding_finding(labels: List[str], body: Optional[str]) -> bool:
+    """The five-conjunct membership derived above. Closedness is the caller's conjunct 1."""
+    if "area:ai" not in labels:
+        return False
+    if not bc.filed_from_review_or_incident(labels):
+        return False
+    if "type:bug" not in labels:
+        return False
+    return names_grounding_lens_finding(body)
+
+
+def load_grounding_specimens(corpus_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Every fixture in `tests/grounding_corpus/`, as plain dicts.
+
+    Reuses `grounding_corpus_stamp.fixture_paths` — the loader the seal itself walks — so
+    the linter and the seal can never disagree about what the corpus contains. A missing
+    or unreadable corpus yields `[]` and the rule stays silent: this gate is a wrap step,
+    and a linter that wedges a wrap over its own missing fixture directory is a worse
+    failure than the one it is guarding.
+    """
+    try:
+        paths = gcs.fixture_paths(corpus_dir) if corpus_dir else gcs.fixture_paths()
+    except OSError:
+        return []
+    out: List[Dict[str, Any]] = []
+    for path in paths:
+        try:
+            out.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            continue
+    return out
+
+
+def rule_grounding_specimen(
+    closed_issues: Optional[List[Dict[str, Any]]],
+    specimens: Optional[List[Dict[str, Any]]] = None,
+    now: Optional[datetime] = None,
+) -> List[Finding]:
+    """A grounding finding cannot close until its specimen is in the corpus (#3614 box 2).
+
+    Two clauses, both a structural key<->id join (fixture key -> issue number), never a
+    phrase match:
+
+      (a) CLOSED WHILE THE CORPUS STILL SAYS NOTHING CATCHES IT. A specimen with
+          `status: "open"` names, in `closes_with`, the story that will land the class.
+          When that story is CLOSED the corpus now names a closed issue as its future
+          closer — i.e. it names nobody, and the finding banked a closure the corpus
+          contradicts. Clearable two ways, both one edit: land the class and flip the
+          fixture to `caught` (the README's own intake step), or point `closes_with` at
+          the issue that now owns the class — then re-seal with
+          `grounding_corpus_stamp.py stamp --amend <id>`.
+
+      (b) CLOSED WITH NO SPECIMEN AT ALL. A member of the derived set (see
+          GROUNDING_LENS_PREFIXES above) that no fixture's `issue` key names. Blocking
+          from GROUNDING_SPECIMEN_EFFECTIVE_FROM forward; a member closed before it is an
+          ADVISORY that NAMES the gap rather than hiding it.
+
+    `closed_issues` is injected, never fetched here — a rule stays pure so a fixture-driven
+    test is deterministic (the golden-tests wall-clock lesson, same as `now`). `None` means
+    "no closed corpus available in this context" and the rule emits nothing; `main()` prints
+    the skip note, matching this module's fail-open contract.
+    """
+    if closed_issues is None:
+        return []
+    now = now or datetime.now(timezone.utc)
+    specimens = load_grounding_specimens() if specimens is None else specimens
+
+    closed_by_number: Dict[int, Dict[str, Any]] = {}
+    for issue in closed_issues:
+        number = _issue_number(issue.get("number"))
+        if number is not None:
+            closed_by_number[number] = issue
+
+    out: List[Finding] = []
+    grandfathered: List[int] = []
+
+    # (a) — driven off the corpus, so membership here cannot be a label guess.
+    for fixture in specimens:
+        if (fixture.get("status") or "").strip() != "open":
+            continue
+        fixture_id = fixture.get("id") or "<unnamed fixture>"
+        closer = _issue_number(fixture.get("closes_with"))
+        if closer is None:
+            owner = _issue_number(fixture.get("issue"))
+            out.append(
+                Finding(
+                    "grounding_specimen",
+                    owner,
+                    f"corpus specimen `{fixture_id}` is `status: open` and names no `closes_with` — "
+                    "an open specimen must name the story that will catch it, or nothing is tracking it (#3614)",
+                )
+            )
+            continue
+        if closer not in closed_by_number:
+            continue
+        why = (fixture.get("why_open") or "").strip()
+        detail = f" — corpus says: {why}" if why else ""
+        out.append(
+            Finding(
+                "grounding_specimen",
+                closer,
+                f"CLOSED while corpus specimen `{fixture_id}` is still `status: open` — the corpus records that no "
+                f"gate class catches that sentence and names this (closed) issue as its closer{detail}. Land the class "
+                "and flip the fixture to `caught`, or point `closes_with` at the issue that now owns it, then re-seal "
+                "(`python3 scripts/grounding_corpus_stamp.py stamp --amend <id>`) (#3614)",
+            )
+        )
+
+    # (b) — driven off the backlog, joined back to the corpus by issue number.
+    owned = {n for n in (_issue_number(f.get("issue")) for f in specimens) if n is not None}
+    for number, issue in sorted(closed_by_number.items()):
+        if number in owned:
+            continue
+        if not is_grounding_finding(bc.label_names(issue), issue.get("body")):
+            continue
+        closed_at = _parse_iso(issue.get("closedAt") or issue.get("closed_at"))
+        if closed_at and closed_at < GROUNDING_SPECIMEN_EFFECTIVE_FROM:
+            grandfathered.append(number)
+            continue
+        out.append(
+            Finding(
+                "grounding_specimen",
+                number,
+                "closed as a grounding finding with NO specimen in `tests/grounding_corpus/` — the sentence it was "
+                "filed for is not captured, so nothing replays it and the class can silently return. Add the fixture "
+                "(README: `Adding a specimen`), bump `MIN_SPECIMENS`, re-seal, then close (#3614)",
+            )
+        )
+
+    if grandfathered:
+        out.append(
+            Finding(
+                "grounding_specimen",
+                grandfathered[0],
+                f"{len(grandfathered)} grounding finding(s) closed before {GROUNDING_SPECIMEN_EFFECTIVE_FROM.date()} "
+                f"with no corpus specimen: {sorted(grandfathered)} — grandfathered (the rule did not exist when they "
+                "closed), named rather than silent. Capturing them is optional backfill, not a blocker (#3614)",
+                ADVISORY,
+            )
+        )
+    return out
+
+
 # ── the whole check ─────────────────────────────────────────────────────────────
 
 
-def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None, lane: Optional[str] = None) -> List[Finding]:
+def check(
+    issues: List[Dict[str, Any]],
+    now: Optional[datetime] = None,
+    lane: Optional[str] = None,
+    closed_issues: Optional[List[Dict[str, Any]]] = None,
+    specimens: Optional[List[Dict[str, Any]]] = None,
+) -> List[Finding]:
     """Every rule over the whole fetched corpus, in a stable order.
 
     `lane` scopes the queue-liveness floor to one `model:*` lane (#3254) — the running
@@ -815,6 +1047,9 @@ def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None, lane: Op
     findings.extend(rule_now_liveness(ctxs, lane=lane))
     findings.extend(rule_now_lane_coverage(ctxs))
     findings.extend(rule_later_staleness(ctxs, now))
+    # #3614: the only rule that grades CLOSED issues — closure is precisely when a
+    # grounding finding's specimen either is in the corpus or is lost.
+    findings.extend(rule_grounding_specimen(closed_issues, specimens=specimens, now=now))
     return findings
 
 
@@ -888,6 +1123,45 @@ def _fetch_live_issues() -> Optional[List[Dict[str, Any]]]:
         return None
 
 
+def _fetch_closed_grounding_issues() -> Optional[List[Dict[str, Any]]]:
+    """The CLOSED half of the corpus, scoped to `area:ai` — conjunct 2 of the #3614 membership.
+
+    Scoped deliberately rather than for speed: `area:ai` is part of the derivation, so an
+    issue outside it is outside the rule's declared set by construction and fetching it
+    would only invite a guess. Fail-open like `_fetch_live_issues` — no gh, no rule.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "issue",
+                "list",
+                "-R",
+                REPO,
+                "--state",
+                "closed",
+                "--label",
+                "area:ai",
+                "--json",
+                "number,labels,body,closedAt",
+                "--limit",
+                "500",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            print(
+                f"check_backlog_hygiene: closed-issue fetch exited {result.returncode}: {result.stderr[:200]}; grounding_specimen skipped."
+            )
+            return None
+        return json.loads(result.stdout or "[]")
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+        print(f"check_backlog_hygiene: could not fetch closed issues via gh ({e}); grounding_specimen skipped.")
+        return None
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Lint the open GitHub issue corpus against the ADR-099 filing contract.")
     mode = parser.add_mutually_exclusive_group()
@@ -910,17 +1184,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--issues-json", help="Offline fixture path (gh issue list --json number,title,labels,milestone,body,updatedAt,createdAt output)."
     )
+    parser.add_argument(
+        "--closed-json",
+        help="Offline fixture path for the CLOSED corpus the #3614 grounding_specimen rule grades "
+        "(gh issue list --state closed --json number,labels,body,closedAt output).",
+    )
     args = parser.parse_args(argv)
 
     if args.issues_json:
         issues = json.loads(Path(args.issues_json).read_text(encoding="utf-8"))
+        closed = json.loads(Path(args.closed_json).read_text(encoding="utf-8")) if args.closed_json else None
     else:
         issues = _fetch_live_issues()
         if issues is None:
             return 0  # fail-open: no gh/network/auth available in this context — ALWAYS, blocking mode included
+        closed = json.loads(Path(args.closed_json).read_text(encoding="utf-8")) if args.closed_json else _fetch_closed_grounding_issues()
 
     now = _parse_iso(args.now) if args.now else None
-    findings = check(issues, now=now, lane=args.lane)
+    findings = check(issues, now=now, lane=args.lane, closed_issues=closed)
     if args.rule:
         findings = [f for f in findings if f.rule in set(args.rule)]
 
