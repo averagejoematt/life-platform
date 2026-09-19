@@ -1,6 +1,15 @@
 """scripts/gate_census_mutations.py — the mechanised can-it-fail verdicts for census
 family 5, the tree-sweeping structural pytest gates (#2999, epic #2578 slice 2).
 
+# module-size-exception: a MUTATION-SPEC + PROOF REGISTRY, same shape and same reason
+# as gate_census_proofs.py's own exception a few lines up the import graph — one
+# `MutationSpec` (the plant, the target, the expected direction) plus one recorded
+# verdict per gate that earned one. It grows by exactly one spec/proof pair each time a
+# gate is proved, which is the ratchet working, not drift; there is no logic here to
+# factor smaller, and splitting the specs from their proofs would put a gate's plant and
+# its verdict in two files for no reason (#3731 crossed 1,000 lines adding four such
+# pairs for the newly-discovered tree-sweeping gates in tests/repo_scan_cache.py).
+
 WHY ITS OWN MODULE
 ──────────────────
 `scripts/gate_census.py` sits at 1,164 lines against the 1,200-line hard ceiling
