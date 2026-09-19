@@ -215,8 +215,13 @@ to its one live leg) · `site/story/build/beats.json` (+1 beat) · `tests/test_d
 **Decisions:** none needed — every call applied an existing ADR (099 closure contract, 103/144 ledger posture, 104
 honest numbers, 077 phase classes, 133 ceiling untouched). **One owner RULING was applied rather than made:** #3671's
 recorded preference decided #3670 box 4 against the box's own wording.
-**Main:** green at wrap — see the final verification block; two CI/CD runs were mid-flight when the gate battery ran,
-which is why `main-green` read red in the interim rather than because anything was broken.
+**Main:** green, verified at wrap rather than assumed — `check_main_green.py` reports *"✅ main GREEN — latest
+completed CI/CD run (a3c62024) succeeded"* with `HEAD-COVERAGE: covered a3c62024`. It read RED earlier in the session
+for two reasons, both benign and both now cleared: a reconcile-push race on `f22c66ad` (my four back-to-back merges
+raced the reconcile bot twice; the error says so itself — *"the queued run will reconcile"* — and `f80e88a50` did),
+and the seven lease REJECTIONS, each of which concludes its run as `failure` by construction. The checker already
+distinguishes the latter, reading the rejection prose back as *"production deployment REJECTED and superseded (#2467
+lease actioned), not a red main"*.
 **Incidents:** none added — no incident occurred. The lease discipline that AJ's incident row demanded was applied
 continuously (a persistent monitor, 5 leases disposed) rather than retro-fitted.
 **Stash/hooks:** clean — one uncommitted file all session (`.claude/settings.local.json`, pre-existing), no stashes.
