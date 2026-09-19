@@ -29,6 +29,7 @@ INVARIANTS (tests enforce):
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -562,17 +563,180 @@ def elevate_pain(table, item, user="matthew") -> dict:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Versioned rewrite (#3816) — attest, never backfill, applied to the note layer
+#
+# A re-extraction that produces DIFFERENT signals used to land as a plain put_item on
+# the same sk. The improved record was then indistinguishable from an original one
+# forever: `extracted_at` moved, and a late first extraction looks exactly the same.
+# This layer is a TRAJECTORY the coach reads as an arc, so a silent re-derivation
+# changes the past shape of that arc with nothing saying it did.
+#
+# Shape: the HEAD keeps its stable key (`DATE#<d>#WORKOUT#<id>`) and the prior copy is
+# moved to `ARCHIVE#DATE#<d>#WORKOUT#<id>#<prior extracted_at>` in the SAME partition.
+# The archive prefix is deliberately `ARCHIVE#`, not a suffix on the head key: every
+# reader of this partition scopes by `DATE#` — `tool_get_exercise_notes` with
+# `sk >= DATE#<start>` and `training_notes_health` with `begins_with(DATE#<d>#WORKOUT#)`
+# — and "ARCHIVE#" sorts BEFORE "DATE#" ("A" < "D"), so archived rows fall outside BOTH
+# ranges by key shape rather than by a filter each reader has to remember. (Same trick
+# the hevy partition already uses in the other direction: `DELETE#WORKOUT#` markers sort
+# after every `DATE#` key.) Archived rows also carry `record_kind: prior_extraction` so a
+# future reader that DOES widen its range has a positive attribute to exclude on.
+# ──────────────────────────────────────────────────────────────────────────────
+ARCHIVE_PREFIX = "ARCHIVE#"
+RECORD_KIND_PRIOR = "prior_extraction"
+
+# The fields that DEFINE an extraction. `extracted_at` is deliberately absent — it moves
+# on every run by construction, and comparing it would make every re-run a new version.
+COMPARED_FIELDS = (
+    "note_hash",
+    "note_raw",
+    "signals",
+    "pain_flag",
+    "sentiment",
+    "degraded",
+    "degraded_reason",
+    "extracted_by",
+    "algo_version",
+)
+
+
+def _json_default(o):
+    """Decimal (what DynamoDB hands back) compares equal to the float we are about to
+    write. Without this a round-trip alone would look like a changed extraction."""
+    try:
+        return float(o)
+    except Exception:  # noqa: BLE001
+        return str(o)
+
+
+def extraction_fingerprint(record: dict) -> str:
+    """Canonical JSON over COMPARED_FIELDS — the thing two extractions are equal on."""
+    return json.dumps({k: (record or {}).get(k) for k in COMPARED_FIELDS}, sort_keys=True, default=_json_default)
+
+
+def extraction_changed(stored: dict, candidate: dict) -> bool:
+    """True when a re-extraction says something different from what is stored."""
+    return extraction_fingerprint(stored) != extraction_fingerprint(candidate)
+
+
+def prior_extraction_sk(head_sk: str, prior_extracted_at: str) -> str:
+    """The archive key of one superseded extraction — readable by key, forever."""
+    return f"{ARCHIVE_PREFIX}{head_sk}#{prior_extracted_at or 'unknown'}"
+
+
+def read_head_record(table, pk: str, sk: str):
+    """The stored head, or None when there is none. Read failures PROPAGATE — the
+    caller has to decide, because "I could not read the prior" and "there is no prior"
+    are different facts and only one of them licenses a v1 write."""
+    return ((table.get_item(Key={"pk": pk, "sk": sk}) or {}).get("Item")) or None
+
+
+def build_prior_extraction_item(stored: dict) -> dict:
+    """A verbatim copy of the stored head, re-keyed to its archive sk."""
+    prior = dict(stored)
+    prior["sk"] = prior_extraction_sk(str(stored.get("sk") or ""), str(stored.get("extracted_at") or ""))
+    prior["record_kind"] = RECORD_KIND_PRIOR
+    prior["superseded_head_sk"] = stored.get("sk")
+    prior["archived_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return prior
+
+
+def archive_prior_extraction(table, stored: dict) -> bool:
+    """Copy the prior extraction to its archive key. True when it is safely stored."""
+    try:
+        table.put_item(Item=floats_to_decimal(build_prior_extraction_item(stored)))
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("training_notes prior archive failed (%s): %s", stored.get("sk"), type(e).__name__)
+        return False
+
+
+def supersede_stamp(stored: dict) -> dict:
+    """What the new head carries about the extraction it replaced: enough to FIND the
+    archived copy by key, and enough to say when this layer first spoke about this
+    workout+exercise at all."""
+    prior_at = str(stored.get("extracted_at") or "")
+    try:
+        prior_version = int(stored.get("version") or 1)
+    except (TypeError, ValueError):
+        prior_version = 1
+    return {
+        "version": prior_version + 1,
+        "first_extracted_at": stored.get("first_extracted_at") or stored.get("extracted_at"),
+        "supersedes": {
+            "algo_version": stored.get("algo_version"),
+            "extracted_at": prior_at,
+            "note_hash": stored.get("note_hash"),
+            "sk": prior_extraction_sk(str(stored.get("sk") or ""), prior_at),
+        },
+    }
+
+
 def write_workout_notes(table, date, workout_uid, exercises, user="matthew", dry_run=False, now_iso=None, llm_fn=None):
-    """Idempotent upsert of one workout's note-signal records. Provenance-guarded: only
-    ever writes the training_notes partition (Invariant 1). Idempotent by stable sk."""
+    """Versioned upsert of one workout's note-signal records (#3816).
+
+    Three outcomes per record, never a silent same-key overwrite:
+
+      * no stored record  -> write the head (version 1).
+      * stored record with the SAME note_hash and the same compared signals -> write
+        NOTHING AT ALL. The windowed re-run in hevy_backfill fires on every invoke, so
+        the unchanged path has to cost zero rows (and zero `extracted_at` churn, which
+        was the only tell a re-derivation ever left).
+      * stored record whose extraction DIFFERS -> copy the prior verbatim to its archive
+        key FIRST, then write the head stamped with `supersedes`.
+
+    Provenance-guarded: only ever writes the training_notes partition (Invariant 1).
+    """
     items = build_workout_note_items(date, workout_uid, exercises, user=user, now_iso=now_iso, llm_fn=llm_fn)
-    result = {"date": date, "workout_uid": workout_uid, "records": len(items), "wrote": 0, "pain": 0, "dry_run": dry_run, "items": items}
+    result = {
+        "date": date,
+        "workout_uid": workout_uid,
+        "records": len(items),
+        "wrote": 0,
+        "skipped": 0,
+        "versioned": 0,
+        "archive_failed": 0,
+        "prior_unverified": 0,
+        "pain": 0,
+        "dry_run": dry_run,
+        "items": items,
+    }
     if dry_run:
         return result
     raw_guard = raw_pk(user)
     for it in items:
         assert it["pk"] != raw_guard, f"training_notes refused to write the raw Hevy pk: {it['pk']!r}"
         assert f"#SOURCE#{NOTES_SOURCE}#" in it["pk"], f"unexpected pk: {it['pk']!r}"
+        try:
+            stored = read_head_record(table, it["pk"], it["sk"])
+            head_readable = True
+        except Exception as e:  # noqa: BLE001
+            # Fail-soft (this runs inside ingestion) but never fail SILENT: the head is
+            # written with a flag saying its lineage could not be checked, so a reader
+            # is never told a clean first extraction happened when nobody knows.
+            logger.warning("training_notes head read failed (%s): %s", it["sk"], type(e).__name__)
+            stored, head_readable = None, False
+            it["prior_unverified"] = True
+            result["prior_unverified"] += 1
+        if head_readable and stored is not None and not extraction_changed(stored, it):
+            # Attest, never backfill: an unchanged re-extraction has nothing to say.
+            result["skipped"] += 1
+            if it.get("pain_flag"):
+                result["pain"] += 1
+            continue
+        if stored is not None:
+            archived = archive_prior_extraction(table, stored)
+            if not archived:
+                # The prior could not be preserved. Say so ON THE RECORD rather than
+                # letting the head imply a clean lineage it does not have.
+                it["prior_archive_failed"] = True
+                result["archive_failed"] += 1
+            it.update(supersede_stamp(stored))
+            result["versioned"] += 1
+        elif head_readable:
+            it.setdefault("version", 1)
+            it.setdefault("first_extracted_at", it.get("extracted_at"))
         table.put_item(Item=floats_to_decimal(it))
         result["wrote"] += 1
         if it.get("pain_flag"):

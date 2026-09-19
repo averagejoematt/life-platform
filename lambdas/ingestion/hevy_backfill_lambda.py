@@ -221,6 +221,12 @@ def reextract_training_notes(days: int) -> dict:
     workout+exercise and the LLM tail is hash-cached, so an unchanged note that already
     extracted cleanly costs nothing and a degraded one is repaired.
 
+    #3816: "idempotent" used to mean "re-puts the same key". It now means NO WRITE at
+    all when the extraction is unchanged — this fires on every hevy-backfill invoke, so
+    a re-put churned `extracted_at` on records nobody re-derived. When the extraction
+    DOES change, the prior is archived first and the new head carries `supersedes`; a
+    repair is visible as a repair instead of replacing the past in place.
+
     Bounded by the same monthly Haiku cap as the live path — a breach degrades exactly
     as before rather than failing the run.
     """
@@ -240,6 +246,9 @@ def reextract_training_notes(days: int) -> dict:
     llm_fn = make_llm_fn(_table)
     workouts = 0
     records = 0
+    wrote = 0
+    skipped = 0
+    versioned = 0
     for item in resp.get("Items", []):
         exercises = item.get("exercises") or []
         if not any((e.get("notes") or "").strip() for e in exercises):
@@ -248,9 +257,23 @@ def reextract_training_notes(days: int) -> dict:
             res = tn.write_workout_notes(_table, item.get("date"), item.get("workout_uid", ""), exercises, llm_fn=llm_fn)
             workouts += 1
             records += res.get("records", 0)
+            wrote += res.get("wrote", 0)
+            skipped += res.get("skipped", 0)
+            versioned += res.get("versioned", 0)
         except Exception as e:  # noqa: BLE001
             logger.warning("re-extract failed for %s: %s: %s", item.get("workout_uid"), type(e).__name__, e)
-    out = {"reextracted_workouts": workouts, "records": records, "window": f"{start}..{end}"}
+    # #3816: `records` is how many notes were CONSIDERED; it was never how many rows
+    # moved. The three counters below are the ones that say what this run did to the
+    # stored past — `versioned` is the number of records whose signals a re-derivation
+    # changed, and every one of them has its prior archived and readable by key.
+    out = {
+        "reextracted_workouts": workouts,
+        "records": records,
+        "wrote": wrote,
+        "skipped_unchanged": skipped,
+        "versioned": versioned,
+        "window": f"{start}..{end}",
+    }
     logger.info("training-notes re-extract: %s", out)
     return out
 
