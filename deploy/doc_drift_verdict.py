@@ -31,20 +31,33 @@ a drift source added to `--check` later is human-owned until someone proves othe
 `  i ` INFO lines (the #3384 pull_request exemption) are excluded from `total` upstream
 and so are invisible here — they are not drift in either direction.
 
-WHY AN EXIT CODE, NOT A STDOUT MARKER. The workflow step branches on `$?`. `--check`
-prints the drifted literals themselves — doc text, verbatim — so any `grep` over its
-stdout is a text matcher reading content it does not own, which is how a guard ends up
-reading the comment that explains it (2026-09-16, four times in one night). `3` cannot
-be forged by a doc that happens to contain the word. The `VERDICT: <name>` line is
-printed for humans and for an annotation reader; it is never the classifier.
+WHY AN EXIT CODE, NOT A STDOUT MARKER. A caller classifies on `$?`. `--check` prints the
+drifted literals themselves — doc text, verbatim — so any `grep` over its stdout is a
+text matcher reading content it does not own, which is how a guard ends up reading the
+comment that explains it (2026-09-16, four times in one night). `3` cannot be forged by
+a doc that happens to contain the word. The `VERDICT: <name>` line is printed for humans
+and for an annotation reader; it is never the classifier.
 
-WHERE THE POLICY LIVES. This module reports a FACT about the tree ("the only drift is
-bot-owned"). Whether that fact is tolerable is the caller's call, and it differs by
-event: on a push to main the reconcile job follows within ~60 s, so `3` is a warning;
-on a pull_request no bot commit is coming, so `3` must still fail and the author runs
-`--apply`. That branch lives in `.github/workflows/docs-ci.yml`, not here.
+WHY THE EVENT BRANCH IS HERE AND NOT IN THE WORKFLOW STEP. The tolerance is event-scoped
+— a reconcile commit follows a push to main, and nothing follows a branch, so a
+pull_request must still red and the author still runs `--apply`. The obvious home for
+that branch is a `run: |` block in `docs-ci.yml`, and it is the wrong one:
+`deploy/restart_verify_gates.py` DERIVES the doc-gate list by parsing single-line
+`run: python3 …` steps out of that workflow (#3477/#3534), and both `restart_pipeline`
+and `scripts/wrap_gates.py` consume the derivation. A block scalar is invisible to that
+parser, so moving the logic into shell would silently DELETE the literal gate from the
+reset's and the wrap battery's gate lists — the "derived silently as nothing" rot those
+two issues exist to stop. So the step stays one line and the event is read here, from
+`GITHUB_EVENT_NAME`/`GITHUB_REF`, exactly as `deploy/doc_platform_counts.py` already
+reads them for its own PR exemption (#3384).
+
+`3` is still what a non-push caller gets: a laptop, a PR run, `wrap_gates`, the reset
+sweep all see a distinct non-zero code and red. Only a push to `refs/heads/main` — the
+one context where the reconcile job is literally the next thing to run — converts it to
+a `::warning::` and exit 0.
 """
 
+import os
 import sys
 
 EXIT_SUCCESS = 0
@@ -66,6 +79,14 @@ _EXIT_FOR = {
     VERDICT_FAILURE: EXIT_FAILURE,
     VERDICT_PENDING_RECONCILE: EXIT_PENDING_RECONCILE,
 }
+
+
+def reconcile_bot_follows_this_run():
+    """True only on a push to `main` inside GitHub Actions — the one context where the
+    `reconcile` job (ci-cd.yml Job 0, `push` + `branches: [main]`) is the next thing to
+    run and will commit the regenerated literals. Deliberately narrow: a branch push, a
+    pull_request, a workflow_dispatch and a laptop all get the strict verdict."""
+    return os.environ.get("GITHUB_EVENT_NAME") == "push" and os.environ.get("GITHUB_REF") == "refs/heads/main"
 
 
 def bot_owned(records):
@@ -96,6 +117,16 @@ def report(total_drift, bot_drift, drifted_docs, out=None):
         for d in drifted_docs:
             print(f"       - {d}", file=out)
         print("  Fix (on a branch, where no bot follows): python3 deploy/sync_doc_metadata.py --apply", file=out)
+        if reconcile_bot_follows_this_run():
+            print(
+                "::warning title=pending-reconcile::Doc-sync literals are stale and every one of them "
+                "is a value the reconcile bot's next commit regenerates — not a red main (#3646). "
+                "Confirm the chore(reconcile) commit lands within ~60 s.",
+                file=out,
+            )
+            print(f"  VERDICT: {verdict} (tolerated: a push to main, the reconcile job runs next)", file=out)
+            print(f"{'='*60}\n", file=out)
+            return EXIT_SUCCESS
     else:
         print(f"  ❌ CHECK FAILED — {total_drift} stale literal(s) across {len(drifted_docs)} file(s),", file=out)
         print(f"     {human_drift} of them NOT repairable by --apply (a rule matched nothing, a marker", file=out)

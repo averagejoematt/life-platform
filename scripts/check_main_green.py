@@ -96,10 +96,10 @@ live runs rather than inferred:
      structurally immune to this class.
 
 The fix therefore lands where the verdict is minted: `sync_doc_metadata --check` exits
-3 and docs-ci's gate step converts that to a `::warning::` + step success on `push`, so
-the Docs CI RUN concludes `success` and every green-reader — the badge, the #3530
-cancelled-rollup reader, this file — reads it correctly with no new annotation parsing.
-If the literal gate ever moves into `ci-cd.yml`, this note is the reason a
+3, and on a push to `refs/heads/main` it prints a `::warning::` and exits 0 — so the
+Docs CI RUN concludes `success` and every green-reader (the badge, the #3530
+cancelled-rollup reader, this file) reads it correctly with no annotation parsing at
+all. If the literal gate ever moves into `ci-cd.yml`, this note is the reason a
 pending-reconcile classifier would then be needed here, and `VERDICT: pending-reconcile`
 on the step's log is the marker to read.
 

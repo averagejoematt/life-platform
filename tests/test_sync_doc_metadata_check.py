@@ -69,6 +69,50 @@ def test_check_exits_pending_reconcile_on_bot_owned_drift(tmp_path, monkeypatch)
     assert doc.read_text(encoding="utf-8") == "Header: v1 (99 Widgets)\n", "--check must never write"
 
 
+def test_push_to_main_tolerates_pending_reconcile_but_nothing_else_does(tmp_path, monkeypatch):
+    """The event branch (#3646): exit 0 + a ::warning:: ONLY on a push to refs/heads/main.
+
+    Deliberately narrow. A pull_request, a branch push, a workflow_dispatch and a laptop
+    all still get the distinct non-zero 3 — nothing follows them that would commit the
+    regenerated literals, so the author must run `--apply` exactly as before. The branch
+    lives in the script rather than in a `run: |` block because
+    `deploy/restart_verify_gates.py` derives Docs CI's gate list from single-line
+    `run: python3 …` steps, and a block scalar would delete this gate from the reset
+    pipeline's and the wrap battery's lists (#3477/#3534).
+    """
+    doc = _isolate(monkeypatch, tmp_path, "Header: v1 (99 Widgets)\n", widget_count=42)
+    assert doc.exists()
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    for env, expected in (
+        ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_SUCCESS),
+        ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/issue-1-x"}, _verdict.EXIT_PENDING_RECONCILE),
+        ({"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF": "refs/pull/1/merge"}, _verdict.EXIT_PENDING_RECONCILE),
+        ({"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_PENDING_RECONCILE),
+        ({}, _verdict.EXIT_PENDING_RECONCILE),  # a laptop
+    ):
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+        monkeypatch.delenv("GITHUB_REF", raising=False)
+        for k, v in env.items():
+            monkeypatch.setenv(k, v)
+        with pytest.raises(SystemExit) as exc:
+            sync.main()
+        assert exc.value.code == expected, f"{env or 'no CI env'} expected exit {expected}, got {exc.value.code}"
+
+
+def test_human_owned_drift_is_not_tolerated_even_on_a_push_to_main(tmp_path, monkeypatch):
+    """The event branch must never reach un-repairable drift — the bot cannot clear it."""
+    _isolate(monkeypatch, tmp_path, "Header: v1 (no widget line here at all)\n", widget_count=42)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+
+    assert exc.value.code == _verdict.EXIT_FAILURE
+
+
 def test_check_exits_failure_on_human_owned_drift(tmp_path, monkeypatch):
     """THE NEGATIVE CONTROL (#3646). Drift `--apply` cannot repair still fails, exit 1.
 

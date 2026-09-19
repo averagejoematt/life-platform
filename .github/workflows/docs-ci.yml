@@ -204,32 +204,29 @@ jobs:
 
       # Each gate reports independently (#749 pattern) so one red doesn't mask the rest.
       #
-      # #3646 — THE PENDING-RECONCILE BRANCH. Since #3533 keyed the push-to-main
-      # concurrency group on the commit sha, this run is no longer cancelled mid-flight by
-      # the reconcile bot's follow-up push, so every merge commit concluded an honest
-      # `failure` on literals the bot's own NEXT commit rewrites ~60 s later (specimens
-      # 2026-09-06: 6fedae2dd, 1efec2f99, d20a0e959). The checker now partitions its drift
-      # by owner and exits 3 when EVERY stale literal is one `--apply` regenerates.
+      # #3646 — THE PENDING-RECONCILE BRANCH, and why it is NOT a `run: |` block here.
+      # Since #3533 keyed the push-to-main concurrency group on the commit sha, this run
+      # is no longer cancelled mid-flight by the reconcile bot's follow-up push, so every
+      # merge commit concluded an honest `failure` on literals the bot's own NEXT commit
+      # rewrites ~60 s later (specimens 2026-09-06: 6fedae2dd, 1efec2f99, d20a0e959).
       #
-      # Branching on the exit code, not on stdout: `--check` prints the drifted literals
-      # verbatim, so a grep over its output is a text matcher reading doc content it does
-      # not own. 3 cannot be forged by a doc that happens to contain the word.
+      # The checker now partitions its drift by owner (`deploy/doc_drift_verdict.py`) and,
+      # when EVERY stale record is one `--apply` regenerates, exits 3 with
+      # `VERDICT: pending-reconcile` — or, on a push to main where the reconcile job is
+      # the very next thing to run, prints `::warning::` and exits 0.
       #
-      # Tolerated on `push` ONLY. On a pull_request no reconcile bot follows, so 3 must
-      # still red and the author runs `--apply` — exactly today's behaviour.
+      # THE EVENT BRANCH LIVES IN THE SCRIPT, NOT IN A SHELL BLOCK HERE, and that is
+      # load-bearing: `deploy/restart_verify_gates.py` DERIVES this workflow's doc-gate
+      # list by parsing single-line `run: python3 …` steps (#3477/#3534), and both the
+      # reset pipeline and `scripts/wrap_gates.py` consume that derivation. A `run: |`
+      # block is invisible to it, so rewriting this step as shell would silently DELETE
+      # the literal gate from the reset's and the wrap battery's gate list — the exact
+      # "derived silently as nothing" rot those two issues exist to stop. The step stays
+      # one line; `GITHUB_EVENT_NAME`/`GITHUB_REF` carry the event, exactly as
+      # `deploy/doc_platform_counts.py` already reads them for its PR exemption (#3384).
       - name: Literal-drift gate (sync_doc_metadata --check)
         if: always()
-        run: |
-          set +e
-          python3 deploy/sync_doc_metadata.py --check
-          rc=$?
-          set -e
-          if [ "$rc" -eq 0 ]; then exit 0; fi
-          if [ "$rc" -eq 3 ] && [ "${{ github.event_name }}" = "push" ]; then
-            echo "::warning title=pending-reconcile::Doc-sync literals are stale, and every one of them is a value the reconcile bot's next commit regenerates. Not a red main (#3646) — verify chore(reconcile) lands within ~60 s."
-            exit 0
-          fi
-          exit "$rc"
+        run: python3 deploy/sync_doc_metadata.py --check
 
       - name: Dead-link gate
         if: always()

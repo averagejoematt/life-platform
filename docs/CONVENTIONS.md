@@ -625,11 +625,17 @@ regenerates — the `  ~` rewrites. A record `--apply` cannot repair (`  !` a ru
 matched nothing, a marker pair missing, a named doc gone) is **human-owned** and still
 exits 1: the bot's commit would not clear it, so tolerating it would mint a gate that
 can never red. The partition is *not* "is the rule in `RULES`" — a `!` comes from a
-rule in `RULES` too. Docs CI's literal-gate step tolerates 3 **on `push` only**; on a
-`pull_request` no bot follows, so a stale literal still reds and the author runs
-`--apply` exactly as before. Branch on the exit code, never on the step's stdout —
-`--check` prints the drifted doc text verbatim, so a grep over it is a text matcher
-reading content it does not own.
+rule in `RULES` too. The tolerance is **event-scoped and applied by the script**: only a
+push to `refs/heads/main` — where the `reconcile` job is literally the next thing to run
+— turns the verdict into a `::warning::` + exit 0. A pull_request, a branch push, a
+`workflow_dispatch`, `wrap_gates`, the reset sweep and a laptop all still get the
+distinct non-zero **3** and red, so a branch carries its own regenerated literals exactly
+as before. The branch lives in the script and **not** in a `run: |` block in
+`docs-ci.yml` because `deploy/restart_verify_gates.py` derives that workflow's doc-gate
+list by parsing single-line `run: python3 …` steps (#3477/#3534) — a block scalar would
+silently delete the literal gate from the reset pipeline's and the wrap battery's lists.
+Classify on the exit code, never on the step's stdout: `--check` prints the drifted doc
+text verbatim, so a grep over it is a text matcher reading content it does not own.
 
 ### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052/#2590)
 
