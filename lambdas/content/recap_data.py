@@ -53,6 +53,7 @@ condensation therefore means no line, never a substitute from a different audien
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -130,6 +131,9 @@ class WorkoutFact:
     exercises: list[str] = field(default_factory=list)
     duration_min: int | None = None
     detail: list[ExerciseFact] = field(default_factory=list)
+    #: Sets that carried a load or counted reps. Walking and stretching entries are sets
+    #: in Hevy's model and are not "working sets" in anyone else's.
+    n_working_sets: int = 0
 
 
 @dataclass
@@ -140,6 +144,12 @@ class DayFacts:
     day_n: int | None = None
     # weight
     weight_lb: float | None = None
+    #: `weight_lb` is `latest_weight` carried forward by the compute cron. Whether the
+    #: scale was actually stepped on THIS day is a separate fact, and a card that
+    #: headlines a carried-forward number as today's reading is the ADR-104 failure
+    #: three panel seats caught on Days 1/3/5.
+    weighed_today: bool = False
+    last_weigh_label: str | None = None
     week_ago_weight_lb: float | None = None
     weekly_rate_lb: float | None = None
     rate_ci: tuple[float, float] | None = None
@@ -192,6 +202,15 @@ class DayFacts:
     acwr_zone: str | None = None
     sleep_debt_hrs: float | None = None
     hrv_ms: float | None = None
+    hrv_30d: float | None = None
+    #: How many vices are tracked, from the scorer — never `len(vice_streaks)`, which
+    #: counts only the ones currently held and made the denominator move day to day.
+    vices_total: int | None = None
+    #: A line the day crossed, set by the lambda (`recap_card_lambda._milestone`). None
+    #: on an ordinary day; a short fixed phrase ("first 10 lb") when not.
+    milestone: str | None = None
+    #: Who the coach line is from, for attribution on the card ("physical coach").
+    coach_label: str | None = None
     # habit + vice DETAIL. These carry NAMES, so they travel through item_labels() and the
     # privacy gate — "which habit" is the interesting half and also the risky half.
     missed_tier0: list[str] = field(default_factory=list)
@@ -278,6 +297,7 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
     for r in rows:
         exercises = r.get("exercises") or []
         sets = 0
+        working = 0
         volume = 0.0
         best = (0.0, None)
         detail: list[ExerciseFact] = []
@@ -297,6 +317,8 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
                     continue
                 sets += 1
                 ex_sets += 1
+                if (lbs and float(lbs) > 0) or (reps and int(reps) > 0):
+                    working += 1
                 if lbs is not None and float(lbs) > 0 and (top is None or float(lbs) > top[0]):
                     top = (float(lbs), int(reps or 0))
             volume += ex_vol
@@ -327,9 +349,29 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
                 exercises=[e.get("name") or e.get("title") for e in exercises if (e.get("name") or e.get("title"))],
                 duration_min=duration_min,
                 detail=detail,
+                n_working_sets=working,
             )
         )
     return out
+
+
+def cycle_volume_max(table, start: str, end_exclusive: str) -> tuple[float, int]:
+    """(heaviest session in lb moved, sessions counted) between genesis and the day BEFORE
+    `end_exclusive`.
+
+    For the session-volume milestone: a day is a personal best for this attempt when its
+    volume beats every earlier session of the cycle. Read from the same hevy rows the
+    cards draw from, never a hand-typed record. The count is what stops the third session
+    of an attempt from being a "best".
+    """
+    days = _day_range(start, end_exclusive)[:-1]
+    best, n = 0.0, 0
+    for d in days:
+        for w in _workout_facts(_query_prefix(table, "hevy", f"DATE#{d}")):
+            if w.volume_lbs and float(w.volume_lbs) > 0:
+                n += 1
+                best = max(best, float(w.volume_lbs))
+    return best, n
 
 
 def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFacts:
@@ -365,6 +407,7 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.acwr_zone = computed.get("acwr_zone")
         facts.sleep_debt_hrs = computed.get("sleep_debt_7d_hrs")
         facts.hrv_ms = computed.get("hrv_ms")
+        facts.hrv_30d = computed.get("hrv_30d")
         facts.vice_streaks = {k: v for k, v in (computed.get("vice_streaks") or {}).items() if v}
         # The detail card (#3741, two cards a day): what the grade was scored FROM.
         details = computed.get("component_details") or {}
@@ -398,6 +441,13 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.missed_tier0 = [m for m in (habits.get("missed_tier0") or []) if isinstance(m, str)]
         if not facts.vice_streaks:
             facts.vice_streaks = {k: v for k, v in (habits.get("vice_streaks") or {}).items() if v}
+        vt = habits.get("vices_total")
+        facts.vices_total = int(vt) if vt is not None else None
+
+    # Was the scale stepped on today? The withings row for the date is the fact; the
+    # compute cron's `latest_weight` is a carry-forward and says nothing about the day.
+    wrow = _get_day(table, "withings", date) or {}
+    facts.weighed_today = wrow.get("weight_lbs") is not None or wrow.get("weight_kg") is not None
 
     hevy_rows = _query_prefix(table, "hevy", f"DATE#{date}")
     if not hevy_rows:
@@ -535,6 +585,59 @@ def first_sentence(text: str, limit: int = COACH_LINE_MAX_CHARS) -> str:
     return (clipped + "…") if clipped else ""
 
 
+#: A sentence with any of these does not go on a card. Dates: the card already carries
+#: one, and a quote opening "On the night of 2026-09-08" reads as a lab report and, worse,
+#: is usually about a DIFFERENT day than the card's (coach summaries lag ingestion, and
+#: the panel caught a Day 8 line contradicting Day 8's own detail card). Instruments and
+#: ops words: a follower does not know what an EWMA is, and "the Garmin pause has created
+#: a data blind spot" is a platform note leaking to an audience. Absence claims: they are
+#: the ones most likely to be stale against the card's own blocks.
+_SENTENCE_REJECT = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}\b"
+    r"|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?\b"
+    r"|\b(?:hrv|ewma|garmin|whoop|bpm|ms|acwr|z-score|sensor|sensors|data|journal|log|logged|ingest|pipeline|blind spot)\b"
+    r"|\d+/10",
+    re.IGNORECASE,
+)
+#: A sentence that opens by pointing back at the one before it ("That gap is…", "It's the
+#: difference…", "Strip that meal…") is not a line, it is half of one. On a card there is
+#: no sentence before it.
+_SENTENCE_ANAPHORA = re.compile(
+    r"^(?:that|this|these|those|it|it's|its|which|so|and|but|once|strip|more|less|the same|either|both|neither|also)\b"
+    r"|\b(?:also|something else|as well|too)\b",
+    re.IGNORECASE,
+)
+#: Two mono lines at the card's wrap width, uncut. A cut sentence is a broken render.
+CARD_SENTENCE_MAX_CHARS = 100
+
+
+def card_sentence(text: str, limit: int = CARD_SENTENCE_MAX_CHARS) -> str:
+    """The first COMPLETE sentence of `text` that fits a card and passes the reject list.
+
+    Still selection, never generation: the result is a verbatim sentence of something a
+    coach wrote — contiguous, unedited, in its original order. What changed from
+    `first_sentence` is only WHICH sentence: one that ends, fits two lines uncut, and
+    says nothing a card cannot carry. Returns "" when no sentence qualifies, and the card
+    draws no quote — nothing at all is just the card the day earned.
+    """
+    text = " ".join(str(text or "").split())
+    if not text:
+        return ""
+    # Split only at a terminator followed by whitespace: a decimal point ("ratio of
+    # 0.754") or an abbreviation is not the end of a thought, and the first cut of this
+    # selector shipped "ratio of 0." as a quote.
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        sentence = sentence.strip()
+        if not sentence or sentence[-1] not in ".!?" or len(sentence) > limit:
+            continue
+        if _SENTENCE_REJECT.search(sentence) or _SENTENCE_ANAPHORA.search(sentence):
+            continue
+        if len(sentence.split()) < 4:
+            continue
+        return sentence
+    return ""
+
+
 #: What `coach_line` is reporting when it hands back no line. Three outcomes that look
 #: identical on the card and must never look identical in the record (#3768's lesson,
 #: applied before it can bite rather than after): the platform genuinely had nothing to
@@ -579,7 +682,7 @@ def coach_line(table, date: str, beat: str = "", *, coach_order=None) -> tuple:
         failed = failed or not ok
         for item in rows:
             blurb = audience_guard.public_blurb(item, limit=COACH_LINE_MAX_CHARS * 4)
-            line = first_sentence(blurb)
+            line = card_sentence(blurb)
             if line:
                 return line, f"COACH#{coach_id}|{item.get('sk')}", LINE_OK
     return None, None, (LINE_UNREADABLE if failed else LINE_ABSENT)

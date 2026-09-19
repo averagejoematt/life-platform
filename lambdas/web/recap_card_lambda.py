@@ -138,6 +138,67 @@ def _record(sk: str, payload: dict[str, Any]) -> None:
         logger.error("recap record write failed for %s: %s: %s", sk, type(e).__name__, e)
 
 
+#: Cumulative-loss lines worth a stripe, in lb. Crossed once each per cycle.
+MILESTONE_LB = (5, 10, 25, 50, 75, 100)
+#: Day numbers worth a stripe (the week closes are the reckoning's job).
+MILESTONE_DAYS = {30: "one month in", 60: "two months in", 90: "three months in", 100: "day 100", 180: "six months in", 365: "one year in"}
+
+
+#: A volume best needs this many earlier sessions in the cycle before it is a milestone —
+#: the third session of an attempt is trivially "the most moved so far".
+PB_MIN_PRIOR_SESSIONS = 3
+
+
+def _milestone(facts, weight_series, volume_best_before: float, prior_sessions: int = 0) -> str | None:
+    """The line this day crossed, if any — from the platform's own series, never typed.
+
+    Order is deliberate: a weight line beats a volume best beats a calendar day, because
+    that is how postable they are. One stripe per card; the others still happened.
+    """
+    n = facts.day_n or 0
+    if facts.weighed_today and facts.total_lost_lb is not None and facts.baseline_weight_lb is not None:
+        prior = [facts.baseline_weight_lb - v for v in (weight_series or [])[:-1] if v is not None]
+        best_before = max(prior, default=0.0)
+        for line in MILESTONE_LB:
+            if facts.total_lost_lb >= line > best_before:
+                return f"first {line} lb"
+    if facts.workouts and prior_sessions >= PB_MIN_PRIOR_SESSIONS:
+        vol = max((float(w.volume_lbs or 0) for w in facts.workouts), default=0.0)
+        if vol > 0 and vol > volume_best_before:
+            return "most moved this attempt"
+    if n in MILESTONE_DAYS:
+        return MILESTONE_DAYS[n]
+    return None
+
+
+def _recent_beats(days: list[str]) -> list[tuple[str, str]]:
+    """[(date, beat)] from the recap rows already written — what the last cards WERE."""
+    out = []
+    for d in days:
+        row = _existing(f"DATE#{d}")
+        if row and row.get("beat") and row.get("outcome") in ("sent", "rendered"):
+            out.append((d, str(row["beat"])))
+    return out
+
+
+def _last_weigh_label(weight_series, date: str) -> str | None:
+    """`Day 10` — the last day of the cycle with a weigh-in, from the series itself."""
+    idx = [i for i, v in enumerate(weight_series or []) if v is not None]
+    if not idx:
+        return None
+    return f"Day {idx[-1] + 1}"
+
+
+def _weekdays(dates: list[str]) -> list[str]:
+    from common.pacific_time import parse_day_key
+
+    out = []
+    for d in dates:
+        p = parse_day_key(d)
+        out.append(p.strftime("%a")[:2] if p else "")
+    return out
+
+
 def _week_totals(table, start: str, end: str) -> dict[str, Any]:
     """The week's own numbers, computed from its days — never hand-typed (the #3565 class)."""
     from content import recap_data
@@ -178,6 +239,14 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     facts = recap_data.day_facts(_table, date, experiment_start=EXPERIMENT_START_DATE)
     trailing = recap_data.trailing(_table, date, days=7, experiment_start=EXPERIMENT_START_DATE)
     weight_series, grade_series = recap_data.cycle_series(_table, EXPERIMENT_START_DATE, date)
+    if not facts.weighed_today:
+        facts.last_weigh_label = _last_weigh_label(weight_series[:-1], date)
+    try:
+        volume_best_before, prior_sessions = recap_data.cycle_volume_max(_table, EXPERIMENT_START_DATE, date)
+    except Exception:  # noqa: BLE001
+        volume_best_before, prior_sessions = 0.0, 0
+    facts.milestone = _milestone(facts, weight_series, volume_best_before, prior_sessions)
+    recent = _recent_beats([d.date for d in trailing if d.date != date][-3:])
 
     # The BEAT, not the biggest number. See recap_layouts.pick_beat.
     day0 = date == _genesis_eve()
@@ -192,8 +261,9 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         # first render was held on a cycle-16 habit row the card never printed.
         facts.workouts, facts.missed_tier0, facts.vice_streaks, facts.journal_templates = [], [], {}, []
     else:
-        layout, why = recap_layouts.pick_beat(facts, trailing)
+        layout, why = recap_layouts.pick_beat(facts, trailing, recent_beats=recent)
     day_label = f"Day {facts.day_n}" if facts.day_n is not None else ""
+    base_extra = {"milestone": facts.milestone, "weighed_today": facts.weighed_today, "recent_beats": [b for _d, b in recent]}
 
     # The coach line is selected AFTER the beat and set onto the facts, because which
     # coach speaks depends on what the day's story turned out to be — a session card
@@ -203,6 +273,9 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         facts.coach_line, facts.coach_line_source, coach_line_status = None, None, "skipped"
     else:
         facts.coach_line, facts.coach_line_source, coach_line_status = recap_data.coach_line(_table, date, layout)
+        if facts.coach_line_source:
+            # "COACH#physical_coach|OUTPUT#…" → "physical coach": the quote is attributed.
+            facts.coach_label = facts.coach_line_source.split("|", 1)[0].removeprefix("COACH#").replace("_", " ")
 
     base: dict[str, Any] = {
         "date": date,
@@ -221,6 +294,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         "coach_line_status": coach_line_status,
         "rendered_at": pacific_now().isoformat(),
         "dry_run": dry_run,
+        **base_extra,
     }
 
     if day0:
@@ -313,6 +387,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
                 weight_series=weight_series,
                 grade_series=grade_series[-7:],
                 totals=totals,
+                weekdays=_weekdays(recap_data._day_range(wk_start, date)),
             )
             qa3 = recap_qa.audit_image(wimg, margin=recap_layouts.M)
             if not qa3.may_store:

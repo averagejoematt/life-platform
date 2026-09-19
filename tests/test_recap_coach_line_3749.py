@@ -630,7 +630,13 @@ def test_a_caption_that_would_overflow_drops_the_quote_rather_than_the_numbers()
     from web import recap_layouts
 
     line = "x" * recap_data.COACH_LINE_MAX_CHARS
-    habits = ["the five kilometre morning walk before breakfast", "the evening mobility and stretching routine"]
+    # Two habit names long enough that the quote cannot also fit under the cap. The cap
+    # rose 300 → 480 on 2026-09-19 when the caption grew its fixed close (NEXT line, site,
+    # tags); the premise assert below is what keeps this fixture honest against the cap.
+    habits = [
+        "the five kilometre morning walk before breakfast, logged on the watch and checked off by hand",
+        "the evening mobility and stretching routine, twenty minutes, before the phone goes away",
+    ]
 
     # Assert the premise before asserting the behaviour. Without this, a future change
     # that shortens the stats would make the quote fit, the drop branch would stop being

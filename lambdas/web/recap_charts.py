@@ -27,6 +27,9 @@ from typing import Any, Sequence
 
 from web import card_engine as ce
 
+#: The worst band's colour. Amber, deeper — never red (see draw_component_bars).
+AMBER_DEEP = (176, 116, 36)
+
 
 def _lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
@@ -43,6 +46,7 @@ def draw_sparkline(
     colour=None,
     dot_last: bool = True,
     baseline: bool = True,
+    dot_r: int = 6,
 ) -> bool:
     """A trend, at a glance. Gaps in the series are GAPS — the line breaks.
 
@@ -82,7 +86,7 @@ def draw_sparkline(
             drew = True
         elif len(points) == 1:
             cx, cy = points[0]
-            draw.ellipse([cx - 6, cy - 6, cx + 6, cy + 6], fill=colour)
+            draw.ellipse([cx - dot_r, cy - dot_r, cx + dot_r, cy + dot_r], fill=colour)
             drew = True
 
     for i, v in pts:
@@ -95,7 +99,8 @@ def draw_sparkline(
 
     if dot_last and pts:
         cx, cy = _xy(*pts[-1])
-        draw.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=colour)
+        r = dot_r + 3
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=colour)
         # The newest reading gets its value, so a two-dot chart is still readable.
         ly = cy - 46 if cy - 46 >= y else cy + 20
         # The newest reading is at the right edge by construction; a centred label there
@@ -104,8 +109,27 @@ def draw_sparkline(
     if pts and len(pts) > 1:
         fx, fy = _xy(*pts[0])
         fly = fy - 46 if fy - 46 >= y else fy + 20
-        draw.text((fx, fly), f"{pts[0][1]:.1f}", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
+        draw.text((fx, fly), f"{pts[0][1]:.1f}", fill=(112, 140, 124), font=ce.font(ce.FONT_MONO, 20))
     return drew
+
+
+def draw_day_ruler(draw, values: Sequence[float | None], *, x: int, y: int, w: int, size: int = 10) -> None:
+    """One tick per day under a sparkline: filled = measured, hollow = not.
+
+    The rule "dots, not a line — the days between were not measured" DRAWN, so the
+    honesty is visible before it is read.
+    """
+    n = len(values or [])
+    if n < 2:
+        return
+    step = w / (n - 1)
+    for i, v in enumerate(values):
+        cx = x + i * step
+        box = [cx - size / 2, y, cx + size / 2, y + size]
+        if v is not None:
+            draw.ellipse(box, fill=ce.GREEN)
+        else:
+            draw.ellipse(box, outline=(40, 56, 44), width=2)
 
 
 def draw_progress(
@@ -137,6 +161,7 @@ def draw_component_bars(
     row_h: int = 46,
     label_size: int = 24,
     value_size: int = 24,
+    bar_h: int = 20,
 ) -> int:
     """The day's components, each a labelled 0-100 bar. Returns the y it ended at.
 
@@ -152,13 +177,16 @@ def draw_component_bars(
     for name, score in rows:
         frac = max(0.0, min(1.0, float(score) / 100.0))
         # Derived, not chosen: the platform's own grade bands, so a bar and a letter can
-        # never disagree about whether a number was good.
-        colour = ce.GREEN if score >= 70 else (ce.AMBER if score >= 50 else (196, 78, 62))
+        # never disagree about whether a number was good. Two hues only — green earned,
+        # amber missed, deeper amber for the worst band. Never red (#405/#551; the panel
+        # review found terracotta bars reading as a report card).
+        colour = ce.GREEN if score >= 70 else (ce.AMBER if score >= 35 else AMBER_DEEP)
         draw.text((x, y + 4), str(name).upper(), fill=ce.MUTED, font=ce.font(ce.FONT_MONO, label_size))
-        draw.rounded_rectangle([bar_x, y + 6, bar_x + bar_w, y + 6 + 20], radius=10, fill=(18, 26, 20))
+        r = bar_h // 2
+        draw.rounded_rectangle([bar_x, y + 4, bar_x + bar_w, y + 4 + bar_h], radius=r, fill=(18, 26, 20))
         if frac > 0:
-            draw.rounded_rectangle([bar_x, y + 6, bar_x + max(int(bar_w * frac), 20), y + 6 + 20], radius=10, fill=colour)
-        draw.text((bar_x + bar_w + 16, y + 4), f"{int(round(score))}", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, value_size))
+            draw.rounded_rectangle([bar_x, y + 4, bar_x + max(int(bar_w * frac), bar_h), y + 4 + bar_h], radius=r, fill=colour)
+        draw.text((bar_x + bar_w + 16, y + 4), f"{int(round(score))}", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, value_size))
         y += row_h
     return y
 
@@ -190,7 +218,7 @@ def draw_dots(
 
 def draw_grade_badge(draw, letter: str, *, x: int, y: int, size: int = 118) -> None:
     """The day's letter grade, in a ring whose colour is the grade's own band."""
-    bands = {"A": ce.GREEN, "B": ce.GREEN, "C": ce.AMBER, "D": (196, 78, 62), "F": (196, 78, 62)}
+    bands = {"A": ce.GREEN, "B": ce.GREEN, "C": ce.AMBER, "D": AMBER_DEEP, "F": AMBER_DEEP}
     colour = bands.get(str(letter or "")[:1].upper(), ce.MUTED)
     draw.ellipse([x, y, x + size, y + size], outline=colour, width=5)
     font = ce.font(ce.FONT_DISPLAY, int(size * 0.52))
@@ -214,9 +242,7 @@ def draw_kv_row(draw, label: str, value: str, *, x: int, y: int, label_size: int
 
 
 def grade_colour(letter: str | None):
-    return {"A": ce.GREEN, "B": ce.GREEN, "C": ce.AMBER, "D": (196, 78, 62), "F": (196, 78, 62)}.get(
-        str(letter or "")[:1].upper(), ce.MUTED
-    )
+    return {"A": ce.GREEN, "B": ce.GREEN, "C": ce.AMBER, "D": AMBER_DEEP, "F": AMBER_DEEP}.get(str(letter or "")[:1].upper(), ce.MUTED)
 
 
 def fit_text(draw, text: str, *, font_name: str, max_size: int, min_size: int, width: int, step: int = 4) -> Any:
