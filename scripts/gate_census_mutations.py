@@ -338,6 +338,18 @@ _PUBLIC_PREFIX_DOOR_PY = (
 )
 
 
+# #3731: a new top-level docs/*.md page that is simultaneously (a) a wildly-wrong
+# CloudWatch alarm-count CLAIM (`scripts/check_doc_facts.py`'s number-fact scan) and
+# (b) missing from the wiki index + missing its status header
+# (`scripts/check_doc_index.py`'s coverage/header scan) — one plant, two real scanners,
+# both reached ONLY through `tests/repo_scan_cache.py`'s cache by every one of the four
+# call sites below. The point of this spec family: `repo_scan_cache` gained a
+# disk-backed, tree-state-keyed second layer (#3731) specifically so a scan is shared
+# across pytest WORKER PROCESSES — the harness proves the other direction just as hard,
+# that sharing never means STALENESS. Untracked (both scanners walk the filesystem, not
+# `git ls-files`), so `track=False` is correct and faster.
+_DOC_FACTS_INDEX_PROBE_MD = "# Probe (census #3731 plant)\n\nCloudWatch: 999999 alarms total.\n"
+
 # Assembled: tests/test_email_sender_identity_3568.py AST-scans every module under
 # lambdas/ for an EMAIL_SENDER default and checks its domain against the committed
 # SES-verified set. A .invalid TLD can never be a real identity (RFC 2606).
@@ -612,6 +624,62 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         target="tests/test_reader_input_prefix_3559.py",
         detects="a reader-input door writing its moderation record under the anonymously readable generated/* prefix (#3559, SEC-1)",
         plants=(("lambdas/web/_census_probe_3559.py", _PUBLIC_PREFIX_DOOR_PY),),
+        track=False,
+    ),
+    # #3731: `tests/repo_scan_cache.py` gained a disk-backed, tree-state-keyed cross-
+    # PROCESS layer this PR. These four call sites — three real `run_repo_scan()`
+    # readers of `scripts/check_doc_facts.py`/`check_doc_index.py`, plus the cache's
+    # OWN test suite's one real (unfaked) call site, `test_g` — are the newly-discovered
+    # `structural::` gates: `repo_scan_cache.py` now matches `premerge_derivation.py`'s
+    # `_SWEEP_PATTERN` (it calls `os.walk` to fingerprint the tree) for the first time,
+    # so every test file that imports it is newly classified as a tree-sweeping gate.
+    # That reclassification is CORRECT — the cache genuinely sweeps the tree now — and
+    # each of the four needed a real proof rather than sitting unproven.
+    "structural::test_doc_facts_ops_1957.py": MutationSpec(
+        gate_id="structural::test_doc_facts_ops_1957.py",
+        target="tests/test_doc_facts_ops_1957.py",
+        detects=(
+            "a new docs/*.md page with a wildly-wrong CloudWatch alarm-count claim, read THROUGH "
+            "tests/repo_scan_cache.py's disk-backed cache (#3731) rather than caught before it — proves the "
+            "cache's tree-state key changes when the plant lands, so a real defect is never served stale"
+        ),
+        plants=(("docs/_census_probe_3731.md", _DOC_FACTS_INDEX_PROBE_MD),),
+        track=False,
+    ),
+    "structural::test_doc_facts_ops_2003.py": MutationSpec(
+        gate_id="structural::test_doc_facts_ops_2003.py",
+        target="tests/test_doc_facts_ops_2003.py",
+        detects=(
+            "the same plant as test_doc_facts_ops_1957.py's gate, at the SECOND of three call sites that "
+            "used to share one in-process memo and now also share the disk layer — the shape #3224 fixed "
+            "in-process, #3731 fixed cross-process, and this spec proves the second layer still catches"
+        ),
+        plants=(("docs/_census_probe_3731.md", _DOC_FACTS_INDEX_PROBE_MD),),
+        track=False,
+    ),
+    "structural::test_wiki_checkers.py": MutationSpec(
+        gate_id="structural::test_wiki_checkers.py",
+        target="tests/test_wiki_checkers.py",
+        detects=(
+            "the same plant, at the third and last plain-key call site of the family — the one #3224's own "
+            "docstring named as the test that regressed to 21.59s when the cache's own fixture once cleared "
+            "the shared table by mistake; this proves it still catches the defect it exists to share, not "
+            "just that it is fast"
+        ),
+        plants=(("docs/_census_probe_3731.md", _DOC_FACTS_INDEX_PROBE_MD),),
+        track=False,
+    ),
+    "structural::test_repo_scan_cache_3224.py": MutationSpec(
+        gate_id="structural::test_repo_scan_cache_3224.py",
+        target="tests/test_repo_scan_cache_3224.py",
+        detects=(
+            "the cache module's OWN test suite has exactly one call site that runs a REAL, unfaked scan "
+            "against the real tree (`test_g`, of scripts/check_doc_index.py) — every other test in this file "
+            "fakes subprocess.run. The same plant breaks check_doc_index.py's wiki-coverage/header scan too "
+            "(missing from docs/README.md's index, no status header), so test_g reds through the identical "
+            "disk-cache path the other three specs exercise via check_doc_facts.py"
+        ),
+        plants=(("docs/_census_probe_3731.md", _DOC_FACTS_INDEX_PROBE_MD),),
         track=False,
     ),
 }
@@ -957,6 +1025,75 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "drift_sentinel.check_bucket_policy holds the live policy to it. It judges the KEY, never the object: whether "
         "an object already sitting under generated/ is readable is the owner's migration, not this gate's.",
         proved_on="2026-09-05",
+    ),
+    # #3731: newly-discovered gates (see the MUTATION_SPECS comment above these four).
+    # `target` is the WHOLE FILE, matching every other record in this dict — `_proof()`
+    # derives `gate_name` from `Path(spec.target).name`, and that has to equal the live
+    # gate's bare filename or tests/test_gate_census_2578.py::
+    # test_no_recorded_proof_is_stale_against_the_live_census reds on an "orphan proof"
+    # (a first, narrower `::test_name` cut of these four records was caught by exactly
+    # that check and replaced with this one — the census proving its own consistency
+    # rule on its own author, same as #3231's fixture incident cited elsewhere in this
+    # file). All four run 2026-09-19, `docs/_census_probe_3731.md` planted once per spec
+    # (harness runs specs sequentially, reverting between each).
+    "structural::test_doc_facts_ops_1957.py": _proof(
+        "structural::test_doc_facts_ops_1957.py",
+        "baseline: 28 passed in 62.24s (0:01:02) | mutated: 2 failed, 26 passed in 62.57s (0:01:02) :: "
+        "tests/test_doc_facts_ops_1957.py::test_alarm_count_clean_on_real_docs; "
+        "tests/test_doc_facts_ops_1957.py::test_gate_passes_on_the_repo | reverted: 28 passed in 12.20s",
+        "Covers the whole file: 27 pre-existing tests over synthetic scratch fixtures (unaffected by the "
+        "plant, still passing mutated) plus `test_gate_passes_on_the_repo`'s real-tree assertion, now read "
+        "through `tests/repo_scan_cache.py`'s disk-backed cache instead of a bare subprocess.run. The plant "
+        "ALSO reds `test_alarm_count_clean_on_real_docs` (a second, independent real-tree assertion in this "
+        "file, not cache-mediated) — two tests failing on one plant is the file's OWN real-tree coverage "
+        "working from two directions, not a scope leak. Does NOT cover the cache's OWN correctness in "
+        "isolation (key composition, atomicity, the `disk_dir=None` isolation contract) — that is "
+        "tests/test_repo_scan_cache_3224.py's job, proven separately below.",
+        proved_on="2026-09-19",
+    ),
+    "structural::test_doc_facts_ops_2003.py": _proof(
+        "structural::test_doc_facts_ops_2003.py",
+        "baseline: 15 passed in 1.00s | mutated: 1 failed, 14 passed in 51.42s :: "
+        "tests/test_doc_facts_ops_2003.py::test_gate_passes_on_the_repo | reverted: 15 passed in 0.98s",
+        "Same scope as test_doc_facts_ops_1957.py's record above — this is the SECOND of the three "
+        "plain-key call sites, run as a SEPARATE OS process from the first (the harness spawns one "
+        "`python3 -m pytest` per spec). Its 1.00s baseline is the cross-process disk hit measured live: the "
+        "first spec's baseline process had already written the clean-tree answer moments earlier, and this "
+        "process — no Python object in common with that one — read it from disk instead of re-spawning. The "
+        "mutated run pays the full ~51s: the plant changes `_tree_fingerprint()`'s value, so the pre-plant "
+        "disk answer is never served stale.",
+        proved_on="2026-09-19",
+    ),
+    "structural::test_wiki_checkers.py": _proof(
+        "structural::test_wiki_checkers.py",
+        "baseline: 46 passed in 82.20s (0:01:22) | mutated: 3 failed, 43 passed in 130.55s (0:02:10) :: "
+        "tests/test_wiki_checkers.py::test_wiki_index_coverage_and_headers; "
+        "tests/test_wiki_checkers.py::test_doc_facts_clean; "
+        "tests/test_wiki_checkers.py::test_verified_advisory_is_warn_only | reverted: 46 passed in 31.53s",
+        "Covers the whole file, including BOTH `run_repo_scan` call sites this file owns: the plain-key "
+        "reader (`test_doc_facts_clean`, the third and last plain-key `check_doc_facts.py` reader after the "
+        "two records above) AND the distinct-env advisory reader (`test_verified_advisory_is_warn_only`, "
+        "CHECK_DOC_FACTS_TODAY=2036-01-01) — proving the disk cache's per-env key separation holds for a "
+        "REAL plant, not just the synthetic env-override check in tests/test_repo_scan_cache_3224.py::test_b. "
+        "`test_wiki_index_coverage_and_headers` also reds independently — the plant is simultaneously a "
+        "`check_doc_index.py` coverage/header violation (docs/_census_probe_3731.md not in the wiki index, "
+        "no status header), which that test asserts directly, uncached. Does not re-prove the other 43 "
+        "tests in this file, none of which read the real tree.",
+        proved_on="2026-09-19",
+    ),
+    "structural::test_repo_scan_cache_3224.py": _proof(
+        "structural::test_repo_scan_cache_3224.py",
+        "baseline: 17 passed in 3.30s | mutated: 1 failed, 16 passed in 2.34s :: "
+        "tests/test_repo_scan_cache_3224.py::test_g_a_real_scan_runs_and_is_reused | reverted: 17 passed in 3.22s",
+        "Covers the cache module's one real, unfaked call site (`test_g`, of scripts/check_doc_index.py) — "
+        "every other test in this file fakes subprocess.run, by design, to keep the low-level hit/miss "
+        "assertions exact (see new_cache()'s own docstring on why a real disk hit would corrupt them). Fast "
+        "on both baseline and mutated because this file's autouse `_private_cache` fixture (`disk_dir=None`) "
+        "keeps every test's table in-memory-only, so no disk I/O is in either measurement — the REAL scanner "
+        "(check_doc_index.py) still ran and still caught the plant (missing wiki-index entry + missing "
+        "status header), which is what test_g exists to prove. Does NOT cover the disk layer's cross-process "
+        "sharing — that is exactly what the three records above, run as separate OS processes, prove instead.",
+        proved_on="2026-09-19",
     ),
 }
 

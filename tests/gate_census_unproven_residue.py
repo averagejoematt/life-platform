@@ -409,7 +409,13 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/daily_metrics_compute_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/hypothesis_engine_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/content/html_builder.py": "2026-09-05 seal (#3536)",
-    "registry::tests/test_module_size_guard.py::BASELINE::lambdas/content/output_writers.py": "2026-09-05 seal (#3536)",
+    # lambdas/content/output_writers.py DELETED (#3731, 2026-09-19, ratchet-down): the
+    # BASELINE entry left tests/test_module_size_guard.py at #3728 (the module was split
+    # up), so this key is no longer a live gate at all — the census's own
+    # test_no_recorded_proof_is_stale_against_the_live_census / ratchet_down_entries
+    # named it by ID, not inferred. Not this PR's change; found while re-proving the
+    # four #3731 gates and fixed in the same pass per the #3536 "delete is never a
+    # surprise" rule.
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/emails/coach_panel_podcast_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/emails/daily_brief_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/emails/weekly_digest_lambda.py": "2026-09-05 seal (#3536)",
@@ -419,7 +425,9 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/intelligence/intelligence_common.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/web/site_api_ai_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::mcp/registry.py": "2026-09-05 seal (#3536)",
-    "registry::tests/test_module_size_guard.py::BASELINE::mcp/tools_hevy_routine.py": "2026-09-05 seal (#3536)",
+    # mcp/tools_hevy_routine.py DELETED (#3731, 2026-09-19, ratchet-down): same class as
+    # output_writers.py above — the BASELINE entry left tests/test_module_size_guard.py,
+    # so this key is no longer a live gate. Found and fixed in the same pass.
     "registry::tests/test_module_size_guard.py::BASELINE::mcp/tools_lifestyle.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_mypy_clean_modules.py::GLOBAL_DISABLE_BASELINE::arg-type": "2026-09-05 seal (#3536)",
     "registry::tests/test_mypy_clean_modules.py::GLOBAL_DISABLE_BASELINE::assignment": "2026-09-05 seal (#3536)",
