@@ -134,8 +134,14 @@ def test_the_three_closed_platforms_are_registered_paste_only():
         assert key not in reg.checker_sources() and key not in reg.public_board_sources(), key
         assert "paste" in entry["method"].lower(), f"{key}'s public method text must say how it actually arrives"
         # capture_channel drives the "you forgot to log" nudges and is reserved for
-        # Matthew's three logging channels (#746/#1682) — a paste must not nag.
-        assert "capture_channel" not in entry, key
+        # Matthew's own logging channels (#746/#1682) — a paste must not nag. Until
+        # 2026-09-17 this asserted the key was ABSENT; #3669 / issue 3571 made the answer
+        # EXPLICIT instead, because a missing key reads identically to nobody having
+        # looked (that ambiguity is the whole of 3571). The behaviour asserted is
+        # unchanged and still the load-bearing half: not nudge-eligible.
+        assert entry["capture_channel"] is None, key
+        assert "2026-" in entry["capture_channel_reason"], f"{key}: an explicit None needs a DATED reason"
+        assert key not in reg.manual_capture_sources(), key
 
 
 def test_pasted_posts_are_raw_timeseries():

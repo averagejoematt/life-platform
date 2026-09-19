@@ -85,7 +85,11 @@ from ingestion import (
 # Part 1 — facet-vocabulary completeness (deliverable 1a)
 # ══════════════════════════════════════════════════════════════════════════
 
-_KNOWN_SCHEMES = {"date-tree", "flat-uuid", "timestamped"}
+# 'date-folder' joined 2026-09-17 (#3669) with the `labs` registry entry: one folder per
+# EVENT date (raw/matthew/labs/<draw-date>/) holding N documents, so there is no per-day
+# object and `raw_date_key()` raises for it by design — the macrofactor idiom. A new scheme
+# is a deliberate edit to this line, which is the review moment it deserves.
+_KNOWN_SCHEMES = {"date-tree", "flat-uuid", "timestamped", "date-folder"}
 
 
 def _all_layouts_with_source():

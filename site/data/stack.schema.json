@@ -70,8 +70,8 @@
           "paused": { "type": "boolean", "description": "Deliberately not ingesting. Never counted as stale." },
           "raw_scheme": {
             "type": "string",
-            "enum": ["date-tree", "flat-uuid", "timestamped"],
-            "description": "The SHAPE of this source's immutable raw archive — never a concrete key or bucket. Present only for sources that keep a raw archive."
+            "enum": ["date-tree", "flat-uuid", "timestamped", "date-folder"],
+            "description": "The SHAPE of this source's immutable raw archive — never a concrete key or bucket. Present only for sources that keep a raw archive. 'date-folder' (added 2026-09-17 with the labs registry entry, #3669) is one folder per EVENT date holding N documents, so no per-day object exists."
           },
           "device": {
             "type": "object",

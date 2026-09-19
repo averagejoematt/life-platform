@@ -296,6 +296,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # merge — which is the whole point of deriving rather than hand-listing. It reads
         # `deploy/generated/**` through the reset writers it contracts.
         "test_reset_writer_contract_3598.py",
+        # #3669: reads `deploy/generated/pk_family_census.json` — the committed pk-family
+        # enumeration its partition-coverage guard grades the registry against. Picked up
+        # by `reset_artifact_test_files()` for exactly that reason; pre-merge because a PR
+        # that adds a live SOURCE# partition (or refreshes the census) must red BEFORE the
+        # merge, not after the partition is already invisible to every freshness check.
+        "test_source_registry_coverage_3669.py",
         "test_restart_verify_gates_3477.py",
         "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda

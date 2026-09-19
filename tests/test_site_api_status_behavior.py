@@ -112,7 +112,11 @@ COMPUTE_SOURCES = _module_literal("_COMPUTE_SOURCES")
 EMAIL_LAMBDAS = _module_literal("_EMAIL_LAMBDAS")
 LAGGED_SOURCES = _module_literal("_LAGGED_SOURCES")
 LAMBDA_TO_SOURCE = _module_literal("_LAMBDA_TO_SOURCE")
-DUE_MONTHS = _module_literal("DUE_MONTHS")
+# #3669: DUE_MONTHS is no longer a local literal inside `status()` — it is a module-level
+# dict whose registered rows are DERIVED from SOURCE_REGISTRY's `cadence_months` facet, so
+# the panel and the registry cannot disagree. Read the real attribute rather than
+# re-composing it here: a test that re-derives the rule beside the module proves the copy.
+DUE_MONTHS = sas.DUE_MONTHS
 
 SOURCE_TO_LAMBDA = {src: fn for fn, src in LAMBDA_TO_SOURCE.items()}
 

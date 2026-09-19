@@ -10,6 +10,15 @@ is not a thing; entries only ever come OUT (the #1964 ratchet precedent).
 Populated honestly by the initial sweep on 2026-08-17 (37 sites). Every entry
 is real debt: convert the site to a registry projection, then delete its line.
 
+2026-09-17 (#3669): ONE key re-keyed, date UNCHANGED, ledger size unchanged. The
+entry for `lambdas/intelligence/intelligence_common.py::sources::…` gained `labs` in its
+matched-member list. The site was not edited — not one byte of `_INVENTORY_SOURCES`
+changed. `labs` entered SOURCE_REGISTRY (#3669), so the sweep's VOCABULARY grew and the
+same unchanged hand-list now matches one more member. Keys are content-keyed on the
+match, so a registry addition re-keys every exempted site that already hand-typed the new
+member. That is the ledger working (the debt is now measured at its true size), not a new
+exemption: the date stays 2026-08-17 because the debt is the same debt.
+
 2026-08-24 (#3049): -2. The two compute Lambdas that hand-typed their own ingest
 set now derive it from the compute-input census
 (`lambdas/common/input_manifest.py`, sanctioned in conformance_guard_lib) — one
@@ -36,7 +45,7 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/health/pillar_absence.py::sources::habitify,todoist": "2026-08-17",
     "lambdas/health/pillar_absence.py::sources::hevy,strava": "2026-08-17",
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::sources::garmin,strava": "2026-08-17",
-    "lambdas/intelligence/intelligence_common.py::sources::apple_health,eightsleep,garmin,habitify,macrofactor,measurements,notion,strava,supplements,whoop,withings": "2026-08-17",
+    "lambdas/intelligence/intelligence_common.py::sources::apple_health,eightsleep,garmin,habitify,labs,macrofactor,measurements,notion,strava,supplements,whoop,withings": "2026-08-17",
     "lambdas/intelligence/intelligence_common.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/intelligence/intelligence_common.py::sources::garmin,strava": "2026-08-17",
     "lambdas/operational/ai_quality_canary_lambda.py::personas::sleep_coach,training_coach": "2026-08-17",
