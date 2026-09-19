@@ -37,7 +37,10 @@ from datetime import date
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 POSTURE = os.path.join(REPO_ROOT, "deploy", "github_posture.json")
-PR_CHECKS = os.path.join(REPO_ROOT, ".github", "workflows", "pr-checks.yml")
+# NB the name: `PR_CHECKS` would match gate_census._REGISTRY_NAME's `.*_CHECKS`
+# arm and mint a phantom registry gate (#3315). Renamed, never registered —
+# NOT_APPLICABLE_REASONS' precedent.
+PR_CHECKS_YML_PATH = os.path.join(REPO_ROOT, ".github", "workflows", "pr-checks.yml")
 WRITER = os.path.join(REPO_ROOT, "deploy", "write_lane_posture.py")
 
 # THE RATCHET. Last measured value per required check, 2026-09-19, by
@@ -106,7 +109,7 @@ def test_the_frozen_rows_match_the_checks_that_actually_exist():
 
 
 def test_the_lane_emits_its_own_wallclock():
-    text = _read(PR_CHECKS)
+    text = _read(PR_CHECKS_YML_PATH)
     assert 'echo "LANE_START=$(date +%s)"' in text, "the fast-lane no longer stamps LANE_START — it cannot measure itself"
     assert "--emit-wallclock-since" in text, "the fast-lane no longer emits its wall-clock (#3608 box 4)"
     # The emit has to ride a step that runs on failure too, or the measurement
@@ -122,7 +125,7 @@ def test_the_gate_status_is_not_swallowed_by_the_emit():
     """#2746's lesson, applied to the step this box modified: the bundle-boot
     gate's own exit code must still fail the job. `status=$?` ... `exit $status`
     is the shape; a bare trailing command would make the gate advisory."""
-    text = _read(PR_CHECKS)
+    text = _read(PR_CHECKS_YML_PATH)
     emit_at = text.index("--emit-wallclock-since")
     step_start = text.rindex("      - name:", 0, emit_at)
     step = text[step_start : text.index("\n\n", emit_at) if "\n\n" in text[emit_at:] else len(text)]
