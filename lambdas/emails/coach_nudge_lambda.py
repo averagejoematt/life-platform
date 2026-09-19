@@ -37,11 +37,11 @@ from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_fin
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
 from coach import coach_nudge_engine as engine
-from coach.coach_checkin import read_cycle
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 from common.numeric import floats_to_decimal  # #3569: the trigger payload carries real floats
 from common.pacific_time import PACIFIC
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from experiment.phase_taxonomy import experiment_stamp_for
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -450,10 +450,29 @@ def _finalize(date_pt: str, nudge_item: dict) -> None:
        write. The handler now finalizes FIRST (see `lambda_handler`), so a nudge
        whose record cannot be written is never delivered.
     """
-    item = floats_to_decimal(nudge_item)
+
+    # #3877: the class-gated write-time stamp, at the ONE place both rows are written.
+    # This writer stamped `cycle` and never `phase`, and `COACH#*` is tagger-blind (the
+    # reset-time tagger only reaches `USER#matthew#SOURCE#*`), so every NUDGE# row read
+    # as current forever — `PHASE_FILTER_EXPRESSION` admits `attribute_not_exists(phase)`
+    # as this cycle, permanently. Measured 2026-09-18: 10 such rows, growing by one a day.
+    #
+    # Stamped HERE rather than in `build_nudge_item` for two reasons. The builder is pure
+    # and takes no I/O; and `tests/test_coach_ensemble_writer_phase_stamp_guard_2119.py`
+    # enumerates `put_item` CALL SITES, so a stamp applied at the builder would leave this
+    # writer exactly as invisible to that guard as it was before (#3877's own box 2).
+    #
+    # `experiment_stamp_for` decides per ROW, so the two puts below get different answers
+    # and neither is a guess: `COACH#<coach>/NUDGE#…` classifies EXPERIMENT_SCOPED and
+    # takes {phase, cycle}; `COACH#nudge_ledger/DAY#…` classifies SYSTEM_STATE and takes
+    # {} — a daily-cap row is not experiment data and must not be wiped with one.
+    def _stamped(row: dict) -> dict:
+        return floats_to_decimal({**experiment_stamp_for(row.get("pk", ""), row.get("sk", "")), **row})
+
+    item = _stamped(nudge_item)
     try:
         _table().put_item(Item=item)
-        _table().put_item(Item=floats_to_decimal(engine.build_ledger_item(date_pt, item)))
+        _table().put_item(Item=_stamped(engine.build_ledger_item(date_pt, item)))
     except Exception as e:  # noqa: BLE001 — re-raised below; the ledger is stamped first
         logger.error("[nudge] FAILED to persist nudge record %s/%s: %s", nudge_item.get("pk"), nudge_item.get("sk"), e)
         _mark_ledger_failed(date_pt, nudge_item, e)
@@ -499,12 +518,11 @@ def lambda_handler(event: dict, context) -> dict:
         return {"statusCode": 200, "graded": graded, "nudge": None, "reason": "daily_cap_race"}
 
     coach_name = _coach_name(chosen["coach_id"])
-    cycle = read_cycle()
 
     copy_text = _phrase(chosen, coach_name)
     if not copy_text:
         item = engine.build_nudge_item(
-            chosen, "", engine.STATUS_BLOCKED, date_pt=date_pt, now_utc=now_utc, gate_findings=["ai_unavailable"], cycle=cycle
+            chosen, "", engine.STATUS_BLOCKED, date_pt=date_pt, now_utc=now_utc, gate_findings=["ai_unavailable"]
         )
         _finalize(date_pt, item)
         return {"statusCode": 200, "graded": graded, "nudge": "blocked", "reason": "ai_unavailable"}
@@ -513,9 +531,7 @@ def lambda_handler(event: dict, context) -> dict:
     if findings:
         # AC4: dropped SILENTLY — stored verbatim for audit, never delivered,
         # never regenerated, and the day stays consumed (anti-nag).
-        item = engine.build_nudge_item(
-            chosen, copy_text, engine.STATUS_BLOCKED, date_pt=date_pt, now_utc=now_utc, gate_findings=findings, cycle=cycle
-        )
+        item = engine.build_nudge_item(chosen, copy_text, engine.STATUS_BLOCKED, date_pt=date_pt, now_utc=now_utc, gate_findings=findings)
         _finalize(date_pt, item)
         logger.info("[nudge] blocked by gates: %s", findings)
         return {"statusCode": 200, "graded": graded, "nudge": "blocked", "reason": "gate", "findings": findings}
@@ -525,7 +541,7 @@ def lambda_handler(event: dict, context) -> dict:
     # and then lost the record it was supposed to be graded from. `_finalize`
     # raises NudgeWriteError (after stamping the ledger `failed`) rather than
     # returning, so an unwritable record means the email is never sent at all.
-    item = engine.build_nudge_item(chosen, copy_text, engine.STATUS_SENT, date_pt=date_pt, now_utc=now_utc, cycle=cycle)
+    item = engine.build_nudge_item(chosen, copy_text, engine.STATUS_SENT, date_pt=date_pt, now_utc=now_utc)
     _finalize(date_pt, item)
 
     try:

@@ -394,6 +394,17 @@ def _wire(monkeypatch, fake, *, now_utc, tier=0, copy_text=None, gate_result="pa
     monkeypatch.setattr(shell, "_coach_name", lambda cid: "Dr. Marcus Webb")
     monkeypatch.setattr(budget_guard, "current_tier", lambda: tier)
     monkeypatch.setattr(coach_checkin, "_cycle_cache", {"value": 10, "read": True})
+    # #3877: provenance no longer rides an injected `cycle` — the write site asks the
+    # taxonomy per ROW. Stub the STAMP, not the gate: the real `should_phase_stamp`
+    # still decides which rows get one, so what this fixture pins is the cycle number,
+    # never the class decision the test is actually about.
+    from experiment.phase_taxonomy import should_phase_stamp as _real_gate
+
+    monkeypatch.setattr(
+        shell,
+        "experiment_stamp_for",
+        lambda pk, sk="", **kw: ({"phase": "experiment", "cycle": 10} if _real_gate(pk, sk) else {}),
+    )
 
     calls = {"phrase": 0}
 
@@ -449,11 +460,19 @@ def test_handler_sends_and_logs_verbatim_nudge(monkeypatch):
     assert n["status"] == "sent"
     assert n["outcome"] == "pending"
     assert n["prior"] == "0.4"
+    # #3877: the NUDGE row is EXPERIMENT_SCOPED, so it carries BOTH attributes. Before
+    # this, it carried `cycle` and never `phase` — and on a tagger-blind COACH# partition
+    # a row with no `phase` is admitted as current forever by PHASE_FILTER_EXPRESSION.
     assert n["cycle"] == 10
+    assert n["phase"] == "experiment", "a NUDGE# row with no phase reads as current forever (#3877)"
     # Ledger row claims the day and points at the record for the grading pass.
     ledger = fake.store.get((eng.LEDGER_PK, "DAY#2026-07-24"))
     assert ledger and ledger["status"] == "sent" and ledger["graded"] is False
     assert (ledger["nudge_pk"], ledger["nudge_sk"]) == (n["pk"], n["sk"])
+    # ...and it carries NEITHER, because COACH#nudge_ledger classifies SYSTEM_STATE. This
+    # is the half that makes the stamp a per-ROW decision rather than a blanket one: a
+    # daily-cap row is not experiment data, and a reset must not wipe it.
+    assert "phase" not in ledger and "cycle" not in ledger, "a SYSTEM_STATE row must take no provenance (#3514/#3877)"
 
 
 def test_handler_daily_cap_second_run_is_silent(monkeypatch):
