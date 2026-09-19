@@ -890,7 +890,7 @@ def gha_paused_gate_annotation(gate, status, env=None, stream=None):
     return line
 
 
-def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None):
+def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None, today_pt=None):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     # #2973: unevaluated pages get their own bucket in the headline (passed +
     # failed + unevaluated == pages) AND a named callout — a page the AI oracle
@@ -918,11 +918,17 @@ def _write_step_summary(path, passed, failed, warns, results, reader_truth_statu
     # #1990: the a11y ledger-shrink signal (gate_findings' "fixed" list) gets its
     # own hard-to-miss section instead of scrolling by folded into per-page
     # `warnings` — the "consumer" #1990's acceptance criteria asks for.
-    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
+    # #3546: the SAME phase filter the console tally and the sidecar use — a CI
+    # summary that lists a candidate the sweep will decline to harvest is a
+    # summary that trains reviewers to ignore the section.
+    summary_day_n = a11y_audit.experiment_day_n(today_pt) if today_pt else None
+    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")}, day_n=summary_day_n)
     # #3277: the mobile ledger has its own shrink signal, keyed with the viewport
     # so it can never be mistaken for (or silently merged into) the desktop one.
     shrink_candidates.update(
-        a11y_audit.shrink_candidates({f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")})
+        a11y_audit.shrink_candidates(
+            {f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")}, day_n=summary_day_n
+        )
     )
     if shrink_candidates:
         lines.append("\n### a11y ledger — shrink candidates (#1990)\n")
@@ -1838,7 +1844,9 @@ def run_sweep(
             observed_by_path = {r["path"]: r[result_key]["observed"] for r in results if r.get(result_key) is not None}
             skipped = [r["path"] for r in results if r.get(result_key) is None]
             if observed_by_path:
-                new_baseline = a11y_audit.update_baseline(observed_by_path, theme=color_scheme, viewport=viewport)
+                new_baseline = a11y_audit.update_baseline(
+                    observed_by_path, theme=color_scheme, viewport=viewport, day_n=a11y_audit.experiment_day_n(capture_today_pt)
+                )
                 counts = a11y_audit.summarize(new_baseline, theme=color_scheme, viewport=viewport)
                 counts_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "clean — no violations"
                 print(
@@ -1952,9 +1960,15 @@ def run_sweep(
     gha_paused_gate_annotation("Reader-truth QA", reader_truth_status)
     # #1990: a dedicated, hard-to-miss tally for baselined a11y debt that's no
     # longer live — the consumer the shrink warnings previously lacked.
-    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
+    # #3546: …and a clock on it. The tally alone printed on every run for a year
+    # while the list grew 5 → 50, so the list is now persisted to a committed
+    # sidecar with a first_seen date per (page, rule) and a unit test reds once
+    # any row is a week old. `day_n` drops phase-dependent pages inside a
+    # cycle's thin window (see a11y_audit.phase_dependent_page).
+    cycle_day_n = a11y_audit.experiment_day_n(capture_today_pt)  # the sweep's ONE clock (#3030)
+    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")}, day_n=cycle_day_n)
     shrink_candidates.update(
-        a11y_audit.shrink_candidates({f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")})
+        a11y_audit.shrink_candidates({f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")}, day_n=cycle_day_n)
     )  # #3277: mobile-ledger shrink, viewport-keyed
     if shrink_candidates:
         total_rules = sum(len(v) for v in shrink_candidates.values())
@@ -1962,6 +1976,24 @@ def run_sweep(
             f"a11y ledger: {total_rules} shrink candidate(s) across {len(shrink_candidates)} page(s) "
             f"— run --update-baseline and review the diff (#1990)"
         )
+    # Persist unconditionally — an EMPTY shrink list must clear the sidecar's
+    # swept rows, or a harvested entry would keep its stale first_seen forever
+    # and the dead-man would red on debt that is already paid.
+    try:
+        shrink_ledger = a11y_audit.write_shrink_ledger(shrink_candidates, capture_today_pt, swept_pages={r["path"] for r in results})
+        stale = a11y_audit.stale_shrink_entries(shrink_ledger, capture_today_pt)
+        print(
+            f"a11y shrink dead-man: {len(shrink_ledger['entries'])} tracked, {len(stale)} older than "
+            f"{a11y_audit.SHRINK_MAX_AGE_DAYS}d → tests/a11y_shrink_ledger.json (#3546)"
+        )
+        for page_key, rule, first_seen, age in stale[:10]:
+            print(f"  ⚠ STALE {age}d — {page_key}: {rule} (first seen {first_seen}) — harvest via --update-baseline")
+    except Exception as e:
+        # Fail-soft on the WRITE only: a sidecar that could not be written must
+        # not take down a sweep that already produced its verdict. The dead-man
+        # itself is a unit test over the committed file, so a silent write
+        # failure surfaces there as an ageing row, never as a pass.
+        print(f"⚠ a11y shrink dead-man ledger NOT written: {str(e)[:160]} (#3546)")
     # ── #2938: a REQUESTED AI gate that graded nothing is a FAILURE, not a warning ──
     #
     # Until 2026-08-21 this was the shape of a green run:
@@ -2024,7 +2056,7 @@ def run_sweep(
 
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
-        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status, ai_vision_status)
+        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status, ai_vision_status, capture_today_pt)
 
     # #2973: an unevaluated page can never ride out on a green exit code — the
     # explicit `unevaluated == 0` term holds even if a future refactor stops

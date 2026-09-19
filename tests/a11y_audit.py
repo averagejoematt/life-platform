@@ -74,7 +74,8 @@ unit suite at collection — memory: reference_test_layer_dep_import_collection_
 import json
 import os
 import re
-from datetime import datetime, timezone
+import sys
+from datetime import date, datetime, timezone
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 AXE_JS_PATH = os.path.join(_HERE, "vendor", "axe.min.js")
@@ -263,7 +264,7 @@ def gate_findings(page_path, violations, baseline, theme="dark", viewport="deskt
     }
 
 
-def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop"):
+def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop", day_n=None):
     """Rewrite the baseline from a sweep's observations — the DELIBERATE path.
 
     observed_by_path: {page_path: [violation, …]} for the pages the sweep
@@ -277,6 +278,10 @@ def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop
     fields are preserved untouched (each ledger gets its own captured_at/note
     pair in `_meta` — see below — so alternating updates never clobber each
     other's capture record). Returns the written baseline dict.
+
+    `day_n` (#3546, default None = pre-#3546 behaviour exactly): the running
+    cycle's 1-indexed day. Supplied, rows that vanished from a phase-dependent
+    page inside the thin window are carried forward instead of harvested.
     """
     path = path or BASELINE_PATH
     baseline = load_baseline(path)
@@ -300,6 +305,18 @@ def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop
             return out
 
         rows = sorted((_row(v) for v in violations), key=lambda r: r["id"])
+        # #3546, the "not harvestable" half of the phase flag: inside the thin
+        # window a phase-dependent page's DISAPPEARED rows are carried forward
+        # rather than harvested. A chart that has not drawn yet emits no
+        # contrast violation; removing the row here is what turns the chart
+        # drawing on Day 3 into a red "NEW serious" a few days later. Rows still
+        # observed are rewritten normally, so this is a floor, not a freeze.
+        if phase_excluded(page_path, day_n):
+            observed_ids = {r["id"] for r in rows}
+            rows = sorted(
+                rows + [dict(r) for r in baseline.get(key, {}).get(page_path, []) if r["id"] not in observed_ids],
+                key=lambda r: r["id"],
+            )
         if rows:
             baseline[key][page_path] = rows
         else:
@@ -320,7 +337,224 @@ def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop
     return baseline
 
 
-def shrink_candidates(gate_results_by_path):
+# ── #3546: the shrink path's dead-man + phase flag ────────────────────────────
+#
+# `shrink_candidates` below has surfaced its list on every run since #1990, and
+# for a year nobody harvested it: 5 (08-24) → 7 (08-29) → 11 (09-04) → 50 across
+# 48 pages (09-19). Each unharvested key is a live (page, rule) pair that has
+# stopped gating — `gate_findings` keys the gate on the baseline id, so a rule
+# sitting in the ledger for a page that no longer violates it will classify a
+# genuinely NEW violation of that rule as "baselined — recorded, not gating".
+# Stale-in-the-good-direction is the most expensive kind of stale.
+#
+# Two things were missing and both are here:
+#   1. a CONSUMER with a clock — the shrink list is persisted to a committed
+#      sidecar with a `first_seen` date per (page, rule), and
+#      `stale_shrink_entries` reds once any entry has sat there a week. A
+#      printed line nobody is accountable for is not a consumer.
+#   2. a PHASE FLAG — an `--update-baseline` taken in the first days of a cycle
+#      bakes that cycle's data thinness into the baseline: a chart that has not
+#      drawn yet emits no contrast violation, the entry gets harvested, and the
+#      sweep reds "NEW serious" a few days later when the chart fills. So
+#      entries on pages backed by an EXPERIMENT_SCOPED partition are neither
+#      shrink candidates NOR harvestable while day_n < PHASE_THIN_DAYS.
+SHRINK_LEDGER_PATH = os.path.join(_HERE, "a11y_shrink_ledger.json")
+
+# A shrink candidate may sit unharvested this long. Load-bearing: at 10,000 the
+# planted 30-day control in tests/test_a11y_shrink_deadman_3546.py goes green.
+SHRINK_MAX_AGE_DAYS = 7
+
+# Below this day_n the cycle's data is too thin for a harvest to be honest —
+# 7 is the issue's own number (#3546 acceptance) and the same week the
+# dead-man's age budget uses.
+PHASE_THIN_DAYS = 7
+
+SHRINK_LEDGER_NOTE = (
+    "a11y shrink dead-man (#3546) — one row per (page, rule) that tests/visual_qa.py observed as "
+    "baselined-but-no-longer-live, with the date it was FIRST seen that way. Written by the sweep, "
+    "read by tests/test_a11y_shrink_deadman_3546.py, which reds once any row is older than "
+    "SHRINK_MAX_AGE_DAYS. A row leaves this file exactly one way: the ledger entry it names is "
+    "harvested via `python3 tests/visual_qa.py --update-baseline` (or the violation comes back). "
+    "Rows flagged phase_dependent are excluded from both the candidate list and the harvest while "
+    "the cycle's day_n < PHASE_THIN_DAYS. Generated — do not hand-edit."
+)
+
+# The suffix tests/visual_qa.py appends to a page path for the 390px ledger.
+_MOBILE_KEY_SUFFIX = " @" + str(MOBILE_VIEWPORT["width"]) + "px"
+
+
+def _page_of(shrink_key):
+    """The bare page path behind a shrink-candidate key ("/x/ @390px" → "/x/")."""
+    return shrink_key[: -len(_MOBILE_KEY_SUFFIX)] if shrink_key.endswith(_MOBILE_KEY_SUFFIX) else shrink_key
+
+
+def experiment_day_n(today_iso):
+    """1-indexed Day-N of the running cycle for an ISO date — the SAME number
+    `/api/journey` serves, from the same genesis constant its handler reads.
+
+    `/api/journey` computes `pacific_day_n(EXPERIMENT_START)`; both sides bottom
+    out on `EXPERIMENT_START_DATE` in `lambdas/common/constants.py`, which ships
+    in every bundle. Reading the constant rather than the endpoint keeps this
+    pure (the unit suite has no network) and removes a live dependency from a
+    decision about a committed file. Returns 0 pre-genesis.
+    """
+    from constants import day_n as _day_n  # lambdas/common — see _ensure_lambda_path
+
+    return _day_n(today_iso)
+
+
+def _ensure_lambda_path():
+    """Put lambdas/common + lambdas on sys.path (sibling-import style, as the
+    rest of the tests/ layer does). Idempotent."""
+    repo = os.path.dirname(_HERE)
+    for p in (os.path.join(repo, "lambdas"), os.path.join(repo, "lambdas", "common"), _HERE):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+
+def phase_dependent_page(page_path):
+    """True when this page's data partition resets with the experiment cycle.
+
+    THE DERIVATION, stated because `phase_taxonomy` classifies DynamoDB SOURCE
+    names and `qa_manifest` describes PAGES — there is no committed page→source
+    map, and inventing one would be a second registry to keep in sync. So the
+    two facets that already exist are composed:
+
+        1. `qa_manifest.PAGES_BY_PATH[path]["api_deps"]` — the endpoints the
+           page renders from (the manifest's own rule is that under-claiming is
+           safe, over-claiming is not).
+        2. `phase_taxonomy.SOURCE_CLASS[<endpoint leaf>]` — for the endpoints
+           that are named for their partition (`/api/labs`, `/api/experiments`,
+           `/api/field_notes`, `/api/protocols`, `/api/calibration`, …), an
+           exact key match gives the real class with no guessing.
+
+    A page is phase-dependent iff its `content_class` is "live-data" AND either
+    some dep resolves to EXPERIMENT_SCOPED, or NO dep resolves at all. That
+    second clause is the deliberate default for the aggregate endpoints
+    (`/api/pulse`, `/api/character`, `/api/training_overview`, …) which are
+    named for the view, not the partition: they are computed_metrics-family
+    reads that DO reset, and the failure this flag exists to prevent — harvest
+    a thin-day entry, red the sweep as "NEW serious" when the chart draws — is
+    caused by under-flagging, so the unresolved case errs toward flagging.
+    Narrative/static/utility pages are never phase-dependent; their content does
+    not come from a cycle partition at all. A page absent from the manifest
+    (an in-page anchor like "/coaching/by-coach/#eli_marsh") is not flagged.
+
+    The flag only changes behaviour while day_n < PHASE_THIN_DAYS — from Day 7
+    a phase-dependent entry is an ordinary candidate — so an over-flag costs at
+    most a six-day harvest delay, while an under-flag costs a red sweep.
+    """
+    _ensure_lambda_path()
+    import qa_manifest
+    from experiment import phase_taxonomy
+
+    entry = qa_manifest.PAGES_BY_PATH.get(page_path)
+    if entry is None or entry.get("content_class") != "live-data":
+        return False
+    resolved = [
+        phase_taxonomy.SOURCE_CLASS[d[len("/api/") :]]
+        for d in (entry.get("api_deps") or [])
+        if d[len("/api/") :] in phase_taxonomy.SOURCE_CLASS
+    ]
+    if not resolved:
+        return True
+    return phase_taxonomy.EXPERIMENT_SCOPED in resolved
+
+
+def phase_excluded(page_path, day_n):
+    """True when `page_path`'s ledger entries must be left alone right now —
+    phase-dependent AND the cycle is still inside its thin window.
+
+    `day_n=None` means "no cycle clock supplied" and excludes nothing, so every
+    pre-#3546 call site behaves byte-for-byte as it did.
+    """
+    return day_n is not None and day_n < PHASE_THIN_DAYS and phase_dependent_page(page_path)
+
+
+def load_shrink_ledger(path=None):
+    """Load the committed shrink dead-man sidecar; a missing file is empty."""
+    path = path or SHRINK_LEDGER_PATH
+    if not os.path.exists(path):
+        return {"_meta": {}, "entries": []}
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    data.setdefault("entries", [])
+    data.setdefault("_meta", {})
+    return data
+
+
+def merge_shrink_ledger(candidates, today_iso, prior=None, swept_pages=None):
+    """The pure half of the dead-man: fold today's shrink list into the prior
+    ledger, CARRYING FORWARD each surviving row's original `first_seen`.
+
+    candidates:  {shrink key: [rule id, …]} — `shrink_candidates()`'s return.
+    swept_pages: page paths this run actually drove. Rows for pages outside it
+                 are preserved untouched (a --page or --max-tier run must not
+                 silently clear the rest of the dead-man, the same contract
+                 `update_baseline` keeps for the baseline itself).
+    A row whose (page, rule) is no longer a candidate on a page that WAS swept
+    is dropped — the debt is gone, so its clock is gone with it. Returns the
+    new ledger dict; no I/O.
+    """
+    prior_first_seen = {(r["page"], r["rule"]): r.get("first_seen") for r in (prior or {}).get("entries", [])}
+    today_keys = {(k, rule) for k, rules in candidates.items() for rule in rules}
+
+    rows = []
+    for key, rule in sorted(today_keys):
+        rows.append(
+            {
+                "page": key,
+                "rule": rule,
+                "first_seen": prior_first_seen.get((key, rule)) or today_iso,
+                "phase_dependent": phase_dependent_page(_page_of(key)),
+            }
+        )
+    # Preserve rows for pages this run never drove.
+    for r in (prior or {}).get("entries", []):
+        if (r["page"], r["rule"]) in today_keys:
+            continue
+        if swept_pages is not None and _page_of(r["page"]) not in swept_pages:
+            rows.append(dict(r))
+    rows.sort(key=lambda r: (r["page"], r["rule"]))
+    meta = dict((prior or {}).get("_meta") or {})
+    meta["updated_at"] = today_iso
+    meta["max_age_days"] = SHRINK_MAX_AGE_DAYS
+    meta["note"] = SHRINK_LEDGER_NOTE
+    return {"_meta": meta, "entries": rows}
+
+
+def write_shrink_ledger(candidates, today_iso, swept_pages=None, path=None):
+    """merge_shrink_ledger() + commit it to disk. Returns the written dict."""
+    path = path or SHRINK_LEDGER_PATH
+    ledger = merge_shrink_ledger(candidates, today_iso, prior=load_shrink_ledger(path), swept_pages=swept_pages)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(ledger, f, indent=2, sort_keys=False)
+        f.write("\n")
+    return ledger
+
+
+def stale_shrink_entries(ledger, today_iso, max_age_days=None):
+    """[(page, rule, first_seen, age_days), …] for every row older than the
+    budget — the dead-man's verdict. Pure.
+
+    Rows with an unparseable/absent `first_seen` are returned too (age -1): a
+    row that cannot be aged is not a row that is young.
+    """
+    max_age_days = SHRINK_MAX_AGE_DAYS if max_age_days is None else max_age_days
+    today = date.fromisoformat(today_iso)
+    out = []
+    for r in ledger.get("entries", []):
+        try:
+            age = (today - date.fromisoformat(r.get("first_seen") or "")).days
+        except ValueError:
+            out.append((r.get("page"), r.get("rule"), r.get("first_seen"), -1))
+            continue
+        if age > max_age_days:
+            out.append((r.get("page"), r.get("rule"), r.get("first_seen"), age))
+    return sorted(out)
+
+
+def shrink_candidates(gate_results_by_path, day_n=None):
     """{page_path: [rule_id, …]} for pages whose gate_findings() reported
     "fixed" rules — baselined but no longer observed live (#1990).
 
@@ -336,8 +570,13 @@ def shrink_candidates(gate_results_by_path):
     gate_results_by_path: {page_path: gate_findings() result dict}, e.g.
     {r["path"]: r["a11y"] for r in results if r.get("a11y")} from a
     tests/visual_qa.py sweep. Pure — no I/O.
+
+    `day_n` (#3546, default None = pre-#3546 behaviour exactly): the running
+    cycle's 1-indexed day. Supplied, it drops candidates on phase-dependent
+    pages while the cycle is still inside its thin window — see
+    `phase_dependent_page` for the derivation and why that window exists.
     """
-    return {path: g["fixed"] for path, g in gate_results_by_path.items() if g.get("fixed")}
+    return {path: g["fixed"] for path, g in gate_results_by_path.items() if g.get("fixed") and not phase_excluded(_page_of(path), day_n)}
 
 
 def summarize(baseline, theme="dark", viewport="desktop"):
