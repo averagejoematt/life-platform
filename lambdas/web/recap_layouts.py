@@ -56,6 +56,7 @@ more blocks of text (Mara Chen's line, and she is right about the thumb-stop).
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from typing import Any
 
@@ -67,6 +68,23 @@ W_CONTENT = PORTRAIT[0] - 2 * M
 
 ATTEMPT_NUMBER = 17  # cycle 17 — see CYCLE_GENESES; the serial marker's second half
 TAGLINE = "proof, not promises"
+#: The spine, as a footer line. Sixteen loss episodes since 2012, zero held (PROVEN_BLUEPRINT).
+STAKES_LINE = "16 lost · 0 kept"
+
+#: The small-text token. `card_engine.FAINT` is 3.9:1 on the card ground — fine for a
+#: 1200×630 unfurl read on a desktop, below WCAG AA on a phone at feed scale. The panel
+#: review (2026-09-19) measured it: a line may be faint OR small, never both. DIM is the
+#: colour every line under ~28 px uses on these cards.
+DIM = (112, 140, 124)
+#: The miss band, deeper. Never red: red on a scorecard is the report card he got as a
+#: kid, and the constraint is "amber is the honest miss, no failure-shaming".
+AMBER_DEEP = (176, 116, 36)
+#: Where the anchored bottom of every daily card sits: the goal bar, then the NEXT line.
+#: Pinned to one y on every card type so the one cross-card rhythm element never wanders.
+BAR_Y = 1084
+NEXT_Y = 1168
+#: Nothing above the anchored bottom may draw below this.
+CONTENT_FLOOR = 1030
 
 
 # ── shared chrome ─────────────────────────────────────────────────────────────
@@ -85,11 +103,98 @@ def _canvas():
 
 
 def _serial(draw, facts, date_label: str) -> int:
-    """`DAY 8 · ATTEMPT #17` over a quiet second line. On every card, without exception."""
+    """`DAY 8` at display size, `· ATTEMPT #17` beside it, the date under. On every card.
+
+    The day number is the only thing that changes card to card and the one thing a
+    profile-grid visitor should be able to read at thumbnail: ninety tiles reading 1→90.
+    """
     day = f"DAY {facts.day_n}" if facts.day_n is not None else "DAY —"
-    draw.text((M, 104), f"{day}  ·  ATTEMPT #{ATTEMPT_NUMBER}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 30))
-    draw.text((M, 148), date_label.upper(), fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 22))
-    return 210
+    df = ce.font(ce.FONT_DISPLAY, 60)
+    draw.text((M, 84), day, fill=ce.TEXT, font=df)
+    try:
+        dw = draw.textlength(day, font=df)
+    except Exception:  # noqa: BLE001
+        dw = 200
+    draw.text((M + dw + 22, 112), f"·  ATTEMPT #{ATTEMPT_NUMBER}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
+    draw.text((M, 160), date_label.upper(), fill=DIM, font=ce.font(ce.FONT_MONO, 24))
+    return 216
+
+
+def _grade_corner(draw, facts) -> None:
+    """The day's grade in a ring, same corner on every daily card — the recurring device.
+
+    The one element the week-01 tile row proved: a wall of C, B-, B-, C- is "bad days
+    included" made visual, and nobody else posts a report card. Absent when the day was
+    not graded, and the absence is the card's statement about that day.
+    """
+    if not facts.grade_letter:
+        return
+    ch.draw_grade_badge(draw, facts.grade_letter, x=PORTRAIT[0] - M - 116, y=96, size=116)
+    draw.text((PORTRAIT[0] - M, 224), "TODAY'S GRADE", fill=DIM, font=ce.font(ce.FONT_MONO, 18), anchor="ra")
+
+
+def _milestone(draw, facts, *, y: int) -> int:
+    """An amber stripe under the serial when the day crossed a line worth marking."""
+    m = getattr(facts, "milestone", None)
+    if not m:
+        return y
+    draw.rectangle([M, y + 4, M + 6, y + 34], fill=ce.AMBER)
+    draw.text((M + 22, y), f"MILESTONE  ·  {m.upper()}", fill=ce.AMBER, font=ce.font(ce.FONT_MONO_BOLD, 26))
+    return y + 52
+
+
+def next_line(facts) -> str | None:
+    """The forward hook — tomorrow's day number and when the week closes. Platform facts only.
+
+    Every seat on the panel asked for a reason to come back. The honest one the platform
+    holds for certain is the calendar: the serial continues tomorrow and the week's
+    reckoning lands on a known day. A planned session would be better and is a follow-up
+    (the plan engine's routine is not yet readable from here).
+    """
+    n = facts.day_n
+    if not n:
+        return None
+    to_close = 7 - (n % 7) if n % 7 else 7
+    week = n // 7 + 1
+    close = "closes tomorrow" if to_close == 1 else f"closes in {to_close} days"
+    return f"Day {n + 1} tomorrow  ·  week {week} {close}"
+
+
+def _fact_rows_above_bar(draw, rows: list[tuple], *, y_min: int) -> None:
+    """Fact rows sitting ON the anchored bar, drawn bottom-up, in the order given.
+
+    (label, value, colour, size) tuples. The block hugs the bar so the card composes as
+    two zones — the story above, the facts and the arc below — instead of leaving the
+    middle third dead on a sparse day. Rows that would climb above `y_min` are dropped
+    from the END of the list (the least important is last).
+    """
+    y = BAR_Y - 56
+    kept = []
+    for row in rows:
+        if y - 44 < y_min:
+            break
+        kept.append(row)
+        y -= 44
+    for label, value, colour, size in kept:
+        _fact_row(draw, label, value, y=y, colour=colour, size=size)
+        y += 44
+
+
+def _bottom(draw, facts, *, frac: float | None = None) -> None:
+    """The anchored bottom of every daily card: the goal bar at BAR_Y, the NEXT line, the footer.
+
+    The panel's first finding was the same on every card: content stops at ~y 1170 on a
+    1350 canvas and the bottom third is dead. Anchoring the arc and the hook to the
+    bottom edge composes to the full height whatever the day held above.
+    """
+    f = facts.pct_to_goal if frac is None else frac
+    if f is not None and facts.baseline_weight_lb is not None and facts.goal_weight_lb is not None:
+        _goal_bar_at(draw, f, facts.baseline_weight_lb, facts.goal_weight_lb, y=BAR_Y, facts=facts)
+    nxt = next_line(facts)
+    if nxt:
+        draw.text((M, NEXT_Y), "NEXT", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
+        draw.text((M + 110, NEXT_Y - 4), nxt, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 27))
+    _footer(draw)
 
 
 def _goal_bar(draw, facts, *, y: int) -> int:
@@ -97,22 +202,32 @@ def _goal_bar(draw, facts, *, y: int) -> int:
     frac = facts.pct_to_goal
     if frac is None:
         return y
-    return _goal_bar_at(draw, frac, facts.baseline_weight_lb, facts.goal_weight_lb, y=y)
+    return _goal_bar_at(draw, frac, facts.baseline_weight_lb, facts.goal_weight_lb, y=y, facts=facts)
 
 
-def _goal_bar_at(draw, frac: float, baseline: float, goal: float, *, y: int) -> int:
+def _goal_bar_at(draw, frac: float, baseline: float, goal: float, *, y: int, facts=None) -> int:
     ch.draw_progress(draw, frac, x=M, y=y, w=W_CONTENT, h=16)
     y += 30
     left = f"{baseline:.0f} lb  day one"
     right = f"goal  {goal:.0f} lb"
-    draw.text((M, y), left, fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 21))
-    draw.text((M + W_CONTENT, y), right, fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 21), anchor="ra")
-    mid = f"{frac * 100:.1f}% of the way"
+    f = ce.font(ce.FONT_MONO, 22)
+    draw.text((M, y), left, fill=DIM, font=f)
+    draw.text((M + W_CONTENT, y), right, fill=DIM, font=f, anchor="ra")
+    # "0.0% of the way" claims a measurement that has not happened. Until the arc has
+    # moved, the honest centre label is the distance — and when today's number is not
+    # today's, it says when it was.
+    if frac < 0.005:
+        mid = f"{baseline - goal:.0f} lb to go"
+    else:
+        mid = f"{frac * 100:.1f}% of the way"
+    if facts is not None and facts.weight_lb is not None and not getattr(facts, "weighed_today", True):
+        last = getattr(facts, "last_weigh_label", None)
+        mid += f"  ·  last weighed {last}" if last else "  ·  not weighed today"
     try:
-        tw = draw.textlength(mid, font=ce.font(ce.FONT_MONO, 21))
+        tw = draw.textlength(mid, font=f)
     except Exception:  # noqa: BLE001
         tw = 200
-    draw.text((M + (W_CONTENT - tw) / 2, y), mid, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 21))
+    draw.text((M + (W_CONTENT - tw) / 2, y), mid, fill=ce.MUTED, font=f)
     return y + 44
 
 
@@ -124,22 +239,22 @@ FOOTER_Y = 1296
 
 def _footer(draw, right: str = "averagejoematt.com"):
     f = ce.font(ce.FONT_MONO, 20)
-    draw.text((M, FOOTER_Y), TAGLINE, fill=ce.FAINT, font=f)
-    draw.text((PORTRAIT[0] - M, FOOTER_Y), right, fill=ce.FAINT, font=f, anchor="ra")
+    draw.text((M, FOOTER_Y), f"{TAGLINE}  ·  {STAKES_LINE}", fill=DIM, font=f)
+    draw.text((PORTRAIT[0] - M, FOOTER_Y), right, fill=DIM, font=f, anchor="ra")
 
 
 #: Nothing draws below this — the footer band starts here.
 FLOOR_Y = 1262
 
 
-def _fact_row(draw, label: str, value: str, *, y: int, colour=None, size: int = 27) -> int:
+def _fact_row(draw, label: str, value: str, *, y: int, colour=None, size: int = 27, floor: int = FLOOR_Y) -> int:
     """A labelled fact on one line — the footer register, quiet and dense.
 
     Silently DROPS itself below the floor rather than overprinting the footer. A fact that
     does not fit is worth less than a card that looks broken, and the layouts feed these in
     priority order so what falls off is the least important line.
     """
-    if y > FLOOR_Y:
+    if y + 36 > floor:
         return y
     draw.text((M, y), label.upper(), fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 20))
     draw.text((M + 190, y - 3), value, fill=colour or ce.MUTED, font=ce.font(ce.FONT_MONO, size))
@@ -164,7 +279,9 @@ def _vice_summary(facts) -> str | None:
     is the layer that makes sure it never has anything to catch.
     """
     held = sum(1 for _n, d in facts.vice_streaks.items() if d and float(d) >= 1)
-    total = len(facts.vice_streaks)
+    # The scorer's tracked count, never len(): the dict holds only the streaks currently
+    # alive, so "5 of 5" one day and "7 of 7" the next looked like moving goalposts.
+    total = int(getattr(facts, "vices_total", None) or 0) or len(facts.vice_streaks)
     if not total:
         return None
     best = max((float(d) for d in facts.vice_streaks.values() if d), default=0)
@@ -174,11 +291,11 @@ def _vice_summary(facts) -> str | None:
 
 #: Where a coach line sits and how much room it gets. Two mono lines at the card's content
 #: width; a third would push the fact footer off every layout that has one.
-COACH_LINE_WRAP = 54
+COACH_LINE_WRAP = 50
 COACH_LINE_MAX_LINES = 2
 
 
-def _coach_line(draw, facts, *, y: int) -> int:
+def _coach_line(draw, facts, *, y: int, floor: int = FLOOR_Y) -> int:
     """The one sentence on the card a coach actually said. Absent when there is none.
 
     Returns `y` unchanged when there is no line, which is the whole absence contract: a
@@ -190,15 +307,20 @@ def _coach_line(draw, facts, *, y: int) -> int:
     lowest-priority block on every layout that carries it — it is the colour, not the
     evidence — so if a dense day has pushed the card down this far, the numbers win.
     """
-    if not getattr(facts, "coach_line", None) or y > FLOOR_Y - 96:
+    if not getattr(facts, "coach_line", None) or y > floor - 110:
         return y
     lines = ce.wrap(facts.coach_line, width=COACH_LINE_WRAP, max_lines=COACH_LINE_MAX_LINES)
     if not lines:
         return y
-    draw.rectangle([M, y, M + 3, y + 30 * len(lines) + 6], fill=ce.GREEN)
+    draw.rectangle([M, y, M + 3, y + 32 * len(lines) + 6], fill=ce.GREEN)
     for i, line in enumerate(lines):
-        draw.text((M + 22, y + i * 30), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 22))
-    return y + 30 * len(lines) + 20
+        draw.text((M + 22, y + i * 32), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
+    who = getattr(facts, "coach_label", None)
+    y += 32 * len(lines) + 6
+    if who:
+        draw.text((M + 22, y), f"— {who}", fill=DIM, font=ce.font(ce.FONT_MONO, 20))
+        y += 26
+    return y + 16
 
 
 def clean_title(text: str) -> str:
@@ -213,6 +335,31 @@ def clean_title(text: str) -> str:
     """
     kept = [c for c in str(text or "") if ord(c) <= 0xFFFF and unicodedata.category(c) not in ("So", "Sk", "Cf", "Mn", "Cn")]
     return " ".join("".join(kept).split())
+
+
+_PAREN = re.compile(r"\s*\([^)]*\)")
+
+
+def short_exercise(name: str) -> str:
+    """`Lat Pulldown (Cable)` → `Lat Pulldown`. The equipment tag buys nothing at phone scale."""
+    return _PAREN.sub("", clean_title(name)).strip() or clean_title(name)
+
+
+def _sets_word(n: int) -> str:
+    return f"{n} set" if n == 1 else f"{n} sets"
+
+
+def _session_line(w) -> str:
+    """`22 sets · 16,710 lb moved · 2h 24m` — or, for a session that moved no load, the
+    time. "0 lb moved" on a cardio day is a null drawn as a zero (ADR-104) and reads as
+    nothing happened."""
+    bits = [_sets_word(w.n_sets)]
+    if w.volume_lbs and w.volume_lbs > 0:
+        bits.append(f"{w.volume_lbs:,.0f} lb moved")
+    mins = _fmt_minutes(getattr(w, "duration_min", None))
+    if mins:
+        bits.append(mins)
+    return "  ·  ".join(bits)
 
 
 def _session_label(title: str) -> str:
@@ -234,7 +381,7 @@ _COMPONENT_NAMES = {
 }
 
 
-def _grade_strip(draw, grades: list, *, y: int, h: int = 74) -> int:
+def _grade_strip(draw, grades: list, *, y: int, h: int = 74, weekdays=None) -> int:
     """Up to seven letter grades in a row, each ringed in its own band's colour."""
     cell = W_CONTENT // max(len(grades), 1)
     for i, g in enumerate(grades):
@@ -248,7 +395,9 @@ def _grade_strip(draw, grades: list, *, y: int, h: int = 74) -> int:
             except Exception:  # noqa: BLE001
                 tw = 30
             draw.text((cx + (cell - 12 - tw) / 2, y + int(h * 0.16)), g, fill=colour, font=gf)
-    return y + h + 22
+        if weekdays and i < len(weekdays):
+            draw.text((cx + (cell - 12) / 2, y + h + 8), str(weekdays[i]).upper(), fill=DIM, font=ce.font(ce.FONT_MONO, 20), anchor="ma")
+    return y + h + (36 if weekdays else 22)
 
 
 def draw_stakes(draw, *, y: int) -> int:
@@ -275,7 +424,7 @@ def draw_stakes(draw, *, y: int) -> int:
     draw.text(
         (M, y),
         "attempt seventeen · instrumented · graded daily, bad days included",
-        fill=ce.FAINT,
+        fill=DIM,
         font=ce.font(ce.FONT_MONO, 21),
     )
     return y + 44
@@ -285,60 +434,62 @@ def draw_stakes(draw, *, y: int) -> int:
 def scorecard(facts, *, date_label: str, weight_series=None, grade_series=None):
     img, draw = _canvas()
     y = _serial(draw, facts, date_label)
+    _grade_corner(draw, facts)
+    y = _milestone(draw, facts, y=y + 10)
 
-    # Hero: the weight, and the only number a follower actually tracks.
-    if facts.weight_lb is not None:
+    comps = [(_COMPONENT_NAMES.get(k, k), v) for k, v in facts.component_scores.items()]
+    if facts.weight_lb is not None and getattr(facts, "weighed_today", True):
+        # A weigh-in today: the number a follower actually tracks.
         hero = f"{facts.weight_lb:.1f}"
         hf = ce.font(ce.FONT_DISPLAY, 132)
         draw.text((M, y), hero, fill=ce.TEXT, font=hf)
-        # Measured, not offset by a guess — "319.7" and "99.8" are not the same width.
         try:
             hw = draw.textlength(hero, font=hf)
         except Exception:  # noqa: BLE001
             hw = 320
         draw.text((M + hw + 18, y + 66), "lb", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 38))
         y += 152
-    if facts.total_lost_lb is not None and facts.total_lost_lb > 0:
-        draw.text((M, y), f"−{facts.total_lost_lb:.1f} lb since day one", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 34))
-        y += 56
+        if facts.total_lost_lb is not None and facts.total_lost_lb > 0:
+            draw.text((M, y), f"−{facts.total_lost_lb:.1f} lb since day one", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 34))
+            y += 56
+    elif comps:
+        # No weigh-in today. Three cards in a row headlining the same stale weight read as
+        # "nothing happened" — and as if it were measured today. The day's weakest mark
+        # is the hero instead: the C- with its cause exposed is the account's promise.
+        worst = min(comps, key=lambda kv: kv[1])
+        hf = ce.font(ce.FONT_DISPLAY, 110)
+        draw.text((M, y), worst[0], fill=ce.TEXT, font=hf)
+        y += 128
+        draw.text((M, y), f"{worst[1]:.0f}/100  ·  the day's weakest mark", fill=ce.AMBER, font=ce.font(ce.FONT_MONO_BOLD, 30))
+        y += 54
+    else:
+        draw.text((M, y), "the day, graded", fill=ce.TEXT, font=ce.font(ce.FONT_DISPLAY, 96))
+        y += 130
 
-    # The grade badge sits opposite the hero — the platform's own verdict, not a mood.
-    if facts.grade_letter:
-        ch.draw_grade_badge(draw, facts.grade_letter, x=PORTRAIT[0] - M - 130, y=225, size=130)
-        draw.text((PORTRAIT[0] - M, 368), "TODAY'S GRADE", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 19), anchor="ra")
-
-    y = _goal_bar(draw, facts, y=max(y + 24, 470))
-
-    # What earned it — worst first, because that is the interesting half.
-    comps = [(_COMPONENT_NAMES.get(k, k), v) for k, v in facts.component_scores.items()]
     if comps:
-        y += 34
+        y += 28
         draw.text((M, y), "WHAT EARNED IT", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
         y += 42
-        # 60 px short of the content width so the score column lands INSIDE the margin —
-        # the render QA read six scores in the gutter on every scorecard until it did.
-        y = ch.draw_component_bars(draw, comps, x=M, y=y, w=W_CONTENT - 60, label_w=230, row_h=48)
+        y = ch.draw_component_bars(draw, comps, x=M, y=y, w=W_CONTENT - 60, label_w=230, row_h=44, bar_h=22)
     else:
-        # The compute cron did not score this day. The slot the components own is filled
-        # by something true on any day — labelled as what it is, noting what it stands for.
         ctx = {"weight_series": weight_series or [], "grade_series": grade_series or []}
         for name in pick_fillers(facts, ctx, 1, exclude=("coach",)):
-            y = draw_filler(draw, name, facts, ctx, y=y + 34, note="the day was not graded")
+            y = draw_filler(draw, name, facts, ctx, y=y + 28, note="the day was not graded")
 
-    y = _coach_line(draw, facts, y=y + 30)
+    y = _coach_line(draw, facts, y=y + 26, floor=CONTENT_FLOOR)
 
-    # The fact footer: today's specifics, named.
-    y = max(y + 40, 1010)
+    rows = []
     if facts.workouts:
         w = facts.workouts[0]
-        y = _fact_row(draw, "trained", f"{_session_label(w.title)} · {w.n_sets} sets · {w.volume_lbs:,.0f} lb", y=y)
+        rows.append(("trained", f"{_session_label(w.title)} · {_session_line(w)}", None, 25))
     if facts.missed_tier0:
-        y = _fact_row(draw, "missed", " · ".join(facts.missed_tier0[:2]), y=y, colour=ce.AMBER, size=25)
+        rows.append(("not checked in", " · ".join(facts.missed_tier0[:2]), ce.AMBER, 25))
     vices = _vice_summary(facts)
     if vices:
-        y = _fact_row(draw, "vice streaks", vices, y=y, size=25)
+        rows.append(("vice streaks", vices, None, 25))
+    _fact_rows_above_bar(draw, rows, y_min=y + 10)
 
-    _footer(draw)
+    _bottom(draw, facts)
     return img
 
 
@@ -346,6 +497,8 @@ def scorecard(facts, *, date_label: str, weight_series=None, grade_series=None):
 def trajectory(facts, *, date_label: str, weight_series=None, grade_series=None):
     img, draw = _canvas()
     y = _serial(draw, facts, date_label)
+    _grade_corner(draw, facts)
+    y = _milestone(draw, facts, y=y + 10)
 
     lost = facts.total_lost_lb
     if lost is not None and lost > 0:
@@ -364,146 +517,192 @@ def trajectory(facts, *, date_label: str, weight_series=None, grade_series=None)
         draw.text((M, y), f"{facts.weight_lb:.1f}", fill=ce.TEXT, font=ce.font(ce.FONT_DISPLAY, 150))
         y += 180
 
-    # The line. Gaps stay gaps — he has one weigh-in this week and a smooth descent through
-    # a single measurement would be the prettiest possible lie (Henning's line).
+    # The line. Gaps stay gaps — a smooth descent through days that were never measured
+    # would be the prettiest possible lie (Henning's line). The day ruler under the chart
+    # DRAWS the rule: a filled tick is a weigh-in, a hollow one is a day without.
     series = [v for v in (weight_series or [])]
     n_meas = len([v for v in series if v is not None])
     if n_meas >= 2:
-        y += 46
-        ch.draw_sparkline(draw, series, x=M, y=y, w=W_CONTENT, h=150, colour=ce.GREEN)
-        y += 186
-        draw.text((M, y), f"{n_meas} weigh-ins across {len(series)} days", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
         y += 30
-        if n_meas < 4:
-            draw.text((M, y), "dots, not a line — the days between were not measured", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
+        ch.draw_sparkline(draw, series, x=M, y=y, w=W_CONTENT, h=140, colour=ce.GREEN, dot_r=8)
+        y += 176
+        ch.draw_day_ruler(draw, series, x=M, y=y, w=W_CONTENT)
+        y += 34
+        line = f"{n_meas} weigh-ins across {len(series)} days"
+        if n_meas < len(series):
+            line += "  ·  dots, not a line — the days between were not measured"
+        for wrapped in ce.wrap(line, width=62, max_lines=2):
+            draw.text((M, y), wrapped, fill=DIM, font=ce.font(ce.FONT_MONO, 22))
             y += 30
-        y += 14
+        y += 8
     elif series:
         y += 16
         n = len([v for v in series if v is not None])
         draw.text(
-            (M, y),
-            f"{n} weigh-in{'s' if n != 1 else ''} this cycle — not enough for a line yet",
-            fill=ce.FAINT,
-            font=ce.font(ce.FONT_MONO, 22),
+            (M, y), f"{n} weigh-in{'s' if n != 1 else ''} this cycle — not enough for a line yet", fill=DIM, font=ce.font(ce.FONT_MONO, 24)
         )
         y += 52
 
-    y = _coach_line(draw, facts, y=y + 26)
-    y = _goal_bar(draw, facts, y=max(y + 20, 880))
+    y = _coach_line(draw, facts, y=y + 20, floor=CONTENT_FLOOR)
 
-    y += 40
+    rows = []
     if facts.lb_to_goal is not None:
-        y = _fact_row(draw, "to goal", f"{facts.lb_to_goal:.0f} lb", y=y, size=30)
+        rows.append(("to goal", f"{facts.lb_to_goal:.0f} lb", None, 30))
     if facts.weekly_rate_lb is not None and not facts.rate_provisional:
         lo, hi = facts.rate_ci or (None, None)
         rate = f"{facts.weekly_rate_lb:+.1f} lb/wk"
         if lo is not None and hi is not None:
             rate += f"   CI {lo:+.1f} to {hi:+.1f}"
-        y = _fact_row(draw, "rate", rate, y=y, size=25)
-    if facts.grade_letter:
-        y = _fact_row(draw, "today", f"grade {facts.grade_letter}", y=y, colour=ch.grade_colour(facts.grade_letter), size=27)
+        # Named, because a reader will divide 130 by it: this is the platform's 28-day
+        # regression rate, not the slope of the dots above.
+        rows.append(("rate · 28d", rate, None, 25))
+    _fact_rows_above_bar(draw, rows, y_min=y + 10)
 
-    _footer(draw)
+    _bottom(draw, facts)
     return img
 
 
 # ── C. SESSION — the training, in detail ──────────────────────────────────────
+#: Lifts named on card 1. The full list is card 2's job; three is a story, eight is a receipt.
+SESSION_TOP_LIFTS = 3
+
+
 def session(facts, *, date_label: str):
     img, draw = _canvas()
     y = _serial(draw, facts, date_label)
+    _grade_corner(draw, facts)
+    y = _milestone(draw, facts, y=y + 10)
 
     if not facts.workouts:
         raise ValueError("session layout needs a workout")
     w = facts.workouts[0]
 
+    # The load moved is the stopper; the split name is the label. Fraunces for the
+    # number, the day beneath — unless the session moved no load, when the time is.
+    if w.volume_lbs and w.volume_lbs > 0:
+        hero = f"{w.volume_lbs:,.0f}"
+        hf = ce.font(ce.FONT_DISPLAY, 150)
+        draw.text((M, y), hero, fill=ce.TEXT, font=hf)
+        try:
+            hw = draw.textlength(hero, font=hf)
+        except Exception:  # noqa: BLE001
+            hw = 480
+        draw.text((M + hw + 18, y + 80), "lb moved", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 34))
+        y += 176
+    else:
+        mins = _fmt_minutes(getattr(w, "duration_min", None)) or _sets_word(w.n_sets)
+        draw.text((M, y), mins, fill=ce.TEXT, font=ce.font(ce.FONT_DISPLAY, 150))
+        y += 176
     title = _session_label(w.title)
-    f = ch.fit_text(draw, title, font_name=ce.FONT_DISPLAY, max_size=126, min_size=58, width=W_CONTENT)
-    draw.text((M, y), title, fill=ce.TEXT, font=f)
-    y += 158
-
-    draw.text((M, y), f"{w.n_sets} working sets   ·   {w.volume_lbs:,.0f} lb moved", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 32))
+    draw.text((M, y), f"{title}  ·  {_sets_word(w.n_sets)}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 32))
     y += 66
 
-    # The movements, named. "27 sets" is a number; the exercise list is a workout.
-    if w.exercises:
-        y += 14
+    detail = [d for d in getattr(w, "detail", []) if d.top_weight_lb]
+    detail.sort(key=lambda d: -(d.top_weight_lb or 0))
+    if detail:
+        y += 10
+        draw.text((M, y), "HEAVIEST", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
+        y += 44
+        f_row = ce.font(ce.FONT_MONO, 27)
+        for d in detail[:SESSION_TOP_LIFTS]:
+            right = (
+                f"{d.n_sets} × {d.reps}  ·  {d.top_weight_lb:,.0f} lb"
+                if d.reps
+                else f"{_sets_word(d.n_sets)}  ·  {d.top_weight_lb:,.0f} lb"
+            )
+            draw.text((M, y), short_exercise(d.name), fill=ce.MUTED, font=f_row)
+            draw.text((M + W_CONTENT, y), right, fill=ce.TEXT, font=f_row, anchor="ra")
+            y += 42
+        rest = len(w.exercises) - min(len(detail), SESSION_TOP_LIFTS)
+        if rest > 0:
+            draw.text((M, y), f"+{rest} more on card 2", fill=DIM, font=ce.font(ce.FONT_MONO, 22))
+            y += 40
+    elif w.exercises:
+        y += 10
         draw.text((M, y), "THE WORK", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
         y += 44
-        for name in w.exercises[:8]:
-            draw.text((M, y), "—", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 26))
-            draw.text((M + 40, y), str(name), fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 26))
-            y += 42
-        if len(w.exercises) > 8:
-            draw.text((M + 40, y), f"+{len(w.exercises) - 8} more", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 24))
+        for name in w.exercises[:4]:
+            draw.text((M, y), short_exercise(str(name)), fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 27))
             y += 42
 
-    y = _coach_line(draw, facts, y=y + 26)
-    y = _goal_bar(draw, facts, y=max(y + 30, 1000))
+    y = _coach_line(draw, facts, y=y + 22, floor=CONTENT_FLOOR)
 
-    y += 34
+    rows = []
     if facts.acwr is not None:
-        zone = (facts.acwr_zone or "").upper()
-        colour = ce.GREEN if zone == "SAFE" else ce.AMBER
-        y = _fact_row(draw, "load", f"ACWR {facts.acwr:.2f} · {zone.lower() or '—'}", y=y, colour=colour, size=26)
+        # 1.29 "safe" against a 1.3 ceiling reads as spin. The band is the honest label.
+        rows.append(("load", f"ACWR {facts.acwr:.2f} · range 0.8–1.3", None, 25))
     if facts.readiness is not None:
-        y = _fact_row(draw, "readiness", f"{facts.readiness:.0f}/100", y=y, size=26)
+        rows.append(("readiness", f"{facts.readiness:.0f}/100", None, 26))
+    _fact_rows_above_bar(draw, rows, y_min=y + 10)
 
-    _footer(draw)
+    _bottom(draw, facts)
     return img
 
 
 # ── D. RECKONING — the weekly close ───────────────────────────────────────────
-def reckoning(facts, *, week_n: int, date_label: str, weight_series=None, grade_series=None, totals: dict[str, Any] | None = None):
+def reckoning(
+    facts, *, week_n: int, date_label: str, weight_series=None, grade_series=None, totals: dict[str, Any] | None = None, weekdays=None
+):
     img, draw = _canvas()
-    draw.text((M, 104), f"WEEK {week_n}  ·  ATTEMPT #{ATTEMPT_NUMBER}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 30))
-    draw.text((M, 148), date_label.upper(), fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 22))
-    y = 224
+    df = ce.font(ce.FONT_DISPLAY, 60)
+    wk = f"WEEK {week_n}"
+    draw.text((M, 84), wk, fill=ce.TEXT, font=df)
+    try:
+        dw = draw.textlength(wk, font=df)
+    except Exception:  # noqa: BLE001
+        dw = 240
+    draw.text((M + dw + 22, 112), f"·  ATTEMPT #{ATTEMPT_NUMBER}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
+    draw.text((M, 160), date_label.upper(), fill=DIM, font=ce.font(ce.FONT_MONO, 24))
+    y = 230
 
     totals = totals or {}
     delta = totals.get("weight_delta")
     if delta is not None:
         colour = ce.GREEN if delta < 0 else ce.AMBER
-        hero = f"{abs(delta):.1f}"
+        hero = f"{'−' if delta < 0 else '+'}{abs(delta):.1f}"
         hf = ce.font(ce.FONT_DISPLAY, 158)
-        draw.text((M, y), hero, fill=ce.TEXT, font=hf)
+        draw.text((M, y), hero, fill=colour, font=hf)
         try:
             hw = draw.textlength(hero, font=hf)
         except Exception:  # noqa: BLE001
             hw = 330
         draw.text((M + hw + 20, y + 86), "lb", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 42))
         y += 188
-        draw.text((M, y), "down this week" if delta < 0 else "up this week", fill=colour, font=ce.font(ce.FONT_MONO_BOLD, 34))
-        y += 62
+        draw.text(
+            (M, y),
+            "this week, scale to scale" if delta < 0 else "up this week, scale to scale",
+            fill=colour,
+            font=ce.font(ce.FONT_MONO_BOLD, 32),
+        )
+        y += 60
 
-    # The week's grades as a strip — seven verdicts, one row. The arc at a glance.
     grades = [g for g in (grade_series or [])]
     if grades:
-        y += 18
+        y += 16
         draw.text((M, y), "THE WEEK, GRADED", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
-        y = _grade_strip(draw, grades, y=y + 46)
+        y = _grade_strip(draw, grades, y=y + 44, weekdays=weekdays)
 
-    # No sparkline here. The grade strip above already IS the week, and a two-dot line
-    # under it said nothing the strip had not said better while colliding with it. One
-    # visual per idea.
-    y = draw_stakes(draw, y=max(y + 30, 668))
-    y = _goal_bar(draw, facts, y=max(y + 22, 930))
+    # The stakes, compact: the weekly close is one of the three places they are spent.
+    y += 14
+    draw.rectangle([M, y, M + W_CONTENT, y + 2], fill=ce.BORDER)
+    y = _filler_stakes(draw, facts, {}, y=y + 26)
 
-    # The week's facts BEFORE the coach line. The first weekly card with a quote on it
-    # drew the quote where "biggest miss — recovery 24/100" had been and pushed that row
-    # (and "to goal") under the floor. On the weekly close the miss is the content and the
-    # quote is the colour, so the quote is what gives way.
-    y += 26
-    for label, key, suffix in (("sessions", "sessions", ""), ("sets", "sets", ""), ("habits", "habit_pct", "%")):
-        if totals.get(key) is not None:
-            y = _fact_row(draw, label, f"{totals[key]:g}{suffix}", y=y, size=27)
+    # The week's facts on ONE row, then the miss, then the quote — in that order, so the
+    # miss (the content) never gives way to the quote (the colour).
+    bits = []
+    if totals.get("sessions") is not None:
+        bits.append(f"{totals['sessions']:g} sessions")
+    if totals.get("sets") is not None:
+        bits.append(f"{totals['sets']:g} sets")
+    if totals.get("habit_pct") is not None:
+        bits.append(f"habits {totals['habit_pct']:g}%")
+    if bits:
+        y = _fact_row(draw, "the week", "  ·  ".join(bits), y=y, size=26, floor=CONTENT_FLOOR)
     if totals.get("misses"):
-        y = _fact_row(draw, "biggest miss", str(totals["misses"]), y=y, colour=ce.AMBER, size=25)
-    if facts.lb_to_goal is not None:
-        y = _fact_row(draw, "to goal", f"{facts.lb_to_goal:.0f} lb", y=y, size=27)
-    _coach_line(draw, facts, y=y + 10)
+        y = _fact_row(draw, "biggest miss", str(totals["misses"]), y=y, colour=ce.AMBER, size=25, floor=CONTENT_FLOOR)
+    _coach_line(draw, facts, y=y + 6, floor=CONTENT_FLOOR)
 
-    _footer(draw)
+    _bottom(draw, facts)
     return img
 
 
@@ -520,7 +719,7 @@ def _filler_arc(draw, facts, ctx, *, y: int) -> int:
     line = f"{n} weigh-ins across {len(series)} days"
     if facts.total_lost_lb is not None and facts.total_lost_lb > 0:
         line += f"  ·  {facts.total_lost_lb:.1f} lb down since day one"
-    draw.text((M, y), line, fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
+    draw.text((M, y), line, fill=DIM, font=ce.font(ce.FONT_MONO, 22))
     return y + 36
 
 
@@ -584,9 +783,11 @@ FILLERS: dict[str, tuple[str, Any, Any]] = {
 
 def pick_fillers(facts, ctx: dict, n: int, *, exclude: tuple[str, ...] = ()) -> list[str]:
     """Up to `n` filler names that can draw today, rotated by day number. Deterministic."""
-    names = list(FILLERS)
+    # The stakes are rationed — Day 0, the reckonings, and the last resort here — so the
+    # best line in the set is not spent as wallpaper. Everything else rotates.
+    names = [n for n in FILLERS if n != "stakes"]
     start = (facts.day_n or 0) % len(names)
-    order = names[start:] + names[:start]
+    order = names[start:] + names[:start] + ["stakes"]
     out: list[str] = []
     for name in order:
         if name in exclude or len(out) >= n:
@@ -601,11 +802,16 @@ def pick_fillers(facts, ctx: dict, n: int, *, exclude: tuple[str, ...] = ()) -> 
 
 
 def draw_filler(draw, name: str, facts, ctx: dict, *, y: int, note: str | None = None) -> int:
-    """One filler block with its header — and the absence it stands in for, named."""
+    """One filler block with its header — and the absence it stands in for, named LOUDLY.
+
+    The panel's honesty seat: the gap day is the campaign, not the failure. A visible
+    "not logged" is the proof "bad days included" promises, so it is amber and at value
+    size, not a faint aside that makes the card look broken.
+    """
     label, _ok, fn = FILLERS[name]
     draw.text((M, y), label.upper(), fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
     if note:
-        draw.text((M + W_CONTENT, y + 2), note, fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 19), anchor="ra")
+        draw.text((M + W_CONTENT, y - 2), note, fill=ce.AMBER, font=ce.font(ce.FONT_MONO_BOLD, 24), anchor="ra")
     return fn(draw, facts, ctx, y=y + 40)
 
 
@@ -614,45 +820,53 @@ def dayzero(facts, *, date_label: str):
     """The card for the eve of genesis: where attempt seventeen starts from.
 
     No day data is drawn — the day before Day 1 belongs to the previous cycle and its
-    numbers are not this attempt's. What IS true on the eve: the baseline weigh-in the
-    cycle is anchored to, the goal, the distance between them, the stakes, and what the
-    platform will grade every day from here. Rendered once, by hand, for the top of the grid.
+    numbers are not this attempt's. What IS true on the eve: the stakes, the baseline
+    weigh-in the cycle is anchored to, the goal, the distance, and what the platform
+    will grade every day from here. Stakes first: 16 / 0 is the hook a stranger reads.
     """
     if facts.baseline_weight_lb is None or facts.goal_weight_lb is None:
         raise ValueError("dayzero layout needs the cycle's baseline and goal")
     img, draw = _canvas()
     y = _serial(draw, facts, date_label)
 
+    y += 10
+    draw.text((M, y), "16", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 150))
+    draw.text((M + 230, y + 52), "times the weight came off", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 30))
+    draw.text((M + 230, y + 94), "since 2012", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 30))
+    y += 176
+    draw.text((M, y), "0", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 150))
+    draw.text((M + 230, y + 52), "times it stayed off", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 30))
+    y += 196
+
+    draw.rectangle([M, y, M + W_CONTENT, y + 2], fill=ce.BORDER)
+    y += 34
     hero = f"{facts.baseline_weight_lb:.1f}"
-    hf = ce.font(ce.FONT_DISPLAY, 150)
+    hf = ce.font(ce.FONT_DISPLAY, 120)
     draw.text((M, y), hero, fill=ce.TEXT, font=hf)
     try:
         hw = draw.textlength(hero, font=hf)
     except Exception:  # noqa: BLE001
-        hw = 340
-    draw.text((M + hw + 18, y + 78), "lb", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 40))
-    y += 176
-    draw.text((M, y), "the starting line", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 34))
-    y += 70
-
-    y = _goal_bar_at(draw, 0.0, facts.baseline_weight_lb, facts.goal_weight_lb, y=y)
-    y += 20
-    y = _fact_row(draw, "goal", f"{facts.goal_weight_lb:.0f} lb", y=y, size=30)
-    y = _fact_row(draw, "to lose", f"{facts.baseline_weight_lb - facts.goal_weight_lb:.0f} lb", y=y, size=30)
-
-    y = draw_stakes(draw, y=y + 26)
-
-    y += 10
-    draw.text((M, y), "GRADED EVERY DAY ON", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
-    y += 40
+        hw = 300
+    draw.text((M + hw + 18, y + 62), "lb  ·  the starting line", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 30))
+    y += 144
+    y = _fact_row(
+        draw,
+        "goal",
+        f"{facts.goal_weight_lb:.0f} lb  ·  {facts.baseline_weight_lb - facts.goal_weight_lb:.0f} lb to lose",
+        y=y,
+        size=30,
+        floor=CONTENT_FLOOR,
+    )
     names = [v for k, v in _COMPONENT_NAMES.items() if k != "journal"]
-    for line in ce.wrap("  ·  ".join(names), width=54, max_lines=2):
-        draw.text((M, y), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
-        y += 36
     y += 8
-    draw.text((M, y), "the first card lands tomorrow morning. bad days included.", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 22))
+    draw.text((M, y), "GRADED EVERY DAY ON", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 20))
+    y += 34
+    for line in ce.wrap(" · ".join(names), width=58, max_lines=2):
+        draw.text((M, y), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
+        y += 34
+    draw.text((M, y + 6), "bad days included.", fill=ce.MUTED, font=ce.font(ce.FONT_MONO_BOLD, 26))
 
-    _footer(draw)
+    _bottom(draw, facts, frac=0.0)
     return img
 
 
@@ -664,7 +878,7 @@ def dayzero_caption(facts) -> str:
         "Sixteen times the weight came off since 2012. Zero times it stayed off. "
         "This one is instrumented, public, and graded every day — bad days included."
     )
-    return cap_caption(head + "\n" + body)
+    return cap_caption(head + "\n" + body + "\n" + f"Day 1 tomorrow\n{SITE_LINE}\n{HASHTAGS}")
 
 
 # ── E. DETAIL — the second card: trained / ate / the rest ─────────────────────
@@ -673,7 +887,7 @@ def dayzero_caption(facts) -> str:
 DETAIL_MIN_BANDS = 2
 DETAIL_SLOTS = 3
 #: Exercise rows the TRAINED band may list when all three slots share the frame.
-DETAIL_EXERCISE_ROWS = {3: 5, 2: 8}
+DETAIL_EXERCISE_ROWS = {3: 4, 2: 8}
 #: What a filler in each slot is standing in for — drawn on the filler's header line.
 DETAIL_ABSENCE_NOTES = {"trained": "no training logged", "ate": "no food logged", "rest": "no sleep or habit data"}
 
@@ -690,8 +904,11 @@ def detail_bands(facts) -> list[str]:
     return bands
 
 
-def _band_header(draw, label: str, *, y: int) -> int:
+def _band_header(draw, label: str, *, y: int, summary: str | None = None) -> int:
+    """`TRAINED` left, the band's one number right — so the three-band rhythm reads at a glance."""
     draw.text((M, y), label.upper(), fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
+    if summary:
+        draw.text((M + W_CONTENT, y - 2), summary, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24), anchor="ra")
     return y + 40
 
 
@@ -702,27 +919,23 @@ def _fmt_minutes(mins: int | None) -> str | None:
 
 
 def _band_trained(draw, facts, *, y: int, rows: int) -> int:
-    y = _band_header(draw, "trained", y=y)
-    if facts.workouts:
-        w = facts.workouts[0]
+    w = facts.workouts[0] if facts.workouts else None
+    summary = _sets_word(w.n_sets) if w else (f"{facts.walk_miles:.1f} mi walked" if facts.walk_miles else None)
+    y = _band_header(draw, "trained", y=y, summary=summary)
+    if w:
         title = _session_label(w.title)
         f = ch.fit_text(draw, title, font_name=ce.FONT_DISPLAY, max_size=72, min_size=40, width=W_CONTENT)
         draw.text((M, y), title, fill=ce.TEXT, font=f)
         y += 86
-        bits = [f"{w.n_sets} sets"]
-        if w.volume_lbs and w.volume_lbs > 0:
-            bits.append(f"{w.volume_lbs:,.0f} lb moved")
-        if _fmt_minutes(w.duration_min):
-            bits.append(_fmt_minutes(w.duration_min) or "")
-        draw.text((M, y), "  ·  ".join(bits), fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
+        draw.text((M, y), _session_line(w), fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
         y += 46
         shown = w.detail[:rows]
+        f_name = ce.font(ce.FONT_MONO, 26)
         for ex in shown:
             if y > FLOOR_Y - 40:
                 break
-            name = clean_title(ex.name)
-            f_name = ce.font(ce.FONT_MONO, 23)
-            right = f"{ex.n_sets} × {ex.reps}" if ex.reps else f"{ex.n_sets} sets"
+            name = short_exercise(ex.name)
+            right = f"{ex.n_sets} × {ex.reps}" if ex.reps else _sets_word(ex.n_sets)
             if ex.top_weight_lb:
                 right += f"  ·  {ex.top_weight_lb:,.0f} lb"
             try:
@@ -736,19 +949,19 @@ def _band_trained(draw, facts, *, y: int, rows: int) -> int:
             except Exception:  # noqa: BLE001
                 pass
             draw.text((M, y), name, fill=ce.MUTED, font=f_name)
-            draw.text((M + W_CONTENT, y), right, fill=ce.FAINT, font=f_name, anchor="ra")
-            y += 36
+            draw.text((M + W_CONTENT, y), right, fill=ce.TEXT, font=f_name, anchor="ra")
+            y += 38
         if len(w.detail) > len(shown):
-            draw.text((M, y), f"+{len(w.detail) - len(shown)} more", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 22))
+            draw.text((M, y), f"+{len(w.detail) - len(shown)} more", fill=DIM, font=ce.font(ce.FONT_MONO, 22))
             y += 36
     if facts.walk_miles is not None and facts.walk_miles >= 0.5:
-        draw.text((M, y), f"walked {facts.walk_miles:.1f} mi", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 23))
-        y += 36
+        draw.text((M, y), f"walked {facts.walk_miles:.1f} mi", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 26))
+        y += 38
     return y
 
 
 def _band_ate(draw, facts, *, y: int) -> int:
-    y = _band_header(draw, "ate", y=y)
+    y = _band_header(draw, "ate", y=y, summary=f"{facts.calories:,.0f} kcal" if facts.calories is not None else None)
     if facts.calories is not None:
         hero = f"{facts.calories:,.0f}"
         hf = ce.font(ce.FONT_DISPLAY, 72)
@@ -758,7 +971,8 @@ def _band_ate(draw, facts, *, y: int) -> int:
         except Exception:  # noqa: BLE001
             hw = 200
         tail = "kcal" + (f"  ·  target {facts.cal_target:,.0f}" if facts.cal_target else "")
-        draw.text((M + hw + 16, y + 36), tail, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 26))
+        over = facts.cal_target is not None and float(facts.calories) > float(facts.cal_target)
+        draw.text((M + hw + 16, y + 36), tail, fill=ce.AMBER if over else ce.MUTED, font=ce.font(ce.FONT_MONO, 26))
         y += 92
     # The macro row: four quiet columns. Protein carries its target because protein is the
     # one macro the protocol sets a floor on; the others are what they were.
@@ -781,14 +995,14 @@ def _band_ate(draw, facts, *, y: int) -> int:
         ch.draw_progress(draw, min(frac, 1.0), x=M, y=y, w=W_CONTENT, h=12, colour=ce.GREEN if frac >= 1 else ce.AMBER)
         y += 24
         draw.text(
-            (M, y), f"protein {frac * 100:.0f}% of the {facts.protein_target_g:.0f} g target", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20)
+            (M, y), f"protein {frac * 100:.0f}% of the {facts.protein_target_g:.0f} g target", fill=DIM, font=ce.font(ce.FONT_MONO, 20)
         )
         y += 34
     if facts.meals is not None:
         logged = f"{int(facts.meals)} meal{'s' if int(facts.meals) != 1 else ''}"
         if facts.snacks:
             logged += f" · {int(facts.snacks)} snack{'s' if int(facts.snacks) != 1 else ''}"
-        draw.text((M, y), f"{logged} logged", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
+        draw.text((M, y), f"{logged} logged", fill=DIM, font=ce.font(ce.FONT_MONO, 20))
         y += 34
     return y
 
@@ -799,7 +1013,11 @@ def _rest_tiles(facts) -> list[tuple[str, str, str | None]]:
     if facts.sleep_hrs is not None:
         tiles.append(("sleep", f"{facts.sleep_hrs:.1f} h", f"score {facts.sleep_score:.0f}" if facts.sleep_score is not None else None))
     if facts.recovery_pct is not None:
-        tiles.append(("recovery", f"{facts.recovery_pct:.0f}%", f"HRV {facts.hrv_ms:.0f} ms" if facts.hrv_ms is not None else None))
+        hrv = None
+        if facts.hrv_ms is not None:
+            base = getattr(facts, "hrv_30d", None)
+            hrv = f"HRV {facts.hrv_ms:.0f} ms" + (f" · 30d {base:.0f}" if base else "")
+        tiles.append(("recovery", f"{facts.recovery_pct:.0f}%", hrv))
     if facts.tier0_done is not None and facts.tier0_total:
         tiles.append(("habits", f"{int(facts.tier0_done)}/{int(facts.tier0_total)}", None))
     if facts.steps is not None:
@@ -812,24 +1030,27 @@ def _rest_tiles(facts) -> list[tuple[str, str, str | None]]:
 
 
 def _band_rest(draw, facts, *, y: int) -> int:
-    y = _band_header(draw, "the rest", y=y)
+    summary = f"slept {facts.sleep_hrs:.1f} h" if facts.sleep_hrs is not None else None
+    y = _band_header(draw, "the rest", y=y, summary=summary)
     tiles = _rest_tiles(facts)
     if tiles:
         cw = W_CONTENT // 3
+        row_h = 104
+        # A second row of tiles only if it clears the floor; the first three are the ones
+        # that matter (sleep, recovery, habits) and the rest go to the caption.
+        if y + 2 * row_h > FLOOR_Y - 20:
+            tiles = tiles[:3]
         for i, (label, value, note) in enumerate(tiles):
             x = M + (i % 3) * cw
-            ty = y + (i // 3) * 84
+            ty = y + (i // 3) * row_h
             draw.text((x, ty), label.upper(), fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 20))
             draw.text((x, ty + 28), value, fill=ce.TEXT, font=ce.font(ce.FONT_MONO, 34))
             if note:
-                try:
-                    vw = draw.textlength(value, font=ce.font(ce.FONT_MONO, 34))
-                except Exception:  # noqa: BLE001
-                    vw = 120
-                draw.text((x + vw + 12, ty + 40), note, fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 19))
-        y += 84 * ((len(tiles) + 2) // 3) + 8
+                # Under the value, at a size a phone can read — never a 13 px aside.
+                draw.text((x, ty + 72), note, fill=DIM, font=ce.font(ce.FONT_MONO, 22))
+        y += row_h * ((len(tiles) + 2) // 3) + 4
     if facts.missed_tier0:
-        y = _fact_row(draw, "missed", " · ".join(facts.missed_tier0[:2]), y=y, colour=ce.AMBER, size=24)
+        y = _fact_row(draw, "not checked in", " · ".join(facts.missed_tier0[:2]), y=y, colour=ce.AMBER, size=24)
     if facts.journaled:
         y = _fact_row(draw, "journal", "wrote it down", y=y, size=24)
     return y
@@ -860,7 +1081,7 @@ def detail(facts, *, date_label: str, weight_series=None, grade_series=None):
     ctx = {"weight_series": weight_series or [], "grade_series": grade_series or []}
     img, draw = _canvas()
     y = _serial(draw, facts, date_label)
-    draw.text((M + W_CONTENT, 148), "2 OF 2  ·  THE DETAIL", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 22), anchor="ra")
+    draw.text((M + W_CONTENT, 148), "2 OF 2  ·  THE DETAIL", fill=DIM, font=ce.font(ce.FONT_MONO, 22), anchor="ra")
     rows = DETAIL_EXERCISE_ROWS.get(len(plan), 5)
     for i, (block, note) in enumerate(plan):
         if i:
@@ -903,7 +1124,7 @@ def detail_caption(facts, *, day_label: str) -> str:
         rest.append(f"habits {int(facts.tier0_done)}/{int(facts.tier0_total)}")
     if rest:
         bits.append((", ".join(rest) + ".").capitalize())
-    return cap_caption((head + "\n" + " ".join(bits)).strip())
+    return cap_caption((head + "\n" + " ".join(bits) + "\n" + _caption_tail(facts)).strip())
 
 
 LAYOUTS = {
@@ -921,7 +1142,14 @@ LAYOUTS = {
 HEAVY_SETS = 20
 
 
-def pick_beat(facts, trailing=None) -> tuple[str, str]:
+#: Trajectory may not fire three days running unless the arc moved this much since the
+#: last trajectory card. With sparse weigh-ins rule 1 was rare; with daily weigh-ins —
+#: the behaviour we want — it would make every card `−N.N lb` and the other beats would
+#: never fire again (the PM seat's finding). Variety is a property, not a coincidence.
+TRAJECTORY_REPEAT_LB = 1.0
+
+
+def pick_beat(facts, trailing=None, recent_beats=None) -> tuple[str, str]:
     """Which layout this day's story wants, and why. Returns (layout, reason).
 
     Ava Moreau's correction, and the reason the first cards felt interchangeable: the
@@ -933,15 +1161,32 @@ def pick_beat(facts, trailing=None) -> tuple[str, str]:
     different card every day" is a property rather than a hope.
     """
     trailing = trailing or []
+    recent = list(recent_beats or [])  # [(date, beat)] for the days before this one, oldest first
+
+    # 0. A milestone picks the beat that carries it.
+    m = getattr(facts, "milestone", None)
+    if m and facts.workouts and "moved" in m:
+        return "session", f"milestone — {m}"
+    if m and facts.weight_lb is not None and "lb" in m:
+        return "trajectory", f"milestone — {m}"
 
     # 1. A new weigh-in is the arc moving. It is the rarest event and the most postable —
-    #    and on this cycle it is genuinely rare: one in the whole first week.
+    #    unless it has been the beat two days running and the arc barely moved since.
     prev = next((d.weight_lb for d in reversed(trailing) if d.date != facts.date and d.weight_lb is not None), None)
     if facts.weight_lb is not None and prev is not None and abs(facts.weight_lb - prev) > 0.05:
-        return "trajectory", "new weigh-in — the arc moved"
+        last_two = [b for _d, b in recent[-2:]]
+        if last_two == ["trajectory", "trajectory"]:
+            last_traj_date = next((d for d, b in reversed(recent) if b == "trajectory"), None)
+            at_last = next((d.weight_lb for d in trailing if d.date == last_traj_date and d.weight_lb is not None), None)
+            if at_last is None or abs(facts.weight_lb - at_last) < TRAJECTORY_REPEAT_LB:
+                pass  # fall through — the arc is not a new story yet
+            else:
+                return "trajectory", "new weigh-in — the arc moved"
+        else:
+            return "trajectory", "new weigh-in — the arc moved"
 
     # 2. A heavy session is its own story, with the movements named.
-    sets = sum(w.n_sets for w in facts.workouts)
+    sets = sum(w.n_working_sets or w.n_sets for w in facts.workouts)
     if sets >= HEAVY_SETS:
         return "session", f"{sets} working sets — a session worth showing"
 
@@ -1007,7 +1252,10 @@ def render_beat(layout: str, facts, *, date_label: str, weight_series=None, grad
 
 #: Instagram takes far more than this; the limit is editorial, not technical. A caption
 #: that has to be expanded to be read is a caption most of the feed never reads (#3749).
-CAPTION_MAX_CHARS = 300
+CAPTION_MAX_CHARS = 480
+#: Fixed, never generated. The account's own tags.
+HASHTAGS = "#attempt17 #proofnotpromises #quantifiedself #weightlossjourney #buildinpublic"
+SITE_LINE = "averagejoematt.com"
 
 
 def cap_caption(text: str) -> str:
@@ -1055,13 +1303,27 @@ def caption_for_beat(layout: str, facts, *, day_label: str, date_label: str) -> 
         if worst:
             bits.append(f"Worst component: {_COMPONENT_NAMES.get(worst[0], worst[0])} at {worst[1]:.0f}/100.")
     if facts.missed_tier0:
-        bits.append("Missed: " + ", ".join(facts.missed_tier0[:2]) + ".")
+        bits.append("Not checked in: " + ", ".join(facts.missed_tier0[:2]) + ".")
     body = " ".join(bits)
-    # The coach line goes last and is the first thing dropped. The stats are the card's
-    # claim; the quote is its voice, and a caption that truncates mid-number reads as
-    # broken in a way a caption that simply has no quote does not (#3749).
+    tail = _caption_tail(facts)
+    # The coach line is the first thing dropped. The stats are the card's claim; the
+    # quote is its voice, and a caption that truncates mid-number reads as broken in a
+    # way a caption that simply has no quote does not (#3749).
     line = getattr(facts, "coach_line", None)
     if line:
-        candidate = f'{body} — "{line}"'.strip()
-        body = candidate if len(head) + 1 + len(candidate) <= CAPTION_MAX_CHARS else body
-    return cap_caption((head + "\n" + body).strip())
+        who = getattr(facts, "coach_label", None)
+        candidate = f'{body}\n"{line}"' + (f" — {who}" if who else "")
+        if len(head) + 1 + len(candidate) + 1 + len(tail) <= CAPTION_MAX_CHARS:
+            body = candidate
+    return cap_caption((head + "\n" + body + "\n" + tail).strip())
+
+
+def _caption_tail(facts) -> str:
+    """NEXT line, the site, the tags — the same close on every caption, all platform facts."""
+    parts = []
+    nxt = next_line(facts)
+    if nxt:
+        parts.append(nxt.replace("  ·  ", " · "))
+    parts.append(SITE_LINE)
+    parts.append(HASHTAGS)
+    return "\n".join(parts)

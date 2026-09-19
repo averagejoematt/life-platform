@@ -228,7 +228,7 @@ def test_the_serial_marker_says_day_0_not_a_dash():
             seen.append(text)
 
     L._serial(_Draw(), DayFacts(date="2026-09-05", day_n=0), "Sat 5 Sep")
-    assert any(t.startswith("DAY 0 ") for t in seen), seen
+    assert "DAY 0" in seen, seen
 
 
 # ── the weekly card's order ───────────────────────────────────────────────────
