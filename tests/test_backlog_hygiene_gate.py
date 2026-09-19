@@ -987,3 +987,143 @@ def test_the_dated_decision_and_the_rejected_alternative_are_recorded_in_both_mo
         assert "#3065" in src, f"{name}: the decision must name its issue"
         assert "REJECTED" in src or "rejected" in src, f"{name}: the losing design must be recorded as rejected, with the reason"
     assert "backlog_next.py" in linter and "rule_now_liveness" in filer, "the rejection has to state its reasons, not just its verdict"
+
+
+# ── #3614 box 2, third clause: a grounding finding cannot close until its specimen
+#    is in tests/grounding_corpus/ ───────────────────────────────────────────────
+#
+# House style above ("no vacuous scans") applies with one extra obligation this class
+# has earned: the rule joins a corpus fixture to an issue NUMBER, so the tests must
+# prove the join is structural and not a phrase match — including on the one body that
+# has bitten this repo four times, the rule's own subject matter.
+
+NOW_3614 = datetime(2026, 9, 20, tzinfo=timezone.utc)
+GROUNDING_BUG_LABELS = ("type:bug", "area:ai", "model:opus", "prio:P2", "review:fullreview-2026-09-05")
+# Verbatim enough to matter: the real #3614 body cites AIQ-3 and AIQ-4 as the specimens
+# it FROZE, which is why it must not be read as a finding that owes one.
+CLASS_STORY_BODY = "Freeze the review's specimens (AIQ-3, AIQ-4) as fixtures and replay them against the gate."
+
+
+def _closed_bug(number=4242, labels=GROUNDING_BUG_LABELS, body="Served live: 'since the September 5th reset' — AIQ-3.", closed=None):
+    return {
+        "number": number,
+        "labels": [{"name": n} for n in labels],
+        "body": body,
+        "closedAt": closed or "2026-09-20T00:00:00Z",
+    }
+
+
+def _specimen(fid="2026-09-04-planted", issue="#4242", status="caught", closes_with=None, why_open=None):
+    out = {"id": fid, "issue": issue, "status": status}
+    if closes_with is not None:
+        out["closes_with"] = closes_with
+    if why_open is not None:
+        out["why_open"] = why_open
+    return out
+
+
+def _grounding(closed, specimens):
+    return hy.rule_grounding_specimen(closed, specimens=specimens, now=NOW_3614)
+
+
+def test_a_grounding_finding_closed_while_its_specimen_is_still_uncaught_reds():
+    """Clause (a) — the founding incident, planted. An `open` specimen names the story
+    that will catch it; that story is CLOSED, so the corpus now names a closed issue as
+    its future closer, i.e. names nobody. Live on 2026-09-19 for #3516 (x2) and #3519."""
+    hits = _grounding(
+        [_closed_bug(number=3516)],
+        [_specimen(fid="2026-09-04-garmin", issue="#3516", status="open", closes_with="#3516", why_open="no text class exists yet")],
+    )
+    assert [f.rule for f in hits] == ["grounding_specimen"], hits
+    assert hits[0].number == 3516 and hits[0].severity == hy.VIOLATION
+    assert "2026-09-04-garmin" in hits[0].message, "the finding must name the fixture, or nobody can clear it"
+    assert "no text class exists yet" in hits[0].message, "the corpus's own `why_open` is the reason; do not make the reader open the file"
+    assert "stamp --amend" in hits[0].message, "the remedy includes the re-seal, or the next edit is a laundered one"
+
+
+def test_the_same_specimen_is_silent_while_its_closer_is_still_open():
+    """The other direction of clause (a): an open specimen with a LIVE closer is the
+    corpus working as designed (#3614's own note), not a violation."""
+    assert _grounding([], [_specimen(issue="#3516", status="open", closes_with="#3516", why_open="pending")]) == []
+
+
+def test_a_specimen_backed_closure_passes():
+    """The positive control. A grounding finding whose sentence IS captured closes clean."""
+    assert _grounding([_closed_bug()], [_specimen(issue="#4242", status="caught")]) == []
+
+
+def test_a_grounding_finding_closed_with_no_specimen_reds_after_the_cutoff():
+    """Clause (b), and the dated start that keeps it from demanding a retroactive fact."""
+    after = _grounding([_closed_bug(closed="2026-09-19T12:00:00Z")], [])
+    assert [(f.rule, f.number, f.severity) for f in after] == [("grounding_specimen", 4242, hy.VIOLATION)], after
+    assert "NO specimen" in after[0].message and "MIN_SPECIMENS" in after[0].message
+
+    before = _grounding([_closed_bug(closed="2026-09-18T23:59:59Z")], [])
+    assert [f.severity for f in before] == [hy.ADVISORY], "a member closed before the rule existed is grandfathered"
+    assert "[4242]" in before[0].message, "grandfathered is NAMED, never silent (the instrument_marker_exempt precedent)"
+
+
+def test_the_class_story_that_owns_the_corpus_is_not_a_member_of_its_own_set():
+    """RULE 12, measured rather than asserted. #3614 carries `area:ai`, a `review:*` label,
+    and its own body cites AIQ-3/AIQ-4 — so a derivation without the `type:bug` conjunct
+    would refuse to let the issue that BUILT this rule close. `type:bug` is the
+    specimen-bearing shape; `type:story` is the class a specimen's `closes_with` points at."""
+    story_labels = ("type:story", "area:ai", "model:opus", "prio:P2", "review:forensic-rca-2026-09-05")
+    assert not hy.is_grounding_finding(list(story_labels), CLASS_STORY_BODY)
+    # ... and the conjunct is doing that work alone: the same body on a bug IS a member.
+    assert hy.is_grounding_finding(list(GROUNDING_BUG_LABELS), CLASS_STORY_BODY)
+    # end to end: the story shape closes with no specimen and nothing fires.
+    assert _grounding([_closed_bug(number=3614, labels=story_labels, body=CLASS_STORY_BODY)], []) == []
+
+
+def test_membership_needs_a_lens_FINDING_ID_not_the_word():
+    """The phrase-match trap, pinned. `AIQ` is a lens name that appears in prose about the
+    lens; `AIQ-4` is a row ID docs/reviews/FULLREVIEW_2026-09-05.md mints and the fixtures
+    cite. Only the identifier is the join."""
+    assert not hy.names_grounding_lens_finding("the aiq lens found nothing today")
+    assert not hy.names_grounding_lens_finding("AIQ and NARR are the two grounding lenses")
+    assert not hy.names_grounding_lens_finding("AIQ-N is the shape of a finding id")
+    assert hy.names_grounding_lens_finding("AIQ-4")
+    assert hy.names_grounding_lens_finding("reproduced from NARR-3 on the coaching door")
+    assert not hy.is_grounding_finding(list(GROUNDING_BUG_LABELS), "a reader-facing AI bug with no lens row cited")
+
+
+def test_an_open_specimen_that_names_no_closer_reds():
+    """The corpus README's own contract ("an open specimen must name its closer"), which is
+    the premise clause (a) reads. A gate must verify its own premise."""
+    hits = _grounding([], [_specimen(fid="2026-09-04-orphan", issue="#4242", status="open")])
+    assert [(f.rule, f.number) for f in hits] == [("grounding_specimen", 4242)], hits
+    assert "names no `closes_with`" in hits[0].message
+
+
+def test_the_rule_is_wired_into_check_not_merely_defined():
+    """THE MUTATION CONTROL. Delete the `rule_grounding_specimen(...)` line from `check()`
+    and this test is the thing that reds — a rule nothing calls is a rule that cannot fire,
+    which is this repo's most-repeated gate defect."""
+    findings = hy.check(
+        _live_now_queue(),
+        now=NOW_3614,
+        closed_issues=[_closed_bug(closed="2026-09-19T12:00:00Z")],
+        specimens=[],
+    )
+    assert "grounding_specimen" in {f.rule for f in findings}, findings
+
+
+def test_no_closed_corpus_means_silent_never_blocking():
+    """Fail-open, this module's standing contract: no gh / no network / an offline fixture
+    without --closed-json must not wedge a wrap. `None` is 'not measured', never 'clean'."""
+    assert hy.rule_grounding_specimen(None, specimens=[_specimen(status="open")], now=NOW_3614) == []
+    assert "grounding_specimen" not in {f.rule for f in hy.check(_live_now_queue(), now=NOW_3614)}
+
+
+def test_the_real_corpus_carries_the_join_this_rule_reads():
+    """Not a fixture test: the LIVE tests/grounding_corpus/ must resolve an issue number on
+    every specimen, and every `open` one must name a closer. Without that key the rule is
+    structurally unable to fire, however green its own fixtures are."""
+    specimens = hy.load_grounding_specimens()
+    assert len(specimens) >= 8, f"the corpus is grow-only (#3614); got {len(specimens)}"
+    for fixture in specimens:
+        fid = fixture.get("id")
+        assert hy._issue_number(fixture.get("issue")) is not None, f"{fid}: `issue` does not resolve to a number"
+        if (fixture.get("status") or "") == "open":
+            assert hy._issue_number(fixture.get("closes_with")) is not None, f"{fid}: open specimen names no `closes_with`"
