@@ -3561,6 +3561,25 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3783"
         }
       ]
+    },
+    {
+      "id": "2026-09-19-the-seal-nobody-could-see",
+      "date": "2026-09-19",
+      "title": "The pre-registration nobody could see",
+      "shipped": "The prediction ledger now shows which of the coaches' forward calls were sealed before Day 1. Each row carries a 'sealed' or 'in-cycle' tag, and all sixteen of this cycle's pre-registered bets are visible on the page. Two things were wrong. Sixteen sealed bets had been written with the wrong cycle stamp — frozen the evening before Day 1, when the clock still honestly said 'previous cycle' — so a permanent filter hid every one of them from the site. And once they were restored, the page still showed none, because the API returns the fifty most recent calls and a pre-registered bet is dated at the start of the cycle, which makes it the oldest thing in the list.",
+      "why_it_mattered": "Pre-registration is the platform's central credibility claim: state the prediction publicly before the data arrives, then let it be graded. The seal existed the whole time. It was published, hash-stamped, and verifiable — and it graded nothing, because the rows it named had been filtered out of the season. A reader looking at the ledger saw sixteen fewer commitments than had actually been made, and every visible row was an in-cycle call logged after the fact. The claim was true and the page quietly contradicted it.",
+      "gotcha": "Fixing the site turned out to be a prerequisite, not a side quest. Two labels on the site rendered a fraction below the design system's own eleven-pixel minimum, which failed the automatic visual check — and that check is wired to roll the whole site back. So every site deploy for three days had been publishing and then silently reverting itself. The renderer fix went out, was undone within the hour, and the ledger page came back showing six sealed rows instead of sixteen — the exact number predicted by the test written to prove that fix could fail. Raising the two labels to the floor then clipped a third label nobody had flagged: the training-volume figure fit at the old size and overflowed at the new one, inside an element too small to show it and too self-contained for any page-level check to notice.",
+      "honest_miss": "The goal was to close eight to twelve backlog items and five closed. Three that looked one step from done were not, and finding that out is most of what the day bought. One had an acceptance criterion that contradicts a decision Matthew had already made in writing, so it was implemented, caught in review and reverted. One asks for a rule that turns out not to exist anywhere in the codebase. The third needs a guard widened, and that same widening is what two other open items are separately waiting on — three issues, one fix, and none of them can be honestly ticked until it lands.",
+      "prs": [
+        {
+          "label": "PR #3879",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3879"
+        },
+        {
+          "label": "PR #3883",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3883"
+        }
+      ]
     }
   ]
 }
