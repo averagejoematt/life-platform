@@ -478,36 +478,104 @@ def test_scanned_tree_is_the_deploy_dir_and_exists():
 
 # ── F. (#3620, security ROW1) live inline policy vs the tracked JSON ─────────
 # Sections A–E above are all OFFLINE: they prove the repo cannot grow a second
-# copy of a governed policy document. None of them can see the thing that was
-# actually true on 2026-09-05 and is still true today — that the LIVE role does
-# not match the tracked JSON at all. #3562 merged (24 Sids, SES scoped to the
-# identity ARN) and closed at merge; the live role kept its 20 Sids and 5
-# wildcards, including `ses:SendEmail` on `*` with no Condition. The
-# least-privilege clause has been FALSE in production ever since, and every gate
-# in this file was green for the whole of it. That is #3595's class on the
-# security lens: a `Fixes` that closes before the apply.
+# copy of a governed policy document. None of them can see whether the LIVE role
+# matches the tracked JSON — which on 2026-09-05 it did not. #3562 merged (24
+# Sids, SES scoped to the identity ARN) and closed at merge; the live role kept
+# 20 Sids and 5 wildcards, including `ses:SendEmail` on `*` with no Condition.
+# The least-privilege clause was FALSE in production for days while every gate in
+# this file was green. That is #3595's class on the security lens: a `Fixes` that
+# closes before the apply.
 #
 # `deploy/verify_oidc_iam.py --strict` (the #401 dead-man) makes the same
-# comparison, and it is the operator's tool. This is the SUITE's copy of the
-# question, so the drift is visible to anyone running the tests with
-# credentials, and — more importantly — so that the day the owner runs
-# `put-role-policy`, something in the repo changes colour to record it.
+# comparison and is the operator's tool. This is the SUITE's copy of the
+# question, so the drift is visible to anyone running the tests.
 #
-# Skips cleanly with no credentials (every laptop and every un-federated CI
-# lane), because a comparison that cannot be made must report that it was not
-# made, never a pass.
-def _live_iam_client():
-    try:
-        import boto3
-        from botocore.exceptions import BotoCoreError, ClientError
-    except ImportError:  # pragma: no cover
-        return None
-    try:
-        client = boto3.client("iam")
-        boto3.client("sts").get_caller_identity()
-        return client
-    except (BotoCoreError, ClientError, Exception):  # noqa: B014 — any auth/config failure means "cannot observe"
-        return None
+# TWO THINGS THIS GOT WRONG FIRST, both recorded because each made the leg unable
+# to fail — the exact defect class #3620 exists to close:
+#
+#   1. It was NOT marked `integration`, so it could never observe anything. This
+#      conftest plants FAKE credentials process-wide at IMPORT time (#381
+#      hermeticity) — `AWS_ACCESS_KEY_ID=testing` — and `@pytest.mark.integration`
+#      is the sanctioned door back to the developer's real ambient credentials
+#      (it also drops boto3's cached DEFAULT_SESSION, which env vars alone cannot).
+#      Without the marker the live call returned `InvalidClientTokenId` on a
+#      machine whose `aws sts get-caller-identity` succeeds one shell line away,
+#      and a broad `except Exception` turned that into a tidy "no credentials"
+#      SKIP. A green suite, a skipped comparison, and nothing to read.
+#
+#   2. The skip branch caught `Exception`. A skip must mean "the question could
+#      not be asked", and exactly two things mean that: no credentials, or a
+#      denial on `iam:GetRolePolicy`. Anything else — a typo'd role name, a
+#      renamed inline policy, a throttle, an expired token — is a FAILURE, and
+#      swallowing it is how a comparison gate goes dark. So the classification is
+#      now explicit and everything unclassified re-raises.
+#
+# There is no xfail on any role. There was one, on
+# `github-actions-remediation-role`, for the drift the issue describes; re-measured
+# 2026-09-19 the live role carries 24 Sids against a tracked 24 — an earlier
+# session applied it. A `strict=True` xfail over a role that now matches would
+# XPASS and red; a `strict=False` one would hide the next real drift behind a
+# permanent excuse. Either way the mark would be asserting history instead of
+# state. The test just compares.
+_SKIPPABLE_ERROR_CODES = frozenset(
+    {
+        "AccessDenied",
+        "AccessDeniedException",
+        "UnauthorizedOperation",
+    }
+)
+
+
+def _hermetic_fakes_active() -> str | None:
+    """Reason string if the suite's own FAKE credentials are what boto3 would use.
+
+    THE DEFECT THIS NAMES (found running the full parallel suite, 2026-09-19, and
+    pre-existing — it is not introduced by #3620). `tests/conftest.py` plants
+    `AWS_ACCESS_KEY_ID=testing` process-wide at import for hermeticity (#381), and
+    `@pytest.mark.integration` restores `_REAL_AWS_ENV` — a snapshot taken when
+    conftest was imported. Under `-n auto` each xdist worker is a CHILD process
+    that INHERITS the controller's already-faked environment, so the worker's
+    snapshot captures `"testing"` and the "restore" restores the fakes. The marker
+    therefore works serially and is inert in the parallel lane, which is the lane
+    CI runs. Every `integration`-marked test in the parallel lane is affected; this
+    is the first one outside `tests/test_integration_aws.py` (which CI --ignores),
+    which is why it had not surfaced.
+
+    Detected by the SENTINEL VALUE, read from conftest rather than retyped, and
+    NOT by the error code: a genuinely expired real token also returns
+    `InvalidClientTokenId`, and that must stay a failure. This function is the only
+    place the two are distinguished.
+    """
+    fake = None
+    conftest = sys.modules.get("conftest")
+    if conftest is not None:
+        fake = getattr(conftest, "_FAKE_AWS_ENV", {}).get("AWS_ACCESS_KEY_ID")
+    if fake and os.environ.get("AWS_ACCESS_KEY_ID") == fake:
+        return (
+            "the suite's hermetic FAKE credentials are active (AWS_ACCESS_KEY_ID == conftest._FAKE_AWS_ENV's "
+            "sentinel) — the comparison was NOT made. Serially, @pytest.mark.integration restores real ambient "
+            "credentials and this test runs for real; under `-n auto` the xdist worker inherits the already-faked "
+            "environment, so conftest's _REAL_AWS_ENV snapshot IS the fakes. Run it serially: "
+            "`python3 -m pytest tests/test_iam_twin_free_3336.py -k live_inline_policy`"
+        )
+    return None
+
+
+def _classify_unobservable(exc) -> str | None:
+    """Reason string if `exc` means "the question could not be asked", else None.
+
+    None is the important half: the caller re-raises on None, so a new failure
+    shape arrives as a red test rather than as an extra silent skip.
+    """
+    from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
+
+    if isinstance(exc, (NoCredentialsError, PartialCredentialsError)):
+        return f"no AWS credentials ({type(exc).__name__}) — the comparison was NOT made"
+    if isinstance(exc, ClientError):
+        code = exc.response.get("Error", {}).get("Code", "")
+        if code in _SKIPPABLE_ERROR_CODES:
+            return f"iam:GetRolePolicy denied ({code}) — the comparison was NOT made"
+    return None
 
 
 def _normalise_policy(doc: dict) -> list:
@@ -526,56 +594,38 @@ def _normalise_policy(doc: dict) -> list:
     return sorted(out, key=lambda s: json.dumps(s, sort_keys=True))
 
 
-def _live_vs_tracked(role_name: str):
-    """(tracked, live) normalised documents, or None when unobservable.
-
-    The role -> inline-policy-name map is read from `verify_oidc_iam.ROLES` (already
-    imported at the top of this file) rather than retyped: a second copy of that map
-    is the exact twin this whole module exists to prevent.
-    """
-    client = _live_iam_client()
-    if client is None:
-        return None
-    role_spec = verify_oidc_iam.ROLES[role_name]
-    tracked = json.loads((IAM_DIR / role_spec["permissions_file"]).read_text(encoding="utf-8"))
-    try:
-        live = client.get_role_policy(RoleName=role_name, PolicyName=role_spec["inline_policy_name"])["PolicyDocument"]
-    except Exception:
-        return None
-    return _normalise_policy(tracked), _normalise_policy(live)
-
-
-@pytest.mark.parametrize(
-    "role_name",
-    [
-        "github-actions-deploy-role",
-        "github-actions-golden-eval-role",
-        "github-actions-diagnosis-role",
-        pytest.param(
-            "github-actions-remediation-role",
-            # strict=True per tests/test_xfail_hygiene.py (#2375): the drift is DETERMINISTIC
-            # — the live role either matches the tracked JSON or it does not — so the marker
-            # must BURN when the owner applies the fix, rather than quietly tolerating an
-            # xpass forever. The apply therefore reds this test by design, and the red is the
-            # instruction to delete the mark. (When no credentials are present the test skips
-            # before asserting, and a skip is neither xfail nor xpass, so an unfederated lane
-            # is unaffected.)
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="owner put-role-policy pending — #3562 merged and closed at merge; the live role still carries 20 Sids "
-                "and 5 wildcards against a tracked 24 (#3606 item 2, ~2 min). Delete this mark in the PR that follows the apply.",
-            ),
-        ),
-    ],
-)
+@pytest.mark.integration
+@pytest.mark.parametrize("role_name", sorted(verify_oidc_iam.ROLES))
 def test_live_inline_policy_matches_the_tracked_json(role_name):
-    pair = _live_vs_tracked(role_name)
-    if pair is None:
-        pytest.skip("no AWS credentials (or no iam:GetRolePolicy) — the comparison was NOT made")
-    tracked, live = pair
+    """Every governed role's LIVE inline policy == its tracked infra/iam/ JSON.
+
+    The role -> inline-policy-name map is read from `verify_oidc_iam.ROLES`, not
+    retyped: a second copy of that map is the exact twin this module exists to
+    prevent. Parametrised over the whole registry for the same reason — a role
+    added there is covered without anyone remembering to extend a list here.
+    """
+    import boto3
+
+    unobservable = _hermetic_fakes_active()
+    if unobservable:
+        pytest.skip(unobservable)
+
+    role_spec = verify_oidc_iam.ROLES[role_name]
+    tracked = _normalise_policy(json.loads((IAM_DIR / role_spec["permissions_file"]).read_text(encoding="utf-8")))
+    try:
+        live_doc = boto3.client("iam").get_role_policy(
+            RoleName=role_name,
+            PolicyName=role_spec["inline_policy_name"],
+        )["PolicyDocument"]
+    except Exception as exc:  # noqa: BLE001 — classified immediately; unclassified re-raises
+        reason = _classify_unobservable(exc)
+        if reason is None:
+            raise
+        pytest.skip(reason)
+    live = _normalise_policy(live_doc)
     assert live == tracked, (
-        f"{role_name}: the LIVE inline policy differs from infra/iam/. "
-        f"tracked {len(tracked)} statement(s), live {len(live)}. "
-        f"Fix with `bash deploy/setup_remediation_role.sh` / `aws iam put-role-policy` from the tracked JSON — "
+        f"{role_name}: the LIVE inline policy `{role_spec['inline_policy_name']}` differs from "
+        f"infra/iam/{role_spec['permissions_file']}. tracked {len(tracked)} statement(s), live {len(live)}. "
+        f"Fix by applying the TRACKED document (`aws iam put-role-policy --policy-document file://...`) — "
         f"never by editing the JSON to match the drift."
     )
