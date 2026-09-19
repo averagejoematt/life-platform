@@ -262,6 +262,15 @@ env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACC
 (Never set `AWS_PROFILE=` empty — boto3 raises `ProfileNotFound`; always `env -u`.)
 Source: `reference_ci_masking_and_creds`.
 
+**This now RUNS in CI, it is not only written here (#3608 box 5).** `ci-cd.yml`'s
+`test-critical` job executes the deploy-critical lane under that exact invocation and
+adds a step, *AWS creds parity — no real credentials resolvable*, which runs
+`scripts/assert_fake_creds_parity.py`: it fails if boto3 resolves anything but the fake
+pair, if `AWS_PROFILE`/`AWS_SESSION_TOKEN` survived the `env -u`, or if the keys are
+absent entirely (absent is the state this convention rejects, not a safe one). It makes
+no AWS call and redacts any real key it finds. `tests/test_fake_creds_parity_step_3608.py`
+holds this paragraph and the workflow to the same literal, so editing one alone reds.
+
 ### 4a0. What gates the MERGE (#1662, ADR-148)
 
 Distinct from §4a (which gates the *deploy*, on push to `main`). Two check-runs are
