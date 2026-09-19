@@ -128,7 +128,10 @@ exercise_template "E53CCBE5"
 workout_uid       "hevy:dc3e3b10-..."
 note_raw          "<verbatim — never mutated>"
 note_hash         "<sha256 of note_raw>"           # cache key; re-extract only on change
-signals           [ { class, summary, value?, confidence } , ... ]   # ≥1 per note
+signals           [ { class, summary, value?, confidence, block? } , ... ]   # ≥1 per note
+                                                   # #3817: `block` (0-based) on block-scoped
+                                                   # classes only (today: progression); absent =
+                                                   # note-level. Merge key is (class, block) — §5b.
 pain_flag         false
 sentiment         "positive" | "neutral" | "negative" | null
 degraded          false                            # true = LLM failed/capped, deterministic-only
@@ -137,7 +140,7 @@ degraded_reason   null                             # #3699: "<code>: <ExcClass>:
                                                    # ABSENT (not null) on records written before #3699 —
                                                    # consumers report those as `unrecorded`, never re-derived.
 extracted_by      "deterministic" | "haiku" | "hybrid"
-algo_version      "note-extractor@1.0.0"
+algo_version      "note-extractor@1.1.0"          # 1.1.0 = per-block merge + calibration + readiness join (#3817)
 extracted_at      <ts>
 ```
 
@@ -162,6 +165,100 @@ Each `{class, summary, value?, confidence}`:
 - `environment` — *("travel gym", "crowded", "outdoor")*
 - `deviation` — Matthew changed the pushed routine: added/removed/swapped exercises, changed sets/loads. Derived by **diffing the pushed routine vs the performed Hevy workout** (not from a note) — durable preference & capacity signal. *(sent 5 leg exercises, did 10; swapped a DB for a barbell)*
 - `rest_adherence` — prescribed rest vs actual rest per exercise. Surfaces where he consistently needs more (or less) rest; feeds a **bidirectional** rest-intent cue (coach may deliberately prescribe "rest discipline matters more than load today"). *(Phase 0 must confirm Hevy exposes actual per-set rest.)*
+
+---
+
+### §5a. Taxonomy amendment — `calibration` (dated 2026-09-19, #3817)
+
+**The taxonomy is a Phase-0 lock.** A class is added deliberately, dated, and argued, or it is
+not added. This is the first amendment since the lock.
+
+**New class — `calibration`** — *what a level/load MEANS for this athlete, independent of any one
+session.* Distinct from `progression`, which is what happened in a session, and from
+`rpe_caveat`, which qualifies a number that was logged.
+
+**Detection rule (deterministic, `training_notes.calibration_anchors`):** a level/load reference
+followed, **within one clause**, by a **copula** (`is/are/feel/feels/felt/was/were`) and a
+**general effort verdict** (`easy`, `very easy`, `too easy`, `hard`, `very hard`, `too hard`,
+`light`, `heavy`, `brutal`, `nothing`), with **no session deictic** (`today`, `tonight`,
+`this time`, `this session`, `last time`) in that clause. The copula is what separates a standing
+property from a report; the deictic exclusion is what keeps `"level 8 was hard today"` in
+`progression` where it belongs. One note may carry several anchors — they are kept as an ordered
+list on a single signal, because they are one claim about one athlete's scale.
+
+**Live example** (`USER#matthew#SOURCE#training_notes#EXERCISE#D8F7F851`, 2026-06-25):
+
+> "L9-10 i think is easy - probably for my weight and heavy legs. L3-4 is a VERY easy flush."
+
+Before the amendment this note landed as **one** `progression` signal reading `{"level": 9}` —
+the entire content of the note was discarded. After it:
+
+```json
+{"class": "calibration", "summary": "what a level/load means for this athlete", "confidence": 0.8,
+ "value": {"anchors": [{"level_low": 9, "level_high": 10, "verdict": "easy"},
+                       {"level_low": 3, "level_high": 4,  "verdict": "very easy"}],
+           "basis": "bodyweight"}}
+```
+
+**Negative control** (2026-09-09, the same exercise): *"Level 8 flat - cardio felt ok - more just
+saddle sore and uncomfortable with compression shorts"* — a level reference and a copula, but
+`ok` is not an effort verdict, so **no** `calibration` signal and the note's four existing
+signals are unchanged.
+
+### §5b. Signals merge per class **per block** (2026-09-19, #3817)
+
+A **block** is one ordered bout **within** a session. `merge_signals` deduped by class across the
+whole note, so a note could structurally carry at most ONE `progression` signal — a two-bout
+session lost its second bout with nothing recording that it had. The merge key is now
+`(class, block)`.
+
+* `split_blocks` takes a split **only** where an ordering connective (`and then`, `then`,
+  `followed by`, `after that`, `and after`) separates two segments that **each** carry a
+  progression anchor (a level or a load). That requirement is the whole safety of the rule: the
+  live note *"Grip gave out before strength, then forearm burn"* contains `then` and stays ONE
+  block, because neither side names a level or a load.
+* `progression` is the only block-scoped class today; it carries `block` (0-based) and, where the
+  block states one, `duration_min`. Every other class is note-level and carries no `block`, so its
+  key is `(class, None)` — byte-identical to the old class-only key.
+* Deterministic precedence is unchanged and stays **whole-class**: if the rule pass emitted a
+  class in any block, a note-level model signal of that class is still dropped.
+
+**Live example** (2026-06-22): *"Level 9 for 20 and then level 6 for 10 - more of a flush - despite
+green recovery - i felt tired today"* → `progression{block:0, level:9, duration_min:20}` **and**
+`progression{block:1, level:6, duration_min:10, character:"flat"}`, where one flat `level 9`
+signal used to stand for the whole session.
+
+### §5c. Recovery discordance carries a readiness **join key** (2026-09-19, #3817)
+
+A note whose subjective state disagrees with the day's objective recovery reading is worth
+nothing to a coach that cannot fetch the number it disagrees with. It lands as an `rpe_caveat`
+(the existing "qualifies a logged metric, overlay only, never overwrites raw" class — deliberately
+**not** a second new class) carrying both halves:
+
+```json
+{"class": "rpe_caveat", "summary": "subjective state disagrees with the day's recovery reading",
+ "confidence": 0.7,
+ "value": {"discordance": {"direction": "subjective_worse", "subjective": "tired",
+                           "objective_cue": "recovery", "contrast": "despite"},
+           "readiness_join": {"source": "computed_metrics",
+                              "pk": "USER#matthew#SOURCE#computed_metrics",
+                              "sk": "DATE#2026-06-22", "date": "2026-06-22",
+                              "fields": ["readiness_score", "readiness_colour"]}}}
+```
+
+**Fires on:** a contrast marker (`despite`, `even though`, `although`, `though`, `but`, `yet`,
+`in spite of`) **and** an objective recovery cue (`recovery`, `readiness`, `hrv`, `whoop`,
+`body battery`, `recovered`) **and** a subjective state, all in one note.
+
+**The join is deterministic; the narration is not** (ADR-105 — deterministic computation before
+any LLM verdict). This module never READS `computed_metrics`: it emits the key, so a note
+extracted before the daily compute has run still carries a key that resolves later, and the coach
+cites both numbers without re-deriving either.
+
+`ALGO_VERSION` moves `note-extractor@1.0.0` → `note-extractor@1.1.0` for all three changes, which
+makes every stored record a **forced** change under `certain_change_reason` — so the re-extraction
+goes through #3816's versioned write (prior archived at `ARCHIVE#…`, head stamped `supersedes`)
+and no improved record is mistakable for an original one.
 
 ---
 

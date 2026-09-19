@@ -30,28 +30,62 @@ HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 # MAX_TOKENS is DERIVED from a measurement, not chosen as a round number (#3699; the
 # #3678/#3403 class — a budget set from a stale observation and never re-derived). 256 was
-# a guess written the day this shipped, and until now a breach of it was INVISIBLE: the cap
+# a guess written the day this shipped, and until then a breach of it was INVISIBLE: the cap
 # truncates, `_parse_signals` returned [] and nothing said the output had been cut off.
 #
-# Measurement below is the live one, not an estimate: every AI call this feature makes is
-# the ONLY AI call hevy-backfill makes, so the per-function metric is this extractor alone.
+# RE-DERIVED 2026-09-19 (#3817 box 5, #3828 box 2) because the taxonomy grew — which is the
+# first clause of the `re_derive_when` facet below, and the honest trigger here. The OTHER
+# clause ("TruncatedResponse is ever observed live") has still NOT fired: zero records in the
+# live partition carry `degraded_reason` starting `truncated` (whole-partition scan, n=40 head
+# records, 2026-09-19). Stated precisely, because 12 of those 40 are `degraded: true` with NO
+# reason field at all (written before #3699 existed): what is measured is that no truncation
+# has ever been RECORDED, not that none ever happened on the 12 that could not say. The cap is
+# being raised because the output can now get bigger, not because anything was cut off.
+#
+# Two channels, because neither alone covers the corpus:
+#   * METERED — LifePlatform/AI::AnthropicOutputTokens{LambdaFunction=hevy-backfill}, the
+#     per-function metric, which is this extractor alone (it is the only AI call that Lambda
+#     makes). 2026-09-14 → 2026-09-19: n=21 billed calls, sum 2,001, max 161. Useful but
+#     PARTIAL: it only exists for calls made after #3768 restored the Bedrock grant, and the
+#     minute-bucket aggregation hides the per-sample distribution (15 of the 21 land in ONE
+#     60s bucket).
+#   * CORPUS PROXY — the serialized `signals` array of every stored record (n=40, DDB scan of
+#     USER#matthew#SOURCE#training_notes#EXERCISE#*, 2026-09-19), converted to tokens at the
+#     ratio measured where the two channels are 1:1: the 15 records extracted on 2026-09-14
+#     hold 3,676 chars against those calls' 1,444 output tokens = 2.546 chars/token. The proxy
+#     is CONSERVATIVE in the direction that matters — stored signals UNDERCOUNT the model's own
+#     array wherever deterministic precedence dropped an overlapping element, so a given char
+#     count maps to more tokens, not fewer.
 MAX_TOKENS_DERIVATION = {
-    "metric": "LifePlatform/AI::AnthropicOutputTokens{LambdaFunction=hevy-backfill}",
-    "window": "2026-09-14 (UTC) — the first day of real extractions after #3768 restored the Bedrock grant",
-    "n": 16,
-    "min": 53,
-    "p50": 94,
-    "p90": 148,
-    "p95": 157,
-    "p99": 160,
-    "max": 161,
-    "rule": "2x the observed max, rounded up to the next 128-token step",
+    "metric": (
+        "LifePlatform/AI::AnthropicOutputTokens{LambdaFunction=hevy-backfill} (n=21 metered calls, max 161) "
+        "cross-checked against the serialized-signals corpus proxy (n=40 stored records) at 2.546 chars/token"
+    ),
+    "window": "2026-09-14 → 2026-09-19 metered; the whole live note partition read 2026-09-19",
+    "n": 40,
+    "metered_n": 21,
+    "min": 1,
+    "p50": 79,
+    "p90": 159,
+    "p95": 168,
+    "p99": 192,
+    "max": 207,
+    "growth_head_room_tokens": 58,
+    "projected_post_change_max": 265,
+    "rule": (
+        "2x the greater of the measured max (207) and the projected post-change max "
+        "(207 + one calibration element at the measured per-signal max of 148 chars = 58 tok -> 265), "
+        "rounded up to the next 128-token step"
+    ),
     "re_derive_when": "the taxonomy grows, the summary word budget changes, or TruncatedResponse is ever observed live",
 }
-# 2 x 161 = 322 -> 384. Headroom for a note with roughly twice the signal density of the
-# richest one measured. max_tokens is a CEILING, not a charge — billing is on tokens actually
-# emitted — so the headroom costs $0 until it is used, while a breach now degrades LOUDLY.
-MAX_TOKENS = 384
+# The change this re-derivation is for (#3817) adds ONE class to the model's allowed set
+# (`calibration`); the per-block progression split and the readiness join key are both
+# deterministic and cost the model nothing. So the growth is bounded at one extra array
+# element, sized at the measured per-signal MAXIMUM (148 chars = 58 tok), not its mean.
+# 2 x 265 = 530 -> 640. max_tokens is a CEILING, not a charge — billing is on tokens actually
+# emitted — so the headroom costs $0 until it is used, while a breach degrades LOUDLY.
+MAX_TOKENS = 640
 DEFAULT_MONTHLY_CAP = 300
 
 _CACHE_PK = "USER#matthew#SOURCE#training_notes#CACHE"
@@ -62,7 +96,10 @@ _SYSTEM = (
     "exercise. Return ONLY a compact JSON array; each element {class, summary, value?, confidence}. "
     "class MUST be one of the allowed classes. summary <= 12 words. confidence 0-1. Emit a class "
     "only if the note clearly supports it; [] if nothing semantic. Never invent numbers. "
-    "pain_discomfort ONLY for joint/tendon/bad pain (NOT normal muscle burn/soreness)."
+    "pain_discomfort ONLY for joint/tendon/bad pain (NOT normal muscle burn/soreness). "
+    # #3817: the class is new and its whole point is the distinction the model has to make.
+    'calibration ONLY for what a level/load MEANS for this athlete in general ("L9-10 is easy '
+    'for my weight") — never for how one session went, which is progression.'
 )
 
 
@@ -119,8 +156,11 @@ def _haiku_call(note_text: str, taxonomy) -> list:
     # #3828: this is the 4th member of #3688's judge Set and it deliberately does NOT retry.
     # The cap and the note text are both fixed, so a truncation here is DETERMINISTIC — a retry
     # loop would bill N times for N identical failures. The right response is the `re_derive_when`
-    # facet above: re-derive MAX_TOKENS against observed note lengths. Registered as a residual in
-    # tests/test_judge_verdict_retry_3688.py::_RESIDUAL so the Set guard stays honest.
+    # facet above: re-derive MAX_TOKENS against the observed output distribution. That was done on
+    # 2026-09-19 (384 -> 640) when #3817 grew the taxonomy — see MAX_TOKENS_DERIVATION. It stays a
+    # residual rather than becoming covered, because the re-derivation is the remedy and the retry
+    # is not; registered in tests/test_judge_verdict_retry_3688.py::_RESIDUAL so the Set guard
+    # stays honest.
     if (resp.get("stop_reason") or "") == "max_tokens":
         out_tok = (resp.get("usage") or {}).get("output_tokens")
         raise TruncatedResponse(f"stop_reason=max_tokens at max_tokens={MAX_TOKENS} (output_tokens={out_tok}, {len(text)} chars of text)")
