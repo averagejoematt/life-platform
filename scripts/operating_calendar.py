@@ -116,33 +116,21 @@ early. Parking a ritual permanently in the future is bounded out: a declared fir
 more than ``MAX_SCHEDULE_AHEAD_DAYS`` past adoption fails the guard, and the entry's reason
 must state the first-occurrence date in full so registry and prose cannot drift apart.
 
-A CARRIED GRADE EXPIRES AT 28 DAYS (#3603, epic #3593)
-------------------------------------------------------
-A delta re-grades the rows the change surface can have moved and carries the rest forward
-in ``unchanged_lenses``. That claim was written honestly and aged by nothing: at the
-2026-09-05 baseline, 8 of the 17 panel rows were last graded from scratch on 07-28/08-02
-and had ridden two deltas since — a grade carried five weeks read exactly like one carried
-a week, and the trend line drawn through them said something about a surface nobody had
-looked at.
+THE REVIEW'S GRADES HAVE A SHELF LIFE, AND ITS CONTROLS HAVE TO FIRE (#3603)
+---------------------------------------------------------------------------
+Two facts the clocks above could not see, added by #3603 and assembled in
+``scripts/review_carry_forward.py`` (its docstring carries the evidence and the reasoning):
 
-So a carried grade now has a shelf life. ``CARRY_FORWARD_MAX_DAYS`` days after the run that
-last graded a lens FROM SCRATCH, that lens's carried grade is **expired**: the sweep prints
-``stale carry-forward: <lens>`` with its age and what to do (re-verify or refile), the next
-delta must select the row regardless of diff, and ``--due`` exits ``EXIT_STALE_CARRY``
-instead of clean. The age is measured from the run that GRADED the lens, never from the
-delta that carried it — carrying is not grading, which is the whole finding.
-
-A RUN THAT FAILS ITS OWN PLANTED CONTROLS DOES NOT RESET THE CLOCK (#3603)
---------------------------------------------------------------------------
-The review had no negative control: the refutation rate fell by four fifths between two
-runs and nothing could say whether the verifiers had got stricter or gone to sleep. The
-rubric now plants false findings in each verifier batch and withholds known issues from the
-graders, and the run records the outcome in its artifact's ``calibration`` block. A run
-whose verifiers CONFIRMED a planted false finding is ``UNCALIBRATED``, and an uncalibrated
-run is not evidence that the ritual happened: ``newest_run`` skips its artifact, so the
-clock keeps counting down toward DUE. Runs predating #3603 state no calibration;
-``UNSTATED`` is reported, never disqualifying — arming a gate retroactively over history is
-how a gate is born red and then ignored (the anchor rule above, one level down).
+* **A carried grade expires.** ``CARRY_FORWARD_MAX_DAYS`` days after the run that last
+  graded a lens FROM SCRATCH, that row is expired — the sweep prints
+  ``stale carry-forward: <lens>``, the next delta must select it regardless of diff, and
+  ``--due`` exits ``EXIT_STALE_CARRY`` instead of clean. Carrying is not grading, so the age
+  runs from the run that graded, never from the delta that carried.
+* **A run that failed its own planted controls does not reset the clock.** The rubric plants
+  false findings in each verifier batch; a run whose verifiers CONFIRMED one is
+  ``UNCALIBRATED``, and ``newest_run`` skips its artifact through the entry's ``qualifier``.
+  Runs predating #3603 state no calibration; ``UNSTATED`` is reported, never disqualifying —
+  arming a gate retroactively over history is how a gate is born red and then ignored.
 
 USAGE
 -----
@@ -164,7 +152,6 @@ v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import sys
@@ -580,201 +567,36 @@ def newest_run(entry: dict, repo: str = REPO) -> date | None:
 
 
 # ── The carry-forward cap + the planted controls (#3603) ─────────────────────
-#: Days a lens grade may be carried forward from the run that last graded it FROM
-#: SCRATCH. Past this, the carried grade is expired: it is dropped from the carried set,
-#: surfaced as "re-verify or refile", and the next delta must select the row regardless of
-#: what the diff touched. 28 days = four weekly deltas, the point at which "the platform
-#: was looked at" stops being a defensible reading of a carried letter.
-CARRY_FORWARD_MAX_DAYS = 28
+# The assembler itself lives in scripts/review_carry_forward.py — this file is at its
+# module-size ceiling (#1665), and the cap has exactly one home either way. Imported by
+# path because the calendar is loaded by path too (tests, the hook, the workflow), so a
+# `scripts` package import would resolve differently for each caller.
+def _carry_forward_module():
+    import importlib.util
 
-#: The artifact family the cap is measured over (the `full` lens's grades JSONs).
-GRADES_DIR = "docs/reviews"
-GRADES_RE = re.compile(r"^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partial)?\.json$")
-
-CALIBRATED = "CALIBRATED"
-UNCALIBRATED = "UNCALIBRATED"  # verifiers confirmed a planted false finding — the run is not evidence
-UNSTATED = "UNSTATED"  # the artifact carries no calibration block (every run before #3603)
-
-_DATE_IN_TEXT = re.compile(r"(\d{4}-\d{2}-\d{2})")
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "review_carry_forward.py")
+    spec = importlib.util.spec_from_file_location("_review_carry_forward", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
-def calibration_verdict(run: dict) -> str:
-    """CALIBRATED / UNCALIBRATED / UNSTATED for one grades JSON.
+_carry = _carry_forward_module()
 
-    UNCALIBRATED is claimed two ways and either is enough: the run says so in
-    `calibration.verdict`, or its own numbers say so (a planted false finding that came
-    back CONFIRMED, or a withheld known issue nothing found). A run grading its own
-    controls green while its numbers say otherwise is exactly the failure mode the
-    controls exist to catch, so the numbers win.
-    """
-    cal = run.get("calibration")
-    if not isinstance(cal, dict):
-        return UNSTATED
-    if str(cal.get("verdict", "")).strip().upper() == UNCALIBRATED:
-        return UNCALIBRATED
-    planted = cal.get("planted_false_findings") or {}
-    withheld = cal.get("withheld_known_issues") or {}
-    if isinstance(planted, dict) and planted.get("confirmed_by_verifiers"):
-        return UNCALIBRATED
-    if isinstance(withheld, dict) and withheld.get("missed_by_graders"):
-        return UNCALIBRATED
-    return CALIBRATED if str(cal.get("verdict", "")).strip().upper() == CALIBRATED else UNSTATED
-
-
-def calibrated_run(path: str) -> bool:
-    """Entry qualifier: may this artifact advance a review clock? A JSON we cannot read is
-    treated as a run (the probe's job is cadence, not schema validation — a parse error
-    must not silently stop a clock), an UNCALIBRATED one is not."""
-    try:
-        with open(path, encoding="utf-8") as fh:
-            run = json.load(fh)
-    except (OSError, ValueError):
-        return True
-    return calibration_verdict(run) != UNCALIBRATED
-
-
-def carried_lenses(run: dict) -> dict[str, date | None]:
-    """{lens: the date of the run that graded it from scratch} from one artifact's
-    `unchanged_lenses`, or {} if it carried nothing forward.
-
-    The structured form is the contract going forward ({"cpo": "2026-08-02"}); the prose
-    form is what four committed artifacts actually carry ("cpo, designer (2026-08-02 delta
-    / 2026-07-28 partial) — grades stand."), so it is parsed best-effort: names before the
-    citation, and the OLDEST date cited, because a grade carried through a chain is only as
-    fresh as the run that actually looked. A carried lens naming no run at all maps to None
-    — an unfalsifiable carry, which the cap treats as expired rather than as fresh.
-    """
-    raw = run.get("unchanged_lenses")
-    out: dict[str, date | None] = {}
-    if isinstance(raw, dict):
-        for lens, since in raw.items():
-            out[str(lens).strip().lower()] = _parse_date(str(since)[:10])
-        return out
-    if isinstance(raw, list):
-        for item in raw:
-            if isinstance(item, dict):
-                lens = str(item.get("lens", "")).strip().lower()
-                if lens:
-                    out[lens] = _parse_date(str(item.get("since") or item.get("from") or "")[:10])
-            elif isinstance(item, str):
-                out.update(carried_lenses({"unchanged_lenses": item}))
-        return out
-    if not isinstance(raw, str) or not raw.strip():
-        return out
-    for chunk in raw.split(";"):
-        dates = [d for d in (_parse_date(m) for m in _DATE_IN_TEXT.findall(chunk)) if d]
-        cited = min(dates) if dates else None
-        head = chunk.split("(")[0] if "(" in chunk else re.split(r"—|--| see | from ", chunk)[0]
-        for token in head.split(","):
-            name = token.strip().strip(".").lower()
-            if name and re.fullmatch(r"[a-z][a-z0-9/_-]{1,24}", name):
-                out[name] = cited
-    return out
-
-
-def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
-    """{lens: the newest date it was graded FROM SCRATCH} across a run history.
-
-    A lens present in a run's `lenses` and NOT named in that run's `unchanged_lenses` was
-    graded by that run. A lens the run carried forward inherits the date it cites, never
-    the run's own date — the one-line statement of the whole defect — and a citation can
-    only ever make a grade OLDER, never fresher (see the loop).
-    """
-    out: dict[str, date | None] = {}
-    for run_date, run in sorted(runs, key=lambda r: r[0]):
-        carried = carried_lenses(run)
-        graded = {str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried)
-        for lens in graded:
-            if lens not in out or out[lens] is None or run_date > out[lens]:
-                out[lens] = run_date
-        for lens, cited in carried.items():
-            # A carry may SEED a lens we have never seen graded, and it may never ADVANCE
-            # one we have. Deltas cite each other: a run that carries `qs` "from the
-            # 2026-08-08 delta" is citing a run that carried it too, and believing that
-            # citation would launder a five-week-old grade into a one-week-old one on every
-            # hop. Only grading moves this date forward.
-            if lens not in out:
-                out[lens] = cited
-    return out
-
-
-def standing_lenses(run: dict) -> set[str]:
-    """The lenses the newest artifact still CLAIMS — graded in it, or carried forward by it.
-
-    The cap governs the carried set, and the carried set is whatever the newest artifact
-    asserts still stands. Scoping here is load-bearing: `ai-quality` was graded in the
-    2026-07-16 run and the panel later renamed it `aiq`, so an unscoped sweep reports a
-    retired name as permanently stale — a red nobody can clear, which is how a gate gets
-    ignored (the anchor rule, one level down).
-    """
-    return {str(k).strip().lower() for k in (run.get("lenses") or {})} | set(carried_lenses(run))
-
-
-def expired_carry_forward(runs, today: date, max_days: int = CARRY_FORWARD_MAX_DAYS) -> list[dict]:
-    """The standing lenses whose newest from-scratch grade is older than the cap. Sorted
-    oldest first; a lens carried with no source run named is expired by construction (age
-    None) — an unfalsifiable carry is not a fresh one."""
-    if not runs:
-        return []
-    standing = standing_lenses(max(runs, key=lambda r: r[0])[1])
-    out = []
-    for lens, when in sorted(scratch_dates(runs).items(), key=lambda kv: (kv[1] is not None, kv[1] or date.min, kv[0])):
-        if lens not in standing:
-            continue
-        age = (today - when).days if when else None
-        if age is None or age > max_days:
-            out.append({"lens": lens, "last_scratch": when, "age_days": age, "cap_days": max_days})
-    return out
-
-
-def load_grade_runs(repo: str = REPO) -> list[tuple[date, dict]]:
-    """Every `full`-lens grades artifact, newest last. Unreadable files are skipped — the
-    cap is a claim about grades, and a file that is not a grades JSON carries none."""
-    d = os.path.join(repo, GRADES_DIR)
-    runs: list[tuple[date, dict]] = []
-    if not os.path.isdir(d):
-        return runs
-    for name in sorted(os.listdir(d)):
-        m = GRADES_RE.match(name)
-        when = _parse_date(m.group(1)) if m else None
-        if not when:
-            continue
-        try:
-            with open(os.path.join(d, name), encoding="utf-8") as fh:
-                runs.append((when, json.load(fh)))
-        except (OSError, ValueError):
-            continue
-    return runs
-
-
-def carry_forward_report(today: date, repo: str = REPO) -> tuple[list[str], list[dict]]:
-    """(lines for the sweep, the expired rows). Empty second element = every lens grade a
-    reader can see today was derived within the cap."""
-    runs = load_grade_runs(repo)
-    if not runs:
-        return (["", "carry-forward: no `full`-lens grades artifact to measure (nothing carried, nothing claimed)."], [])
-    expired = expired_carry_forward(runs, today)
-    newest_date, newest = runs[-1]
-    verdict = calibration_verdict(newest)
-    lines = [
-        "",
-        f"carry-forward cap: {CARRY_FORWARD_MAX_DAYS}d since a lens was graded from scratch "
-        f"(newest artifact {newest_date}, calibration {verdict})",
-    ]
-    if verdict == UNSTATED:
-        lines.append("   calibration UNSTATED — the run recorded no planted-control outcome; it counts, and says so (#3603).")
-    if not expired:
-        lines.append("   ✅ every graded lens is within the cap.")
-        return lines, expired
-    for row in expired:
-        age = f"{row['age_days']}d" if row["age_days"] is not None else "unknown age"
-        since = row["last_scratch"].isoformat() if row["last_scratch"] else "no source run named"
-        lines.append(f"   ❌ stale carry-forward: {row['lens']} (last graded from scratch {since}, {age}) — expired, re-verify or refile")
-    lines += [
-        f"   {len(expired)} lens grade(s) are older than the cap. They are DROPPED from the carried set: the next delta",
-        "   selects those rows regardless of what the diff touched, and until it does, no artifact may carry them again.",
-    ]
-    return lines, expired
+CARRY_FORWARD_MAX_DAYS = _carry.CARRY_FORWARD_MAX_DAYS
+GRADES_DIR = _carry.GRADES_DIR
+GRADES_RE = _carry.GRADES_RE
+CALIBRATED = _carry.CALIBRATED
+UNCALIBRATED = _carry.UNCALIBRATED
+UNSTATED = _carry.UNSTATED
+calibration_verdict = _carry.calibration_verdict
+calibrated_run = _carry.calibrated_run
+carried_lenses = _carry.carried_lenses
+scratch_dates = _carry.scratch_dates
+standing_lenses = _carry.standing_lenses
+expired_carry_forward = _carry.expired_carry_forward
+load_grade_runs = _carry.load_grade_runs
+carry_forward_report = _carry.carry_forward_report
 
 
 #: The two `full`-lens clocks read a calibration-aware probe. Wired here rather than at the
