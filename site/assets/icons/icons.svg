@@ -104,6 +104,13 @@
     <path d="M17 13h1.2" stroke-dasharray="1 2.6"/>
     <circle cx="20.5" cy="13" r="1.4"/>
   </symbol>
+  <!-- info: the provenance trigger (#3543) — a ringed i, stroke-only like the rest
+       of the set, replacing the U+24D8 text glyph that could not honour the type floor -->
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M12 11v5.5"/>
+    <path d="M12 7.6v.9"/>
+  </symbol>
   <!-- ── outbound social marks (#1620) ──────────────────────────────────
        Vendor brand marks are solid-fill; per DESIGN_SYSTEM_V5 §8 they are REDRAWN
        here as stroke-only line art so they read as siblings of the rest of the set

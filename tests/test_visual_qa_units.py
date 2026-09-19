@@ -49,14 +49,41 @@ def test_visual_pages_carry_api_deps():
 def test_html_text_floor_pages_are_in_the_sweep_manifest():
     """#2674: the HTML-text floor gate fires only for paths in TEXT_FLOOR_PAGES —
     a gating page missing from the sweep manifest would make the gate a no-op
-    (the 'gate that cannot fail' class). Pin the set AND its presence in the sweep."""
-    from qa_manifest import visual_pages
+    (the 'gate that cannot fail' class).
+
+    #3543: the set is DERIVED from the registry (every tier-1/2 page) instead of the
+    three pages it was armed on, so this pins the DERIVATION, not a literal — a new
+    tier-1/2 page joins the floor gate the day it lands. The three original pages are
+    still in it, and the whole set must still be reachable by the sweep."""
+    from qa_manifest import MANIFEST, text_floor_paths, visual_pages
     from visual_qa import TEXT_FLOOR_PAGES
 
-    assert TEXT_FLOOR_PAGES == {"/", "/cockpit/", "/data/"}
+    assert TEXT_FLOOR_PAGES == text_floor_paths()
+    assert TEXT_FLOOR_PAGES == {p["path"] for p in MANIFEST if p["tier"] <= 2}
+    assert {"/", "/cockpit/", "/data/"} <= TEXT_FLOOR_PAGES  # the #2674 originals
+    assert len(TEXT_FLOOR_PAGES) > 50, len(TEXT_FLOOR_PAGES)  # non-vacuous: the real surface
     swept = {p["path"] for p in visual_pages()}
     missing = TEXT_FLOOR_PAGES - swept
     assert not missing, f"TEXT_FLOOR_PAGES not in the visual sweep manifest: {missing}"
+
+
+def test_glyph_leak_audit_covers_the_forbidden_ranges():
+    """#3543: the provenance trigger shipped as a U+24D8 text glyph. The sweep's regex
+    must cover the enclosed-alphanumeric range it came from, the emoji ranges, and the
+    variation selector — and must NOT reach the typographic marks the site uses."""
+    import re
+
+    from visual_qa import _GLYPH_LEAK_AUDIT_JS
+
+    assert "\\u2460-\\u24FF" in _GLYPH_LEAK_AUDIT_JS  # the class the shipped ⓘ belongs to
+    assert "\\uFE0F" in _GLYPH_LEAK_AUDIT_JS  # emoji presentation of an otherwise-plain code point
+    assert "\\uD83C-\\uD83E" in _GLYPH_LEAK_AUDIT_JS  # surrogate pairs: the pictograph planes
+    # The same class, exercised in Python against the real code points, so the range
+    # arithmetic is checked rather than asserted: ⓘ in, the site's own marks out.
+    rng = re.compile("[\u2460-\u24ff\u2600-\u27bf\ufe0f]")
+    assert rng.search("ⓘ") and rng.search("\u2714\ufe0f")
+    for keep in ["—", "·", "▼", "→", "±", "…"]:
+        assert not rng.search(keep), keep
 
 
 def test_html_text_floor_audit_excludes_svg_and_shares_the_1210_floor():

@@ -940,6 +940,18 @@ def visual_pages():
     return out
 
 
+def text_floor_paths():
+    """tests/visual_qa.py TEXT_FLOOR_PAGES (#2674/#3543) — every tier-1/2 page.
+
+    The 11px floor was measured on three pages while the doc promised the surface,
+    and 19 sub-floor rules accumulated in tokens.css behind that gap: 10 pages were
+    rendering 8.0–10.4px text that no gate could see. The set is DERIVED here for the
+    same reason every other page list is — a new tier-1/2 page joins the floor gate
+    the day it lands, and nobody has to remember a fourth registry. Tier 3 (editorial
+    /static) stays out until it is measured clean, per the #2674 arming rule."""
+    return {p["path"] for p in MANIFEST if p["tier"] <= 2}
+
+
 def leak_scan_paths():
     """deploy/restart_verify_rendered.py PAGES — every real HTML page."""
     return [p["path"] for p in MANIFEST if p["leak_scan"] and not p["path"].endswith(".html")]

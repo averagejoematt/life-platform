@@ -261,6 +261,63 @@ def font_size_findings(name: str, text: str) -> list:
     return findings
 
 
+# (#3543) tokens.css is the DEFINITIONS source — but only its definition BLOCKS are.
+# Everything after them is ordinary component CSS (`.hb-tax`, `.heat-d`, `.provenance`
+# …) that was exempt from the type-scale check for one reason only: the file it happens
+# to live in. 19 sub-floor literals accumulated there — live on 10 pages at 8.0–10.4px,
+# under the documented 11px floor — while every consumer sheet was swept for exactly
+# that. The mask below blanks the definition blocks (line numbers preserved, the #1974
+# idiom) so the existing font-size check reads the component half and nothing else.
+_PROP_DECL = re.compile(r"--[\w-]+\s*:")
+
+
+def _blank(text: str) -> str:
+    """`text` replaced by newlines only — blanks a span while holding line numbers."""
+    return "\n" * text.count("\n")
+
+
+def token_definition_mask(text: str) -> str:
+    """(#3543) `text` (tokens.css) with every custom-property DEFINITION block blanked,
+    line numbers preserved. A top-level block that declares at least one `--x:` is a
+    definitions block (`:root`, the theme blocks, `[data-tier]`); an at-rule is
+    recursed into so a component rule inside `@media` is still swept, and so a
+    `@media (prefers-color-scheme: dark) { :root { --ink: … } }` still masks only its
+    definition block. Everything else survives as ordinary CSS for the existing checks."""
+    out = []
+    i = 0
+    n = len(text)
+    while i < n:
+        brace = text.find("{", i)
+        if brace < 0:
+            out.append(text[i:])
+            break
+        depth = 0
+        j = brace
+        while j < n:
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        end = min(j + 1, n)
+        prelude = text[i:brace]
+        body = text[brace + 1 : j]
+        if prelude.lstrip().lstrip("}").lstrip().startswith("@") and "{" in body:
+            # at-rule wrapping nested rules — recurse so its component rules stay swept
+            out.append(text[i : brace + 1])
+            out.append(token_definition_mask(body))
+            out.append(text[j:end])
+        elif _PROP_DECL.search(strip_comments(body)):
+            out.append(text[i:brace])  # keep the selector line(s) and any prose above
+            out.append(_blank(text[brace:end]))
+        else:
+            out.append(text[i:end])
+        i = end
+    return "".join(out)
+
+
 def _sanction_reason(line: str) -> Optional[Tuple[str, str]]:
     """(kind, reason) for the first hex-ok/fs-ok sanction on `line`, or None. `kind`
     is the literal marker text ("hex-ok" or "fs-ok"); `reason` is trimmed prose."""
@@ -432,6 +489,54 @@ def js_breakpoint_findings(name: str, text: str) -> list:
     return findings
 
 
+# (#3543) The hex form as JS spells it. NOT the CSS HEX_COLOR: JavaScript source is
+# full of visitor-facing prose, and `(#1892)` / `TODO(#735)` — issue references inside
+# template literals the reader actually sees — are 4- and 3-digit runs the CSS pattern
+# reads as `#rgba`/`#rgb`. All four live ones were prose, in a file the sweep exists to
+# read. So a SHORT form (3 or 4 digits) must contain a hex LETTER to be a colour here;
+# the 6- and 8-digit forms are unambiguous and always match. The cost is a literal
+# all-decimal `#123` short colour going unseen — the six-digit form of the same colour
+# is caught, and no such literal exists in the tree today.
+_JS_HEX_COLOR = re.compile(r"#(?:[0-9a-fA-F]{8}\b|[0-9a-fA-F]{6}\b|(?=[0-9a-fA-F]{3,4}\b)[0-9a-fA-F]{0,3}[a-fA-F][0-9a-fA-F]{0,3}\b)")
+
+
+def js_hex_exemption(label: str) -> Optional[str]:
+    """(#3543) The ONE sanctioned JS palette, expressed as a RULE rather than a list:
+    site/assets/js/portrait_data.js is the ADR-106 coach-portrait palette — 40 skin /
+    hair / garment literals that ARE the artwork, owner-approved per portrait, and by
+    definition not tokens. Returns the reason a module is exempt, or None.
+
+    Anything else that spells a colour in JavaScript is the #1211 drift class wearing
+    a different file extension: dispatches.js carried `--coach:#94a3b8` (Elena's
+    identity colour, duplicated out of config/personas.json) through a sweep that read
+    stylesheets only."""
+    if Path(label).name == "portrait_data.js":
+        return "ADR-106 coach-portrait palette — the artwork itself, owner-approved per portrait"
+    return None
+
+
+def js_raw_hex_findings(name: str, text: str) -> list:
+    """(#3543) §4 over a JS module: no raw hex colour literal in a site ES module.
+    Comments are blanked first (an issue ref or a note is not a colour); a line
+    carrying `hex-ok:` is a sanctioned exception, same grammar as the sheets; a module
+    js_hex_exemption() names is skipped whole."""
+    if js_hex_exemption(name):
+        return []
+    findings = []
+    raw = text.splitlines()
+    stripped = js_code_lines(text)
+    for i, line in enumerate(raw, 1):
+        if "hex-ok:" in line:
+            continue
+        for hm in _JS_HEX_COLOR.finditer(stripped[i - 1] if i - 1 < len(stripped) else ""):
+            findings.append(
+                f"{name}:{i}: raw hex colour `{hm.group(0)}` in JS — a colour a module writes into the DOM "
+                "is the same drift a stylesheet literal is (#1211/#3543). Use a tokens.css token "
+                "(`var(--…)`), fetch it from the registry that owns it, or sanction with /* hex-ok: reason #NNNN */"
+            )
+    return findings
+
+
 def js_sources() -> list:
     """(#3542) The swept JS surface, DERIVED not enumerated — every module under
     site/assets/js/. Returned as (repo-relative label, path)."""
@@ -512,7 +617,14 @@ def check() -> list:
     # (#3542) …and across the JS surface it never reached either: a matchMedia()
     # boundary is a §10.1 breakpoint that happens to be spelled in JavaScript.
     for label, path in js_sources():
-        findings.extend(js_breakpoint_findings(label, path.read_text(errors="replace")))
+        js_text = path.read_text(errors="replace")
+        findings.extend(js_breakpoint_findings(label, js_text))
+        # (#3543) …and a colour spelled in JavaScript is a colour: the same §4 literal
+        # ban, with ONE by-rule exemption (js_hex_exemption) for the ADR-106 palette.
+        findings.extend(js_raw_hex_findings(label, js_text))
+    # (#3543) tokens.css's COMPONENT half — ordinary CSS that was exempt from the type
+    # scale only because of the file it lives in. Definition blocks stay masked out.
+    findings.extend(font_size_findings("site/assets/css/tokens.css", token_definition_mask(TOKENS.read_text())))
     return findings
 
 
