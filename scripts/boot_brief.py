@@ -20,6 +20,12 @@ WHAT PINS IT (tests/test_boot_contract_3314.py)
     dead-man that turns a hand-edit into something a booting session sees;
   * CLAUDE.md's hand-stated copies of a boot fact agree with the model or are absent.
 
+  #3603 adds ONE line that is not a model fact and says so: the review lenses whose grades
+  have been carried forward past the operating calendar's cap. It is read from the review
+  artifacts through scripts/operating_calendar.py (the one home for the cap), printed
+  fail-soft with its reason, and it is deliberately NOT a BOOT_CONTRACT entry — the model
+  carries the platform's shape, not the review's clock.
+
   python3 scripts/boot_brief.py             # the brief, as the SessionStart hook prints it
   python3 scripts/boot_brief.py --json      # the same facts as JSON (a routine's boot)
   python3 scripts/boot_brief.py --model P   # render another model file (tests)
@@ -136,6 +142,34 @@ def consistency(model: dict) -> list[str]:
     return problems
 
 
+def stale_review_lenses(today: _dt.date | None = None, repo: pathlib.Path = ROOT) -> dict:
+    """Which review lenses a reader is being shown a grade for that nobody has re-derived
+    inside the carry-forward cap (#3603).
+
+    Fail-soft by construction: a boot brief that raises kills the SessionStart hook for
+    every session, so a failure here prints its own reason on the line instead of a
+    traceback. The verdict itself is the calendar's — the cap and the parser live there.
+    """
+    out: dict = {"expired": [], "newest": None, "cap_days": None, "error": None}
+    try:
+        import importlib.util
+
+        path = repo / "scripts" / "operating_calendar.py"
+        spec = importlib.util.spec_from_file_location("_operating_calendar_for_boot", path)
+        oc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(oc)
+        runs = oc.load_grade_runs(str(repo))
+        out["cap_days"] = oc.CARRY_FORWARD_MAX_DAYS
+        if runs:
+            out["newest"] = max(runs, key=lambda r: r[0])[0].isoformat()
+        out["expired"] = [
+            {"lens": row["lens"], "age_days": row["age_days"]} for row in oc.expired_carry_forward(runs, today or _dt.date.today())
+        ]
+    except Exception as exc:  # pragma: no cover - exercised by the missing-script test
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 def facts(model: dict, now: _dt.datetime | None = None) -> dict:
     now = now or _dt.datetime.now(_dt.timezone.utc)
     out: dict = {}
@@ -145,6 +179,7 @@ def facts(model: dict, now: _dt.datetime | None = None) -> dict:
         else:
             out[fact.key] = resolve(model, fact.path)
     out["_consistency"] = consistency(model)
+    out["_review_carry_forward"] = stale_review_lenses(now.date())
     out["_now_utc"] = now.strftime("%Y-%m-%dT%H:%MZ")
     return out
 
@@ -161,6 +196,17 @@ def render_lines(model: dict, now: _dt.datetime | None = None) -> list[str]:
     routing = " · ".join(f"{k} {v}" for k, v in f["alarms_by_routing"].items())
     runs = " · ".join(f"{r['utc']}Z {r['lambda']}" for r in f["next_runs"]) or "no fixed-time schedules"
     consent = f["consent"]
+    carry = f["_review_carry_forward"]
+    cap = carry["cap_days"] if carry["cap_days"] is not None else "?"
+    if carry["error"]:
+        stale = f"UNREAD ({carry['error']})"
+    elif not carry["expired"]:
+        stale = f"[] (newest full-lens grades {carry['newest'] or 'none'})"
+    else:
+        rows = ", ".join(
+            f"{r['lens']} ({r['age_days']}d)" if r["age_days"] is not None else f"{r['lens']} (no source run)" for r in carry["expired"]
+        )
+        stale = f"[{rows}] — expired, re-verify or refile before the next delta carries them again"
     return [
         f"  model       {model_line}",
         f"  fleet       {f['lambdas']} lambdas · {f['scheduled_lambdas']} scheduled ({f['schedules']} crons) · {f['mcp_tools']} MCP tools",
@@ -169,6 +215,7 @@ def render_lines(model: dict, now: _dt.datetime | None = None) -> list[str]:
         f"  privacy     {f['privacy_sources_owner_only']} owner-only + {f['privacy_sources_owner_published']} owner-published sources · "
         f"{f['privacy_fields_owner_only']} owner-only fields · consent {consent.get('adr')} ({consent.get('date')})",
         f"  data        {f['partitions']} partitions · {f['edges']} edges · {f['contracts_enrolled']} contracts enrolled (floor {f['contracts_ratchet']})",
+        f"  review      lenses not graded from scratch in >{cap}d: {stale}",
         "  query       scripts/blast_radius.py --touches P | --feeds M | --alarm A | --at HH | --privacy S | --lambda L",
         "  read        docs/CHARTER.md first · docs/DEPENDENCY_GRAPH.md is the model's rendering · prose is depth, not prerequisite",
     ]
