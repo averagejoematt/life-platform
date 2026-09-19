@@ -33,6 +33,8 @@ from __future__ import annotations
 
 from datetime import date as _date
 
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+
 from mcp.core import LAYER_DARK, LAYER_DEGRADED, LAYER_OK, LAYER_UNKNOWN, derived_layer_status  # noqa: F401 — re-exported
 
 # The read itself failed (throttle, auth, timeout). Distinct from `unknown` (the read
@@ -85,7 +87,8 @@ def read_status(
         )
     if newest_date and cadence_days:
         try:
-            today = _date.fromisoformat(str(as_of)[:10]) if as_of else _date.today()
+            # #2817: the tools run interactively in PT evenings, when a UTC "today" is tomorrow's empty day.
+            today = _date.fromisoformat(str(as_of)[:10] if as_of else pacific_today())
             age = (today - _date.fromisoformat(str(newest_date)[:10])).days
         except ValueError:
             return LAYER_UNKNOWN, f"newest record carries an unparseable date ({newest_date!r}); producer cadence cannot be checked"
