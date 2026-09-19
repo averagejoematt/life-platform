@@ -465,10 +465,26 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml)
           pip install $PINS
 
+      # #3608 box 5: the docs/CONVENTIONS.md §4 FAKE-creds parity invocation, run
+      # as an actual step rather than kept as a documented incantation. `env -u`
+      # (never AWS_PROFILE="", which makes boto3 raise ProfileNotFound) clears the
+      # ambient profile/session, and PRESENT-BUT-INVALID keys stop boto3 silently
+      # falling back to a [default] profile and querying prod. On the runner there
+      # is no profile to fall back TO — which is exactly why this has to run here
+      # and not only on a laptop: this lane is the parity REFERENCE, so the
+      # invocation a developer is told to reproduce must be the one CI executes.
+      - name: AWS creds parity — no real credentials resolvable (CONVENTIONS §4)
+        run: |
+          echo "::group::AWS creds parity (#3608 box 5)"
+          env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACCESS_KEY=FAKESECRET \
+            python3 scripts/verify_fake_creds_parity.py
+          echo "::endgroup::"
+
       - name: Run deploy-critical test lane
         run: |
           echo "::group::Deploy-critical lane — pytest -m 'deploy_critical and not integration'"
-          python3 -m pytest tests/ -m "deploy_critical and not integration" -v --tb=short
+          env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACCESS_KEY=FAKESECRET \
+            python3 -m pytest tests/ -m "deploy_critical and not integration" -v --tb=short
           echo "::endgroup::"
 
   # ════════════════════════════════════════════════════════════════

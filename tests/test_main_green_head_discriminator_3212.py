@@ -242,7 +242,21 @@ def test_covered_head_never_fetches_the_discriminator_inputs(monkeypatch, capsys
     out = capsys.readouterr().out
     assert code == 0, out
     assert f"{cmg.HEAD_COVERAGE_PREFIX} covered {HEAD[:8]}" in out
-    assert len(gh.calls) == 2
+    # The #3212 claim is unchanged: NEITHER discriminator input (the
+    # all-workflow run list at head_sha, the commit's changed files) is read on
+    # a covered head. #3608 box 2 added ONE further call that is not a
+    # discriminator input — the winning run's own job list, without which an
+    # EXPECTED job that never attached reads as green. It is bounded (one run,
+    # only when that run concluded `success`) and it is asserted by name here so
+    # the cost claim stays honest rather than just being a bigger number.
+    assert [c[1] if c[0] == "api" else c[0] for c in gh.calls] == [
+        "run",
+        "repos/averagejoematt/life-platform/actions/runs/7/jobs?per_page=100",
+        "repos/averagejoematt/life-platform/branches/main",
+    ], gh.calls
+    for call in gh.calls:
+        assert "actions/runs?head_sha" not in " ".join(call), f"discriminator input read on a covered head: {call}"
+        assert f"commits/{HEAD}" not in " ".join(call), f"discriminator input read on a covered head: {call}"
 
 
 # ─────────────────────────────────────────────────────────────────────────

@@ -160,11 +160,20 @@ def _hermetic_aws_credentials(request, monkeypatch):
 # ~4,600 tests / ~22s locally (measured 2026-08-08), against a lane that took 117s
 # with a 10-minute timeout.
 #
-# THAT AFFORDABILITY NUMBER HAS MOVED — re-measure it, never quote it (#2924,
-# 2026-08-21): the whole `premerge` selection is now 8,813 tests in 155s locally,
-# not the ~6,075-in-30s this comment block used to claim further down. Still ~26%
-# of the 10-minute budget, so the posture holds; but the next person to add a slow
-# file should measure, not trust a number a previous session stamped and left.
+# THAT AFFORDABILITY NUMBER HAS MOVED, AND THIS COMMENT NO LONGER CARRIES IT
+# (#2924 filed it; #3608 box 4 removed the literal). The number that used to sit
+# here — a test-count-and-seconds pair stamped 2026-08-21 — was exactly the thing
+# the surrounding paragraph warns against: a measurement frozen into prose, where
+# nothing re-measures it and nothing reds when it drifts. It also disagreed with
+# `deploy/github_posture.json`'s stored `typical_seconds` by more than a minute,
+# and both were wrong against the observed 13m57s–15m22s band #3678 measured.
+#
+# THE MEASUREMENT, not a number: the pre-merge lane emits its own wall-clock and
+# `deploy/github_posture.json`'s `typical_seconds` is written from it. Read that
+# field (and `measured_on`/`measured_from` beside it) for the current figure — do
+# not quote it back into a comment. The posture still holds on ratio, not on any
+# particular second: the lane is a fraction of its `timeout-minutes`, and
+# `scripts/check_job_timeout_headroom.py` (#3678) is what grades that fraction.
 #
 # DERIVED, NOT HAND-LISTED. Marking 34 files by hand would rot the moment someone
 # adds the 35th. This hook keys on the filename, so a new `*_behavior.py` joins the
