@@ -461,13 +461,16 @@ def test_hold_is_dated_bounded_and_reasoned(name):
 
 def test_the_fullreview_delta_hold_is_pinned():
     """Same shape as test_anchor_is_not_refloated: the ONE hold in force is pinned here,
-    so renewing it is a deliberate, reviewed edit rather than a quiet date bump. #3245
-    rewrote the review-skill corpus; the next fullreview run is a NEW BASELINE, not a
-    delta (#3250)."""
+    so renewing it is a deliberate, reviewed edit rather than a quiet date bump. The first
+    hold (2026-08-27 → 2026-09-06) was #3245's corpus rewrite (#3250). The hold now in force
+    is the second instance of the same rule: #3603 (PR #3904, 2026-09-19) rewrote the
+    instrument again — frozen anchors, the carry-forward cap, calibration controls — and
+    the change surface was the whole tree, so the next fullreview run is a NEW BASELINE,
+    not a delta. Renewing this pin is the reviewed edit; a third hold must replace it here."""
     hold = oc.CALENDAR["fullreview-delta"]["hold"]
-    assert hold is not None, "the #3250 decision is recorded as a hold — deleting it silently re-opens the lapse"
-    assert hold[0] == "2026-08-27" and hold[1] == "2026-09-06"
-    assert "#3245" in hold[2] and "BASELINE" in hold[2]
+    assert hold is not None, "the #3603 decision is recorded as a hold — deleting it silently re-opens the lapse"
+    assert hold[0] == "2026-09-19" and hold[1] == "2026-09-26"
+    assert "#3603" in hold[2] and "#3904" in hold[2] and "BASELINE" in hold[2]
 
 
 def test_delta_mode_is_a_defined_procedure():
