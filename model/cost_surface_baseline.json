@@ -1,12 +1,12 @@
 {
   "_purpose": "#3374 R1 — the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff — that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
   "counts": {
-    "ai_features": 18,
+    "ai_features": 19,
     "alarms": 131,
     "emf_namespaces": 31,
     "schedules": 90,
     "secrets": 29
   },
   "measured_on": "2026-09-19",
-  "_last_change": "#3620 (2026-09-19): secrets 28 -> 29 — ONE secret, `life-platform/ip-hash-salt`, the salt for the reader `ip_hash` on the six site-api engagement doors (/api/nudge, /api/submit_finding, /api/board_question, /api/predict, /api/ritual_log, /api/verify_subscriber). Cost-bearing surface named per #3374 R1: one Secrets Manager secret at $0.40/mo plus API calls, and the READ is bounded — one GetSecretValue per warm container per 15 min through the existing common/secret_cache, not one per request. No new Lambda, no new schedule, no new alarm, no new EMF namespace. It replaces an unsalted SHA-256 over a 2**32 IPv4 keyspace that was being written into S3 records, a DynamoDB sort key and CloudWatch logs. Owner-provisioned: until the secret exists the doors answer 503 by design (fail-closed, no unsalted fallback)."
+  "_last_change": "#3752 (2026-09-19): ai_features 18 -> 19 — ONE budget-guard feature, `plan_critics`, band 2 (Matthew-facing coach voice). Cost-bearing surface named per #3374 R1: four short Haiku calls per drafted routine, at most once a night, inside the existing life-platform-mcp Lambda (which made no other Bedrock call — zero EstimatedCostUSD datapoints over the trailing 30d). Ledger row EXCLUSIVE on `life-platform-mcp` at the $1.00/mo floor (scripts/ai_budget_ledger.py). No new Lambda, no new schedule, no new alarm, no new EMF namespace, no new secret. A paused tier reports the model as paused on every verdict and the deterministic layer still runs at $0."
 }

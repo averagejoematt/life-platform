@@ -7134,8 +7134,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 336,
-        "sites_resolved": 844,
-        "sites_total": 1180
+        "sites_resolved": 843,
+        "sites_total": 1179
       },
       "schedule_resolution": {
         "dynamic": 0,
