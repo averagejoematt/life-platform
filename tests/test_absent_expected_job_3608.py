@@ -56,6 +56,17 @@ def _jobs_for(expected: dict) -> list[dict]:
 # ══════════════════════════════════════════════════════════════════════════
 
 
+def test_the_derivation_lives_in_its_own_module():
+    """#1665: `check_main_green.py` hit the 1000-logical-line hard ceiling and was
+    paid by extraction, not by a baseline entry. The names below are RE-EXPORTED
+    from `check_main_green` so every consumer keeps one import site — but a
+    re-export is not ownership (reference_reexport_is_not_a_patch_point), so this
+    pins where the derivation actually lives. If it ever collapses back into the
+    classifier, this reds before the size guard does."""
+    for fn in (cmg.ci_cd_expected_jobs, cmg.absent_expected_jobs, cmg.commit_is_in_push_trigger_scope, cmg.ci_cd_push_paths):
+        assert fn.__module__ == "main_green_expected_jobs", f"{fn.__name__} is defined in {fn.__module__}, not the derivation module"
+
+
 def test_expected_jobs_are_parsed_from_the_workflow_not_listed():
     expected = cmg.ci_cd_expected_jobs("""
 name: CI/CD
