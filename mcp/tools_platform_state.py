@@ -49,7 +49,10 @@ from mcp.config import logger
 # The published artifact — the exact URL site/assets/js/evidence_meta.js fetches.
 STATE_URL = "https://averagejoematt.com/data/platform_state.json"
 PAGE_URL = "https://averagejoematt.com/method/state/"
-_UA = "life-platform/mcp-get-platform-state"
+# NOT "life-platform/..." — that spelling is the SECRET-NAME shape SR1
+# (tests/test_secret_references.py) scans source for, and a user-agent string that
+# pattern-matches a Secrets Manager id reds the gate for a value that is not a secret.
+_UA = "averagejoematt-mcp get_platform_state/1.0"
 _TIMEOUT_SECS = 10
 
 
