@@ -57,6 +57,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run
+from experiment.phase_taxonomy import experiment_stamp_for  # #3513: class-gated, date-derived write-time stamp
 
 # #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
 # The exemption axis is TRIGGER TYPE, not recipient consent: this handler runs only
@@ -252,6 +253,11 @@ def save_insight(text, source_email_subject="", dry_run=False):
         "email_subject": source_email_subject[:200] if source_email_subject else "",
     }
 
+    # #3513: the same write-time stamp `content.insight_writer` applies, at this second
+    # writer to the same EXPERIMENT_SCOPED partition — derived from the day the insight is
+    # filed under (`pilot` before EXPERIMENT_START_DATE, else the current phase, #3598), and
+    # {} should the class ever forbid one. Without it the row is served as current forever.
+    item = {**experiment_stamp_for(item["pk"], item["sk"], as_of=date_saved), **item}
     item = json.loads(json.dumps(item), parse_float=Decimal)
     if dry_run:
         print(f"[DRY-RUN] insight write suppressed — {len(text)} chars, tags={tags}")

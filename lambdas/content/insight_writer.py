@@ -52,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from common.pacific_time import pacific_today
+from experiment.phase_taxonomy import experiment_stamp_for  # #3513: the class-gated, date-derived write-time stamp
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,19 @@ def write_insight(
 
     if metadata:
         item["metadata"] = json.loads(json.dumps(metadata, default=str))
+
+    # #3513: provenance at the write site, derived — not chosen — from the row's own date.
+    # This writer never stamped. `USER#matthew#SOURCE#insights` classifies EXPERIMENT_SCOPED,
+    # PHASE_FILTER_EXPRESSION admits `attribute_not_exists(phase)` as CURRENT, and the
+    # reset-time tagger runs BEFORE genesis — so every daily-brief insight written in the
+    # reset->genesis countdown window (dated genesis-1, written the morning after) read as
+    # this cycle's on Day 1. Measured live 2026-09-19: 109 unstamped rows, 10 of them
+    # pre-genesis. `as_of=date_val` makes the stamp follow the tagger's own rule (#3598):
+    # `pilot` iff the insight's date is before EXPERIMENT_START_DATE, else the current
+    # phase, with the cycle from CYCLE_GENESES. The stamp is spread FIRST so nothing the
+    # item carries can be overridden by it, and `experiment_stamp_for` returns {} for a
+    # class that forbids provenance, so this is the same shape the eleven #3870 writers use.
+    item = {**experiment_stamp_for(_PK, sk, as_of=date_val), **item}
 
     try:
         _table.put_item(Item=json.loads(json.dumps(item, default=str), parse_float=Decimal))

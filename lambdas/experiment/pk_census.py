@@ -153,6 +153,114 @@ def live_scoped_pks(prefix: str, table=None) -> dict:
     return out
 
 
+PROVENANCE_PROJECTION = {
+    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb",
+    "ExpressionAttributeNames": {"#phase": "phase", "#cycle": "cycle", "#tomb": "tombstone"},
+}
+
+
+def scan_provenance_pages(table):
+    """Yield each page of a FULL-table scan projected to the key plus the provenance
+    attributes (`phase`, `cycle`, `tombstone`). The row-side companion to
+    `scan_pk_sk_pages`: same RCU (a Scan is billed on the bytes SCANNED, not projected —
+    see COST above), three more attributes in the payload, and it answers a question the
+    pk-only scan cannot: does THIS row carry the stamp its class requires?"""
+    kwargs = dict(PROVENANCE_PROJECTION)
+    while True:
+        resp = table.scan(**kwargs)
+        yield resp.get("Items", [])
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+
+
+def scoped_stamp_audit(pages, inverse_pks=()) -> dict:
+    """#3599 box 2 / #3513 / #3877 — the phase-stamp audit over ROWS, not writers.
+
+    WHY ROWS
+      `tests/test_coach_ensemble_writer_phase_stamp_guard_2119.py` enumerates `put_item`
+      call sites and flags the ones with a literal `COACH#` pk that do not stamp. Measured
+      2026-09-19 over `lambdas/`: 154 functions call `put_item`, and the guard can see 7 —
+      the other 147 build their pk at runtime (a module global set at init, an f-string, a
+      dict field), so `pks == set()` and the function cannot be flagged whatever it does.
+      `insight_writer` (#3513, 109 live unstamped rows) and `coach_nudge_lambda._finalize`
+      (#3877) are both in the 147. Widening the AST walk cannot reach a runtime value.
+
+      This inverts the question. Every EXPERIMENT_SCOPED row must carry a `phase` stamp
+      (write-time on the tagger-blind partitions, #1233; and since #3598 the stamp derives
+      from the write's own date, so the reset->genesis countdown window stamps `pilot`).
+      A row without one is served as CURRENT by `PHASE_FILTER_EXPRESSION`
+      (`attribute_not_exists(phase)`) — regardless of which writer produced it. So the
+      audit enumerates the rows and asks the taxonomy per row, and a new unstamped writer
+      is caught by the row it writes, the morning after it writes it.
+
+    THE SET IS DERIVED
+      Families come from the scan (`pk_family`, the census's own keying) and the class from
+      `phase_taxonomy.classify()` — never from `OPERATIONAL_COACH_IDS` or a hand list of
+      pks, which is how `nudge_ledger`/`outbound_ledger`/`commitments` escaped for three
+      cycles (#3514) and how `SOURCE#insights` sat outside this audit for its whole life
+      (#3513). `families_audited` is the derived member count the PR body states.
+
+    TWO DIRECTIONS, ONE PASS
+      * forward — an EXPERIMENT_SCOPED row with no `phase`: `unstamped[family]` lists it.
+      * inverse — a CROSS_PHASE row carrying provenance its class forbids
+        (`forbidden_provenance`, #3514 DA-6): `wrongly_stamped` lists it. Confined to
+        `inverse_pks` — the COACH#/ENSEMBLE# set the nightly has always audited and the
+        set `deploy/reconcile_provenance_2026_09.py --only 3514` remediates — because this
+        leg is ALARMED and measured 2026-09-19 at 3,185 rows table-wide (calibration 2,211,
+        recall_embeddings 883, milestones 27, retired-coach CHAT# 64) with no remediation
+        naming them. Widening an alarmed leg by three thousand members nobody can clear
+        trains the reader to skip it (#3851/#3853); that Set is a follow-up, filed by number.
+      * `by_design` counts the unstamped CROSS_PHASE / SYSTEM_STATE rows on `inverse_pks`
+        (the ADR-153 conversation history), so the exclusion is visible, not silent (#2520).
+      * `unclassified` counts rows `classify()` cannot resolve; the totality census is the
+        instrument that rules on those, this one neither guesses nor stops.
+
+    THE VACUOUS-SCAN TRAP
+      An empty scan raises. An all-clear over zero rows is a check that cannot fail.
+    """
+    inverse = set(inverse_pks)
+    unstamped: dict = {}
+    wrongly_stamped: list = []
+    families_audited: set = set()
+    rows = by_design = unclassified = 0
+    for page in pages:
+        for it in page:
+            rows += 1
+            pk, sk = it.get("pk", ""), str(it.get("sk", ""))
+            try:
+                cls = taxonomy.classify(pk, sk)
+            except KeyError:
+                unclassified += 1
+                continue
+            if pk in inverse:
+                bad = taxonomy.forbidden_provenance(pk, sk, it)
+                if bad:
+                    wrongly_stamped.append(f"{pk}/{sk}[{'+'.join(bad)}]")
+            if cls != taxonomy.EXPERIMENT_SCOPED:
+                if pk in inverse and it.get("phase") is None:
+                    by_design += 1
+                continue
+            fam = pk_family(pk)
+            families_audited.add(fam)
+            if it.get("phase") is None:
+                unstamped.setdefault(fam, []).append(f"{pk}/{sk}")
+    if rows == 0:
+        raise CensusPreflightError(
+            "phase-stamp row audit: the provenance scan returned ZERO rows. Refusing to certify "
+            "stamp coverage on an empty scan (the vacuous-scan trap)."
+        )
+    return {
+        "rows": rows,
+        "families_audited": families_audited,
+        "unstamped": unstamped,
+        "wrongly_stamped": wrongly_stamped,
+        "by_design": by_design,
+        "unclassified": unclassified,
+    }
+
+
 def unresolved_families(table=None) -> tuple[list[tuple[str, str, str, str]], int]:
     """The census as DATA rather than as an exception: return
     ``(unresolved, family_count)`` where each unresolved entry is

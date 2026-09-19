@@ -194,6 +194,16 @@ DEFAULT_STALE_HOURS = 48
 #                  Read via `day_key_frame_for()` / `utc_day_key_source_ids()`; never
 #                  hardcode the frame at a call site and never CLAMP the resulting age
 #                  (#3232 ruled the storage key correct — the defect is presentation).
+#   day_key_frame_consequence
+#                  (#3677) REQUIRED on any source whose `day_key_frame` is not the
+#                  platform default: what the non-default frame COSTS a reader, in
+#                  sentences, at the site of the exemption. A frame label on its own is
+#                  a neutral-looking fact — 'utc' does not tell anyone that the owner's
+#                  evening lands on tomorrow's key — so #3666's guard requires the note
+#                  and `tests/test_ingestion_day_key_derivation_3666.py` fails a UTC
+#                  source that carries none. Read via `day_key_frame_consequence_for()`.
+#                  It is a RULING record, not a TODO: a source that should be flipped
+#                  gets flipped, and one that is deliberately kept explains the keep.
 #   inbound_mode   (#1677) how a record can arrive AT ALL. Absent = a fetch of some kind
 #                  exists. 'paste-only' = the closed platforms (X/Instagram/TikTok):
 #                  no client, no secret, no token path in this repo — the owner pastes
@@ -550,6 +560,24 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # day (TD-19 Phase 2). Every consumer that ages this key must anchor it at UTC
         # midnight; the other 11 board sources anchor at Pacific midnight.
         "day_key_frame": "utc",
+        # #3677: the RULING recorded 2026-09-19 — apple_health KEEPS the UTC frame, and
+        # this note is the price of keeping it. It lives on the facet rather than in prose
+        # because the exemption and its consequence have to travel together: `day_key_frame`
+        # on its own reads as a neutral fact about a key, and it is not one.
+        "day_key_frame_consequence": (
+            "KEEP-UTC RULING (#3677, 2026-09-19; TD-19 Phase 2, docs/audits/TD-19_DATE_PARTITION_AUDIT.md). "
+            "Because parse_date_str converts a reading's own offset-aware stamp to UTC before taking the day, "
+            "EVERY apple_health reading taken from 17:00 PT (PDT; 16:00 PST) until Pacific midnight is stored "
+            "under the FOLLOWING Pacific day's DATE# key — 33.14 fl_oz of water logged 2026-09-06 19:15 -0700 "
+            "is on DATE#2026-09-07. So for the last ~7h of every Pacific day the row keyed with today's date is "
+            "a partial NEXT-day record, and the owner's evening (water, CGM, BP, State of Mind, steps, workouts) "
+            "is invisible to anything that asks for today. NOT flipped: 2,508 stored rows with no backfill, and "
+            "a flip without one is a silent mid-history discontinuity in the platform's densest partition — a "
+            "quieter defect than the one it fixes. Every consumer that presents these rows as today is "
+            "enumerated with the ruling in the audit's 2026-09-19 section; two absorb the boundary explicitly "
+            "(vitals_resolver #3287 takes the newest day PT has actually reached; site_api_freshness and "
+            "freshness_checker anchor the age at UTC midnight through day_key_frame_for), the rest inherit it."
+        ),
         "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
         # #3252: HAE pushes steps AND the `workouts` sub-datatype below — both are
         # passive captures, and both are evidence under the auto-sync ruling.
@@ -1942,6 +1970,20 @@ def day_key_frame_for(source: str) -> str:
     right answer for any source that has not yet been classified.
     """
     return SOURCE_REGISTRY.get(source, {}).get("day_key_frame") or DEFAULT_DAY_KEY_FRAME
+
+
+def day_key_frame_consequence_for(source: str) -> str:
+    """The written consequence of a source's non-default ``day_key_frame`` (#3677), or ''.
+
+    #3257 gave the platform one address for WHICH calendar a ``DATE#`` key names. What it
+    could not carry is what the answer COSTS: 'utc' is a label a reader nods at, and it
+    took #3677 to write down that it means every apple_health reading after 17:00 PT is
+    filed on tomorrow's key — so the 8 PM evening nudge asks for today's State of Mind
+    check-ins and is told there are none, seven hours after the check-in was recorded.
+    The exemption and its price now travel together, and #3666's derivation guard fails a
+    UTC-framed source that has no price written down.
+    """
+    return SOURCE_REGISTRY.get(source, {}).get("day_key_frame_consequence") or ""
 
 
 def utc_day_key_source_ids() -> set:

@@ -1007,6 +1007,22 @@ def operational_site_stats_refresh() -> list[iam.PolicyStatement]:
     ]
 
 
+def _experiment_cycle_read() -> iam.PolicyStatement:
+    """#3599/#3513: ssm:GetParameter on experiment-cycle, the single parameter and nothing
+    wider. `content.insight_writer` (and the inbound insight parser) now stamp every INSIGHT#
+    row through `phase_taxonomy.experiment_stamp_for`, whose post-genesis fallback reads the
+    cycle from SSM via `coach_checkin.read_cycle()`. Every handler that bundles the writer
+    reaches that channel; `tests/test_grant_enumeration_drift.py` enumerates them from the
+    import closure. Without this grant the read AccessDenies inside a fail-soft `except` and
+    the row lands with no cycle — a silent provenance defect, never a failed write. Same
+    action + resource the coach-nudge role's `SSMRead` carries for its NUDGE# stamp."""
+    return iam.PolicyStatement(
+        sid="ExperimentCycleRead",
+        actions=["ssm:GetParameter"],
+        resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+    )
+
+
 def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     """Insight email parser: reads from SES S3 drop, writes insight records to DDB.
 
@@ -1047,6 +1063,7 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
                 actions=["cloudwatch:PutMetricData"],
                 resources=["*"],  # PutMetricData only accepts "*"
             ),
+            _experiment_cycle_read(),  # #3599/#3513: save_insight stamps through experiment_stamp_for
         ],
     )
 
