@@ -202,6 +202,14 @@ def census_snapshot(table=None) -> dict:
     just not a live one — and the artifact carries `generated_at` so a reader can see how
     old the measurement is instead of trusting a hand-typed list.
 
+    `_meta.captured_at` IS DELIBERATELY UTC (#3669, `utc-exempt` at the site). It dates a
+    SCAN — an instant — not one of Matthew's calendar days, and the only thing that grades
+    it is the freshness bar in tests/test_source_registry_coverage_3669, which takes its
+    `today` from `datetime.now(timezone.utc).date()`. Both sides are therefore the same
+    frame. Rendering this one in Pacific while leaving the grader in UTC is exactly the
+    shape #3666 retired Habitify's exemption for: the defect there was never the frame
+    either side picked, it was the two sides picking differently.
+
     READ-ONLY against DynamoDB (the caller writes the file).
     """
     from datetime import datetime, timezone
@@ -254,6 +262,9 @@ def census_snapshot(table=None) -> dict:
             ),
             "table": TABLE,
             "region": REGION,
+            # utc-exempt(#3669): dates a SCAN, and its only grader reads UTC too — see
+            # the `captured_at` note in this function's docstring for why splitting the
+            # two frames would rebuild the #3666 Habitify bug.
             "captured_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "item_count": _scanned[0],
             "family_count": n_families,
