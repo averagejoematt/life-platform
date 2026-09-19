@@ -1,11 +1,12 @@
 {
- "_note": "#2632 suppression list for scripts/verify_bundle_boot.py --compare. ONLY probe-environment gaps belong here: a dependency that reaches the Lambda from a LAYER and therefore can never be in the bundle. NOT a place to park a real bundle-shape failure. Every entry is printed on every run. Adding one is a reviewed diff; justify it in the PR.",
- "_note_pillow": "Pillow ships as a Lambda layer, never in the code bundle. These modules import PIL at MODULE SCOPE - directly, or transitively through a first-party module that does - so they fail the probe in any environment without Pillow installed, which is the pre-merge lane and the CI deploy runner. On a workstation with Pillow the probe reports them as 'now import cleanly'. THIS LIST IS DERIVED, NOT CURATED: tests/test_bundle_boot_pil_baseline_3784.py recomputes the module-scope PIL closure over lambdas/ and reds if this set is not exactly it. Do not hand-add a non-PIL failure here.",
- "web.card_engine": "ModuleNotFoundError: No module named 'PIL'",
- "web.og_coach_cards": "ModuleNotFoundError: No module named 'PIL'",
- "web.og_image_lambda": "ModuleNotFoundError: No module named 'PIL'",
- "web.portrait_raster": "ModuleNotFoundError: No module named 'PIL'",
- "web.recap_canvas": "ModuleNotFoundError: No module named 'PIL'",
- "web.recap_charts": "ModuleNotFoundError: No module named 'PIL'",
- "web.recap_layouts": "ModuleNotFoundError: No module named 'PIL'"
+  "_note": "#2632 suppression list for scripts/verify_bundle_boot.py --compare. ONLY probe-environment gaps belong here: a dependency that reaches the Lambda from a LAYER and therefore can never be in the bundle. NOT a place to park a real bundle-shape failure. Every entry is printed on every run. Adding one is a reviewed diff; justify it in the PR.",
+  "_note_pillow": "Pillow ships as a Lambda layer, never in the code bundle. These modules import PIL at MODULE SCOPE - directly, or transitively through a first-party module that does - so they fail the probe in any environment without Pillow installed, which is the pre-merge lane and the CI deploy runner. On a workstation with Pillow the probe reports them as 'now import cleanly'. THIS LIST IS DERIVED, NOT CURATED: tests/test_bundle_boot_pil_baseline_3784.py recomputes the module-scope PIL closure over lambdas/ and reds if this set is not exactly it. Do not hand-add a non-PIL failure here.",
+  "web.card_engine": "ModuleNotFoundError: No module named 'PIL'",
+  "web.og_coach_cards": "ModuleNotFoundError: No module named 'PIL'",
+  "web.og_image_lambda": "ModuleNotFoundError: No module named 'PIL'",
+  "web.portrait_raster": "ModuleNotFoundError: No module named 'PIL'",
+  "web.recap_canvas": "ModuleNotFoundError: No module named 'PIL'",
+  "web.recap_charts": "ModuleNotFoundError: No module named 'PIL'",
+  "web.recap_detail": "ModuleNotFoundError: No module named 'PIL'",
+  "web.recap_layouts": "ModuleNotFoundError: No module named 'PIL'"
 }
