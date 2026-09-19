@@ -40,6 +40,7 @@ THE VACUOUS-SCAN TRAP
 from __future__ import annotations
 
 import os
+import re
 
 from experiment import phase_taxonomy as taxonomy
 
@@ -175,7 +176,30 @@ def scan_provenance_pages(table):
         kwargs["ExclusiveStartKey"] = lek
 
 
-def scoped_stamp_audit(pages, inverse_pks=()) -> dict:
+# #3877 box 4 / #3899-era finding: the reset-time tagger (deploy/restart_phase_tag.py) reaches
+# ONLY these pks. An unstamped EXPERIMENT_SCOPED row elsewhere is served as current forever
+# (tagger-BLIND); one here is stamped at the next reset, so in-cycle it is the CORRECT state
+# and only a row dated BEFORE genesis (the #3513 shape: written in the countdown window
+# after the wipe, never tagged) is a finding. The first nightly of the widened audit
+# (2026-09-19T18:31Z) reported 194 rows / 17 families; 159 of them were reachable in-cycle
+# rows on 13 SOURCE# families — chronic noise that would train the reader to skip the leg
+# (#3851). The split keeps the leg meaning what its citation says.
+TAGGER_REACHABLE_PREFIX = "USER#matthew#SOURCE#"
+_ROW_DATE_RE = re.compile(r"(20\d\d-\d\d-\d\d)")
+
+
+def row_date(item: dict) -> str | None:
+    """YYYY-MM-DD for a row's own date dimension, or None: an explicit `date` attr, else the
+    first date in the sk. Mirrors deploy/restart_phase_tag.extract_date's order without
+    importing deploy/ (never staged into the bundle). An undated row is NOT guessed at."""
+    explicit = item.get("date")
+    if isinstance(explicit, str) and _ROW_DATE_RE.match(explicit):
+        return explicit[:10]
+    m = _ROW_DATE_RE.search(str(item.get("sk", "")))
+    return m.group(1) if m else None
+
+
+def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dict:
     """#3599 box 2 / #3513 / #3877 — the phase-stamp audit over ROWS, not writers.
 
     WHY ROWS
@@ -203,7 +227,9 @@ def scoped_stamp_audit(pages, inverse_pks=()) -> dict:
       (#3513). `families_audited` is the derived member count the PR body states.
 
     TWO DIRECTIONS, ONE PASS
-      * forward — an EXPERIMENT_SCOPED row with no `phase`: `unstamped[family]` lists it.
+      * forward — an EXPERIMENT_SCOPED row with no `phase` that the reset tagger cannot cure:
+        tagger-BLIND (any date) or tagger-reachable but dated BEFORE genesis: `unstamped[family]`.
+        A tagger-reachable in-cycle row goes to `deferred[family]` — visible, never a finding.
       * inverse — a CROSS_PHASE row carrying provenance its class forbids
         (`forbidden_provenance`, #3514 DA-6): `wrongly_stamped` lists it. Confined to
         `inverse_pks` — the COACH#/ENSEMBLE# set the nightly has always audited and the
@@ -220,8 +246,13 @@ def scoped_stamp_audit(pages, inverse_pks=()) -> dict:
     THE VACUOUS-SCAN TRAP
       An empty scan raises. An all-clear over zero rows is a check that cannot fail.
     """
+    if genesis is None:
+        from common.constants import EXPERIMENT_START_DATE
+
+        genesis = EXPERIMENT_START_DATE
     inverse = set(inverse_pks)
     unstamped: dict = {}
+    deferred: dict = {}  # tagger-reachable, in-cycle: stamped by the next reset's tagger, by design
     wrongly_stamped: list = []
     families_audited: set = set()
     rows = by_design = unclassified = 0
@@ -245,7 +276,11 @@ def scoped_stamp_audit(pages, inverse_pks=()) -> dict:
             fam = pk_family(pk)
             families_audited.add(fam)
             if it.get("phase") is None:
-                unstamped.setdefault(fam, []).append(f"{pk}/{sk}")
+                d = row_date(it)
+                if pk.startswith(TAGGER_REACHABLE_PREFIX) and not (d and d < genesis):
+                    deferred.setdefault(fam, []).append(f"{pk}/{sk}")
+                else:
+                    unstamped.setdefault(fam, []).append(f"{pk}/{sk}")
     if rows == 0:
         raise CensusPreflightError(
             "phase-stamp row audit: the provenance scan returned ZERO rows. Refusing to certify "
@@ -255,6 +290,7 @@ def scoped_stamp_audit(pages, inverse_pks=()) -> dict:
         "rows": rows,
         "families_audited": families_audited,
         "unstamped": unstamped,
+        "deferred": deferred,
         "wrongly_stamped": wrongly_stamped,
         "by_design": by_design,
         "unclassified": unclassified,
