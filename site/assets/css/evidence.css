@@ -757,7 +757,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* The seven pillars — stat block + radar. */
 .ch-statgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); gap: var(--sp-6); align-items: center; }
 .ch-rows { display: grid; gap: var(--sp-3); }
-.ch-row { display: grid; grid-template-columns: 22px 6.8rem 2.9rem minmax(90px, 1fr) 4rem 3.4rem 64px; gap: var(--sp-2); align-items: center; }
+.ch-row { display: grid; grid-template-columns: 22px 6.8rem minmax(2.9rem, max-content) minmax(90px, 1fr) 4rem 3.4rem 64px; gap: var(--sp-2); align-items: center; }  /* #3543: the level track sizes to its content — .ch-hold ('held') escaped a fixed 2.9rem by 4.2px once it reached the 11px floor */
 .ch-ric .ico { width: 18px; height: 18px; display: block; }
 .ch-rname { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink); }
 .ch-rlv { color: var(--ink-muted); }
@@ -880,7 +880,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .ch-idnote { margin-inline: auto; }
   .ch-statgrid { grid-template-columns: 1fr; }
   .radar-chart { max-width: 320px; margin: 0 auto; }
-  .ch-row { grid-template-columns: 20px minmax(0, 1fr) 3rem 4rem; }
+  .ch-row { grid-template-columns: 20px minmax(0, 1fr) minmax(3rem, max-content) 4rem; }
   .ch-rbar { grid-column: 1 / -1; }
   .ch-rspark { display: none; }
   .ch-rung { grid-template-columns: 28px minmax(0, 1fr) auto; }

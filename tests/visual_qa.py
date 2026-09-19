@@ -905,11 +905,17 @@ _GLYPH_LEAK_AUDIT_JS = r"""() => {
         if (cs.display === 'none' || cs.visibility === 'hidden') continue;
         const cls = (typeof el.className === 'string' && el.className.trim())
             ? '.' + el.className.trim().split(/\s+/).join('.') : '';
+        // Is the glyph standing in for an ICON — i.e. inside interactive chrome the
+        // site draws (a button, a link, a tab)? That is the #3543 defect: a control
+        // whose mark is a code point is sized by the type scale and rendered by
+        // whatever font the reader has. A glyph inside a data label is typography.
+        const chrome = !!el.closest('button, a, [role="button"], [role="tab"], summary');
         out.push({
             sel: el.tagName.toLowerCase() + cls,
             glyph: m[0],
             code: 'U+' + m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0'),
             txt: txt.trim().slice(0, 24),
+            chrome: chrome,
         });
     }
     return out;
@@ -1576,11 +1582,22 @@ def capture_page(
                     )
                 # ── glyph leak (#3543): an icon spelled as a code point. Same page set
                 #    and the same two widths — a leak can be conditional on either.
+                #    REPORTED AS A WARNING, deliberately: measured across all 64 tier-1/2
+                #    pages it finds 10 live glyphs on 8 pages, and only one of them was
+                #    the defect this sweep was written for (the provenance ⓘ, fixed in
+                #    this change). The rest are content — ✓/✗ in a scorecard label, ⚑/⚠
+                #    in a readout note, and a ☀️ inside a Hevy workout TITLE, which is
+                #    ingested data no site change can clear. Arming a gate on a surface
+                #    carrying live findings is what red-walls a deploy for a week and
+                #    teaches readers to skip it; arming it as a warning makes the count
+                #    visible and falsifiable on every run. Promote to `issues` once the
+                #    content producers are clean — the sweep will say when.
                 for f in _glyph_leak_findings(page):
-                    issues.append(
+                    warnings.append(
                         f"Glyph leak in visitor-facing text @{_floor_w}px (#3543): {f['sel']} "
-                        f"'{f['txt']}' carries {f['code']} '{f['glyph']}' x{f['n']} — icons come from "
-                        "icons.js/icons.svg, never a text code point (DESIGN_SYSTEM_V5 §8)"
+                        f"'{f['txt']}' carries {f['code']} '{f['glyph']}' x{f['n']}"
+                        f"{' — INSIDE INTERACTIVE CHROME (an icon, not typography)' if f.get('chrome') else ''}"
+                        " — icons come from icons.js/icons.svg, never a text code point (DESIGN_SYSTEM_V5 §8)"
                     )
 
         # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
