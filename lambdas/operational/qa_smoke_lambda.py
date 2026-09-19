@@ -913,6 +913,14 @@ def check_coach_ensemble_phase_stamp_coverage():
     by_design = audit["by_design"]
     n_families = len(audit["families_audited"])
     protected = f" {by_design} cross-phase/system-state row(s) are correctly unstamped and excluded." if by_design else ""
+    deferred = audit["deferred"]
+    n_deferred = sum(len(v) for v in deferred.values())
+    tagger = (
+        f" {n_deferred} in-cycle row(s) on {len(deferred)} tagger-reachable SOURCE# families carry no write-time stamp "
+        "and will be stamped by the next reset's tagger (#3877 split: not a finding, reported so it is visible)."
+        if n_deferred
+        else ""
+    )
     unresolved = f" {audit['unclassified']} row(s) unclassifiable — the pk-family census rules on those." if audit["unclassified"] else ""
     wrongly_stamped = audit["wrongly_stamped"]
     if wrongly_stamped:
@@ -945,17 +953,18 @@ def check_coach_ensemble_phase_stamp_coverage():
         return [
             c.warn(
                 f"{total} row(s) across {len(unstamped)} of {n_families} EXPERIMENT_SCOPED pk families are "
-                f"experiment-scoped but carry no phase attribute (#1970/#3599) — served as current by "
-                f"PHASE_FILTER_EXPRESSION until stamped: {fam_summary}{fam_more}; e.g. {sample}{more}. "
+                f"experiment-scoped but carry no phase attribute the reset tagger can cure (#1970/#3599) — tagger-blind, "
+                f"or tagger-reachable and dated before genesis — served as current by PHASE_FILTER_EXPRESSION until "
+                f"stamped: {fam_summary}{fam_more}; e.g. {sample}{more}. "
                 "Run deploy/backfill_coach_ensemble_phase_stamps.py --apply for the COACH#/ENSEMBLE#/SOURCE#insights "
-                f"families it covers; any other family named here is a writer with no write-time stamp.{protected}{unresolved}",
+                f"families it covers; any other family named here is a writer with no write-time stamp.{protected}{tagger}{unresolved}",
                 chronic=True,
             )
         ]
     return [
         c.ok(
             f"all stampable rows across {n_families} EXPERIMENT_SCOPED pk families ({audit['rows']} rows scanned) "
-            f"carry a phase stamp.{protected}{unresolved}"
+            f"carry a phase stamp.{protected}{tagger}{unresolved}"
         )
     ]
 

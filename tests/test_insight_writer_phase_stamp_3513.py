@@ -202,13 +202,17 @@ def test_the_row_audit_derives_its_families_and_never_reports_a_cross_phase_row(
     one on a CROSS_PHASE source and one on a SYSTEM_STATE source. The scoped ones are all
     findings, the other two never are, and `families_audited` is the registry's own size."""
     scoped = sorted(s for s, c in tx.SOURCE_CLASS.items() if c == tx.EXPERIMENT_SCOPED)
-    rows = [{"pk": f"USER#matthew#SOURCE#{s}", "sk": "X#1"} for s in scoped]
+    # Dated BEFORE genesis: SOURCE# pks are tagger-reachable, so only a pre-genesis unstamped
+    # row is a finding there (#3877 split); an in-cycle one is `deferred` to the next reset's tagger.
+    rows = [{"pk": f"USER#matthew#SOURCE#{s}", "sk": "X#2020-01-01"} for s in scoped]
     rows += [
-        {"pk": f"USER#matthew#SOURCE#{tx.CROSS_PHASE_SOURCES[0]}", "sk": "X#1"},
-        {"pk": f"USER#matthew#SOURCE#{tx.SYSTEM_STATE_SOURCES[0]}", "sk": "X#1"},
+        {"pk": f"USER#matthew#SOURCE#{tx.CROSS_PHASE_SOURCES[0]}", "sk": "X#2020-01-01"},
+        {"pk": f"USER#matthew#SOURCE#{tx.SYSTEM_STATE_SOURCES[0]}", "sk": "X#2020-01-01"},
+        {"pk": f"USER#matthew#SOURCE#{scoped[0]}", "sk": "X#2099-01-01"},  # in-cycle: deferred, not a finding
     ]
     out = _audit(rows)
     assert sorted(out["unstamped"]) == [f"SOURCE#{s}" for s in scoped]
+    assert sorted(out["deferred"]) == [f"SOURCE#{scoped[0]}"]
     assert len(out["families_audited"]) == len(scoped)
     assert out["rows"] == len(rows)
 
