@@ -32,6 +32,49 @@ import doc_drift_verdict as _verdict  # noqa: E402 — #3646: the bot-owned/huma
 import sync_doc_metadata as sync  # noqa: E402
 
 
+# ── #3646 follow-up: the verdict under test must be the GATE's, not CI's ──────
+# THE INCIDENT. `deploy/doc_drift_verdict.py` tolerates `pending-reconcile` — exit 0 +
+# a `::warning::` — on a push to `refs/heads/main`, because there the reconcile job is
+# literally the next thing to run. CI exports `GITHUB_EVENT_NAME` and `GITHUB_REF` into
+# every step, so on main's own post-merge full-suite run each planted drift below was
+# silently forgiven and these tests read 0 where they assert a non-zero verdict. Main
+# went red on run 35465658218 (b876ae900) for exactly that, and the PR that shipped it
+# was green — because a PR's event is `pull_request`, where the branch cannot fire.
+#
+# A test that plants drift and asserts the gate reds is making a claim about the GATE.
+# Inheriting the ambient event makes that claim conditional on where the suite happens
+# to run, which is the same defect class as a gate that cannot fail. So the env is
+# built explicitly here and both variables are REMOVED. The one test that pins the
+# tolerated branch sets them back deliberately, so both directions are covered wherever
+# this file runs.
+@pytest.fixture(autouse=True)
+def _gate_verdict_not_ci_exemption(monkeypatch):
+    """Strip the CI event vars from every test in this module (#3646)."""
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.delenv("GITHUB_REF", raising=False)
+
+
+def _gate_env(event_name="pull_request"):
+    """A child env whose verdict is the GATE's, never CI's (#3646).
+
+    `GITHUB_REF` is REMOVED, which is what disarms the push-to-main tolerance in
+    `doc_drift_verdict.reconcile_bot_follows_this_run()` — the branch that turned
+    a planted drift into exit 0 on main's own full-suite run (35465658218).
+
+    `GITHUB_EVENT_NAME` is PINNED rather than removed, and the asymmetry is deliberate:
+    `deploy/doc_platform_counts.py`'s #3384 exemption keys on `pull_request`, and it is
+    the only thing that stops an unrelated `test_count` delta — which every branch that
+    adds a test carries, and which the reconcile bot owns — from reaching a subprocess
+    that is asserting about something else entirely. Removing it would red this file on
+    every lane PR. Pinning it makes the child deterministic in BOTH directions instead
+    of inheriting whatever the runner exported.
+    """
+    env = dict(os.environ)
+    env.pop("GITHUB_REF", None)
+    env["GITHUB_EVENT_NAME"] = event_name
+    return env
+
+
 def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
     """Point sync at a synthetic single-doc/single-rule world in tmp_path.
 
@@ -67,6 +110,38 @@ def test_check_exits_pending_reconcile_on_bot_owned_drift(tmp_path, monkeypatch)
 
     assert exc.value.code == _verdict.EXIT_PENDING_RECONCILE
     assert doc.read_text(encoding="utf-8") == "Header: v1 (99 Widgets)\n", "--check must never write"
+
+
+def test_the_tolerated_branch_emits_the_warning_and_exits_zero(tmp_path, monkeypatch, capsys):
+    """THE OTHER DIRECTION, pinned explicitly (#3646 follow-up).
+
+    Every other test in this file now runs with the CI event vars stripped, which is
+    right — the verdict under test must be the gate's. But stripping them everywhere
+    would leave the tolerated branch itself covered by nothing, and that branch is the
+    entire point of the change: it is what makes a merge commit's Docs CI run conclude
+    `success`. So it is set here BY THE TEST, never inherited, and both halves are
+    asserted — the exit code AND the `::warning::` line a reader of the run sees.
+
+    This pair is what main's red run (35465658218, b876ae900) proved was missing: the
+    suite passed on a `pull_request` where the branch cannot fire, and the same tests
+    read 0 on main's `push` where it always fires. Neither direction may depend on
+    where the suite happens to run.
+    """
+    _isolate(monkeypatch, tmp_path, "Header: v1 (99 Widgets)\n", widget_count=42)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(sys, "argv", ["sync_doc_metadata.py", "--check"])
+
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+
+    assert exc.value.code == _verdict.EXIT_SUCCESS, "the push-to-main tolerance did not fire"
+    out = capsys.readouterr().out
+    assert "::warning title=pending-reconcile::" in out, (
+        "the tolerated branch exited 0 without telling anyone — a silent pass is how the "
+        "reconcile bot's commit stops being verified at all (#3646)"
+    )
+    assert "VERDICT: pending-reconcile" in out
 
 
 def test_push_to_main_tolerates_pending_reconcile_but_nothing_else_does(tmp_path, monkeypatch):
@@ -218,6 +293,7 @@ def test_check_is_clean_on_repo_head():
             cwd=_REPO,
             capture_output=True,
             text=True,
+            env=_gate_env(),
             # #3849, the Set's third member. This was 30s, and on 2026-09-16 it
             # TimeoutExpired in the pre-merge lane on a branch whose diff could not slow a
             # doc-sync scan. The checker measures ~11s locally; 30s was ~2.7x that, which

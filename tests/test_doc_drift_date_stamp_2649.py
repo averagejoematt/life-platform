@@ -56,6 +56,27 @@ _SCRIPT = _REPO / "deploy" / "sync_doc_metadata.py"
 _DOC = _REPO / "docs" / "ARCHITECTURE.md"
 
 
+def _gate_env(event_name="pull_request"):
+    """A child env whose verdict is the GATE's, never CI's (#3646).
+
+    `GITHUB_REF` is REMOVED, which is what disarms the push-to-main tolerance in
+    `doc_drift_verdict.reconcile_bot_follows_this_run()` — the branch that turned
+    a planted drift into exit 0 on main's own full-suite run (35465658218).
+
+    `GITHUB_EVENT_NAME` is PINNED rather than removed, and the asymmetry is deliberate:
+    `deploy/doc_platform_counts.py`'s #3384 exemption keys on `pull_request`, and it is
+    the only thing that stops an unrelated `test_count` delta — which every branch that
+    adds a test carries, and which the reconcile bot owns — from reaching a subprocess
+    that is asserting about something else entirely. Removing it would red this file on
+    every lane PR. Pinning it makes the child deterministic in BOTH directions instead
+    of inheriting whatever the runner exported.
+    """
+    env = dict(os.environ)
+    env.pop("GITHUB_REF", None)
+    env["GITHUB_EVENT_NAME"] = event_name
+    return env
+
+
 def _check() -> int:
     """Run the real gate exactly as CI does, and return its exit code.
 
@@ -73,6 +94,7 @@ def _check() -> int:
         cwd=str(_REPO),
         capture_output=True,
         text=True,
+        env=_gate_env(),
     ).returncode
 
 

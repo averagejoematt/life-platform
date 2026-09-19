@@ -45,6 +45,28 @@ def test_the_three_rules_are_actually_registered():
     assert len(_KIT_RULES) == 2, _KIT_RULES
 
 
+# ── #3646 follow-up: the verdict under test must be the GATE's, not CI's ──────
+# THE INCIDENT. `deploy/doc_drift_verdict.py` tolerates `pending-reconcile` — exit 0 +
+# a `::warning::` — on a push to `refs/heads/main`, because there the reconcile job is
+# literally the next thing to run. CI exports `GITHUB_EVENT_NAME` and `GITHUB_REF` into
+# every step, so on main's own post-merge full-suite run each planted drift below was
+# silently forgiven and these tests read 0 where they assert a non-zero verdict. Main
+# went red on run 35465658218 (b876ae900) for exactly that, and the PR that shipped it
+# was green — because a PR's event is `pull_request`, where the branch cannot fire.
+#
+# A test that plants drift and asserts the gate reds is making a claim about the GATE.
+# Inheriting the ambient event makes that claim conditional on where the suite happens
+# to run, which is the same defect class as a gate that cannot fail. So the env is
+# built explicitly here and both variables are REMOVED. The one test that pins the
+# tolerated branch sets them back deliberately, so both directions are covered wherever
+# this file runs.
+@pytest.fixture(autouse=True)
+def _gate_verdict_not_ci_exemption(monkeypatch):
+    """Strip the CI event vars from every test in this module (#3646)."""
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.delenv("GITHUB_REF", raising=False)
+
+
 def _isolate(monkeypatch, tmp_path, rel_path, doc_text, rule):
     doc = tmp_path / rel_path
     doc.parent.mkdir(parents=True, exist_ok=True)
