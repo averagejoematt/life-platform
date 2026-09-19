@@ -31,9 +31,7 @@ WHY THE LIST IS EXPLICIT (and small)
 
 from __future__ import annotations
 
-from datetime import date as _date
-
-from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.pacific_time import pacific_today, parse_day_key  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import LAYER_DARK, LAYER_DEGRADED, LAYER_OK, LAYER_UNKNOWN, derived_layer_status  # noqa: F401 — re-exported
 
@@ -86,12 +84,14 @@ def read_status(
             f"the read failed ({type(error).__name__}: {error}) — counts from this layer are withheld: they would read as measured zeros",
         )
     if newest_date and cadence_days:
-        try:
-            # #2817: the tools run interactively in PT evenings, when a UTC "today" is tomorrow's empty day.
-            today = _date.fromisoformat(str(as_of)[:10] if as_of else pacific_today())
-            age = (today - _date.fromisoformat(str(newest_date)[:10])).days
-        except ValueError:
+        # #2817: the tools run interactively in PT evenings, when a UTC "today" is tomorrow's
+        # empty day — the frame is the Pacific calendar day, and the parse is THE shared
+        # calendar-day parse (#3609: a new site gets the helper, not a registry row).
+        today = parse_day_key(str(as_of)[:10] if as_of else pacific_today())
+        newest = parse_day_key(str(newest_date)[:10])
+        if today is None or newest is None:
             return LAYER_UNKNOWN, f"newest record carries an unparseable date ({newest_date!r}); producer cadence cannot be checked"
+        age = (today - newest).days
         if age > 2 * cadence_days:
             return (
                 LAYER_DEGRADED,
