@@ -252,8 +252,40 @@ _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
 # no-double-counting invariant) — the per-coach queries just run concurrently,
 # projected down to the fields either surface actually reads.
 
+
 # Every top-level attribute the predictions/calibration/team surfaces consume;
 # aliased wholesale because some (status) are DynamoDB reserved words.
+def admit_sealed(predictions: list, limit: int) -> list:
+    """The newest `limit` calls, but never at the cost of a SEALED one (#3511).
+
+    Pure so the contract is testable without the handler: `predictions` is already
+    date-DESCENDING, and the return is the same rows in the same order, length
+    `min(limit, len(predictions))`.
+
+    WHY THIS EXISTS, MEASURED. #3511 box 4 asked that the projection carry
+    `pre_registered` and the ledger table render sealed vs unsealed. Both shipped and
+    the box was still vacuous in effect: a pre-registered bet is dated at GENESIS, so it
+    is the oldest thing in the season, and a newest-first `[:limit]` drops it first. Read
+    live on 2026-09-18 (cycle 17, Day 12), after the 16 stranded rows were restamped into
+    the season: `/api/predictions?limit=50` served 0 sealed rows and `?limit=200` served
+    16. The page requests no limit at all, so the provenance column rendered "in-cycle"
+    for every row and would have done so for the rest of the cycle.
+
+    The sealed set is bounded by the frozen artifact, so admitting all of it is bounded
+    work. Sealed rows displace the OLDEST in-cycle rows, never the newest, and a limit
+    below the sealed count degrades to sealed-only rather than dropping some silently.
+    """
+    if limit >= len(predictions):
+        return list(predictions)
+    sealed = [p for p in predictions if p.get("pre_registered")]
+    if not sealed:
+        return predictions[:limit]
+    rest = [p for p in predictions if not p.get("pre_registered")]
+    kept = rest[: max(0, limit - len(sealed))] + sealed[:limit]
+    kept.sort(key=lambda x: x.get("date", ""), reverse=True)
+    return kept[:limit]
+
+
 _PREDICTION_PROJECTION_FIELDS = (
     "status",
     "outcome",
@@ -829,7 +861,22 @@ def handle_predictions(event, *, _g):
         _order = {"confirmed": 0, "refuted": 0, "pending": 1, "inconclusive": 1, "observational": 2, "expired": 2}
         all_predictions.sort(key=lambda x: (_order.get(x.get("status"), 1), x.get("date", "")), reverse=False)
         all_predictions.sort(key=lambda x: x.get("date", ""), reverse=True)
-        all_predictions = all_predictions[:limit]
+        # #3511 RESIDUE — the seal is the OLDEST thing in the season, so a newest-first
+        # slice drops it first. Box 4 of the issue ("the ledger table renders sealed vs
+        # unsealed") was satisfied LITERALLY and vacuous in effect: the renderer shipped,
+        # the projection carried `pre_registered`, and the default `limit=50` still
+        # answered with 50 rows of which ZERO were sealed — every cycle-17 pre-registered
+        # bet is dated at genesis (2026-09-06) and by Day 12 there were 200 in-cycle calls
+        # ahead of it. Measured live 2026-09-18: `?limit=50` -> 0 sealed, `?limit=200` ->
+        # 16 sealed. A reader could not see which rows were pre-registered at any limit
+        # the page actually requested.
+        #
+        # The pre-registered set is BOUNDED by the frozen artifact (16 for cycle 17), so
+        # admitting all of it costs a bounded number of rows. The slice stays exactly
+        # `limit` long: sealed rows displace the OLDEST in-cycle rows, never the newest,
+        # and the date ordering the table renders is unchanged. A limit smaller than the
+        # sealed set degrades to "sealed rows only" rather than silently dropping some.
+        all_predictions = admit_sealed(all_predictions, limit)
 
         # Compute overall stats — season (unchanged shape) + career (#1376).
         total = sum(c["total"] for c in by_coach.values())
