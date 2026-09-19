@@ -1,15 +1,15 @@
-# Handover — Session AL: the Fable drain — 24 closed, 10 filed, and the two reds the merge posture bought (2026-09-19 15:41Z → 23:1xZ)
+# Handover — Session AL: the Fable drain — 25 closed, 10 filed, and the two reds the merge posture bought (2026-09-19 15:41Z → 23:1xZ)
 
 **Driver:** Fable 5.1, autonomous drain. Owner brief: drive the DEBT COUNT (Now+Next+Later + the milestone-less epics = 84) as low
 as it honestly goes; 40 the stretch, ~60–65 the plan's own honest landing; standing merge + deploy authority (CDK included);
 auto-merge on the two REQUIRED checks only, deploy via `deploy_fleet.sh` from origin/main after each wave, REJECT every CI lease by
 name; no `--deliver`. Plan: `~/.claude/plans/elegant-wobbling-beacon.md`. Owner answered the §2 sheet in-session (11 + 4 prompts).
 
-**105 → 91 open, measured two ways (`search total_count` AND a paginated id-set, agreeing). 24 closed, 10 filed, net −14.**
-Debt count 84 → 75 (Now 27 / Next 16 / Later 32; the 12 milestone-less epics were milestoned in Wave 0 and are inside those
+**105 → 90 open, measured two ways (`search total_count` AND a paginated id-set, agreeing). 25 closed, 10 filed, net −15.**
+Debt count 84 → 74 (Now 27 / Next 15 / Later 32; the 12 milestone-less epics were milestoned in Wave 0 and are inside those
 numbers); Roadmap 21 → 16 (five retirements on the owner's word). **Owner-sheet closures 9** (3716 3771 2883 3042 + Roadmap 1677
-1629 1570 1388 1407) · **engineering closures 15** (3614 3750 epic 3491 3731 3677 3692 3513 3877 3816 3769 3603 3543 3817 3717 3546).
-**21 PRs merged** (#3889–#3912 minus the open #3908, plus #3913–#3920 are issues), **4 fleet-class deploys** (3 `deploy_fleet.sh`
+1629 1570 1388 1407) · **engineering closures 16** (3614 3750 epic 3491 3731 3677 3692 3513 3877 3816 3769 3603 3543 3817 3717 3546 3608).
+**22 PRs merged** (#3889–#3912 and #3921; #3913–#3920 are issues), **4 fleet-class deploys** (3 `deploy_fleet.sh`
 runs, 106/106 each; 4 MCP deploys; four stacks redeployed by hand via `cdk_deploy.sh`: Email/Operational/Ingestion for #3890's SSM grant, Serve for #3895's salt
 grant), 1 auto site-deploy with the visual gate GREEN (build 7058541), **15 leases REJECTED by name**, 0 approved. Short of 40 by
 the plan's own arithmetic, not by a shortfall of work; the reason 60–65 was not reached either is the through-line below.
@@ -106,9 +106,7 @@ edit beside it — the #3888 sweep lesson, one file wide, and I did it once befo
 
 ## Residual / next picks
 
-- **#3908** (lane G, 3608) — all five boxes paid on the branch, rebased on #3912's fix, paying `check_main_green.py`'s 1114-line
-  overrun by extraction at wrap time; merge + verify each box on the next main run (the parity step and the wall-clock notice are
-  the live outputs). Then `python3 deploy/write_lane_posture.py --measure` joins the wrap ritual (#3608).
+- **3608 closed post-wrap** on its live CI outputs (the `lane-wallclock` notice at 977s on run 35471979963; the parity step on main's run 35471328402) — `python3 deploy/write_lane_posture.py --measure` joins the wrap ritual — not-work — a `/wrap` skill line for the next wrap.
 - **#3900** — the 4 tagger-blind families; the next nightly's line (`35 row(s) across 4 of 37`) is its baseline.
 - **#3646** — the system-model gate's `pending-reconcile` verdict (box 2's remaining member).
 - **#3654** — box 4 (owner's choice above). **#3620** — box 1's `ci-cd.yml` host.
@@ -139,8 +137,8 @@ delta hold is the calendar's own sanctioned shape (#3250 precedent).
 **Incidents:** 1 row added — the merge posture's two self-inflicted full-suite reds (~2h, no reader impact).
 **Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢.
 **Closures:** 3716, 3771, 2883, 3042, 1677, 1629, 1570, 1388, 1407, 3614, 3750, 3491, 3731, 3677, 3692, 3513, 3877, 3816, 3769,
-3603, 3543, 3817, 3717, 3546 commented, each with an ADR-099 `**Outcome:**` verdict and, on the instrument issues, a `**Live proof:**`
-instant · DoD: `closure_sweep.py --session` scanned 30, hits 0, findings 0 (after one round of rewording four verdicts whose
+3603, 3543, 3817, 3717, 3546, 3608 commented, each with an ADR-099 `**Outcome:**` verdict and, on the instrument issues, a `**Live proof:**`
+instant · DoD: `closure_sweep.py --session` scanned 31, hits 0, findings 0 (after one round of rewording four verdicts whose
 residuals lacked a carrier — the same treadmill as AK, three rounds fewer).
 **Backlog:** Now live at 3 (floor 3; fable lane 3 startable, opus 4, sonnet 1); no stale Later issues; `now_liveness` not firing.
 **Alarms:** 0 uncited — every alarm red >72h cites an open issue; `qa-smoke-warnings`' chronic clause re-cited to #3900 with the

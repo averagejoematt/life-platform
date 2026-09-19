@@ -211,13 +211,13 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-19 (Fable 5.1, **Session AL — the Fable drain: 24 closed, 10 filed, and the two reds the merge posture bought**;
+**Verified:** 2026-09-19 (Fable 5.1, **Session AL — the Fable drain: 25 closed, 10 filed, and the two reds the merge posture bought**;
 owner brief *"drive the DEBT COUNT as low as it honestly goes"*, autonomous, standing merge+deploy authority incl. CDK, auto-merge on the two
 REQUIRED checks only, deploy via `deploy_fleet.sh`, reject every lease, **no `--deliver`**, target 84 → 60–65 honest / 40 stretch).
-**105 → 91 open, measured two ways (search `total_count` AND a paginated id-set, agreeing): 24 closed (9 on the owner's in-session
-answers to the §2 sheet, 15 on engineering evidence), 10 filed (2 lane finds + 8 residuals), 21 PRs merged, 3 fleet deploys (106/106 each,
+**105 → 90 open, measured two ways (search `total_count` AND a paginated id-set, agreeing): 25 closed (9 on the owner's in-session
+answers to the §2 sheet, 16 on engineering evidence), 10 filed (2 lane finds + 8 residuals), 21 PRs merged, 3 fleet deploys (106/106 each,
 verified by shipped content), 4 MCP deploys, four stacks redeployed by hand via `cdk_deploy.sh`, 1 auto site-deploy green, 15 leases REJECTED by name, 0 approved.**
-Debt count 84 → 75; Roadmap 21 → 16. **The through-line:** auto-merge on the required lane let 21 PRs land in 8h, and the full suite,
+Debt count 84 → 74; Roadmap 21 → 16. **The through-line:** auto-merge on the required lane let 21 PRs land in 8h, and the full suite,
 running post-merge, caught what the lane could not — twice (F's tests keyed on the CI EVENT passed under `pull_request` and failed on
 main's `push`; H's new module tripped a full-suite-only ratchet) — both fixed forward by their lanes; nine of fourteen engineering
 closures needed a second CI round the lane's targeted tests could not see. **Findings:** the widened phase-stamp audit's first nightly
@@ -232,5 +232,4 @@ today's statement EXTENDED it to 2021-04-12 → 2026-09-19) · `agent_commit.sh`
 legitimately carries the sync output · filed member counts were low again in both directions (3513: 6 → 120; 3543: 8 → 10 pages; 3620:
 2 → 6 doors; 3677: 1 fix → 0). **Owner acts:** 3770 · 1738 · 1571 (left open on today's answers) · 3654 box 4 (a `site-shell` injection
 lever or an attended rollback run) · 3918's key collision · 3741 (0 posted; a parallel posting-session prompt was handed over) · the 5
-`acceptance_count` violations (3607 3611 3615 3617 3621). **Open at wrap:** #3908 (lane G, 3608 — all five boxes on the branch, paying a
-1114-line overrun by extraction). **Final measured: 91 open.**
+`acceptance_count` violations (3607 3611 3615 3617 3621). **Post-wrap:** 3608 closed on its live CI outputs (#3908 merged). **Final measured: 90 open.**
