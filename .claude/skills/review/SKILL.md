@@ -81,10 +81,18 @@ queue before filing or shipping.
    lens's review-batch idempotency set. The label scheme and the exact reconcile query are the
    `issue-filer` contract's, not this file's — read them there and run the reconcile in Phase 0,
    so a duplicate filing is impossible by the time Phase 4 starts.
-5. Load the previous run's artifact for this lens (the rubric names the filename). Reuse its
-   `rubric_anchors` **verbatim** and cite which artifact each came from; anchors may be *extended*
-   (a new A-criterion, stated as new), never silently redefined — silently redefining one makes
-   the trend line a lie.
+5. **Freeze the anchors, and say what you froze (#3603).** Load the previous run's artifact for
+   this lens (the rubric names the filename) and reuse its `rubric_anchors` **verbatim**, citing
+   which artifact each came from. Then run
+   `python3 scripts/review_anchors.py --freeze --lens <lens>` and paste the `anchor_freeze` block
+   into this run's grades JSON **before any grading starts**. The anchors are now fixed for the
+   run: they may not be extended, narrowed or reworded while it is in flight. This reverses what
+   this file used to sanction — "anchors may be *extended*" — and the reversal is the finding:
+   on the 2026-09-05 baseline every one of the panel's anchors was extended by the run that
+   graded against it, so a dropped grade cannot be separated from a raised bar, and the trend
+   line (the only reason to grade) stops meaning anything. Extend an anchor **between** runs, by
+   PR, where the change is a reviewable dated diff. A later run that grades against different
+   anchors gets a different fingerprint and must say so in its `method`.
 6. Write the **shared context block** every lens brief will carry verbatim: the platform
    one-paragraph + experiment day N of cycle N; the budget tier and what it pauses; the
    **intentional-emptiness manifest** (post-reset, which surfaces are empty *by design* per
@@ -136,6 +144,31 @@ supporting findings were refuted must be re-derived before the scorecard.
 A smaller run does not license skipping this. A delta's smaller n makes one false positive a
 *bigger* share of the result, not a smaller one.
 
+**Planted controls — the run's own negative control (#3603).** Verification with no control
+cannot tell a strict pass from a sleeping one: the refutation rate fell by four fifths between
+two runs and nothing in either artifact could say which had happened. So every run plants its
+own controls and reports whether they fired:
+
+- **Into each verifier batch, plant a false finding or two** — a *true* property of the system
+  written up as though it were a defect, in the batch's own voice, indistinguishable in shape
+  from its neighbours. Keep the planted list out of the verifier's brief and in the run's notes.
+  A verifier that returns CONFIRMED on a planted false finding has failed the control.
+- **Withhold a known issue or two from the graders** — real open issues in that lens's area,
+  removed from the do-not-refile list so the grader has a fair chance to find them. A grader row
+  that misses every withheld issue in its own area has failed the control.
+- **Record the outcome in the artifact**, in a `calibration` block:
+  `{planted_false_findings: {n, confirmed_by_verifiers: [...]}, withheld_known_issues: {n,
+  found: [...], missed_by_graders: [...]}, verdict: "CALIBRATED" | "UNCALIBRATED"}`. Name each
+  planted item so a reader can check the claim.
+- **An UNCALIBRATED run does not reset the calendar clock.** `scripts/operating_calendar.py`
+  reads that block (`calibrated_run`) and skips the artifact, so the lens still counts down
+  toward DUE. A run whose instruments were asleep is not evidence that the ritual happened —
+  and its findings are still filed, because a false negative in the verifiers says nothing about
+  the findings that did survive.
+- **A planted control that is never confirmed is not proof the verifiers are awake** — it is one
+  sample. Vary what you plant; a control that looks the same every run is one the ritual learns
+  by shape.
+
 ## Phase 3 — The scorecard
 
 Every lens writes two artifacts, and **the filenames are a contract** — the operating calendar's
@@ -143,9 +176,12 @@ dead-man probes them by name, so a run whose artifact lands somewhere else reads
 never happened. The rubric names its exact pair.
 
 - **Grade table**: area · grade · one-line justification · **trend vs the previous run**.
-- **Machine-readable grades** (`{date, run_id, method, headline, lenses{…}}`) — this file IS the
-  comparability mechanism: the next run loads it, reuses its rubric anchors, and diffs grades
-  mechanically.
+- **Machine-readable grades** (`{date, run_id, method, headline, anchor_freeze, calibration,
+  lenses{…}}`) — this file IS the comparability mechanism: the next run loads it, reuses its
+  rubric anchors, and diffs grades mechanically. `anchor_freeze` is the Phase-0 block verbatim
+  (what this run graded against, fingerprinted at its own sha — `anchor_drift()` in
+  `scripts/review_anchors.py` is the read-back); `calibration` is the planted-control result
+  from Phase 2. A run missing either is a run whose numbers nobody can check.
 - **Remediation ledger to A**: per area, ranked — root cause, fix, A/B class, regression guard,
   effort (S/M/L), milestone. Cap ~5 actions per area; a 200-item ledger nobody burns down is a
   failed review.
@@ -172,6 +208,11 @@ where a contract goes to drift. If the contract needs to change, change it in th
 - Only a genuine **won't-do** verdict goes to the run's parked-register section (and the standing
   register in `docs/reviews/PLATFORM_PRODUCT_REVIEW_2026-07.md`) instead of being filed. An item
   that merely needs a human act is still filed — the contract stamps it, it never skips it.
+- **Every B-class path-to-A item is filed OR explicitly declined with a written reason (#3603) —
+  never silently dropped, and never mandatory-filed.** Mandatory filing buys a corpus of process
+  stories nobody ranked; silent dropping is how a path-to-A ledger rots into decoration. The
+  disposition line for each B item names which it was and why, so the next delta's "unresolved"
+  rule and the closure contract can both see it.
 - **Implementation is not this ritual's job.** The filed backlog feeds `/uplevel` and
   worktree-implementer sessions. Ship only with explicit in-session authorization; if authorized,
   run it like a paydown session (worktree fan-out on independent Now stories, serial
@@ -185,6 +226,8 @@ A `/review` run succeeds when: (1) every confirmed finding traces to reproduced 
 current tree or the live surface, not best-practice lore; (2) each recommendation survives the
 ADR-103 solo-operator rent test; (3) at least one deliberate posture is confirmed as correct and
 named; (4) the grade table is honest enough that a stranger could dispute it with evidence; (5)
-the machinery is stronger at wrap than at start; and (6) **the artifact landed under the exact
-filename the rubric names**, because that filename is the only thing that tells the operating
+the machinery is stronger at wrap than at start; (6) **the run's planted controls are reported,
+and its anchor-freeze block is in its artifact** — a run that cannot say whether its verifiers
+were awake, or what text it graded against, has produced letters rather than measurements; and
+(7) **the artifact landed under the exact filename the rubric names**, because that filename is the only thing that tells the operating
 calendar the ritual actually ran.
