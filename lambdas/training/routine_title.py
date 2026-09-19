@@ -181,35 +181,12 @@ def count_distinct_performed(performed: list[dict[str, Any]]) -> int:
     return len({str(w.get("workout_uid") or w.get("date")) for w in performed})
 
 
-def counter_anchor(candidate: Any) -> str:
-    """Floor a counter's start date at EXPERIMENT_START_DATE. Pure — no I/O.
-
-    #3670 box 4. Every date these counters open on must come from, or be bounded
-    by, the one anchor a reset actually regenerates. `current_started` lives in
-    `config/training_phases.json`, which `restart_pipeline.py` does not own and
-    the Lambda bundle does not ship (the runtime reads the S3 copy) — so a value
-    from the PREVIOUS cycle survives a reset by default and the counter silently
-    counts pre-genesis sessions. `Foundation - Push - 3 - 11` on day 1 of cycle
-    17 was exactly that. #3671 deleted Y's second copy; this is the other half:
-    whatever the config holds, the code cannot reach behind genesis.
-
-    The phase NAME still spans cycles (the owner advances it by hand and a reset
-    deliberately leaves it alone) — only the counter's WINDOW is floored. A
-    `current_started` on/after genesis is honoured unchanged, which is why this
-    is a no-op against today's config and bites only on the next reset.
-    """
-    if not candidate:
-        return EXPERIMENT_START_DATE
-    return max(str(candidate), EXPERIMENT_START_DATE)
-
-
 def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
     """Compose the title-context dict (work order 2026-06-16 — supersedes the
     2026-05-31 ADR-067 amendment).
 
     N — performed workouts of THIS type since the current phase started
-        (phase_started_date, floored at EXPERIMENT_START_DATE — see
-        counter_anchor, #3670), +1. Resets when the phase advances; a
+        (phase_started_date), +1. Resets when the phase advances; a
         planned-but-skipped session never inflates it (we count performed, not
         pushed). Type is resolved via resolve_archetype (no title parsing).
     Y — performed workouts since EXPERIMENT_START_DATE, +1. Honest,
@@ -230,10 +207,12 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
     """
     state = load_phase_state()
     phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
-    # Both windows are floored at genesis (#3670). `reset_epoch` has been derived
-    # rather than read since #3671; `phase_started` is still config-held — the
-    # floor is what makes a stale copy of it unable to move a counter.
-    phase_started = counter_anchor(state.get("current_started"))
+    # N's window is the config's `current_started`, DELIBERATELY not floored at
+    # genesis: the owner's ruling recorded on #3671 is that a phase advances only
+    # when he says so, so a pre-genesis anchor is the real start of a phase he has
+    # not advanced — "Pull #3 of Foundation" is the answer he asked N for, even
+    # where Foundation spans two cycles. Only Y is reset-relative (#3671).
+    phase_started = state.get("current_started") or EXPERIMENT_START_DATE
     reset_epoch = EXPERIMENT_START_DATE
 
     # Load the index from the earlier of the two windows so an early performed

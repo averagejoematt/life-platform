@@ -10,31 +10,17 @@ Verifies:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
 from unittest.mock import patch
 
 import pytest
-from common.constants import EXPERIMENT_START_DATE
 from training import routine_title as rt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 
-def _day(offset: int) -> str:
-    """A date `offset` days after genesis, as an ISO string.
-
-    The counter fixtures below are genesis-RELATIVE since #3670: `build_title_context`
-    floors both counter windows at EXPERIMENT_START_DATE, so a fixture pinned to a
-    literal pre-genesis date no longer exercises the path it names — it silently
-    measures the floor instead. Deriving from the constant also means the next reset
-    moves these fixtures with it rather than reding them.
-    """
-    return (date.fromisoformat(EXPERIMENT_START_DATE) + timedelta(days=offset)).isoformat()
-
-
-def _ir(archetype="upper", variant="ideal", target_date=None, rationale=None) -> RoutineSpec:
+def _ir(archetype="upper", variant="ideal", target_date="2026-06-15", rationale=None) -> RoutineSpec:
     return RoutineSpec(
         routine_id="r-1",
-        target_date=target_date or _day(-1),
+        target_date=target_date,
         archetype=archetype,
         variant=variant,
         exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
@@ -108,11 +94,11 @@ def test_why_note_floor_variant_is_explicit():
 # `reset_epoch_date` and prove it is ignored — see the negative control below.
 
 
-def _phase_state(current="Foundation", started=None, reset=None):
+def _phase_state(current="Foundation", started="2026-06-16", reset=None):
     state = {
         "phases": ["Foundation", "Build", "Forge", "Sustain"],
         "current": current,
-        "current_started": started or _day(0),
+        "current_started": started,
     }
     if reset is not None:
         state["reset_epoch_date"] = reset
@@ -120,20 +106,20 @@ def _phase_state(current="Foundation", started=None, reset=None):
 
 
 def test_build_context_n_and_y_from_performed():
-    """Seed scenario: one performed 'upper' on genesis day; index has a matching
+    """Seed scenario: one performed 'upper' on 2026-06-16; index has a matching
     pushed routine. Next 'upper' → N=2, Y=2."""
-    performed = [{"date": _day(0), "workout_uid": "hevy:a"}]
-    index = [{"archetype": "upper", "target_date": _day(0), "variant": "ideal"}]
+    performed = [{"date": "2026-06-16", "workout_uid": "hevy:a"}]
+    index = [{"archetype": "upper", "target_date": "2026-06-16", "variant": "ideal"}]
     with (
         patch.object(rt, "load_phase_state", return_value=_phase_state()),
         patch.object(rt, "_query_performed", return_value=performed),
         patch.object(rt, "_load_routine_index", return_value=index),
     ):
-        ctx = rt.build_title_context(_ir(archetype="upper", target_date=_day(1)))
+        ctx = rt.build_title_context(_ir(archetype="upper", target_date="2026-06-17"))
     assert ctx["type_count_in_phase"] == 2
     assert ctx["all_time_count"] == 2
     assert ctx["phase"] == "Foundation"
-    assert ctx["phase_started"] == _day(0)
+    assert ctx["phase_started"] == "2026-06-16"
     # Derived, not configured (#3671) — compare against the constant, never a literal,
     # or this assertion becomes the twelfth thing a reset has to remember to edit.
     assert ctx["reset_epoch"] == rt.EXPERIMENT_START_DATE
@@ -142,14 +128,14 @@ def test_build_context_n_and_y_from_performed():
 def test_build_context_first_of_type_is_n1_but_y_tracks_total():
     """A 'lower' with no prior performed lowers → N=1, but Y still counts all
     performed workouts (here one upper) → Y=2."""
-    performed = [{"date": _day(0), "workout_uid": "hevy:a"}]
-    index = [{"archetype": "upper", "target_date": _day(0), "variant": "ideal"}]
+    performed = [{"date": "2026-06-16", "workout_uid": "hevy:a"}]
+    index = [{"archetype": "upper", "target_date": "2026-06-16", "variant": "ideal"}]
     with (
         patch.object(rt, "load_phase_state", return_value=_phase_state()),
         patch.object(rt, "_query_performed", return_value=performed),
         patch.object(rt, "_load_routine_index", return_value=index),
     ):
-        ctx = rt.build_title_context(_ir(archetype="lower", target_date=_day(2)))
+        ctx = rt.build_title_context(_ir(archetype="lower", target_date="2026-06-18"))
     assert ctx["type_count_in_phase"] == 1
     assert ctx["all_time_count"] == 2
 
@@ -157,20 +143,17 @@ def test_build_context_first_of_type_is_n1_but_y_tracks_total():
 def test_build_context_n_resets_on_phase_advance():
     """Advancing the phase (bump current_started) windows N to the new phase, so
     pre-advance performed workouts no longer count toward N — N resets to 1."""
-    # phase started on genesis+30; the only performed work is BEFORE that window, so
-    # _query_performed(phase_started) returns nothing → N=1. Y uses the reset epoch.
-    # Both dates are on/after genesis so the #3670 floor is inert here — this test
-    # is about the phase window, and a pre-genesis `started` would be floored away
-    # and leave it measuring nothing.
+    # phase started 2026-08-01; the only performed work is BEFORE that window, so
+    # _query_performed(phase_started) returns nothing → N=1. Y uses reset epoch.
     with (
-        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build", started=_day(30))),
+        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Build", started="2026-08-01")),
         patch.object(
             rt,
             "_query_performed",
-            side_effect=lambda start: [] if start == _day(30) else [{"date": _day(1), "workout_uid": "hevy:a"}],
+            side_effect=lambda start: [] if start == "2026-08-01" else [{"date": "2026-06-16", "workout_uid": "hevy:a"}],
         ),
         patch.object(rt, "_load_routine_index", return_value=[]),
     ):
-        ctx = rt.build_title_context(_ir(archetype="upper", target_date=_day(31)))
+        ctx = rt.build_title_context(_ir(archetype="upper", target_date="2026-08-02"))
     assert ctx["type_count_in_phase"] == 1  # N reset by the new phase window
     assert ctx["all_time_count"] == 2  # Y still counts the pre-advance workout

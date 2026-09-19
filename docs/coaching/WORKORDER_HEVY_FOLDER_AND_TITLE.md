@@ -188,14 +188,16 @@ rather than hiding it); `ensure_folder` refuses to create out of a truncated lis
 the miss like any other. `_action_archive` carried the same page-1-only scan and now routes
 through `ensure_folder`.
 
-**The N anchor is now floored, superseding the `Foundation - Push - 3 - 1` expectation above.**
-`routine_title.counter_anchor()` bounds every counter window at `EXPERIMENT_START_DATE`, so a
-`current_started` left behind by a reset cannot move a counter. The phase NAME still spans
-cycles untouched — the owner advances `current` by hand and a reset deliberately does not — and
-a `current_started` on/after genesis is passed through unchanged, so a mid-cycle phase advance
-still windows N. This is a **no-op against today's config** (`current_started` == genesis); it
-exists so the NEXT reset needs no config edit, which is #3670's box 4 verbatim. Two expectations
-in `tests/test_routine_title_y_anchor_3671.py` moved with it and say so inline.
+**#3670 box 4 is NOT fully payable as written, and N is unchanged.** Its wording — "the title
+counters cannot reach behind `EXPERIMENT_START_DATE`" — is plural, but the owner ruled the
+opposite for N on #3671 (2026-09-06): *the reset zeroes Y, and the phase advances only when he
+says so, so N answers "Pull #3 of Foundation" even where Foundation spans two cycles.* A
+pre-genesis `current_started` is therefore not stale — it is the real start of a phase he has
+deliberately not advanced. Y is already reset-relative by derivation (#3671), which is the half
+of box 4 that was genuinely broken. A floor on N was implemented in this lane, reviewed against
+the ruling, and **reverted**; `build_title_context` carries a comment recording why. The open
+question — whether #3670's plural wording was meant to revisit the N ruling — is the owner's,
+not this lane's, and the `Foundation - Push - 3 - 1` expectation above still stands.
 
 **Still open:** box 1's live leg — a fresh `draft_custom → commit` landing in its type folder,
 with the routine's `folder_id` non-null — is an owner-side run against the live Hevy account.
