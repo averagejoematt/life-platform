@@ -215,7 +215,24 @@ BASELINE = {
     # count, and restructuring the one module the MCP Lambda boots from — unattended, on a
     # stacked branch — is a materially worse risk than the 60 lines it would reclaim. The
     # extraction is real debt and is filed as such, not absorbed silently.
-    "mcp/registry.py": 2453,
+    # 2026-09-19 (#3692): 2453 -> 2130, PAID BY EXTRACTION rather than raised. The two
+    # raises above left this file at 2453/2453 — zero headroom — which is the state the
+    # issue was filed for: the registry could not accept ANY new tool, and the two obvious
+    # routes (schema to a sibling, `**TOOLS_OTHER` merge) are both blocked by guards that
+    # are correct. What moved instead is the one part of an entry that is not dispatch: the
+    # model-facing selection prose, 81 of 83 descriptions, to mcp/tools_descriptions.py as
+    # module-level UPPERCASE constants referenced by name. That shape is not invented — it
+    # is the existing GET_BENCHMARK_DESCRIPTION precedent and the literal instruction
+    # scripts/generate_mcp_tool_catalog.py raises on an unresolvable name, so the catalog
+    # rebuilds byte-identical and none of the three AST discoverers named above sees a
+    # change: TOOLS is still ONE literal whose values still carry an inline `schema` with
+    # an inline `name`. Measured 2106 after the extraction AND after adding
+    # get_platform_state (#3691's conversational half, +24). The recorded number is 2130,
+    # i.e. measured + one tool entry's worth of room: a ceiling with literally zero
+    # headroom IS the defect this issue names, and recreating it would only move the same
+    # wall one tool to the right. The addition after that pays the same way — `inputSchema`
+    # is 1,335 physical lines of this file and no guard reads it either.
+    "mcp/registry.py": 2130,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict
