@@ -237,6 +237,7 @@ STRANDED_APPROVAL = "stranded-approval"
 STRANDED_PLAN = "stranded-plan"
 STRANDED_DEPLOY_WEDGE = "stranded-deploy-wedge"
 NO_VERDICT = "no-verdict"
+MISSING_JOB = "missing-job"  # #3608 box 2: an EXPECTED job never attached to the run.
 
 
 def _parse_iso(ts: str | None) -> datetime | None:
@@ -389,6 +390,120 @@ def ci_cd_push_paths(yaml_text: str) -> list[str]:
         on = doc.get(True)
     push = (on or {}).get("push") or {}
     return [p for p in (push.get("paths") or []) if isinstance(p, str)]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #3608 box 2 — the EXPECTED job set, and the absence nobody could see.
+#
+# Every verdict above classifies a job that RAN. A job that never ATTACHED — a
+# path-filter miss, a job-level `if:` that stopped evaluating true, a workflow
+# edit that deleted the job — produces no record to classify, so the run rolls
+# up `success` and this gate reported GREEN. Session W lost hours to exactly
+# that shape (a Deploy that was stranded rather than failed): absence reads as
+# "no signal", and no signal reads as fine.
+#
+# The derivation is `deploy/sentinel_github.py`'s PUSH_TRIGGER_GLOBS (parity-
+# tested against the live workflow filters in tests/test_drift_sentinel.py) for
+# "is this commit in scope at all", and ci-cd.yml's OWN job block for "which
+# jobs should therefore exist". Both are read from the tree, never typed here:
+# a job added to ci-cd.yml is expected from the moment it is added.
+#
+# Which jobs count as expected, stated honestly:
+#   * a job with a job-level `if:` is EXCLUDED — it is conditional by
+#     construction (deploy, post-deploy-checks, the two rollback/notify jobs),
+#     and a conditional job that does not attach is the design working.
+#   * a job WITHOUT an `if:` is expected unconditionally. `needs:`-chaining does
+#     not excuse it: when an upstream job is skipped, GitHub still emits the
+#     downstream job with conclusion `skipped`, so it is PRESENT in the jobs
+#     list. Absence therefore means the job never entered the run at all.
+#   * a job that `uses:` a reusable workflow reports as `<job-id> / <inner job
+#     name>` (this is why the live name is `test / Unit Tests`, not `test`), so
+#     presence is matched on the `<job-id> / ` PREFIX as well as on equality.
+
+
+def ci_cd_expected_jobs(yaml_text: str) -> dict[str, str]:
+    """{job_id: display name} for every job ci-cd.yml declares WITHOUT a
+    job-level `if:`.
+
+    The display name matters: a job with a `name:` key reports under THAT
+    string, not under its id (`reconcile` reports as "Reconcile derived
+    artifacts"), so a matcher that only knew ids would call every named job
+    absent and red every run. Both spellings are carried and both are accepted
+    by `absent_expected_jobs`. Pure — parses
+    caller-supplied YAML text so it is testable against a frozen fixture, the
+    same discipline `ci_cd_push_paths` above uses (including its `on:`-is-True
+    gotcha, which does not arise here but would if this ever read triggers)."""
+    import yaml  # local: keeps the module importable where PyYAML is absent
+
+    try:
+        doc = yaml.safe_load(yaml_text) or {}
+    except yaml.YAMLError:
+        return {}
+    jobs = doc.get("jobs") or {}
+    if not isinstance(jobs, dict):
+        return {}
+    out: dict[str, str] = {}
+    for job_id, spec in jobs.items():
+        if not isinstance(spec, dict) or spec.get("if"):
+            continue
+        name = spec.get("name")
+        out[str(job_id)] = str(name) if isinstance(name, str) and name else str(job_id)
+    return out
+
+
+def load_ci_cd_expected_jobs(repo_root: str | None = None) -> dict[str, str]:
+    """`ci_cd_expected_jobs` over the real workflow file. Returns an empty set
+    if the file is unreadable — the caller treats an empty expected set as "no
+    absence claim", never as "nothing is expected, so everything is fine"."""
+    path = os.path.join(repo_root or _REPO_ROOT, ".github", "workflows", CI_CD_WORKFLOW_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return ci_cd_expected_jobs(f.read())
+    except OSError:
+        return {}
+
+
+def commit_is_in_push_trigger_scope(changed_paths: list[str]) -> bool:
+    """True if any changed path matches a push-workflow trigger glob — the
+    #3608 derivation the issue names, read from deploy/sentinel_github.py's
+    PUSH_TRIGGER_GLOBS rather than restated here.
+
+    Since #3378 ci-cd.yml carries no `paths:` filter, so it contributes the
+    universal `**` glob and this is True for every real commit. That is the
+    POINT: with ci-cd unfiltered, "the job is absent" can no longer be excused
+    as an ordinary path-filter skip. It is kept as a function (rather than
+    assumed) so that reintroducing a filter on ci-cd.yml narrows this gate
+    automatically instead of turning it into a false-alarm generator.
+    """
+    if not changed_paths:
+        return False
+    sys.path.insert(0, os.path.join(_REPO_ROOT, "deploy"))
+    try:
+        import sentinel_github  # noqa: E402
+    except ImportError:
+        return True  # cannot derive → do not suppress the absence check
+    return any(sentinel_github._matches_push_trigger(p) for p in changed_paths)
+
+
+def absent_expected_jobs(jobs: list[dict] | None, expected: dict[str, str] | None) -> list[str]:
+    """Expected jobs with NO record in the run's job list, by job id.
+
+    `jobs` is the `gh api .../jobs` shape (each entry has a `name`). An expected
+    job is PRESENT if some job's name equals its id, equals its declared display
+    name, or begins `"<id> / "` (how a job that `uses:` a reusable workflow
+    renders — `test / Unit Tests`). `None` for either argument means "not
+    probed" → no claim, which is deliberately different from "probed and found
+    nothing": a gate that cannot see must not mint a verdict.
+    """
+    if not expected or jobs is None:
+        return []
+    names = [(j.get("name") or "") for j in jobs]
+    missing = []
+    for job_id, display in sorted(expected.items()):
+        if any(n == job_id or n == display or n.startswith(f"{job_id} / ") for n in names):
+            continue
+        missing.append(job_id)
+    return missing
 
 
 def _pattern_to_regex(pattern: str) -> re.Pattern:
@@ -660,6 +775,9 @@ def classify_pipeline(
     rejected: list[dict] | None = None,
     cancelled_verdicts: dict | None = None,
     cancelled_notes: list[dict] | None = None,
+    completed_jobs: list[dict] | None = None,
+    expected_jobs: dict[str, str] | None = None,
+    changed_paths: list[str] | None = None,
 ) -> dict:
     """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
@@ -705,8 +823,19 @@ def classify_pipeline(
     else:
         kind = RED
 
+    # #3608 box 2: an EXPECTED job that never attached outranks a `success`
+    # rollup. Only applied to an otherwise-GREEN verdict — a run already
+    # classified red/stranded has a louder finding, and re-labelling it would
+    # lose that finding's recovery instructions.
+    missing_jobs: list[str] = []
+    if kind == GREEN and (changed_paths is None or commit_is_in_push_trigger_scope(changed_paths)):
+        missing_jobs = absent_expected_jobs(completed_jobs, expected_jobs)
+        if missing_jobs:
+            kind = MISSING_JOB
+
     return {
         "kind": kind,
+        "missing_jobs": missing_jobs,
         "sha": (completed or {}).get("headSha"),
         "run": completed,
         "waiting": waiting,
@@ -779,6 +908,23 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             "   run, re-dispatches ci-cd.yml with deploy_all=true — a dispatch carries no push\n"
             "   diff, so change detection would otherwise deploy nothing). Do NOT salt the\n"
             "   concurrency group: three salts failed across recurrences 1-3 (CONVENTIONS §4d)."
+        )
+        return 1, "\n".join(lines + notices)
+
+    if kind == MISSING_JOB:
+        lines.append(
+            f"🛑 EXPECTED JOB ABSENT (#3608 box 2) — run {(state.get('run') or {}).get('databaseId')} sha {sha8} "
+            "rolled up `success` with a required job that NEVER ATTACHED:"
+        )
+        for job_id in state.get("missing_jobs", []):
+            lines.append(f"   `{job_id}` is declared in {CI_CD_WORKFLOW_FILE} with no job-level `if:` and produced no job record.")
+        lines.append(
+            "   A green rollup over an absent job is not a green main — nothing ran to fail.\n"
+            "   Causes, in likelihood order: a `paths:` filter was (re)introduced on ci-cd.yml or\n"
+            "   on the reusable workflow the job calls; a job-level `if:` was added; the job was\n"
+            "   renamed or deleted in the same push whose run this is.\n"
+            "   Read the run's job list (`gh run view <id> --json jobs`) against\n"
+            f"   `.github/workflows/{CI_CD_WORKFLOW_FILE}`'s jobs block before declaring main green."
         )
         return 1, "\n".join(lines + notices)
 
@@ -1035,6 +1181,22 @@ def main() -> int:
             f"⚠️  check_main_green: deploy-wedge detection unavailable ({e}) — run scripts/check_deploy_wedge.py by hand if a deploy looks stuck."
         )
 
+    # #3608 box 2: the winning run's OWN job list, so an EXPECTED job that never
+    # attached cannot hide behind a `success` rollup. Probed only for the run the
+    # walk selected (one extra `gh run view`), and only consulted when that run
+    # is otherwise green — a red already carries a louder finding.
+    winner = latest_completed_run(
+        runs,
+        rejected_ids={(e.get("run") or {}).get("databaseId") for e in rejected},
+        cancelled_verdicts=cancelled_verdicts,
+    )
+    winner_jobs = None
+    if winner is not None and winner.get("conclusion") == "success":
+        try:
+            winner_jobs = civ.fetch_run_jobs(_gh_json, REPO, winner.get("databaseId"))
+        except Exception as e:  # noqa: BLE001 — unreadable jobs means NO absence claim, never a false green-over-absence
+            print(f"⚠️  check_main_green: could not read jobs for the winning run ({e}) — absent-job check skipped (#3608).")
+
     state = classify_pipeline(
         runs,
         latest_failure_jobs=jobs,
@@ -1042,6 +1204,8 @@ def main() -> int:
         rejected=rejected,
         cancelled_verdicts=cancelled_verdicts,
         cancelled_notes=cancelled_notes,
+        completed_jobs=winner_jobs,
+        expected_jobs=load_ci_cd_expected_jobs(),
     )
     # #2762: the verdict must vouch for the sha main actually points at — read the
     # REMOTE head (never the local checkout, which may be stale or on a branch).
