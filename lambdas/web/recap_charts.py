@@ -98,7 +98,9 @@ def draw_sparkline(
         draw.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=colour)
         # The newest reading gets its value, so a two-dot chart is still readable.
         ly = cy - 46 if cy - 46 >= y else cy + 20
-        draw.text((cx - 12, ly), f"{pts[-1][1]:.1f}", fill=colour, font=ce.font(ce.FONT_MONO, 20), anchor="ma")
+        # The newest reading is at the right edge by construction; a centred label there
+        # runs into the gutter. Right-anchor it to the chart's own edge instead.
+        draw.text((min(cx - 12, x + w - 30), ly), f"{pts[-1][1]:.1f}", fill=colour, font=ce.font(ce.FONT_MONO, 20), anchor="ra")
     if pts and len(pts) > 1:
         fx, fy = _xy(*pts[0])
         fly = fy - 46 if fy - 46 >= y else fy + 20

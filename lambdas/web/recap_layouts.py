@@ -71,7 +71,17 @@ TAGLINE = "proof, not promises"
 
 # ── shared chrome ─────────────────────────────────────────────────────────────
 def _canvas():
-    return ce.base_canvas(size=PORTRAIT, margin=M)
+    """A portrait canvas whose draw RECORDS every string, so `recap_qa` can audit the frame.
+
+    The records ride on `img.info["recap_strings"]` — the image carries its own evidence
+    to the gate, and a layout cannot opt out by forgetting to return something extra.
+    """
+    from web import recap_qa
+
+    img, draw = ce.base_canvas(size=PORTRAIT, margin=M)
+    rec = recap_qa.RecordingDraw(draw)
+    img.info["recap_strings"] = rec.records
+    return img, rec
 
 
 def _serial(draw, facts, date_label: str) -> int:
@@ -106,8 +116,16 @@ def _goal_bar_at(draw, frac: float, baseline: float, goal: float, *, y: int) -> 
     return y + 44
 
 
+#: Where the footer band draws. `card_engine.draw_footer` is sized for a 1200×630 unfurl
+#: (an 11 px face); at 1080×1350 read on a phone that is a hairline, so the portrait card
+#: draws its own footer at its own scale, on the same baseline the QA floor knows about.
+FOOTER_Y = 1296
+
+
 def _footer(draw, right: str = "averagejoematt.com"):
-    ce.draw_footer(draw, left_text=TAGLINE, right_text=right, canvas=PORTRAIT, margin=M)
+    f = ce.font(ce.FONT_MONO, 20)
+    draw.text((M, FOOTER_Y), TAGLINE, fill=ce.FAINT, font=f)
+    draw.text((PORTRAIT[0] - M, FOOTER_Y), right, fill=ce.FAINT, font=f, anchor="ra")
 
 
 #: Nothing draws below this — the footer band starts here.
@@ -297,7 +315,9 @@ def scorecard(facts, *, date_label: str, weight_series=None, grade_series=None):
         y += 34
         draw.text((M, y), "WHAT EARNED IT", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
         y += 42
-        y = ch.draw_component_bars(draw, comps, x=M, y=y, w=W_CONTENT, label_w=230, row_h=48)
+        # 60 px short of the content width so the score column lands INSIDE the margin —
+        # the render QA read six scores in the gutter on every scorecard until it did.
+        y = ch.draw_component_bars(draw, comps, x=M, y=y, w=W_CONTENT - 60, label_w=230, row_h=48)
     else:
         # The compute cron did not score this day. The slot the components own is filled
         # by something true on any day — labelled as what it is, noting what it stands for.
@@ -352,14 +372,12 @@ def trajectory(facts, *, date_label: str, weight_series=None, grade_series=None)
         y += 46
         ch.draw_sparkline(draw, series, x=M, y=y, w=W_CONTENT, h=150, colour=ce.GREEN)
         y += 186
-        draw.text(
-            (M, y),
-            f"{n_meas} weigh-ins across {len(series)} days"
-            + ("  ·  dots, not a line — the days between were not measured" if n_meas < 4 else ""),
-            fill=ce.FAINT,
-            font=ce.font(ce.FONT_MONO, 20),
-        )
-        y += 44
+        draw.text((M, y), f"{n_meas} weigh-ins across {len(series)} days", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
+        y += 30
+        if n_meas < 4:
+            draw.text((M, y), "dots, not a line — the days between were not measured", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 20))
+            y += 30
+        y += 14
     elif series:
         y += 16
         n = len([v for v in series if v is not None])
@@ -628,8 +646,10 @@ def dayzero(facts, *, date_label: str):
     draw.text((M, y), "GRADED EVERY DAY ON", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
     y += 40
     names = [v for k, v in _COMPONENT_NAMES.items() if k != "journal"]
-    draw.text((M, y), "  ·  ".join(names), fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
-    y += 44
+    for line in ce.wrap("  ·  ".join(names), width=54, max_lines=2):
+        draw.text((M, y), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
+        y += 36
+    y += 8
     draw.text((M, y), "the first card lands tomorrow morning. bad days included.", fill=ce.FAINT, font=ce.font(ce.FONT_MONO, 22))
 
     _footer(draw)

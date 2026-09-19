@@ -35,7 +35,11 @@ second card (which the record says).
 
 THE ORDER OF OPERATIONS IS THE SAFETY PROPERTY
 
-  facts → pick → GATE → render → store → deliver → record
+  facts → pick → GATE → render → QA → store → deliver → record
+
+The QA step (`recap_qa`, 2026-09-19) audits the DRAWN frame — clipped text, overlaps,
+undrawable glyphs, placeholder strings — and a hard finding holds that card the way the
+privacy gate holds a blocked term: nothing stored, nothing sent, the finding on the row.
 
 The gate runs before the render and the render before the send, so a blocked term costs
 CPU rather than reaching a public grid. The record is written whatever happened, including
@@ -162,7 +166,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     """Render (and optionally send) the card for one PT date. Returns the picker record."""
     from content import recap_data, recap_deliver, recap_gate
 
-    from web import recap_canvas, recap_layouts
+    from web import recap_canvas, recap_layouts, recap_qa
 
     sk = f"DATE#{date}"
     if not force:
@@ -255,6 +259,14 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
             _record(sk, {**base, "outcome": "no_signal", "error": f"{type(e2).__name__}: {e2}"})
             return {**base, "outcome": "no_signal"}
 
+    # QA AFTER RENDER, BEFORE STORE. The frame is judged, not the inputs.
+    qa1 = recap_qa.audit_image(img, margin=recap_layouts.M)
+    base["qa"] = qa1.to_dict()
+    if not qa1.may_store:
+        _record(sk, {**base, "outcome": "held_qa", "privacy": verdict.to_dict()})
+        logger.warning("recap for %s held by render QA: %s", date, qa1.hard[:3])
+        return {**base, "outcome": "held_qa"}
+
     png = recap_canvas.to_png_bytes(img)
     key = f"{RECAP_PREFIX}{date}.png"
     try:
@@ -271,6 +283,12 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     if detail_caption:
         try:
             dimg = recap_layouts.detail(facts, date_label=_date_label(date), weight_series=weight_series, grade_series=grade_series)
+            qa2 = recap_qa.audit_image(dimg, margin=recap_layouts.M)
+            base["qa_detail"] = qa2.to_dict()
+            if not qa2.may_store:
+                # Card 2 is held on its own; card 1 still ships. A second card that cannot be
+                # drawn cleanly is a day with one card, and the row says why.
+                raise RuntimeError(f"render QA held the detail card: {qa2.hard[:3]}")
             detail_png = recap_canvas.to_png_bytes(dimg)
             detail_key = f"{RECAP_PREFIX}{date}-detail.png"
             _s3.put_object(Bucket=S3_BUCKET, Key=detail_key, Body=detail_png, ContentType="image/png")
@@ -296,6 +314,9 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
                 grade_series=grade_series[-7:],
                 totals=totals,
             )
+            qa3 = recap_qa.audit_image(wimg, margin=recap_layouts.M)
+            if not qa3.may_store:
+                raise RuntimeError(f"render QA held the weekly card: {qa3.hard[:3]}")
             weekly_key = f"{RECAP_PREFIX}week-{week_n:02d}.png"
             _s3.put_object(Bucket=S3_BUCKET, Key=weekly_key, Body=recap_canvas.to_png_bytes(wimg), ContentType="image/png")
             base["weekly"] = {"week": week_n, "s3_key": weekly_key, "totals": totals}
