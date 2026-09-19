@@ -72,6 +72,7 @@ def _packets(
     layer="ok",
     lifts_7d=2,
     walking=None,
+    weeks_in_block=0,
 ):
     return {
         "muscle_defense": c.build_muscle_defense_packet(
@@ -101,6 +102,7 @@ def _packets(
         ),
         "blueprint_historian": c.build_historian_packet(
             d,
+            weeks_in_block=weeks_in_block,
             reference=(
                 reference
                 if reference is not None
@@ -480,3 +482,42 @@ def test_every_change_or_veto_names_the_metric_and_the_value_it_relied_on():
             assert v["metric"] in P[v["critic"]]["numbers"], v
             assert v["value"] == P[v["critic"]]["numbers"][v["metric"]]
             assert v["provenance"]
+
+
+# ── 9. the historian's second axis — found live on 2026-09-19 ────────────────
+def test_the_historian_defers_to_a_current_baseline_when_he_is_in_a_block():
+    """The 2026-09-19 live finding: the band reference (2019-2024 window) held a 40 lb dumbbell
+    row against an 80 lb row performed three days earlier. In a consistent block the band
+    figure is DESCRIPTIVE — a cut to 36 lb would be an invented objection (#3851).
+    Mutation control: drop the `cold` branch so the change fires regardless → this reds."""
+    d = c.draft_summary(_ir(squat_lbs=200.0))
+    ref = {
+        "proven_target": {
+            "band": "300-309",
+            "band_distance_lb": 7,
+            "window": "2019-12-30..2024-09-16",
+            "top_kg_by_movement": {"Squat (Barbell)": 90},
+        }
+    }
+    in_block = _packets(d, reference=ref, weeks_in_block=c.CONSISTENT_BLOCK_WEEKS)
+    h = in_block["blueprint_historian"]
+    assert h["numbers"]["weeks_in_current_block"] == 2
+    top = next(f for f in h["flags"] if f["metric"] == "band_top_lbs[0]")
+    assert top["severity"] == "info" and "descriptive" in top["reason"] and top["field"] is None
+    assert c.deterministic_verdict(h)["verdict"] == "approve"
+    # unknown block length is NOT cold: descriptive only, and named as unreadable
+    unk = _packets(d, reference=ref, weeks_in_block=None)["blueprint_historian"]
+    assert "weeks_in_current_block" in unk["unknown"] and c.deterministic_verdict(unk)["verdict"] == "approve"
+    # cold: the discount applies and the change is down only
+    cold = _packets(d, reference=ref, weeks_in_block=1)["blueprint_historian"]
+    v = c.deterministic_verdict(cold)
+    assert v["verdict"] == "change" and v["to"] == pytest.approx(90 * c._LBS_PER_KG * 0.9, abs=0.1) and "cold" in v["reason"]
+
+
+def test_the_advocate_says_so_when_the_rate_is_already_above_the_band():
+    d = c.draft_summary(_ir())
+    P = c.build_rate_advocate_packet(
+        d, tripwires=[], walking=None, rate_target={"low_lb_wk": 1.6, "high_lb_wk": 3.2}, current_rate_lb_wk=3.7, lifting_sessions_7d=2
+    )
+    f = next(f for f in P["flags"] if f["metric"] == "current_rate_lb_wk")
+    assert f["severity"] == "info" and "ABOVE" in f["reason"]

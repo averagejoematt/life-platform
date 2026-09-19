@@ -57,7 +57,7 @@ def _ir(routine_id="r-3752", squat_lbs=176.0, version=1):
     )
 
 
-def _evidence(pain0=False, drop=0.0, days0=3):
+def _evidence(pain0=False, drop=0.0, days0=3, weeks_in_block=0):
     return {
         "exercises": [
             {
@@ -86,6 +86,7 @@ def _evidence(pain0=False, drop=0.0, days0=3):
         ],
         "consecutive_days": 1,
         "lifting_sessions_7d": 2,
+        "weeks_in_block": weeks_in_block,
         "pain_layer_status": "ok",
     }
 
@@ -351,3 +352,19 @@ def test_a_veto_stored_on_an_already_pushed_routine_blocks_the_update_branch_too
             st.enter_context(cm)
         res = t.tool_manage_hevy_routine({"action": "commit", "routine_id": ir.routine_id})
     assert "CRITIC_VETO" in json.dumps(res) and updated == []
+
+
+def test_in_a_consistent_block_the_historian_does_not_cut_a_load_the_band_never_saw():
+    ir = _ir(squat_lbs=200.0)
+    out, _, _ = _run(ir, _evidence(weeks_in_block=3))
+    h = next(v for v in out["critics"]["verdicts"] if v["critic"] == "blueprint_historian")
+    assert h["verdict"] == "approve" and out["critics"]["changes"] == []
+    assert ir.exercises[0].sets[0].weight_kg == pytest.approx(200.0 * KG, abs=0.01)
+
+
+def test_weeks_in_block_counts_trailing_consistent_weeks_only():
+    # weeks ending 09-19: [09-12..09-18] 4 lifts, [09-05..09-11] 2 lifts, [08-29..09-04] 1 lift -> 2
+    dates = ["2026-09-18", "2026-09-16", "2026-09-14", "2026-09-12", "2026-09-10", "2026-09-06", "2026-09-01"]
+    assert tp._weeks_in_block(dates, "2026-09-19") == 2
+    assert tp._weeks_in_block([], "2026-09-19") == 0
+    assert tp._weeks_in_block(["2026-09-19"], "2026-09-19") == 0, "the target day itself is not a trailing week"

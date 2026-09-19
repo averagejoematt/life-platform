@@ -40,6 +40,7 @@ logger = logging.getLogger("tools_plan")
 ANCHOR_HISTORY_LOOKBACK_DAYS = 180
 PAIN_LOOKBACK_DAYS = 28
 STREAK_LOOKBACK_DAYS = 14
+BLOCK_LOOKBACK_DAYS = 56  # 8 weeks, enough to count the trailing consistent block (>=2 lifts/wk)
 
 
 def _safe(fn, *a, **kw):
@@ -255,10 +256,11 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
             row["pain_layer_status"] = pain.get("layer_status")
         exercises.append(row)
 
-    dates = _safe(_workout_dates, _minus_days(target_date, STREAK_LOOKBACK_DAYS), target_date)
+    dates = _safe(_workout_dates, _minus_days(target_date, BLOCK_LOOKBACK_DAYS), target_date)
     consecutive = _consecutive_days(dates, target_date) if dates is not None else None
     week_start = _minus_days(target_date, 7)
     lifting_7d = len({d for d in dates if week_start <= d < target_date}) if dates is not None else None
+    weeks_in_block = _weeks_in_block(dates, target_date) if dates is not None else None
     # the per-movement reads each carry the derived layer's own status; a dark read on ANY
     # drafted movement makes the whole pain input unknown (never clear by omission, #3768)
     statuses = [e.get("pain_layer_status") for e in exercises if e.get("pain_layer_status")]
@@ -270,8 +272,22 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         "exercises": exercises,
         "consecutive_days": consecutive,
         "lifting_sessions_7d": lifting_7d,
+        "weeks_in_block": weeks_in_block,
         "pain_layer_status": layer_status,
     }
+
+
+def _weeks_in_block(dates: list[str], target_date: str, min_per_week: int = 2, max_weeks: int = 8) -> int:
+    """Trailing consecutive 7-day windows (ending the day before target) with >= min_per_week lifts."""
+    weeks = 0
+    for w in range(max_weeks):
+        end = _minus_days(target_date, 7 * w)  # exclusive
+        start = _minus_days(target_date, 7 * (w + 1))
+        if len({d for d in dates if start <= d < end}) >= min_per_week:
+            weeks += 1
+        else:
+            break
+    return weeks
 
 
 def _resolver():
@@ -341,7 +357,9 @@ def _run_stage_2(
                 current_rate_lb_wk=(reference or {}).get("current_rate_lb_wk"),
                 lifting_sessions_7d=evidence.get("lifting_sessions_7d"),
             ),
-            "blueprint_historian": critics.build_historian_packet(draft, reference=reference),
+            "blueprint_historian": critics.build_historian_packet(
+                draft, reference=reference, weeks_in_block=evidence.get("weeks_in_block")
+            ),
         }
 
     draft = critics.draft_summary(ir)

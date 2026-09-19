@@ -405,6 +405,15 @@ def build_rate_advocate_packet(
                 provenance=rt.get("provenance", "owner"),
             )
         )
+    elif current_rate_lb_wk is not None and hi is not None and current_rate_lb_wk > hi:
+        flags.append(
+            _flag(
+                "current_rate_lb_wk",
+                "info",
+                f"losing {current_rate_lb_wk} lb/wk, ABOVE the {rt.get('low_lb_wk')}-{hi} lb/wk band he set — on rate the advocate has nothing to add",
+                provenance=rt.get("provenance", "owner"),
+            )
+        )
     if lifting_sessions_7d is not None and lifting_sessions_7d >= sessions_hi:
         flags.append(
             _flag(
@@ -417,16 +426,28 @@ def build_rate_advocate_packet(
     return {"critic": "rate_advocate", "numbers": numbers, "flags": flags, "unknown": unknown, "violations": []}
 
 
-def build_historian_packet(draft: dict[str, Any], *, reference: dict[str, Any] | None) -> dict[str, Any]:
+CONSISTENT_BLOCK_WEEKS = 2  # trailing weeks at >=2 lifts/wk before a lift counts as having a CURRENT baseline
+
+
+def build_historian_packet(draft: dict[str, Any], *, reference: dict[str, Any] | None, weeks_in_block: int | None = None) -> dict[str, Any]:
     """The weight-band reference, and the #3717 attestation with its label welded on.
 
-    Band-matched loads are compared to the draft with the owner's detraining discount
-    (#3753 `load_anchoring`, 10-15%). Down only: the historian never argues a load UP —
-    what his frame handled at this weight is a ceiling on what to prescribe cold, not a
-    target. Attested volume is reported beside the measured figure, never added to it."""
+    The owner's load rule (#3753 `load_anchoring`) has TWO axes: (1) the matched bodyweight
+    band says what his frame handled; (2) weeks since the last consistent block says what
+    his connective tissue is ready for NOW. This critic holds both — `weeks_in_block` is the
+    trailing count of weeks at >=2 lifts/wk, a different number from the joints critic's
+    per-movement days-since. COLD (fewer than CONSISTENT_BLOCK_WEEKS) → a draft top above
+    the band-matched best less the detraining discount is a `change`, down only. IN A BLOCK,
+    or block length unknown → the band figure is DESCRIPTIVE: the calibration doc says once a
+    lift has a current baseline, prescribe near it, and on 2026-09-19 the live band reference
+    (2019-2024 window) held a 40 lb dumbbell row against an 80 lb row performed three days
+    earlier — a cut to 36 lb would have been an invented objection (#3851).
+    Attested volume is reported beside the measured figure, never added to it."""
     proven = (reference or {}).get("proven_target") or {}
     disc_lo, disc_hi = owner_redlines.REDLINES["load_anchoring"]["detraining_discount_pct"]
+    cold = weeks_in_block is not None and weeks_in_block < CONSISTENT_BLOCK_WEEKS
     numbers: dict[str, Any] = {
+        "weeks_in_current_block": weeks_in_block,
         "band": proven.get("band"),
         "band_distance_lb": proven.get("band_distance_lb"),
         "band_sets_wk": proven.get("sets_wk"),
@@ -442,6 +463,8 @@ def build_historian_packet(draft: dict[str, Any], *, reference: dict[str, Any] |
     }
     flags: list[dict[str, Any]] = []
     unknown: list[str] = []
+    if weeks_in_block is None:
+        unknown.append("weeks_in_current_block")
     if not proven:
         unknown.append("band")
         flags.append(
@@ -492,16 +515,28 @@ def build_historian_packet(draft: dict[str, Any], *, reference: dict[str, Any] |
         numbers[k] = round(band_lbs, 1)
         ceiling = band_lbs * (1 - disc_lo / 100.0)
         if ex["top_weight_lbs"] > ceiling + 0.5:
-            flags.append(
-                _flag(
-                    k,
-                    "change",
-                    f"{ex['label']}: draft top {ex['top_weight_lbs']} lb vs band-matched best {band_lbs:.0f} lb less the {disc_lo}% detraining discount = {ceiling:.0f} lb",
-                    provenance="owner",
-                    field=f"exercises[{ex['idx']}].weight_lbs",
-                    to=round(ceiling, 1),
+            if cold:
+                flags.append(
+                    _flag(
+                        k,
+                        "change",
+                        f"{ex['label']}: draft top {ex['top_weight_lbs']} lb vs band-matched best {band_lbs:.0f} lb less the {disc_lo}% detraining "
+                        f"discount = {ceiling:.0f} lb, and only {weeks_in_block} wk into a block — cold",
+                        provenance="owner",
+                        field=f"exercises[{ex['idx']}].weight_lbs",
+                        to=round(ceiling, 1),
+                    )
                 )
-            )
+            else:
+                flags.append(
+                    _flag(
+                        k,
+                        "info",
+                        f"{ex['label']}: draft top {ex['top_weight_lbs']} lb vs band-matched best {band_lbs:.0f} lb (window {proven.get('window')}) — "
+                        f"descriptive: {weeks_in_block if weeks_in_block is not None else 'unknown'} wk in the current block, a current baseline outranks the band",
+                        provenance="owner",
+                    )
+                )
     return {"critic": "blueprint_historian", "numbers": numbers, "flags": flags, "unknown": unknown, "violations": []}
 
 
