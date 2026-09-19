@@ -173,3 +173,29 @@ experiment counter Y zeroes on a reset. The next title therefore reads
 **Also corrected in passing:** `_action_archive` said it did a "rename + folder-move". Hevy's
 `folder_id` is create-only and `to_update_body` omits it, so the move never reached the wire.
 The behaviour is unchanged (it cannot be fixed by API); the comment and the result now say so.
+
+---
+
+## Amendment (2026-09-18, #3670 — the code half of the remaining boxes)
+
+**The page-size fix is not, on its own, what makes foldering work.** Capping `pageSize` at
+10 stops the 400. It also makes ONE page a smaller window than the broken `pageSize=50` ever
+asked for, and `ensure_folder` did find-or-create over one page. At eleven routine folders the
+target sits on page 2, the scan misses it, and the find-or-create branch creates a **duplicate**
+`Push` beside the real one — a failure that reports success and looks like success in the app.
+`hevy_write_client.list_all_folders()` now walks every page (bounded, and it reports truncation
+rather than hiding it); `ensure_folder` refuses to create out of a truncated listing and reports
+the miss like any other. `_action_archive` carried the same page-1-only scan and now routes
+through `ensure_folder`.
+
+**The N anchor is now floored, superseding the `Foundation - Push - 3 - 1` expectation above.**
+`routine_title.counter_anchor()` bounds every counter window at `EXPERIMENT_START_DATE`, so a
+`current_started` left behind by a reset cannot move a counter. The phase NAME still spans
+cycles untouched — the owner advances `current` by hand and a reset deliberately does not — and
+a `current_started` on/after genesis is passed through unchanged, so a mid-cycle phase advance
+still windows N. This is a **no-op against today's config** (`current_started` == genesis); it
+exists so the NEXT reset needs no config edit, which is #3670's box 4 verbatim. Two expectations
+in `tests/test_routine_title_y_anchor_3671.py` moved with it and say so inline.
+
+**Still open:** box 1's live leg — a fresh `draft_custom → commit` landing in its type folder,
+with the routine's `folder_id` non-null — is an owner-side run against the live Hevy account.
