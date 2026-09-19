@@ -32,7 +32,7 @@ This guard mirrors tests/test_coverage_floor_ratchet.py's shape exactly:
 "agreement-only" turned out to be the defect. See the class record below.
 
 ═══════════════════════════════════════════════════════════════════════════════
-THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224 → #3265 → #3835)
+THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224 → #3265 → #3835 → #3731)
 ═══════════════════════════════════════════════════════════════════════════════
 Every instance of this class has been answered by re-deriving the budget UPWARD, and
 the trend line between instances has been steeper than the raises — until #3224 broke
@@ -50,6 +50,77 @@ that streak, and #3265 kept it broken:
                       (n=9)                          where the shed was ALREADY BUILT
   #3835   2026-09-18  1970s med    1950 → 1950       the shed MEASURED: 1.45x, and
           (post-change) (n=24)                       still not raised
+  #3731   2026-09-19  n=14, med    1950 → 1950       SHED — the fourth, aimed at the
+                      2575s (32%                      PER-TEST bar (conftest.py's
+                      over median,                     90s warner) rather than the
+                      13/14 over)                       aggregate total: 6 of 7 tests
+                                                          breaching 90s were duplicated
+                                                          whole-repo scans, now cached
+                                                          cross-process (disk) or
+                                                          within-process (shared AST
+                                                          parse); see below.
+
+#3731 (2026-09-19) — MEMBER 8, AND THE FIRST AIMED AT THE PER-TEST WARNER RATHER THAN
+THE AGGREGATE. The filing issue sampled n=14 green-main runs (2026-09-05→09-13, all
+post-#3378): median 2575s against this 1950s budget (32% over), 13 of 14 breaching.
+Two comments folded onto the issue in the following days named the PER-TEST duration
+warner's (conftest.py `PER_TEST_WARN_SECONDS=90.0`, #3025) own breach population
+growing 5→7 in one day, all but one (`test_deploy_critical_lane_imports_2758` — an
+import-resolution walk, a different animal, measured separately and left unchanged
+here) the exact shape #3224/#3265 each already shed: a duplicated whole-repo scan.
+
+  tests/test_doc_facts_ops_1957.py::test_gate_passes_on_the_repo                92.8s → 138.6s
+  tests/test_doc_facts_ops_2003.py::test_gate_passes_on_the_repo                       → 137.9s
+  tests/test_wiki_checkers.py::test_doc_facts_clean                             93.5s → 135.5s
+  tests/test_wiki_checkers.py::test_verified_advisory_is_warn_only              95.9s → 137.2s
+  tests/test_fixture_frame_pairing_3222.py::test_no_pt_paired_utc_today_...            → 98.2s
+  tests/test_fixture_frame_pairing_3222.py::test_the_one_hop_blind_spot_...            → 95.8s
+
+THE DIAGNOSIS, AND WHY IT WASN'T ALREADY SHED. tests/repo_scan_cache.py (#3224) already
+routed the four doc-facts/wiki call sites through ONE per-process memo table — but
+#3797/#3835 (landed AFTER #3224) put this job's parallel pass on
+`pytest -n auto --dist loadfile`, which hands a test FILE, not the whole session, to
+one xdist WORKER. Those four call sites live in three DIFFERENT files, so they
+routinely land on three DIFFERENT worker processes, each with its own empty memo
+table — #3224's fix was silently re-fragmented by the job that parallelised
+everything else, back to (up to) 4 spawns of one ~15s-class scan. Separately,
+tests/test_fixture_frame_pairing_3222.py's OWN `test_the_one_hop_blind_spot_stays_
+measured` — already reading `_measure()`'s cached DIRECT-pt_modules pairing per
+#3265 — still re-read and re-`ast.parse`d every file NOT in that cache under a WIDE
+pt_modules set: a second full in-process AST walk of `_test_files()`, the
+pt_modules-INDEPENDENT half of which (`utc_day_semantics_sites` findings +
+`referenced_module_names`) does not depend on which pt_modules set is being tested.
+
+WHAT WAS SHED (tests/repo_scan_cache.py gained a disk-backed, tree-state-keyed
+second layer so a `run_repo_scan` call shares its answer across worker PROCESSES,
+not just within one; test_fixture_frame_pairing_3222.py gained a per-file memo so its
+direct and wide passes share the read+parse work). Local measurement, 2026-09-19,
+same-process runs matching what one `--dist loadfile` worker actually executes:
+
+  test_doc_facts_ops_1957.py::test_gate_passes_on_the_repo        50.2s → 50.2s (pays once, unavoidable)
+  test_doc_facts_ops_2003.py::test_gate_passes_on_the_repo        49.6s → 0.22s (separate-process disk hit)
+  test_wiki_checkers.py::test_doc_facts_clean                     49.8s → 0.25s (separate-process disk hit)
+  test_wiki_checkers.py::test_verified_advisory_is_warn_only      49.9s → 49.9s (distinct env key, pays once)
+  fixture_frame_pairing_3222.py, both tests, ONE process (the CI shape):
+                                                                   27.16s combined → 14.45s combined
+      test_no_pt_paired_utc_today_outside_the_residue              13.80s → 13.72s (unchanged — first payer)
+      test_the_one_hop_blind_spot_stays_measured                   13.16s → 0.52s  (-96.0%, second full-tree pass gone)
+
+Honestly stated: the disk layer's cross-process saving is a FIRST-WRITER-WINS race,
+not a guarantee — if two workers ask for the identical key before either has written,
+both spawn (still correct, never wrong, just not maximally efficient that one run).
+Under any realistic worker start-time stagger at least one of the three plain-scan
+callers benefits; the worst case degrades to today's behavior, never below it.
+
+NOT RAISED — this instance never argued for a raise in the first place; it targeted
+the per-test bar, not the aggregate. THE AGGREGATE BUDGET (1950s) IS LEFT EXACTLY
+WHERE IT IS, for the same reason #3224/#3265/#3835 left it: the class record's
+own instruction is measure-then-decide, and the honest measurement here is that this
+shed retires 6 of the 7 named per-test breaches without touching the aggregate number
+at all — the next green-main post-merge CI run's total (n and spread) is the number
+that would justify moving BUDGET_SECONDS, and per the #1966 rule that is never
+re-derived from a single reading. That measurement is left to the next reader with
+CI access to this PR's merge commit, not guessed here.
 
 #3835 (2026-09-16) — THE SHED WAS ALREADY MERGED AND APPLIED TO THE WRONG JOB. #3797
 split the full unit suite into a parallel pass + a serial pass for the four modules that

@@ -763,7 +763,26 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # not-applicable 6, attempted-unproven 3} over 655 rows on the rebased, COMMITTED tree,
         # against 654/108 on a disposable `git archive origin/main` export. id-set diff between
         # the two --json dumps: exactly {guard::deploy/prereg_truth_gate.py} enters, {} leaves.
-        <= 109
+        # 2026-09-19 (#3731): 109 -> 113. FOUR entrants, all arriving PROVEN — the newly-
+        # discovered structural:: gates found when tests/repo_scan_cache.py gained a
+        # disk-backed, tree-state-keyed cache: its `_tree_fingerprint()` calls `os.walk`,
+        # which makes it match premerge_derivation.py's `_SWEEP_PATTERN` for the first time,
+        # so every test file that imports it (test_doc_facts_ops_1957.py,
+        # test_doc_facts_ops_2003.py, test_wiki_checkers.py, test_repo_scan_cache_3224.py) is
+        # newly classified as a tree-sweeping gate — correctly, since the module genuinely
+        # sweeps the tree now. Each proved with the SAME real plant
+        # (docs/_census_probe_3731.md, a wrong CloudWatch alarm-count claim that is
+        # simultaneously a wiki-index/header violation), run through the harness one at a
+        # time: `python3 scripts/gate_census_mutations.py --run --gate structural::test_X.py`
+        # for each of the four, ARMED 4/4. The record's own point: the mutated run for each
+        # paid the real scan cost (the plant changes the cache's tree-state key, so none of
+        # the three real-scan readers served a pre-plant disk answer), while a same-tree-state
+        # baseline that ran in a LATER, separate OS process read the FIRST process's disk
+        # write in under a second — the cross-process sharing this PR ships, and the
+        # never-stale property it depends on, both observed on the live tree in one batch.
+        # {can-fail (proven) 113, unproven 537, not-applicable 6, attempted-unproven 3} over
+        # 659 rows, measured on this branch after rebasing onto origin/main (#3889, #3894).
+        <= 113
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

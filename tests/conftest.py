@@ -662,6 +662,33 @@ _PREMERGE_TREE_SWEEP_EXCLUDED = {
         "imports qa_manifest.MANIFEST only to assert the single fixed /story/diary/ page "
         "is registered (AC4 of #1846); the other 29 tests are diary-shelf behaviour"
     ),
+    # #3731: tests/repo_scan_cache.py gained a disk-backed cache keyed on a tree-state
+    # fingerprint (`os.walk`), so it now matches `_SWEEP_PATTERN` for the first time and
+    # every test file below — which merely imports it to reuse a scan — was newly
+    # discovered as a sweeper. None of the four has a population that grows or shrinks
+    # with the tree: each real-tree assertion is a fixed "the gate still exits 0 on the
+    # committed tree" check, the exact `test_mirror_parity.py` shape above (inherits a
+    # sweep by import, asserts about one fixed thing, not a repo-shape ratchet). Their
+    # ~50s-class real-tree assertions belong in the exhaustive post-merge run, not the
+    # fast pre-merge gate.
+    "test_doc_facts_ops_1957.py": (
+        "27 synthetic-fixture behaviour tests over doc_facts_ops.py's predicates; "
+        "test_gate_passes_on_the_repo is one fixed pass/fail check, not a growing population"
+    ),
+    "test_doc_facts_ops_2003.py": (
+        "14 synthetic-fixture behaviour tests over doc_facts_ops.py's predicates; "
+        "test_gate_passes_on_the_repo is one fixed pass/fail check, not a growing population"
+    ),
+    "test_wiki_checkers.py": (
+        "43 synthetic-fixture / scratch-file behaviour tests over the wiki-checker scripts; "
+        "its three real-tree readers (test_doc_facts_clean, test_verified_advisory_is_warn_only, "
+        "test_wiki_index_coverage_and_headers) are each one fixed pass/fail check"
+    ),
+    "test_repo_scan_cache_3224.py": (
+        "the shared cache's own test suite — 16 of 17 tests fake subprocess.run entirely; "
+        "the one real call (test_g) checks a single fixed script (check_doc_index.py) exits 0, "
+        "not a population that changes with the repo"
+    ),
 }
 
 
