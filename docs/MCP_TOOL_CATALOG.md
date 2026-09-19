@@ -13,6 +13,11 @@
 > Registry removals go through the AUDITED_AT ratchet in `docs/MCP_TOOL_AUDIT.md`
 > (#395 ER-04 pruned 143 → 60 on 2026-07-08 against 30-day usage telemetry).
 > For architecture and schema details, see ARCHITECTURE.md and SCHEMA.md.
+>
+> **Derived-layer contract (#3767/#3769):** a tool that reads a computed layer
+> (`training_notes`, `coach_thread`, `platform_memory` — the registry is
+> `mcp/layer_status.py`) carries `layer_status` (`ok|degraded|dark|unknown|unavailable`)
+> and returns `null`, never `0`, for any count from a layer it could not read.
 
 ---
 
