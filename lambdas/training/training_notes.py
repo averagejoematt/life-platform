@@ -43,9 +43,15 @@ from common.pacific_time import pacific_today  # #2798: workout DATE# keys name 
 NOTES_SOURCE = "training_notes"
 SOURCE_LABEL = "training_feedback_loop"
 RAW_SOURCE = "hevy"  # never written — provenance guard target
-ALGO_VERSION = "note-extractor@1.0.0"
+ALGO_VERSION = "note-extractor@1.1.0"  # 1.1.0 = per-block merge + calibration + readiness join (#3817)
 
 # ── Frozen taxonomy (Phase 0 lock, brief §5) ──
+# AMENDED 2026-09-19 (#3817): `calibration` joins the lock. The amendment is dated and
+# argued in the spec (SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md §5a) because the
+# taxonomy is a Phase-0 lock, not an open set — a class is added deliberately or not at
+# all. The gap it closes: a note like "L9-10 i think is easy - probably for my weight"
+# says what a level MEANS for this athlete, which no session-scoped class can hold, and
+# the whole content of that note was landing as one `progression` signal reading `level 9`.
 TAXONOMY = frozenset(
     {
         "progression",
@@ -59,6 +65,7 @@ TAXONOMY = frozenset(
         "environment",
         "deviation",
         "rest_adherence",
+        "calibration",
     }
 )
 
@@ -131,6 +138,72 @@ _INTERVAL_KW = ["interval", "intervals", "6 and 7", "6 and 8", "6↔8"]
 
 _LEVEL_RE = re.compile(r"\b(?:level|lvl|l)\s*(\d{1,3})\b", re.IGNORECASE)
 _LOAD_RE = re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*(lbs?|kg|kilos?|pounds?)\b", re.IGNORECASE)
+
+# ── Blocks: the ordered bouts WITHIN one session (#3817) ──────────────────────
+# "Level 9 for 20 and then level 6 for 10" is two bouts, not one session at level 9.
+# Before this, `merge_signals` deduped by class across the whole note, so a note could
+# carry at most ONE progression signal and the second bout was discarded silently —
+# the flattening this issue is about.
+#
+# A split is taken ONLY where an ordering connective separates two segments that EACH
+# carry a progression anchor (a level or a load). That requirement is what keeps the
+# splitter from minting empty bouts out of ordinary prose: the live note "Grip gave out
+# before strength, then forearm burn" contains " then " and stays ONE block, because
+# neither side names a level or a load.
+_BLOCK_CONNECTIVE_RE = re.compile(r"(\s*(?:,\s*)?(?:and\s+then|then|followed\s+by|after\s+that|and\s+after)\s+)", re.IGNORECASE)
+
+# Duration inside one block. An explicit unit is authoritative; a bare "for N" counts
+# only when N is not immediately a rep/set/distance/load count — "for 10 reps" and
+# "for 100 yards" are not ten and a hundred minutes.
+_DURATION_UNIT_RE = re.compile(r"\b(?:for\s+)?(\d{1,3})\s*(?:min|mins|minute|minutes)\b", re.IGNORECASE)
+_DURATION_BARE_RE = re.compile(
+    r"\bfor\s+(\d{1,3})\b(?!\s*(?:reps?|sets?|sec|secs|second|seconds|lbs?|kg|%|yards?|steps?|meters?|metres?|miles?|rounds?|m\b))",
+    re.IGNORECASE,
+)
+
+# ── calibration (taxonomy amendment 2026-09-19, #3817) ────────────────────────
+# Detection rule, stated once here and in the spec: a level/load reference followed —
+# within one clause — by a COPULA and a general effort verdict, with NO session deictic
+# in that clause. The copula is what separates "L9-10 is easy" (a standing property of
+# the athlete at this bodyweight) from "level 9 for 20" (a thing that happened once);
+# the deictic exclusion is what separates it from "level 8 was hard today", which is a
+# session report and belongs to `progression`.
+_LEVEL_SPAN_RE = re.compile(r"\b(?:level|lvl|l)\s*(\d{1,3})(?:\s*(?:-|–|/|to)\s*(\d{1,3}))?\b", re.IGNORECASE)
+_CAL_VERDICT_RE = re.compile(
+    r"\b(?:is|are|feels?|felt|was|were)\b[^.;]{0,40}?\b(very\s+easy|too\s+easy|easy|very\s+hard|too\s+hard|hard|light|heavy|brutal|nothing)\b",
+    re.IGNORECASE,
+)
+_SESSION_DEICTIC = ["today", "tonight", "this time", "this session", "this morning", "this evening", "last time"]
+_CAL_BASIS = {"for my weight": "bodyweight", "my weight": "bodyweight", "heavy legs": "leg_mass", "at my size": "bodyweight"}
+
+# ── recovery discordance (#3817) ──────────────────────────────────────────────
+# "despite green recovery - i felt tired today" is the note disagreeing with the day's
+# objective number. It lands as an `rpe_caveat` — the taxonomy's existing "qualifies a
+# logged metric, overlay only, never overwrites raw" class — carrying a JOIN KEY to that
+# date's readiness record. Deliberately not a new class: the amendment above adds exactly
+# one, and a caveat on a logged number is what this already is.
+#
+# The join is deterministic (a pk/sk a reader can fetch), the narration is not (ADR-105:
+# deterministic computation before any LLM verdict). This module never reads the readiness
+# record — it emits the key so the coach can cite BOTH numbers without re-deriving either.
+READINESS_SOURCE = "computed_metrics"
+READINESS_FIELDS = ("readiness_score", "readiness_colour")
+_CONTRAST_MARKERS = ["despite", "even though", "although", "though", "but ", "yet ", "in spite of"]
+_RECOVERY_CUE = ["recovery", "readiness", "hrv", "whoop", "body battery", "recovered", "recovery score"]
+_SUBJECTIVE_LOW = [
+    "tired",
+    "flat",
+    "heavy legs",
+    "exhausted",
+    "drained",
+    "fatigued",
+    "sluggish",
+    "felt off",
+    "no energy",
+    "wiped",
+    "dead legs",
+]
+_SUBJECTIVE_HIGH = ["felt great", "felt strong", "fresh", "full of energy", "flying", "felt amazing", "felt good"]
 
 from common.numeric import floats_to_decimal
 
@@ -223,39 +296,190 @@ def pain_lexicon_hit(note_text: str) -> bool:
     return False
 
 
-def _signal(cls, summary, confidence, value=None):
+def _signal(cls, summary, confidence, value=None, block=None):
     s = {"class": cls, "summary": summary, "confidence": confidence}
+    if block is not None:
+        s["block"] = int(block)  # which bout within the session (#3817); absent = note-level
     if value is not None:
         s["value"] = value
     return s
 
 
-def deterministic_pass(note_text: str) -> list:
+def signal_key(signal: dict):
+    """The identity two signals collide on — `(class, block)` since #3817.
+
+    Note-level classes carry no `block` and key on `(class, None)`, exactly as they did
+    when the key was the class alone. Only block-scoped classes (today: `progression`)
+    can now appear more than once in one record.
+    """
+    blk = signal.get("block")
+    try:
+        blk = int(blk) if blk is not None else None
+    except (TypeError, ValueError):
+        blk = None
+    return (signal.get("class"), blk)
+
+
+def _has_progression_anchor(text: str) -> bool:
+    return bool(_LEVEL_RE.search(text or "") or _LOAD_RE.search(text or ""))
+
+
+def split_blocks(note_text: str) -> list:
+    """Ordered bouts within one session. One block for the overwhelming majority of notes.
+
+    A connective only splits when BOTH sides carry a progression anchor; otherwise the
+    segments are re-joined with the connective they were separated by, so the block text
+    stays verbatim-reconstructible from the note.
+    """
+    raw = (note_text or "").strip()
+    if not raw:
+        return []
+    parts = _BLOCK_CONNECTIVE_RE.split(raw)
+    if len(parts) == 1:
+        return [raw]
+    blocks = [parts[0]]
+    for i in range(1, len(parts), 2):
+        sep, seg = parts[i], parts[i + 1] if i + 1 < len(parts) else ""
+        if _has_progression_anchor(blocks[-1]) and _has_progression_anchor(seg):
+            blocks.append(seg)
+        else:
+            blocks[-1] = blocks[-1] + sep + seg
+    return blocks
+
+
+def block_duration_min(block_text: str):
+    """Minutes for one bout, or None. Explicit unit wins over a bare `for N`."""
+    m = _DURATION_UNIT_RE.search(block_text or "")
+    if m:
+        return int(m.group(1))
+    m = _DURATION_BARE_RE.search(block_text or "")
+    return int(m.group(1)) if m else None
+
+
+def calibration_anchors(note_text: str) -> list:
+    """Every "<level> is <verdict>" claim in the note, in order. [] for a session report.
+
+    The span examined for each level reference runs to the next level reference or the
+    end of the sentence, whichever comes first — so one note can calibrate two bands
+    ("L9-10 ... is easy ... L3-4 is a VERY easy flush") and both are kept.
+    """
+    text = note_text or ""
+    matches = list(_LEVEL_SPAN_RE.finditer(text))
+    anchors = []
+    for i, m in enumerate(matches):
+        nxt = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        span = text[m.end() : nxt]  # noqa: E203
+        cut = min([x for x in (span.find("."), span.find(";")) if x != -1] or [len(span)])
+        span = span[:cut]
+        if any(d in span.lower() for d in _SESSION_DEICTIC):
+            continue  # a dated report of one session, not a standing property
+        v = _CAL_VERDICT_RE.search(span)
+        if not v:
+            continue
+        low = int(m.group(1))
+        high = int(m.group(2)) if m.group(2) else low
+        anchors.append({"level_low": low, "level_high": high, "verdict": " ".join(v.group(1).lower().split())})
+    return anchors
+
+
+def readiness_join_key(date, user: str = "matthew") -> dict:
+    """The deterministic pointer to that date's readiness record (#3817).
+
+    A discordance signal is worth nothing unless a reader can fetch the number it
+    disagrees with. This is the key, not the value: this module never reads
+    `computed_metrics`, so a note extracted before the daily compute runs still carries a
+    key that resolves later.
+    """
+    return {
+        "source": READINESS_SOURCE,
+        "pk": f"USER#{user}#SOURCE#{READINESS_SOURCE}",
+        "sk": f"DATE#{date}" if date else None,
+        "date": date or None,
+        "fields": list(READINESS_FIELDS),
+    }
+
+
+def recovery_discordance(note_text: str, date=None, user: str = "matthew"):
+    """The note's subjective state vs the day's objective recovery number, or None.
+
+    Fires on a contrast marker + an objective recovery cue + a subjective state, all in
+    one note. Returns an `rpe_caveat` signal carrying the discordance and the join key.
+    """
+    t = (note_text or "").lower()
+    if not any(c in t for c in _CONTRAST_MARKERS):
+        return None
+    cue = next((c for c in _RECOVERY_CUE if c in t), None)
+    if not cue:
+        return None
+    low = next((s for s in _SUBJECTIVE_LOW if s in t), None)
+    high = None if low else next((s for s in _SUBJECTIVE_HIGH if s in t), None)
+    if not (low or high):
+        return None
+    return _signal(
+        "rpe_caveat",
+        "subjective state disagrees with the day's recovery reading",
+        0.7,
+        {
+            "discordance": {
+                "direction": "subjective_worse" if low else "subjective_better",
+                "subjective": low or high,
+                "objective_cue": cue,
+                "contrast": next(c.strip() for c in _CONTRAST_MARKERS if c in t),
+            },
+            "readiness_join": readiness_join_key(date, user=user),
+        },
+    )
+
+
+def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list:
     """Rule-pass signals — no model. High-confidence pattern classes only; the semantic
-    tail (rpe_caveat, nuanced form/limiter) is the Haiku pass's job."""
+    tail (nuanced form/limiter) is the Haiku pass's job.
+
+    `progression` is emitted PER BLOCK since #3817 and stamped with its block index;
+    every other class is note-level and carries no block.
+    """
     if not note_text or not note_text.strip():
         return []
     t = note_text.lower()
     out = []
 
-    # progression — numeric level / load, plus character + ROM/aid cues
-    prog_val = {}
-    m = _LEVEL_RE.search(note_text)
-    if m:
-        prog_val["level"] = int(m.group(1))
-    lm = _LOAD_RE.search(note_text)
-    if lm:
-        prog_val["load"] = float(lm.group(1))
-        prog_val["unit"] = "lb" if lm.group(2).lower().startswith(("lb", "pound")) else "kg"
-    if any(k in t for k in _INTERVAL_KW):
-        prog_val["character"] = "intervals"
-    elif any(k in t for k in _FLAT_KW):
-        prog_val["character"] = "flat"
-    if "platform" in t:
-        prog_val["aid"] = "platform"
-        prog_val["rom"] = "full"
-    if prog_val:
-        out.append(_signal("progression", "level/load/ROM change", 0.9, prog_val))
+    # progression — one per bout: numeric level / load, duration, character + ROM/aid cues
+    for idx, block in enumerate(split_blocks(note_text)):
+        bt = block.lower()
+        prog_val = {}
+        m = _LEVEL_RE.search(block)
+        if m:
+            prog_val["level"] = int(m.group(1))
+        lm = _LOAD_RE.search(block)
+        if lm:
+            prog_val["load"] = float(lm.group(1))
+            prog_val["unit"] = "lb" if lm.group(2).lower().startswith(("lb", "pound")) else "kg"
+        dur = block_duration_min(block)
+        if dur is not None:
+            prog_val["duration_min"] = dur
+        if any(k in bt for k in _INTERVAL_KW):
+            prog_val["character"] = "intervals"
+        elif any(k in bt for k in _FLAT_KW):
+            prog_val["character"] = "flat"
+        if "platform" in bt:
+            prog_val["aid"] = "platform"
+            prog_val["rom"] = "full"
+        if prog_val:
+            out.append(_signal("progression", "level/load/ROM change", 0.9, prog_val, block=idx))
+
+    # calibration (#3817) — what a level MEANS for this athlete, not what happened today
+    anchors = calibration_anchors(note_text)
+    if anchors:
+        val = {"anchors": anchors}
+        basis = next((b for k, b in _CAL_BASIS.items() if k in t), None)
+        if basis:
+            val["basis"] = basis
+        out.append(_signal("calibration", "what a level/load means for this athlete", 0.8, val))
+
+    # rpe_caveat — the note disagreeing with the day's recovery number (#3817)
+    disc = recovery_discordance(note_text, date=date, user=user)
+    if disc is not None:
+        out.append(disc)
 
     # equipment_setup
     eq = [k for k in _EQUIPMENT_KW if k in t]
@@ -289,24 +513,42 @@ def deterministic_pass(note_text: str) -> list:
 
 
 def merge_signals(deterministic: list, llm: list, pain_deterministic: bool) -> tuple[list, bool]:
-    """Dedupe by class (deterministic wins on a tie), and compute pain_flag.
+    """Dedupe by `(class, block)` (deterministic wins on a tie), and compute pain_flag.
+
+    #3817: the key was the CLASS alone, which made a two-bout note structurally incapable
+    of carrying two `progression` signals — the model could return both and one was thrown
+    away with nothing recording that it had been. Per-class-per-block is the fix; for a
+    single-block note (the overwhelming majority) the key is identical to what it was.
+
+    Deterministic precedence is unchanged and stays WHOLE-CLASS: if the rule pass emitted
+    a class in ANY block, a note-level model signal of that class is still dropped. That
+    is the property `certain_change_reason` reads — the model tail can add classes, never
+    alter one the regex produced.
 
     pain_flag = deterministic pain OR any LLM pain. The deterministic hit can NEVER be
     cleared by the LLM (Invariant 5). Returns (signals, pain_flag).
     """
-    by_class = {}
-    for s in deterministic + (llm or []):
+    by_key = {}
+    det_classes = set()
+    for s in deterministic or []:
         cls = s.get("class")
         if cls not in TAXONOMY:
             continue  # never emit an off-taxonomy class
-        if cls not in by_class:  # first writer wins → deterministic precedence
-            by_class[cls] = s
-    signals = list(by_class.values())
+        det_classes.add(cls)
+        by_key.setdefault(signal_key(s), s)
+    for s in llm or []:
+        cls = s.get("class")
+        if cls not in TAXONOMY:
+            continue
+        if cls in det_classes:
+            continue  # deterministic precedence (first writer wins), unchanged
+        by_key.setdefault(signal_key(s), s)
+    signals = list(by_key.values())
     llm_pain = any(s.get("class") == "pain_discomfort" for s in (llm or []))
     pain_flag = bool(pain_deterministic or llm_pain)
     # If pain fired but no pain_discomfort signal is present, synthesize one so the
     # record carries it (deterministic floor is authoritative).
-    if pain_flag and "pain_discomfort" not in by_class:
+    if pain_flag and not any(s.get("class") == "pain_discomfort" for s in signals):
         signals.append(_signal("pain_discomfort", "deterministic pain-lexicon hit", 0.6))
     return signals, pain_flag
 
@@ -318,15 +560,18 @@ def _sentiment_label(signals: list):
     return None
 
 
-def extract_signals(note_text: str, llm_fn=None) -> dict:
+def extract_signals(note_text: str, llm_fn=None, date=None, user: str = "matthew") -> dict:
     """Full per-note extraction. PURE when llm_fn is None (deterministic + pain only) —
     this is the path the fixtures exercise with ZERO model calls. In production llm_fn is
     the bounded Haiku tail; on its failure we degrade (keep deterministic, never drop).
 
+    `date` is the workout's Pacific day. It is NOT narration — it is the readiness join
+    key a recovery-discordance signal carries (#3817), so it has to reach the rule pass.
+
     Returns the signal record body (no pk/sk — the writer keys it by exercise).
     """
     raw = note_text or ""
-    det = deterministic_pass(raw)
+    det = deterministic_pass(raw, date=date, user=user)
     pain_det = pain_lexicon_hit(raw)
     llm: list[dict[str, Any]] = []
     degraded, used_llm = False, False
@@ -399,7 +644,7 @@ def build_workout_note_items(date, workout_uid, exercises, user="matthew", now_i
         note = (ex.get("notes") or "").strip()
         if not note:
             continue  # dominant path → no record, no model call ($0)
-        extraction = extract_signals(note, llm_fn=llm_fn)
+        extraction = extract_signals(note, llm_fn=llm_fn, date=date, user=user)
         items.append(build_note_item(date, workout_uid, ex, extraction, user=user, now_iso=now_iso))
     return items
 
@@ -633,7 +878,7 @@ def extraction_changed(stored: dict, candidate: dict) -> bool:
     return extraction_fingerprint(stored) != extraction_fingerprint(candidate)
 
 
-def certain_change_reason(stored: dict, note_text: str):
+def certain_change_reason(stored: dict, note_text: str, user: str = "matthew"):
     """Would a re-extraction of `note_text` CERTAINLY differ from `stored`? (#3816)
 
     A read-only predicate — no model call, no spend. It answers only where the answer is
@@ -654,14 +899,17 @@ def certain_change_reason(stored: dict, note_text: str):
         return "note text changed"
     if str(stored.get("algo_version") or "") != ALGO_VERSION:
         return f"algo_version moved ({stored.get('algo_version')} -> {ALGO_VERSION})"
-    stored_by_class = {str(s.get("class")): s for s in (stored.get("signals") or [])}
-    for det in deterministic_pass(note_text):
-        cls = str(det.get("class"))
-        got = stored_by_class.get(cls)
+    stored_by_key = {signal_key(s): s for s in (stored.get("signals") or [])}
+    # #3817: keyed by (class, block) — a stored record carrying only bout 1 of a two-bout
+    # note is now a FORCED change, which is exactly the flattening this version fixes.
+    for det in deterministic_pass(note_text, date=stored.get("date"), user=user):
+        key = signal_key(det)
+        name = f"{key[0]!r}" + (f" (block {key[1]})" if key[1] is not None else "")
+        got = stored_by_key.get(key)
         if got is None:
-            return f"deterministic signal {cls!r} is absent from the stored record"
+            return f"deterministic signal {name} is absent from the stored record"
         if extraction_fingerprint({"signals": [got]}) != extraction_fingerprint({"signals": [det]}):
-            return f"deterministic signal {cls!r} differs from the stored one"
+            return f"deterministic signal {name} differs from the stored one"
     return None
 
 
