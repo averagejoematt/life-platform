@@ -1976,11 +1976,44 @@ def run_sweep(
             f"a11y ledger: {total_rules} shrink candidate(s) across {len(shrink_candidates)} page(s) "
             f"— run --update-baseline and review the diff (#1990)"
         )
+    # The sidecar must record what is STILL unharvested. The tally above is
+    # computed against the baseline as it was when the pages were swept, so on
+    # an --update-baseline run it is the BEFORE number — correct to print, wrong
+    # to persist (every row it names was just written away). Re-derive against
+    # the file now on disk, from the SAME observations, and print the residue.
+    ledger_candidates = shrink_candidates
+    if update_a11y_baseline:
+        fresh = a11y_audit.load_baseline()
+        ledger_candidates = a11y_audit.shrink_candidates(
+            {
+                r["path"]: a11y_audit.gate_findings(r["path"], r["a11y"]["observed"], fresh, theme=color_scheme, viewport="desktop")
+                for r in results
+                if r.get("a11y")
+            },
+            day_n=cycle_day_n,
+        )
+        ledger_candidates.update(
+            a11y_audit.shrink_candidates(
+                {
+                    f"{r['path']} @390px": a11y_audit.gate_findings(
+                        r["path"], r["a11y_mobile"]["observed"], fresh, theme=color_scheme, viewport="mobile"
+                    )
+                    for r in results
+                    if r.get("a11y_mobile")
+                },
+                day_n=cycle_day_n,
+            )
+        )
+        residue = sum(len(v) for v in ledger_candidates.values())
+        print(
+            f"a11y ledger after harvest: {residue} shrink candidate(s) across {len(ledger_candidates)} page(s) "
+            f"remaining (phase-excepted or audit-skipped) (#3546)"
+        )
     # Persist unconditionally — an EMPTY shrink list must clear the sidecar's
     # swept rows, or a harvested entry would keep its stale first_seen forever
     # and the dead-man would red on debt that is already paid.
     try:
-        shrink_ledger = a11y_audit.write_shrink_ledger(shrink_candidates, capture_today_pt, swept_pages={r["path"] for r in results})
+        shrink_ledger = a11y_audit.write_shrink_ledger(ledger_candidates, capture_today_pt, swept_pages={r["path"] for r in results})
         stale = a11y_audit.stale_shrink_entries(shrink_ledger, capture_today_pt)
         print(
             f"a11y shrink dead-man: {len(shrink_ledger['entries'])} tracked, {len(stale)} older than "

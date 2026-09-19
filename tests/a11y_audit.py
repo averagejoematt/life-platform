@@ -388,6 +388,15 @@ def _page_of(shrink_key):
     return shrink_key[: -len(_MOBILE_KEY_SUFFIX)] if shrink_key.endswith(_MOBILE_KEY_SUFFIX) else shrink_key
 
 
+def _ensure_lambda_path():
+    """Put lambdas/common + lambdas on sys.path (sibling-import style, as the
+    rest of the tests/ layer does). Idempotent."""
+    repo = os.path.dirname(_HERE)
+    for p in (os.path.join(repo, "lambdas"), os.path.join(repo, "lambdas", "common"), _HERE):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+
 def experiment_day_n(today_iso):
     """1-indexed Day-N of the running cycle for an ISO date — the SAME number
     `/api/journey` serves, from the same genesis constant its handler reads.
@@ -398,18 +407,10 @@ def experiment_day_n(today_iso):
     pure (the unit suite has no network) and removes a live dependency from a
     decision about a committed file. Returns 0 pre-genesis.
     """
-    from constants import day_n as _day_n  # lambdas/common — see _ensure_lambda_path
+    _ensure_lambda_path()  # MUST precede the import — the live sweep's ONLY caller
+    from constants import day_n as _day_n  # lambdas/common
 
     return _day_n(today_iso)
-
-
-def _ensure_lambda_path():
-    """Put lambdas/common + lambdas on sys.path (sibling-import style, as the
-    rest of the tests/ layer does). Idempotent."""
-    repo = os.path.dirname(_HERE)
-    for p in (os.path.join(repo, "lambdas"), os.path.join(repo, "lambdas", "common"), _HERE):
-        if p not in sys.path:
-            sys.path.insert(0, p)
 
 
 def phase_dependent_page(page_path):
