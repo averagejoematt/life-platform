@@ -526,8 +526,8 @@ All three step lists must stay in sync — change one, change all three. Run it 
 add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
 
 **What the site auto-rollback can and cannot reach (2026-08-27).** `deploy/rollback_site.sh`
-is `git checkout <ref> -- site/` plus a sync of the `site/` prefix — it touches no Lambda,
-no DynamoDB row, and not bucket-root `config/`. The gate that fires it judges `/api/*`
+restores `site/` plus bucket-root `config/` (#3654 — see below); it still touches no
+Lambda and no DynamoDB row. The gate that fires it judges `/api/*`
 content too, so for any failure sourced from DynamoDB the rollback reverts good static
 content, reports success on every step and leaves the defect live (it did exactly that to a
 wanted build beat). Since #3352/#3395/#3652 the rollback asks
@@ -538,12 +538,29 @@ an ordinary rendering defect. Two reflexes: when a gating copy reds, ask **which
 produced the failing content** before trusting the remediation — an `/api/`-sourced truth
 finding is a hold-and-page, not a `site/` revert; and after any auto-rollback, **rerun the
 FULL workflow**, never the failed jobs only — a failed-jobs rerun greens against the
-rolled-back content and ships nothing. The `config/` asymmetry (shipped by the same
-workflow — `config_twin_sync.py --apply --strict` — but not covered by
-`rollback_site.sh`, which is `git checkout <ref> -- site/` and nothing else) is open on
-**#3654**. It used to point at #2799, which CLOSED 2026-08-31 as the completed
-silent-failure-floor epic; a live rule pointing at a closed issue is a rule with no
-owner, and #3652 found it that way.
+rolled-back content and ships nothing.
+
+**The rollback's restore set is derived from the deploy's write set (#3654).**
+`site-deploy.yml` writes **two** S3 prefixes on every run: `site/` (the canonical
+`deploy_site.sh` → `sync_site_to_s3.sh` build, plus the explicit fonts sync) and
+bucket-root `config/` (the "Sync bucket-root config/ twins (#2019)" step,
+`config_twin_sync.py --apply --strict`). `rollback_site.sh` restores **both** — it
+`git checkout <ref> --`s `site/` *and* `config/`, then re-runs `config_twin_sync.py
+--apply --strict` against the restored `config/` tree so any twin still on the bad
+deploy's bytes is pushed back. `tests/test_rollback_site_coverage_3654.py` pins this as
+a set relationship, not a hand-kept pair: it parses `site-deploy.yml`'s literal `aws s3
+sync`/`cp` destinations plus its `on.push.paths` trigger list for the write set, and
+`rollback_site.sh`'s `git checkout "$REF" -- <path>` restores for the restore set, and
+reds if a future new write prefix joins the workflow without a matching restore (or an
+explicit LEFT LIVE declaration) — so the two lists cannot drift apart silently again
+(the shape that made this invisible for 10 days, #3654's own filing). One case the
+restore can never fully close: a `config/` twin the bad deploy **added** (no bytes at
+the restored ref to push back) can be re-uploaded once new bytes exist but never
+*deleted* — `config/*` is DELETE-protected for `matthew-admin` by bucket policy
+(ADR-032/033/046) — so `rollback_site.sh` names any such key explicitly in the run log
+("LEFT LIVE") rather than silently leaving it live. This used to point at #2799, which
+CLOSED 2026-08-31 as the completed silent-failure-floor epic; a live rule pointing at a
+closed issue is a rule with no owner, and #3652 found it that way.
 
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
