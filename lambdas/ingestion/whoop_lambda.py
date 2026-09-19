@@ -868,6 +868,31 @@ def _utc_day(s) -> str | None:
     ingestion per-date loop fetches by [day T00:00Z, nextday T00:00Z), so a
     record's DDB day is the UTC day of its ``start``.
 
+    DO NOT "FIX" THIS TO PACIFIC (#3677, measured 2026-09-19). #3666's derivation
+    registry flagged this function as a residual of its class on the reasoning that
+    whoop's writes go through ``ingestion_framework`` in the Pacific frame, so a UTC
+    expected-set must disagree with a Pacific store for the evening PT hours. The
+    premise is false, and the distinction is subtle enough to be worth writing down:
+    the framework enumerates Pacific date LABELS (``pacific_today()`` backwards), but
+    ``fetch_day`` turns each label into a UTC WINDOW and ``transform`` files whatever
+    the window returns under that same label — so a whoop ``DATE#{d}`` names the UTC
+    day ``d``, exactly as TD-19's own cross-source matrix already recorded. Measured
+    read-only on the live partition: of the 2,249 stored rows whose start straddles the
+    boundary (UTC day != Pacific day, i.e. 17:00 PT..midnight) — 1,649 daily, 600
+    workout, 2020-03-23..2026-09-19 — ALL 2,249 are keyed by the UTC day and ZERO by
+    the Pacific day. The live reconciler agrees: MissingActivityCount{Source=whoop} was
+    0 on 30 of 30 consecutive daily runs (2026-08-19..09-17), which a frame
+    disagreement could not produce, since a main sleep starts after 17:00 PT nearly
+    every night. Re-framing this to Pacific would therefore mint a phantom nightly gap
+    and hold the reconciliation alarm red; tests/test_whoop_reconciler_frame_3677.py
+    fails if anyone tries.
+
+    The residual #3677 leaves open is the opposite direction and lives in the registry,
+    not here: ``source_registry`` carries no ``day_key_frame`` for whoop, so the facet
+    reads as the 'pacific' default while the keys are UTC. Flipping the facet moves a
+    reader-facing freshness age by 7h (it feeds ``utc_day_key_source_ids()``), so it is
+    its own ruling with its own consumer sweep — see the audit's 2026-09-19 section.
+
     #1964: parses via the canonical ``parse_iso_utc``. The private ``_parse_iso``
     this replaces left a tz-less stamp NAIVE, so ``.astimezone(timezone.utc)``
     below would have interpreted it in the *runner's* local zone — correct only

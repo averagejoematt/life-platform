@@ -95,3 +95,144 @@ Phase 2 scope (preview):
 - `lambdas/apple_health_lambda.py`: same fix on `parse_date(date_str)`.
 - `backfill/backfill_apple_health_export_v16.py`: same fix on `parse_dt(date_str)`. Per TD-14, ship in the same PR.
 - Phase 3 historical migration: separate PR. Higher risk (DDB cost, idempotency).
+
+---
+
+# 2026-09-19 — the ruling on `apple_health`, and the whoop row measurement (#3677)
+
+*Added by #3677, the issue #3666 split out when it fixed habitify and derived the rest of
+the class. Two members were left open. This section rules on both. Nothing in the sections
+above is edited — Phase 2's reasoning is the history this ruling is made against.*
+
+## 1. `apple_health` — **KEEP UTC.** No flip, no backfill, consequence recorded.
+
+The defect is real and confirmed live 2026-09-06: a `dietary_water` reading that states
+its own offset — `2026-09-06 19:15:00 -0700` — was stored on `DATE#2026-09-07`. Unit
+conversion, source filter and reading-level dedup were all correct; only the day moved.
+
+It is **not** being flipped:
+
+- **2,508 stored rows** carry the UTC frame, counted not estimated, and there is no
+  backfill. Re-deriving months of CGM, steps, BP, State-of-Mind and workout aggregates
+  from raw is its own job with its own idempotency proof.
+- A flip without that backfill produces a **silent mid-history discontinuity** in the
+  platform's densest partition — a quieter defect than the one it fixes, and one no
+  consumer can detect, because both sides of the boundary look like valid days.
+- Three consumers resolve the frame from the registry facet by design (#3257/#3287). A
+  flip is a coordinated change across all of them plus two ratchet files that assert
+  `"utc"` by name, not a one-line edit.
+
+**The price of keeping it, written where a consumer can read it.** `day_key_frame: "utc"`
+now carries a sibling facet, `day_key_frame_consequence`, on the `apple_health` entry in
+`lambdas/ingestion/source_registry.py`, read through `day_key_frame_consequence_for()`:
+every reading taken from **17:00 PT (PDT; 16:00 PST) until Pacific midnight lands on the
+FOLLOWING Pacific day's key**, so for the last ~7 hours of every Pacific day the row keyed
+with today's date is a partial *next*-day record and the owner's evening is invisible to
+anything that asks for today. `tests/test_ingestion_day_key_derivation_3666.py` fails any
+UTC-framed source that carries no such note — derived over `utc_day_key_source_ids()`, so
+the next source to take a non-default frame inherits the requirement instead of having to
+be remembered into it.
+
+### Every consumer that presents `apple_health` rows as "today"
+
+Derived, not recalled. The query — reproducible, and it is a member of its own result set:
+
+```bash
+grep -rnE "(apple_health|health_auto_export)[^\n]*\btoday\b|\btoday\b[^\n]*(apple_health|health_auto_export)" \
+  lambdas mcp --include="*.py"
+```
+
+plus the three frame-aware readers named in the `day_key_frame` facet, plus two
+single-day readers the `today`-on-the-same-line query cannot see because they bind the
+day to a variable first (`evening_nudge`'s `today = pacific_today()`, `dashboard_refresh`
+and `daily_brief`'s `yesterday`). **Nothing below was changed by #3677** — the ruling's
+whole point is that changing them piecemeal is how a frame becomes un-auditable.
+
+**A. Frame-aware — these already absorb the boundary (they read the facet):**
+
+| Consumer | What it does with the frame |
+|---|---|
+| `lambdas/common/pacific_time.py::anchor_day_key` | THE anchor. Turns a `DATE#` day into an instant *in the frame that named it* — UTC midnight for apple_health, Pacific midnight for everything else. |
+| `lambdas/emails/freshness_checker_lambda.py:654` | Ops staleness alert; ages every source's key through `anchor_day_key`, so apple_health is not reported 7h stale at the moment it is written. |
+| `lambdas/web/site_api_freshness.py:173` | The public freshness board, same anchor — the surface that once served a record stamped with today's Pacific date as 21.7 hours old (#3257). |
+| `lambdas/web/vitals_resolver.py:190-207` | Steps resolution; publishes `steps_as_of_frame` from `day_key_frame_for(source)` so a reader is told which calendar the number's day belongs to (#3287). |
+| `lambdas/web/site_api_pulse.py:260-274` | Widens the query to today(UTC) so a boundary row is never missed, then keeps only days Pacific has actually reached — the explicit fix (#3287) for the ~7h window where `Limit=1` returned a partial next-day row. |
+
+**B. Single-day reads — the sharp edge. These ask for one named day and get the
+17:00-PT-shifted window:**
+
+| Consumer | The consequence, stated |
+|---|---|
+| `lambdas/emails/evening_nudge_lambda.py:138` | **The sharpest one.** The 8 PM PT nudge asks `apple_health[DATE#pacific_today()]` for `som_check_in_count`. A How We Feel check-in logged between 17:00 and 20:00 PT is on *tomorrow's* key, so the nudge can report "No How We Feel check-in today" hours after one was recorded. |
+| `lambdas/compute/dashboard_refresh_lambda.py:365` | `apple_today = fetch_date("apple_health", today)` for glucose — from 17:00 PT this row is the next UTC day's partial, which is also why #3204 had to pick the *reading* rather than the row. |
+| `lambdas/web/site_stats_refresh_lambda.py:86` | `resolve_glucose(apple_health, existing_vitals, today)` — publishes the day's glucose and its `sk` date to the public stats artifact. |
+| `lambdas/emails/daily_brief_lambda.py:664` | `fetch_date("apple_health", yesterday)` at 10 AM PT: "yesterday" for apple_health spans 17:00 PT of the day before to 17:00 PT yesterday. |
+
+**C. Window reads bounded at `today` — the boundary is real but diluted across the
+window; only the newest day in each is a partial next-day row:**
+
+`lambdas/web/site_api_body.py:178` · `lambdas/web/site_api_biomarkers.py:145` ·
+`lambdas/web/site_api_mind.py:146,252` · `lambdas/web/site_api_sleep.py:391` ·
+`lambdas/web/site_api_physical.py:82` · `lambdas/web/site_api_training.py:361,426` ·
+`lambdas/web/site_api_journey.py:124` · `lambdas/web/site_api_pulse.py:819` ·
+`lambdas/intelligence/ai_expert_analyzer_lambda.py:272,357,502` ·
+`lambdas/coach/spiral_breaker.py:570` · `lambdas/content/output_writers.py:767,800` ·
+`mcp/ritual_triggers.py:120`
+
+**Not enumerated on purpose:** the ~50 further modules that touch the `apple_health`
+partition without a today-bound (range extracts, correlation windows, field-tier and
+manifest declarations). They inherit the frame, but they do not *present* a row as today,
+which is the question this box asked.
+
+## 2. `whoop`'s reconciler — **measured first, and the measurement reversed the finding**
+
+#3666 registered `whoop_lambda.py` as the second open member on this reasoning: the
+reconciler computes its expected keys with `_utc_day(sleep["start"])` while "the real
+writes go through `ingestion_framework` in the Pacific frame", so the frames must disagree
+for the evening PT hours.
+
+**The premise is false.** The framework enumerates Pacific date *labels*
+(`pacific_today()` backwards), but whoop's `fetch_day` turns each label into a UTC
+*window* (`{d}T00:00:00.000Z` .. `{d+1}T00:00:00.000Z`) and `transform` files whatever the
+window returns under that same label. A whoop `DATE#{d}` therefore names the **UTC day
+`d`** — which is exactly what this audit's own cross-source matrix recorded in 2026-05
+(*"Whoop today, 9pm PT → `DATE#2026-05-03`"*), four months before #3666 re-derived a
+different belief from the framework's stamp.
+
+**Blast radius, measured read-only before touching anything** (`aws dynamodb query` on
+`USER#matthew#SOURCE#whoop`, projecting `sk`, `sleep_start`, `start_time`; 4,858 rows):
+
+| Rows whose start straddles the boundary (UTC day ≠ Pacific day, i.e. 17:00 PT–midnight) | n | keyed by **UTC** day | keyed by **Pacific** day |
+|---|---|---|---|
+| daily aggregates (`sleep_start`) | 1,649 | **1,649** | **0** |
+| workout sub-records (`start_time`) | 600 | **600** | **0** |
+| **total** | **2,249** | **2,249** | **0** |
+
+Range `2026-09-19` back to `2020-03-23`. The live instrument agrees:
+`LifePlatform/IngestReconciliation::MissingActivityCount{Source=whoop}` = **0 on 30 of 30
+consecutive daily runs, 2026-08-19 … 09-17** — which a frame disagreement could not
+produce, since a main sleep starts after 17:00 PT nearly every night.
+
+(37 daily rows match *neither* frame — sleeps that began 22:00–24:00 UTC filed on the next
+UTC day. All are 2021-2025 bulk-import rows; **zero since 2026-01-01**, i.e. none from the
+live writer. Noise from the historical import, not a third generation.)
+
+**Ruling: the reconciler stays UTC — it is correct, by measurement rather than by
+exemption**, and re-framing it to Pacific would mint a phantom gap most nights and hold
+the reconciliation alarm red. The registry row in
+`tests/test_ingestion_day_key_derivation_3666.py` moves from *undeclared residual* to
+*measured and correct*, with the numbers in the reason; the belief is pinned behind
+`tests/test_whoop_reconciler_frame_3677.py`, which fails if the frame is ever flipped.
+The existing `tests/test_whoop_reconcile.py` was run against that flip and passed all 6 —
+it could not see a whole-frame re-derivation, which is why the new file exists.
+
+### The residual this leaves open (named, not folded in)
+
+`source_registry` carries **no** `day_key_frame` for whoop, so the facet reads as the
+`pacific` default while the keys are measurably UTC. Flipping the facet is not a
+bookkeeping edit: `day_key_frame` feeds `utc_day_key_source_ids()`, which
+`freshness_checker_lambda` and `site_api_freshness` use to anchor an **age**, so it moves
+a reader-facing freshness number for whoop by 7 hours — the #3257 shape, needing its own
+consumer sweep and its own `day_key_frame_consequence`. It is declared in-place at the
+skip in `test_the_declared_frames_agree_with_the_live_source_registry` rather than changed
+here, so the disagreement is visible to the next reader instead of resolved by silence.

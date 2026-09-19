@@ -50,7 +50,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, os.path.join(str(ROOT), "lambdas"))
 
-from ingestion.source_registry import day_key_frame_for  # noqa: E402
+from ingestion.source_registry import day_key_frame_consequence_for, day_key_frame_for, utc_day_key_source_ids  # noqa: E402
 
 # ── #3025: this whole module is `serial` ─────────────────────────────────────
 #
@@ -139,11 +139,20 @@ DAY_KEY_WRITERS = {
         "origin": "reading_timestamp",
         "frame": "utc",
         "reason": (
-            "RESIDUAL, and not a writer: the sks built here are the RECONCILER's expected set "
-            "(_utc_day(sleep['start'])), compared against stored keys to find gaps — the real writes go "
-            "through ingestion_framework in the Pacific frame. So the reconciler's frame and the store's "
-            "frame disagree for the evening PT hours. Same class as #3666, own blast radius, own issue; "
-            "flagged here rather than fixed so it cannot be forgotten."
+            "MEASURED AND CORRECT (#3677, 2026-09-19) — and the entry it replaces was wrong in a way worth "
+            "keeping visible. #3666 flagged this as a residual on the reasoning that 'the real writes go "
+            "through ingestion_framework in the Pacific frame', so the reconciler's _utc_day(sleep['start']) "
+            "expected set had to disagree with the store for the evening PT hours. The premise is false. The "
+            "framework enumerates Pacific date LABELS, but whoop's fetch_day turns each label into a UTC window "
+            "({d}T00:00Z..{d+1}T00:00Z) and transform files what comes back under that same label, so a whoop "
+            "DATE#{d} names the UTC day d — which is what TD-19's own matrix already recorded (whoop: UTC). "
+            "Measured read-only on the live partition: of 2,249 stored rows whose start straddles the boundary "
+            "(UTC day != Pacific day, i.e. 17:00 PT..midnight), 1,649 daily + 600 workout, ALL 2,249 are keyed "
+            "by the UTC day and ZERO by the Pacific day, 2020-03-23..2026-09-19. The live reconciler agrees: "
+            "MissingActivityCount{Source=whoop} = 0 on 30 of 30 consecutive daily runs 2026-08-19..09-17, which "
+            "a frame disagreement could not produce (a main sleep starts after 17:00 PT almost every night). "
+            "So this stays UTC by measurement, not by exemption, and flipping it to Pacific would mint a "
+            "phantom gap nightly — pinned against exactly that by tests/test_whoop_reconciler_frame_3677.py."
         ),
     },
     "health_auto_export_lambda.py": {
@@ -250,20 +259,36 @@ def test_the_declared_frames_agree_with_the_live_source_registry():
             continue
         facet = day_key_frame_for(source)
         if source == "whoop":
-            # The reconciler's residual: the STORE is Pacific (framework) and the facet
-            # agrees; only the expected-set computation is UTC. Pinned by its own test.
+            # #3677: the ONE declared disagreement, and it is the FACET that is behind.
+            # Measured on the live partition (2,249 straddling rows, all UTC-keyed, zero
+            # Pacific-keyed), whoop's DATE# names a UTC day, so this module's "utc" is the
+            # true one and the registry's silent default of "pacific" is not. The facet is
+            # deliberately NOT flipped here: day_key_frame feeds utc_day_key_source_ids(),
+            # which freshness_checker_lambda and site_api_freshness use to anchor an AGE —
+            # moving whoop shifts a reader-facing freshness number by 7h and is its own
+            # ruling with its own consumer sweep (#3257's shape), not a rider on this one.
+            # Recorded in the audit's 2026-09-19 section as the residual this PR does not
+            # close. Pinned meanwhile by tests/test_whoop_reconciler_frame_3677.py.
             continue
         if facet != entry["frame"]:
             disagreements.append(f"{name}: declares {entry['frame']!r}, source_registry.day_key_frame says {facet!r}")
     assert not disagreements, "\n".join(disagreements)
 
 
-def test_the_only_utc_framed_writers_are_the_two_named_residuals():
-    """The set, pinned. Closing either shrinks this — a THIRD member is a new defect."""
+def test_the_utc_framed_writer_set_is_exactly_the_two_ruled_on():
+    """The set, pinned. A THIRD member is a new defect.
+
+    Renamed from ...two_named_residuals by #3677: after measurement only ONE of the two is
+    a residual. health_auto_export is a KEPT exemption (the ruling + its written
+    consequence, 2,508 rows, no backfill); whoop is UTC because the store is UTC, proven
+    on 2,249 straddling rows. Shrinking this set now means a real re-frame with a
+    migration, not the closure of an open bug.
+    """
     utc = {name for name, entry in DAY_KEY_WRITERS.items() if entry["frame"] == "utc"}
     assert utc == {"health_auto_export_lambda.py", "whoop_lambda.py"}, (
-        "The UTC-framed DATE# writer set changed. This ratchet only shrinks: closing "
-        f"health_auto_export (TD-19 Phase 2 reversal + backfill) or whoop's reconciler removes a member. Got: {sorted(utc)}"
+        "The UTC-framed DATE# writer set changed. This ratchet only shrinks, and both members are now "
+        "RULED ON (#3677): health_auto_export keeps UTC with a written consequence, whoop is UTC because its "
+        f"store measurably is. Removing either means a re-frame WITH a backfill. Got: {sorted(utc)}"
     )
 
 
@@ -285,6 +310,41 @@ def test_the_hae_exemption_still_describes_the_live_code():
     assert "def parse_date_str" in src
     assert 'astimezone(timezone.utc).strftime("%Y-%m-%d")' in src, "HAE's day derivation changed — update or retire its #3666 exemption"
     assert day_key_frame_for("apple_health") == "utc"
+
+
+def test_every_utc_framed_source_has_written_down_what_the_frame_COSTS():
+    """#3677. A frame label is not a ruling; a ruling states its price.
+
+    #3666 left `day_key_frame='utc'` reading like a neutral fact about a key. It is not
+    one: it means every apple_health reading from 17:00 PT until Pacific midnight is filed
+    under the NEXT day's key, which is why the 8 PM evening nudge can ask for today's State
+    of Mind check-ins and be told there are none, seven hours after one was recorded. That
+    sentence existed nowhere a consumer could read it, so nobody carrying the cost could
+    find the reason for it.
+
+    Derived over `utc_day_key_source_ids()`, not written against apple_health by name — the
+    next source that takes a non-default frame inherits the requirement rather than being
+    remembered into it.
+    """
+    for source in sorted(utc_day_key_source_ids()):
+        note = day_key_frame_consequence_for(source)
+        assert len(note) >= 80, (
+            f"{source}: day_key_frame is not the platform default and no day_key_frame_consequence is "
+            "written down. State what the frame costs a reader (which hours land on the following day, "
+            "and why the frame is kept anyway) — #3677."
+        )
+        assert "17:00" in note or "16:00" in note, f"{source}: the consequence note must name the PT hour at which the boundary bites"
+        assert "#" in note or "TD-" in note, f"{source}: the consequence note must cite the ruling that kept the frame"
+
+
+def test_the_consequence_note_is_reachable_through_the_same_helper_consumers_would_use():
+    """A note only a test can see is a comment. It has to be on the facet, behind an
+    accessor, the way day_key_frame_for() is — so a consumer deciding whether its 'today'
+    is safe reads the answer instead of rediscovering it. An unknown source returns '',
+    never a KeyError: the default frame has no price to state."""
+    assert day_key_frame_consequence_for("apple_health").startswith("KEEP-UTC RULING")
+    assert day_key_frame_consequence_for("withings") == "", "a Pacific-framed source is the default and has no price to state"
+    assert day_key_frame_consequence_for("a_source_that_does_not_exist_yet") == ""
 
 
 def test_the_scan_would_see_a_planted_writer(tmp_path):
