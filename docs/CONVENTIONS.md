@@ -265,7 +265,7 @@ Source: `reference_ci_masking_and_creds`.
 **This now RUNS in CI, it is not only written here (#3608 box 5).** `ci-cd.yml`'s
 `test-critical` job executes the deploy-critical lane under that exact invocation and
 adds a step, *AWS creds parity — no real credentials resolvable*, which runs
-`scripts/assert_fake_creds_parity.py`: it fails if boto3 resolves anything but the fake
+`scripts/verify_fake_creds_parity.py`: it fails if boto3 resolves anything but the fake
 pair, if `AWS_PROFILE`/`AWS_SESSION_TOKEN` survived the `env -u`, or if the keys are
 absent entirely (absent is the state this convention rejects, not a safe one). It makes
 no AWS call and redacts any real key it finds. `tests/test_fake_creds_parity_step_3608.py`

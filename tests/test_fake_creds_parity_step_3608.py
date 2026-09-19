@@ -7,7 +7,7 @@ one-bundle claim.
 
 THE FIX. ci-cd.yml's `test-critical` job runs the invocation for real: the
 deploy-critical lane itself executes under it, and a dedicated step runs
-`scripts/assert_fake_creds_parity.py`, which fails if boto3 can resolve
+`scripts/verify_fake_creds_parity.py`, which fails if boto3 can resolve
 anything but the fake pair.
 
 WHAT THIS FILE GUARDS. Not a copy of the invocation — the two texts must AGREE.
@@ -24,7 +24,13 @@ import re
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CI_CD = os.path.join(REPO_ROOT, ".github", "workflows", "ci-cd.yml")
 CONVENTIONS = os.path.join(REPO_ROOT, "docs", "CONVENTIONS.md")
-PARITY_SCRIPT = os.path.join(REPO_ROOT, "scripts", "assert_fake_creds_parity.py")
+# `verify_` is not decoration: scripts/gate_census.py's `_GATE_VERB` recognises
+# `verify_[a-z_]+` as a gating step verb, and an `assert_…` name matched NOTHING
+# in it — the first draft of this step enforced in CI and was INVISIBLE to the
+# census (measured: the id-set diff showed no entrant, only the neighbouring
+# step's positional id shifting 3 -> 4). A gate the census cannot see is a dark
+# gate, which is the class #3000 exists to retire.
+PARITY_SCRIPT = os.path.join(REPO_ROOT, "scripts", "verify_fake_creds_parity.py")
 
 # The invocation's load-bearing tokens, in the order §4 states them. `env -u`
 # for the profile/session (never `AWS_PROFILE=`, which raises ProfileNotFound)
@@ -62,8 +68,8 @@ def test_ci_cd_runs_the_parity_invocation_not_just_documents_it():
 def test_the_parity_step_exists_and_calls_the_assertion_script():
     text = _read(CI_CD)
     assert "AWS creds parity" in text, "the dedicated parity STEP is gone from ci-cd.yml"
-    assert "scripts/assert_fake_creds_parity.py" in text, "the parity step no longer calls the assertion script"
-    assert os.path.exists(PARITY_SCRIPT), "scripts/assert_fake_creds_parity.py is missing"
+    assert "scripts/verify_fake_creds_parity.py" in text, "the parity step no longer calls the assertion script"
+    assert os.path.exists(PARITY_SCRIPT), "scripts/verify_fake_creds_parity.py is missing"
 
 
 def test_the_deploy_critical_lane_itself_runs_under_the_fake_creds():

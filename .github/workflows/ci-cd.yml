@@ -477,7 +477,7 @@ jobs:
         run: |
           echo "::group::AWS creds parity (#3608 box 5)"
           env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACCESS_KEY=FAKESECRET \
-            python3 scripts/assert_fake_creds_parity.py
+            python3 scripts/verify_fake_creds_parity.py
           echo "::endgroup::"
 
       - name: Run deploy-critical test lane
