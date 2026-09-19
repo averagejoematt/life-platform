@@ -5,8 +5,8 @@
     "alarms": 131,
     "emf_namespaces": 31,
     "schedules": 90,
-    "secrets": 28
+    "secrets": 29
   },
-  "measured_on": "2026-09-17",
-  "_last_change": "#3506 (2026-09-17): alarms 129 -> 131 — TWO alarms, both dead-men for detectors that could not fail. (1) canary-no-invocations-1h (operational_stack.py): AWS/Lambda Invocations SampleCount < 2 for 4 consecutive hours on life-platform-canary, BREACHING, digest. The canary backs SIX LifePlatform/Canary notBreaching alarms (ddb/s3/mcp/anthropic/subscribe-cleanup/subscribe-residue, two of them paging) which would all stay green forever if its two EventBridge rules were disabled; it was waived in the heartbeat ledger on a reason that was false by ~20x (\"4x-daily\" against a measured 102-124 invocations/day). Standard-resolution metric, no new metric published — the Invocations series already exists and is free. (2) board-verdict-silence-7d (monitoring_stack.py): a metric-math alarm comparing BoardQualityGateVerdict{Surface=board_ask} against board_ask coach generations over 7d, digest-only, closing the #3414 observe-only verdict channel's total absence of a silence detector. Metric math over two EXISTING series — no new metric, no new EMF namespace. No new Lambda, no new schedule, no Bedrock call. Cost: 2 x $0.10/mo standard alarms."
+  "measured_on": "2026-09-19",
+  "_last_change": "#3620 (2026-09-19): secrets 28 -> 29 — ONE secret, `life-platform/ip-hash-salt`, the salt for the reader `ip_hash` on the six site-api engagement doors (/api/nudge, /api/submit_finding, /api/board_question, /api/predict, /api/ritual_log, /api/verify_subscriber). Cost-bearing surface named per #3374 R1: one Secrets Manager secret at $0.40/mo plus API calls, and the READ is bounded — one GetSecretValue per warm container per 15 min through the existing common/secret_cache, not one per request. No new Lambda, no new schedule, no new alarm, no new EMF namespace. It replaces an unsalted SHA-256 over a 2**32 IPv4 keyspace that was being written into S3 records, a DynamoDB sort key and CloudWatch logs. Owner-provisioned: until the secret exists the doors answer 503 by design (fail-closed, no unsalted fallback)."
 }

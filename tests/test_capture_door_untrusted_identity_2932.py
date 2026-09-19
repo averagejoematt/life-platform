@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import ast
 import fnmatch
-import hashlib
 import json
 import logging
 import os
@@ -68,7 +67,27 @@ from common import client_ip  # noqa: E402
 
 # The shared fail-closed rate-limit identity (#1221) — what every identity-less
 # caller's RATE bucket keys on, and what the idempotency id must never key on.
-SENTINEL_HASH = hashlib.sha256(b"no-trusted-client-ip").hexdigest()[:16]
+SENTINEL_IP = "no-trusted-client-ip"
+
+
+def sentinel_hash():
+    """The stored `ip_hash` an identity-less caller must carry.
+
+    Computed through the PRODUCTION helper rather than restated as
+    `sha256(b"no-trusted-client-ip")`: since #3620 the digest is salted, so a
+    hand-written expectation here would be a twin of the hashing rule that
+    silently disagrees the moment the rule changes — which is exactly what
+    happened when the salt landed. Called inside a test, not at import, because
+    the salt is stubbed by a function-scoped conftest fixture.
+
+    What this assertion is FOR is unchanged: the stored record must key on the
+    ONE shared fail-closed rate identity (#1221), never on the per-request
+    idempotency id (#2932). Salted or not, all identity-less callers must land
+    on the same value, and that is what is being pinned."""
+    from web import site_api_social_engage as _engage
+
+    return _engage._salted_ip_hash(SENTINEL_IP, {"logger": logging.getLogger("test")})
+
 
 IDEA = "Try a two-week 10pm lights-out protocol and track HRV against the baseline."
 FINDING = {"metric_a": "sleep", "metric_b": "hrv", "finding": "more sleep tracks higher hrv over time"}
@@ -124,7 +143,7 @@ def test_two_identityless_readers_same_finding_both_stored(wp):
     # The stored records still carry the honest fail-closed rate identity.
     for k in set(keys):
         record = json.loads(wp.s3.objects[k])
-        assert record["ip_hash"] == SENTINEL_HASH
+        assert record["ip_hash"] == sentinel_hash()
 
 
 def test_two_identityless_readers_same_board_question_both_stored(wp):

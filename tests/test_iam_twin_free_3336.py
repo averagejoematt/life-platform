@@ -553,11 +553,17 @@ def _live_vs_tracked(role_name: str):
         "github-actions-diagnosis-role",
         pytest.param(
             "github-actions-remediation-role",
+            # strict=True per tests/test_xfail_hygiene.py (#2375): the drift is DETERMINISTIC
+            # — the live role either matches the tracked JSON or it does not — so the marker
+            # must BURN when the owner applies the fix, rather than quietly tolerating an
+            # xpass forever. The apply therefore reds this test by design, and the red is the
+            # instruction to delete the mark. (When no credentials are present the test skips
+            # before asserting, and a skip is neither xfail nor xpass, so an unfederated lane
+            # is unaffected.)
             marks=pytest.mark.xfail(
-                strict=False,
+                strict=True,
                 reason="owner put-role-policy pending — #3562 merged and closed at merge; the live role still carries 20 Sids "
-                "and 5 wildcards (#3606 item 2, ~2 min). strict=False so the apply FLIPS this to xpass rather than "
-                "needing a second PR to notice.",
+                "and 5 wildcards against a tracked 24 (#3606 item 2, ~2 min). Delete this mark in the PR that follows the apply.",
             ),
         ),
     ],

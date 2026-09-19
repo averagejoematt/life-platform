@@ -46,6 +46,31 @@ from common.secret_cache import get_secret as _get_secret
 _IP_HASH_SALT_SECRET_NAME = _os.environ.get("IP_HASH_SALT_SECRET_NAME", "life-platform/ip-hash-salt")
 
 
+_salt_client_cache: list = []
+
+
+def _secrets_client():
+    """A cached Secrets Manager client, or None if one cannot be built.
+
+    Deliberately imports boto3 here rather than taking `_g["boto3"]`: the facade's
+    `boto3` is the object dozens of door tests monkeypatch to fake S3/DynamoDB, and
+    reaching through it made an unrelated stub decide whether the salt was readable —
+    18 pre-existing tests answered 503 for that reason, none of them about secrets.
+    Failure to build a client is NOT the fail-closed decision; only a failed READ is,
+    which is why this returns None instead of raising.
+    """
+    if _salt_client_cache:
+        return _salt_client_cache[0] or None
+    try:
+        import boto3 as _boto3
+
+        client = _boto3.client("secretsmanager", region_name="us-west-2")
+    except Exception:
+        client = None
+    _salt_client_cache.append(client)
+    return client
+
+
 def _salted_ip_hash(source_ip: str, _g) -> "str | None":
     """`sha256(salt + ip)[:16]`, or None when the salt is unavailable (fail-closed).
 
@@ -53,11 +78,9 @@ def _salted_ip_hash(source_ip: str, _g) -> "str | None":
     there is no unsalted fallback by construction — this function cannot return
     an unsalted digest.
     """
-    boto3 = _g["boto3"]
     logger = _g["logger"]
     try:
-        client = boto3.client("secretsmanager", region_name="us-west-2")
-        salt = _get_secret(_IP_HASH_SALT_SECRET_NAME, client)
+        salt = _get_secret(_IP_HASH_SALT_SECRET_NAME, _secrets_client())
     except Exception as e:
         logger.error(f"[ip_hash] salt unavailable ({type(e).__name__}: {e}) — refusing the write (fail-closed)")
         return None
