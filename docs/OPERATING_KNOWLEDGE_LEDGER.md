@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 454** — feedback 24 · reference 262 · security 1 · project 164 · user 1 · index 2
+**Files in the memory index snapshot: 461** — feedback 24 · reference 268 · security 1 · project 165 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 287** — homed-here 81 · already-homed 180 · superseded 7 · narrative 15 · off-repo 4
+**Rule-class files (feedback + reference + security): 293** — homed-here 81 · already-homed 184 · superseded 7 · narrative 17 · off-repo 4
 
-**Program/session files (project): 164** — already-homed 14 · superseded 1 · narrative 146 · off-repo 2 · index 1
+**Program/session files (project): 165** — already-homed 14 · superseded 1 · narrative 147 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -215,6 +215,7 @@ project_session_af_2026_09_15.md
 project_session_ah_2026_09_16.md
 project_session_ai_2026_09_17.md
 project_session_aj_2026_09_18.md
+project_session_al_2026_09_19.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -281,6 +282,7 @@ reference_a_page_level_overflow_measure_is_blind.md
 reference_a_page_of_logs_is_not_the_latest.md
 reference_a_pct_suffix_is_not_one_semantic.md
 reference_a_piped_exit_code_is_not_a_test_result.md
+reference_a_pr_green_is_not_a_main_green_when_a_gate_keys_on_the_ci_event.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
 reference_a_private_artifact_under_a_public_prefix.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
@@ -295,6 +297,7 @@ reference_a_text_match_reads_the_comment_explaining_it.md
 reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
+reference_a_visual_gate_failure_silently_reverts_every_site_deploy.md
 reference_a_well_formed_citation_is_not_a_true_one.md
 reference_a_writer_that_ignores_the_wipe_tombstone.md
 reference_absence_read_as_success.md
@@ -304,11 +307,13 @@ reference_adr099_score_inverts_priority.md
 reference_agent_commit_and_the_throughput_fix.md
 reference_agent_commit_directory_arg_destroys.md
 reference_agent_commit_directory_is_not_a_name.md
+reference_agent_commit_reverts_platform_counts_even_when_the_branch_owns_it.md
 reference_ai_gate_blocking_deploys.md
 reference_all_settled_over_an_incomplete_check_set.md
 reference_an_enumeration_query_is_a_member_of_its_own_set.md
 reference_an_epic_can_pass_every_box_and_fail_its_outcome.md
 reference_an_instrument_in_deploy_cannot_run_in_a_lambda.md
+reference_an_md5_on_the_source_is_not_proof_the_mutation_ran.md
 reference_api_before_frontend_autodeploy_race.md
 reference_api_schema_capture_wholesale.md
 reference_arming_a_semantic_gate_needs_a_baseline.md
@@ -504,10 +509,12 @@ reference_test_importing_aws_cdk_reds_ci.md
 reference_test_layer_dep_import_collection_red.md
 reference_the_acceptance_box_can_be_vacuous_on_its_own_incident.md
 reference_the_census_enumerates_tracked_files.md
+reference_the_closure_sweep_reads_your_own_verdict_prose.md
 reference_the_doc_literal_merge_treadmill.md
 reference_the_first_denial_masks_the_second.md
 reference_the_rubric_can_be_the_finding_generator.md
 reference_the_squash_message_is_a_fourth_text.md
+reference_the_tip_does_not_carry_a_superset_of_its_ancestors_deploys.md
 reference_time_dependent_gate_outside_its_window.md
 reference_token_overlap_misses_structural_cloning.md
 reference_two_module_size_guards.md
@@ -996,6 +1003,13 @@ carries an operating rule.
 | `project_session_ac_2026_09_13.md` | project | — narrative: a session record (the owner's week-one feature review — three epics filed, then the training-tools investigation), not a repo rule; its extracted rules are the two reference rows above | narrative |
 | `MEMORY.md` | index | — the memory index itself | index |
 | `user_who_is_matthew.md` | user | — out of scope: who the owner is stays in memory | user |
+| `project_session_al_2026_09_19.md` | project | session record — the Fable drain's numbers, the merge posture's two reds, the audit's 194 → 35 split; the RULES it produced are homed in their own reference rows | narrative |
+| `reference_a_pr_green_is_not_a_main_green_when_a_gate_keys_on_the_ci_event.md` | reference | `tests/test_doc_drift_date_stamp_2649.py` (`_gate_env()` builds the gate subprocess's env explicitly — `GITHUB_REF` removed, `GITHUB_EVENT_NAME` pinned — and one test asserts the push-to-main branch on purpose) | already-homed |
+| `reference_a_visual_gate_failure_silently_reverts_every_site_deploy.md` | reference | incident narrative (09-16 → 09-19: three days of site merges published then auto-rolled-back by the #3652 scope check working as designed); the rule — read the LAST site-deploy's conclusion before merging `site/**` — is a driver reflex the `/land` skill's verify step already states, so this file keeps only the measurement | narrative |
+| `reference_agent_commit_reverts_platform_counts_even_when_the_branch_owns_it.md` | reference | `deploy/agent_commit.sh` (the restore block's own comment: platform_counts.py is refused outright and diffed against the merge-base — the sync output is committed with a plain `git commit`, hook intact) | already-homed |
+| `reference_an_md5_on_the_source_is_not_proof_the_mutation_ran.md` | reference | `scripts/gate_census_mutations.py` (module docstring: CPython validates a cached `.pyc` on mtime+size, so a byte-length-preserving edit runs the ORIGINAL module — purge `__pycache__` and run `-B` before reading a verdict) | already-homed |
+| `reference_the_closure_sweep_reads_your_own_verdict_prose.md` | reference | `scripts/closure_contract.py` (`unhomed_residuals` / `RESIDUAL_CUE_RE`: a residual is named lexically and disposed structurally — `#N` or `not-work —` on the same block; the docstring says why a closing comment about another issue's lifecycle trips it) | already-homed |
+| `reference_the_tip_does_not_carry_a_superset_of_its_ancestors_deploys.md` | reference | incident narrative (AK's five rejection comments written on a false premise); the rule — CI's Plan diffs `${GITHUB_SHA}~1 HEAD`, so a docs-only tip skips Deploy and an ancestor's fix ships from nobody; verify by shipped content — is stated in `docs/CONVENTIONS.md` §4d and the `/land` skill, so this file keeps the measurement | narrative |
 
 ---
 

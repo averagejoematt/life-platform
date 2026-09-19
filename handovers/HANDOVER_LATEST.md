@@ -1,242 +1,150 @@
-# Handover — Session AK: three issues the plan said were one box from done, and none of them was (2026-09-19 00:36Z → 04:00Z)
+# Handover — Session AL: the Fable drain — 24 closed, 10 filed, and the two reds the merge posture bought (2026-09-19 15:41Z → 23:1xZ)
 
-**Driver:** Opus 5 (1M), autonomous drain. Owner brief: *"close issues on demonstrated evidence"*, target 112 → 100-104
-measured, standing merge+deploy authority (CDK included, announce before running), no `--deliver`, issue numbers
-sigil-free near closing verbs, every deploy lease disposed. Plan: `~/.claude/plans/iterative-prancing-starlight.md`.
+**Driver:** Fable 5.1, autonomous drain. Owner brief: drive the DEBT COUNT (Now+Next+Later + the milestone-less epics = 84) as low
+as it honestly goes; 40 the stretch, ~60–65 the plan's own honest landing; standing merge + deploy authority (CDK included);
+auto-merge on the two REQUIRED checks only, deploy via `deploy_fleet.sh` from origin/main after each wave, REJECT every CI lease by
+name; no `--deliver`. Plan: `~/.claude/plans/elegant-wobbling-beacon.md`. Owner answered the §2 sheet in-session (11 + 4 prompts).
 
-**112 → 105 open, measured two ways (`search total_count` AND a paginated id-set, agreeing). **7 closed** on demonstrated
-evidence, 0 filed, **10 PRs merged**, 6 production deploys (site-api direct, two successful
-`site-deploy`s, three approved fleet deploys), 7 superseded leases rejected by name and 3 approved.** One outside the 100-104 target, and the reason is the
-through-line below rather than a shortfall of work: the plan's arithmetic rested on three issues being one box from
-done, and measurement said otherwise on all three.
+**105 → 91 open, measured two ways (`search total_count` AND a paginated id-set, agreeing). 24 closed, 10 filed, net −14.**
+Debt count 84 → 75 (Now 27 / Next 16 / Later 32; the 12 milestone-less epics were milestoned in Wave 0 and are inside those
+numbers); Roadmap 21 → 16 (five retirements on the owner's word). **Owner-sheet closures 9** (3716 3771 2883 3042 + Roadmap 1677
+1629 1570 1388 1407) · **engineering closures 15** (3614 3750 epic 3491 3731 3677 3692 3513 3877 3816 3769 3603 3543 3817 3717 3546).
+**21 PRs merged** (#3889–#3912 minus the open #3908, plus #3913–#3920 are issues), **4 fleet-class deploys** (3 `deploy_fleet.sh`
+runs, 106/106 each; 4 MCP deploys; four stacks redeployed by hand via `cdk_deploy.sh`: Email/Operational/Ingestion for #3890's SSM grant, Serve for #3895's salt
+grant), 1 auto site-deploy with the visual gate GREEN (build 7058541), **15 leases REJECTED by name**, 0 approved. Short of 40 by
+the plan's own arithmetic, not by a shortfall of work; the reason 60–65 was not reached either is the through-line below.
 
 ## The through-line
 
-The plan's key finding was that **the ranker scores stale bodies** — nine ranked issues had boxes already landed under
-`Refs`. That is true, and it produced two of the five closures. What it did not anticipate is that **the correction
-runs both ways.** Three issues the plan sized as nearly-done were not:
+**The merge posture bought throughput and two self-inflicted reds, and every lane's second-round fix came from CI, not from
+reading.** Auto-merge on the required lane let 21 PRs land in 8 hours; the full suite, running post-merge, caught what the lane
+could not — twice (F's event-keyed tests, H's ratchet) — and both lanes fixed forward within the session. Nine of the fourteen
+engineering closures needed a second CI round on the same PR (a grant the gate demanded, a user-agent string that matched the
+secret-name shape, a census identity lost by editing a proven test, a frozen-clock guard, a size ceiling, a Pacific-day ratchet,
+a conflicting model regeneration, a sync-owned literal the commit hook refuses). None of those was visible to the lane's targeted
+tests; all were visible to the gate. That is the platform working, and it is also the reason a 45-minute lane is a 90-minute lane.
 
-- **3614** — box 2's third clause (a `check_backlog_hygiene` rule blocking a grounding finding's closure until its
-  specimen is in the corpus) simply does not exist; `grep 'corpus' scripts/check_backlog_hygiene.py` returns the
-  `## Set` intake and nothing else. 3 of the corpus's 8 specimens are also still `status: open`.
-- **3670** — box 4 as literally written ("the title **counters** cannot reach behind `EXPERIMENT_START_DATE`")
-  contradicts an owner ruling recorded verbatim on #3671: *N answers "Pull #3 of Foundation" even where Foundation
-  spans two cycles.* The lane implemented it, flagged it as a reviewer decision point, and I ruled it reverted.
-- **3599** — box 2 (the scoped-writer guard generalised to `classify()==EXPERIMENT_SCOPED`) is unpaid on main; the
-  #2119 guard is still scoped to `COACH#` pk tokens with no `SOURCE#insights` control.
-
-All three lanes delivered good work and all of it merged. **A body can be stale in the "further along than it reads"
-direction and in the "an owner already ruled against this box" direction, and only reading the code and the owner's
-own words separates them.**
-
-## What closed, and on what
+## What closed, and on what (engineering)
 
 | # | Closed on |
 |---|---|
-| **3829** | The box-3 instrument caught firing on a real hole at 16:06:55Z and going quiet at 18:31:17Z; producer side verified by unzipping the live Lambda (`stored=pending` at :1199, `Timeout 300`) |
-| **3792** | The framing flipped on the first `coach_state_updater` run after the deploy, with the day before it as a negative control in the same partition |
-| **3835** | The shed measured — median 2850s → 1970.5s (n=9 → n=24), **1.45×** — and the budget deliberately not raised, with the residual and the p50-vs-p90 question written into the class record |
-| **3669** | `assert_registry_coverage` passing on the live census with `COACH#brand_new` as its must-fail control; the measured Set was **67 of 83**, not the 4 filed |
-| **3511** | `/method/predictions/` rendering `sealed 16 / in-cycle 24` where it read `sealed 0 / in-cycle 40`; `SEALED_ROW_MISSING: 0`; the cycle-17 sweep sanctioning 16 coach rows, none by a bare cycle stamp |
-| **3878** | The two labels measured at **11.00px** on the deployed site at both widths; `visual_qa --screenshot` **94 passed / 0 failed**; CI/CD `35415903531` concluded **success** with `Visual + AI-vision QA: success` |
-| **3604** | Auto-closed on the green standalone sweep it names in its own close policy — dispatched after the site was verified clean, never closed by hand |
+| **3614** | the corpus-before-close rule run from merged main, firing on its founding incidents (3 `status: open` specimens) — then epic **3491** on its six closed stories |
+| **3750** | the live footer (`instagram.com/averagejoematt`) + the owner's handle + the dated auto-posting rule on epic 3741 |
+| **3731** | per-test table (six lockstep scanners cached cross-process; 49.6s → 0.22s) + the first post-merge Unit Tests reading, 1966s, n=1 stated |
+| **3677** | the measurement reversed the premise: whoop's 2,249 straddling rows are ALL UTC-keyed, 0 Pacific — the "fix" would have minted phantom gaps; `MissingActivityCount{whoop}` 0 for 4 days incl. post-deploy |
+| **3692** | registry 2453 → 2117 lines by extraction; `get_platform_state` listed over the real MCP transport (84 tools) and its summary equal to the page's artifact field-for-field |
+| **3513 / 3877** | the row-side audit deployed (37 families); 120 rows backfilled (issue said 6); the third insights writer (MCP `save_insight`) found by the audit and stamped; the 18:31Z nightly reading zero for NUDGE# |
+| **3816** | 15 changed re-extractions archived their prior + stamped `supersedes`, live; the 09-07 specimen declared unrecoverable |
+| **3769** | `layer_status` on four readers, called live over the deployed server: a `count: 0` that says the layer was readable |
+| **3603** | the calendar workflow's green run 35468600861 printing the carry-forward block under the rewritten instrument |
+| **3543** | 353 → 0 sub-floor nodes on 64 pages; the visual gate green with the floor measured everywhere for the first time |
+| **3817** | the 06-22 head record carrying two `progression` blocks with durations and an `rpe_caveat` joined to `DATE#2026-06-22`'s readiness row |
+| **3717** | the deployed attestation record executed: 2021-04-12 → 2026-09-19, 30/45/60 min, on the owner's verbatim statement |
 
-## What shipped
+## Findings the work produced that the plan did not predict
 
-| PR | Issue | What | Live? |
-|---|---|---|---|
-| #3879 | 3511 | `admit_sealed` — the seal survives the ledger's newest-first slice, in the API and the renderer | site-api + site |
-| #3880 | 3835 | the duration class record gains its post-change distribution (n=24) | repo-side |
-| #3883 | 3878 | two labels onto `--fs-label`; the spine rail sizes to its content instead of clipping | site |
-| #3872 | 3669 | `labs` registered with a derived cadence, `inbound_email` retired, every live `SOURCE#` dispositioned | fleet |
-| #3881 | 3670 | `list_all_folders` walks every page and REPORTS a truncated sweep; box 4 reverted on the owner ruling | fleet (MCP verified) |
-| #3882 | 3614 | the audience/fail-mode facet on all 32 surfaces + the derived phase-prose census | repo-side |
-| #3884 | 3599 | the pre-seal truth gate, positive control = the live published seal | repo-side |
-| #3885 | — | 4 `PROPORTIONALITY` rows for this session's standing machinery | repo-side |
-| #3886 | 3877 | the nudge writer stamps per ROW at the single write site | **needed a recovery deploy — see finding 9** |
-| #3887 | — | the #736 build beat | site (verified served: 142 beats) |
+**1. The widened audit's first night found the real Set, and half of it was noise by construction.** #3890 replaced a hand list with
+`pk_census` + `classify()`; the 18:31Z nightly reported 194 unstamped rows across 17 of 37 families. Split by tagger reach (read-only,
+19:33Z): **35 rows on 4 tagger-BLIND families** (PERSONA 19, bare-USER coach_thread 14, COACH#commitments 1, NARRATIVE 1) are real
+and filed as #3900; **159 on 13 SOURCE# families** are tagger-reachable in-cycle rows the reset stamps anyway. #3901 split the leg so
+the chronic WARN names only blind or pre-genesis rows — a gate nobody can clear trains the reader to skip it (#3851). The alarm
+citation was re-pointed to #3900, never dropped while the leg still warned.
 
-## Findings the work produced that the issues did not predict
+**2. Three acceptance boxes were unsatisfiable as written, and each was recorded rather than paid by a look-alike.** 3654 box 4 wants
+a dispatched red site-deploy showing the rollback's coverage line — but every injectable failure surface is one the #3652 scope check
+DECLINES before the rollback script runs. 3646 box 2 ("next 3 merges green") failed 1 of 3 on the SYSTEM-MODEL gate, a second
+bot-owned artifact outside #3896's partition. 3620 box 1 wants `pii_surface_guard` on a schedule — deploy/ is never bundled, so a
+qa_smoke leg is impossible; only `ci-cd.yml` can host it. All three stay open, partial, with the member named.
 
-**1. Two sub-floor labels were auto-rolling-back EVERY site deploy — not just reddening a badge.** #3878 says a
-standing red trains readers to stop reading the badge. Measured, it was worse: `site-deploy.yml` run `35363669931`
-shows `Auto-rollback site … success` with `all 2 failed page(s) are site/**-reachable (site-shell=2)`. The #3652 scope
-check was working exactly as designed — those failures *are* site-reachable. The last successful site deploy before
-this session was 2026-09-16T06:29Z. **This session watched it happen to its own work:** #3879's renderer fix deployed,
-was reverted, and in that window `/method/predictions/` rendered `sealed 6` instead of `sealed 16` — a number matching
-that renderer's own mutation control exactly.
+**3. The fullreview-delta was INVALID by the rubric's own two tests, and the calendar carries the dated hold instead of a silent
+lapse.** The change surface since the 09-05 baseline is 896 files across every area (>70% of the panel qualifies), and #3904
+rewrote the instrument the same afternoon (frozen anchors, the 28-day cap, calibration controls). PR #3910 re-anchors the clock to
+2026-09-26 with the reason verbatim; the next fullreview run is a NEW BASELINE. The owner's headroom answer (<50% used) would have
+allowed it; the rubric did not.
 
-**2. An acceptance box can be fully satisfied and produce no reader-visible effect.** #3511 box 4 asked that the
-projection carry `pre_registered` and the ledger table render sealed vs unsealed. Both shipped; both were live. And a
-reader could not reach a single sealed row, because a pre-registered bet is dated at genesis and is therefore the
-**oldest** row in the season, so every newest-first slice drops it first. Two truncations, in the API and in the
-renderer.
+**4. A backfill without `--since` walked the whole corpus — my omission, not the lane's.** Intending the 40 stored heads under the
+1.0.0 → 1.1.0 version bump, `backfill_training_notes.py --apply` also CREATED the ~515 historically-absent note records #3918 had
+reserved for an owner call (568 rows written, 53 versioned with priors archived; on the order of 500 short Haiku calls, under the
+ceiling). Additive, versioned, readable — recorded on #3918 as a driver act, not claimed as the box's payment.
 
-**3. Raising a font to a floor CLIPPED a label the gate never named.** The #3878 Set was two elements, but
-`.chart-spine-v` comes from a shared producer, so sweeping all 93 QA pages found a third: `'22407.5 kg'` on
-`/data/training/` fits exactly at 9.6px and clips at 11px (`scrollWidth 46` vs `clientWidth 40`). Invisible to a
-page-level overflow read — the #3734 class. **The fix would have shipped the defect if the Set had not been swept.**
+**5. The owner's 09-18 question on 3717 was stale: the record had been active since 09-08.** Today's statement EXTENDED it to the whole
+Hevy window (first stored `DATE#` 2021-04-12 → the statement date). Reading the code before asking would have made it a one-word
+confirm rather than a three-value question.
 
-**4. The published cycle-17 pre-registration is untrue in seven places.** Lane A's positive control is the live seal,
-hash-verified (`curl … | shasum` == the fixture, `bd225d24f673…`), and the gate reports 7 blocking findings against it:
-a retired coach sealed (`training_coach` / "Dr. Sarah Chen", after ADR-153), a wrong byline (`physical_coach` sealed
-"Dr. Victor Reyes" vs the registry's "Dr. Max Reyes"), three assertions of a 326.2 lb start against a 327.34 baseline,
-and two bare literal `min_effect` values. The seal is permanent, so this is an amendment question, not an edit one.
+**6. `deploy/agent_commit.sh` silently reverts `lambdas/web/platform_counts.py` to the merge-base on every run** — even when the
+branch legitimately carries the sync output (#3891, #3895 both hit it; the file must be committed with a plain `git commit` after
+`sync_doc_metadata.py --apply`, hook intact). And `git checkout -- <file>` after a mutation restores HEAD, eating the uncommitted
+edit beside it — the #3888 sweep lesson, one file wide, and I did it once before re-applying.
 
-**5. `an md5 on the source proves the FILE changed, never that the CODE UNDER TEST did.`** Lane A's third mutation
-reported GREEN falsely: `100.0 → 400.0` is byte-length preserving, and CPython validates a cached `.pyc` on
-`(mtime, size)`, so the stale bytecode ran. The fix (purge `__pycache__`, run with `-B` before reading any verdict) and
-the reasoning now live in `scripts/gate_census_mutations.py`'s module docstring, in front of the next author of a
-mutation control. **This is the most transferable thing the session produced.**
-
-**6. Filed member counts in the provenance family are systematically low.** #3669 filed "4 live partitions with no
-entry" and measures **67 of 83**; #3513 filed 6 unstamped rows and measures **109**; #3877 filed 9 and is **10**,
-growing by one a day. All were filed from review sweeps that sampled rather than enumerated. #3594's `## Set` intake is
-the structural answer and is going-forward-only.
-
-**7. A text matcher read my own prose four more times.** The closure sweep's `post-close-assertion` rule fired on a
-sentence about a *different* issue's lifecycle in my 3669 comment; its `unhomed-residual` rule fired on my quoting an
-earlier comment's marker; and **the note I wrote explaining the first false positive reproduced the trigger phrase and
-tripped it again.** Reworded each time rather than answered by changing a detector. Closure sweep now: 0 findings.
-
-**8. The #2119 writer guard sees 7 of 154 `put_item` call sites.** Measured read-only with the guard's OWN helpers,
-so this is its definition of visibility rather than mine: 154 functions under `lambdas/` call `put_item`; **7** carry a
-literal pk token and are therefore visible; **143 are blind and do not stamp**; 4 are blind and stamp anyway. The guard
-flags on `if pks and not _stamps_directly(fn)`, so a writer whose pk is built at runtime cannot be flagged whatever it
-does — ~95% of call sites. I hit this concretely: I moved #3877's stamp to its `put_item` site specifically hoping it
-would land inside the guard, and measured that it did not.
-
-**It is NOT 143 defects** — most of those partitions are `system_state` or `cross_phase`, where not stamping is exactly
-right. What is unknown is how many write an `EXPERIMENT_SCOPED` row, and that cannot be answered by AST at all, because
-the pk is the runtime value the AST cannot see. The cheaper and more complete answer is to **invert the check**:
-enumerate ROWS, not writers — `pk_census` already walks every live family and `classify()` already rules on each, so a
-nightly "every EXPERIMENT_SCOPED family has zero unstamped rows" catches the defect regardless of which writer produced
-it. #3877's box 4 is a single-partition version of exactly that. Recorded on #3599, which owns the widening.
-
-**9. "The tip carries a strict superset" is FALSE, and I wrote it into five rejection comments before catching it.**
-`ci-cd.yml`'s Plan diffs **`${GITHUB_SHA}~1 HEAD`** — its OWN commit against its OWN parent — so each run deploys only
-what its commit changed. `cd6014f36` (#3886, a `lambdas/` provenance fix) had its lease rejected as an ancestor; the
-tip `a3c62024d` (#3887, `site/story/build/beats.json` only) then recorded **`Deploy: skipped`**, and `coach-nudge`
-stayed on the previous bundle — `grep experiment_stamp_for` on the **deployed artifact** returned 0. The merged fix was
-shipped by nobody.
-
-It looked fine earlier only by accident: the previous tip `f80e88a50` was a reconcile commit touching an UNMAPPED
-`lambdas/` file, which sets `FLEET_CHANGED=true`, and a fleet deploy does ship the whole bundle. The premise held by
-luck, not by rule. Recovered with `gh workflow run ci-cd.yml --ref main -f deploy_all=true`.
-
-**The only reason this was caught is the standing rule to verify by SHIPPED CONTENT rather than by a merge or a badge.**
-Every badge in that chain was green.
+**7. Filed member counts were low again, in both directions.** 3513: 6 filed, 120 reconciled. 3543: 8 pages filed, 10 measured. 3620:
+2 hash doors filed, 6 salted. 3677: a "fix" filed, 0 to fix. 3608: `typical_seconds: 90` stored, 1026 measured.
 
 ## Deploys and leases
 
-- `deploy/deploy_site_api.sh` at `9258da37` (direct; ancestry preflight + postflight both confirmed), verified by
-  unzipping the deployed artifact — `def admit_sealed` at :258, on the call path at :879.
-- `site-deploy` succeeded on `f22c66ad` (visual QA **success**, auto-rollback **skipped**) — the first successful site
-  deploy since 2026-09-16T06:29Z.
-- The build beat is live and verified as served, not merely merged: `curl https://averagejoematt.com/story/build/beats.json`
-  returns **142 beats** with `2026-09-19-the-seal-nobody-could-see` at the top, on site build `a3c6202`. Its `site-deploy`
-  concluded success with `Visual + AI-vision QA: success` — the second site deploy in a row to survive its own gate.
-- CI/CD fleet deploy approved on main's **tip** `f80e88a50`, and verified by reach rather than by the job's green:
-  **105 of 111 Lambdas** carry a `LastModified` between 02:47Z and 03:00Z. Spot-checked by shipped content — the
-  deployed MCP package carries `list_all_folders` with `FOLDER_PAGE_LIMIT = 20` and the `unfoldered: <reason>`
-  reporting, so #3670's duplicate-folder hazard (a commit that creates a second `Push` folder and reports success) is
-  no longer live.
-- **A rejection comment is CONSUMED by an instrument, not just etiquette.** `check_main_green.py` reads the
-  rejection text back and classifies the run as *"production deployment REJECTED and superseded (#2467 lease actioned),
-  not a red main"*, quoting the reason inline. So the prose written on a rejection is what stops a correctly-disposed
-  lease from reading as a broken main at the next wrap. Worth knowing before writing a terse one.
-- **7 leases rejected by name** (`df9cfca1`, `c9411dbf`, `0ce5b1ea`, `63c7fc33`, `29549cfd6`, `9b19afc87`,
-  `cd6014f36`), each as a superseded
-  ancestor with its reasoning recorded on the rejection, and **3 approved** — `f80e88a50`, `e2cfee176`, and the dispatched
-  `deploy_all` recovery on `a3c62024d`, each the tip at the moment it gated. The second was approved rather than held back for a batch, deliberately: I had three PRs still
-  going green, and holding a tip's lease open until they land is exactly the eviction that wedged six merges for 12.5h
-  on 2026-09-18. A second fleet deploy is cheap; a held lease is not. A persistent monitor watched the gate for the whole
-  session rather than the check being a wrap step — the direct answer to that incident.
+- `deploy_fleet.sh` from origin/main at `2ce05e84e` (17:08Z), `ae53b679f` (20:08Z), `a7c39b102` (20:58Z) — each 106 updated / 0
+  skipped / 0 failed, each verified by unzipping named functions and grepping the changed symbol (the row audit, both writer stamps,
+  M's facet, the salted hash, the OAuth leg, the versioned note write, the attestation record — executed, not read).
+- MCP via `deploy_lambda.sh` at 53e43517, ae53b679, f1e5113b, 9878f42c — each with the ancestry postflight.
+- CDK by hand, `--require-approval never`: Email + Operational + Ingestion (the `ExperimentCycleRead` grant the pre-merge gate
+  demanded, verified live on two roles), Serve (`IpHashSalt`, verified live). The first CDK attempt exited 1 on the no-TTY IAM
+  prompt — the flag is the fix, and the wrapper's own usage line names it.
+- Site: one auto site-deploy for #3907, `Visual + AI-vision QA: success`, rollback skipped.
+- **15 leases rejected by name**, each with the prose the green-reader consumes; 0 approved; one persistent steward for the whole
+  session (a leftover monitor from a prior session was stopped as a duplicate).
 
 ## Owner asks
 
-**The 8 gated questions are still unanswered** (last activity is AJ's own 2026-09-18T00:59Z posts): **3716 3717 3750
-3753 3755 3761 3770 3771** — the last open children of five epics, ~13 closures for near-zero engineering. They are the
-single largest available move on the board and no session can make it.
-
-Four more, each one sentence:
-
-- **3571** — the `dropbox` ruling on MacroFactor's CSV upload. Its derived denominator is **7**, not the 1 its text
-  implies, and the `capture_channel` facet comment is stale (`progress_photos` has carried `'telegram'` since #3757).
-- **3563** — the scoped `logs:FilterLogEvents` grant.
-- **3601** — the reset-cadence ruling. (Its box 2 is a sleeper: `monthly_close.py:573` says in its own output that
-  `$/reset` needs a per-reset cost model that does not exist.)
-- **3670 box 4, NEW this session** — the box says *"the title **counters**"* (plural) and #3671 records the opposite
-  ruling for N. If the ruling stands, box 4 should be reworded to name **Y** and ticked as already paid by #3671. If
-  you have changed your mind, the implementation existed and reverting it was one commit.
-
-And the **5 standing `acceptance_count` violations** (3607 3611 3615 3617 3621) still red `check_backlog_hygiene` all
-day. They need splitting, not trimming — untouched by instruction.
+- **3770** (calf-press template, in the Hevy app) · **1738** (TTS by ear) · **1571** (the S3 kit re-upload) — left open on the
+  owner's own answers today.
+- **3654 box 4** — choose: a `site-shell` injection surface (a real revert lever) or an attended `rollback_site.sh` run, and reword
+  the box.
+- **3918** — the duplicate-template key collision (the backfill half is done, by my omission).
+- The 8 `gate:owner` items the sheet did not reach (3753 3755 3606 2978 …) and the 5 `acceptance_count` violations (3607 3611
+  3615 3617 3621), untouched by instruction.
+- **3741** — 0 cards posted; the owner intends to post the set in a parallel session (prompt handed over in-chat); box 4 re-measures
+  after; boxes 1–2 become satisfiable 2026-09-22.
 
 ## Residual / next picks
 
-- **`docs/PROPORTIONALITY.md` rows for Session AJ's four subsystems** — the two #3506 alarms (the AI-canary dead-man
-  and the cadence assertion), #3785's config-ownership registry, #3514's SCHEMA census gate. I wrote rows for **this**
-  session's four (#3511, #3829, #3614, #3670 — PR #3885) and deliberately did not write AJ's: I did not build them and
-  have measured only part of them, and writing rent I have not measured is the failure the ledger exists to prevent.
-- **A three-issue provenance cluster with one shape:** #3513, #3877, and **#3599 box 2**, which is the one that makes
-  the other two unable to recur. Paying them separately means writing the same guard three times. Whoever takes any one
-  should read all three first. #3877 has a PR open (#3886) paying box 1 only.
-- **#3877 boxes 1 and 3 are now paid and live** — the writer fix deployed (verified by unzipping `coach-nudge`:
-  `experiment_stamp_for` at :470, the bare `cycle` gone from the builder), then the backfill applied **10 rows written,
-  77 correctly protected**, and a read-only re-run reports *"nothing to repair — every EXPERIMENT_SCOPED row on the
-  audited COACH#/ENSEMBLE# partitions carries a phase stamp."* Boxes 2 (the guard's reach) and 4 (needs the ~18:30Z
-  nightly) remain, so the issue stays open. The 77 protected rows matter as much as the 10: stamping a `CHAT#` or
-  `RELATIONSHIP#state` row would be #3514's defect running backwards.
-- **#3546's shrink list has grown 11 → 50 across 48 pages**, measured by this session's own sweep. Every stale entry is
-  a live (page, rule) pair that has stopped gating. Do not harvest before its box 2 `phase_dependent` flag exists.
-- **122 worktrees**, and two agent lanes from prior sessions flagged their own locks still present
-  (`issue-3688-judge-truncation-retry`, `issue-3699-training-notes-degrade-reason`) — **not-work — the `/worktree`
-  inventory ritual, which the boot brief already flags every session and which no issue tracks by design.** Both lanes
-  reported their own lock rather than clearing it, which is the lane rule working; the reaping is the driver's.
-- **#3699 owes three deploys** from a prior session's lane, reported by that lane's own agent in this session:
-  `cdk_deploy.sh LifePlatformIngestion`, then `deploy_lambda.sh life-platform-mcp`, then the freshness checker. Until
-  the first runs, nothing writes a `degraded_reason`; until the second, the read surface cannot show it.
+- **#3908** (lane G, 3608) — all five boxes paid on the branch, rebased on #3912's fix, paying `check_main_green.py`'s 1114-line
+  overrun by extraction at wrap time; merge + verify each box on the next main run (the parity step and the wall-clock notice are
+  the live outputs). Then `python3 deploy/write_lane_posture.py --measure` joins the wrap ritual (#3608).
+- **#3900** — the 4 tagger-blind families; the next nightly's line (`35 row(s) across 4 of 37`) is its baseline.
+- **#3646** — the system-model gate's `pending-reconcile` verdict (box 2's remaining member).
+- **#3654** — box 4 (owner's choice above). **#3620** — box 1's `ci-cd.yml` host.
+- **#3913–#3920** — the eight filed from lane findings (whoop's frame facet, the evening-nudge false negative, the 3,185-row inverse
+  leg, the orphan guard's import blindness, the inert `integration` marker under xdist, the note-key collision, the calendar's exit-4
+  arm, four more `DERIVED_LAYERS` readers).
+- **#3897** — 18 serious contrast nodes on `/data/habits/` at 390px light (lane P's find; `site/**`).
+- **#3678** — `check_job_timeout_headroom.py` red on main: pr-checks' Collect lane needs 20.74 min vs 18 (lane G measured it).
+- The two `unvalidated-merge-closure` sweep hits (69f31b05e → #1921, d681aecc6 → #3715) predate this session — not-work — the
+  #3863 class, owned by whoever dispositions `DISPOSITIONED_MERGE_TEXT`.
+- **122 worktrees** — not-work — the `/worktree` inventory ritual; every lane worktree this session was released after merge.
 
 ---
 
-**Build beat:** `2026-09-19-the-seal-nobody-could-see` — "The pre-registration nobody could see" (PR #3887). Merged AND
-deployed AND live: `/method/predictions/` renders `sealed 16 / in-cycle 24` where it rendered `sealed 0 / in-cycle 40`.
-**Doc-impact sweep:** no canonical wiki page was invalidated, and here is the per-item reason rather than silence.
-`admit_sealed` (#3511) changes which rows `/api/predictions` returns, not its contract, its field set or the endpoint
-count `ARCHITECTURE.md` carries. #3669's registry work is exactly the kind of fact `CLAUDE.md` already delegates to
-`source_registry.py` ("read the registry, don't hand-state a source's schedule here") — and `check_doc_facts.py` is the
-gate that would catch a drift, run green. #3878 moved two component rules onto an EXISTING token; `DESIGN_SYSTEM_V5.md`
-documents the §10.5 floor and the `--fs-label` step already, and neither changed. #3614, #3670, #3877 and #3884 are
-tests, internal writers and a `deploy/` script — no public surface, no MCP tool added or retired, no new ADR, no
-secret or account. Nothing load-bearing was retired, so `docs/_lint/tombstones.txt` needs no rule. The three docs that
-DID change are listed below because they are the subject of the change, not collateral.
-**Docs:** `docs/PROPORTIONALITY.md` (+4 ledger rows, PR #3885) · `docs/alarm_citations.json` (qa-smoke-warnings pruned
-to its one live leg) · `site/story/build/beats.json` (+1 beat) · `tests/test_duration_budget_ratchet.py`'s class record
-(the post-change distribution) · `scripts/gate_census_mutations.py` (the `.pyc` trap, via #3884).
-**Decisions:** none needed — every call applied an existing ADR (099 closure contract, 103/144 ledger posture, 104
-honest numbers, 077 phase classes, 133 ceiling untouched). **One owner RULING was applied rather than made:** #3671's
-recorded preference decided #3670 box 4 against the box's own wording.
-**Main:** green, verified at wrap rather than assumed — `check_main_green.py` reports *"✅ main GREEN — latest
-completed CI/CD run (a3c62024) succeeded"* with `HEAD-COVERAGE: covered a3c62024`. It read RED earlier in the session
-for two reasons, both benign and both now cleared: a reconcile-push race on `f22c66ad` (my four back-to-back merges
-raced the reconcile bot twice; the error says so itself — *"the queued run will reconcile"* — and `f80e88a50` did),
-and the seven lease REJECTIONS, each of which concludes its run as `failure` by construction. The checker already
-distinguishes the latter, reading the rejection prose back as *"production deployment REJECTED and superseded (#2467
-lease actioned), not a red main"*.
-**Incidents:** none added — no incident occurred. The lease discipline that AJ's incident row demanded was applied
-continuously (a persistent monitor, 5 leases disposed) rather than retro-fitted.
-**Stash/hooks:** clean — one uncommitted file all session (`.claude/settings.local.json`, pre-existing), no stashes.
-**Closures:** 3511, 3604, 3669, 3792, 3829, 3835, 3878 — every one commented AND ADR-099 verdict-stamped · DoD:
-`closure_sweep.py --session` ends at **scanned=7 hits=0 findings=0 blocking=none**, after four rounds of rewording my
-own verdict prose (see finding 7). 3604 was auto-closed by its own workflow's close policy, never by hand.
-**Backlog:** 105 open, measured two ways (search `total_count` and a paginated id-set, agreeing). Bare hygiene ends at the 5 standing `acceptance_count` violations (3607 3611
-3615 3617 3621) — the owner's, untouched by instruction, red all day by construction.
-**Alarms:** ✅ clean. `qa-smoke-warnings`'s citation was pruned in the session's first 20 minutes: both of its dated
-expiry legs had resolved **on the run they named**, leaving only the chronic leg, owned by #3877. The `cause` key was
-REMOVED rather than left naming the cured pair — with an empty live cause list there is nothing to declare, and
-removing it re-arms `undeclared_causes`, which fires the moment the channel names anything again.
-**CI warnings:** unverified at the time of the gate run (it triages the latest GREEN completed main run, and two were
-mid-flight). Not a clean board being claimed.
-**Ledger:** 4 rows added for this session's own standing machinery (#3511, #3829, #3614, #3670). AJ's four remain
-unwritten and are named individually in the residuals above — I did not build them and have measured only part of them.
+**Build beat:** 2026-09-19-the-floor-on-every-page — "The 11px floor is now measured on every page" (PR #3907; merged, deployed,
+build 7058541 served with the visual gate green).
+**Docs:** `docs/PROPORTIONALITY.md` (+2 rows this wrap: #3603, #3546; +1 by #3895: #3620) · `docs/INCIDENT_LOG.md` (+1 row,
+Patterns regenerated) · `docs/alarm_citations.json` (qa-smoke-warnings re-cited to #3900, #3901) · `docs/OPERATING_CALENDAR.md`
+(regenerated for the hold, #3910) · `docs/CONVENTIONS.md` §4b/§4c (#3906, #3896) · `docs/SCHEMA.md` (the ARCHIVE#/`supersedes`
+shape, #3899) · `docs/audits/TD-19_DATE_PARTITION_AUDIT.md` (§ 2026-09-19, #3894) · `docs/MCP_TOOL_CATALOG.md` (regenerated,
+#3891/#3902) · `docs/ARCHITECTURE.md` (the salt secret; the 50-module count) · `site/story/build/beats.json` (+1). Doc-impact
+sweep: nothing load-bearing was retired except `scripts/deploy.command` (tombstoned in #3908, pending).
+**Decisions:** none needed — every call applied an existing ADR or the rubric's own text (ADR-099 closures, 103/144 ledger rows,
+104 honest numbers, 133 ceiling untouched); the merge posture was the owner's per-session brief, not a standing change; the
+delta hold is the calendar's own sanctioned shape (#3250 precedent).
+**Main:** red — the tip's full suite carried F's event-keyed tests (#3896) and H's ratchet (#3902) until #3911/#3912 merged at
+21:38Z/20:55Z; the first push run after #3911 is the one to read (decoded; `check_main_green.py --decoded`).
+**Incidents:** 1 row added — the merge posture's two self-inflicted full-suite reds (~2h, no reader impact).
+**Stash/hooks:** clean — `git stash list` empty; hook freshness 🟢.
+**Closures:** 3716, 3771, 2883, 3042, 1677, 1629, 1570, 1388, 1407, 3614, 3750, 3491, 3731, 3677, 3692, 3513, 3877, 3816, 3769,
+3603, 3543, 3817, 3717, 3546 commented, each with an ADR-099 `**Outcome:**` verdict and, on the instrument issues, a `**Live proof:**`
+instant · DoD: `closure_sweep.py --session` scanned 30, hits 0, findings 0 (after one round of rewording four verdicts whose
+residuals lacked a carrier — the same treadmill as AK, three rounds fewer).
+**Backlog:** Now live at 3 (floor 3; fable lane 3 startable, opus 4, sonnet 1); no stale Later issues; `now_liveness` not firing.
+**Alarms:** 0 uncited — every alarm red >72h cites an open issue; `qa-smoke-warnings`' chronic clause re-cited to #3900 with the
+dated reason; `check_alarm_citations.py` ✅.
+**CI warnings:** unverified at the gate run — the latest completed main run was not green (the F/H reds above); the next green
+run's annotations are the next wrap's triage.
+**Ledger:** #3603 and #3546 rows added; #3620's row landed in #3895.

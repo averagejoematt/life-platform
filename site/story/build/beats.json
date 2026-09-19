@@ -2,6 +2,21 @@
   "updated_at": "2026-07-21",
   "beats": [
     {
+      "id": "2026-09-19-the-floor-on-every-page",
+      "date": "2026-09-19",
+      "title": "The 11px floor is now measured on every page",
+      "shipped": "The site's smallest text size — the 11px mono label — was documented as a floor but measured on three pages. It is now measured on all 64 tier-1 and tier-2 pages at desktop and phone widths, the stylesheet that defines the design tokens is swept by the same gate that polices every other sheet, and the seventeen component rules that quietly rendered text at 8 to 10.4 pixels were lifted to the token. Measured live before and after with the QA harness's own audit script: 353 sub-floor text nodes on ten pages, then zero. The provenance popover's text-glyph trigger became a real stroked icon.",
+      "why_it_mattered": "A floor that is measured on three pages is a promise about three pages. Readers on phones were getting 8px dates in the habit heatmap and 9px axis labels in the training charts — exactly the pages a returning reader opens most — and the gate that would have said so was scoped to the front door. Widening the measurement is what turns a design-system sentence into something the deploy pipeline enforces; from this build, a new sub-floor rule anywhere on the surface fails the visual gate before it ships.",
+      "gotcha": "Raising a font size to the floor can CLIP the text it was sized to fit. Every lifted rule was probed at both widths for element-versus-parent overflow, not page-level scroll, because a label escaping a 46px rail reads as zero at the page level. Three rules did clip after the lift and needed their containers fixed, not their text shrunk. The first attempt at the after-measurement also intercepted nothing — the assets are content-hashed, so a naive route override matched no request and produced an identical 'after' that would have passed as clean.",
+      "honest_miss": "The issue said eight pages; the widened measurement found ten. The new glyph sweep that flags circled-letter and emoji code points in visitor-facing text reports as a warning, not a failure: nine of the ten live glyphs are content — scorecard ticks, a flag in a readout note, a sun emoji inside a logged workout title — that no site change can clear. Two pre-existing phone-width escapes on the character page are named in the PR and still there.",
+      "prs": [
+        {
+          "label": "PR #3907",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3907"
+        }
+      ]
+    },
+    {
       "id": "2026-08-31-the-september-first-launch",
       "date": "2026-08-31",
       "title": "September 1st is the starting point",
