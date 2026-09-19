@@ -254,10 +254,7 @@ def _load_bp_readings(date_str):
 
 
 def tool_save_insight(args):
-    """Save a new insight to the coaching log.
-    PK: USER#matthew#SOURCE#insights
-    SK: INSIGHT#<ISO-timestamp>
-    """
+    """Save a new insight to the coaching log — pk USER#matthew#SOURCE#insights, sk INSIGHT#<ISO-timestamp>."""
     text = (args.get("text") or "").strip()
     if not text:
         raise ValueError("text is required")
@@ -265,8 +262,7 @@ def tool_save_insight(args):
     tags = args.get("tags") or []
     source = args.get("source") or "chat"
 
-    now = datetime.now(timezone.utc)
-    ts = now.strftime("%Y-%m-%dT%H:%M:%S")  # human-readable; doubles as insight_id AND the INSIGHT# sort-key suffix
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")  # human-readable; insight_id AND the INSIGHT# sk suffix
     item = {
         "pk": INSIGHTS_PK,
         "sk": f"INSIGHT#{ts}",
