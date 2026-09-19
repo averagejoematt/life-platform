@@ -1,0 +1,23 @@
+# POSITIVE CONTROLS for the #3620 custom gitleaks rules. NOT live credentials.
+#
+# Every value here was generated locally for this file and has never been valid
+# anywhere. They exist so each rule in .gitleaks.toml can be OBSERVED firing
+# rather than assumed to — the failure mode a custom regex has is being silently
+# wrong, which looks exactly like a clean repo.
+#
+# .gitleaks.toml allowlists this directory by path, so these do not red the gate.
+
+# life-platform-mcp-bearer
+LP_BEARER = "lp_9f2c41ab77de03516c8e5a04bd2f9e17c0a63b8d4e5f712a9c0b3d6e8f1a2b4c"
+
+# life-platform-mcp-session-bearer
+LPS_SESSION = "lps_kQ7x2Vb9Nm4Tz8Wp1Rc6Yh3Jf5Ld0Sg"
+
+# life-platform-hae-ingest-bearer
+hae_api_key = "b7QmZ2xL9vT4nR8sK1dW6yH3pC5gF0jA"
+
+# life-platform-telegram-webhook-secret
+webhook_secret = "tg7Kq2Zm9Xv4Rt8Np1Ws"
+
+# life-platform-site-api-origin-secret
+SITE_API_ORIGIN_SECRET = "amj9Xq2Kd7Vz4Rp1"

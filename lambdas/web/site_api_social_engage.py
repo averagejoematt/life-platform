@@ -10,6 +10,67 @@ test monkeypatch surface are unchanged. This module does NOT import the facade,
 so there is no import cycle.
 """
 
+import hashlib as _hashlib
+import os as _os
+
+from common.secret_cache import get_secret as _get_secret
+
+# ── #3620 box 5 / security ROW4: the ip_hash is SALTED, and fails CLOSED ──────
+# Every door in this module keys its rate limiter on `sha256(client_ip)[:16]`,
+# and three of them PERSIST that value — /api/submit_finding and
+# /api/board_question write it into the stored record, /api/predict writes it
+# into a DynamoDB sort key, and /api/nudge + /api/ritual_log log it to
+# CloudWatch. Unsalted, that digest is a 2**32 keyspace over IPv4: anyone who
+# obtains one recovers the reader's address in minutes on a laptop. The digest
+# was never a pseudonym; it only looked like one.
+#
+# The salt is a Secrets Manager value (`life-platform/ip-hash-salt`, the repo's
+# only sanctioned credential home — a salt committed to a PUBLIC repo would be
+# strictly worse than none, because it would read as a fix). It is read through
+# the shared 15-minute `secret_cache`, so the steady-state cost is one
+# GetSecretValue per warm container per 15 min, not one per request.
+#
+# FAIL-CLOSED, deliberately: when the salt cannot be read, `_salted_ip_hash`
+# returns None and the door answers 503 rather than computing the unsalted form.
+# A fallback to `sha256(ip)` would make this change decorative — the reversible
+# value would still reach S3/DDB/CloudWatch, on exactly the days when the thing
+# that broke was the control that was supposed to prevent it.
+#
+# Rotation is safe and needs no migration: nothing compares a stored ip_hash to
+# a freshly computed one. A rotation resets the TTL'd rate counters, and orphans
+# the current week's `PRED#{ip_hash}#...` duplicate-vote markers (a reader could
+# vote once more that week). Both are bounded and self-healing; there is no
+# back-compat shim to write.
+# Name resolved the same way as the module's sibling secrets (_SUBSCRIBER_TOKEN_SECRET_NAME,
+# _RITUAL_TOKEN_SECRET_NAME in the facade): env override first, repo default second.
+_IP_HASH_SALT_SECRET_NAME = _os.environ.get("IP_HASH_SALT_SECRET_NAME", "life-platform/ip-hash-salt")
+
+
+def _salted_ip_hash(source_ip: str, _g) -> "str | None":
+    """`sha256(salt + ip)[:16]`, or None when the salt is unavailable (fail-closed).
+
+    Callers MUST branch on None and refuse the request (`_salt_unavailable`);
+    there is no unsalted fallback by construction — this function cannot return
+    an unsalted digest.
+    """
+    boto3 = _g["boto3"]
+    logger = _g["logger"]
+    try:
+        client = boto3.client("secretsmanager", region_name="us-west-2")
+        salt = _get_secret(_IP_HASH_SALT_SECRET_NAME, client)
+    except Exception as e:
+        logger.error(f"[ip_hash] salt unavailable ({type(e).__name__}: {e}) — refusing the write (fail-closed)")
+        return None
+    if not salt:
+        logger.error("[ip_hash] salt resolved EMPTY — refusing the write (fail-closed)")
+        return None
+    return _hashlib.sha256(f"{salt}:{source_ip}".encode()).hexdigest()[:16]
+
+
+def _salt_unavailable(_g) -> dict:
+    """The one 503 shape every salted door answers when the salt cannot be read."""
+    return _g["_error"](503, "Service temporarily unavailable. Please try again shortly.")
+
 
 def _handle_verify_subscriber(event: dict, *, _g) -> dict:
     """
@@ -52,7 +113,6 @@ def _handle_verify_subscriber(event: dict, *, _g) -> dict:
     _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
     params = event.get("queryStringParameters") or {}
     email = (params.get("email") or "").strip().lower()
 
@@ -65,7 +125,9 @@ def _handle_verify_subscriber(event: dict, *, _g) -> dict:
     # Metered through the module chokepoint (#2237) like every other public door.
     # Keyed on the IP alone — NOT on the address — or each new probe address would
     # get its own fresh budget and enumeration would stay free.
-    ip_hash = hashlib.sha256(extract_client_ip(event).encode()).hexdigest()[:16]
+    ip_hash = _salted_ip_hash(extract_client_ip(event), _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
     allowed, _rem, retry_after = _rate_check(
         "verify_subscriber",
         ip_hash,
@@ -138,7 +200,6 @@ def _handle_nudge(event: dict, *, _g) -> dict:
     _rate_limited = _g["_rate_limited"]
     _sanitise_text = _g["_sanitise_text"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
     json = _g["json"]
     logger = _g["logger"]
     source_ip = extract_client_ip(event)
@@ -158,7 +219,9 @@ def _handle_nudge(event: dict, *, _g) -> dict:
     if category not in NUDGE_CATEGORIES:
         return _error(400, f"Invalid category. Must be one of: {sorted(NUDGE_CATEGORIES)}")
 
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    ip_hash = _salted_ip_hash(source_ip, _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
     # Rate limit: 1 per IP per category per hour. Per-category endpoint key so a
     # nudge in one category doesn't consume another's budget.
     allowed, _rem, _retry = _rate_check(f"nudge:{category}", ip_hash, limit=1, window_seconds=3600)
@@ -207,7 +270,9 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
     os = _g["os"]
     timezone = _g["timezone"]
     source_ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    ip_hash = _salted_ip_hash(source_ip, _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
 
     # Rate limit: FINDING_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
     # cold starts; bounded in-memory fallback only, #2237).
@@ -330,7 +395,6 @@ def _handle_ritual_log(event: dict, *, _g) -> dict:
     _rate_limited = _g["_rate_limited"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
     logger = _g["logger"]
     table = _g["table"]
     timezone = _g["timezone"]
@@ -376,7 +440,9 @@ def _handle_ritual_log(event: dict, *, _g) -> dict:
     # cold starts; bounded in-memory fallback only, #2237). Public GET, so it needs
     # the same protection as every other write endpoint in this module.
     ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    ip_hash = _salted_ip_hash(ip, _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
     allowed, _rem, _retry = _rate_check("ritual_log", ip_hash, limit=RITUAL_LOG_RATE_LIMIT, window_seconds=3600)
     if not allowed:
         return _rate_limited("ritual_log", "Too many taps recently. Try again in a bit.", retry_after=3600)
@@ -486,7 +552,6 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
     _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -515,7 +580,9 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
     if choice not in _PREDICT_CHOICES:
         return _error(400, "choice must be up, down, or flat")
 
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    ip_hash = _salted_ip_hash(source_ip, _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
     now_epoch = int(datetime.now(timezone.utc).timestamp())
     try:
         table.put_item(
@@ -616,7 +683,9 @@ def _handle_board_question(event: dict, *, _g) -> dict:
     os = _g["os"]
     timezone = _g["timezone"]
     source_ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    ip_hash = _salted_ip_hash(source_ip, _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
 
     # #2237: this door's old `else` branch set `allowed = True` unconditionally —
     # an unmetered S3 write path whenever the shared limiter was unavailable. It

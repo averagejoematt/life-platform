@@ -143,6 +143,108 @@ jobs:
       # pytest lane by tests/test_config_ownership_3785.py on purpose: the PR lane is
       # where a re-committed twin should be stopped, and this schedule is where one that
       # arrived by some other path is found.
-      - name: config/ ownership registry (repo-side, no AWS, blocking)
+      - name: config/ ownership registry + bucket-policy drift (blocking)
         if: always()
-        run: python3 deploy/config_ownership_audit.py --strict
+        run: |
+          rc=0
+          python3 deploy/config_ownership_audit.py --strict || rc=1
+
+          # #3620 (security ROW3) — the bucket-policy drift leg. Deliberately a COMMAND in
+          # this existing step rather than a step of its own: it answers the same question
+          # this workflow was built for ("does live still match the repo twin?"), on the
+          # one file where a mismatch is a data breach rather than a stale number.
+          #
+          # `rc` accumulation, not `&&`: masking either finding behind the other is the
+          # exact failure mode the `if: always()` comments above this step describe.
+          #
+          # Two assertions, and the second is the one that matters:
+          #   1. live bucket policy == deploy/bucket_policy.json, compared on a NORMALISED
+          #      form (sorted statements/actions/resources, no whitespace) — AWS returns
+          #      the document re-serialised, so a raw string diff would red every night.
+          #   2. the anonymously-readable prefix set derived from the LIVE policy is a
+          #      subset of deploy/anonymous_read_prefixes.txt — the shrink-only ratchet.
+          #      Assertion 1 alone is not enough: a policy change that shipped and was
+          #      committed agrees with itself, which is how a comparison gate goes blind
+          #      (the 2026-09-14 hevy_template_index class). The ratchet is a THIRD text
+          #      that must be edited deliberately.
+          # s3:GetBucketPolicy is already granted to github-actions-deploy-role — no new grant.
+          python3 - <<'PYEOF' || rc=1
+          import json, subprocess, sys
+
+          BUCKET = "matthew-life-platform"
+
+          def norm(doc):
+              def key(st):
+                  return json.dumps(st, sort_keys=True)
+              out = []
+              for st in doc.get("Statement", []):
+                  st = dict(st)
+                  for f in ("Action", "Resource"):
+                      v = st.get(f)
+                      if isinstance(v, str):
+                          st[f] = [v]
+                      elif isinstance(v, list):
+                          st[f] = sorted(v)
+                  out.append(st)
+              return sorted(out, key=key)
+
+          def anon_prefixes(doc):
+              head = f"arn:aws:s3:::{BUCKET}/"
+              found = set()
+              for st in doc.get("Statement", []):
+                  if st.get("Effect") != "Allow":
+                      continue
+                  if st.get("Principal") not in ("*", {"AWS": "*"}):
+                      continue
+                  actions = st.get("Action")
+                  actions = [actions] if isinstance(actions, str) else list(actions or [])
+                  if not any(a in ("s3:GetObject", "s3:*", "*") for a in actions):
+                      continue
+                  res = st.get("Resource")
+                  res = [res] if isinstance(res, str) else list(res or [])
+                  for r in res:
+                      if r.startswith(head):
+                          found.add(r[len(head):].split("/")[0].rstrip("*"))
+              return found
+
+          raw = subprocess.run(
+              ["aws", "s3api", "get-bucket-policy", "--bucket", BUCKET, "--output", "text", "--query", "Policy"],
+              capture_output=True, text=True,
+          )
+          if raw.returncode != 0:
+              print(f"::error::could not read the live bucket policy: {raw.stderr.strip()}")
+              sys.exit(1)
+          live = json.loads(raw.stdout)
+          repo = json.load(open("deploy/bucket_policy.json"))
+
+          failed = False
+          if norm(live) != norm(repo):
+              print("::error::live bucket policy DIFFERS from deploy/bucket_policy.json")
+              live_sids = sorted(st.get("Sid", "<no-sid>") for st in live.get("Statement", []))
+              repo_sids = sorted(st.get("Sid", "<no-sid>") for st in repo.get("Statement", []))
+              print(f"  live Sids: {live_sids}")
+              print(f"  repo Sids: {repo_sids}")
+              failed = True
+          else:
+              print(f"bucket policy matches the repo twin ({len(live.get('Statement', []))} statements)")
+
+          ratchet = {
+              ln.strip() for ln in open("deploy/anonymous_read_prefixes.txt")
+              if ln.strip() and not ln.strip().startswith("#")
+          }
+          live_anon = anon_prefixes(live)
+          if not live_anon:
+              print("::error::derived NO anonymous-read prefixes from the live policy — the derivation broke, not the policy")
+              failed = True
+          added = live_anon - ratchet
+          if added:
+              print(f"::error::LIVE bucket policy publishes {sorted(added)} anonymously — not in deploy/anonymous_read_prefixes.txt")
+              failed = True
+          else:
+              print(f"anonymous-read prefixes live: {sorted(live_anon)} (ratchet: {sorted(ratchet)})")
+          retired = ratchet - live_anon
+          if retired:
+              print(f"::notice::ratchet lists {sorted(retired)} which are no longer public — shrink is allowed, tidy the file when convenient")
+          sys.exit(1 if failed else 0)
+          PYEOF
+          exit $rc

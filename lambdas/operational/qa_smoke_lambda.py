@@ -63,6 +63,7 @@ from operational import (
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
     qa_check_edge_429,  # noqa: E402
+    qa_check_oauth_door,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
     weight_truth_qa,  # noqa: E402
@@ -1077,6 +1078,7 @@ def check_steps():
         ("notion_template_schema", check_notion_template_schema),  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
         ("canary_precision", check_canary_precision),  # #1956: AI-canary grounded false-positive-rate (sensor on the sensor)
         ("edge_429_enforcement", qa_check_edge_429.checks),  # #2828: nightly real-edge 429 observation (the 08-14 class)
+        ("oauth_door", qa_check_oauth_door.checks),  # #3620: nightly MCP OAuth consent/PKCE/open-redirect/bearer observation
         ("phase_stamp_coverage", check_coach_ensemble_phase_stamp_coverage),  # #1970: tagger-blind COACH#/ENSEMBLE# gap
         # #3860: an unclassified pk family blocks the NEXT reset — report it the day it appears, not at reset time
         ("pk_family_census", check_pk_family_census),

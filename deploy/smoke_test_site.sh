@@ -228,6 +228,74 @@ echo "── /legacy archive pin (#1905: reachable by design) ─────"
 check_status "/legacy/ pin"          "$BASE/legacy/archive/v1/board/" "200"
 echo ""
 
+# ── Sensitive S3 prefixes DENY (#3620, security ROW3) ─────────────────────────
+# The /legacy pin above is the right idiom applied to ONE path. The clause it
+# serves ("the private prefixes are not anonymously readable") had no standing
+# assertion at all — the bucket policy's Allow set is the only thing making
+# raw/, config/, uploads/ and dashboard/ deny, and nothing observed that it
+# still does. A policy edit that added one of these to PublicReadSite would
+# publish the whole prefix silently: every test would stay green, because every
+# test asserts the policy FILE, not the bucket.
+#
+# TWO probes per prefix, because they can fail independently and only one of
+# them is about the bucket:
+#   * direct-to-S3 → 403. S3 default-denies (no Allow statement covers the key),
+#     so this observes the BUCKET POLICY. Measured live 2026-09-19: 403 on all
+#     four.
+#   * via CloudFront → 404. The distribution has no behaviour routing these
+#     paths, so they resolve inside the site origin and miss. Measured live
+#     2026-09-19: 404 on all four. This observes the DISTRIBUTION.
+#
+# The probe key does not exist on purpose: a 403 on a nonexistent key is the
+# access-denied answer (S3 does not distinguish, which is the hardened shape),
+# and a 200 here would mean the prefix became anonymously listable/readable.
+# 404 direct-to-S3 would ALSO be a finding — it would mean anonymous GetObject
+# is now ALLOWED on the prefix and the object merely happens to be absent.
+SMOKE_SURFACE="infra"  # bucket policy + distribution behaviours — no site/** revert repairs either
+echo "── Private S3 prefixes deny (#3620) ────────────────────"
+_S3_ORIGIN="https://matthew-life-platform.s3.us-west-2.amazonaws.com"
+# Named `_PROBE_OBJECT`, not `_PROBE_KEY`: gitleaks' generic-api-key rule fires on any
+# `*_KEY="…"` assignment, and it did (run 35456614255). A false positive on a probe
+# filename is cheap to avoid and expensive to allowlist — an allowlist entry here
+# would also cover a real key someone later adds to this file.
+_PROBE_OBJECT="smoke-probe-3620.txt"   # deliberately nonexistent
+for _pfx in raw config uploads dashboard; do
+  check_status "s3://$_pfx/ denies anonymously" "$_S3_ORIGIN/$_pfx/$_PROBE_OBJECT" "403"
+  check_status "/$_pfx/ not served by CloudFront" "$BASE/$_pfx/$_PROBE_OBJECT" "404"
+done
+echo ""
+
+# ── Reader-input residue in generated/ (#3620 box 5 / security ROW4) ──────────
+# WARN, not FAIL, and deliberately so. #3559 moved the WRITE site off
+# `generated/*` (which the bucket policy grants anonymous GetObject) to
+# `reader_input/*`, but it did not and could not remove the five objects already
+# there — each carrying a reader's email plus the (until this PR, unsalted)
+# ip_hash. Their removal is an OWNER act: deploy/bucket_policy.json's own
+# ProtectDataFromDeployScripts statement denies matthew-admin DeleteObject on
+# generated/*, so no automation in this repo may do it.
+#
+# So this reports the residue every run and FAILS nothing. Once the owner's
+# cleanup lands, flip the WARN to smoke_record_fail and it becomes the standing
+# assertion the acceptance box asks for. Leaving it silent until then would mean
+# the cleanup could regress with no detector; failing now would auto-roll-back
+# healthy site deploys for a condition no deploy caused and no revert repairs.
+if command -v aws >/dev/null 2>&1 && aws sts get-caller-identity >/dev/null 2>&1; then
+  for _rp in board_questions findings; do
+    _n=$(aws s3 ls "s3://matthew-life-platform/generated/$_rp/" --recursive 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$_n" = "0" ]; then
+      echo "  ✅ generated/$_rp/ is empty (owner cleanup complete)"
+      PASS=$((PASS + 1))
+    else
+      echo "  ⚠️  generated/$_rp/ still holds $_n anonymously-readable reader object(s) — owner cleanup pending (#3606 item 14); WARN by design"
+      WARN=$((WARN + 1))
+    fi
+  done
+else
+  echo "  ⚠️  generated/ residue check skipped — no AWS credentials in this run"
+  WARN=$((WARN + 1))
+fi
+echo ""
+
 # ── /now/ → /cockpit/ rename (#1108) — single-hop, exact targets ───────────────
 # Deploy ordering (the issue's rule 6): S3 content ships FIRST, the CloudFront
 # v4-redirects function is published SECOND — so there is a sanctioned window where

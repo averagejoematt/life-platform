@@ -474,3 +474,102 @@ def test_the_wildcard_rule_reds_on_a_planted_grant():
 
 def test_scanned_tree_is_the_deploy_dir_and_exists():
     assert DEPLOY_DIR.is_dir() and os.access(DEPLOY_DIR, os.R_OK)
+
+
+# ── F. (#3620, security ROW1) live inline policy vs the tracked JSON ─────────
+# Sections A–E above are all OFFLINE: they prove the repo cannot grow a second
+# copy of a governed policy document. None of them can see the thing that was
+# actually true on 2026-09-05 and is still true today — that the LIVE role does
+# not match the tracked JSON at all. #3562 merged (24 Sids, SES scoped to the
+# identity ARN) and closed at merge; the live role kept its 20 Sids and 5
+# wildcards, including `ses:SendEmail` on `*` with no Condition. The
+# least-privilege clause has been FALSE in production ever since, and every gate
+# in this file was green for the whole of it. That is #3595's class on the
+# security lens: a `Fixes` that closes before the apply.
+#
+# `deploy/verify_oidc_iam.py --strict` (the #401 dead-man) makes the same
+# comparison, and it is the operator's tool. This is the SUITE's copy of the
+# question, so the drift is visible to anyone running the tests with
+# credentials, and — more importantly — so that the day the owner runs
+# `put-role-policy`, something in the repo changes colour to record it.
+#
+# Skips cleanly with no credentials (every laptop and every un-federated CI
+# lane), because a comparison that cannot be made must report that it was not
+# made, never a pass.
+def _live_iam_client():
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+    except ImportError:  # pragma: no cover
+        return None
+    try:
+        client = boto3.client("iam")
+        boto3.client("sts").get_caller_identity()
+        return client
+    except (BotoCoreError, ClientError, Exception):  # noqa: B014 — any auth/config failure means "cannot observe"
+        return None
+
+
+def _normalise_policy(doc: dict) -> list:
+    """Order-insensitive form. AWS re-serialises the document, so a raw compare
+    would report drift on every role forever and teach people to ignore this."""
+    out = []
+    for st in doc.get("Statement", []):
+        st = dict(st)
+        for field in ("Action", "Resource", "NotAction", "NotResource"):
+            v = st.get(field)
+            if isinstance(v, str):
+                st[field] = [v]
+            elif isinstance(v, list):
+                st[field] = sorted(v)
+        out.append(st)
+    return sorted(out, key=lambda s: json.dumps(s, sort_keys=True))
+
+
+def _live_vs_tracked(role_name: str):
+    """(tracked, live) normalised documents, or None when unobservable.
+
+    The role -> inline-policy-name map is read from `verify_oidc_iam.ROLES` (already
+    imported at the top of this file) rather than retyped: a second copy of that map
+    is the exact twin this whole module exists to prevent.
+    """
+    client = _live_iam_client()
+    if client is None:
+        return None
+    role_spec = verify_oidc_iam.ROLES[role_name]
+    tracked = json.loads((IAM_DIR / role_spec["permissions_file"]).read_text(encoding="utf-8"))
+    try:
+        live = client.get_role_policy(RoleName=role_name, PolicyName=role_spec["inline_policy_name"])["PolicyDocument"]
+    except Exception:
+        return None
+    return _normalise_policy(tracked), _normalise_policy(live)
+
+
+@pytest.mark.parametrize(
+    "role_name",
+    [
+        "github-actions-deploy-role",
+        "github-actions-golden-eval-role",
+        "github-actions-diagnosis-role",
+        pytest.param(
+            "github-actions-remediation-role",
+            marks=pytest.mark.xfail(
+                strict=False,
+                reason="owner put-role-policy pending — #3562 merged and closed at merge; the live role still carries 20 Sids "
+                "and 5 wildcards (#3606 item 2, ~2 min). strict=False so the apply FLIPS this to xpass rather than "
+                "needing a second PR to notice.",
+            ),
+        ),
+    ],
+)
+def test_live_inline_policy_matches_the_tracked_json(role_name):
+    pair = _live_vs_tracked(role_name)
+    if pair is None:
+        pytest.skip("no AWS credentials (or no iam:GetRolePolicy) — the comparison was NOT made")
+    tracked, live = pair
+    assert live == tracked, (
+        f"{role_name}: the LIVE inline policy differs from infra/iam/. "
+        f"tracked {len(tracked)} statement(s), live {len(live)}. "
+        f"Fix with `bash deploy/setup_remediation_role.sh` / `aws iam put-role-policy` from the tracked JSON — "
+        f"never by editing the JSON to match the drift."
+    )

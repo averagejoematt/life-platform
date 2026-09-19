@@ -1,0 +1,22 @@
+# deploy/anonymous_read_prefixes.txt — the SHRINK-ONLY ratchet on public S3 reads (#3620).
+#
+# One line per bucket prefix that deploy/bucket_policy.json grants `s3:GetObject`
+# to `Principal: "*"`. This file is the RATCHET, not the source of truth: the
+# bucket policy is. Its whole purpose is to make the set require a deliberate
+# edit in two places, because the failure this guards is a one-line Resource
+# addition that publishes an entire prefix and reds nothing — the bucket policy
+# is the only file in the repo where a typo is a data breach.
+#
+# Adding a prefix here + in bucket_policy.json is ALLOWED but never silent: both
+# the nightly live check and tests/test_anonymous_read_prefixes_3620.py compare
+# the two, and the diff is what a reviewer sees.
+# Removing one is free (shrink-only): a smaller public surface never reds.
+#
+# #3559 is why generated/ is on this list and should not stay: reader-submitted
+# findings and board questions were written under it, world-readable at the S3
+# origin. The write site moved to reader_input/*; the five residual objects are
+# an owner delete (#3606 item 14), after which generated/ holds only
+# platform-authored artifacts.
+site
+blog
+generated
