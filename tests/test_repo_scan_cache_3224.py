@@ -10,6 +10,10 @@ The suite-cost win this protects, measured 2026-08-27 at 10315b618:
 `python3 scripts/check_doc_facts.py` costs 15.4s locally / ~27.5s on CI's
 coverage-instrumented lane, and THREE tests asserted it against the identical
 unmutated tree.
+
+#3731 added the disk-backed cross-process layer (tests below `test_l_`) — the
+in-memory layer above stays pinned exactly as before, now proved NOT to leak into
+or out of the disk layer (`disk_dir=None` isolation, `test_l`/`test_m`/`test_n`).
 """
 
 import ast
@@ -37,8 +41,14 @@ def _private_cache(monkeypatch):
     `test_wiki_checkers.py::test_doc_facts_clean` re-spawned at 21.59s and half of
     #3224's saving silently evaporated while all 12 tests below stayed green. Swap,
     never clear.
+
+    `disk_dir=None` (#3731): this fixture's private table must NOT read or write the
+    real `.pytest_cache/repo_scan_cache/` disk layer — see `new_cache()`'s own
+    docstring for why a disk hit would silently corrupt these tests' exact-spawn-count
+    assertions. Tests that specifically exercise the disk layer build their own
+    `new_cache(disk_dir=tmp_path / "disk")` instead of relying on this fixture's table.
     """
-    monkeypatch.setattr(repo_scan_cache, "_run_once", repo_scan_cache.new_cache())
+    monkeypatch.setattr(repo_scan_cache, "_run_once", repo_scan_cache.new_cache(disk_dir=None))
 
 
 def _counting_run(counter):
@@ -209,3 +219,100 @@ def test_j_cache_clear_actually_clears(monkeypatch):
     repo_scan_cache.run_repo_scan("scripts/check_doc_facts.py")
 
     assert len(spawns) == 2, "cache_clear() did not clear — a later test needing a fresh scan would silently get a stale one"
+
+
+# ── the disk-backed layer (#3731): cross-process sharing, and it cannot go stale ──
+#
+# Everything below builds its OWN table via `new_cache(disk_dir=...)` rather than
+# using the autouse `_private_cache` fixture (that fixture is disk_dir=None on
+# purpose — see its docstring), because these tests exist specifically to prove the
+# disk path.
+
+
+def test_l_a_second_TABLE_reads_the_first_tables_disk_write(monkeypatch, tmp_path):
+    """The whole point: two SEPARATE in-memory tables (standing in for two xdist
+    WORKER PROCESSES, which cannot share a Python object) sharing one disk
+    directory collapse to a single real spawn, not one each."""
+    disk = tmp_path / "disk"
+    spawns: list = []
+    monkeypatch.setattr(repo_scan_cache.subprocess, "run", _counting_run(spawns))
+
+    worker_a = repo_scan_cache.new_cache(disk_dir=disk)
+    worker_b = repo_scan_cache.new_cache(disk_dir=disk)
+    tree_fp = repo_scan_cache._tree_fingerprint()
+    argv = (sys.executable, str(_REPO / "scripts" / "check_doc_facts.py"))
+
+    first = worker_a(argv, str(_REPO), (), tree_fp)
+    second = worker_b(argv, str(_REPO), (), tree_fp)  # a FRESH table — no shared Python object
+
+    assert len(spawns) == 1, f"two independent tables sharing one disk dir still spawned {len(spawns)} times"
+    assert second.returncode == first.returncode and second.stdout == first.stdout
+
+
+def test_m_the_disk_layer_never_leaks_into_the_isolated_low_level_tests(tmp_path):
+    """`disk_dir=None` really does turn the disk layer off — a table built that way
+    must not create anything on disk, or a stray file could later masquerade as a
+    real cached scan for some other key that happens to collide."""
+    disk = tmp_path / "disk"
+    table = repo_scan_cache.new_cache(disk_dir=None)
+    argv = (sys.executable, str(_REPO / "scripts" / "check_doc_index.py"))
+    table(argv, str(_REPO), (), "irrelevant-fixed-fp")
+    assert not disk.exists(), "a disk_dir=None table wrote to disk anyway"
+
+
+def test_n_tree_fingerprint_changes_when_an_already_dirty_file_is_edited_again(tmp_path):
+    """The reason `_tree_fingerprint` stat()s the whole tree instead of trusting a
+    `git status --porcelain` STRING: porcelain's one-line-per-path output is
+    identical before and after a SECOND edit to a file that was already dirty (both
+    times it just reads "M path"). A porcelain-string-only fingerprint would collide
+    on these two edits and a disk cache primed after the first would still look
+    current after the second — served STALE to whichever worker asks next."""
+    target = _REPO / "docs" / "PROPORTIONALITY.md"
+    original = target.read_text(encoding="utf-8")
+    try:
+        target.write_text(original + "\n<!-- repo_scan_cache_3731 probe A -->\n", encoding="utf-8")
+        fp_after_first_edit = repo_scan_cache._tree_fingerprint()
+        target.write_text(original + "\n<!-- repo_scan_cache_3731 probe B -->\n", encoding="utf-8")
+        fp_after_second_edit = repo_scan_cache._tree_fingerprint()
+        assert fp_after_first_edit != fp_after_second_edit, (
+            "editing an already-dirty file produced the SAME tree fingerprint — "
+            "a disk cache entry from before the second edit would be served as if it were current"
+        )
+    finally:
+        target.write_text(original, encoding="utf-8")
+
+
+def test_o_a_real_edit_between_two_real_run_repo_scan_calls_is_never_served_stale(monkeypatch):
+    """THE MUST-FAIL CONTROL (#3731 box 5): this calls the real, un-monkeypatched
+    `run_repo_scan` -> `_run_once` -> `_tree_fingerprint` production path (only
+    `subprocess.run` itself is faked, to keep this fast) and edits a REAL file the
+    doc-facts family actually scans in between two calls with otherwise-identical
+    argv/cwd/env.
+
+    If `_tree_fingerprint` regressed to a constant (or to a `git status --porcelain`
+    STRING with no stat() term — see `test_n`), the cache key would not change
+    across the edit, the second call would be a HIT, and `spawns` would be `[argv]`
+    (length 1) instead of `[argv, argv]` (length 2). Verified failing: patching
+    `repo_scan_cache._tree_fingerprint` to `lambda root=None: "CONSTANT"` before
+    running this test reds it with `len(spawns) == 1` — exactly the staleness this
+    module exists to prevent, now visible as a failing assertion instead of a
+    silently-wrong gate.
+    """
+    spawns: list = []
+    monkeypatch.setattr(repo_scan_cache.subprocess, "run", _counting_run(spawns))
+
+    target = _REPO / "docs" / "PROPORTIONALITY.md"
+    original = target.read_text(encoding="utf-8")
+    try:
+        repo_scan_cache.run_repo_scan("scripts/check_doc_index.py")
+
+        target.write_text(original + "\n<!-- repo_scan_cache_3731 test_o probe -->\n", encoding="utf-8")
+
+        repo_scan_cache.run_repo_scan("scripts/check_doc_index.py")
+
+        assert len(spawns) == 2, (
+            f"a real edit to a real scanned file between two calls was served from cache ({len(spawns)} spawn(s), "
+            "expected 2) — the tree-state term of the cache key did not change with the edit"
+        )
+    finally:
+        target.write_text(original, encoding="utf-8")

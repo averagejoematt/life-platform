@@ -260,13 +260,55 @@ def pt_paired_utc_today_sites(source: str, filename: str, pt_modules) -> list[st
     return findings
 
 
+@functools.lru_cache(maxsize=None)
+def _file_utc_findings_and_names(path: pathlib.Path) -> tuple[tuple[str, ...], frozenset]:
+    """The pt_modules-INDEPENDENT half of `pt_paired_utc_today_sites`, computed once
+    per REAL on-disk file and shared by every pt_modules set that queries it (#3731).
+
+    `_measure()` (the direct pt_modules pass) and
+    `test_the_one_hop_blind_spot_stays_measured` (the wide pt_modules pass) both used
+    to read + `ast.parse` every one of ~1,036 files in `_test_files()` independently
+    to get here — offset-zero UTC-today findings and a file's referenced module names
+    don't depend on WHICH pt_modules set is being tested, only the final membership
+    check does. That's the whole expensive part of `pt_paired_utc_today_sites` (the
+    same `ast.parse`+`ast.walk` class #3224/#3265 each shed elsewhere, here as a
+    SECOND full-tree pass rather than a second subprocess), and it's safe to memoize
+    on file identity alone because this module only ever scans the UNMUTATED tree
+    (see the file header: the mutation proofs below all run on synthetic STRINGS via
+    `pt_paired_utc_today_sites` directly, never through this cache).
+
+    `pt_paired_utc_today_sites` itself is UNCHANGED and still takes a raw `source`
+    string — the synthetic-fixture tests below call it directly, on strings that
+    exist nowhere on disk, and must keep working exactly as before.
+    """
+    rel = str(path.relative_to(ROOT))
+    source = path.read_text(encoding="utf-8")
+    findings = tuple(f for f in utc_day_semantics_sites(source, filename=rel) if _is_offset_zero(f))
+    if not findings:
+        return (), frozenset()
+    try:
+        tree = ast.parse(source, filename=rel)
+    except SyntaxError:
+        return (), frozenset()
+    return findings, frozenset(referenced_module_names(tree))
+
+
+def _pt_paired_utc_today_sites_for_file(path: pathlib.Path, pt_modules) -> list[str]:
+    """`pt_paired_utc_today_sites`, specialised to a REAL on-disk file and routed
+    through the per-file memo above instead of re-reading + re-parsing it."""
+    findings, names = _file_utc_findings_and_names(path)
+    if not findings or not (names & set(pt_modules)):
+        return []
+    return list(findings)
+
+
 @functools.lru_cache(maxsize=1)
 def _measure() -> dict:
     pt_modules = pt_clock_modules()
     counts: dict = {}
     for path in _test_files():
         rel = str(path.relative_to(ROOT))
-        hits = pt_paired_utc_today_sites(path.read_text(encoding="utf-8"), rel, pt_modules)
+        hits = _pt_paired_utc_today_sites_for_file(path, pt_modules)
         if hits:
             counts[rel] = hits
     return counts
@@ -407,6 +449,23 @@ def test_the_one_hop_blind_spot_stays_measured():
     (-9.27s, -28.2%); this test 20.99s -> 11.25s (-9.74s, -46.4%) — the removed pass
     was roughly half this test's own cost, matching one full whole-tree scan eliminated
     out of the two it used to run.
+
+    #3731: the WIDE pass below still re-READ and re-`ast.parse`d every file NOT in
+    `direct_hits` (still ~all of `_test_files()` — `direct_hits` is a handful of
+    residue entries) to get `utc_day_semantics_sites`'s findings a SECOND time under
+    a different `pt_modules` set. That work does not depend on which `pt_modules`
+    set is being checked — only the final membership test
+    (`referenced_module_names(tree) & set(pt_modules)`) does — so it is now read
+    through `_pt_paired_utc_today_sites_for_file`'s per-file memo, which `_measure()`
+    (direct pass, above) already populated for every file in `_test_files()`. This
+    loop now does zero additional file reads or `ast.parse` calls; it is pure
+    dict-lookup + set-intersection. Measured locally 2026-09-19 (both tests, one
+    process — the shape a `--dist loadfile` worker actually runs, since both land
+    in this ONE file — before vs after this change): combined 27.16s -> 14.45s
+    (-12.71s, -46.8%); this test alone 13.16s -> 0.52s (-12.64s, -96.0%) — the
+    second full-tree read+parse pass this test used to run is now gone entirely,
+    leaving only the genuinely-new `_one_hop_pt_modules()` computation (a smaller
+    walk over `_handler_files()`, not `_test_files()`).
     """
     direct_hits = _measure()
     wide = _one_hop_pt_modules()
@@ -415,8 +474,7 @@ def test_the_one_hop_blind_spot_stays_measured():
         rel = str(path.relative_to(ROOT))
         if rel in direct_hits:
             continue  # the guard already catches it (see test_no_pt_paired_utc_today_outside_the_residue)
-        src = path.read_text(encoding="utf-8")
-        if pt_paired_utc_today_sites(src, rel, wide):
+        if _pt_paired_utc_today_sites_for_file(path, wide):
             surfaced.add(rel)
     assert (
         surfaced == _ONE_HOP_BLIND_SPOT
