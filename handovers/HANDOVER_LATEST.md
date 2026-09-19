@@ -5,7 +5,8 @@ as it honestly goes; 40 the stretch, ~60–65 the plan's own honest landing; sta
 auto-merge on the two REQUIRED checks only, deploy via `deploy_fleet.sh` from origin/main after each wave, REJECT every CI lease by
 name; no `--deliver`. Plan: `~/.claude/plans/elegant-wobbling-beacon.md`. Owner answered the §2 sheet in-session (11 + 4 prompts).
 
-**105 → 90 open, measured two ways (`search total_count` AND a paginated id-set, agreeing). 25 closed, 10 filed, net −15.**
+**105 → 90 open at the wrap, measured two ways (`search total_count` AND a paginated id-set, agreeing); 96 after the
+owner's post-wrap amendments filed six more (below). 25 closed, 16 filed, net −9.**
 Debt count 84 → 74 (Now 27 / Next 15 / Later 32; the 12 milestone-less epics were milestoned in Wave 0 and are inside those
 numbers); Roadmap 21 → 16 (five retirements on the owner's word). **Owner-sheet closures 9** (3716 3771 2883 3042 + Roadmap 1677
 1629 1570 1388 1407) · **engineering closures 16** (3614 3750 epic 3491 3731 3677 3692 3513 3877 3816 3769 3603 3543 3817 3717 3546 3608).
@@ -106,6 +107,14 @@ edit beside it — the #3888 sweep lesson, one file wide, and I did it once befo
 
 ## Residual / next picks
 
+- **Post-wrap (22:5xZ–23:2xZ):** the owner posted seven coaching amendments (subtract-only autoregulation, the carry-forward
+  floor, stall-calling, adherence aliases, the Strava-only walking calc, the inflated TDEE, the fuzzy exercise match) — written
+  VERBATIM as §7 of the owner-private `TRAINING_CALIBRATION.md` + a dated block in `TRAINING_PROGRAM.md` at the S3 coaching home
+  (`config/coaching/`, read back); the six platform defects filed as **#3927 #3928 #3929 #3930 #3931 #3932** (three P1 on Now:
+  the planner's up-branches + carry-forward floor, the walking calc, the TDEE proxy); the stale `0.78 mi/wk` string purged from
+  `owner_redlines.py` + two docstrings (PR #3926). Debt count 74 → 80 with the six. Five epics' `## Stories` lists were missing
+  their newly filed children and #3897 lacked a model label + epic line — fixed; the hygiene gate is back to the standing 9
+  (5 `acceptance_count`, 4 `grounding_specimen`).
 - **3608 closed post-wrap** on its live CI outputs (the `lane-wallclock` notice at 977s on run 35471979963; the parity step on main's run 35471328402) — `python3 deploy/write_lane_posture.py --measure` joins the wrap ritual — not-work — a `/wrap` skill line for the next wrap.
 - **#3900** — the 4 tagger-blind families; the next nightly's line (`35 row(s) across 4 of 37`) is its baseline.
 - **#3646** — the system-model gate's `pending-reconcile` verdict (box 2's remaining member).
