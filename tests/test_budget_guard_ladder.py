@@ -49,6 +49,7 @@ _READER_NARRATIVE = (
     "coach_diary_reaction",
     "coach_social_reaction",  # #1675: the same reaction mechanism on the social channel — same audience, same band
     "coach_nudge",  # #1382: proactive decision-moment nudge — band 2, tier ≥2 silences (AC2)
+    "plan_critics",  # #3752: the four debrief critics — Matthew-facing coach voice, pauses with the narrative band
 )
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 # #1927: the AI halves of the deploy pipeline's own QA. Not "internal QA" — they

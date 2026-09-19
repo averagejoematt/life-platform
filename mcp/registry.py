@@ -548,6 +548,10 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "target_date": {"type": "string", "description": "Session date YYYY-MM-DD. Defaults to today (Pacific)."},
+                    "routine_id": {
+                        "type": "string",
+                        "description": "Stage 2 (#3752): a drafted routine_id to red-team. Runs the four critics over disjoint evidence, applies their changes to the draft, stores the verdicts on it; a veto then blocks commit.",
+                    },
                 },
                 "required": [],
             },

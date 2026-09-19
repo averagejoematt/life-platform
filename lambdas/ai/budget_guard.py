@@ -192,6 +192,14 @@ _FEATURE_CUTOFF = {
     # audience order, not dollars. A paused call ⇒ no precedent block/card (the
     # coach reads exactly as it did before recall existed).
     "semantic_recall": 2,
+    # plan_critics (#3752, epic #3742): the four adversarial reviewers of tomorrow's
+    # session — muscle-defense, joints/tendons, rate-advocate, blueprint historian — one
+    # short Haiku call each over a DISJOINT evidence packet, at most once per drafted
+    # routine. Matthew-facing coaching product (the verdicts ride in his Hevy notes), so
+    # band 2 with the rest of the coach voice. A paused critic is REPORTED as paused on the
+    # verdict and the deterministic layer (redline vetoes, tripped tripwires) still runs at
+    # $0 — the routine is never reported as red-teamed by a model that did not run.
+    "plan_critics": 2,
     # ── Band 3: the two IRREDUCIBLE reader promises + the two OPERATOR-TRUTH CI
     #    gates — pause LAST (ADR-100/125, the latter added by the ADR-125
     #    2026-08-03 amendment, #1927).

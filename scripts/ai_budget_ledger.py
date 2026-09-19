@@ -234,6 +234,18 @@ LEDGER: dict[str, dict] = {
         note="dedicated coach-nudge lambda (email_stack); $0 stamped in the founding window — "
         "the floor budget means growth past $1/mo gets a look at close",
     ),
+    "plan_critics": _row(
+        owner="mcp/tools_plan.py",
+        attribution=EXCLUSIVE,
+        attribution_keys=("life-platform-mcp",),
+        founding_usd=0.00,
+        monthly_budget_usd=1.00,
+        note="#3752: the four debrief critics — four short Haiku calls per drafted routine, at most once a night, "
+        "inside the MCP Lambda, which makes no other Bedrock call (grep mcp/ for bedrock_client: this is the only "
+        "caller; EstimatedCostUSD{LambdaFunction=life-platform-mcp} had ZERO datapoints over the trailing 30d on "
+        "2026-09-19). Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo "
+        "gets a look at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=life-platform-mcp}",
+    ),
     "coach_diary_reaction": _row(
         owner="lambdas/coach/coach_diary_reaction.py",
         attribution=SHARED,
