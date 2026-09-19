@@ -491,6 +491,11 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
         "claim": ".github/workflows/remediation-agent.yml",
         "notes": "provisions the role remediation-agent.yml assumes",
     },
+    "deploy/write_lane_posture.py": {
+        "clause": "C",
+        "claim": ".github/workflows/pr-checks.yml",
+        "notes": "#3608 box 4 — writes typical_seconds from the fast-lane's own emitted wall-clock; it stands in for that workflow's timing",
+    },
     "deploy/verify_doc_facts_derivable.py": {
         "clause": "C",
         "claim": ".github/workflows/ci-cd.yml",
@@ -573,10 +578,15 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
     },
 }
 
-# Frozen 2026-09-19 (#3608 box 3): 30 members, up from 3 under the prose-only
+# Frozen 2026-09-19 (#3608 box 3): 31 members, up from 3 under the prose-only
 # predicate. Clause mix measured, not asserted — A=3 (a prose parity claim),
-# B=4 (names a required-check context), C=23 (names a workflow path literal).
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 23}
+# B=4 (names a required-check context), C=24 (names a workflow path literal).
+#
+# 31 rather than 30 because the widened guard caught THIS issue's own new file:
+# deploy/write_lane_posture.py (box 4) names pr-checks.yml by path, and the
+# equality assertion redded by name until it was registered. That is the
+# derivation guard working on its author, one commit after it landed.
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 24}
 
 
 def main() -> None:
