@@ -1068,8 +1068,22 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .chart--spined { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2); align-items: stretch; }
 .chart--spined > svg { grid-column: 2; }
 .chart--spined > .chart-cap { grid-column: 1 / -1; }
+/* #3878: fixed `width` -> `width: auto` + `min-width`. The rail was a fixed 46px, so raising .chart-spine-v to
+   the 11px floor CLIPPED the widest label instead of overflowing it — measured on
+   /data/training/, where '22407.5 kg' goes scrollWidth 46 against clientWidth 40 at 11px
+   while fitting exactly at the old 9.6px. Nothing above the element could see that: the
+   parent is 45px and never overflows, so a page-level scrollWidth read stays 0 (#3734).
+   The grid column is already `auto` (.chart--spined), so dropping the fixed width lets the
+   rail size to its own content while min-width keeps 46px as the floor for short labels
+   like '0 kg'. `width: auto` is stated explicitly rather than omitted: leaving the old
+   declaration in place and merely ADDING a min-width does nothing — measured, the rail
+   stayed pinned at 46px and the label still clipped, because the two are different
+   properties and the fixed one still won.
+   A magic wider number was rejected — cumulative volume grows all cycle, so any fixed
+   width is a clip waiting for a bigger number. Measured after: '22407.5 kg' 66/66,
+   '8.7 RPE' 46/46, '65 bpm' 40/40 (scrollWidth == clientWidth throughout). */
 .chart-spine { grid-column: 1; align-self: stretch; min-height: clamp(110px, 8vw + 80px, 150px);
-  width: var(--spine-width); border-right: var(--spine-border); background: var(--spine-ticks);
+  width: auto; min-width: var(--spine-width); border-right: var(--spine-border); background: var(--spine-ticks);
   display: flex; flex-direction: column; justify-content: space-between; padding: 2px 5px 2px 0;
   text-align: right; }
 /* #3878: was 0.6rem = 9.6px. The value this renders is Matthew's current weight on
