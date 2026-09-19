@@ -25,6 +25,15 @@ freeze content-addressed — the receipts pattern (ADR-105):
      prediction ledger agrees with the frozen artifact — no unsealed row presenting
      as pre-genesis, and (from genesis onward) no sealed id missing from the season.
      Blocking findings abort the publish; a gate that cannot run aborts it too.
+  5. TRUTH (#3599): steps 3 and 4 can both be green over an artifact that is
+     internally consistent and simply not true — a retired coach, a superseded
+     baseline, a minimum effect nobody priced. deploy/prereg_truth_gate.py checks the
+     artifact against the platform's own facts (persona registry, EXPERIMENT_BASELINE_
+     WEIGHT_LBS, the #3552 derivation block) and write_stamp() refuses to MINT a seal
+     over blocking findings. It is deliberately placed after the idempotent
+     already-stamped return: a seal that already exists is never re-vouched or
+     rewritten (#3552's lesson — a published pre-registration is amended in public,
+     never edited), so the gate binds new seals only.
 
 HONESTY RULES (ADR-104, docs-current-truth-only):
   - stamped_at is ALWAYS the real stamping moment — never backdated to the freeze.
@@ -85,6 +94,36 @@ def load_stamp() -> dict | None:
     return json.loads(STAMP_PATH.read_text())
 
 
+def _truth_findings(frozen: dict) -> list:
+    """The #3599 blocking findings for `frozen`. Fails CLOSED — "could not tell" is not
+    "fine" for the platform's central credibility claim, the same posture the #3511
+    gate and restart_verify.served_genesis take."""
+    if str(REPO_ROOT / "deploy") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "deploy"))
+    try:
+        import prereg_truth_gate
+    except Exception as e:
+        raise SystemExit(f"#3599 truth gate could not be imported ({e}) — refusing to stamp a seal it cannot vouch for.")
+    try:
+        return prereg_truth_gate.require_clean_for_seal(artifact=frozen)
+    except SystemExit:
+        raise
+    except Exception as e:
+        raise SystemExit(f"#3599 truth gate could not run ({e}) — refusing to stamp a seal it cannot vouch for.")
+
+
+def _refuse_untrue_seal(frozen: dict) -> None:
+    untrue = _truth_findings(frozen)
+    if untrue:
+        raise SystemExit(
+            f"REFUSED: the #3599 truth gate reports {len(untrue)} blocking finding(s) — this pre-registration "
+            "disagrees with the platform's own facts, and a seal is permanent. Fix the artifact and re-freeze "
+            "(delete the frozen file and re-run deploy/seed_genesis_preregistration.py); a sealed one is amended "
+            "in public, never edited.\n  - " + "\n  - ".join(str(f) for f in untrue)
+        )
+    print("#3599 truth gate: clean — the artifact agrees with the persona registry, the baseline and the derivation contract.")
+
+
 def write_stamp(now: datetime = None) -> dict:
     """Stamp the current frozen file. Idempotent over an unchanged file (keeps the
     original stamped_at). Refuses a same-genesis re-stamp with a different hash —
@@ -108,6 +147,16 @@ def write_stamp(now: datetime = None) -> dict:
             "file (git checkout), or regenerate the whole pre-registration deliberately for a "
             "new genesis (delete BOTH the frozen file and this stamp)."
         )
+
+    # #3599 — everything below MINTS a seal, and a seal is one-way: the same genesis may
+    # never be re-stamped with different bytes and stamped_at is never backdated, so an
+    # artifact that names a retired coach, a superseded baseline or an underived minimum
+    # effect can never be corrected afterwards, only amended in public. Pure (file +
+    # repo constants, no credentials, no network), so unlike the #3511 ledger gate it
+    # runs on every seal path — the seeder's freeze-time stamp as well as this module's
+    # CLI. Placed AFTER the idempotent return on purpose: an already-published seal is
+    # left exactly as it stands.
+    _refuse_untrue_seal(frozen)
 
     stamped_at = (now or datetime.now(timezone.utc)).isoformat()
     if stamped_at < frozen_generated_at:
@@ -219,6 +268,20 @@ def main():
         raise SystemExit("Post-stamp verification FAILED (should be impossible):\n  - " + "\n  - ".join(issues))
     print(f"VERIFIED: {FROZEN_PATH.name} matches its stamp ({stamp['sha256']}).")
     print(f"Note: {stamp['stamp_note']}")
+
+    # #3599 — write_stamp() only gates seals it MINTS, so an artifact sealed before this
+    # gate existed slips past silently. Report it here so the operator sees the verdict
+    # on every run rather than only on the run that would have been blocked. This does
+    # NOT block: the seal is already published, and rewriting a published pre-registration
+    # is the defect, not the repair.
+    standing = _truth_findings(json.loads(FROZEN_PATH.read_text()))
+    if standing:
+        print(
+            f"\nALREADY SEALED, NOT RE-VOUCHED — the #3599 truth gate reports {len(standing)} blocking finding(s) "
+            f"against this artifact. It was stamped at {stamp['stamped_at']}; a FRESH seal carrying these would be "
+            "REFUSED. The repair for a published seal is a public amendment record, never an edit:\n  - "
+            + "\n  - ".join(str(f) for f in standing)
+        )
 
     if not args.apply:
         print(
