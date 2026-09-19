@@ -129,6 +129,11 @@ GATHER = [
     Gate("backlog-hygiene", "e7", ["python3", "scripts/check_backlog_hygiene.py"]),
     Gate("alarm-citations", "e10", ["python3", "scripts/check_alarm_citations.py"], marker="Alarms"),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),
+    # #3546: the a11y shrink-ledger dead-man — a shrink candidate older than 7 days is a
+    # (page, rule) pair that has silently stopped gating serious a11y violations. The ledger
+    # is a committed sidecar the standalone sweep writes; this is the consumer that makes a
+    # stale entry a wrap-time red rather than a log line nobody reads (#1990's recurrence).
+    Gate("a11y-shrink-deadman", "e11", [sys.executable, "-m", "pytest", "tests/test_a11y_shrink_deadman_3546.py", "-q"]),
     *derived_doc_gates(),  # #3531: every Docs CI python gate, derived from docs-ci.yml
     # #3318: detector A of the closure contract over THIS session's closures (closed since
     # today 00:00 UTC — the same window (e8) lists). In the gather phase every issue closed
