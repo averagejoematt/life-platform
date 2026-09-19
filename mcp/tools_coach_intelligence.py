@@ -12,6 +12,7 @@ from experiment import calibration_core  # #538: shared Brier + reliability scor
 
 from mcp.config import USER_PREFIX
 from mcp.core import decimal_to_float, table
+from mcp.layer_status import DERIVED_LAYERS, LAYER_DARK, LAYER_DEGRADED, LAYER_OK, counted, layer_fields, read_status
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +29,22 @@ COACH_NAMES = _short_id_names(include_retired=True)
 
 
 def tool_get_coach_thread(args):
-    """Read a coach's thread history — persistent memory of positions, predictions, surprises."""
+    """Read a coach's thread history — persistent memory of positions, predictions, surprises.
+
+    #3769: `coach_thread` is a DERIVED layer (ai-expert-analyzer writes it weekly), so the
+    response says whether the layer could be read before it reports a count from it. On
+    2026-09-19 this returned `entries: 0, thread: []` for a coach id that does not exist
+    and `{"error": ...}` for a throttled read — the first a confident zero over nothing,
+    the second indistinguishable from any other failure.
+    """
     coach_id = args.get("coach_id")
     if not coach_id:
         return {"error": "coach_id required. Valid: " + ", ".join(COACH_IDS)}
+    if coach_id not in COACH_NAMES:
+        # An unknown coach has no thread to be empty — that is a caller error, not a zero.
+        return {"error": f"unknown coach_id {coach_id!r}. Valid: " + ", ".join(COACH_IDS)}
     limit = int(args.get("limit", 4))
+    cadence = DERIVED_LAYERS["coach_thread"]["cadence_days"]
 
     try:
         # ADR-058: phase=pilot hidden by default.
@@ -47,27 +59,45 @@ def tool_get_coach_thread(args):
                 }
             )
         )
-        entries = [decimal_to_float(i) for i in resp.get("Items", [])]
+    except Exception as ex:
+        status, reason = read_status(error=ex)
         return {
             "coach_id": coach_id,
             "coach_name": COACH_NAMES.get(coach_id, coach_id),
-            "entries": len(entries),
-            "thread": [
-                {
-                    "date": e.get("date"),
-                    "week": e.get("week"),
-                    "position_summary": e.get("position_summary"),
-                    "emotional_investment": e.get("emotional_investment"),
-                    "predictions": e.get("predictions", []),
-                    "surprises": e.get("surprises", []),
-                    "open_questions": e.get("open_questions", []),
-                    "stance_changes": e.get("stance_changes", []),
-                }
-                for e in entries
-            ],
+            "entries": counted(status, 0),  # None: the count is withheld, not zero
+            "error": str(ex),
+            **layer_fields(status, reason, producer=DERIVED_LAYERS["coach_thread"]["producer"], cadence_days=cadence),
         }
-    except Exception as ex:
-        return {"error": str(ex)}
+
+    entries = [decimal_to_float(i) for i in resp.get("Items", [])]
+    newest = entries[0].get("date") if entries else None
+    status, reason = read_status(newest_date=newest, cadence_days=cadence)
+    if not entries and status == LAYER_OK:
+        # Readable and empty for a coach that exists: the producer has not written in the
+        # current phase (it runs weekly; a reset hides the prior cycle). Not a measured zero.
+        status = LAYER_DARK
+        reason = f"no thread entry for {coach_id!r} in the current phase — the producer ({DERIVED_LAYERS['coach_thread']['producer']}) has not written since genesis, or the coach is retired"
+    out = {
+        "coach_id": coach_id,
+        "coach_name": COACH_NAMES.get(coach_id, coach_id),
+        "entries": counted(status, len(entries)),
+        **layer_fields(status, reason, producer=DERIVED_LAYERS["coach_thread"]["producer"], cadence_days=cadence, newest_date=newest),
+    }
+    if status in (LAYER_OK, LAYER_DEGRADED):
+        out["thread"] = [
+            {
+                "date": e.get("date"),
+                "week": e.get("week"),
+                "position_summary": e.get("position_summary"),
+                "emotional_investment": e.get("emotional_investment"),
+                "predictions": e.get("predictions", []),
+                "surprises": e.get("surprises", []),
+                "open_questions": e.get("open_questions", []),
+                "stance_changes": e.get("stance_changes", []),
+            }
+            for e in entries
+        ]
+    return out
 
 
 def tool_get_predictions(args):
@@ -360,7 +390,9 @@ def tool_evaluate_prediction(args):
     if status not in ("confirmed", "refuted"):
         return {"error": "status must be 'confirmed' or 'refuted'"}
 
-    # Find the prediction across all coach threads
+    # Find the prediction across all coach threads. #3769: a thread that could not be READ
+    # is recorded, so a read failure never comes back as "not found in any coach thread".
+    unreadable = {}
     for cid in COACH_IDS:
         try:
             # ADR-058: phase=pilot hidden by default.
@@ -395,10 +427,17 @@ def tool_evaluate_prediction(args):
                             "status": status,
                             "outcome_note": outcome_note,
                         }
-        except Exception:
-            pass
+        except Exception as ex:  # noqa: BLE001 — recorded below, never silently "not found"
+            unreadable[cid] = f"{type(ex).__name__}: {ex}"
 
-    return {"error": f"Prediction {prediction_id} not found in any coach thread"}
+    if unreadable:
+        status, reason = read_status(error=RuntimeError(f"{len(unreadable)} of {len(COACH_IDS)} coach thread(s) unreadable"))
+        return {
+            "error": f"Prediction {prediction_id} not found in the {len(COACH_IDS) - len(unreadable)} readable coach thread(s); {len(unreadable)} could not be read",
+            "unreadable_threads": unreadable,
+            **layer_fields(status, reason, producer=DERIVED_LAYERS["coach_thread"]["producer"]),
+        }
+    return {"error": f"Prediction {prediction_id} not found in any coach thread", **layer_fields(LAYER_OK)}
 
 
 # ── #1387: the Coach Dossier audit + correction affordance ────────────────────
