@@ -742,7 +742,28 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # rows, against 653/107 on a disposable `git archive origin/main` export. Unproven is
         # UNCHANGED at 537 and BASELINE_UNPROVEN_GATES is not touched — the entrant spends no
         # headroom.
-        <= 108
+        # 2026-09-18 (#3599 box 3): 108 -> 109. ONE entrant, arriving PROVEN —
+        # guard::deploy/prereg_truth_gate.py, the pre-seal truth contract: a frozen
+        # pre-registration whose coach roster, asserted starting weight or min_effect derivation
+        # disagrees with the platform's own facts may not acquire a hash. Four mutations planted
+        # one at a time in the real tracked module, each reverted byte-identical before the next,
+        # and the stronger half is again not a plant: on its first run against the LIVE published
+        # cycle-17 seal (sha256 bd225d24…) it reported 7 blocking findings — a retired coach, a
+        # byline the registry does not use, three assertions of a superseded 326.2 lb baseline
+        # against a 327.34 constant, and two bare-literal minimum effects. Worth recording,
+        # because it is the failure mode this ceiling exists for: mutation M3 reported GREEN on
+        # its first run and the HARNESS was wrong, not the gate — an md5 on the source proves the
+        # FILE changed, never that the code under test did, and `100.0` -> `400.0` is byte-length
+        # preserving, so CPython's (mtime, size) pyc validation re-ran the original module. The
+        # general form of that trap, and the purge + `-B` fix, is written up for the next author
+        # of a mutation control in scripts/gate_census_mutations.py's docstring.
+        # FIRST measured at 107 -> 108 over 653 -> 654 against origin/main 56c6c4e7a; #3882's
+        # #3614 entrant above merged first, so this was RE-MEASURED after rebasing onto
+        # 63c7fc335 rather than incremented: {can-fail (proven) 109, unproven 537,
+        # not-applicable 6, attempted-unproven 3} over 655 rows on the rebased, COMMITTED tree,
+        # against 654/108 on a disposable `git archive origin/main` export. id-set diff between
+        # the two --json dumps: exactly {guard::deploy/prereg_truth_gate.py} enters, {} leaves.
+        <= 109
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

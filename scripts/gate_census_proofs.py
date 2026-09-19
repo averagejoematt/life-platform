@@ -1440,6 +1440,74 @@ GUARD_PROOFS.update(
     }
 )
 
+GUARD_PROOFS.update(
+    {
+        # #3599 box 3: the pre-seal truth contract. Four mutations planted ONE AT A TIME
+        # in the real tracked module and reverted immediately after each verdict was
+        # read — each the plausible "simplification" of one clause.
+        "guard::deploy/prereg_truth_gate.py": {
+            "gate_name": "deploy/prereg_truth_gate.py",
+            "command": (
+                "python3 -m pytest tests/test_prereg_truth_gate_3599.py -q   # 39 tests, baseline 39 passed; "
+                "plus the offline run python3 deploy/prereg_truth_gate.py (exit 1 on the live cycle-17 seal)"
+            ),
+            "mutation": (
+                "Four defects planted one at a time in the REAL tracked file (md5 asserted changed, the mutated and "
+                "original lines asserted present/absent on disk, and the bytecode cache purged, all before each "
+                "verdict was read; byte-identical again after each revert): "
+                "M1 — the coach-membership clause disarmed (`if False and coach_id not in coach_bylines`), i.e. a "
+                "retired seat stops being reported at all. "
+                "M2 — the byline pairing softened to a membership test (`name not in coach_bylines.values()`), which "
+                "is the #3520 freeze check's own weaker predicate: two live coaches swapped between two live seats "
+                "become invisible. "
+                "M3 — the baseline prose scan made vacuous (`_WEIGHT_MIN_LBS 100.0 -> 400.0`), so no weight figure "
+                "qualifies and the clause reports nothing over any artifact. "
+                "M4 — derivation completeness decided by `f not in block` instead of a usability test, so a "
+                "null `sd` in the derivation block passes as complete."
+            ),
+            "observed": (
+                "2026-09-18, watched one mutation at a time, each reverted before the next. BASELINE 39 passed, exit 0. "
+                "M1 RED (10 failed, 29 passed, exit 1) — the positive control, the finding-kind coverage assertion, "
+                "the named-offender tests, the COACH_NOT_OPERATIONAL isolation case, the current-artifact ratchet and "
+                "both in-test mutation controls. "
+                "M2 RED (1 failed, 38 passed, exit 1) — test_a_seat_swap_of_two_live_bylines_is_caught_here_and_not_by_"
+                "the_freeze_check, and only that one, which is the right blast radius for a clause about pairing. "
+                "M3 RED (11 failed, 28 passed, exit 1) — including test_the_baseline_clause_is_not_vacuous_on_the_real_"
+                "specimen, which exists precisely for this mutation. "
+                "M4 RED (2 failed, 37 passed, exit 1) — both null-field cases of "
+                "test_a_null_derivation_field_is_the_same_defect_as_an_absent_one. "
+                "RESTORED after each: 39 passed, exit 0, `git status --porcelain` empty. "
+                "M3's FIRST run reported GREEN and the harness was wrong, not the gate: an md5 on the source proves "
+                "the FILE changed, never that the code under test did — `100.0` and `400.0` are the same byte length, "
+                "so CPython's (mtime, size) pyc validation re-used deploy/__pycache__/prereg_truth_gate.*.pyc and ran "
+                "the ORIGINAL module. The harness now purges the cache and runs `-B` before reading any verdict; the "
+                "GENERAL form of that trap — necessary-but-not-sufficient md5 assertions on a hand-driven "
+                "control — is written up for the next author in scripts/gate_census_mutations.py's docstring, "
+                "because it is a defect in how a control is built rather than a quirk of this one. "
+                "The gate was ALSO watched reporting a real defect on its first run, which is the stronger half: "
+                "against the LIVE published cycle-17 seal (sha256 bd225d24…, curled from "
+                "/experiments/prereg/genesis-2026-09-06.json) it returned "
+                "{COACH_NOT_OPERATIONAL: 1, COACH_NAME_MISMATCH: 1, BASELINE_MISMATCH: 3, MIN_EFFECT_UNDERIVED: 2} "
+                "— 7 blocking, every kind reached by one real artifact."
+            ),
+            "scope": (
+                "The predicate is pure and is proved here against the committed sealed bytes "
+                "(tests/fixtures/prereg_cycle17_2026-09-06.json, byte-identical to the published artifact). What that "
+                "does NOT prove: that the seal chokepoint aborts a REAL attended seal — the write_stamp() refusal is "
+                "exercised behaviourally against a tmp_path stamp here, and the next genesis freeze is the first live "
+                "chance. The gate binds seals it MINTS only, so today's already-published cycle-17 seal passes "
+                "through untouched (the CLI prints the standing verdict but does not block). Clause coverage is "
+                "bounded by shape: an artifact carrying zero coaches and zero hypotheses produces zero findings, and "
+                "the baseline clause is silent on an artifact whose prose asserts no start weight — "
+                "asserted_baselines() is exported and its non-emptiness asserted against the real specimen for "
+                "exactly that reason, but a FUTURE artifact that simply stops stating its baseline would not be "
+                "caught here."
+            ),
+            "proved_on": "2026-09-18",
+        },
+    }
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QA_PROOFS — census family 3 (qa-smoke-check). Same `Proof` bar; here, like
