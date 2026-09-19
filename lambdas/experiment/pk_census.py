@@ -210,7 +210,19 @@ def census_snapshot(table=None) -> dict:
         import boto3
 
         table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
-    reps = census_families(scan_pk_sk_pages(table))
+    # #3669: `item_count` is the artifact's anti-vacuity signal and it can only be taken
+    # HERE, while the pages stream past — `census_families` reduces them to one
+    # representative per family, so by the time it returns the scan's size is gone. A
+    # family_count alone cannot distinguish a healthy table from a scan truncated after
+    # its first page, because both can surface the same handful of families.
+    _scanned = [0]
+
+    def _counting(pages):
+        for page in pages:
+            _scanned[0] += len(page)
+            yield page
+
+    reps = census_families(_counting(scan_pk_sk_pages(table)))
     if not reps:
         raise CensusPreflightError(
             "pk-family census snapshot: the pk+sk scan returned ZERO pk families. Refusing to "
@@ -224,11 +236,28 @@ def census_snapshot(table=None) -> dict:
         except KeyError:
             cls = None  # unresolved; run_census_preflight is the instrument that RULES on this
         families[fam] = {"rep_pk": pk, "rep_sk": sk, "class": cls}
+    n_families = len(families)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py.",
-        "family_count": len(families),
+        "family_count": n_families,
         "families": families,
+        # #3669: the provenance block. `family_count` is repeated inside `_meta` rather
+        # than cross-referenced because the two are one expression evaluated once, so they
+        # cannot drift; a reader grading the artifact should not have to know which of the
+        # two levels is authoritative. `table`/`region` catch the "right shape, wrong
+        # table" failure that reads as all-clear, and `item_count` catches the truncated
+        # scan that `family_count` alone cannot see.
+        "_meta": {
+            "generated_by": (
+                "lambdas/experiment/pk_census.py::census_snapshot via " "deploy/write_pk_family_census.py — never hand-edit this artifact"
+            ),
+            "table": TABLE,
+            "region": REGION,
+            "captured_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "item_count": _scanned[0],
+            "family_count": n_families,
+        },
     }
 
 

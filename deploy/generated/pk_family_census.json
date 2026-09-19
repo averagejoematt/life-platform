@@ -1,4 +1,12 @@
 {
+  "_meta": {
+    "captured_at": "2026-09-19",
+    "family_count": 98,
+    "generated_by": "lambdas/experiment/pk_census.py::census_snapshot via deploy/write_pk_family_census.py \u2014 never hand-edit this artifact",
+    "item_count": 44697,
+    "region": "us-west-2",
+    "table": "life-platform"
+  },
   "families": {
     "BOOK": {
       "class": "cross_phase",
@@ -492,6 +500,6 @@
     }
   },
   "family_count": 98,
-  "generated_at": "2026-09-18T01:08:22.857401+00:00",
+  "generated_at": "2026-09-19T00:51:06.105464+00:00",
   "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py."
 }

@@ -529,25 +529,33 @@ class TestTheCensusWriterDelegates:
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
         }
         assert "table.scan" not in calls, "the writer re-implemented the scan instead of calling pk_census"
-        assert "pk_census.scan_pk_sk_pages" in src and "pk_census.pk_family" in src
+        # The writer's entry point is `pk_census.census_snapshot` (#3514's shape, which is
+        # the one `restart_pipeline.py` Step [0] calls) — this lane's earlier `capture()`
+        # was a second, independent writer for the same artifact and lost the reconciliation.
+        # What is asserted is the DELEGATION, not the import spelling: the scan, the family
+        # reduction and the vacuity refusal must all live in pk_census.
+        assert "census_snapshot" in src, "the writer no longer delegates to pk_census.census_snapshot"
+        assert "def write_artifact" in src, "the artifact path is no longer constructed in exactly one place (#3860)"
+        for owned_by_pk_census in ("scan_pk_sk_pages", "census_families", "pk_family"):
+            assert f"def {owned_by_pk_census}" not in src, f"the writer re-implemented {owned_by_pk_census} instead of calling pk_census"
 
     def test_it_refuses_an_empty_census(self):
         """The vacuous-scan trap, at the point of capture: writing an empty artifact would
         turn every assertion in this file green by erasing the denominator."""
-        sys.path.insert(0, str(ROOT / "deploy"))
-        import write_pk_family_census as writer
+        sys.path.insert(0, str(ROOT / "lambdas"))
+        from experiment import pk_census
 
         class _EmptyTable:
             def scan(self, **_kw):
                 return {"Items": []}
 
         with pytest.raises(Exception) as exc:
-            writer.capture(table=_EmptyTable())
+            pk_census.census_snapshot(table=_EmptyTable())
         assert "vacuous-scan trap" in str(exc.value)
 
     def test_it_counts_families_from_real_shaped_pages(self):
-        sys.path.insert(0, str(ROOT / "deploy"))
-        import write_pk_family_census as writer
+        sys.path.insert(0, str(ROOT / "lambdas"))
+        from experiment import pk_census
 
         class _Table:
             def __init__(self):
@@ -566,6 +574,12 @@ class TestTheCensusWriterDelegates:
                     }
                 return {"Items": [{"pk": "USER#matthew#SOURCE#labs", "sk": "DATE#2026-04-03"}]}
 
-        payload = writer.capture(table=_Table())
-        assert payload["families"] == {"COACH": 1, "SOURCE#labs": 1, "SOURCE#whoop": 2}
-        assert payload["_meta"]["item_count"] == 4 and payload["_meta"]["family_count"] == 3
+        payload = pk_census.census_snapshot(table=_Table())
+        # #3514's shape: each family carries its representative row and resolved class, so
+        # the family SET is the assertion here and the scan's size is carried by `_meta`.
+        # (This lane's earlier writer stored per-family counts; that shape lost the
+        # reconciliation, and `item_count` below preserves the anti-vacuity signal it had.)
+        assert set(payload["families"]) == {"COACH", "SOURCE#labs", "SOURCE#whoop"}
+        assert payload["families"]["SOURCE#whoop"]["rep_sk"] == "DATE#2026-09-01", "first seen must win"
+        assert payload["_meta"]["item_count"] == 4, "item_count must count SCANNED items (4), not families (3)"
+        assert payload["_meta"]["family_count"] == 3
