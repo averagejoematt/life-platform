@@ -232,4 +232,7 @@ today's statement EXTENDED it to 2021-04-12 → 2026-09-19) · `agent_commit.sh`
 legitimately carries the sync output · filed member counts were low again in both directions (3513: 6 → 120; 3543: 8 → 10 pages; 3620:
 2 → 6 doors; 3677: 1 fix → 0). **Owner acts:** 3770 · 1738 · 1571 (left open on today's answers) · 3654 box 4 (a `site-shell` injection
 lever or an attended rollback run) · 3918's key collision · 3741 (0 posted; a parallel posting-session prompt was handed over) · the 5
-`acceptance_count` violations (3607 3611 3615 3617 3621). **Post-wrap:** 3608 closed on its live CI outputs (#3908 merged). **Final measured: 90 open.**
+`acceptance_count` violations (3607 3611 3615 3617 3621). **Post-wrap:** 3608 closed on its live CI outputs (#3908 merged); the owner's seven coaching amendments written verbatim into the
+owner-private `TRAINING_CALIBRATION.md` §7 / `TRAINING_PROGRAM.md` at the S3 coaching home and their six platform defects filed as
+#3927–#3932 (3 × P1 on Now: the planner's conditional up-branches + carry-forward floor, the Strava-only walking calc, the TDEE proxy
+charging rest time); the stale walking string purged (PR #3926). **Final measured: 96 open (25 closed, 16 filed).**
