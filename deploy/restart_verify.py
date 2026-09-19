@@ -74,6 +74,12 @@ Checks (each pass/fail):
      with the CI half (deploy/prereg_provenance_gate.py); repairs via
      deploy/reconcile_prereg_season_3511.py.
 
+ 21. Pre-genesis provenance census (#3513 box 3): no EXPERIMENT_SCOPED row dated
+     before genesis may lack phase=pilot. Row-side and family-derived (pk_census +
+     phase_taxonomy.classify), never a writer list — insight_writer wrote 109 bare
+     INSIGHT# rows across four cycles that PHASE_FILTER_EXPRESSION served as CURRENT on
+     Day 1, and no writer enumeration could see it because its pk is a runtime value.
+
  19. Cross-surface VITALS honesty (#2113): no coach card on
      /api/coaching-dashboard cites a recovery score, HRV, resting HR or sleep
      duration the cockpit disagrees with. The sibling of the weight check —
@@ -138,6 +144,36 @@ def served_genesis(payload) -> str | None:
         return None
     value = experiment.get("genesis")
     return value if isinstance(value, str) and value else None
+
+
+def pre_genesis_unstamped(pages, genesis: str) -> tuple[list, int]:
+    """#3513 box 3 — the pure predicate behind check 21: every EXPERIMENT_SCOPED row whose own
+    date is strictly before `genesis` must carry phase=pilot. Returns (violations, rows_scanned).
+
+    Family and class are DERIVED per row (`phase_taxonomy.classify`), so a new scoped family is
+    audited the reset it appears; rows the taxonomy cannot classify are skipped here — the
+    totality census is the instrument that rules on those. Date comes from the row itself
+    (`restart_phase_tag.extract_date`: explicit `date` attr, then the sk, then a timestamp
+    attr); an undated row cannot be pre-genesis by this predicate and is not guessed at."""
+    sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+    from experiment import phase_taxonomy as taxonomy  # noqa: E402
+    from restart_phase_tag import extract_date  # noqa: E402
+
+    bad: list = []
+    scanned = 0
+    for page in pages:
+        for it in page:
+            scanned += 1
+            pk, sk = it.get("pk", ""), str(it.get("sk", ""))
+            try:
+                if taxonomy.classify(pk, sk) != taxonomy.EXPERIMENT_SCOPED:
+                    continue
+            except KeyError:
+                continue
+            d = extract_date(it)
+            if d and d < genesis and it.get("phase") != "pilot":
+                bad.append(f"{pk}/{sk}[phase={it.get('phase')}]")
+    return bad, scanned
 
 
 def check(name: str, ok: bool, detail: str = ""):
@@ -366,6 +402,24 @@ def main():
         check("No countdown-gap escapees (wipe→genesis swept, #1947)", esc == 0, detail)
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("No countdown-gap escapees (wipe→genesis swept, #1947)", False, f"check could not run: {e}")
+
+    # 21. #3513 box 3 — pre-genesis provenance census. Check 14 sweeps the wipe->genesis
+    # countdown window for un-tombstoned rows; this asks the older question it cannot: is
+    # there ANY experiment-scoped row dated before genesis that is not `pilot`? A writer that
+    # stamps nothing (insight_writer until #3890; the MCP save_insight tool until the same
+    # PR as this check) leaves rows PHASE_FILTER_EXPRESSION serves as current on Day 1.
+    # One projected full scan (pk_census.scan_provenance_pages — the totality census's RCU).
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+        from experiment.pk_census import scan_provenance_pages  # noqa: E402
+
+        bad, scanned = pre_genesis_unstamped(scan_provenance_pages(t), EXPERIMENT_START_DATE)
+        detail = f"{len(bad)} pre-genesis scoped row(s) not pilot over {scanned} scanned" + (
+            f"; e.g. {', '.join(bad[:4])}; repair: python3 deploy/backfill_coach_ensemble_phase_stamps.py (dry-run first)" if bad else ""
+        )
+        check("No pre-genesis EXPERIMENT_SCOPED row without phase=pilot (#3513)", not bad and scanned > 0, detail)
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("No pre-genesis EXPERIMENT_SCOPED row without phase=pilot (#3513)", False, f"check could not run: {e}")
 
     # 15. #1979 — pre-registration completion gate. "Pre-registered" is the
     # platform's central credibility claim; nothing previously asserted a cycle's
