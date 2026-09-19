@@ -33,6 +33,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: workout DATE# keys name Pacific days
@@ -601,18 +602,30 @@ COMPARED_FIELDS = (
 )
 
 
-def _json_default(o):
-    """Decimal (what DynamoDB hands back) compares equal to the float we are about to
-    write. Without this a round-trip alone would look like a changed extraction."""
-    try:
-        return float(o)
-    except Exception:  # noqa: BLE001
-        return str(o)
+def _canonical(value):
+    """Normalise a value so a DynamoDB round-trip is not mistaken for a change.
+
+    DynamoDB has ONE number type. `{"level": 9}` comes back as `Decimal('9')`, and the
+    fresh extraction that produced it holds the int `9` — so a naive compare (or a
+    `json.dumps(default=float)`, which renders `9.0` against `9`) reports every single
+    record as changed, and a versioning writer built on it mints a new version on every
+    invoke forever. Every number is compared as a float, on both sides; `bool` is left
+    alone because it is an int subclass and `True` is not `1.0` here.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        return float(value)
+    if isinstance(value, dict):
+        return {str(k): _canonical(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_canonical(v) for v in value]
+    return value
 
 
 def extraction_fingerprint(record: dict) -> str:
     """Canonical JSON over COMPARED_FIELDS — the thing two extractions are equal on."""
-    return json.dumps({k: (record or {}).get(k) for k in COMPARED_FIELDS}, sort_keys=True, default=_json_default)
+    return json.dumps({k: _canonical((record or {}).get(k)) for k in COMPARED_FIELDS}, sort_keys=True, default=str)
 
 
 def extraction_changed(stored: dict, candidate: dict) -> bool:
@@ -620,9 +633,71 @@ def extraction_changed(stored: dict, candidate: dict) -> bool:
     return extraction_fingerprint(stored) != extraction_fingerprint(candidate)
 
 
-def prior_extraction_sk(head_sk: str, prior_extracted_at: str) -> str:
-    """The archive key of one superseded extraction — readable by key, forever."""
-    return f"{ARCHIVE_PREFIX}{head_sk}#{prior_extracted_at or 'unknown'}"
+def certain_change_reason(stored: dict, note_text: str):
+    """Would a re-extraction of `note_text` CERTAINLY differ from `stored`? (#3816)
+
+    A read-only predicate — no model call, no spend. It answers only where the answer is
+    forced by the extraction contract, and returns None (meaning "cannot say without
+    running the model") everywhere else. That asymmetry is the point: this is used by
+    `--report-overwrites` to count what a re-run would version, and a report that guessed
+    at the LLM tail would be a projection dressed as a measurement.
+
+    Three forced cases:
+      * the raw note itself changed  — `note_hash` is in COMPARED_FIELDS;
+      * the extractor version moved  — `algo_version` is too;
+      * the deterministic floor no longer matches. `merge_signals` gives the
+        deterministic pass first-writer precedence, so for every class it emits the
+        stored record MUST carry that exact signal. The model tail can add classes; it
+        can never change or remove one the regex produced.
+    """
+    if str(stored.get("note_hash") or "") != note_hash(note_text):
+        return "note text changed"
+    if str(stored.get("algo_version") or "") != ALGO_VERSION:
+        return f"algo_version moved ({stored.get('algo_version')} -> {ALGO_VERSION})"
+    stored_by_class = {str(s.get("class")): s for s in (stored.get("signals") or [])}
+    for det in deterministic_pass(note_text):
+        cls = str(det.get("class"))
+        got = stored_by_class.get(cls)
+        if got is None:
+            return f"deterministic signal {cls!r} is absent from the stored record"
+        if extraction_fingerprint({"signals": [got]}) != extraction_fingerprint({"signals": [det]}):
+            return f"deterministic signal {cls!r} differs from the stored one"
+    return None
+
+
+def prior_extraction_sk(head_sk: str, prior_record: dict) -> str:
+    """The archive key of one superseded extraction — CONTENT-addressed, not time-addressed.
+
+    The obvious key is `…#<prior extracted_at>`, and it is wrong here. The live corpus
+    (measured 2026-09-19) contains workouts logging the SAME exercise template twice with
+    two different notes — they collide on one head key by construction, so each pass over
+    that workout replaces A with B and then B with A. Timestamped archive keys would mint
+    two NEW rows on every invoke, forever. Digesting the extraction instead bounds the
+    archive at the number of DISTINCT extractions that ever stood at this key, which is
+    the thing worth keeping, and makes re-archiving idempotent.
+
+    Chronology is not lost: each archived row is a verbatim copy and carries its own
+    `extracted_at`, and the head's `supersedes` names this key outright.
+    """
+    digest = hashlib.sha256(extraction_fingerprint(prior_record).encode("utf-8")).hexdigest()[:16]
+    return f"{ARCHIVE_PREFIX}{head_sk}#{digest}"
+
+
+def _sk_not_exists():
+    """`attribute_not_exists(sk)` — write-once, so an already-archived extraction keeps
+    the timestamps it was first archived with. Returns None if boto3 is unavailable
+    (the pure-core unit path), in which case the put is unconditional."""
+    try:
+        from boto3.dynamodb.conditions import Attr
+
+        return Attr("sk").not_exists()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _already_archived(exc: BaseException) -> bool:
+    """A failed `attribute_not_exists` is the SUCCESS case: the prior is already stored."""
+    return "ConditionalCheckFailed" in type(exc).__name__ or "ConditionalCheckFailed" in str(exc)
 
 
 def read_head_record(table, pk: str, sk: str):
@@ -635,7 +710,7 @@ def read_head_record(table, pk: str, sk: str):
 def build_prior_extraction_item(stored: dict) -> dict:
     """A verbatim copy of the stored head, re-keyed to its archive sk."""
     prior = dict(stored)
-    prior["sk"] = prior_extraction_sk(str(stored.get("sk") or ""), str(stored.get("extracted_at") or ""))
+    prior["sk"] = prior_extraction_sk(str(stored.get("sk") or ""), stored)
     prior["record_kind"] = RECORD_KIND_PRIOR
     prior["superseded_head_sk"] = stored.get("sk")
     prior["archived_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -643,11 +718,16 @@ def build_prior_extraction_item(stored: dict) -> dict:
 
 
 def archive_prior_extraction(table, stored: dict) -> bool:
-    """Copy the prior extraction to its archive key. True when it is safely stored."""
+    """Copy the prior extraction to its archive key. True when it is safely stored —
+    including when it was already stored by an earlier pass (write-once)."""
+    item = floats_to_decimal(build_prior_extraction_item(stored))
+    cond = _sk_not_exists()
     try:
-        table.put_item(Item=floats_to_decimal(build_prior_extraction_item(stored)))
+        table.put_item(Item=item, **({"ConditionExpression": cond} if cond is not None else {}))
         return True
     except Exception as e:  # noqa: BLE001
+        if _already_archived(e):
+            return True
         logger.warning("training_notes prior archive failed (%s): %s", stored.get("sk"), type(e).__name__)
         return False
 
@@ -668,7 +748,7 @@ def supersede_stamp(stored: dict) -> dict:
             "algo_version": stored.get("algo_version"),
             "extracted_at": prior_at,
             "note_hash": stored.get("note_hash"),
-            "sk": prior_extraction_sk(str(stored.get("sk") or ""), prior_at),
+            "sk": prior_extraction_sk(str(stored.get("sk") or ""), stored),
         },
     }
 

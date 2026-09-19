@@ -36,10 +36,21 @@ TABLE = os.environ.get("TABLE_NAME", "life-platform")
 
 
 def _noted_workouts(table, since):
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#hevy") & Key("sk").between(f"DATE#{since}", "DATE#9999~"),
-    )
-    workouts = [it for it in resp.get("Items", []) if "#WORKOUT#" in it.get("sk", "")]
+    """Every noted Hevy workout since `since` — PAGINATED.
+
+    The original read one `table.query` page and called it the corpus. At ~5 years of
+    workouts that is a 1MB truncation, and it silently returns the OLDEST slice: a
+    "whole-history" backfill that never reaches this year. A count taken from it would
+    be a floor reported as a total (#3816 box 4 needs the total)."""
+    workouts = []
+    kwargs = {"KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#hevy") & Key("sk").between(f"DATE#{since}", "DATE#9999~")}
+    while True:
+        resp = table.query(**kwargs)
+        workouts.extend(it for it in resp.get("Items", []) if "#WORKOUT#" in it.get("sk", ""))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
     return [w for w in workouts if any((e.get("notes") or "").strip() for e in (w.get("exercises") or []))]
 
 
@@ -83,15 +94,27 @@ def report_overwrites(table, since):
             if not stored:
                 buckets["absent"].append(row)
                 continue
+            row["stored_extracted_at"] = stored.get("extracted_at")
+            row["stored_extracted_by"] = stored.get("extracted_by")
+            # (a) forced by the extraction contract — no model needed, and it holds even
+            #     where the cached tail is missing.
+            forced = tn.certain_change_reason(stored, note)
+            if forced:
+                row["why"] = forced
+                buckets["would_version"].append(row)
+                continue
+            # (b) otherwise predict the whole extraction from the CACHED tail.
             predicted = tn.extract_signals(note, llm_fn=llm_fn)
             if predicted.get("degraded"):
                 # The only degrade path reachable here is the cache miss above: the
                 # prediction would need a model call, so it is not made.
                 buckets["undetermined"].append(row)
                 continue
-            row["stored_extracted_at"] = stored.get("extracted_at")
-            row["stored_extracted_by"] = stored.get("extracted_by")
-            buckets["would_version" if tn.extraction_changed(stored, predicted) else "unchanged"].append(row)
+            if tn.extraction_changed(stored, predicted):
+                row["why"] = "cached re-extraction differs from the stored record"
+                buckets["would_version"].append(row)
+            else:
+                buckets["unchanged"].append(row)
 
     print("REPORT-OVERWRITES (read-only; nothing was written)\n")
     for label in ("would_version", "unchanged", "absent", "undetermined"):
@@ -99,7 +122,8 @@ def report_overwrites(table, since):
         print(f"{label}: {len(rows)}")
         for r in rows:
             extra = f"  [stored {r.get('stored_extracted_by')} @ {r.get('stored_extracted_at')}]" if r.get("stored_extracted_at") else ""
-            print(f"    {r['date']}  {r['exercise']}  {r['sk']}{extra}")
+            why = f"  — {r['why']}" if r.get("why") else ""
+            print(f"    {r['date']}  {r['exercise']}  {r['sk']}{extra}{why}")
         print()
     print(
         f"A re-run today would VERSION {len(buckets['would_version'])} stored record(s) "

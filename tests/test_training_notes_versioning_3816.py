@@ -48,6 +48,27 @@ HEAD_SK = f"DATE#{DATE}#WORKOUT#e5c2f877"
 PK = tn.notes_pk("D8F7F851")
 
 
+class ConditionalCheckFailedException(Exception):
+    """boto3 mints this class dynamically off the error code; the module matches on the
+    NAME, so the fake has to carry the same name for the write-once path to be real."""
+
+
+def _as_ddb(value):
+    """What boto3's resource layer ACTUALLY hands back: DynamoDB has one number type, so
+    every int and float comes back a `Decimal`. A fake table that returns the ints it was
+    given is not the wire, and the whole point of this test file is a comparison that
+    survives the round-trip — the first version of it did not (`9` vs `Decimal('9')`)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    if isinstance(value, dict):
+        return {k: _as_ddb(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_as_ddb(v) for v in value]
+    return value
+
+
 class FakeTable:
     """Enough DynamoDB to exercise the read-compare-archive-write path."""
 
@@ -57,10 +78,14 @@ class FakeTable:
         self.fail_get = False
         self.fail_put_sk_prefix: str | None = None
 
-    def put_item(self, Item):
+    def put_item(self, Item, ConditionExpression=None):
         if self.fail_put_sk_prefix and str(Item["sk"]).startswith(self.fail_put_sk_prefix):
             raise RuntimeError("simulated put failure")
-        self.items[(Item["pk"], Item["sk"])] = Item
+        key = (Item["pk"], Item["sk"])
+        if ConditionExpression is not None and key in self.items:
+            # The one condition this module uses is attribute_not_exists(sk).
+            raise ConditionalCheckFailedException("the conditional request failed")
+        self.items[key] = _as_ddb(Item)
         self.puts.append(Item)
 
     def get_item(self, Key):
@@ -117,6 +142,53 @@ def test_decimal_roundtrip_is_not_a_change():
     assert r2["skipped"] == 1 and r2["wrote"] == 0
 
 
+def test_an_int_read_back_as_decimal_is_not_a_change():
+    """THE false positive this comparator was born with. DynamoDB has one number type:
+    a deterministic `{"level": 9}` comes back as `Decimal('9')`, and the fresh extraction
+    that produced it holds the int `9`. Compared through `json.dumps(default=float)` that
+    is `9.0` vs `9` — so EVERY stored record read as changed, and the versioning writer
+    would have minted a new version on every hevy-backfill invoke, forever. Measured live
+    on 2026-09-19: 13 of 42 stored records reported as changed for exactly this reason.
+    """
+    fresh = {"note_hash": "h", "signals": [{"class": "progression", "confidence": 0.9, "value": {"level": 9}}]}
+    stored = {"note_hash": "h", "signals": [{"class": "progression", "confidence": Decimal("0.9"), "value": {"level": Decimal("9")}}]}
+    assert not tn.extraction_changed(stored, fresh)
+    # ...and the guard still sees a REAL numeric change (it is not just equal-to-everything).
+    assert tn.extraction_changed(
+        stored, {"note_hash": "h", "signals": [{"class": "progression", "confidence": 0.9, "value": {"level": 10}}]}
+    )
+
+
+def test_a_live_stored_record_round_trips_unchanged():
+    """End to end through the writer: seed, read the row back the way DynamoDB would
+    (Decimal-ised by `floats_to_decimal`), and re-run. Zero writes."""
+    t = FakeTable()
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=None)
+    stored = t.items[(PK, HEAD_SK)]
+    assert isinstance(stored["signals"][0]["value"]["level"], Decimal), "fixture no longer exercises the Decimal path"
+    assert not tn.extraction_changed(stored, tn.build_note_item(DATE, WUID, EXS[0], tn.extract_signals(CYCLING)))
+
+
+# ── 1b. The read-only change predicate ────────────────────────────────────────
+def test_certain_change_reason_is_silent_on_an_unchanged_record():
+    t = FakeTable()
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=_llm(LOGGING_QUIRK))
+    stored = t.items[(PK, HEAD_SK)]
+    assert tn.certain_change_reason(stored, CYCLING) is None
+
+
+def test_certain_change_reason_names_the_three_forced_cases():
+    t = FakeTable()
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=None)
+    stored = dict(t.items[(PK, HEAD_SK)])
+    assert "note text changed" in tn.certain_change_reason(stored, CYCLING + " and more")
+    assert "algo_version" in tn.certain_change_reason(dict(stored, algo_version="note-extractor@0.9.0"), CYCLING)
+    # The model tail can ADD a class; it can never remove one the regex produced, so a
+    # stored record missing a deterministic class is a forced change.
+    stripped = dict(stored, signals=[s for s in stored["signals"] if s["class"] != "progression"])
+    assert "progression" in tn.certain_change_reason(stripped, CYCLING)
+
+
 # ── 2. Positive control: a CHANGED re-extraction versions ─────────────────────
 def _seed_then_change(t):
     """Seed the deterministic-only extraction (the specimen's week-one state), then
@@ -137,7 +209,7 @@ def test_changed_reextraction_versions_and_the_prior_is_still_readable_by_key():
     assert any(s["class"] == "logging_quirk" for s in head["signals"])
 
     # The prior is readable BY KEY — not "still in the table somewhere".
-    prior_sk = tn.prior_extraction_sk(HEAD_SK, "2026-09-07T18:00:00Z")
+    prior_sk = head["supersedes"]["sk"]
     got = t.get_item(Key={"pk": PK, "sk": prior_sk})["Item"]
     assert got["extracted_by"] == before["extracted_by"] == "deterministic"
     assert got["signals"] == before["signals"], "the archived prior is not the verbatim prior"
@@ -174,12 +246,48 @@ def test_a_third_extraction_keeps_both_priors():
     assert t.items[(PK, HEAD_SK)]["version"] == 3
 
 
+# ── 2b. The archive is bounded by DISTINCT extractions, not by passes ─────────
+# Measured live on 2026-09-19 with `--report-overwrites`: of 42 stored note records, the
+# only two a re-run would version today are `2026-06-23 Treadmill` and `2026-09-10
+# Treadmill` — and both are there because that workout logs the SAME exercise template
+# TWICE with two different notes. They collide on one head key by construction, so every
+# pass writes A over B and then B over A. A timestamped archive key would mint two NEW
+# rows per pass, forever, in a measured partition. (The collision itself is a separate,
+# pre-existing conservation defect — named as residual in the PR, not fixed here.)
+COLLIDING = [
+    {"template_id": "D8F7F851", "name": "Treadmill", "notes": "Level 9 - 5.6 miles"},
+    {"template_id": "D8F7F851", "name": "Treadmill", "notes": "Level 4 - 1.2 miles"},
+]
+
+
+def test_a_flapping_head_does_not_mint_an_archive_row_per_pass():
+    t = FakeTable()
+    for i in range(6):
+        tn.write_workout_notes(t, DATE, WUID, COLLIDING, llm_fn=None, now_iso=f"2026-09-{7 + i:02d}T00:00:00Z")
+    archived = sorted(sk for (_pk, sk) in t.items if sk.startswith(tn.ARCHIVE_PREFIX))
+    assert len(archived) == 2, f"6 passes minted {len(archived)} archive rows — the archive is unbounded: {archived}"
+
+
+def test_an_already_archived_extraction_keeps_its_first_timestamps():
+    """Write-once: re-archiving the same extraction must not move `archived_at` or
+    overwrite the copy with a later pass's view of it."""
+    t = FakeTable()
+    tn.write_workout_notes(t, DATE, WUID, COLLIDING, llm_fn=None, now_iso="2026-09-07T00:00:00Z")
+    first = {sk: dict(it) for (_pk, sk), it in t.items.items() if sk.startswith(tn.ARCHIVE_PREFIX)}
+    assert first
+    tn.write_workout_notes(t, DATE, WUID, COLLIDING, llm_fn=None, now_iso="2026-09-30T00:00:00Z")
+    for sk, was in first.items():
+        now = t.items[(PK, sk)]
+        assert now["archived_at"] == was["archived_at"]
+        assert now["extracted_at"] == was["extracted_at"]
+
+
 # ── 3. Reader containment: archived rows are outside every live reader's range ─
 def test_archive_key_sorts_outside_the_two_reader_ranges():
     """`tool_get_exercise_notes` queries sk >= DATE#<start>; `training_notes_health`
     queries begins_with(DATE#<d>#WORKOUT#). The archive prefix must fall outside BOTH
     by key shape — not by a filter each reader has to remember to apply."""
-    prior_sk = tn.prior_extraction_sk(HEAD_SK, "2026-09-07T18:00:00Z")
+    prior_sk = tn.prior_extraction_sk(HEAD_SK, {"note_hash": "h", "signals": []})
     assert prior_sk < "DATE#1970-01-01", "an archived row leaks into sk >= DATE#<start>"
     assert not prior_sk.startswith(f"DATE#{DATE}#WORKOUT#"), "an archived row leaks into the health check's begins_with"
     # ...and it does NOT collide with the correction overlay the reader special-cases.
