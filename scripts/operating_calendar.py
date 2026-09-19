@@ -116,17 +116,35 @@ early. Parking a ritual permanently in the future is bounded out: a declared fir
 more than ``MAX_SCHEDULE_AHEAD_DAYS`` past adoption fails the guard, and the entry's reason
 must state the first-occurrence date in full so registry and prose cannot drift apart.
 
+THE REVIEW'S GRADES HAVE A SHELF LIFE, AND ITS CONTROLS HAVE TO FIRE (#3603)
+---------------------------------------------------------------------------
+Two facts the clocks above could not see, added by #3603 and assembled in
+``scripts/review_carry_forward.py`` (its docstring carries the evidence and the reasoning):
+
+* **A carried grade expires.** ``CARRY_FORWARD_MAX_DAYS`` days after the run that last
+  graded a lens FROM SCRATCH, that row is expired — the sweep prints
+  ``stale carry-forward: <lens>``, the next delta must select it regardless of diff, and
+  ``--due`` exits ``EXIT_STALE_CARRY`` instead of clean. Carrying is not grading, so the age
+  runs from the run that graded, never from the delta that carried.
+* **A run that failed its own planted controls does not reset the clock.** The rubric plants
+  false findings in each verifier batch; a run whose verifiers CONFIRMED one is
+  ``UNCALIBRATED``, and ``newest_run`` skips its artifact through the entry's ``qualifier``.
+  Runs predating #3603 state no calibration; ``UNSTATED`` is reported, never disqualifying —
+  arming a gate retroactively over history is how a gate is born red and then ignored.
+
 USAGE
 -----
     python3 scripts/operating_calendar.py            # human table, exit 0 always
-    python3 scripts/operating_calendar.py --due      # dead-man: 1 = OVERDUE, 3 = never-run
+    python3 scripts/operating_calendar.py --due      # dead-man: 1 = OVERDUE, 3 = never-run, 4 = stale carry-forward
     python3 scripts/operating_calendar.py --due --today 2026-12-01   # deterministic (tests)
     python3 scripts/operating_calendar.py --check    # docs/OPERATING_CALENDAR.md drift → exit 1
     python3 scripts/operating_calendar.py --apply    # regenerate docs/OPERATING_CALENDAR.md
 
 Exit codes: 0 clean · 1 at least one OVERDUE · 2 bad --today · 3 no OVERDUE but at least
-one ritual has never produced its artifact.
+one ritual has never produced its artifact · 4 nothing late, but at least one lens grade has
+been carried forward past the 28-day cap (#3603).
 
+v1.4.0 — 2026-09-19 (#3603, the carry-forward cap + a calibration-aware probe) ·
 v1.3.0 — 2026-08-31 (launch checkpoints, `starts`) · v1.2.0 — 2026-08-30 (#3250, lens set) ·
 v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
 """
@@ -169,7 +187,7 @@ _DATE_RE_GROUPS = 1  # every probe regex carries exactly one capture group: the 
 REVIEW_SPINE = "review"
 
 
-def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None, starts=None):
+def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None, starts=None, qualifier=None):
     return {
         "skill": skill,  # resolved via skill_registry.skill_path(), or None for a doc-only ritual
         # The `/review <lens>` rubric this entry schedules — a name under
@@ -191,6 +209,11 @@ def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reas
         # entry reads SCHEDULED instead of NEVER-RUN; after it, ordinary DUE/OVERDUE apply.
         # See the module docstring — it moves the clock, never the lateness verdict.
         "starts": starts,
+        # Optional predicate(abs_path) -> bool: does this matched artifact COUNT as a run?
+        # None = every dated artifact counts (the behaviour before #3603). The two review
+        # entries pass `calibrated_run`, so an artifact whose own calibration block says its
+        # verifiers confirmed a planted false finding does not advance the clock.
+        "qualifier": qualifier,
     }
 
 
@@ -227,17 +250,21 @@ CALENDAR: dict[str, dict] = {
             "procedure cannot drift apart."
         ),
         hold=(
-            "2026-08-27",
-            "2026-09-06",
-            "#3245 rewrote the review-skill corpus (102 files) — the instrument this clock "
-            "measures. A delta grades the platform against the PREVIOUS run's anchors, so a "
-            "delta run across an instrument rewrite produces a number that means nothing: the "
-            "movement would be the rubric moving, not the platform. Decision (#3250, Session I): "
-            "do NOT run a delta into the rewrite. The next fullreview run is recorded as a NEW "
-            "BASELINE (a full, suffix-free grades file), and this clock is re-anchored once to "
-            "2026-09-06 so the 2026-09-01 hard date is discharged by a written decision rather "
-            "than by a silent lapse. This hold is one-time: after 2026-09-06 the ordinary "
-            "cadence applies and a missed run reds like any other.",
+            "2026-09-19",
+            "2026-09-26",
+            "#3603 (PR #3904, merged 2026-09-19) rewrote the instrument this clock measures — "
+            "frozen anchors per run, the 28-day carry-forward cap, the planted calibration "
+            "controls, and the rubric text in SKILL.md + references/full.md — and the change "
+            "surface since the 2026-09-05 baseline is 896 files across every area, so more than "
+            "~70% of the panel qualifies. Both are the rubric's own 'delta is INVALID' tests "
+            "(references/full.md § Delta mode): a delta across an instrument rewrite measures the "
+            "rubric moving, and a delta touching nearly everything is a full run wearing worse "
+            "anchors. Decision (Session AL, 2026-09-19): do NOT run the overdue delta; the next "
+            "fullreview run is a NEW BASELINE under the rewritten instrument (a full, suffix-free "
+            "grades file, `method` naming #3904), and this clock is re-anchored once to 2026-09-26 "
+            "so the 2026-09-16 hard date is discharged by a written decision rather than a silent "
+            "lapse. Precedent: the 2026-08-27 hold for #3245 (#3250, Session I). One-time: after "
+            "2026-09-26 the ordinary cadence applies and a missed run reds like any other.",
         ),
     ),
     # ── Monthly ───────────────────────────────────────────────────────────────
@@ -513,6 +540,7 @@ def newest_run(entry: dict, repo: str = REPO) -> date | None:
     """The newest dated artifact this ritual's probe can see, or None (never ran)."""
     kind, target, pattern = entry["probe"]
     rx = re.compile(pattern)
+    qualifier = entry.get("qualifier")
     dates: list[date] = []
     if kind == NEWEST_DATED_FILE:
         d = os.path.join(repo, target)
@@ -521,7 +549,11 @@ def newest_run(entry: dict, repo: str = REPO) -> date | None:
                 m = rx.match(name)
                 if m:
                     parsed = _parse_date(m.group(1))
-                    if parsed:
+                    # #3603: an artifact that landed is not automatically a run that
+                    # happened. The qualifier is the entry's own answer to "does THIS
+                    # artifact count?" — for the review rows, "did its planted controls
+                    # fire?". A disqualified artifact leaves the clock where it was.
+                    if parsed and (qualifier is None or qualifier(os.path.join(d, name))):
                         dates.append(parsed)
     elif kind == REGEX_IN_FILE:
         path = os.path.join(repo, target)
@@ -536,6 +568,46 @@ def newest_run(entry: dict, repo: str = REPO) -> date | None:
     else:  # pragma: no cover — well-formedness test pins the kinds
         raise ValueError(f"unknown probe kind {kind!r}")
     return max(dates) if dates else None
+
+
+# ── The carry-forward cap + the planted controls (#3603) ─────────────────────
+# The assembler itself lives in scripts/review_carry_forward.py — this file is at its
+# module-size ceiling (#1665), and the cap has exactly one home either way. Imported by
+# path because the calendar is loaded by path too (tests, the hook, the workflow), so a
+# `scripts` package import would resolve differently for each caller.
+def _carry_forward_module():
+    import importlib.util
+
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "review_carry_forward.py")
+    spec = importlib.util.spec_from_file_location("_review_carry_forward", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_carry = _carry_forward_module()
+
+CARRY_FORWARD_MAX_DAYS = _carry.CARRY_FORWARD_MAX_DAYS
+GRADES_DIR = _carry.GRADES_DIR
+GRADES_RE = _carry.GRADES_RE
+CALIBRATED = _carry.CALIBRATED
+UNCALIBRATED = _carry.UNCALIBRATED
+UNSTATED = _carry.UNSTATED
+calibration_verdict = _carry.calibration_verdict
+calibrated_run = _carry.calibrated_run
+carried_lenses = _carry.carried_lenses
+scratch_dates = _carry.scratch_dates
+standing_lenses = _carry.standing_lenses
+expired_carry_forward = _carry.expired_carry_forward
+load_grade_runs = _carry.load_grade_runs
+carry_forward_report = _carry.carry_forward_report
+
+
+#: The two `full`-lens clocks read a calibration-aware probe. Wired here rather than at the
+#: CALENDAR literal because `calibrated_run` is defined below it; the set is explicit so a
+#: reader can see exactly which clocks a failed planted control stops (#3603).
+for _review_entry in ("fullreview-delta", "fullreview-full"):
+    CALENDAR[_review_entry]["qualifier"] = calibrated_run
 
 
 # ── The dead-man ──────────────────────────────────────────────────────────────
@@ -553,6 +625,7 @@ EXIT_CLEAN = 0
 EXIT_OVERDUE = 1
 EXIT_BAD_ARG = 2
 EXIT_NEVER_RUN = 3
+EXIT_STALE_CARRY = 4  # #3603 — nothing is late, but a lens grade has been carried past the cap
 
 
 def _hold_dates(entry: dict) -> tuple[date, date] | None:
@@ -906,11 +979,15 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_BAD_ARG
     report, overdue, never = due_report(today)
     print(report)
+    carry_lines, expired = carry_forward_report(today)
+    print("\n".join(carry_lines))
     if not args.due:
         return EXIT_CLEAN
     if overdue:
         return EXIT_OVERDUE
-    return EXIT_NEVER_RUN if never else EXIT_CLEAN
+    if never:
+        return EXIT_NEVER_RUN
+    return EXIT_STALE_CARRY if expired else EXIT_CLEAN
 
 
 if __name__ == "__main__":

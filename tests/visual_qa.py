@@ -131,7 +131,7 @@ try {
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
 import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright import)
-from qa_manifest import leak_scan_paths, visual_pages  # noqa: E402
+from qa_manifest import leak_scan_paths, text_floor_paths, visual_pages  # noqa: E402
 
 _API_SEQUENCING_REGISTRY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy", "api_deploy_sequencing.json")
 
@@ -807,11 +807,19 @@ def _svg_text_floor_findings(page, width):
 # CSS gate (check_css_tokens.py) had blessed them via free-text `fs-ok:` sanctions
 # (a sanction can bless ANY literal; nothing checked the rendered result). This is
 # the rendered-px arbiter for HTML text: every visible text node must compute
-# >= the §10.5 11px floor. Gating on the three highest-traffic pages (the #2674
+# >= the §10.5 11px floor. Armed on the three highest-traffic pages (the #2674
 # scope, measured clean before arming — the 2026-07-17 lesson: never arm a widened
-# gate on surfaces still carrying live findings); extending a page into TEXT_FLOOR_PAGES
-# requires measuring it clean first.
-TEXT_FLOOR_PAGES = {"/", "/cockpit/", "/data/"}
+# gate on surfaces still carrying live findings).
+#
+# (#3543) The set is now DERIVED from the page registry — every tier-1/2 page, 64 of
+# them — instead of the three it was armed on. Three pages was never the promise
+# DESIGN_SYSTEM_V5 §10.5 makes ("every rendered text node"), and the 61 unmeasured
+# pages carried 19 sub-floor tokens.css rules at 8.0–10.4px on 10 of them: the gate
+# reported green the whole time because those rules happened to render somewhere it
+# never looked. Widened under the same arming rule it was born with — the full
+# tier-1/2 surface was measured at 1280 and 390 first, and every sub-floor node that
+# sweep found was FIXED (lifted to var(--fs-label)), not exempted.
+TEXT_FLOOR_PAGES = text_floor_paths()
 
 _HTML_TEXT_AUDIT_JS = """(floor) => {
     const out = [];
@@ -859,6 +867,75 @@ def _html_text_floor_findings(page, width):
             agg[key] = {**f, "n": 0}
         agg[key]["n"] += 1
     return sorted(agg.values(), key=lambda x: (x.get("eff") or 0, x.get("sel") or ""))
+
+
+# ── visitor-facing GLYPH leak (#3543) ─────────────────────────────────────────
+# The provenance trigger shipped as `&#9432;` — a U+24D8 CIRCLED LATIN SMALL LETTER I
+# used as an icon. A text glyph standing in for an icon is a defect in two registers at
+# once: it is sized by the type scale (that one rendered at 10.12px, under the §10.5
+# floor, and no type fix could raise it without making the trigger larger than the label
+# it sits on), and it renders in whatever the reader's font stack has for that code
+# point — which is exactly the "no emoji, no glyph decoration" rule DESIGN_SYSTEM_V5 §8
+# states and nothing measured. Icons come from the sprite (icons.js/icons.svg); this is
+# the arbiter that no module quietly goes back to a code point.
+#
+# Narrow by construction — only the ranges the design system actually forbids:
+#   U+2460–U+24FF  enclosed alphanumerics (the ⓘ class)
+#   U+2600–U+27BF  misc symbols + dingbats
+#   U+1F300–U+1FAFF emoji / pictographs
+#   U+FE0F         the emoji variation selector (an otherwise-plain code point,
+#                  presented as emoji — invisible to a naive range check)
+# Typographic marks the site DOES use — —, ·, ▼, ✓-as-SVG, arrows — are deliberately
+# out of range; this sweep is about glyphs standing in for icons, not punctuation.
+_GLYPH_LEAK_AUDIT_JS = r"""() => {
+    const out = [];
+    const bad = /[\u2460-\u24FF\u2600-\u27BF\uFE0F]|[\uD83C-\uD83E][\uDC00-\uDFFF]/;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walker.nextNode())) {
+        const txt = (n.textContent || '');
+        if (!txt.trim()) continue;
+        const m = bad.exec(txt);
+        if (!m) continue;
+        const el = n.parentElement;
+        if (!el) continue;
+        let box; try { box = el.getBoundingClientRect(); } catch (e) { continue; }
+        if (!box || box.width < 1 || box.height < 1) continue;   // not laid out
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        const cls = (typeof el.className === 'string' && el.className.trim())
+            ? '.' + el.className.trim().split(/\s+/).join('.') : '';
+        // Is the glyph standing in for an ICON — i.e. inside interactive chrome the
+        // site draws (a button, a link, a tab)? That is the #3543 defect: a control
+        // whose mark is a code point is sized by the type scale and rendered by
+        // whatever font the reader has. A glyph inside a data label is typography.
+        const chrome = !!el.closest('button, a, [role="button"], [role="tab"], summary');
+        out.push({
+            sel: el.tagName.toLowerCase() + cls,
+            glyph: m[0],
+            code: 'U+' + m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0'),
+            txt: txt.trim().slice(0, 24),
+            chrome: chrome,
+        });
+    }
+    return out;
+}"""
+
+
+def _glyph_leak_findings(page):
+    """Every visible text node carrying a forbidden glyph code point (#3543),
+    deduped by (selector, code point). The viewport is whatever the caller set."""
+    try:
+        raw = page.evaluate(_GLYPH_LEAK_AUDIT_JS) or []
+    except Exception:
+        return []
+    agg = {}
+    for f in raw:
+        key = (f.get("sel"), f.get("code"))
+        if key not in agg:
+            agg[key] = {**f, "n": 0}
+        agg[key]["n"] += 1
+    return sorted(agg.values(), key=lambda x: (x.get("code") or "", x.get("sel") or ""))
 
 
 def gha_paused_gate_annotation(gate, status, env=None, stream=None):
@@ -1502,6 +1579,25 @@ def capture_page(
                 for f in _html_text_floor_findings(page, _floor_w):
                     issues.append(
                         f"HTML text below 11px floor @{_floor_w}px (#2674): {f['sel']} '{f['txt']}' = " f"{f['eff']}px computed x{f['n']}"
+                    )
+                # ── glyph leak (#3543): an icon spelled as a code point. Same page set
+                #    and the same two widths — a leak can be conditional on either.
+                #    REPORTED AS A WARNING, deliberately: measured across all 64 tier-1/2
+                #    pages it finds 10 live glyphs on 8 pages, and only one of them was
+                #    the defect this sweep was written for (the provenance ⓘ, fixed in
+                #    this change). The rest are content — ✓/✗ in a scorecard label, ⚑/⚠
+                #    in a readout note, and a ☀️ inside a Hevy workout TITLE, which is
+                #    ingested data no site change can clear. Arming a gate on a surface
+                #    carrying live findings is what red-walls a deploy for a week and
+                #    teaches readers to skip it; arming it as a warning makes the count
+                #    visible and falsifiable on every run. Promote to `issues` once the
+                #    content producers are clean — the sweep will say when.
+                for f in _glyph_leak_findings(page):
+                    warnings.append(
+                        f"Glyph leak in visitor-facing text @{_floor_w}px (#3543): {f['sel']} "
+                        f"'{f['txt']}' carries {f['code']} '{f['glyph']}' x{f['n']}"
+                        f"{' — INSIDE INTERACTIVE CHROME (an icon, not typography)' if f.get('chrome') else ''}"
+                        " — icons come from icons.js/icons.svg, never a text code point (DESIGN_SYSTEM_V5 §8)"
                     )
 
         # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──

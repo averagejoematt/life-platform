@@ -371,7 +371,16 @@ _RESIDUAL = {
         "cap and the note text is fixed, so the truncation is DETERMINISTIC and N retries bill N times "
         "for N identical failures. The module's own registry facet already says the right response — "
         "`re_derive_when: '... or TruncatedResponse is ever observed live'` — i.e. re-derive the cap, "
-        "not re-invoke. Never observed live as of 2026-09-15. Folded onto #3828.",
+        "not re-invoke. "
+        "STAYS A RESIDUAL after #3817 (2026-09-19), and the reason is now stronger rather than "
+        "unchanged: the cap WAS re-derived that day (384 -> 640, #3828 box 2) when the taxonomy grew, "
+        "on the first clause of `re_derive_when` and not on an observation — a whole-partition scan "
+        "(n=40 head records) still finds zero `degraded_reason` starting `truncated`. So the remedy "
+        "this site needs has now been exercised once, end to end, and it is still not a retry. What "
+        "keeps #3828 open is its box 1: a single live truncation is counted NOWHERE an operator "
+        "reads — `freshness_checker_lambda` prints the degrade tally only on the `extractor_dark` "
+        "branch, which needs EVERY record degraded, so one truncated note among healthy ones is "
+        "silent. Folded onto #3828.",
     ),
     "lambdas/ai/bedrock_client.py": (
         "#2893",
@@ -548,3 +557,19 @@ def test_3832_MUTATION_a_judge_planted_OUTSIDE_the_staging_roots_is_STILL_caught
     planted.write_text(_planted_judge_source(), encoding="utf-8")
     hits = _enumerate_truncation_decision_sites(repo)
     assert os.path.relpath(str(planted), repo) in hits, "the fix silenced a REAL untracked judge — track=False was lost (#3832 box 2)"
+
+
+def test_the_training_notes_residual_carries_a_re_derivation_not_a_retry():
+    """#3828's remedy, asserted where the Set is enumerated (the residual's claim above is
+    otherwise prose nobody checks). The cap must clear 2x the measured max AND the
+    projected post-change max — the second is what #3817's taxonomy growth moved, and a
+    cap re-derived against the OLD taxonomy would pass the first check alone."""
+    sys.path.insert(0, os.path.join(_REPO, "lambdas"))
+    from training import training_notes_llm as tnl
+
+    d = tnl.MAX_TOKENS_DERIVATION
+    assert d["projected_post_change_max"] >= d["max"], "the post-change projection is below the measured max — it projects nothing"
+    assert tnl.MAX_TOKENS >= 2 * d["projected_post_change_max"], "the cap does not clear 2x the post-change projection — re-derive it"
+    assert "2026-09-19" in _read("lambdas/training/training_notes_llm.py"), "the re-derivation is undated in its own source"
+    # The residual is a re-derivation, NOT a retry: this site must stay off the chokepoint.
+    assert "invoke_until_readable_verdict" not in _read("lambdas/training/training_notes_llm.py")

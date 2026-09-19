@@ -3737,6 +3737,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/training_notes.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/training/training_notes.py",
@@ -7105,7 +7112,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 680,
+      "edges": 681,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7120,8 +7127,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 336,
-        "sites_resolved": 841,
-        "sites_total": 1177
+        "sites_resolved": 842,
+        "sites_total": 1178
       },
       "schedule_resolution": {
         "dynamic": 0,
