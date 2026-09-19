@@ -172,6 +172,10 @@ class _FakeTable:
     def put_item(self, Item):
         self.items[(Item["pk"], Item["sk"])] = Item
 
+    def get_item(self, Key):
+        it = self.items.get((Key["pk"], Key["sk"]))
+        return {"Item": it} if it is not None else {}
+
 
 def test_writer_never_touches_raw_partition_and_is_idempotent():
     from training.training_notes import write_workout_notes
@@ -180,7 +184,8 @@ def test_writer_never_touches_raw_partition_and_is_idempotent():
     exs = [{"template_id": "E53CCBE5", "name": "Standing Calf Raise", "notes": STANDING_CALF}]
     r1 = write_workout_notes(t, "2026-06-20", "hevy:dc3e3b10", exs, llm_fn=None)
     r2 = write_workout_notes(t, "2026-06-20", "hevy:dc3e3b10", exs, llm_fn=None)  # re-run
-    assert r1["wrote"] == 1 and r2["wrote"] == 1
+    # #3816: the second run is not a re-put of the same bytes, it is NO write at all.
+    assert r1["wrote"] == 1 and r2["wrote"] == 0 and r2["skipped"] == 1
     # Idempotent: same stable sk → no duplicate row.
     assert len(t.items) == 1
     # Provenance: only ever the training_notes partition, never SOURCE#hevy.

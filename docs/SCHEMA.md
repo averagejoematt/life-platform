@@ -1522,6 +1522,53 @@ LLM namer for residual `uncategorized` clusters is Phase 2 (deferred).
 
 ---
 
+### training_notes (derived note-signal layer — versioned, #951/#3816)
+
+Derived, exercise-keyed projection of Matthew's freeform Hevy exercise notes, written by
+`lambdas/training/training_notes.py` (deterministic floor + bounded Haiku tail). Raw is
+never mutated. Read by `get_exercise_notes` and `training_notes_health`.
+
+**pk:** `USER#matthew#SOURCE#training_notes#EXERCISE#<template_id>` ·
+**sk (head):** `DATE#YYYY-MM-DD#WORKOUT#<workout_id>` · one head per exercise per workout.
+Corrections overlay at `DATE#…#WORKOUT#<id>#CORRECTION` (win on read).
+
+**2026-09-19 (#3816) — a re-extraction no longer overwrites the head in place.** The
+writer compares the candidate extraction against the stored head first and takes one of
+three paths: identical (`note_hash`, `note_raw`, `signals`, `pain_flag`, `sentiment`,
+`degraded`, `degraded_reason`, `extracted_by`, `algo_version` — `extracted_at` is
+deliberately NOT compared) → **no write at all**; no stored head → write it; different →
+copy the prior verbatim to its archive key FIRST, then write the head. New/changed
+attributes:
+
+| Field | Type | Where | Description |
+|-------|------|-------|-------------|
+| `version` | number | head | 1 on first write, +1 per superseding extraction |
+| `first_extracted_at` | string | head | when this layer FIRST spoke about this workout+exercise; `extracted_at` moves, this does not |
+| `supersedes` | map | head | `{algo_version, extracted_at, note_hash, sk}` of the extraction replaced — `sk` names the archived copy |
+| `prior_archive_failed` | bool | head | present+true only when the prior could not be stored; the head never implies a lineage it does not have |
+| `prior_unverified` | bool | head | present+true only when the stored head could not be READ (fail-soft, never fail-silent) |
+| `record_kind` | string | archive | `prior_extraction` — the positive attribute a future reader excludes on |
+| `superseded_head_sk` | string | archive | the head key this copy used to occupy |
+| `archived_at` | string | archive | when the copy was taken (write-once; a re-archive of identical content is a no-op) |
+
+**Archive sk:** `ARCHIVE#DATE#YYYY-MM-DD#WORKOUT#<id>#<16-hex extraction digest>`, same
+pk. Two deliberate choices: (a) the `ARCHIVE#` **prefix** (not a suffix on the head key)
+puts archived rows OUTSIDE both live readers' key ranges by shape — `get_exercise_notes`
+scans `sk >= DATE#<start>` and `training_notes_health` uses
+`begins_with(DATE#<d>#WORKOUT#)`, and `"ARCHIVE#" < "DATE#"` — so no reader needs to
+remember a filter (mirror of the hevy partition's `DELETE#WORKOUT#` markers, which sort
+the other way); (b) the key digests the **extraction content**, not `extracted_at`,
+because the live corpus contains workouts logging one exercise template twice with two
+different notes — they collide on one head key, and a timestamped archive key would mint
+new rows on every pass forever. The archive is therefore bounded by the number of
+DISTINCT extractions that ever stood at that key. Chronology survives on the rows
+themselves (each archived copy carries its own `extracted_at`).
+
+`deploy/backfill_training_notes.py --report-overwrites` is the read-only preview of what
+a re-run would version (no writes, no model calls).
+
+---
+
 ## Profile Record
 
 **pk:** `USER#matthew`  
