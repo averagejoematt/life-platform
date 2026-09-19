@@ -10,6 +10,7 @@ from decimal import Decimal
 from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from experiment.phase_taxonomy import experiment_stamp_for  # #3513: the class-gated, date-derived write-time stamp
 from ingestion.source_registry import raw_date_key  # bundled shared module: the X-9 raw/ layout facts (#2278)
 
 from mcp import idempotency as _idem
@@ -281,6 +282,13 @@ def tool_save_insight(args):
     dup = _idem.guard(table, "save_insight", _idem.content_key(item["date_saved"], text, source, tags), payload={"insight_id": ts})
     if dup:
         return {**dup, "saved": False}
+    # #3513: the THIRD insights writer. `insight_writer` and the inbound email parser were
+    # stamped by #3890; this tool kept writing bare INSIGHT# rows, which the row-side nightly
+    # audit named on its first pass (3 rows at 15:14Z, 2026-09-19). Same shape as those two:
+    # class-gated by the taxonomy, phase derived from the row's own Pacific day, so a save
+    # in the reset->genesis countdown lands `pilot`, never this cycle's `experiment`. The
+    # stamp goes FIRST so nothing the item carries is overridden by it.
+    item = {**experiment_stamp_for(INSIGHTS_PK, item["sk"], as_of=item["date_saved"]), **item}
     table.put_item(Item=item)
     logger.info(f"save_insight: saved insight_id={ts}")
     return {
