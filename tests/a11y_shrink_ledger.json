@@ -1,0 +1,8 @@
+{
+  "_meta": {
+    "updated_at": "2026-09-19",
+    "max_age_days": 7,
+    "note": "a11y shrink dead-man (#3546) \u2014 one row per (page, rule) that tests/visual_qa.py observed as baselined-but-no-longer-live, with the date it was FIRST seen that way. Written by the sweep, read by tests/test_a11y_shrink_deadman_3546.py, which reds once any row is older than SHRINK_MAX_AGE_DAYS. A row leaves this file exactly one way: the ledger entry it names is harvested via `python3 tests/visual_qa.py --update-baseline` (or the violation comes back). Rows flagged phase_dependent are excluded from both the candidate list and the harvest while the cycle's day_n < PHASE_THIN_DAYS. Generated \u2014 do not hand-edit."
+  },
+  "entries": []
+}
