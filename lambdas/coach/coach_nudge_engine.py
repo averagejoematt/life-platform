@@ -464,7 +464,6 @@ def build_nudge_item(
     now_utc: datetime,
     uid: Optional[str] = None,
     gate_findings: Optional[list] = None,
-    cycle: Optional[int] = None,
 ) -> dict:
     """The verbatim COACH#-partition nudge record (ADR-104: stored exactly as
     produced, graded later). Numeric prior is kept as str for Decimal-safe DDB
@@ -488,8 +487,14 @@ def build_nudge_item(
         item["outcome"] = OUTCOME_PENDING
     if gate_findings:
         item["gate_findings"] = [str(f)[:300] for f in gate_findings][:10]
-    if cycle is not None:
-        item["cycle"] = int(cycle)
+    # #3877: NO provenance is written here. This used to stamp a bare `cycle` and never
+    # `phase`, which on a tagger-blind COACH# partition reads as the current cycle forever.
+    # Provenance now comes from `experiment_stamp_for(pk, sk)` at the single write site
+    # (`coach_nudge_lambda._finalize`), which asks the taxonomy per ROW. A bare `cycle`
+    # surviving here would be the same category error as a bare `phase` on a row whose
+    # class forbids both — `phase_taxonomy.forbidden_provenance` names both attributes,
+    # and the writer's behaviour has to agree with the reconcile's exactly or the next
+    # write re-creates what the reconcile just removed.
     return item
 
 
