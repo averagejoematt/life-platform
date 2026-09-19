@@ -29,13 +29,36 @@ that planted control PASS (i.e. the dead-man stops firing), which is what proves
 the budget — not the file's existence — is what does the work. Verified by
 running the mutation and restoring it; see the PR body for the transcript.
 
+NO WALL-CLOCK TIME BOMB (#2376 / the #2354 class)
+--------------------------------------------------
+A dead-man is, by construction, a test about dates, so it is one careless line
+away from the class that red-mained main at 2026-08-09T00:00Z: a fixed fixture
+date plus a handler that derives "today" from the real clock, agreeing only on
+the day the test was written. Two things keep this file out of it:
+
+  * ONE pinned as-of day, `_AS_OF`, with every fixture date derived from it by
+    arithmetic (`_STALE_SINCE`, `_FRESH_SINCE`) — never a second literal that
+    must agree — and handed to `stale_shrink_entries(ledger, today_iso)` as the
+    argument it already takes. Fixture and assertion co-derive; UTC midnight
+    cannot separate them.
+  * a real freeze where the read is: `frozen_sweep_clock` pins
+    `common.pacific_time`'s OWN `datetime`, because `pacific_today()` reads that
+    module's name and no consumer-side patch reaches it (tests/pacific_clock.py).
+    `test_fresh_entry_is_not_stale` asserts the frozen value comes back, so the
+    freeze is proven to bite rather than decorating a scanner.
+
+The ONE test that deliberately reads the real calendar is
+`test_committed_shrink_ledger_has_no_stale_entry` — ageing a committed file
+against the actual clock is that test's entire contract, and freezing it would
+make it a gate that cannot fail.
+
 Run it alone:  python3 -B -m pytest tests/test_a11y_shrink_deadman_3546.py -q
 """
 
 import json
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone
 
 import pytest
 
@@ -44,6 +67,53 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 import a11y_audit  # noqa: E402
+
+# ── the pinned as-of day, and every fixture date DERIVED from it (#2376) ──────
+#
+# `stale_shrink_entries(ledger, today_iso)` takes the as-of day as a PARAMETER,
+# so the anti-bomb shape is available and is used: one constant generates the
+# fixture `first_seen` values AND is handed to the function under test, and the
+# two cannot desync at UTC midnight the way #2354 did. The name says what the
+# value IS — an injected as-of argument — rather than claiming it is the day a
+# clock will read, because it never is one.
+#
+# Deriving `_STALE_SINCE`/`_FRESH_SINCE` by arithmetic rather than writing a
+# second literal is the other half: two dated literals that must agree is
+# exactly how this class drifts back into a bomb (the `frozen_handler_clock`
+# exemplar in tests/test_pipeline_health_check_behavior.py makes the same point).
+_AS_OF = "2026-09-19"
+_STALE_SINCE = (date.fromisoformat(_AS_OF) - timedelta(days=30)).isoformat()
+_FRESH_SINCE = (date.fromisoformat(_AS_OF) - timedelta(days=1)).isoformat()
+
+
+@pytest.fixture
+def frozen_sweep_clock(monkeypatch):
+    """Pin the PT clock the sweep reads to an instant DERIVED from `_AS_OF`.
+
+    The sweep's own day (`capture_today_pt`) comes from `pacific_today()`, which
+    lives in `common.pacific_time` and reads THAT module's own `datetime` — a
+    patch on any consumer's namespace cannot reach it (tests/pacific_clock.py's
+    docstring records the measurement). So the freeze goes where the read is.
+
+    Used by the tests that exercise the live-clock path. The committed-ledger
+    dead-man below deliberately does NOT take it: ageing a committed file
+    against the real calendar is that test's entire contract, and freezing it
+    would be a gate that cannot fail.
+    """
+    a11y_audit._ensure_lambda_path()
+    import common.pacific_time as pacific_time
+
+    year, month, day = (int(x) for x in _AS_OF.split("-"))
+
+    class _FrozenDatetime(pacific_time.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            # Noon UTC on _AS_OF is early morning PT on the SAME calendar day,
+            # so the Pacific frame and the constant agree in both directions.
+            return pacific_time.datetime(year, month, day, 12, 0, 0, tzinfo=timezone.utc).astimezone(tz or timezone.utc)
+
+    monkeypatch.setattr(pacific_time, "datetime", _FrozenDatetime)
+    return _AS_OF
 
 
 def _today():
@@ -92,18 +162,17 @@ def test_stale_entry_is_caught():
 
     This is the assertion the 10,000-day mutation flips green.
     """
-    today = "2026-09-19"
     planted = {
         "_meta": {},
         "entries": [
-            {"page": "/cockpit/", "rule": "region", "first_seen": "2026-08-20", "phase_dependent": True},
-            {"page": "/data/labs/", "rule": "color-contrast", "first_seen": today, "phase_dependent": False},
+            {"page": "/cockpit/", "rule": "region", "first_seen": _STALE_SINCE, "phase_dependent": True},
+            {"page": "/data/labs/", "rule": "color-contrast", "first_seen": _AS_OF, "phase_dependent": False},
         ],
     }
-    stale = a11y_audit.stale_shrink_entries(planted, today)
+    stale = a11y_audit.stale_shrink_entries(planted, _AS_OF)
     assert len(stale) == 1, f"expected exactly the 30-day row, got {stale}"
     page, rule, first_seen, age = stale[0]
-    assert (page, rule, first_seen) == ("/cockpit/", "region", "2026-08-20")
+    assert (page, rule, first_seen) == ("/cockpit/", "region", _STALE_SINCE)
     assert age == 30
 
 
@@ -116,28 +185,33 @@ def test_stale_control_survives_a_file_round_trip(tmp_path):
             {
                 "_meta": {"note": "planted fixture"},
                 "entries": [
-                    {"page": "/method/board/ @390px", "rule": "heading-order", "first_seen": "2026-08-20", "phase_dependent": True}
+                    {"page": "/method/board/ @390px", "rule": "heading-order", "first_seen": _STALE_SINCE, "phase_dependent": True}
                 ],
             }
         )
     )
     ledger = a11y_audit.load_shrink_ledger(str(fixture))
-    assert a11y_audit.stale_shrink_entries(ledger, "2026-09-19")
+    assert a11y_audit.stale_shrink_entries(ledger, _AS_OF)
 
 
 def test_a_row_that_cannot_be_aged_is_not_young():
     """An absent/garbled first_seen returns as stale with age -1 — silence is
     never health (the #2938 rule applied to a date field)."""
     ledger = {"entries": [{"page": "/x/", "rule": "region", "first_seen": None}]}
-    assert a11y_audit.stale_shrink_entries(ledger, "2026-09-19") == [("/x/", "region", None, -1)]
+    assert a11y_audit.stale_shrink_entries(ledger, _AS_OF) == [("/x/", "region", None, -1)]
 
 
-def test_fresh_entry_is_not_stale():
-    """…and the negative control, so the test is not vacuously red-happy."""
-    today = _today()
-    yesterday = (date.fromisoformat(today) - timedelta(days=1)).isoformat()
-    ledger = {"entries": [{"page": "/cockpit/", "rule": "region", "first_seen": yesterday, "phase_dependent": True}]}
-    assert a11y_audit.stale_shrink_entries(ledger, today) == []
+def test_fresh_entry_is_not_stale(frozen_sweep_clock):
+    """…and the negative control, so the test is not vacuously red-happy.
+
+    Takes `frozen_sweep_clock` so the live-clock path (`_today()` →
+    `pacific_today()`) is exercised at a PINNED instant: the assertion below
+    that it equals `_AS_OF` is what proves the freeze actually reaches
+    `common.pacific_time`'s own `datetime`, rather than being decoration that
+    satisfies a scanner."""
+    assert _today() == _AS_OF, "the freeze did not reach common.pacific_time"
+    ledger = {"entries": [{"page": "/cockpit/", "rule": "region", "first_seen": _FRESH_SINCE, "phase_dependent": True}]}
+    assert a11y_audit.stale_shrink_entries(ledger, _today()) == []
 
 
 # ── carry-forward: the clock must not restart on every sweep ──────────────────
@@ -147,17 +221,17 @@ def test_merge_carries_first_seen_forward():
     """The whole dead-man rests on this: a candidate seen again keeps its
     ORIGINAL date. Re-stamping today on every run would make the ledger a
     perpetual-motion machine that can never age past zero."""
-    prior = {"_meta": {}, "entries": [{"page": "/cockpit/", "rule": "region", "first_seen": "2026-09-01", "phase_dependent": True}]}
-    merged = a11y_audit.merge_shrink_ledger({"/cockpit/": ["region"]}, "2026-09-19", prior=prior, swept_pages={"/cockpit/"})
-    assert merged["entries"][0]["first_seen"] == "2026-09-01"
-    assert a11y_audit.stale_shrink_entries(merged, "2026-09-19")
+    prior = {"_meta": {}, "entries": [{"page": "/cockpit/", "rule": "region", "first_seen": _STALE_SINCE, "phase_dependent": True}]}
+    merged = a11y_audit.merge_shrink_ledger({"/cockpit/": ["region"]}, _AS_OF, prior=prior, swept_pages={"/cockpit/"})
+    assert merged["entries"][0]["first_seen"] == _STALE_SINCE
+    assert a11y_audit.stale_shrink_entries(merged, _AS_OF)
 
 
 def test_merge_drops_a_harvested_row_on_a_swept_page():
     """Harvest the baseline entry → the candidate disappears → so does its row
     (and with it its clock). Otherwise a paid debt reds this test forever."""
-    prior = {"_meta": {}, "entries": [{"page": "/cockpit/", "rule": "region", "first_seen": "2026-09-01", "phase_dependent": True}]}
-    merged = a11y_audit.merge_shrink_ledger({}, "2026-09-19", prior=prior, swept_pages={"/cockpit/"})
+    prior = {"_meta": {}, "entries": [{"page": "/cockpit/", "rule": "region", "first_seen": _STALE_SINCE, "phase_dependent": True}]}
+    merged = a11y_audit.merge_shrink_ledger({}, _AS_OF, prior=prior, swept_pages={"/cockpit/"})
     assert merged["entries"] == []
 
 
@@ -166,11 +240,11 @@ def test_merge_preserves_rows_for_pages_this_run_never_drove():
     the same contract `a11y_audit.update_baseline` keeps for the baseline."""
     prior = {
         "_meta": {},
-        "entries": [{"page": "/data/labs/", "rule": "color-contrast", "first_seen": "2026-09-01", "phase_dependent": False}],
+        "entries": [{"page": "/data/labs/", "rule": "color-contrast", "first_seen": _STALE_SINCE, "phase_dependent": False}],
     }
-    merged = a11y_audit.merge_shrink_ledger({}, "2026-09-19", prior=prior, swept_pages={"/cockpit/"})
+    merged = a11y_audit.merge_shrink_ledger({}, _AS_OF, prior=prior, swept_pages={"/cockpit/"})
     assert [r["page"] for r in merged["entries"]] == ["/data/labs/"]
-    assert merged["entries"][0]["first_seen"] == "2026-09-01"
+    assert merged["entries"][0]["first_seen"] == _STALE_SINCE
 
 
 # ── box 2: the phase flag ─────────────────────────────────────────────────────
@@ -239,7 +313,7 @@ def test_update_baseline_carries_a_phase_row_forward_on_day_3(tmp_path):
 
 def test_merge_records_the_phase_flag_on_every_row():
     merged = a11y_audit.merge_shrink_ledger(
-        {"/cockpit/": ["region"], "/data/labs/": ["color-contrast"]}, "2026-09-19", prior=None, swept_pages=None
+        {"/cockpit/": ["region"], "/data/labs/": ["color-contrast"]}, _AS_OF, prior=None, swept_pages=None
     )
     flags = {r["page"]: r["phase_dependent"] for r in merged["entries"]}
     assert flags == {"/cockpit/": True, "/data/labs/": False}
