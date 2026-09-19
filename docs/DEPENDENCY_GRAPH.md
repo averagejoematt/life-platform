@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-681 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+682 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -228,7 +228,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_training.py, whoop_lambda.py |
-| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
+| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
 ## 4. MCP Layer
@@ -493,7 +493,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1178 total · 842 resolved · 336 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1180 total · 844 resolved · 336 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
 - Alarms: 131 literal-named declarations across three idioms, 4 composite; routing digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
