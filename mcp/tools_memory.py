@@ -28,6 +28,7 @@ from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE
 
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
+from mcp.layer_status import DERIVED_LAYERS, LAYER_DEGRADED, LAYER_OK, counted, layer_fields, read_status
 
 try:
     # Shared, bundled module (#781) — staged at zip root in the Lambda.
@@ -61,6 +62,12 @@ VALID_CATEGORIES = set(_pm.MEMORY_CATEGORIES)
 
 def _memory_pk():
     return f"USER#{_get_user_id()}#SOURCE#{MEMORY_SOURCE}"
+
+
+def _channels_of(category):
+    """Which writers a category admits (#1482 registry) — part of the layer_health block."""
+    spec = _pm.MEMORY_CATEGORIES.get(category) or {}
+    return list(spec.get("channels") or [])
 
 
 def _sk(category, date_str):
@@ -238,16 +245,36 @@ def tool_read_platform_memory(args: dict) -> dict:
                 }
             )
         )
-        records = [_d2f(i) for i in resp.get("Items", [])]
-        # Remove internal DDB keys from response for readability
-        clean = []
-        for r in records:
-            r.pop("pk", None)
-            r.pop("sk", None)
-            clean.append(r)
-        return {"category": category, "records": clean, "count": len(clean)}
     except Exception as e:
-        return {"error": str(e), "category": category}
+        # #3769: an unreadable layer withholds its count (None, never 0) and omits the
+        # list an empty read would have returned — an empty list is a claim.
+        status, reason = read_status(error=e)
+        return {
+            "error": str(e),
+            "category": category,
+            "count": counted(status, 0),
+            **layer_fields(status, reason, producer=DERIVED_LAYERS["platform_memory"]["producer"], channels=_channels_of(category)),
+        }
+    records = [_d2f(i) for i in resp.get("Items", [])]
+    # Remove internal DDB keys from response for readability
+    clean = []
+    for r in records:
+        r.pop("pk", None)
+        r.pop("sk", None)
+        clean.append(r)
+    # A successful read of a sanctioned category with nothing in the window is a measured
+    # zero (nobody wrote); the health block says which channels COULD have written it.
+    return {
+        "category": category,
+        "records": clean,
+        "count": counted(LAYER_OK, len(clean)),
+        **layer_fields(
+            LAYER_OK,
+            producer=DERIVED_LAYERS["platform_memory"]["producer"],
+            channels=_channels_of(category),
+            sanctioned=category in VALID_CATEGORIES,
+        ),
+    }
 
 
 def tool_list_memory_categories(args: dict) -> dict:
@@ -328,22 +355,37 @@ def tool_list_memory_categories(args: dict) -> dict:
                 }
             )
 
+        # #3769: a page-capped census is a DEGRADED read — every count is a floor and the
+        # response says so in the contract's own vocabulary, not only in `scan_exhausted`.
+        status, reason = (
+            (LAYER_OK, "")
+            if start_key is None
+            else (LAYER_DEGRADED, f"census stopped at the {_MEMORY_MAX_PAGES}-page cap — counts are floors")
+        )
         return {
             "categories": result,
             # ADR-104: say what each number counted. `total_records` is the window (what
             # `categories` sums to); `records_scanned` is the whole partition it was
             # filtered out of. `scan_exhausted` False means even that is a floor.
-            "total_records": in_window,
-            "records_scanned": len(items),
+            "total_records": counted(status, in_window),
+            "records_scanned": counted(status, len(items)),
             "scan_exhausted": start_key is None,
             "lookback_days": days,
             "window_start": start,
             # #1482: the sanctioned taxonomy (code registry: lambdas/platform_memory.py)
             # — chat modes (#1479) read this to route takeaways into valid categories.
             "taxonomy": _pm.taxonomy_summary(),
+            **layer_fields(status, reason, producer=DERIVED_LAYERS["platform_memory"]["producer"], pages_read=pages),
         }
     except Exception as e:
-        return {"error": str(e)}
+        status, reason = read_status(error=e)
+        return {
+            "error": str(e),
+            "total_records": counted(status, 0),
+            "records_scanned": counted(status, 0),
+            "lookback_days": days,
+            **layer_fields(status, reason, producer=DERIVED_LAYERS["platform_memory"]["producer"]),
+        }
 
 
 def tool_delete_platform_memory(args: dict) -> dict:
