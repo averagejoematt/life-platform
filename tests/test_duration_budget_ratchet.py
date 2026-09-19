@@ -48,6 +48,8 @@ that streak, and #3265 kept it broken:
   #3265   2026-08-30  2244s       1950 → 1950       SHED — the second non-raise
   #3835   2026-09-16  2850s med    1950 → 1950       SHED — the third, and the first
                       (n=9)                          where the shed was ALREADY BUILT
+  #3835   2026-09-18  1970s med    1950 → 1950       the shed MEASURED: 1.45x, and
+          (post-change) (n=24)                       still not raised
 
 #3835 (2026-09-16) — THE SHED WAS ALREADY MERGED AND APPLIED TO THE WRONG JOB. #3797
 split the full unit suite into a parallel pass + a serial pass for the four modules that
@@ -78,6 +80,35 @@ this job's 2850s median lands near 2160s, still above 1950s. **That estimate is 
 written into the budget and must not be.** The residual is stated with its number: if
 post-change green-main runs still sit over 1950s, the next instance measures THEM and
 decides, rather than inheriting an arithmetic projection made before the change ran once.
+
+POST-CHANGE, MEASURED 2026-09-18 (#3835 box 3) — the number the paragraph above refused
+to guess. Every `test / Unit Tests` job on a green-main CI/CD run since the two-pass lane
+merged (27046d3c4, 2026-09-16T23:37:28Z), read from the Actions API as
+`completed_at - started_at`, failures excluded:
+
+    n=24   min 1103s   p25 1882s   MEDIAN 1970.5s   p75 2015s   p90 2059s   max 2080s
+    mean 1882s   stdev 232s   min-to-max spread 1.89x
+
+    before (n=9, single-pass)   median 2850s   8 of 9 over budget   1.46x budget
+    after  (n=24, two-pass)     median 1970.5s 13 of 24 over budget 1.01x budget
+
+The shed delivered **1.45x** (2850 -> 1970.5 median), close to the ~1.3x the pre-merge
+lane's thin n=3 projected, and the projection's own caveat is now discharged.
+
+STILL NOT RAISED, and the residual is this: **1950 now sits essentially AT the median**,
+so roughly half of all runs warn by construction and the warning carries correspondingly
+little information. That is a different complaint from every earlier instance in this
+table, all of which were "the job costs more than the budget says". By #3224's own
+argued-raise test the case for moving fails: a 20.5s excess at the median is 1%, far
+inside a 1.89x spread, so the spread explains it and no decomposition is owed. Raising
+would also be the third raise after three sheds, and a duration budget is a ceiling —
+moving it up weakens the gate in exactly the direction this file exists to resist.
+
+What the NEXT instance must answer, with this n=24 distribution already in hand and no
+need to re-derive it: whether a budget belongs at p50 or at p90 of its own job. At p50 it
+warns half the time; at p90 (2059s here) it warns on the tail it was meant to catch. That
+is a question about what the instrument is FOR, not about what the suite costs, and it
+should be decided as one rather than absorbed into an arithmetic bump.
 
 The second copy of the two-pass idiom brought its own hazard, which is not a duration
 question at all: coverage is now produced by two invocations, so the 80% floor could be
