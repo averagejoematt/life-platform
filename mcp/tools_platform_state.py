@@ -44,6 +44,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
+from common.pacific_time import parse_iso_utc
+
 from mcp.config import logger
 
 # The published artifact — the exact URL site/assets/js/evidence_meta.js fetches.
@@ -75,14 +77,12 @@ def available_sections(doc: dict) -> list[str]:
 
 def age_hours(generated_at: str | None) -> float | None:
     """Hours since the artifact was generated, or None if the stamp is missing/unparseable."""
-    if not generated_at:
+    # common.pacific_time.parse_iso_utc is THE parser (#1964/#3609) — a tz-less stamp
+    # is UTC, never the runner's local time, and a malformed one returns None rather
+    # than raising. An inline fromisoformat here would be a fork of that semantic.
+    stamp = parse_iso_utc(generated_at)
+    if stamp is None:
         return None
-    try:
-        stamp = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if stamp.tzinfo is None:
-        stamp = stamp.replace(tzinfo=timezone.utc)
     return round((datetime.now(timezone.utc) - stamp).total_seconds() / 3600.0, 1)
 
 

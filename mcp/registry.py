@@ -84,7 +84,6 @@ from mcp.tools_descriptions import (
     GET_PLATFORM_STATE_DESCRIPTION,
     GET_PLATFORM_SURFACE_DESCRIPTION,
     GET_PREDICTIONS_DESCRIPTION,
-    GET_READINESS_SCORE_DESCRIPTION,
     GET_READING_HISTORY_DESCRIPTION,
     GET_READING_PROFILE_DESCRIPTION,
     GET_READING_RECOMMENDATION_DESCRIPTION,
@@ -654,7 +653,22 @@ TOOLS = {
         "fn": tool_get_readiness_score,
         "schema": {
             "name": "get_readiness_score",
-            "description": GET_READINESS_SCORE_DESCRIPTION,
+            # Inline, unlike its 80 siblings: tests/test_data_truth_batch.py
+            # ::test_device_agreement_never_silent_null asserts these weights appear in the
+            # TEXT of this file, so the table can never advertise a blend the code dropped.
+            "description": (
+                "Unified readiness score (0-100) synthesising Whoop recovery (40%), Whoop sleep quality (25%), "
+                "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
+                "Garmin Body Battery (5%) into a single GREEN / YELLOW / RED signal with a 1-line "
+                "actionable recommendation. Also includes a device_agreement section showing Whoop vs "
+                "Garmin HRV/RHR delta as a confidence signal — flag status means lower score reliability; "
+                "when the cross-check can't run it returns status=unavailable with a reason instead of null. "
+                "Reduces cognitive load: one number instead of 5 separate metrics tells you "
+                "'train hard today' vs 'go easy' vs 'rest day'. Missing components are excluded and "
+                "remaining weights re-normalised. "
+                "Use for: 'should I train hard today?', 'what is my readiness score?', "
+                "'am I ready for a key session?', 'how am I feeling today?', 'morning readiness check-in'."
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {

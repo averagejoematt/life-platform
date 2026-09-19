@@ -226,9 +226,12 @@ BASELINE = {
     # scripts/generate_mcp_tool_catalog.py raises on an unresolvable name, so the catalog
     # rebuilds byte-identical and none of the three AST discoverers named above sees a
     # change: TOOLS is still ONE literal whose values still carry an inline `schema` with
-    # an inline `name`. Measured 2106 after the extraction AND after adding
-    # get_platform_state (#3691's conversational half, +24). The recorded number is 2130,
-    # i.e. measured + one tool entry's worth of room: a ceiling with literally zero
+    # an inline `name`. Measured 2117 after the extraction AND after adding
+    # get_platform_state (#3691's conversational half, +24). Two of the 83 descriptions
+    # could not move and a third was moved BACK: tests/test_data_truth_batch.py asserts
+    # get_readiness_score's blend weights appear in the TEXT of registry.py, and that guard
+    # is right — the claim it protects is reader-facing. The recorded number is 2130, i.e.
+    # measured plus room for one more tool entry: a ceiling with literally zero
     # headroom IS the defect this issue names, and recreating it would only move the same
     # wall one tool to the right. The addition after that pays the same way — `inputSchema`
     # is 1,335 physical lines of this file and no guard reads it either.

@@ -38,7 +38,13 @@ WHAT STAYED INLINE, AND WHY
       The catalog generator substitutes config constants into f-strings found IN THE
       REGISTRY; as a constant here it would be an un-literal-evaluable node and the
       catalog would render the placeholder instead of 90.
-  Both exceptions are visible at their call site in the table.
+    * `get_readiness_score` — `tests/test_data_truth_batch.py::test_device_agreement_never_silent_null`
+      asserts the blend weights ("Whoop recovery (40%)", "Garmin Body Battery (5%)") appear
+      in the TEXT of mcp/registry.py, so that the table can never advertise weights the code
+      stopped using. That guard reads the file, not the resolved schema, and it is right to:
+      the claim it protects is a reader-facing one. Moving the string out would have turned a
+      true assertion false without changing a single number, so it stays where the guard looks.
+  All three exceptions are visible at their call site in the table.
 """
 
 GET_EXERCISE_NOTES_DESCRIPTION = (
@@ -153,20 +159,6 @@ GET_ZONE2_BREAKDOWN_DESCRIPTION = (
     "Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', "
     "'show my training zone distribution', 'weekly Zone 2 minutes', 'zone 2 trend', "
     "'am I doing enough easy cardio?', 'training polarization check'. Requires Strava data with HR."
-)
-
-GET_READINESS_SCORE_DESCRIPTION = (
-    "Unified readiness score (0-100) synthesising Whoop recovery (40%), Whoop sleep quality (25%), "
-    "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
-    "Garmin Body Battery (5%) into a single GREEN / YELLOW / RED signal with a 1-line "
-    "actionable recommendation. Also includes a device_agreement section showing Whoop vs "
-    "Garmin HRV/RHR delta as a confidence signal — flag status means lower score reliability; "
-    "when the cross-check can't run it returns status=unavailable with a reason instead of null. "
-    "Reduces cognitive load: one number instead of 5 separate metrics tells you "
-    "'train hard today' vs 'go easy' vs 'rest day'. Missing components are excluded and "
-    "remaining weights re-normalised. "
-    "Use for: 'should I train hard today?', 'what is my readiness score?', "
-    "'am I ready for a key session?', 'how am I feeling today?', 'morning readiness check-in'."
 )
 
 SAVE_INSIGHT_DESCRIPTION = (
