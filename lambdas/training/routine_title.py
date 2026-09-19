@@ -207,6 +207,11 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
     """
     state = load_phase_state()
     phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
+    # N's window is the config's `current_started`, DELIBERATELY not floored at
+    # genesis: the owner's ruling recorded on #3671 is that a phase advances only
+    # when he says so, so a pre-genesis anchor is the real start of a phase he has
+    # not advanced — "Pull #3 of Foundation" is the answer he asked N for, even
+    # where Foundation spans two cycles. Only Y is reset-relative (#3671).
     phase_started = state.get("current_started") or EXPERIMENT_START_DATE
     reset_epoch = EXPERIMENT_START_DATE
 

@@ -70,18 +70,33 @@ def ensure_folder(title: str) -> tuple[str | None, str | None]:
     `miss_reason` so the caller can put it in its own result (#3670).
 
     Hevy folders are a flat list; folder_id is set-on-create only.
+
+    The scan walks EVERY page (`list_all_folders`), not page 1. Hevy's pageSize
+    cap is 10, so a single page stops being the whole list at 11 folders, and a
+    page-1-only find-or-create would then create a duplicate "Push" beside the
+    real one — a failure that looks like success in the app. When the walk is
+    truncated by its own page bound the folder is reported MISSING-UNKNOWN rather
+    than created, because a possible duplicate is worse than an unfoldered
+    routine the result already names.
     """
     from training import hevy_write_client as wc
 
     try:
-        folders = wc.list_folders()
+        folders, truncated = wc.list_all_folders()
     except Exception as e:  # noqa: BLE001 — never block a commit on folder I/O
         reason = f"list_folders failed ({type(e).__name__}: {e})"
         logger.warning(f"{reason}; committing without folder")
         return None, reason
-    for f in folders.get("routine_folders") or folders.get("folders") or []:
+    for f in folders:
         if (f.get("title") or "").strip().lower() == title.strip().lower():
             return f.get("id"), None
+    if truncated:
+        reason = (
+            f"folder {title!r} not found in the first {len(folders)} folders and the listing was "
+            f"truncated at the page bound — refusing to create a possible duplicate"
+        )
+        logger.warning(f"{reason}; committing without folder")
+        return None, reason
     try:
         created = wc.create_folder(title)
         new_folder = created.get("routine_folder") or created

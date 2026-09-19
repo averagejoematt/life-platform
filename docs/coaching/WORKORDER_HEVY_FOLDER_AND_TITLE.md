@@ -173,3 +173,31 @@ experiment counter Y zeroes on a reset. The next title therefore reads
 **Also corrected in passing:** `_action_archive` said it did a "rename + folder-move". Hevy's
 `folder_id` is create-only and `to_update_body` omits it, so the move never reached the wire.
 The behaviour is unchanged (it cannot be fixed by API); the comment and the result now say so.
+
+---
+
+## Amendment (2026-09-18, #3670 — the code half of the remaining boxes)
+
+**The page-size fix is not, on its own, what makes foldering work.** Capping `pageSize` at
+10 stops the 400. It also makes ONE page a smaller window than the broken `pageSize=50` ever
+asked for, and `ensure_folder` did find-or-create over one page. At eleven routine folders the
+target sits on page 2, the scan misses it, and the find-or-create branch creates a **duplicate**
+`Push` beside the real one — a failure that reports success and looks like success in the app.
+`hevy_write_client.list_all_folders()` now walks every page (bounded, and it reports truncation
+rather than hiding it); `ensure_folder` refuses to create out of a truncated listing and reports
+the miss like any other. `_action_archive` carried the same page-1-only scan and now routes
+through `ensure_folder`.
+
+**#3670 box 4 is NOT fully payable as written, and N is unchanged.** Its wording — "the title
+counters cannot reach behind `EXPERIMENT_START_DATE`" — is plural, but the owner ruled the
+opposite for N on #3671 (2026-09-06): *the reset zeroes Y, and the phase advances only when he
+says so, so N answers "Pull #3 of Foundation" even where Foundation spans two cycles.* A
+pre-genesis `current_started` is therefore not stale — it is the real start of a phase he has
+deliberately not advanced. Y is already reset-relative by derivation (#3671), which is the half
+of box 4 that was genuinely broken. A floor on N was implemented in this lane, reviewed against
+the ruling, and **reverted**; `build_title_context` carries a comment recording why. The open
+question — whether #3670's plural wording was meant to revisit the N ruling — is the owner's,
+not this lane's, and the `Foundation - Push - 3 - 1` expectation above still stands.
+
+**Still open:** box 1's live leg — a fresh `draft_custom → commit` landing in its type folder,
+with the routine's `folder_id` non-null — is an owner-side run against the live Hevy account.

@@ -595,3 +595,28 @@ def test_commit_update_branch_says_the_folder_cannot_change():
     folders_mock.assert_not_called()
     assert result["status"] == "committed"
     assert "create-only" in result["folder"]
+
+
+def test_tool_description_tells_the_caller_both_title_args_are_draft_time_only():
+    """#3670 box 3, second clause. The warning above is the runtime backstop; the
+    DESCRIPTION is what stops the call being made in the first place, and it is the
+    text the model actually reads — so assert the registered string, not a comment
+    about it. Before the fix it read "A title you pass is ignored unless you also
+    set force_title=true", which parses as though commit honours the pair."""
+    import os
+
+    os.environ.setdefault("S3_BUCKET", "test-bucket")
+    os.environ.setdefault("USER_ID", "matthew")
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    from mcp.registry import TOOLS
+
+    spec = TOOLS["manage_hevy_routine"]["schema"]
+    desc = spec["description"]
+    assert "DRAFT-TIME" in desc or "draft-time" in desc, desc
+    assert "title" in desc and "force_title" in desc
+    assert "commit" in desc
+    # Both parameters say it on their own line too — a caller reading one property
+    # in isolation must not conclude commit will honour it.
+    props = spec["inputSchema"]["properties"]
+    for arg in ("title", "force_title"):
+        assert "draft_custom only" in props[arg]["description"], props[arg]["description"]
