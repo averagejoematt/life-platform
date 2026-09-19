@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-14
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-14 | **Total tools:** 83
+**Version:** v8.6.0 | **Last updated:** 2026-09-14 | **Total tools:** 84
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -16,7 +16,7 @@
 
 ---
 
-## All 83 Tools — by module
+## All 84 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -50,6 +50,7 @@
 | `mcp/tools_coach_corrections.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
 | `mcp/tools_platform.py` | 3 |
+| `mcp/tools_platform_state.py` | 1 |
 
 ### Training Notes (`mcp/tools_training_notes.py`)
 
@@ -283,6 +284,12 @@
 | `get_experiment_cycle` | date= | Which experiment CYCLE is running, its genesis date, which DAY of it today is, and the phase (experiment vs pilot). This is the authoritative answer — it returns experiment_stamp()'s cycle (CYCLE_GENESES-derived), never a fresh derivation, and reports the SSM cross-check alongside it. Use for 'what cycle are we on?', 'what day of the experiment is it?', 'when did this cycle start?', and before quoting any cycle number from memory or from a document — cycle numbers move weekly and a correct-when-written number goes stale silently. |
 | `get_habit_completion` | include_registry= | How the habits are going: today's completion, per-habit streaks, and the DATE RULE behind both. Use for 'how are my habits going?', 'what streaks am I on?', 'did I hit my habits today?'. A zero here is annotated with the date basis and phase filter that produced it — habit rows written against the adjacent calendar day have read as '0 of 61 completed' before. |
 | `get_platform_cost` | skip_inference= | What the platform is costing: the budget envelope (ceiling, spend to date, projected month-end, budget tier) plus the AI inference receipt broken down by feature and model. Use for 'what is this costing me?', 'what did the AI spend go to?', 'are we near the ceiling?'. These are the platform's own accounting surfaces, not a live Cost Explorer query — the projection is a forecast. |
+
+### mcp.tools_platform_state (`mcp/tools_platform_state.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_platform_state` | section= | How the BUILD of this platform is going — the joined owner-facing readout that /method/state/ renders, read from the same published artifact so the page and this answer cannot disagree. Use for 'how is the build going?', 'how many issues are actually open?', 'what is the delivery rate?', 'what is the jury still out on?', 'what did the last review grade?'. Returns a one-line summary plus one joined section — board, delivery, grades, jury_out, bets, incidents, quality, cost, autonomy — or 'all' of them; the live section set comes back as sections_available. This is the BUILD, not the experiment: for health, training or nutrition data use the domain tools. Every section carries its own as_of and source, and a section the generator could not compute this run arrives as an error with null data rather than a stale value, so a gap is reported as a gap. |
 
 ---
 

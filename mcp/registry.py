@@ -35,6 +35,93 @@ from mcp.tools_data import (
     tool_search_activities,
 )
 from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
+
+# #3692: the model-facing selection prose lives in a cohesive sibling so this file
+# stays the wiring table it says it is. Two descriptions stayed inline below — see
+# that module's docstring for which and why.
+from mcp.tools_descriptions import (
+    ARCHIVE_HORIZON_DESCRIPTION,
+    AUDIT_COACH_DOSSIER_DESCRIPTION,
+    CLOSE_TODOIST_TASK_DESCRIPTION,
+    CREATE_EXPERIMENT_DESCRIPTION,
+    CREATE_TODOIST_TASK_DESCRIPTION,
+    CURATE_HORIZON_DESCRIPTION,
+    DELETE_PLATFORM_MEMORY_DESCRIPTION,
+    DESCRIBE_PLATFORM_SURFACES_DESCRIPTION,
+    END_EXPERIMENT_DESCRIPTION,
+    EVALUATE_PREDICTION_DESCRIPTION,
+    FIND_DAYS_DESCRIPTION,
+    GET_ACWR_STATUS_DESCRIPTION,
+    GET_CAPTURE_QUEUES_DESCRIPTION,
+    GET_CGM_DESCRIPTION,
+    GET_COACH_CHECKIN_QUEUE_DESCRIPTION,
+    GET_COACH_THREAD_DESCRIPTION,
+    GET_COACH_TRACK_RECORD_DESCRIPTION,
+    GET_CONSTELLATION_DESCRIPTION,
+    GET_DAILY_METRICS_DESCRIPTION,
+    GET_DAILY_SNAPSHOT_DESCRIPTION,
+    GET_DECISIONS_DESCRIPTION,
+    GET_DEFICIT_SUSTAINABILITY_DESCRIPTION,
+    GET_DUE_RECALLS_DESCRIPTION,
+    GET_EXERCISE_HISTORY_DESCRIPTION,
+    GET_EXERCISE_NOTES_DESCRIPTION,
+    GET_EXPERIMENT_CYCLE_DESCRIPTION,
+    GET_EXPERIMENT_RESULTS_DESCRIPTION,
+    GET_FIELD_NOTES_DESCRIPTION,
+    GET_FLOURISHING_TREND_DESCRIPTION,
+    GET_FRESHNESS_STATUS_DESCRIPTION,
+    GET_HABIT_COMPLETION_DESCRIPTION,
+    GET_HABIT_REFLECTION_QUEUE_DESCRIPTION,
+    GET_HORIZONS_DESCRIPTION,
+    GET_INSIGHTS_DESCRIPTION,
+    GET_INTAKE_RESPONSE_DESCRIPTION,
+    GET_INTELLIGENCE_QUALITY_DESCRIPTION,
+    GET_LABS_DESCRIPTION,
+    GET_MOOD_DESCRIPTION,
+    GET_MUSCLE_VOLUME_DESCRIPTION,
+    GET_NUTRITION_DESCRIPTION,
+    GET_PLATFORM_COST_DESCRIPTION,
+    GET_PLATFORM_STATE_DESCRIPTION,
+    GET_PLATFORM_SURFACE_DESCRIPTION,
+    GET_PREDICTIONS_DESCRIPTION,
+    GET_READING_HISTORY_DESCRIPTION,
+    GET_READING_PROFILE_DESCRIPTION,
+    GET_READING_RECOMMENDATION_DESCRIPTION,
+    GET_READING_SHELF_DESCRIPTION,
+    GET_READING_TRACK_RECORD_DESCRIPTION,
+    GET_SOCIAL_CONNECTION_TREND_DESCRIPTION,
+    GET_SOCIAL_DASHBOARD_DESCRIPTION,
+    GET_SOURCES_DESCRIPTION,
+    GET_TODOIST_SNAPSHOT_DESCRIPTION,
+    GET_TRAINING_DESCRIPTION,
+    GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION,
+    GET_WORKOUT_DETAIL_DESCRIPTION,
+    GET_WORKOUTS_DESCRIPTION,
+    GET_ZONE2_BREAKDOWN_DESCRIPTION,
+    LIST_AVAILABLE_TOOLS_DESCRIPTION,
+    LIST_EXPERIMENTS_DESCRIPTION,
+    LIST_MEMORY_CATEGORIES_DESCRIPTION,
+    LOG_COACH_CALIBRATION_DESCRIPTION,
+    LOG_COACH_CHECKIN_DESCRIPTION,
+    LOG_COACH_CORRECTION_DESCRIPTION,
+    LOG_DECISION_DESCRIPTION,
+    LOG_EVENING_INTAKE_DESCRIPTION,
+    LOG_FIELD_NOTE_RESPONSE_DESCRIPTION,
+    LOG_HABIT_REFLECTION_DESCRIPTION,
+    MANAGE_DIARY_CLAIMS_DESCRIPTION,
+    MANAGE_HEVY_ROUTINE_DESCRIPTION,
+    MANAGE_READING_DESCRIPTION,
+    MANAGE_SICK_DAYS_DESCRIPTION,
+    MARK_JOURNAL_QUOTE_DESCRIPTION,
+    PLAN_NEXT_SESSION_DESCRIPTION,
+    READ_PLATFORM_MEMORY_DESCRIPTION,
+    SAVE_INSIGHT_DESCRIPTION,
+    SEARCH_ACTIVITIES_DESCRIPTION,
+    UPDATE_DECISION_OUTCOME_DESCRIPTION,
+    UPDATE_INSIGHT_OUTCOME_DESCRIPTION,
+    UPDATE_TODOIST_TASK_DESCRIPTION,
+    WRITE_PLATFORM_MEMORY_DESCRIPTION,
+)
 from mcp.tools_habits import tool_get_habit_reflection_queue, tool_log_habit_reflection
 from mcp.tools_health import tool_get_daily_metrics, tool_get_readiness_score, tool_get_weight_loss_progress
 
@@ -71,6 +158,10 @@ from mcp.tools_plan import tool_plan_next_session
 # #3668: the three hot-path named tools (cycle / habits / cost) over the same waiter
 # machinery the index uses — never a second copy of the rule declaration.
 from mcp.tools_platform import tool_get_experiment_cycle, tool_get_habit_completion, tool_get_platform_cost
+
+# #3692: the conversational half of /method/state/ (#3691) — the joined read of the
+# BUILD, answered from chat against the same published artifact the page renders.
+from mcp.tools_platform_state import tool_get_platform_state
 from mcp.tools_reading import (
     tool_archive_horizon,
     tool_curate_horizon,
@@ -104,16 +195,7 @@ TOOLS = {
         "fn": tool_get_exercise_notes,
         "schema": {
             "name": "get_exercise_notes",
-            "description": (
-                "The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), "
-                "derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + "
-                "a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling "
-                "progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside "
-                "get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their "
-                "notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + "
-                "confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or "
-                "dismiss before loading that movement."
-            ),
+            "description": GET_EXERCISE_NOTES_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -132,7 +214,7 @@ TOOLS = {
         "fn": tool_get_sources,
         "schema": {
             "name": "get_sources",
-            "description": "List all available data sources and their date ranges in the life platform.",
+            "description": GET_SOURCES_DESCRIPTION,
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -142,12 +224,7 @@ TOOLS = {
         "fn": tool_get_daily_snapshot,
         "schema": {
             "name": "get_daily_snapshot",
-            "description": (
-                "Unified daily data access. "
-                "'summary' (default) = all available data across every source for a specific date. Best for 'how was my day/yesterday?' questions. Requires date=. "
-                "'latest' = most recent record for each source — useful for current status checks. "
-                "Use for: 'how was yesterday?', 'what's my latest data?', 'show me today's readings', 'all data for 2026-03-10'."
-            ),
+            "description": GET_DAILY_SNAPSHOT_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -187,7 +264,7 @@ TOOLS = {
         "fn": tool_find_days,
         "schema": {
             "name": "find_days",
-            "description": "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet'. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor.",
+            "description": FIND_DAYS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -231,7 +308,7 @@ TOOLS = {
         "fn": tool_get_intelligence_quality,
         "schema": {
             "name": "get_intelligence_quality",
-            "description": "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong source-of-truth values. Use for: 'are the coaches accurate?', 'any quality issues?', 'intelligence validation results'.",
+            "description": GET_INTELLIGENCE_QUALITY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -251,7 +328,7 @@ TOOLS = {
         "fn": tool_get_coach_thread,
         "schema": {
             "name": "get_coach_thread",
-            "description": "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'",
+            "description": GET_COACH_THREAD_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -269,7 +346,7 @@ TOOLS = {
         "fn": tool_get_predictions,
         "schema": {
             "name": "get_predictions",
-            "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses. Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. #726: reads the canonical COACH#/PREDICTION# store (evaluator-graded, code-stamped IDs per #725 — the SAME store the public site serves); the legacy SOURCE#coach_thread# embedded predictions were tombstoned. For hit-rate + calibration analysis, use get_coach_track_record.",
+            "description": GET_PREDICTIONS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -285,7 +362,7 @@ TOOLS = {
         "fn": tool_get_coach_track_record,
         "schema": {
             "name": "get_coach_track_record",
-            "description": "Hit-rate track record for a single coach over a configurable window — reads the COACH#{coach_id}/LEARNING# audit trail written daily by the prediction evaluator. Returns by_outcome counts (confirmed/refuted/inconclusive/expired), hit_rate_pct (confirmed / decided), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'.",
+            "description": GET_COACH_TRACK_RECORD_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -304,19 +381,7 @@ TOOLS = {
         "fn": tool_audit_coach_dossier,
         "schema": {
             "name": "audit_coach_dossier",
-            "description": (
-                "#1387: Matthew's PRIVATE audit + correction affordance over a coach's public dossier "
-                "('what this coach knows' on /coaching/by-coach/, rendered verbatim from COACH# memory). "
-                "action='view' (default) returns the FULL UNFILTERED memory — commitments, learnings "
-                "(including the ADR-141 conversation-channel rows the public dossier must never show, "
-                "flagged), quality trail, relationship state — plus any dossier corrections already logged. "
-                "action='retract' removes a record from the public dossier; action='correct' renders a dated "
-                "correction note under it. Both write a dated row to the #1689 corrections ledger "
-                "(item_ref.surface='coach_dossier') and NEVER edit the memory record in place — the memory "
-                "stays auditable, corrections are themselves on the record. Args: coach_id (required), "
-                "action (view|retract|correct), record_sk + note (required for retract/correct; get the "
-                "record_sk from action=view)."
-            ),
+            "description": AUDIT_COACH_DOSSIER_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -342,7 +407,7 @@ TOOLS = {
         "fn": tool_evaluate_prediction,
         "schema": {
             "name": "evaluate_prediction",
-            "description": "Manually resolve a coach prediction — mark as confirmed or refuted with an outcome note.",
+            "description": EVALUATE_PREDICTION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -358,7 +423,7 @@ TOOLS = {
         "fn": tool_search_activities,
         "schema": {
             "name": "search_activities",
-            "description": "Search Strava activities by name keyword, sport type, minimum distance, or minimum elevation gain. ALWAYS use this tool (not find_days) for: named activities ('first century', 'mailbox peak', 'machu picchu'), achievement queries (longest run, biggest hike, first 100-mile ride), or sorting by distance/elevation to find top efforts. CRITICAL: Do NOT filter by sport_type when looking for longest/biggest/most impressive efforts — long walks and hikes count equally to runs and should be included. Only pass sport_type if the user explicitly asks for a specific type (e.g. 'my longest run' vs 'my longest activity'). Results include an all-time percentile rank and a context flag for exceptional values so you can narrate how remarkable the effort was.",
+            "description": SEARCH_ACTIVITIES_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -391,14 +456,7 @@ TOOLS = {
         "fn": tool_get_training,
         "schema": {
             "name": "get_training",
-            "description": (
-                "Unified training intelligence. Use 'view' to select the analysis: "
-                "'load' (default) = Banister CTL/ATL/TSB fitness-fatigue model + ACWR injury risk. Warmed nightly. "
-                "'periodization' = mesocycle detection (Base/Build/Peak/Deload), 80/20 polarization analysis, progressive overload tracking. Warmed nightly. "
-                "'recommendation' = readiness-based workout suggestion synthesising Whoop, Eight Sleep, Garmin, training load. Board of Directors rationale. Warmed nightly. "
-                "Use for: 'how fit am I?', 'am I overtraining?', 'training load', 'CTL', 'TSB', 'form', "
-                "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?'."
-            ),
+            "description": GET_TRAINING_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -420,14 +478,7 @@ TOOLS = {
         "fn": tool_get_daily_metrics,
         "schema": {
             "name": "get_daily_metrics",
-            "description": (
-                "Unified daily activity metrics. "
-                "'movement' (default) = NEAT analysis, movement score 0-100, step target tracking, sedentary day flags. "
-                "'energy' = calorie expenditure vs intake balance — TDEE breakdown, activity energy, deficit/surplus trend. "
-                "'hydration' = daily water intake adequacy scored against bodyweight-adjusted target (35ml/kg). "
-                "Use for: 'am I moving enough?', 'NEAT', 'steps', 'sedentary days', "
-                "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake'."
-            ),
+            "description": GET_DAILY_METRICS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -474,7 +525,7 @@ TOOLS = {
         "fn": tool_get_weight_loss_progress,
         "schema": {
             "name": "get_weight_loss_progress",
-            "description": "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), and % complete toward goal. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile.",
+            "description": GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -492,15 +543,7 @@ TOOLS = {
         "fn": tool_plan_next_session,
         "schema": {
             "name": "plan_next_session",
-            "description": (
-                "The DETERMINISTIC constraint block for a training session — the same inputs, computed the same way, "
-                "whichever client asks. Returns: the walking-volume gap against his own proven floor (FIRST, because it "
-                "is the largest lever at his current weight), recovery tier, ACWR, 28d per-muscle volume, the "
-                "weight-matched reference WITH the sentences its evidence cannot support, and each owner tripwire as "
-                "tripped / clear / UNKNOWN. No model runs in this tool. Stage 1 of 3: it does not draft the session and "
-                "the adversarial critics are not wired, so a plan built on it is not red-teamed — the payload says so. "
-                "Use before authoring any session, in chat or in Claude Code, so both get the same constraints."
-            ),
+            "description": PLAN_NEXT_SESSION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -514,16 +557,7 @@ TOOLS = {
         "fn": tool_get_exercise_history,
         "schema": {
             "name": "get_exercise_history",
-            "description": (
-                "Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, "
-                "the note written on it, per-session volume, PR chronology and estimated-1RM trend. Pass an exact "
-                "Hevy `template_id` (preferred — stable) or a fuzzy `exercise_name`. No default lookback: it answers "
-                "from the whole history, back to 2021. Use for: 'have I done leg extensions before?', 'what did I "
-                "last squat?', 'how has my bench progressed?', 'what loads did I use at this bodyweight?' — and as "
-                "the pre-flight pull before prescribing a load on any movement. This reads raw Hevy; "
-                "`get_exercise_notes` reads the DERIVED note-signal layer built from it. Zero notes there with "
-                "sessions here means he logged the work and wrote nothing about it — never that the work is absent."
-            ),
+            "description": GET_EXERCISE_HISTORY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -547,7 +581,7 @@ TOOLS = {
         "fn": tool_get_muscle_volume,
         "schema": {
             "name": "get_muscle_volume",
-            "description": "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?'",
+            "description": GET_MUSCLE_VOLUME_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -565,15 +599,7 @@ TOOLS = {
         "fn": tool_get_nutrition,
         "schema": {
             "name": "get_nutrition",
-            "description": (
-                "Unified nutrition intelligence from MacroFactor. Use 'view' to select the analysis: "
-                "'summary' (default) = daily macro breakdown and rolling averages: calories, protein, carbs, fat, fiber, sodium, omega-3, vitamin D, gap vs targets. "
-                "'macros' = calorie and protein adherence vs TDEE estimate. Day-by-day hit rates. Supports calorie_target= and protein_target= overrides. "
-                "'meal_timing' = eating window analysis (TRF/Satchin Panda): first/last bite, window duration, circadian consistency, gap to sleep onset. "
-                "'micronutrients' = score ~25 micronutrients against RDA + longevity targets (Attia, Patrick, Blueprint). Flags deficiencies, omega-6:3 ratio, vitamin D risk. "
-                "Use for: 'how is my nutrition?', 'average macros', 'am I hitting protein?', 'am I in a deficit?', "
-                "'eating window', 'am I eating too late?', 'TRF', 'micronutrient deficiencies', 'omega-3 intake', 'vitamin D'. Requires MacroFactor data."
-            ),
+            "description": GET_NUTRITION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -602,18 +628,7 @@ TOOLS = {
         "fn": tool_get_zone2_breakdown,
         "schema": {
             "name": "get_zone2_breakdown",
-            "description": (
-                "Zone 2 training tracker and weekly breakdown. Classifies Strava activities into 5 HR zones "
-                "based on average heartrate as a percentage of max HR (from profile). Aggregates weekly Zone 2 "
-                "minutes and compares to the 150 min/week target (Attia, Huberman, WHO moderate-intensity guidelines). "
-                "Shows full 5-zone training distribution, sport type breakdown for Zone 2, weekly trend analysis, "
-                "and training polarization alerts (Zone 3 'no man's land' warning per Seiler). "
-                "Zone 2 (60-70% max HR) is the highest-evidence longevity training modality — builds mitochondrial "
-                "density, fat oxidation capacity, and cardiovascular base. "
-                "Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', "
-                "'show my training zone distribution', 'weekly Zone 2 minutes', 'zone 2 trend', "
-                "'am I doing enough easy cardio?', 'training polarization check'. Requires Strava data with HR."
-            ),
+            "description": (GET_ZONE2_BREAKDOWN_DESCRIPTION),
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -638,6 +653,9 @@ TOOLS = {
         "fn": tool_get_readiness_score,
         "schema": {
             "name": "get_readiness_score",
+            # Inline, unlike its 80 siblings: tests/test_data_truth_batch.py
+            # ::test_device_agreement_never_silent_null asserts these weights appear in the
+            # TEXT of this file, so the table can never advertise a blend the code dropped.
             "description": (
                 "Unified readiness score (0-100) synthesising Whoop recovery (40%), Whoop sleep quality (25%), "
                 "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
@@ -664,14 +682,7 @@ TOOLS = {
         "fn": tool_save_insight,
         "schema": {
             "name": "save_insight",
-            "description": (
-                "Save a new insight to the personal coaching log. "
-                "Use whenever Claude or Matthew identifies something worth tracking and following up on — "
-                "a hypothesis, a behavioural change to try, a pattern noticed, or a recommendation to act on. "
-                "Returns the insight_id needed for update_insight_outcome. "
-                "Use for: 'save this insight', 'track this idea', 'add this to the coaching log', "
-                "'remember to follow up on this'."
-            ),
+            "description": SAVE_INSIGHT_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -691,13 +702,7 @@ TOOLS = {
         "fn": tool_get_flourishing_trend,
         "schema": {
             "name": "get_flourishing_trend",
-            "description": (
-                "EMA trends of the daily PERMA signals LLM-coded from the journal "
-                "(#1403: values lived, gratitude, flow, growth signals, ownership, "
-                "social quality — SOURCE#flourishing). Every payload carries model "
-                "provenance and anti-rumination framing. Use for: 'how are my values "
-                "trending?', 'flourishing signals this month', 'social quality trend'."
-            ),
+            "description": GET_FLOURISHING_TREND_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -712,12 +717,7 @@ TOOLS = {
         "fn": tool_log_evening_intake,
         "schema": {
             "name": "log_evening_intake",
-            "description": (
-                "PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) "
-                "to the Matthew-private intake ledger. One tap, no free text. Idempotent: "
-                "re-logging the same evening updates it (returns previous_count), never double-counts. "
-                "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date)."
-            ),
+            "description": LOG_EVENING_INTAKE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -732,13 +732,7 @@ TOOLS = {
         "fn": tool_get_intake_response,
         "schema": {
             "name": "get_intake_response",
-            "description": (
-                "PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs "
-                "vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on "
-                "n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 "
-                "nonzero evenings exist. Reports arming progress below the floors (ADR-105). "
-                "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'."
-            ),
+            "description": GET_INTAKE_RESPONSE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -752,14 +746,7 @@ TOOLS = {
         "fn": tool_get_insights,
         "schema": {
             "name": "get_insights",
-            "description": (
-                "List insights from the personal coaching log, newest-first, with days_open calculated. "
-                "`total` is the whole corpus, `returned` the page, `truncated` says if they differ (#2221). "
-                "Stale flag is set for open insights older than 14 days. "
-                "Use for: 'what insights are open?', 'show my coaching log', "
-                "'what have I been meaning to act on?', 'any stale insights?', "
-                "'show me resolved insights'."
-            ),
+            "description": GET_INSIGHTS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -774,12 +761,7 @@ TOOLS = {
         "fn": tool_update_insight_outcome,
         "schema": {
             "name": "update_insight_outcome",
-            "description": (
-                "Close the loop on a saved insight — record what happened when you acted on it. "
-                "Updates the insight's status and adds outcome notes. "
-                "Use for: 'I tried the caffeine cutoff — it worked', 'mark this insight as resolved', "
-                "'update the outcome for insight X', 'close out this coaching log item'."
-            ),
+            "description": UPDATE_INSIGHT_OUTCOME_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -798,14 +780,7 @@ TOOLS = {
         "fn": tool_get_labs,
         "schema": {
             "name": "get_labs",
-            "description": (
-                "Unified lab intelligence. Use 'view' to select the analysis: "
-                "'results' (default) = latest blood work values across all 7 draws with reference ranges and trend direction. "
-                "'trends' = biomarker trajectory over time — slope, direction, clinical threshold crossings. "
-                "'out_of_range' = out-of-range biomarkers with persistence (chronic/recurring/occasional/single_observation). "
-                "Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what's out of range?', "
-                "'cholesterol history', 'which labs are chronic issues?'."
-            ),
+            "description": GET_LABS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -827,16 +802,7 @@ TOOLS = {
         "fn": tool_get_freshness_status,
         "schema": {
             "name": "get_freshness_status",
-            "description": (
-                "Per-source data freshness summary (WR-48 Enhancement 4). "
-                "Returns overall status (green / yellow / orange / red) plus "
-                "per-source last-date / age-days / threshold. Use for: "
-                "'are we OK?', 'what sources are stale?', 'data status check', "
-                "'why isn't my dashboard updating?'. "
-                "Independent of freshness-checker Lambda — reads DDB directly so it "
-                "works even if the Lambda's silently failing (which is what happened "
-                "during the Apr–May 2026 silence)."
-            ),
+            "description": GET_FRESHNESS_STATUS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -854,13 +820,7 @@ TOOLS = {
         "fn": tool_get_cgm,
         "schema": {
             "name": "get_cgm",
-            "description": (
-                "Unified CGM (continuous glucose monitor) intelligence. "
-                "'dashboard' (default) = time-in-range (target >90%), variability (SD target <20), mean glucose, time above 140, fasting proxy, clinical flags, trend. Warmed nightly. "
-                "'fasting' = overnight nadir-based fasting glucose validation — avoids dawn phenomenon by using 2-5 AM nadir. Cross-validates CGM accuracy. "
-                "Use for: 'glucose overview', 'blood sugar', 'time in range', 'CGM dashboard', "
-                "'am I pre-diabetic?', 'fasting glucose', 'glucose variability', 'metabolic health'."
-            ),
+            "description": GET_CGM_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -882,13 +842,7 @@ TOOLS = {
         "fn": tool_get_mood,
         "schema": {
             "name": "get_mood",
-            "description": (
-                "Unified mood and state-of-mind intelligence. "
-                "'trend' (default) = journal-derived mood, energy, and stress scores with 7-day rolling averages, trend direction. "
-                "'state_of_mind' = Apple Health How We Feel (HWF) valence data — objective emotional state tracking. "
-                "Use for: 'how has my mood been?', 'mood trend', 'energy levels', 'stress trend', "
-                "'state of mind', 'emotional wellbeing', 'How We Feel data', 'mood vs training'."
-            ),
+            "description": GET_MOOD_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -909,15 +863,7 @@ TOOLS = {
         "fn": tool_create_experiment,
         "schema": {
             "name": "create_experiment",
-            "description": (
-                "Start tracking a new N=1 experiment. An experiment is a specific protocol change "
-                "(supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis "
-                "and start date. The system will automatically compare before/after metrics when you "
-                "call get_experiment_results. Board rules: one variable at a time, minimum 14 days, "
-                "define success criteria upfront. "
-                "Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', "
-                "'create experiment for cold plunge protocol', 'I want to test if X improves Y'."
-            ),
+            "description": CREATE_EXPERIMENT_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1102,12 +1048,7 @@ TOOLS = {
         "fn": tool_list_experiments,
         "schema": {
             "name": "list_experiments",
-            "description": (
-                "List all N=1 experiments with their status, duration, and whether minimum "
-                "data threshold (14 days) has been met. Filter by status. "
-                "Use for: 'what experiments am I running?', 'show active experiments', "
-                "'list completed experiments', 'any experiments ready to evaluate?'."
-            ),
+            "description": LIST_EXPERIMENTS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1121,15 +1062,7 @@ TOOLS = {
         "fn": tool_get_experiment_results,
         "schema": {
             "name": "get_experiment_results",
-            "description": (
-                "Auto-compare before vs during metrics for an N=1 experiment. "
-                "Automatically queries sleep, recovery, stress, body composition, nutrition, "
-                "movement, and glucose metrics for both the pre-experiment baseline period "
-                "and the experiment period. Reports deltas, % changes, and direction "
-                "(improved/worsened). Board of Directors evaluates results against hypothesis. "
-                "Use for: 'how is my creatine experiment going?', 'did cutting caffeine help my sleep?', "
-                "'show experiment results', 'evaluate my N=1', 'did this actually work?'."
-            ),
+            "description": GET_EXPERIMENT_RESULTS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1143,13 +1076,7 @@ TOOLS = {
         "fn": tool_end_experiment,
         "schema": {
             "name": "end_experiment",
-            "description": (
-                "End an active N=1 experiment and record the outcome. "
-                "Run get_experiment_results first to review the data. "
-                "Status can be 'completed' (ran full course) or 'abandoned' (stopped early). "
-                "Use for: 'end my creatine experiment', 'I'm stopping the no-caffeine experiment', "
-                "'mark experiment as completed', 'abandon experiment X'."
-            ),
+            "description": END_EXPERIMENT_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1180,13 +1107,7 @@ TOOLS = {
         "fn": tool_get_social_connection_trend,
         "schema": {
             "name": "get_social_connection_trend",
-            "description": (
-                "Social connection quality trend from journal entries. Tracks enriched_social_quality "
-                "(alone/surface/meaningful/deep) over time with rolling averages, streaks, and PERMA "
-                "wellbeing model context. Correlates social quality with recovery, HRV, sleep, stress. "
-                "Seligman: Relationships are the #1 predictor of sustained wellbeing. "
-                "Use for: 'social connection trend', 'meaningful connections', 'PERMA score'."
-            ),
+            "description": GET_SOCIAL_CONNECTION_TREND_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1208,13 +1129,7 @@ TOOLS = {
         "fn": tool_manage_sick_days,
         "schema": {
             "name": "manage_sick_days",
-            "description": (
-                "Manage sick and rest day flags. Sick day flags suppress streak breaks, habit alerts, and anomaly noise. "
-                "'list' (default) = show all logged sick/rest days in a date range. "
-                "'log' = flag a date as sick/rest day (requires date=). Accepts dates= list for multiple days. "
-                "'clear' = remove a sick day flag logged in error (requires date=). "
-                "Use for: 'log a sick day', 'I'm sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
-            ),
+            "description": MANAGE_SICK_DAYS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1238,13 +1153,7 @@ TOOLS = {
         "fn": tool_get_social_dashboard,
         "schema": {
             "name": "get_social_dashboard",
-            "description": (
-                "Social connection dashboard: contact frequency, depth distribution, connection diversity, "
-                "weekly trends, stale contacts, and Murthy-threshold assessment. Pillar 7 data source. "
-                "Use for: 'social connection status', 'how often do I talk to people', "
-                "'who haven't I contacted recently', 'social health dashboard', 'am I isolated', "
-                "'relationship pillar data', 'connection quality trends'."
-            ),
+            "description": GET_SOCIAL_DASHBOARD_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1266,13 +1175,7 @@ TOOLS = {
         "fn": tool_get_todoist_snapshot,
         "schema": {
             "name": "get_todoist_snapshot",
-            "description": (
-                "Unified Todoist snapshot. "
-                "'load' (default) = current task load: active count, overdue, due-today, priority breakdown, cognitive load signal (LOW/MODERATE/ELEVATED/HIGH). "
-                "'today' = full Todoist day summary for a specific date — completed tasks, project breakdown, counts. "
-                "Use for: 'how many tasks do I have?', 'task load', 'am I overloaded?', 'decision fatigue', "
-                "'overdue tasks', 'Todoist summary', 'what tasks did I complete yesterday?', 'task backlog'."
-            ),
+            "description": GET_TODOIST_SNAPSHOT_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1293,13 +1196,7 @@ TOOLS = {
         "fn": update_todoist_task,
         "schema": {
             "name": "update_todoist_task",
-            "description": (
-                "Update an existing Todoist task — reschedule, change recurrence, rename, change priority or project. "
-                "IMPORTANT: Always use 'every!' (with exclamation mark) for recurring due_string to reschedule from "
-                "completion date, not original due date. This prevents pile-up when tasks are missed. "
-                "Examples: due_string='every! week', 'every! month', 'every! 3 months', 'every! year'. "
-                "To set first-fire date AND recurrence: set due_string='every! month' AND due_date='2026-04-01'."
-            ),
+            "description": UPDATE_TODOIST_TASK_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1322,11 +1219,7 @@ TOOLS = {
         "fn": create_todoist_task,
         "schema": {
             "name": "create_todoist_task",
-            "description": (
-                "Create a new Todoist task with optional recurrence and due date. "
-                "Always use 'every!' for recurring tasks. Omit project_id to file into Inbox; "
-                "get_todoist_snapshot(view='today') shows the project breakdown for existing tasks."
-            ),
+            "description": CREATE_TODOIST_TASK_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1345,7 +1238,7 @@ TOOLS = {
         "fn": close_todoist_task,
         "schema": {
             "name": "close_todoist_task",
-            "description": "Mark a Todoist task as complete. For recurring tasks, advances to next occurrence. For one-time tasks, removes from active list.",
+            "description": CLOSE_TODOIST_TASK_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1363,16 +1256,7 @@ TOOLS = {
         "fn": tool_write_platform_memory,
         "schema": {
             "name": "write_platform_memory",
-            "description": (
-                "Store a structured memory record in the platform_memory partition. "
-                "The compounding intelligence substrate — routes durable takeaways from conversation "
-                "(life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) "
-                "into the store that coach prompt assembly injects (#1482). Conversation-writable categories: "
-                "life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. "
-                "Writes are validated against the code taxonomy (lambdas/platform_memory.py) and stamped "
-                "channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — "
-                "that is what reaches coach prompts. Call list_memory_categories for the full taxonomy."
-            ),
+            "description": WRITE_PLATFORM_MEMORY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1418,10 +1302,7 @@ TOOLS = {
         "fn": tool_read_platform_memory,
         "schema": {
             "name": "read_platform_memory",
-            "description": (
-                "Retrieve recent memory records for a given category from the platform_memory partition. "
-                "Use to pull coaching calibration, failure patterns, or episodic wins into context."
-            ),
+            "description": READ_PLATFORM_MEMORY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1437,11 +1318,7 @@ TOOLS = {
         "fn": tool_list_memory_categories,
         "schema": {
             "name": "list_memory_categories",
-            "description": (
-                "List all platform_memory categories that have records (counts + date ranges), plus the full "
-                "sanctioned category taxonomy (#1482: descriptions, channels, privacy tiers, retention windows). "
-                "Use to understand what the platform has accumulated and where a conversation takeaway should be filed."
-            ),
+            "description": LIST_MEMORY_CATEGORIES_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1455,7 +1332,7 @@ TOOLS = {
         "fn": tool_delete_platform_memory,
         "schema": {
             "name": "delete_platform_memory",
-            "description": "Delete a specific platform_memory record by category + date. Use to correct bad memories or remove stale records.",
+            "description": DELETE_PLATFORM_MEMORY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1471,11 +1348,7 @@ TOOLS = {
         "fn": tool_log_decision,
         "schema": {
             "name": "log_decision",
-            "description": (
-                "IC-19: Log a platform-guided decision for trust calibration. Record what the platform recommended, "
-                "whether Matthew followed or overrode the advice, and why. Outcome recorded later via update_decision_outcome. "
-                "Use for: 'the brief said rest day but I trained', 'followed protein advice', 'platform recommended X and I did Y'."
-            ),
+            "description": LOG_DECISION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1518,18 +1391,7 @@ TOOLS = {
         "fn": tool_mark_journal_quote,
         "schema": {
             "name": "mark_journal_quote",
-            "description": (
-                "#1568 (ADR-142): mark ONE verbatim journal line explicitly publishable — the consent-per-line "
-                "'from the journal, in his words' channel. Use ONLY during a journal-interview / vlog close, after "
-                "nominating at most 2 quote-worthy lines and getting Matthew's explicit per-line yes; pass "
-                "approved=true only when he said yes to THIS exact line. The tool refuses (fail-closed) any line "
-                "touching the mark-time taboo list (substances / family-specifics / age / private events / real "
-                "names — the ELENA brief's omit list, enforced in code), any paraphrase that isn't verbatim in that "
-                "day's entry (ADR-104 grounding), and a third line on a day (cap 0–2). Marked lines surface on the "
-                "story hub archive + at most one featured line per week on home, dated, with a receipts link. "
-                "action='unmark' revokes a line (consent is revocable); action='list' shows what's marked. "
-                "The chronicle's never-quote rule is untouched — never quote unmarked journal text anywhere."
-            ),
+            "description": MARK_JOURNAL_QUOTE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1564,21 +1426,7 @@ TOOLS = {
         "fn": tool_manage_diary_claims,
         "schema": {
             "name": "manage_diary_claims",
-            "description": (
-                "#1841: the on-tape claims ledger — the diary's half of the prediction machinery. "
-                "action='due' (default, ZERO args) is a /vlog STEP-0 call: the claims whose stated deadline has "
-                "landed, to be called back ON TAPE in his own words before anything new is asked. "
-                "action='log' registers claims at the route-the-takeaways close: propose 0-3 falsifiable claims "
-                "he actually made this session, take his explicit yes PER CLAIM (consent=true per claim, silence "
-                "means no, never auto), and pass them with the entry's source_sk. The gate is deterministic and "
-                "will REFUSE anything not falsifiable — the metric must resolve through measurable_metrics, and "
-                "the claim needs either a number to beat (threshold + condition) or an unambiguous direction plus "
-                "an integer horizon_days (14-365). Say refusals out loud rather than retrying them (ADR-105). "
-                "Admitted claims are graded by the same daily evaluator as every coach prediction; nothing here "
-                "grades and nothing here calls an LLM. action='list' shows the ledger + track record; "
-                "action='called_back' marks a due claim worked so it stops resurfacing. "
-                "PRIVATE — no public surface reads this partition."
-            ),
+            "description": MANAGE_DIARY_CLAIMS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1616,13 +1464,7 @@ TOOLS = {
         "fn": tool_get_acwr_status,
         "schema": {
             "name": "get_acwr_status",
-            "description": (
-                "BS-09: Acute:Chronic Workload Ratio status from Whoop strain data. "
-                "Reads pre-computed ACWR from computed_metrics partition (written nightly by acwr-compute Lambda). "
-                "Safe zone: 0.8–1.3. Above 1.3 = injury risk, below 0.8 = detraining. "
-                "Gabbett et al. thresholds. Proxy note: Whoop strain is cardiac-based; use as directional signal, not precise injury predictor. "
-                "Use for: 'what is my ACWR?', 'am I overtraining?', 'is my training load safe?', 'injury risk assessment'."
-            ),
+            "description": GET_ACWR_STATUS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1637,12 +1479,7 @@ TOOLS = {
         "fn": tool_get_decisions,
         "schema": {
             "name": "get_decisions",
-            "description": (
-                "IC-19: Retrieve recent platform-guided decisions with outcomes and trust calibration. "
-                "Shows follow vs override patterns and which approach produces better outcomes. "
-                "Use for: 'how often do I follow platform advice?', 'should I trust the system?', "
-                "'decision journal', 'when do my overrides work?'."
-            ),
+            "description": GET_DECISIONS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1658,11 +1495,7 @@ TOOLS = {
         "fn": tool_update_decision_outcome,
         "schema": {
             "name": "update_decision_outcome",
-            "description": (
-                "IC-19: Record the outcome of a past decision. Call 1-3 days after logging a decision "
-                "to capture what actually happened. Over time builds trust calibration: when to follow "
-                "vs override platform advice. Use for: 'that rest day advice worked', 'I ignored the protein tip and felt fine'."
-            ),
+            "description": UPDATE_DECISION_OUTCOME_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1685,15 +1518,7 @@ TOOLS = {
         "fn": tool_get_deficit_sustainability,
         "schema": {
             "name": "get_deficit_sustainability",
-            "description": (
-                "BS-12: Multi-signal early warning for unsustainable caloric deficit. "
-                "Monitors 5 channels simultaneously: HRV trend, sleep quality, recovery, "
-                "Tier 0 habit completion, and training output. When 3+ degrade concurrently "
-                "during an active deficit → flags with severity and calorie increase recommendation. "
-                "Attia / Huberman: aggressive deficits destroy adherence, sleep, and muscle. "
-                "Use for: 'is my deficit sustainable?', 'am I cutting too hard?', "
-                "'deficit health check', 'should I eat more?', 'deficit sustainability'."
-            ),
+            "description": GET_DEFICIT_SUSTAINABILITY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1724,13 +1549,7 @@ TOOLS = {
         "fn": tool_get_workouts,
         "schema": {
             "name": "get_workouts",
-            "description": (
-                "List normalized workouts across all logging sources (Hevy + MacroFactor) "
-                "in a date range. Returns per-workout records with title, duration, "
-                "set count, total volume in kg, and source attribution. Use for: "
-                "'what workouts did I do this week?', 'show recent training', "
-                "'compare workouts across apps'."
-            ),
+            "description": GET_WORKOUTS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1751,11 +1570,7 @@ TOOLS = {
         "fn": tool_get_workout_detail,
         "schema": {
             "name": "get_workout_detail",
-            "description": (
-                "Return full per-set detail for one workout (exercises, weights, reps, RPE, "
-                "notes). Looked up by workout_uid in the form '<source>:<source_workout_id>' "
-                "(e.g. 'hevy:abc-123'). Use after get_workouts to drill into a specific session."
-            ),
+            "description": GET_WORKOUT_DETAIL_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1772,24 +1587,7 @@ TOOLS = {
         "fn": tool_manage_hevy_routine,
         "schema": {
             "name": "manage_hevy_routine",
-            "description": (
-                "Author, preview, push, list, fetch, archive, or score adherence on Hevy training routines. One tool, "
-                "action-dispatched. Actions: 'draft' (the deterministic programmer builds its OWN routine from your state "
-                "— does NOT take an exercise list), 'draft_custom' (author a routine from an explicit exercise/set/weight "
-                "list you supply — use this to push a hand-designed session), 'dry_run' (compile a draft into the Hevy "
-                "POST body for preview), 'commit' (push to Hevy — requires explicit routine_id), 'list' (date range), "
-                "'get' (one IR by routine_id), 'archive' (RENAME only — Hevy has no DELETE, and folder_id is create-only "
-                "so the routine is NOT moved out of its folder), 'floor' (≈20-min variant), 're_entry' (deliberately "
-                "easy after a break), 'adherence' (programmed-vs-performed). Typical custom flow: draft_custom → dry_run "
-                "→ commit. Subtract-only autoregulation on the 'draft' path. TITLES ARE AUTO-RENDERED: the compiler names "
-                "every routine 'Phase - Type - N - Y' (e.g. 'Foundation - Push - 2 - 2') from config + performed history "
-                "— DO NOT pass a title; leave it to the compiler. `title` and `force_title` are DRAFT-TIME arguments, read "
-                "only by draft_custom: passing either to 'commit' does nothing and the result returns a warning naming it. "
-                "To force a title: draft_custom(force_title=true, title=...) → dry_run → commit. NEW routines are filed "
-                "into a per-type Hevy folder (Push/Pull/Legs/Engine); commit's `folder` key reports the outcome and reads "
-                "'unfoldered: <reason>' when that failed. Honest framing: 'deterministic volume-landmark programming with "
-                "red-day deload guard' — never describe as 'autoregulated' publicly until the readiness signal is validated."
-            ),
+            "description": MANAGE_HEVY_ROUTINE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1876,10 +1674,7 @@ TOOLS = {
         "fn": tool_get_reading_shelf,
         "schema": {
             "name": "get_reading_shelf",
-            "description": (
-                "The reading shelf (Mind pillar): currently-reading, the queue, finished books, and the "
-                "'set down' (abandoned) shelf. Use for: 'what am I reading', 'my bookshelf', 'reading list'."
-            ),
+            "description": GET_READING_SHELF_DESCRIPTION,
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -1887,11 +1682,7 @@ TOOLS = {
         "fn": tool_get_reading_recommendation,
         "schema": {
             "name": "get_reading_recommendation",
-            "description": (
-                "A curated next-read pick from the queue, each with a DECOMPOSED reason string + confidence "
-                "label. Below the data n-gate it is propose-and-dispose (one pick, stated as a hypothesis). "
-                "Use for: 'what should I read next', 'recommend a book'."
-            ),
+            "description": GET_READING_RECOMMENDATION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Max picks to surface (default 3; capped to 1 at low n)."}},
@@ -1903,7 +1694,7 @@ TOOLS = {
         "fn": tool_get_reading_profile,
         "schema": {
             "name": "get_reading_profile",
-            "description": "The reading calibration profile: taste hypothesis, curriculum phase, difficulty ratchet, roundedness wheel, trust mode.",
+            "description": GET_READING_PROFILE_DESCRIPTION,
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -1911,7 +1702,7 @@ TOOLS = {
         "fn": tool_get_reading_history,
         "schema": {
             "name": "get_reading_history",
-            "description": "Reading-session history over a date range + the current input streak (consecutive days read). Defaults to the trailing 90 days.",
+            "description": GET_READING_HISTORY_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1926,7 +1717,7 @@ TOOLS = {
         "fn": tool_get_due_recalls,
         "schema": {
             "name": "get_due_recalls",
-            "description": "Spaced-retrieval recall prompts that are due now (private). The sparse-index sweep that powers the cockpit's recall nudge.",
+            "description": GET_DUE_RECALLS_DESCRIPTION,
             "inputSchema": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -1934,7 +1725,7 @@ TOOLS = {
         "fn": tool_get_reading_track_record,
         "schema": {
             "name": "get_reading_track_record",
-            "description": "Cora's reading-recommendation track record + auditable hit rate (low-confidence until enough recommendations resolve).",
+            "description": GET_READING_TRACK_RECORD_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Max records (default 50)."}},
@@ -1946,10 +1737,7 @@ TOOLS = {
         "fn": tool_get_constellation,
         "schema": {
             "name": "get_constellation",
-            "description": (
-                "The Constellation idea-graph (Mind pillar signature). Honest empty state below the node threshold; "
-                "pass idea_id to fetch one node + its edges. Whole-graph enumeration ships in Phase E."
-            ),
+            "description": GET_CONSTELLATION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {"idea_id": {"type": "string", "description": "Optional — fetch a single idea node + its edges."}},
@@ -1961,12 +1749,7 @@ TOOLS = {
         "fn": tool_manage_reading,
         "schema": {
             "name": "manage_reading",
-            "description": (
-                "Write fat-tool for the reading library (draft -> dry_run -> commit). Every mutating action PREVIEWS by "
-                "default (dry_run=true) and writes only on an explicit dry_run=false. Actions: add_book, update_status "
-                "(abandon requires abandon_reason), log_session, add_note, answer_recall, debrief, log_outcome, "
-                "update_profile, onboard (taste-archaeology interview)."
-            ),
+            "description": MANAGE_READING_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2024,11 +1807,7 @@ TOOLS = {
         "fn": tool_get_horizons,
         "schema": {
             "name": "get_horizons",
-            "description": (
-                "Horizons (Mind pillar): the weekly coach-curated media pick that broadens Matthew's horizons "
-                "across all pillars (article|podcast|video|paper|news|longform|essay|song). Returns the current "
-                "pick + past picks (newest first). Honest empty state before the first pick."
-            ),
+            "description": GET_HORIZONS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Max picks to return, newest first (default 26)."}},
@@ -2040,12 +1819,7 @@ TOOLS = {
         "fn": tool_curate_horizon,
         "schema": {
             "name": "curate_horizon",
-            "description": (
-                "Author the week's Horizons pick (the Mind coach, curating broadly across all pillars). Runs the "
-                "link-verification gate (ADR-104: no fabricated links) and stores the pick ONLY if its URL resolves "
-                "to real content — fail-closed. draft->dry_run->commit: verifies in both modes; writes only on "
-                "explicit dry_run=false. An unverified link is rejected and never stored."
-            ),
+            "description": CURATE_HORIZON_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2088,13 +1862,7 @@ TOOLS = {
         "fn": tool_archive_horizon,
         "schema": {
             "name": "archive_horizon",
-            "description": (
-                "Archive a prior Horizons pick with the Mind coach's grounded retrospective (the week AFTER "
-                "the pick): why you recommended it and what you hoped it would do for Matthew. GROUNDED "
-                "(ADR-104 — built only from the stored pick, never Matthew's private reactions), budget-gated "
-                "(reader-narrative), and passed through the #1673 fail-closed sensitivity gate before it can "
-                "publish. draft->dry_run->commit: writes only on explicit dry_run=false. Defaults to last week."
-            ),
+            "description": ARCHIVE_HORIZON_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2115,12 +1883,7 @@ TOOLS = {
         "fn": tool_get_field_notes,
         "schema": {
             "name": "get_field_notes",
-            "description": (
-                "Retrieve the weekly Field Notes entry — AI Lab Notes (present/lookback/focus paragraphs) "
-                "and any existing Matthew response. Defaults to current week if no week specified. "
-                "Use for: 'show me this week's field notes', 'what did the AI say this week', "
-                "'read field notes for week 14', 'get my lab notebook'."
-            ),
+            "description": GET_FIELD_NOTES_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2134,12 +1897,7 @@ TOOLS = {
         "fn": tool_log_field_note_response,
         "schema": {
             "name": "log_field_note_response",
-            "description": (
-                "Write Matthew's response to the right page of a Field Notes entry. "
-                "The AI Lab Notes must already exist for that week. Uses update_item to never overwrite AI fields. "
-                "Use for: 'respond to field notes', 'write my side of the lab notebook', "
-                "'I disagree with the AI notes this week', 'add my response to week 14'."
-            ),
+            "description": LOG_FIELD_NOTE_RESPONSE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2161,16 +1919,7 @@ TOOLS = {
         "fn": "tool_list_available_tools",  # placeholder; rebound below
         "schema": {
             "name": "list_available_tools",
-            "description": (
-                "Discover MCP tools by domain or keyword. Use when you're unsure "
-                "which specific tool matches a question. Returns tool names, "
-                "domains, and short descriptions. "
-                "Filter by domain (e.g. 'health', 'training', 'nutrition', 'sleep', "
-                "'journal', 'cgm', 'labs', 'habits', 'lifestyle', 'board', "
-                "'character', 'social', 'memory', 'measurements', 'strength', "
-                "'coach_intelligence', 'decisions', 'hypotheses', 'challenges') "
-                "or keyword (matches tool name + description substring)."
-            ),
+            "description": LIST_AVAILABLE_TOOLS_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2200,14 +1949,7 @@ TOOLS = {
         "fn": tool_get_habit_reflection_queue,
         "schema": {
             "name": "get_habit_reflection_queue",
-            "description": (
-                "#422: Recent habit-days still missing causality context — what to ask Matthew about. "
-                "Deterministically returns missed days with no recorded 'why' and completed days with no "
-                "trigger/reward, scoped to the last N days. Use this OPTIONALLY when Matthew is already "
-                "reflecting on his day/week: pick a couple, ask about them conversationally, then call "
-                "log_habit_reflection with his answer. Never nag or schedule — it only makes the ask possible. "
-                "Use for: 'ask me about my habits', 'what habit context am I missing?', end-of-day/week reflection."
-            ),
+            "description": GET_HABIT_REFLECTION_QUEUE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2221,14 +1963,7 @@ TOOLS = {
         "fn": tool_log_habit_reflection,
         "schema": {
             "name": "log_habit_reflection",
-            "description": (
-                "#422: Log Matthew's reflection about a habit on a date — the richer, Claude-sourced context "
-                "layer that complements in-app Habitify notes. Record any of trigger (what cued it), reward "
-                "(what it paid back), why_missed (why a missed day slipped), or free-text context. Stored "
-                "verbatim, keyed to habit+date, tagged channel=claude_reflection so it coexists with (never "
-                "overwrites) Habitify-sourced notes. Renders on the habits page. "
-                "Use for: 'I missed meditation because I was traveling', 'the walk is triggered by my morning coffee'."
-            ),
+            "description": LOG_HABIT_REFLECTION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2251,15 +1986,7 @@ TOOLS = {
         "fn": tool_get_coach_checkin_queue,
         "schema": {
             "name": "get_coach_checkin_queue",
-            "description": (
-                "#915: Up to 3 open check-in questions FROM Matthew's AI coaches — qualitative questions whose "
-                "verbatim answers pair with (or explain the absence of) the quantitative data. Open questions "
-                "persist: re-calls return the SAME queue; fresh questions are generated (Bedrock, in the asking "
-                "coach's persona, grounded in live presence/adaptive-mode/manual-source context) only when the "
-                "queue is empty. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is "
-                "always valid with zero penalty — never nag. "
-                "Use for: 'what do my coaches want to know?', 'coach check-in', periodic qualitative catch-ups."
-            ),
+            "description": GET_COACH_CHECKIN_QUEUE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2280,12 +2007,7 @@ TOOLS = {
         "fn": tool_log_coach_checkin,
         "schema": {
             "name": "log_coach_checkin",
-            "description": (
-                "#915: Record Matthew's answer to a coach check-in question VERBATIM (his words, never a "
-                "paraphrase — ADR-104), or an explicit skip (always valid, zero penalty). The answer becomes "
-                "durable qualitative context stored with the coach's records. "
-                "Use after get_coach_checkin_queue, once Matthew has responded (or declined)."
-            ),
+            "description": LOG_COACH_CHECKIN_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2307,16 +2029,7 @@ TOOLS = {
         "fn": tool_log_coach_calibration,
         "schema": {
             "name": "log_coach_calibration",
-            "description": (
-                "#1481: After a check-in answer is logged, the ASKING coach updates its own read of Matthew — a "
-                "bounded per-subdomain confidence move (source=conversation) plus a LEARNING# record "
-                "(channel=conversation) that quotes the verbatim answer by checkin_id (ADR-104/ADR-141). Rules: "
-                "only an ANSWERED check-in qualifies (never a skip); max 2 subdomains per answer; one write per "
-                "(answer, subdomain) — replays are idempotent; one conversation can never move confidence more "
-                "than one graded prediction would. Prefer the coach's existing CONFIDENCE# subdomain vocabulary "
-                "(e.g. sleep_quality, protein_intake, mood, training_load). "
-                "Use after log_coach_checkin, when the answer genuinely changed (or confirmed) the coach's read."
-            ),
+            "description": LOG_COACH_CALIBRATION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2356,24 +2069,7 @@ TOOLS = {
         "fn": tool_get_capture_queues,
         "schema": {
             "name": "get_capture_queues",
-            "description": (
-                "#1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending "
-                "manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + "
-                "context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — "
-                "this call is read-only and fast). (2) habit_reflection — missed-needing-why / "
-                "completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), "
-                "not the note text. (4) evening_intake — logged tonight? + dose-response arming progress "
-                "(#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. "
-                "(6) freshness_flags — stale sources only, name + days_dark. (7) suggested_rituals — #1578: "
-                "deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, "
-                "mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, "
-                "and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a "
-                "dark source proposes nothing, skipping records nothing. Each section fails soft "
-                "independently: a broken sub-query never blocks the others, it just reports "
-                "{status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, "
-                "journal interview, speak-to-the-coaches, open check-in) instead of calling the "
-                "underlying tools separately. Skip-without-penalty framing — nothing here is a nag."
-            ),
+            "description": GET_CAPTURE_QUEUES_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {},
@@ -2385,18 +2081,7 @@ TOOLS = {
         "fn": tool_log_coach_correction,
         "schema": {
             "name": "log_coach_correction",
-            "description": (
-                "#1690 (epic #1687): correct a weekly AI-review-pack item by its NUMBER. Matthew reads the "
-                "ranked review-pack email (each generation carries a stable #N) and corrects an item that's "
-                "wrong or misleading — this resolves #N back to the exact archived generation the pack numbered "
-                "and writes ONE row to the corrections ledger, tagged by error-class, so the mistake compounds "
-                "toward not recurring. Args: item_number (the #N, required), correction (what's wrong + what it "
-                "should say, required), error_class (OPTIONAL override — one of stale-baseline, "
-                "ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, "
-                "defense-held, other; an unrecognized value is stored as 'other', never rejected). An unknown "
-                "or out-of-range number is REPORTED (with how many items the week's pack has), never silently "
-                "dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows."
-            ),
+            "description": LOG_COACH_CORRECTION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2426,16 +2111,7 @@ TOOLS = {
         "fn": tool_describe_platform_surfaces,
         "schema": {
             "name": "describe_platform_surfaces",
-            "description": (
-                "THE INDEX — call this FIRST whenever you are about to say the platform does not hold something. Lists every "
-                "platform surface (derived from the site API's own route table, so it is never stale) with, per surface: the "
-                "plain-English question it answers, its parameters, an example phrasing, AND the rule it applies — the phase "
-                "filter ('experiment-only' hides phase=pilot pre-genesis/prior-cycle rows; 'includes-pilot' does not), the date "
-                "basis (Pacific day vs UTC), and whether row provenance (live capture vs backfill) is distinguished at all. Read "
-                "default_filter BEFORE reporting an empty result: on an experiment-only surface, empty means EXCLUDED BY A RULE, "
-                "not 'never recorded'. Reader-only surfaces are listed with the reason they are excluded, because 'exists but not "
-                "for you' is a different answer from 'no such surface'."
-            ),
+            "description": DESCRIBE_PLATFORM_SURFACES_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2452,15 +2128,7 @@ TOOLS = {
         "fn": tool_get_platform_surface,
         "schema": {
             "name": "get_platform_surface",
-            "description": (
-                "THE WAITER — fetch any surface named by describe_platform_surfaces (e.g. 'hypotheses', 'receipts', "
-                "'nutrition_overview', 'correlations', 'state_of_matthew', 'last_sync', 'phenoage'). Read-only. EVERY response "
-                "carries `rule` — the phase filter, date basis and provenance rule that produced the payload — so a "
-                "technically-correct answer can be INTERPRETED instead of guessed at. Pass explain_against='<other surface>' when "
-                "two surfaces seem to contradict each other: it returns whether the difference is explained by their differing "
-                "rules, or is a real disagreement. A request no surface can answer is recorded to the durable miss log and "
-                "reported as 'no surface exposes this' — never as 'the platform does not hold it'."
-            ),
+            "description": GET_PLATFORM_SURFACE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2477,13 +2145,7 @@ TOOLS = {
         "fn": tool_get_experiment_cycle,
         "schema": {
             "name": "get_experiment_cycle",
-            "description": (
-                "Which experiment CYCLE is running, its genesis date, which DAY of it today is, and the phase (experiment vs "
-                "pilot). This is the authoritative answer — it returns experiment_stamp()'s cycle (CYCLE_GENESES-derived), never "
-                "a fresh derivation, and reports the SSM cross-check alongside it. Use for 'what cycle are we on?', 'what day of "
-                "the experiment is it?', 'when did this cycle start?', and before quoting any cycle number from memory or from a "
-                "document — cycle numbers move weekly and a correct-when-written number goes stale silently."
-            ),
+            "description": GET_EXPERIMENT_CYCLE_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -2497,12 +2159,7 @@ TOOLS = {
         "fn": tool_get_habit_completion,
         "schema": {
             "name": "get_habit_completion",
-            "description": (
-                "How the habits are going: today's completion, per-habit streaks, and the DATE RULE behind both. Use for 'how are "
-                "my habits going?', 'what streaks am I on?', 'did I hit my habits today?'. A zero here is annotated with the date "
-                "basis and phase filter that produced it — habit rows written against the adjacent calendar day have read as "
-                "'0 of 61 completed' before."
-            ),
+            "description": GET_HABIT_COMPLETION_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {"include_registry": {"type": "boolean", "description": "Also return the full tracked-habit registry."}},
@@ -2514,16 +2171,33 @@ TOOLS = {
         "fn": tool_get_platform_cost,
         "schema": {
             "name": "get_platform_cost",
-            "description": (
-                "What the platform is costing: the budget envelope (ceiling, spend to date, projected month-end, budget tier) "
-                "plus the AI inference receipt broken down by feature and model. Use for 'what is this costing me?', 'what did "
-                "the AI spend go to?', 'are we near the ceiling?'. These are the platform's own accounting surfaces, not a live "
-                "Cost Explorer query — the projection is a forecast."
-            ),
+            "description": GET_PLATFORM_COST_DESCRIPTION,
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "skip_inference": {"type": "boolean", "description": "Return only the budget envelope, skip the AI receipt."}
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_platform_state": {
+        "fn": tool_get_platform_state,
+        "schema": {
+            "name": "get_platform_state",
+            "description": GET_PLATFORM_STATE_DESCRIPTION,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "section": {
+                        "type": "string",
+                        "description": (
+                            "Which joined source to return: board, delivery, grades, jury_out, bets, incidents, quality, cost "
+                            "or autonomy — or 'all' (the default) for every section. Not an enum on purpose: the set is "
+                            "validated against the artifact's own keys at call time and echoed back as sections_available, so "
+                            "a section the generator adds is selectable the day it ships."
+                        ),
+                    }
                 },
                 "required": [],
             },
