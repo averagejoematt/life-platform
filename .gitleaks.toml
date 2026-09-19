@@ -47,3 +47,52 @@ condition = "AND"
 regexTarget = "match"
 regexes = ['''AIzaSyA17Uwy37irVEQSwz6PIyX3wnkHrDBeleA''']
 paths = ['''docs/DECISIONS\.md''']
+
+# ── #3620 — the platform's OWN bearer shapes ─────────────────────────────────
+# GitHub's validity checks and non-provider patterns are not offered on a
+# user-owned repo (#3606 item 3), so gitleaks' default ruleset is the whole
+# detector here — and it knows AWS keys and GitHub PATs, not `lp_…`. Four
+# platform-minted credentials were therefore invisible to every scanner in the
+# pipeline. Each rule below has a positive control under tests/fixtures/gitleaks/
+# proving the pattern MATCHES a planted token (see the allowlist block after the
+# rules, which is what stops those controls redding the gate on every PR that
+# touches them), and tests/test_gitleaks_rules_3620.py re-runs every rule's
+# regex against its own fixture so the controls hold even where the gitleaks
+# binary is not installed.
+
+[[rules]]
+id = "life-platform-mcp-bearer"
+description = "MCP remote bearer (lp_<sha256>) — mcp/handler.py::_get_bearer_token"
+regex = '''\blp_[0-9a-f]{64}\b'''
+keywords = ["lp_"]
+
+[[rules]]
+id = "life-platform-mcp-session-bearer"
+description = "MCP 24h session bearer (lps_…) — minted by /token, #893-A"
+regex = '''\blps_[A-Za-z0-9_\-]{20,}'''
+keywords = ["lps_"]
+
+[[rules]]
+id = "life-platform-hae-ingest-bearer"
+description = "Health Auto Export ingest bearer (life-platform/ingestion-keys) — no prefix, so keyed on the assignment context"
+regex = '''(?i)\b(?:hae|health_auto_export|ingestion)[_-]?(?:api[_-]?)?(?:key|token|secret)\b\s*[:=]\s*["']([A-Za-z0-9_\-]{24,})["']'''
+secretGroup = 1
+keywords = ["hae", "health_auto_export", "ingestion"]
+
+[[rules]]
+id = "life-platform-telegram-webhook-secret"
+description = "Telegram X-Telegram-Bot-Api-Secret-Token value (life-platform/telegram::webhook_secret)"
+regex = '''(?i)\b(?:webhook_secret|telegram_secret_token|x[_-]telegram[_-]bot[_-]api[_-]secret[_-]token)\b\s*[:=]\s*["']([A-Za-z0-9_\-]{16,})["']'''
+secretGroup = 1
+keywords = ["webhook_secret", "telegram_secret_token", "secret-token"]
+
+[[rules]]
+id = "life-platform-site-api-origin-secret"
+description = "SITE_API_ORIGIN_SECRET / x-amj-origin gate value (life-platform/site-api-origin-secret)"
+regex = '''(?i)\b(?:site_api_origin_secret|x[_-]amj[_-]origin)\b\s*[:=]\s*["']([A-Za-z0-9_\-]{12,})["']'''
+secretGroup = 1
+keywords = ["site_api_origin_secret", "x-amj-origin", "x_amj_origin"]
+
+[[allowlists]]
+description = "tests/fixtures/gitleaks/** — the POSITIVE CONTROLS for the five rules above. Each file plants a syntactically real token of the shape its rule hunts, so that the rule can be shown to fire (by `gitleaks detect --source tests/fixtures/gitleaks --no-git`, and by tests/test_gitleaks_rules_3620.py where the binary is absent). None is a live credential: every value is locally generated, self-describing, and matched here by path so the gate does not red on the controls that prove it works."
+paths = ['''tests/fixtures/gitleaks/.*''']

@@ -1,0 +1,17 @@
+# NEGATIVE CONTROLS — shapes that must NOT match, so the rules are known to be
+# scoped rather than merely loud. A rule that fires on everything is retired by
+# whoever it interrupts, and then the real token walks through the hole.
+
+# prefix present, digest too short / wrong alphabet
+lp_short = "lp_9f2c41ab"
+lp_notahex = "lp_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+
+# the NAME of a secret, which is what belongs in source
+ORIGIN_SECRET_NAME = "life-platform/site-api-origin-secret"
+TELEGRAM_SECRET_NAME = "life-platform/telegram"
+
+# a header name with no value
+header = "X-Telegram-Bot-Api-Secret-Token"
+
+# an env-var READ, not a literal
+site_api_origin_secret = os.environ["SITE_API_ORIGIN_SECRET"]

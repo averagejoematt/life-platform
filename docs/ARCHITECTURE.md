@@ -432,6 +432,19 @@ enters git. Until it exists the switch is disarmed but honest: transition notice
 the operator address and the run reports `contacts_configured: false`. Add it to the
 table and bump `secret_count` when it is created.
 
+`life-platform/ip-hash-salt` — the salt for the reader `ip_hash` on every site-api
+engagement door (#3620, security ROW4): `/api/nudge`, `/api/submit_finding`,
+`/api/board_question`, `/api/predict`, `/api/ritual_log`, `/api/verify_subscriber`.
+Read at runtime through `common/secret_cache` (15-min TTL) by
+`web/site_api_social_engage._salted_ip_hash`, and granted to the site-api role by the
+`IpHashSalt` statement in `cdk/stacks/role_policies_serve.py`. A random value, created
+by the owner — never in git, because a salt committed to a PUBLIC repo is strictly
+worse than none (it reads as a fix). **Until it exists those six doors answer 503**,
+which is the fix working: there is deliberately no unsalted fallback, since the
+fallback would keep writing a reversible digest into S3, a DynamoDB sort key and
+CloudWatch on exactly the days the control was broken. Add it to the table and bump
+`secret_count` when it is created.
+
 ---
 
 ## Cost Profile

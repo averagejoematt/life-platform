@@ -613,4 +613,18 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     # gate does not, and should not, have. `tests/test_playwright_gated_skip_reporting.py`
     # (a proven structural-test gate) covers the discovery logic this script wraps.
     "guard::scripts/playwright_gated_tests.py": "2026-09-07 (#3548/#3676) — informational reporter, never exits nonzero by design",
+    # 2026-09-19 (#3620): the bucket-policy drift leg. The step already existed
+    # (config_ownership_audit --strict); appending the live-policy comparison is what
+    # made the census read it as a gate. Its failing arm needs `s3api get-bucket-policy`
+    # under the deploy OIDC role against the real bucket, so a mutation cannot be run on
+    # a laptop or in the PR lane — any local exit code would be a verdict on a different
+    # gate (the ci-lint gitleaks entry in gate_census.ATTEMPTED_UNPROVEN records the same
+    # shape). What IS proven is the repo-side half of the same ratchet:
+    # tests/test_anonymous_read_prefixes_3620.py carries a must-fail control
+    # (`test_a_planted_addition_reds`) over the identical derivation, so the logic that
+    # decides "anonymously readable" is exercised in both directions here; only the live
+    # read is unproven. First nightly run after deploy is the live proof.
+    "ci::.github/workflows/config-drift.yml::drift / config/ ownership registry + bucket-policy drift (blocking)": (
+        "2026-09-19 (#3620) — live-AWS-only failing arm; repo-side twin is mutation-proven"
+    ),
 }
