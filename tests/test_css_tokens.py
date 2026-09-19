@@ -50,7 +50,10 @@ def test_sweep_covers_all_consumer_sheets():
     scale + palette). The evidence pointer: mind.css was previously unswept."""
     for sheet in ["story.css", "evidence.css", "cockpit.css", "mind.css", "fonts.css", "section_toc.css", "subscribe.css"]:
         assert sheet in check_css_tokens.SWEPT, f"{sheet} must be swept"
-    assert "tokens.css" not in check_css_tokens.SWEPT  # the allowlist/definitions file, never swept
+    # tokens.css stays out of SWEPT (hex + undefined-var would flag its own palette and
+    # scale) — but since #3543 its COMPONENT half is font-size-swept separately, via
+    # token_definition_mask(); "not in SWEPT" is no longer "unmeasured".
+    assert "tokens.css" not in check_css_tokens.SWEPT
     # And the sweep genuinely fires on a planted violation in a (now-swept) mind-style sheet.
     assert check_css_tokens.raw_hex_findings(".sp-face { background: #1d1810; }") == [(1, "#1d1810")]
 
@@ -275,3 +278,116 @@ def test_check_includes_the_js_surface(tmp_path, monkeypatch):
     monkeypatch.setattr(check_css_tokens, "js_sources", lambda: [("site/assets/js/evidence.js", planted)])
     findings = check_css_tokens.check()
     assert any("819px" in f and "evidence.js" in f for f in findings), findings
+
+
+# ── #3543: tokens.css's component half, and colours spelled in JavaScript ─────
+
+_TOKENS_FIXTURE = """:root {
+  --fs-label: 0.6875rem;
+  --fs-aq: 8px;                 /* a viewBox-unit DEFINITION, not a rendered size */
+}
+[data-theme="light"] { --ink: #2b2b2b; --fs-label: 0.6875rem; }
+@media (prefers-color-scheme: dark) { :root { --ink: #eee; } }
+
+.hb-tax { font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; }
+.vl-k { color: var(--ink-faint); font-size: var(--fs-label); }
+@media (max-width: 600px) { .ewin-v { font-size: 0.6rem; } }
+"""
+
+
+def test_tokens_css_component_rules_are_swept_for_font_size():
+    """#3543 positive control — a sub-floor literal planted in a tokens.css-shaped
+    fixture is a FINDING. Before this, tokens.css was 'the allowlist, never swept' and
+    19 component rules had accumulated there at 8.0-10.4px, live on 10 pages."""
+    masked = check_css_tokens.token_definition_mask(_TOKENS_FIXTURE)
+    findings = check_css_tokens.font_size_findings("tokens.css", masked)
+    assert any("0.6rem" in f and ":8:" in f for f in findings), findings  # .hb-tax
+    assert any("0.6rem" in f and ":10:" in f for f in findings), findings  # inside @media
+    assert len(findings) == 2, findings  # .vl-k (a real token) is not a finding
+
+
+def test_token_definition_blocks_are_not_swept():
+    """The other half of the control: the DEFINITIONS must stay exempt, or the gate
+    flags the type scale it exists to protect (`--fs-aq: 8px` is a viewBox-unit token,
+    not a rendered size). A mask that blanked nothing would red the whole file; a mask
+    that blanked everything would be the vacuous-scan trap."""
+    masked = check_css_tokens.token_definition_mask(_TOKENS_FIXTURE)
+    assert "--fs-aq" not in masked and "--ink: #2b2b2b" not in masked
+    assert ".hb-tax" in masked and ".ewin-v" in masked
+    # line numbers survive the blanking, so a finding still points at the real line
+    assert len(masked.splitlines()) == len(_TOKENS_FIXTURE.splitlines())
+
+
+def test_live_tokens_css_component_half_is_on_the_scale():
+    """The real file, after the #3543 lift — every component rule draws its font-size
+    from a token or carries a sanction citing a MEASURED rendered floor."""
+    masked = check_css_tokens.token_definition_mask(check_css_tokens.TOKENS.read_text())
+    assert ".provenance" in masked  # non-vacuous: the component half really is in there
+    assert not check_css_tokens.font_size_findings("tokens.css", masked)
+
+
+_JS_FIXTURE = """export function render(c) {
+  // withdrawn citations (#1892) — an issue ref, not a colour
+  const mark = `<span class="coach-mark" style="--coach:#abcdef">${c.name}</span>`;
+  return mark; // TODO(#735): link the roster
+}
+"""
+
+
+def test_js_raw_hex_sweep_is_non_vacuous():
+    """#3543 positive control — a coach colour hardcoded in a JS template is a finding,
+    exactly as it would be in a stylesheet. dispatches.js carried `--coach:#94a3b8` past
+    the #1211 sweep for months because that sweep read stylesheets only."""
+    findings = check_css_tokens.js_raw_hex_findings("site/assets/js/dispatches.js", _JS_FIXTURE)
+    assert len(findings) == 1, findings
+    assert "#abcdef" in findings[0] and ":3:" in findings[0]
+
+
+def test_js_raw_hex_sweep_does_not_read_issue_refs_as_colours():
+    """An issue reference in visitor-facing prose is 3-4 decimal digits behind a '#' —
+    the CSS pattern reads that as #rgb/#rgba. All four live 'hits' were prose
+    (evidence_body.js '(#1892)', evidence_meta.js 'TODO(#735)'); a gate whose first
+    findings are all false trains readers to skip it."""
+    for prose in ["`withdrawn citations (#1892)`", "`TODO(#735): profile URL`", "`receipts began (#1373)`"]:
+        assert check_css_tokens.js_raw_hex_findings("site/assets/js/x.js", prose) == []
+    # …while the unambiguous forms still fire
+    assert check_css_tokens.js_raw_hex_findings("site/assets/js/x.js", "el.style.color = '#94a3b8';")
+    assert check_css_tokens.js_raw_hex_findings("site/assets/js/x.js", "el.style.color = '#fff';")
+
+
+def test_js_hex_exemption_is_by_rule_not_by_finding():
+    """The ADR-106 portrait palette is exempt BY RULE (the module it lives in), so the
+    exemption is one auditable statement rather than 40 sanctions — and it names why.
+    Mutation proof: the same planted hex is a finding in any other module."""
+    assert check_css_tokens.js_hex_exemption("site/assets/js/portrait_data.js")
+    assert "ADR-106" in check_css_tokens.js_hex_exemption("site/assets/js/portrait_data.js")
+    assert check_css_tokens.js_hex_exemption("site/assets/js/dispatches.js") is None
+    assert check_css_tokens.js_raw_hex_findings("site/assets/js/portrait_data.js", _JS_FIXTURE) == []
+    assert check_css_tokens.js_raw_hex_findings("site/assets/js/coaching.js", _JS_FIXTURE)
+
+
+def test_portrait_data_is_the_only_exempt_module_and_it_really_has_hexes():
+    """Non-vacuity from the other direction: the exempt module must actually carry the
+    palette it is exempt for (an exemption for an empty file is a dead rule), and it
+    must be the ONLY module the rule exempts."""
+    exempt = [label for label, _ in check_css_tokens.js_sources() if check_css_tokens.js_hex_exemption(label)]
+    assert exempt == ["site/assets/js/portrait_data.js"], exempt
+    text = (check_css_tokens.JS_DIR / "portrait_data.js").read_text()
+    assert len(check_css_tokens._JS_HEX_COLOR.findall(text)) > 20
+
+
+def test_check_includes_the_js_hex_and_tokens_css_halves(tmp_path, monkeypatch):
+    """check() — what CI runs — folds in BOTH new halves. A helper nothing calls is the
+    #3200 class."""
+    assert not check_css_tokens.check()
+    planted = tmp_path / "dispatches.js"
+    planted.write_text(_JS_FIXTURE)
+    monkeypatch.setattr(check_css_tokens, "js_sources", lambda: [("site/assets/js/dispatches.js", planted)])
+    assert any("#abcdef" in f for f in check_css_tokens.check())
+    monkeypatch.undo()
+
+    planted_css = tmp_path / "tokens.css"
+    planted_css.write_text(_TOKENS_FIXTURE)
+    monkeypatch.setattr(check_css_tokens, "TOKENS", planted_css)
+    findings = check_css_tokens.check()
+    assert any("tokens.css" in f and "0.6rem" in f for f in findings), findings

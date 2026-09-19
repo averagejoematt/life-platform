@@ -19,6 +19,8 @@
   dismiss. Pure enhancement — if /api/methods can't load, every readout is untouched.
 */
 
+import { icon } from "./icons.js";
+
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 let _reg = null; // id -> registry entry (null until first load; {} if load failed)
@@ -139,7 +141,11 @@ export async function enhanceProvenance(root) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "prov-btn";
-    btn.innerHTML = '<span aria-hidden="true">&#9432;</span>';
+    // #3543: the sprite's info mark, not a U+24D8 text glyph. A text trigger is
+    // sized by the type scale and this one landed at 10.12px (0.92em of an 11px
+    // label) — under the §10.5 floor, and unreachable by any type fix short of
+    // making the trigger bigger than the label it sits on. An icon is geometry.
+    btn.innerHTML = icon("info", { size: "12px" });
     btn.setAttribute("aria-label", `How "${entry.name}" is computed`);
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("aria-expanded", "false");

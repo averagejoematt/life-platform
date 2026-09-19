@@ -21,6 +21,10 @@ const KNOWN = new Set([
   // utility / subscribe-flow state marks (#1473): incoming reading, confirmed
   // reading, signal-lost trace (also the 404 vocabulary).
   "mail", "check", "flatline",
+  // the provenance trigger (#3543): the ⓘ on a [data-method] stat used to be a
+  // literal U+24D8 text glyph — outside this vocabulary, and rendering at 10.12px
+  // (0.92em of an 11px label), under the §10.5 floor no matter how the label is sized.
+  "info",
   // outbound social marks (#1620): line-art redraws of the vendor brand marks
   // (DESIGN_SYSTEM_V5 §8) for the end-of-chronicle follow row. An id not in this set
   // renders "" silently, so these MUST match the <symbol id="i-…"> ids in icons.svg.

@@ -911,8 +911,10 @@ DERIVED_SHIPPED = {
     ".ndots-more": (
         "tokens.css",
         0.8,
-        ".ndots-more { font-size: 0.62rem; margin-left: 2px; }",
-        ".ndots-more { font-size: 0.62rem; margin-left: 2px; opacity: 0.8; }",
+        # #3543 re-pointed the anchor: the rule's 0.62rem (9.92px) was lifted to the
+        # 11px floor token. The control is about the OPACITY, not the size.
+        ".ndots-more { font-size: var(--fs-label); margin-left: 2px; }",
+        ".ndots-more { font-size: var(--fs-label); margin-left: 2px; opacity: 0.8; }",
         ["ember", "ink-faint", "ink-muted"],
         ALL_BLOCKS,
     ),
