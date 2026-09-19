@@ -137,6 +137,13 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         OWNER_CHAT_MCP,
         "MCP-only exercise-note classification against a fixed taxonomy allow-list — a label from a closed set, not prose, and not published.",
     ),
+    "mcp/tools_plan.py": _ex(
+        OWNER_CHAT_MCP,
+        "#3752 stage 2: the four debrief critics — each model reply is ONE JSON object {verdict, metric, value, field, to, sentence} parsed by "
+        "coach.critics.parse_model_verdict; the verdict is floored by the deterministic layer and a `metric` outside the packet is discarded, "
+        "so the model cannot introduce a number. The only free text is a single <=200-char sentence that lands in Matthew's own Hevy routine "
+        "notes and the training coach thread (owner-only surfaces, never rendered publicly).",
+    ),
     "lambdas/intelligence/intelligence_common.py": _ex(
         OWNER_CHAT_MCP,
         # THE ISSUE'S PREMISE CORRECTION — see test_extract_thread_is_guard_wrapped below.

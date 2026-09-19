@@ -297,9 +297,15 @@ def _resolver():
 
 
 def _workout_dates(start: str, end: str) -> list[str]:
-    from mcp.core import query_source
+    """Performed lifting days, read through `get_workouts` — the SAME tool a chat turn calls.
 
-    return sorted({(it.get("date") or "")[:10] for it in query_source("hevy", start, end, lean=True) or [] if it.get("date")})
+    Deliberately not a direct partition read: a new reader of a partition another module
+    writes is a new must-agree seam (#2847), and this module needs only the dates the
+    existing tool already normalises."""
+    from mcp.tools_hevy import tool_get_workouts
+
+    res = tool_get_workouts({"start_date": start, "end_date": end, "source": "hevy", "limit": 500}) or {}
+    return sorted({(w.get("date") or "")[:10] for w in res.get("workouts") or [] if w.get("date")})
 
 
 def _worst_anchor(evidence: dict[str, Any]) -> tuple[float | None, int | None]:

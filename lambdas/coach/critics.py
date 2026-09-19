@@ -625,6 +625,9 @@ def _prompt(packet: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
 def parse_model_verdict(resp: dict[str, Any]) -> dict[str, Any]:
     """The model's JSON object, or a named parse failure. Never a fabricated verdict."""
     if (resp or {}).get("stop_reason") == "max_tokens":
+        # No retry: MAX_TOKENS and the packet are fixed, so the truncation is deterministic and a
+        # retry bills again for the same cut. Recorded on the verdict; counted nowhere an operator
+        # reads — the #3828 residual class (registered in tests/test_judge_verdict_retry_3688.py).
         return {"error": f"truncated at max_tokens={MAX_TOKENS}"}
     text = "".join(p.get("text", "") for p in (resp or {}).get("content", []) if p.get("type") == "text").strip()
     a, b = text.find("{"), text.rfind("}")
