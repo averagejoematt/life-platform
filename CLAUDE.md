@@ -211,37 +211,29 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-18 (Opus 5, **Session AJ — the gate that reads the comment, and the lease I left waiting**;
-owner brief *"close issues on demonstrated evidence, as many as honestly possible"*, autonomous all-day, standing
-merge+deploy authority, **no `--deliver`**, target 117 -> 100-104). **117 -> 112 open, FINAL and measured two ways at 19:5xZ
-(search `total_count` AND a paginated id-set, agreeing): 7 closed on live proof (3506 3514 3659 3663 3785 3848
-3853), 3 filed (3877, 3878, plus the auto-filed wedge row 3876), 6 PRs merged, 4 production deploys plus one
-`cdk deploy` covering LifePlatformOperational and LifePlatformMonitoring. The 110 measured at 17:0xZ predated the
-last two filings; 66 -> 61 addressable is that same instant.** Short of target, and the
-reason is structural rather than a knowledge gap: roughly a third of the window went to background CI waits I did
-not overlap with work. **The session's own worst finding is about itself — I left a production-approval lease
-WAITING 12.5h.** Two superseded ancestors were rejected correctly and the TIP was never disposed; run 35301189491
-sat at the gate from 02:54Z while the `ci-cd-deploy-<ref>` concurrency group evicted every following merge's run,
-so six merged PRs sat undeployed and `Deploy wedge watch` went red every ten minutes into a log nobody read. The
-rule says *approve the tip, reject ancestors by name, never leave one waiting*; I did two of the three halves, and
-the wording has no case for what happened — **the tip's own run had been evicted, so there was no lease to approve
-and a fresh `workflow_dispatch` was needed.** Incident row filed. **The through-line in the technical work is that
-an instrument read the prose explaining it, four times in one night.** `gate_census` enumerates through git's
-TRACKED-file listing, so "measure the census after the tree is complete" is insufficient — it must be after the
-tree is complete **and committed**; I measured a finished tree, got a clean 17-passed, and CI contradicted it the
-moment `agent_commit.sh` tracked the new file. Two independent agent lanes hit the identical hole. Then my own
-ceiling COMMENT, containing the literal phrase `git ls-files`, made `premerge_derivation._SWEEP_PATTERN` classify
-that test file as a tree-sweeping gate — and my first measurement of that Set was WRONG (a tokenize round-trip
-split `.rglob(` apart and reported 82 false members; the true count is 1, mine). Three more were registry-shaped
-names expanded entry-by-entry into phantom verdict-less gates. **Three issues' own text was out of date and the
-work says so on the record:** 3785's cause was `site-deploy.yml`'s own config-twin step, not an ad-hoc `aws s3 cp`
-(the Site-deploy run started 17:46:03Z, the stale copy landed 17:47:58Z, three clobbers matching to the second and
-two non-clobbering deploys as the control); 3514's 26 tombstoned rows no longer exist and its count is 22; 3669's
-Set is 67 of 83 live `SOURCE#` families, not 4. **3552 was triaged and deliberately NOT closed** — its box 3 asks
-for a regeneration that would rewrite a PUBLISHED, hash-sealed pre-registration 12 days into the cycle it
-pre-registers (`curl … | shasum` matches the stamp byte for byte), so acting on the plan would have been the
-defect. **Owner acts:** the 8 `gate:owner` questions posted at 00:5xZ with recommended defaults (3716 3717 3750
-3753 3755 3761 3770 3771 — the last open children of five epics, 13 closures for near-zero engineering) · 3571's
-one-sentence `dropbox` ruling · the 5 standing `acceptance_count` violations (3607 3611 3615 3617 3621) still need
-splitting, not trimming. **Final measured: 112 open.**
-
+**Verified:** 2026-09-19 (Opus 5, **Session AK — three issues the plan said were one box from done, and none of them was**;
+owner brief *"close issues on demonstrated evidence"*, autonomous, standing merge+deploy authority, **no `--deliver`**,
+target 112 -> 100-104). **112 -> 105 open, measured two ways (search `total_count` AND a paginated id-set, agreeing):
+7 closed on live proof (3511 3604 3669 3792 3829 3835 3878), 0 filed, 10 PRs merged, 6 production deploys (site-api direct, two
+successful `site-deploy`s, three approved fleet deploys), 7 superseded leases REJECTED by name and 3 approved.** Short of target, and the reason is the finding rather than a shortfall of work. **The plan's premise — that
+the ranker scores stale bodies — is true and produced two of the five closures. What it missed is that the correction
+runs BOTH ways.** Three issues sized as one box from done were not: **3614**'s box 2 wants a `check_backlog_hygiene`
+rule that does not exist anywhere; **3670**'s box 4, read literally, contradicts an owner ruling recorded verbatim on
+3671 (*N answers "Pull #3 of Foundation" even where Foundation spans two cycles*) — implemented by the lane, flagged as
+a reviewer decision, reverted on my ruling; **3599**'s box 2 is unpaid on main. All three lanes' work merged; none of
+the three issues could honestly close. **The session's sharpest technical finding is not its own:** a planted mutation
+reported GREEN because `100.0 -> 400.0` is byte-length preserving and CPython validates a cached `.pyc` on
+`(mtime, size)` — so an md5 on the SOURCE proves the file changed, never that the code under test did. That now lives in
+`scripts/gate_census_mutations.py`'s docstring where mutation authors read it. **Two live defects were bigger than
+their issues said:** the 11px type-floor pair had been **auto-rolling-back every site deploy since 09-16** (the #3652
+scope check working exactly as designed), and it reverted this session's own renderer fix mid-flight — the ledger page
+came back reading `sealed 6` where the fix's own mutation control predicted 6; and #3511 box 4 was satisfied in full
+while a reader could reach **zero** sealed rows, because a pre-registered bet is dated at genesis and every newest-first
+slice drops it first. **Filed member counts in the provenance family are systematically low:** 3669 filed 4 and
+measures 67 of 83; 3513 filed 6 and measures 109; 3877 filed 9 and is 10, growing daily. **A text matcher read my own
+prose four more times** — including the note I wrote explaining the first false positive, which reproduced the trigger
+phrase; closure sweep ends at 0 findings. **Owner acts:** the 8 `gate:owner` questions (3716 3717 3750 3753 3755 3761
+3770 3771) remain unanswered since 09-18T00:59Z and are still ~13 closures for near-zero engineering · 3670 box 4's
+N-counter wording vs 3671's ruling (NEW) · 3571's `dropbox` ruling · 3563's `logs:FilterLogEvents` grant · 3601's
+reset-cadence ruling · the 5 standing `acceptance_count` violations (3607 3611 3615 3617 3621), which need splitting.
+**Final measured: 105 open.**
