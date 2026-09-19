@@ -752,7 +752,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .rt-fill.rt-ink { background: var(--ink-muted); }
 .rt-v { white-space: nowrap; color: var(--ember); }
 .rt-v.rt-na { color: var(--ink-faint); }
-.rt-flag { grid-column: 3; color: var(--ink-faint); font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+/* #3878: was a hand-typed 0.66rem = 10.56px, below the §10.5 11px floor the design
+   system sets for itself, and the visual gate reported it on /data/ at both widths.
+   --fs-label IS that floor (0.6875rem = 11px), so this is the scale step this label
+   always meant rather than a value nudged until the gate went quiet. */
+.rt-flag { grid-column: 3; color: var(--ink-faint); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: var(--tracking-label); }
 /* #1410 — the Ghost: observed (chart-line) vs counterfactual (dashed muted) with the
    served, honestly-widening 95% band. Same band vocabulary as the projection cone. */
 .gh-fig { margin: var(--sp-2) 0 0; }
@@ -1068,7 +1072,18 @@ a.vg-lit:hover { background: var(--ember-wash); }
   width: var(--spine-width); border-right: var(--spine-border); background: var(--spine-ticks);
   display: flex; flex-direction: column; justify-content: space-between; padding: 2px 5px 2px 0;
   text-align: right; }
-.chart-spine-v { color: var(--ink-faint); font-size: 0.6rem; line-height: 1; }
+/* #3878: was 0.6rem = 9.6px. The value this renders is Matthew's current weight on
+   the home loop dial — one of the first numbers a reader sees — and it was the
+   smallest type on the site. Raised to the --fs-label floor.
+   THE SPINE IS NOT WIDENED, and that was checked rather than assumed: box 1 asks for
+   ">= 11px with the weight value still fitting its spine", and IBM Plex Mono's advance
+   made 8 characters at 11px look like ~53px against a 46px rail on paper. Measured in a
+   real render instead (live page, working-tree tokens.css injected, chromium at 1280px
+   and 390px): the element is 40px wide with scrollWidth == clientWidth inside a 45px
+   parent content box, at both widths. The comparison is element-rect vs PARENT
+   clientWidth, not a page-level overflow read, because a child escaping a non-scrolling
+   parent leaves the page's own scrollWidth at 0 (#3734). */
+.chart-spine-v { color: var(--ink-faint); font-size: var(--fs-label); line-height: 1; }
 /* Serif "what this means" annotation under a chart (SIGNATURE 2 human voice). */
 .nut-anno { margin-top: var(--sp-3); }
 /* Designed "coming online" empty state (P1.3 hunger/energy, §8 CGM) — honest, flagged. */
