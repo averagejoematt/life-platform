@@ -93,6 +93,22 @@ def _email_base(
     return stmts
 
 
+def _experiment_cycle_read() -> iam.PolicyStatement:
+    """#3599/#3513: ssm:GetParameter on experiment-cycle, the single parameter and nothing
+    wider. `content.insight_writer` (and the inbound insight parser) now stamp every INSIGHT#
+    row through `phase_taxonomy.experiment_stamp_for`, whose post-genesis fallback reads the
+    cycle from SSM via `coach_checkin.read_cycle()`. Every handler that bundles the writer
+    reaches that channel; `tests/test_grant_enumeration_drift.py` enumerates them from the
+    import closure. Without this grant the read AccessDenies inside a fail-soft `except` and
+    the row lands with no cycle — a silent provenance defect, never a failed write. Same
+    action + resource the coach-nudge role's `SSMRead` carries for its NUDGE# stamp."""
+    return iam.PolicyStatement(
+        sid="ExperimentCycleRead",
+        actions=["ssm:GetParameter"],
+        resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+    )
+
+
 def email_daily_brief() -> list[iam.PolicyStatement]:
     """Daily brief: DDB read, S3 config, ai-keys, SES, writes dashboard/ + buddy/ + site/ to S3.
     Risk-7: also emits ComputePipelineStaleness metric to CloudWatch.
@@ -154,19 +170,20 @@ def email_weekly_digest() -> list[iam.PolicyStatement]:
                 actions=["s3:ListBucket"],
                 resources=[BUCKET_ARN],
                 conditions={"StringLike": {"s3:prefix": ["mcp-audit/*"]}},
-            )
+            ),
+            _experiment_cycle_read(),  # #3599: bundles content.insight_writer
         ],
     )
 
 
 def email_monthly_digest() -> list[iam.PolicyStatement]:
-    """Monthly digest: DDB read, S3 config, ai-keys, SES."""
-    return _email_base()
+    """Monthly digest: DDB read, S3 config, ai-keys, SES, + experiment-cycle (#3599, insight_writer stamp)."""
+    return _email_base(extra_statements=[_experiment_cycle_read()])
 
 
 def email_nutrition_review() -> list[iam.PolicyStatement]:
-    """Nutrition review: DDB read, S3 config, ai-keys, SES."""
-    return _email_base()
+    """Nutrition review: DDB read, S3 config, ai-keys, SES, + experiment-cycle (#3599, insight_writer stamp)."""
+    return _email_base(extra_statements=[_experiment_cycle_read()])
 
 
 def email_milestone_digest() -> list[iam.PolicyStatement]:
@@ -279,13 +296,14 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
             ),
             # #2669: the timeout watchdog emits ChronicleTimeoutImminent.
             iam.PolicyStatement(sid="TimeoutWatchdogMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+            _experiment_cycle_read(),  # #3599: bundles content.insight_writer
         ],
     )
 
 
 def email_weekly_plate() -> list[iam.PolicyStatement]:
-    """Weekly Plate: DDB read, S3 config, ai-keys, SES."""
-    return _email_base()
+    """Weekly Plate: DDB read, S3 config, ai-keys, SES, + experiment-cycle (#3599, insight_writer stamp)."""
+    return _email_base(extra_statements=[_experiment_cycle_read()])
 
 
 def email_monday_compass() -> list[iam.PolicyStatement]:
@@ -297,7 +315,7 @@ def email_monday_compass() -> list[iam.PolicyStatement]:
     to the honest-unavailable state rather than erroring, but the fix wouldn't
     actually take effect without this).
     """
-    return _email_base(extra_secrets=["life-platform/todoist"])
+    return _email_base(extra_secrets=["life-platform/todoist"], extra_statements=[_experiment_cycle_read()])  # #3599: insight_writer stamp
 
 
 def email_ai_review_pack() -> list[iam.PolicyStatement]:
