@@ -293,6 +293,22 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
 # revival if Hevy ever ships webhooks.
 
 
+def _experiment_cycle_read() -> iam.PolicyStatement:
+    """#3599/#3513: ssm:GetParameter on experiment-cycle, the single parameter and nothing
+    wider. `content.insight_writer` (and the inbound insight parser) now stamp every INSIGHT#
+    row through `phase_taxonomy.experiment_stamp_for`, whose post-genesis fallback reads the
+    cycle from SSM via `coach_checkin.read_cycle()`. Every handler that bundles the writer
+    reaches that channel; `tests/test_grant_enumeration_drift.py` enumerates them from the
+    import closure. Without this grant the read AccessDenies inside a fail-soft `except` and
+    the row lands with no cycle — a silent provenance defect, never a failed write. Same
+    action + resource the coach-nudge role's `SSMRead` carries for its NUDGE# stamp."""
+    return iam.PolicyStatement(
+        sid="ExperimentCycleRead",
+        actions=["ssm:GetParameter"],
+        resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+    )
+
+
 def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
     """Hevy scheduled events-cursor backfill Lambda.
 
@@ -306,9 +322,12 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
     `degraded: true`, and the derived note layer was dark from the day it shipped: the
     monthly-usage counter (`training_notes#USAGE / MONTH#...`) — bumped only AFTER a
     successful call — had no item for ANY month, while `get_freshness_status` reported
-    `extractor_dark: true` with 15/15 records degraded. No SSM grant is needed alongside
-    it: `budget_guard.current_tier()` fails open to tier 0 when the parameter is
+    `extractor_dark: true` with 15/15 records degraded. No budget-tier SSM grant is needed
+    alongside it: `budget_guard.current_tier()` fails open to tier 0 when the parameter is
     unreadable, and the hard stop at tier 3 is enforced inside `bedrock_client.invoke`.
+
+    #3599: + experiment-cycle (and ONLY that parameter) — this handler bundles
+    `content.insight_writer`, whose write-time stamp falls back to the SSM cycle read.
     """
     return _ingestion_base(
         "hevy",
@@ -319,7 +338,10 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
         # previous copy (to refuse a shrink that would mean a partial walk) and writes the new one.
         extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json", "config/hevy_template_index.json"],
         extra_s3_write=["config/hevy_template_index.json"],
-    ) + [_bedrock_statement()]
+    ) + [
+        _bedrock_statement(),
+        _experiment_cycle_read(),
+    ]  # #3599: bundles content.insight_writer (the stamp's SSM fallback)
 
 
 # ingestion_macrofactor_puller() removed 2026-05-25 — see ADR-061. MF Tier 1

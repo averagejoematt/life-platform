@@ -861,79 +861,60 @@ def check_canary_precision():
 
 
 # ---------------------------------------------------------------------------
-# CHECK — #1970 phase-stamp coverage on the tagger-blind COACH#/ENSEMBLE# partitions
+# CHECK — #1970/#3599 phase-stamp coverage over every EXPERIMENT_SCOPED row family
 # ---------------------------------------------------------------------------
 
-# ENSEMBLE#influence_graph is deliberately excluded — SYSTEM_STATE static config
+# The INVERSE leg's Set (a CROSS_PHASE row carrying provenance its class forbids) and the
+# visible-exclusion count stay on the COACH#/ENSEMBLE# partitions this check has always
+# audited — see `pk_census.scoped_stamp_audit` for why that alarmed leg is not widened
+# here. ENSEMBLE#influence_graph is deliberately absent — SYSTEM_STATE static config
 # (phase_taxonomy._PK_RULES), never an EXPERIMENT_SCOPED write, never phase-stamped.
 _PHASE_STAMP_ENSEMBLE_PKS = ("ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "ENSEMBLE#docket")
 
 
 def check_coach_ensemble_phase_stamp_coverage():
-    """#1970: every EXPERIMENT_SCOPED row on the tagger-blind COACH#*/ENSEMBLE#*
-    partitions should carry a write-time phase attribute (#1233,
-    experiment.phase_taxonomy.experiment_stamp). restart_phase_tag.py (the
-    reset-time tagger) only reaches USER#matthew#SOURCE#* pks, never
-    COACH#*/ENSEMBLE#*, and PHASE_FILTER_EXPRESSION (phase_filter.py) admits
-    attribute_not_exists(phase) forever — so such a row survives every read filter
-    and leaks into the next reset cycle as if freshly current.
+    """#1970 → #3599 box 2: every EXPERIMENT_SCOPED row, on EVERY family, must carry a
+    write-time `phase` attribute. Its id is unchanged (docs/alarm_citations.json cites it),
+    its scope is not: it used to walk a hand list of COACH#*/ENSEMBLE#* pks — the
+    tagger-blind partitions, where restart_phase_tag.py never reaches — and so could not
+    see `USER#matthew#SOURCE#insights`, which sat at 109 unstamped rows (#3513) while this
+    check reported the coach partitions clean.
 
-    #2520: counting EVERY unstamped row became wrong when ADR-153 put the texting
-    relationship (CROSS_PHASE CHAT#/CHAT#summary#/RELATIONSHIP#) and Telegram
-    DEDUPE# rows (SYSTEM_STATE) on the same COACH#<id> partitions, where unstamped
-    is CORRECT: the count grew with every text Matthew sent a coach, could never
-    reach zero (a standing #2379 saturation feeder), and its remediation line told
-    the operator to run a backfill that would have marked his conversation history
-    for the next reset wipe. Now derived via should_phase_stamp(), so a new sk class
-    is classified rather than assumed and an unclassifiable row raises into the
-    errored branch — which, like the all-clear, emits NO --apply remediation.
+    WHY ROWS AND NOT WRITERS: the AST guard over `put_item` call sites
+    (tests/test_coach_ensemble_writer_phase_stamp_guard_2119.py) sees 7 of 154 writers,
+    because a pk built at runtime is invisible to it. The row is not. Every family comes
+    from `experiment.pk_census` (one full scan, pk+sk+provenance; ~$0.001/run, the same
+    RCU as the totality census above) and every class from `phase_taxonomy.classify()`, so
+    a new scoped family — or a new writer to an old one — is audited the night it appears.
+    An unstamped scoped row is served as CURRENT by PHASE_FILTER_EXPRESSION
+    (`attribute_not_exists(phase)`) until it is stamped; on a tagger-blind partition that
+    is forever, on a tagger-reachable one it is until the next reset, and a pre-genesis
+    row in the countdown window is served as this cycle's either way (#3598/#3513).
 
-    Read-only: a paginated Query per known pk (no Scan). WARN, not FAIL — a known,
-    low-severity gap with its own reviewed, dry-run-by-default operator tool."""
+    #2520: the derivation is should_phase_stamp() via classify(), so an unstamped
+    CROSS_PHASE / SYSTEM_STATE row (the ADR-153 conversation history, DEDUPE#) is the
+    CORRECT state and never a finding; on the COACH#/ENSEMBLE# set those are counted and
+    named as excluded rather than silently dropped.
+
+    Read-only. WARN, not FAIL — the missing-stamp leg is chronic (#2378: a known gap with
+    its own dry-run-by-default operator tool); the inverse leg and the errored branch
+    (including an EMPTY scan — the vacuous-scan trap) stay on the alarmed side."""
     from coach.persona_registry import OPERATIONAL_COACH_IDS
-    from experiment.phase_taxonomy import PROVENANCE_ATTRS, forbidden_provenance, should_phase_stamp
+    from experiment.phase_taxonomy import PROVENANCE_ATTRS
+    from experiment.pk_census import scan_provenance_pages, scoped_stamp_audit
 
     c = Check("data:coach_ensemble_phase_stamp_coverage", "Phase Stamping", CONTENT_TRUTH)
-    pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
-    unstamped = []
-    wrongly_stamped = []
-    by_design = 0
+    inverse_pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
     try:
-        for pk in pks:
-            lek = None
-            while True:
-                # #3514: ONE unfiltered pass per partition, projected to the key plus the
-                # provenance attributes, answering BOTH directions. It replaced a
-                # FilterExpression pass that cost the same read units (a DynamoDB filter is
-                # applied AFTER the read) and could only ever see the missing-stamp half —
-                # so the inverse defect, a stamp on a row whose class forbids one, was
-                # invisible to the instrument built to audit stamping.
-                kw = {
-                    "KeyConditionExpression": Key("pk").eq(pk),
-                    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb",
-                    "ExpressionAttributeNames": {"#phase": "phase", "#cycle": "cycle", "#tomb": "tombstone"},
-                }
-                if lek:
-                    kw["ExclusiveStartKey"] = lek
-                resp = table.query(**kw)
-                for it in resp.get("Items", []):
-                    sk = str(it.get("sk", ""))
-                    bad = forbidden_provenance(pk, sk, it)
-                    if bad:
-                        wrongly_stamped.append(f"{pk}/{sk}[{'+'.join(bad)}]")
-                    if it.get("phase") is not None:
-                        continue  # stamped; the missing-stamp leg has nothing to say about it
-                    if should_phase_stamp(pk, sk):
-                        unstamped.append(f"{pk}/{sk}")
-                    else:
-                        by_design += 1  # cross-phase / system-state: unstamped IS the correct state
-                lek = resp.get("LastEvaluatedKey")
-                if not lek:
-                    break
+        audit = scoped_stamp_audit(scan_provenance_pages(table), inverse_pks=inverse_pks)
     except Exception as e:
         return [c.warn(f"phase-stamp coverage check errored: {e}")]
 
+    by_design = audit["by_design"]
+    n_families = len(audit["families_audited"])
     protected = f" {by_design} cross-phase/system-state row(s) are correctly unstamped and excluded." if by_design else ""
+    unresolved = f" {audit['unclassified']} row(s) unclassifiable — the pk-family census rules on those." if audit["unclassified"] else ""
+    wrongly_stamped = audit["wrongly_stamped"]
     if wrongly_stamped:
         # The INVERSE defect (#3514 DA-6), reported FIRST because it is the damaging one:
         # an unstamped scoped row is invisible-as-current, a stamped CROSS_PHASE row is
@@ -950,20 +931,33 @@ def check_coach_ensemble_phase_stamp_coverage():
                 "belonging to a single cycle. Remediate with deploy/reconcile_provenance_2026_09.py --only 3514."
             )
         ]
+    unstamped = audit["unstamped"]
     if unstamped:
-        sample = ", ".join(unstamped[:5])
-        more = f" (+{len(unstamped) - 5} more)" if len(unstamped) > 5 else ""
-        # #2378: chronic — awaiting the #1970 backfill; errored branch above stays ALARMED.
+        total = sum(len(v) for v in unstamped.values())
+        by_size = sorted(unstamped.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        fam_summary = ", ".join(f"{fam} {len(rows)}" for fam, rows in by_size[:6])
+        fam_more = f" (+{len(by_size) - 6} more families)" if len(by_size) > 6 else ""
+        flat = [r for _, rows in by_size for r in rows]
+        sample = ", ".join(flat[:5])
+        more = f" (+{len(flat) - 5} more)" if len(flat) > 5 else ""
+        # #2378: chronic — a known gap with its own operator tool; errored branch above stays ALARMED.
         # The --apply line is emitted ONLY here, where every listed row is safe to stamp.
         return [
             c.warn(
-                f"{len(unstamped)} row(s) on tagger-blind COACH#/ENSEMBLE# partitions are experiment-scoped but carry "
-                f"no phase attribute (#1970) — survives PHASE_FILTER_EXPRESSION forever until backfilled: {sample}"
-                f"{more}. Run deploy/backfill_coach_ensemble_phase_stamps.py --apply.{protected}",
+                f"{total} row(s) across {len(unstamped)} of {n_families} EXPERIMENT_SCOPED pk families are "
+                f"experiment-scoped but carry no phase attribute (#1970/#3599) — served as current by "
+                f"PHASE_FILTER_EXPRESSION until stamped: {fam_summary}{fam_more}; e.g. {sample}{more}. "
+                "Run deploy/backfill_coach_ensemble_phase_stamps.py --apply for the COACH#/ENSEMBLE#/SOURCE#insights "
+                f"families it covers; any other family named here is a writer with no write-time stamp.{protected}{unresolved}",
                 chronic=True,
             )
         ]
-    return [c.ok(f"all stampable rows across {len(pks)} tagger-blind COACH#/ENSEMBLE# partitions carry a phase stamp.{protected}")]
+    return [
+        c.ok(
+            f"all stampable rows across {n_families} EXPERIMENT_SCOPED pk families ({audit['rows']} rows scanned) "
+            f"carry a phase stamp.{protected}{unresolved}"
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
