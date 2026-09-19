@@ -211,29 +211,26 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-19 (Opus 5, **Session AK — three issues the plan said were one box from done, and none of them was**;
-owner brief *"close issues on demonstrated evidence"*, autonomous, standing merge+deploy authority, **no `--deliver`**,
-target 112 -> 100-104). **112 -> 105 open, measured two ways (search `total_count` AND a paginated id-set, agreeing):
-7 closed on live proof (3511 3604 3669 3792 3829 3835 3878), 0 filed, 10 PRs merged, 6 production deploys (site-api direct, two
-successful `site-deploy`s, three approved fleet deploys), 7 superseded leases REJECTED by name and 3 approved.** Short of target, and the reason is the finding rather than a shortfall of work. **The plan's premise — that
-the ranker scores stale bodies — is true and produced two of the five closures. What it missed is that the correction
-runs BOTH ways.** Three issues sized as one box from done were not: **3614**'s box 2 wants a `check_backlog_hygiene`
-rule that does not exist anywhere; **3670**'s box 4, read literally, contradicts an owner ruling recorded verbatim on
-3671 (*N answers "Pull #3 of Foundation" even where Foundation spans two cycles*) — implemented by the lane, flagged as
-a reviewer decision, reverted on my ruling; **3599**'s box 2 is unpaid on main. All three lanes' work merged; none of
-the three issues could honestly close. **The session's sharpest technical finding is not its own:** a planted mutation
-reported GREEN because `100.0 -> 400.0` is byte-length preserving and CPython validates a cached `.pyc` on
-`(mtime, size)` — so an md5 on the SOURCE proves the file changed, never that the code under test did. That now lives in
-`scripts/gate_census_mutations.py`'s docstring where mutation authors read it. **Two live defects were bigger than
-their issues said:** the 11px type-floor pair had been **auto-rolling-back every site deploy since 09-16** (the #3652
-scope check working exactly as designed), and it reverted this session's own renderer fix mid-flight — the ledger page
-came back reading `sealed 6` where the fix's own mutation control predicted 6; and #3511 box 4 was satisfied in full
-while a reader could reach **zero** sealed rows, because a pre-registered bet is dated at genesis and every newest-first
-slice drops it first. **Filed member counts in the provenance family are systematically low:** 3669 filed 4 and
-measures 67 of 83; 3513 filed 6 and measures 109; 3877 filed 9 and is 10, growing daily. **A text matcher read my own
-prose four more times** — including the note I wrote explaining the first false positive, which reproduced the trigger
-phrase; closure sweep ends at 0 findings. **Owner acts:** the 8 `gate:owner` questions (3716 3717 3750 3753 3755 3761
-3770 3771) remain unanswered since 09-18T00:59Z and are still ~13 closures for near-zero engineering · 3670 box 4's
-N-counter wording vs 3671's ruling (NEW) · 3571's `dropbox` ruling · 3563's `logs:FilterLogEvents` grant · 3601's
-reset-cadence ruling · the 5 standing `acceptance_count` violations (3607 3611 3615 3617 3621), which need splitting.
-**Final measured: 105 open.**
+**Verified:** 2026-09-19 (Fable 5.1, **Session AL — the Fable drain: 24 closed, 10 filed, and the two reds the merge posture bought**;
+owner brief *"drive the DEBT COUNT as low as it honestly goes"*, autonomous, standing merge+deploy authority incl. CDK, auto-merge on the two
+REQUIRED checks only, deploy via `deploy_fleet.sh`, reject every lease, **no `--deliver`**, target 84 → 60–65 honest / 40 stretch).
+**105 → 91 open, measured two ways (search `total_count` AND a paginated id-set, agreeing): 24 closed (9 on the owner's in-session
+answers to the §2 sheet, 15 on engineering evidence), 10 filed (2 lane finds + 8 residuals), 21 PRs merged, 3 fleet deploys (106/106 each,
+verified by shipped content), 4 MCP deploys, four stacks redeployed by hand via `cdk_deploy.sh`, 1 auto site-deploy green, 15 leases REJECTED by name, 0 approved.**
+Debt count 84 → 75; Roadmap 21 → 16. **The through-line:** auto-merge on the required lane let 21 PRs land in 8h, and the full suite,
+running post-merge, caught what the lane could not — twice (F's tests keyed on the CI EVENT passed under `pull_request` and failed on
+main's `push`; H's new module tripped a full-suite-only ratchet) — both fixed forward by their lanes; nine of fourteen engineering
+closures needed a second CI round the lane's targeted tests could not see. **Findings:** the widened phase-stamp audit's first nightly
+found 194 unstamped rows / 17 families — 35 on 4 tagger-BLIND families are real (#3900), 159 are tagger-reachable in-cycle rows the reset
+stamps anyway, so #3901 split the chronic leg by tagger reach (a gate nobody can clear is the #3851 class) · three boxes were
+unsatisfiable as written and recorded rather than look-alike-paid (3654 box 4: every injectable failure is one the scope check DECLINES;
+3646 box 2: the system-model gate is a second bot-owned artifact; 3620 box 1: deploy/ is never bundled) · the fullreview-delta was
+INVALID by the rubric's own two tests (896-file surface; #3904 rewrote the instrument) → dated hold to 2026-09-26 (#3910), next run a
+NEW BASELINE · a `backfill_training_notes.py --apply` without `--since` walked the whole corpus and created the ~515 absent notes #3918
+had reserved for an owner call — my omission, recorded on the issue · 3717's 09-18 question was stale (the record was active since 09-08;
+today's statement EXTENDED it to 2021-04-12 → 2026-09-19) · `agent_commit.sh` silently reverts `platform_counts.py` even when the branch
+legitimately carries the sync output · filed member counts were low again in both directions (3513: 6 → 120; 3543: 8 → 10 pages; 3620:
+2 → 6 doors; 3677: 1 fix → 0). **Owner acts:** 3770 · 1738 · 1571 (left open on today's answers) · 3654 box 4 (a `site-shell` injection
+lever or an attended rollback run) · 3918's key collision · 3741 (0 posted; a parallel posting-session prompt was handed over) · the 5
+`acceptance_count` violations (3607 3611 3615 3617 3621). **Open at wrap:** #3908 (lane G, 3608 — all five boxes on the branch, paying a
+1114-line overrun by extraction). **Final measured: 91 open.**
