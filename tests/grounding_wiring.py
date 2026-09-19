@@ -623,3 +623,579 @@ def scan_tree(repo=REPO):
                 found.setdefault(key, set())
                 found[key] |= classes
     return found
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #3614 — the THIRD facet: audience + fail mode, per surface, AST-checked
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# WHY. Until this block the key union across all 32 entries was exactly
+# {required, exempt}: which gate CLASSES a surface arms, and why not. The thing
+# the aiq anchor actually asks for — "the audience-correct fail mode (fail-closed
+# public, keep-best internal)" — was enforced by convention everywhere, and
+# `lambdas/ai/grounded_generation.py` says so in as many words ("the caller's
+# choice"). Convention is what #1967 replaced for the class list; this replaces it
+# for the disposition.
+#
+# THE TWO FACETS.
+#   audience   — PUBLIC iff the gated text, or a condensation/quotation of it, can
+#                reach a reader who is not Matthew, INCLUDING by being quoted into a
+#                prompt that generates reader text. That last clause is why the coach
+#                COMPRESSED#latest writer is public: it is never served verbatim, and
+#                it is replayed into board-answer prompts.
+#   fail_mode  — FAIL_CLOSED iff the disposition site branches on the findings and
+#                drops / falls back / holds. KEEP_BEST iff the text ships anyway and
+#                the findings are at most logged or recorded as metadata.
+#
+# WHAT THE AST PROVES, AND WHAT IT DOES NOT. Each entry names its DISPOSITION —
+# "<function>@<token>", or "<module>::<function>@<token>" when the decision is taken
+# in another module — and `disposition_evidence()` reads that function: the token
+# must be real there, and the function must (fail_closed) or must not (keep_best)
+# ACT on it. "Act" is deliberately narrow and structural: an `if` on the token whose
+# branch returns / continues / breaks / raises / rebinds, a `return X if token else Y`,
+# or a predicate return (`return not findings`). A mention inside a log call, an
+# f-string or a `len()` is NOT an act — that is precisely the keep-best shape.
+# What this does NOT prove is data provenance: it does not follow the findings value
+# across the wire into the disposition function (`coach_quality_gate` hands its report
+# to a separate Lambda's caller, and the review-pack auditors have no draft at all).
+# Provenance is what the written reason carries; the AST carries the disposition.
+#
+# THE CONTROL. Flipping one public surface from fail_closed to keep_best reds the
+# facet test two ways — the AST still finds the hold branch, and the public keep-best
+# residual set below gains a member it does not name. Both directions are exercised
+# on a COPY of the registry in tests/test_grounding_sets_3614.py, so the control runs
+# on every build rather than once in a session.
+
+PUBLIC = "public"
+INTERNAL = "internal"
+AUDIENCES = frozenset({PUBLIC, INTERNAL})
+
+FAIL_CLOSED = "fail_closed"
+KEEP_BEST = "keep_best"
+FAIL_MODES = frozenset({FAIL_CLOSED, KEEP_BEST})
+
+FACET_KEYS = ("audience", "fail_mode", "disposition", "facet_reason")
+
+# The one disposition that is not a call site: a post-hoc AUDITOR re-grades text that
+# was published long ago, so there is no draft to hold and no generation to fall back
+# to — the finding becomes an advisory flag beside an entry that ships either way. Only
+# a surface whose gate-class exemptions already cite the measured `_AUDITOR` reason may
+# use it (asserted, so this cannot become a way to dodge the AST check).
+AUDITOR_NO_DRAFT = "auditor:no-draft-to-dispose"
+
+# The measured residual, pinned by NAME (#3614). A public surface SHOULD be fail-closed;
+# these three are not, and each is a recorded decision rather than an oversight. A fourth
+# public keep-best surface reds `test_public_keep_best_residual_is_pinned` — which is the
+# flip control's second edge.
+PUBLIC_KEEP_BEST_RESIDUAL = frozenset(
+    {
+        "lambdas/ai/ai_calls.py::_run_coach_v2_pipeline",
+        "lambdas/coach/inter_coach_dialogue_lambda.py::generate_gated_turn",
+        "lambdas/emails/chronicle_prompt.py::installment_grounding_findings",
+    }
+)
+
+
+def _facet(audience, fail_mode, disposition, reason):
+    return {"audience": audience, "fail_mode": fail_mode, "disposition": disposition, "facet_reason": reason}
+
+
+SURFACE_FACETS = {
+    "lambdas/ai/ai_calls.py::_ground_legacy_output": _facet(
+        INTERNAL,
+        KEEP_BEST,
+        "_ground_legacy_output@_left",
+        "The four legacy daily-brief narratives go to ONE address — daily_brief_lambda's EMAIL_RECIPIENT, Matthew — and are "
+        "never published; the archived copy feeds the Sunday review pack, itself internal. Keep-best by construction: "
+        "`regen_once` returns the better of the two drafts and the residual `_left` is only printed, so a finding costs a log "
+        "line rather than blanking his brief. Correct for an internal surface, and it is why the coach-brief archive carries "
+        "the findings in meta for the review pack to flag later.",
+    ),
+    "lambdas/ai/ai_calls.py::_run_coach_v2_pipeline": _facet(
+        PUBLIC,
+        KEEP_BEST,
+        "_run_coach_v2_pipeline@_left",
+        "The coach narrative IS reader text — it is written to OUTPUT# and served by the coach pages and /api/coach_*. This "
+        "step is nevertheless keep-best at its own call site: `regen_once` keeps the better draft and nothing branches on "
+        "`_left`. The fail-closed half of this pipeline is one step later, in a SEPARATE registered surface — "
+        "coach_quality_gate::_number_grounding_report, whose deterministic verdict sets passed=False and makes this function "
+        "return CoachHold. Recorded rather than smoothed over: this is one of the three public keep-best surfaces, and the "
+        "composite is fail-closed only because that other surface is.",
+    ),
+    "lambdas/coach/coach_chat_grounding.py::build_grounder": _facet(
+        INTERNAL,
+        FAIL_CLOSED,
+        "lambdas/coach/coach_chat.py::run_turn@findings",
+        "The chat is Matthew's own conversation with a coach (Telegram and his own clients); nothing under lambdas/web reads "
+        "the CHAT# partition. It is held to the public bar anyway, for the reason this entry's gate-class block already "
+        "gives — in a chat HE chooses the subject, so the surface cannot predict its own topic. `run_turn` returns the reply "
+        "only when `findings` is empty, retries once with the offending claim named, then returns the held reply, which is "
+        "stored so the deferral stays on the record.",
+    ),
+    "lambdas/coach/coach_ensemble_digest.py::_still_grounded": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_still_grounded@findings",
+        "It re-grades a STORED digest against today's inputs before republication, and the digest is reader text "
+        "(site_api_coach_stance reads ENSEMBLE#digest; the Friday Panel quotes it). Check-only and fail-closed: `return not "
+        "findings` is the entire disposition — a surviving finding denies the reuse, and the caller regenerates from scratch "
+        "through the full gate below.",
+    ),
+    "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "lambda_handler@adr104_findings",
+        "The digest's prose is served (/api/coach_analysis's cross_coach_reference, the stance endpoint, the Panel). "
+        "Fail-closed: on any finding surviving the one regen the handler replaces the model digest with the deterministic "
+        "`_build_default_digest` and stamps `_grounding_hold`, so text that failed the gate is never persisted and never "
+        "earns a reuse cache slot.",
+    ),
+    "lambdas/coach/coach_history_summarizer.py::_apply_compression_gate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_compress_coach@findings",
+        "COMPRESSED#latest is never served verbatim, but it is replayed into board-answer prompt assembly "
+        "(site_api_ai_lambda._coach_memory_bits) — an internal record laundered into reader text, which is exactly the reach "
+        "clause in this registry's audience rule. Fail-closed: `_compress_coach` returns the PRIOR COMPRESSED#latest (or the "
+        "structural fallback when there is no prior) whenever findings survive the regen, so the write is skipped rather "
+        "than made.",
+    ),
+    "lambdas/coach/coach_history_summarizer.py::_apply_grounding_gate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_run_stance@adr104_findings",
+        "The stance is reader text — site_api_coach_stance serves STANCE#latest. Fail-keep-priors, which is a fail-closed "
+        "shape: the gate stamps `_adr104_findings` on the record and `_run_stance` pops it, and on any residual finding it "
+        "returns `written: False` without calling `_write_stance`, so a stance that still cites an ungrounded number is "
+        "never written over a good one.",
+    ),
+    "lambdas/coach/coach_quality_gate.py::_number_grounding_report": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_apply_number_grounding_verdict@findings",
+        "Its own output is a verdict, not prose, but the TEXT it grades is the coach draft that ships to readers — so the "
+        "audience is theirs. Fail-closed and structurally so: `_apply_number_grounding_verdict` sets passed=False on any "
+        "measured finding, the LLM judge cannot overrule it, and ai_calls turns that `passed` into a CoachHold. Note the "
+        "honest limit of the AST check here: the findings travel across a Lambda wire, so the token this entry names is "
+        "bound from the report dict rather than from the gate call.",
+    ),
+    "lambdas/coach/coach_state_updater.py::_gate_derived_prose": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_write_output_record@_gate_findings",
+        "The derived condensations (observatory_summary, key_recommendation, elena_quote) are what six serving paths publish "
+        "in preference to the coach's own `content`. Fail-closed on the derived set only: `_write_output_record` calls "
+        "`coach_derived_prose.hold(extraction)` on any residual finding, nulling the whole set so every read site falls back "
+        "to the narrative that passed its own gate. The record itself still ships — that is the point of holding the "
+        "condensation rather than the row.",
+    ),
+    "lambdas/coach/inter_coach_dialogue_lambda.py::generate_gated_turn": _facet(
+        PUBLIC,
+        KEEP_BEST,
+        "_air_one@left1",
+        "The exchange is published: the THREAD# rows under ENSEMBLE#dispute are read by site_api_coach_stance's dispute "
+        "reader. Keep-best: `regen_once` returns the better turn and `_air_one` records `gate_findings_left` as a COUNT on "
+        "the turn, branching only on an empty reply, never on the findings. So a residual finding is airing on a reader "
+        "surface with a number beside it — the second of the three public keep-best surfaces, and the one whose residual is "
+        "visible in the stored record.",
+    ),
+    "lambdas/compute/coach_daily_reflection_lambda.py::_grounding_findings": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "lambda_handler@ok",
+        "The reflection is published to generated/coach_daily.json and rendered on the coach pages with no second gate "
+        "downstream. Fail-closed through `_accepts`, which ANDs the ER-03 verdict with an empty finding list: the handler "
+        "regenerates once stricter, and a coach that still fails is added to `skipped` — dropped, never shipped.",
+    ),
+    "lambdas/compute/coach_memoir_lambda.py::gate_check": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_generate_memoir@ok",
+        "The quarterly memoir is published to generated/coach_memoirs.json. Fail-closed: `_generate_memoir` retries once "
+        "with the reasons named and returns `(None, reasons2)` when the second draft still fails, so a memoir that fails "
+        "the gate twice is dropped rather than shipped, and the flagged pair is retained as eval data.",
+    ),
+    "lambdas/compute/hypothesis_engine_lambda.py::generate_hypotheses": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "generate_hypotheses@findings",
+        "Generated hypothesis prose is served verbatim by /api/hypotheses. Fail-closed per candidate: a hypothesis whose "
+        "reader-bound prose carries a finding is HELD with a `continue` — it is simply not stored, and the grounded "
+        "candidates from the same batch still land (a batch re-call would re-roll them, which is why the drop is per "
+        "candidate rather than per batch).",
+    ),
+    "lambdas/compute/hypothesis_engine_lambda.py::narrate_resolution": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "narrate_resolution@findings",
+        "The resolution sentence is appended to last_evidence, which /api/hypotheses serves. Fail-closed: one correction "
+        'pass, then `return ""` on any surviving finding — which leaves the DETERMINISTIC evidence sentence as the only '
+        "stored evidence, the fallback the regenerate-or-hold contract asks for.",
+    ),
+    "lambdas/compute/state_of_matthew_lambda.py::narration_gate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "narrate@findings",
+        "The weekly State of Matthew narration is reader text on the site. Fail-closed: `narrate` returns the deterministic "
+        "fallback narrative with reason=grounding_gate on any finding or banned causal connective, and retains the flagged "
+        "draft/final pair as labeled eval data.",
+    ),
+    "lambdas/content/review_pack_ranker.py::baseline_mismatch_findings": _facet(
+        INTERNAL,
+        KEEP_BEST,
+        AUDITOR_NO_DRAFT,
+        "A post-hoc auditor over ALREADY-PUBLISHED archived text, ranked into Matthew's own Sunday review pack — no reader, "
+        "no draft, and nothing to hold: the finding becomes a score component and an advisory flag beside an entry that "
+        "ships either way. There is therefore no disposition call site for the AST to read, which is what the "
+        "auditor sentinel records; the fail-mode is keep-best in the only sense available to an auditor.",
+    ),
+    "lambdas/emails/ai_review_pack_lambda.py::_freshness_findings_for": _facet(
+        INTERNAL,
+        KEEP_BEST,
+        AUDITOR_NO_DRAFT,
+        "The same auditor shape one layer up: it re-runs the freshness class over an archived coach_brief and renders a "
+        "warning banner into the review-pack email Matthew reads. The entry is rendered whether or not the banner appears, "
+        "so there is no draft to drop and no generation to fall back to — advisory by construction, and fail-soft so a bad "
+        "entry never breaks the pack.",
+    ),
+    "lambdas/emails/chronicle_prompt.py::installment_grounding_findings": _facet(
+        PUBLIC,
+        KEEP_BEST,
+        "lambdas/emails/wednesday_chronicle_lambda.py::_handler_core@_residual",
+        "The chronicle is the most public narrative the platform ships — emailed to subscribers and published on the site. "
+        "It is nevertheless keep-best: `_handler_core` runs `regen_once`, logs 'chronicle keeps N residual grounding "
+        "findings (best draft)' and carries on into Margaret's edit pass and the presence gate. The DELIBERATE reason is "
+        "that a held chronicle is a missing weekly issue, and the two later gates (#914 presence-ack, the privacy filter) "
+        "are the ones allowed to hold it — but the ADR-104 residual does ship. Third of the three public keep-best "
+        "surfaces, and the one most worth revisiting.",
+    ),
+    "lambdas/emails/coach_nudge_lambda.py::_gate": _facet(
+        INTERNAL,
+        FAIL_CLOSED,
+        "lambda_handler@findings",
+        "The nudge is an email to Matthew alone. Fail-closed regardless, by the AC4 rule: a non-empty finding list means "
+        "DROP SILENTLY — the handler writes the copy verbatim as a BLOCKED row for audit, never delivers it, never "
+        "regenerates, and the day stays consumed so the anti-nag contract holds.",
+    ),
+    "lambdas/emails/daily_debrief_lambda.py::narrate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "narrate@findings",
+        "The debrief is published as a podcast episode under generated/podcast/debrief with its own RSS feed, so the "
+        "audience is readers/listeners, not just Matthew. Fail-closed and single-shot: on any finding or causal hit it "
+        "returns the deterministic template with narrated=False — it never regenerates, because the episode is one call "
+        "per day.",
+    ),
+    "lambdas/emails/partner_email_lambda.py::_grounding_gate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "build_commentary@findings",
+        "The only AI sender addressed to a human who is not Matthew — a third party who cannot check the platform's "
+        "numbers, which is the audience test this registry uses rather than 'is it on the website'. Fail-closed: "
+        "`build_commentary` regenerates once and then returns None, and the caller sends the deterministic data-only email "
+        "instead.",
+    ),
+    "lambdas/experiment/eyeball_calibration.py::_grounded_note": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_grounded_note@findings",
+        "The note rides the estimate row the /method/eyeball/ exhibit renders. Fail-closed on the NOTE alone: "
+        "`return None if findings else str(note)` drops the phrase and keeps the graded estimate, because holding the "
+        "estimate would delete a measured data point over a descriptive sentence.",
+    ),
+    "lambdas/intelligence/ai_expert_analyzer_lambda.py::_gate_prose": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_gate_prose@_left",
+        "All six of the analyzer's model calls are reader-bound (the observatory narratives, the weekly priority, the "
+        'experiment arc, the month rollup). Fail-closed at the chokepoint itself: one corrective rewrite, then `return ""` '
+        "on any residual finding, and the caller keeps the PRIOR cached record serving. Gate-infra failure holds too "
+        "(#2763), which is the inverse of the fail-open shape the /explain endpoint had to fix in #2393.",
+    ),
+    "lambdas/intelligence/field_notes_lambda.py::_note_grounding_findings": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "generate_field_notes@findings",
+        "The weekly field note is the public Third Wall (/api/field_notes). Fail-closed: one strict rewrite kept only if it "
+        "strictly improves, and if the best draft still carries findings the note is HELD — nothing is written, so the "
+        "endpoint serves the previous week rather than failed text. The gate itself also fails closed on its own "
+        "unavailability, returning a synthetic gate_error finding.",
+    ),
+    "lambdas/reading/horizons_retrospective.py::_grounding_gate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "generate@findings",
+        "The retrospective is the reader hook on the public /data/horizons/ feed. Fail-closed: `generate` returns a HELD "
+        "status carrying the finding details instead of the text, and a gate that is unavailable or raises returns a "
+        "synthetic finding rather than the ungated draft.",
+    ),
+    "lambdas/reading/reading_constellation.py::_idea_grounding_findings": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "extract_ideas@findings",
+        "Idea labels and gists land on the IDEA public allow-list (/api/constellation). Fail-closed per idea: "
+        "`extract_ideas` skips the candidate with a `continue` on any finding — 'no invented ideas' is the module contract "
+        "and the fill machinery can re-run — and a gate that raises holds the idea too.",
+    ),
+    "lambdas/reading/reading_enrich.py::_grounded_themes": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_grounded_themes@findings",
+        "Themes are served on the BOOK public allow-list (/api/reading_shelf). Fail-closed per theme: a flagged phrase is "
+        "dropped with a `continue`, and a missing or raising gate holds ALL themes rather than waving any through.",
+    ),
+    "lambdas/web/site_api_ai_prompt.py::board_grounding_findings": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "lambdas/web/site_api_board_panel.py::_generate@_gf",
+        "The shared board gate core — it has no call site of its own; both consumers are registered surfaces in their own "
+        "right and BOTH dispose identically: one corrective rewrite, then the in-voice refusal copy replaces the answer. "
+        "The disposition named here is the opening board turn; the follow-up leg's is its own entry below.",
+    ),
+    "lambdas/web/site_api_board_panel.py::_generate": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_generate@_gf",
+        "The board answer is served to any reader of /api/board_ask. Fail-closed: one bounded corrective rewrite inside the "
+        "board rate limit, and if the retry is still ungrounded the persona's text becomes the honest in-voice refusal — "
+        "never a fabricated figure — with the flagged draft retained as eval data.",
+    ),
+    "lambdas/web/site_api_ai_lambda.py::_handle_ask": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_handle_ask@_pre",
+        "/api/ask answers an anonymous reader. Fail-closed: one corrective regen, and an answer that is still ungrounded is "
+        "replaced by the refusal copy ('I couldn't ground part of that answer …') before the 200 is returned.",
+    ),
+    "lambdas/web/site_api_ai_lambda.py::_handle_explain": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_handle_explain@grounding_findings",
+        "/api/explain hands a reader 3-4 sentences about a page they are looking at. Fail-closed with no regen at all: a "
+        "finding replaces the explanation with _EXPLAIN_GROUNDING_REFUSAL, and since #2393 so does a PARTIAL bundle that "
+        "cannot import the gate — the ImportError branch refuses rather than serving ungated Haiku output. The disposition "
+        "token here is the gate CALL itself, because the finding list is never bound to a name.",
+    ),
+    "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "_handle_board_followup@_gf",
+        "The follow-up turn is served to the same anonymous reader as the opening one and replays server-stored prior "
+        "turns. Fail-closed identically: one corrective rewrite, else the refusal copy, with the flagged pair retained.",
+    ),
+}
+
+# The entries themselves GAIN the facets (#3614) — `SURFACES[key]["audience"]` is the
+# registry's own shape, not a second dict a reader has to join by hand. Both directions
+# of the key match are asserted in tests/test_grounding_sets_3614.py rather than here:
+# an import-time assertion would fail collection with a traceback instead of a verdict.
+for _key, _facets in SURFACE_FACETS.items():
+    if _key in SURFACES:
+        SURFACES[_key].update(_facets)
+
+
+# ── The disposition derivation (#3614) ───────────────────────────────────────
+# Structural, deliberately narrow, and documented at the top of this block: these
+# four helpers answer ONE question about a named function — does it ACT on a named
+# token, or merely mention it?
+
+_DISPOSAL_NODES = (ast.Return, ast.Continue, ast.Break, ast.Raise, ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Delete)
+_NESTED_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def _walk_own_scope(node):
+    """Yield every descendant of ``node`` that belongs to its OWN scope.
+
+    Nested defs/lambdas are skipped: a closure's `return` is that closure's
+    disposition, not the enclosing surface's. (The regen-once shape nests a
+    `_findings_fn`, which would otherwise read as a hold on every surface.)
+    """
+    for child in ast.iter_child_nodes(node):
+        yield child
+        if isinstance(child, _NESTED_SCOPES):
+            continue
+        yield from _walk_own_scope(child)
+
+
+def _mentions(node, token):
+    """``token`` appears in ``node`` as a bare name, or as the function of a call."""
+    for n in [node] + list(ast.walk(node)):
+        if isinstance(n, ast.Name) and n.id == token:
+            return True
+        if isinstance(n, ast.Call):
+            fn = n.func
+            name = fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else None)
+            if name == token:
+                return True
+    return False
+
+
+def _contains_disposal(stmts):
+    """A branch body that does something other than log: returns, continues, breaks,
+    raises, or rebinds. A bare call (``logger.warning(...)``) is NOT a disposal — that
+    distinction is the whole difference between fail-closed and keep-best."""
+    for stmt in stmts:
+        if isinstance(stmt, _DISPOSAL_NODES):
+            return True
+        for n in _walk_own_scope(stmt):
+            if isinstance(n, _DISPOSAL_NODES):
+                return True
+    return False
+
+
+def _is_predicate(value, token):
+    """``return not findings`` / ``return ok and not findings`` — a VERDICT return,
+    which is how a check-only surface disposes (the caller acts on the boolean)."""
+    for n in [value] + list(ast.walk(value)):
+        if isinstance(n, (ast.UnaryOp, ast.BoolOp, ast.Compare)) and _mentions(n, token):
+            return True
+    return False
+
+
+def token_is_real(func_node, token):
+    """The named token exists in the function: a parameter, something it binds, or a
+    function it calls. A renamed variable reds here rather than silently reading as
+    'no disposition found'."""
+    args = func_node.args
+    for a in list(args.args) + list(args.posonlyargs) + list(args.kwonlyargs) + [args.vararg, args.kwarg]:
+        if a is not None and a.arg == token:
+            return True
+    for n in _walk_own_scope(func_node):
+        if isinstance(n, ast.Name) and isinstance(getattr(n, "ctx", None), ast.Store) and n.id == token:
+            return True
+        if isinstance(n, (ast.ExceptHandler,)) and n.name == token:
+            return True
+        if isinstance(n, ast.Call):
+            fn = n.func
+            name = fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else None)
+            if name == token:
+                return True
+    return False
+
+
+def acts_on(func_node, token):
+    """Does this function DROP / FALL BACK / HOLD on ``token``?"""
+    for n in _walk_own_scope(func_node):
+        if isinstance(n, ast.If) and _mentions(n.test, token) and (_contains_disposal(n.body) or _contains_disposal(n.orelse)):
+            return True
+        if isinstance(n, ast.Return) and n.value is not None:
+            if isinstance(n.value, ast.IfExp) and _mentions(n.value.test, token):
+                return True
+            if _is_predicate(n.value, token):
+                return True
+    return False
+
+
+def parse_disposition(key, disposition):
+    """``"func@token"`` (the surface's own module) or ``"path.py::func@token"``.
+
+    Returns ``(rel_path, function_name, token)``; raises ValueError on a malformed
+    declaration so a typo cannot read as 'nothing to check'.
+    """
+    if "@" not in disposition:
+        raise ValueError(f"{key}: disposition {disposition!r} names no token (expected '<function>@<token>')")
+    where, token = disposition.rsplit("@", 1)
+    if "::" in where:
+        rel_path, func = where.split("::", 1)
+    else:
+        rel_path, func = key.split("::", 1)[0], where
+    if not token or not func:
+        raise ValueError(f"{key}: malformed disposition {disposition!r}")
+    return rel_path, func, token
+
+
+def disposition_evidence(key, disposition, repo=REPO):
+    """What the tree says about one surface's disposition site.
+
+    ``{"module", "function", "token", "module_exists", "function_found",
+    "token_real", "acts"}`` — the caller compares ``acts`` with the declared
+    fail mode. Never guesses: a missing module or function is reported as such.
+    """
+    rel_path, func, token = parse_disposition(key, disposition)
+    out = {
+        "module": rel_path,
+        "function": func,
+        "token": token,
+        "module_exists": False,
+        "function_found": False,
+        "token_real": False,
+        "acts": False,
+    }
+    path = os.path.join(repo, rel_path)
+    if not os.path.exists(path):
+        return out
+    out["module_exists"] = True
+    with open(path, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func:
+            out["function_found"] = True
+            out["token_real"] = out["token_real"] or token_is_real(node, token)
+            out["acts"] = out["acts"] or acts_on(node, token)
+    return out
+
+
+def facet_problems(surfaces=None, repo=REPO):
+    """Every violation of the #3614 facet contract, as a list of strings.
+
+    A pure function over a registry mapping so the flip-one-public-surface control
+    can run it against a MUTATED COPY — the must-fail control is a test, not a
+    session's memory of having tried it once.
+    """
+    surfaces = SURFACES if surfaces is None else surfaces
+    problems = []
+    for key, entry in sorted(surfaces.items()):
+        missing = [k for k in FACET_KEYS if k not in entry]
+        if missing:
+            problems.append(f"{key}: no #3614 facet(s) {missing} — decide the audience and the fail mode")
+            continue
+        audience, fail_mode = entry["audience"], entry["fail_mode"]
+        if audience not in AUDIENCES:
+            problems.append(f"{key}: unknown audience {audience!r} (expected one of {sorted(AUDIENCES)})")
+        if fail_mode not in FAIL_MODES:
+            problems.append(f"{key}: unknown fail_mode {fail_mode!r} (expected one of {sorted(FAIL_MODES)})")
+        reason = entry["facet_reason"]
+        if not isinstance(reason, str) or len(reason.strip()) < 120:
+            problems.append(f"{key}: the facet needs a written reason naming the reader AND what happens to a finding")
+        # Half of the audience facet IS derivable: lambdas/web/site_api* is the public
+        # serving path by construction (privacy_tier_wiring.family_of makes the same
+        # call), so a surface there may not be declared internal.
+        if key.startswith("lambdas/web/site_api") and audience != PUBLIC:
+            problems.append(f"{key}: a lambdas/web/site_api* surface serves averagejoematt.com — audience cannot be {audience!r}")
+        if audience == PUBLIC and fail_mode == KEEP_BEST and key not in PUBLIC_KEEP_BEST_RESIDUAL:
+            problems.append(
+                f"{key}: declared public + keep_best but is not in PUBLIC_KEEP_BEST_RESIDUAL — a public surface that "
+                "ships its best draft with residual findings is a recorded decision, never a default"
+            )
+        if entry["disposition"] == AUDITOR_NO_DRAFT:
+            if fail_mode != KEEP_BEST or _AUDITOR not in set(entry.get("exempt", {}).values()):
+                problems.append(
+                    f"{key}: the auditor sentinel is only for a post-hoc auditor — the surface must cite the measured "
+                    "_AUDITOR exemption reason and keep-best, or it needs a real disposition site"
+                )
+            continue
+        try:
+            ev = disposition_evidence(key, entry["disposition"], repo=repo)
+        except ValueError as e:
+            problems.append(str(e))
+            continue
+        if not ev["module_exists"]:
+            problems.append(f"{key}: disposition names module {ev['module']} — it does not exist")
+            continue
+        if not ev["function_found"]:
+            problems.append(f"{key}: disposition names {ev['module']}::{ev['function']} — no such function (renamed? moved?)")
+            continue
+        if not ev["token_real"]:
+            problems.append(f"{key}: disposition token {ev['token']!r} is not bound, taken or called in {ev['module']}::{ev['function']}")
+            continue
+        if fail_mode == FAIL_CLOSED and not ev["acts"]:
+            problems.append(
+                f"{key}: declared fail_closed, but {ev['module']}::{ev['function']} never drops, falls back or holds on "
+                f"{ev['token']!r} — it only mentions it (logging a finding is not a fail mode)"
+            )
+        if fail_mode == KEEP_BEST and ev["acts"]:
+            problems.append(
+                f"{key}: declared keep_best, but {ev['module']}::{ev['function']} BRANCHES on {ev['token']!r} and "
+                "drops/falls back — the declaration and the call site disagree"
+            )
+    return problems
