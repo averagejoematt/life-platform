@@ -52,29 +52,37 @@ from typing import Any
 ATTESTATIONS: list[dict[str, Any]] = [
     {
         "id": "post_lift_low_cardio",
-        # CONFIRMED by the owner 2026-09-08: "it was during the whole 100lb
-        # transformation, i always kept doing cardio even when i was already in
-        # good shape". The window is set to the reference cut, which is the
-        # period the proven bands actually draw from. He states the habit also
-        # continued past it; extending the end date adds nothing to the
-        # reference and would be attesting beyond what was asked, so it stays
-        # at the transformation and is extended only on a further statement.
+        # CONFIRMED by the owner 2026-09-08 ("during the whole 100lb transformation, i
+        # always kept doing cardio") and EXTENDED by the owner 2026-09-19 (Session AL,
+        # answered in-session, verbatim): "for that whole window where i logged hevy
+        # workouts, we can assume every single workout include 30-60 minutes of
+        # recumbant bike at different intensities (sometimes just low level flat,
+        # sometimes hill like, sometimes interval), but mostly zone 2, and then
+        # eventually sometimes walking treadmills on inclines. I have zero records and
+        # so the attestation best is to just add a blended average for that on top of
+        # all the workouts, as something as a reference point as we plan future
+        # workouts". The window is therefore the whole Hevy record: the first stored
+        # Hevy DATE# is 2021-04-12 (read from the partition, not recalled), and the end
+        # is the date of the statement — the code requires a closed range and the
+        # habit is stated as continuing, so the end is EXTENDED only on a further
+        # statement, never inferred. Still a blended average on lift days only.
         "active": True,
-        "start_date": "2024-09-05",
-        "end_date": "2025-04-30",
+        "start_date": "2021-04-12",
+        "end_date": "2026-09-19",
         "applies_when": "hevy_lift_logged",  # only on days with a logged lift
         "kind": "cycle",
         "minutes_low": 30,
         "minutes_high": 60,
         "minutes_typical": 45,
-        # Deliberately None. He gave minutes, not a heart rate, and a seated
-        # low-intensity bike figure invented here would be indistinguishable
-        # from a measured one downstream. No attested HR is reported.
+        # Deliberately None. He gave minutes and intensity words ("mostly zone 2"), not
+        # a heart rate; a seated low-intensity bike figure invented here would be
+        # indistinguishable from a measured one downstream. No attested HR is reported.
         "bpm_estimate": None,
-        "modalities": ["recumbent_bike", "treadmill", "cross_trainer"],
+        "modalities": ["recumbent_bike", "incline_treadmill_walk"],
+        "intensity_note": "mostly zone 2; flat, hill-like and interval sessions; incline treadmill walking later in the window",
         "attested_by": "matthew",
-        "attested_at": "2026-09-08",
-        "basis": "owner recollection — never captured by any device",
+        "attested_at": "2026-09-19",
+        "basis": "owner recollection (2026-09-08, extended 2026-09-19) — never captured by any device; zero records exist",
     }
 ]
 
