@@ -22,6 +22,17 @@ and closes on a Saturday; its card renders the Sunday morning after. But the rul
 (seventeen so far), and a `SAT`/`SUN` literal would be correct until the next reset and
 wrong silently after it.
 
+TWO CARDS A DAY
+
+The owner's brief on 2026-09-19: *"two graphics per day, maybe day 1 is the high level
+overview, highlights, insights, specifics, and the second image is a dual or three part
+split screen summarizing what i actually worked out that day, what i ate that day if
+available, and then any other sort of insights."* So the beat card is card 1 of 2 and the
+`detail` layout is card 2 — stored at `{date}-detail.png`, delivered as a second photo
+with its own caption, recorded on the same row. Card 2 is not a second beat: it is fixed
+in shape and draws only the bands the day has, and a day with fewer than two bands has no
+second card (which the record says).
+
 THE ORDER OF OPERATIONS IS THE SAFETY PROPERTY
 
   facts → pick → GATE → render → store → deliver → record
@@ -75,6 +86,21 @@ def _yesterday_pt() -> str:
     from datetime import timedelta
 
     return (pacific_now().date() - timedelta(days=1)).isoformat()
+
+
+def _genesis_eve() -> str:
+    """The one date that renders as Day 0 — the day before genesis, and no other.
+
+    `pacific_day_n` clamps EVERY pre-genesis date to 0, which is right for a site that
+    should never say "Day −3" and wrong for a card: a backfill for a random August date
+    must not mint a starting-line card. Day 0 is exactly one calendar day.
+    """
+    from datetime import timedelta
+
+    from common.pacific_time import parse_day_key
+
+    g = parse_day_key(EXPERIMENT_START_DATE)
+    return (g - timedelta(days=1)).isoformat() if g else ""
 
 
 def _date_label(date: str) -> str:
@@ -150,14 +176,29 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     weight_series, grade_series = recap_data.cycle_series(_table, EXPERIMENT_START_DATE, date)
 
     # The BEAT, not the biggest number. See recap_layouts.pick_beat.
-    layout, why = recap_layouts.pick_beat(facts, trailing)
-    day_label = f"Day {facts.day_n}" if facts.day_n else ""
+    day0 = date == _genesis_eve()
+    if day0:
+        # The starting line. The eve's own numbers belong to the previous cycle and are
+        # not drawn; the card is the baseline, the goal and the stakes.
+        facts.day_n = 0
+        layout, why = "dayzero", "the eve of genesis — the starting line"
+        # The eve's names are the PREVIOUS cycle's — its workouts, its missed habits, its
+        # streaks — and the starting-line card draws none of them. They are cleared here
+        # so the gate screens what the card says, not what the eve happened to hold: the
+        # first render was held on a cycle-16 habit row the card never printed.
+        facts.workouts, facts.missed_tier0, facts.vice_streaks, facts.journal_templates = [], [], {}, []
+    else:
+        layout, why = recap_layouts.pick_beat(facts, trailing)
+    day_label = f"Day {facts.day_n}" if facts.day_n is not None else ""
 
     # The coach line is selected AFTER the beat and set onto the facts, because which
     # coach speaks depends on what the day's story turned out to be — a session card
     # wants the physical coach, a graded day wants the mind coach. `day_facts()` stays
     # unaware of beats on purpose; it assembles a day, it does not narrate one (#3749).
-    facts.coach_line, facts.coach_line_source, coach_line_status = recap_data.coach_line(_table, date, layout)
+    if day0:
+        facts.coach_line, facts.coach_line_source, coach_line_status = None, None, "skipped"
+    else:
+        facts.coach_line, facts.coach_line_source, coach_line_status = recap_data.coach_line(_table, date, layout)
 
     base: dict[str, Any] = {
         "date": date,
@@ -178,11 +219,19 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         "dry_run": dry_run,
     }
 
-    caption = recap_layouts.caption_for_beat(layout, facts, day_label=day_label, date_label=_date_label(date))
+    if day0:
+        caption = recap_layouts.dayzero_caption(facts)
+        detail_plan: list = []
+    else:
+        caption = recap_layouts.caption_for_beat(layout, facts, day_label=day_label, date_label=_date_label(date))
+        detail_plan = recap_layouts.detail_plan(facts, weight_series, grade_series)
+    detail_caption = recap_layouts.detail_caption(facts, day_label=day_label) if len(detail_plan) >= recap_layouts.DETAIL_MIN_BANDS else ""
+    base["detail_plan"] = [f"{b}:{n}" if n else b for b, n in detail_plan]
 
-    # GATE BEFORE RENDER. A blocked term costs CPU, never a public frame.
+    # GATE BEFORE RENDER. A blocked term costs CPU, never a public frame. BOTH captions go
+    # through the one call — the second card never gets its own, weaker, verdict.
     verdict = recap_gate.gate(
-        recap_layouts.gate_strings(facts, caption),
+        recap_layouts.gate_strings(facts, caption, extra=(detail_caption,)),
         items=facts.item_labels(),
         free_text=facts.free_text(),
     )
@@ -216,6 +265,21 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     except Exception as e:  # noqa: BLE001
         logger.error("recap put_object failed for %s: %s: %s", key, type(e).__name__, e)
 
+    # Card 2 of 2: the detail. Same gate verdict, its own PNG, its own caption.
+    detail_key = None
+    detail_png = b""
+    if detail_caption:
+        try:
+            dimg = recap_layouts.detail(facts, date_label=_date_label(date), weight_series=weight_series, grade_series=grade_series)
+            detail_png = recap_canvas.to_png_bytes(dimg)
+            detail_key = f"{RECAP_PREFIX}{date}-detail.png"
+            _s3.put_object(Bucket=S3_BUCKET, Key=detail_key, Body=detail_png, ContentType="image/png")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("detail card could not render for %s: %s: %s", date, type(e).__name__, e)
+            base["detail_error"] = f"{type(e).__name__}: {e}"
+            detail_key = None
+            detail_png = b""
+
     # The weekly card is derived from the daily run, not a second cron.
     weekly_key = None
     day_n = pacific_day_n(EXPERIMENT_START_DATE, date)
@@ -240,27 +304,47 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
             base["weekly"] = {"error": f"{type(e).__name__}: {e}"}
 
     delivered: dict[str, str] = {}
+    delivered_detail: dict[str, str] = {}
     if deliver:
+        ses = boto3.client("ses", region_name=os.environ.get("AWS_REGION", "us-west-2"))
         delivered = recap_deliver.deliver(
             png,
             caption,
             dry_run=dry_run,
             telegram_secret_getter=_telegram_secret,
             telegram_bot_key=TELEGRAM_BOT_KEY,
-            ses_client=boto3.client("ses", region_name=os.environ.get("AWS_REGION", "us-west-2")),
+            ses_client=ses,
             sender=EMAIL_SENDER,
             recipient=EMAIL_RECIPIENT,
-            subject=f"{day_label or date} — your card",
+            subject=f"{day_label or date} — your card (1 of 2)" if detail_png else f"{day_label or date} — your card",
             filename=f"recap-{date}.png",
         )
+        if detail_png:
+            # The same fan-out, a second time: two photos on the phone, two attachments in
+            # the inbox, in the order he posts them.
+            delivered_detail = recap_deliver.deliver(
+                detail_png,
+                detail_caption,
+                dry_run=dry_run,
+                telegram_secret_getter=_telegram_secret,
+                telegram_bot_key=TELEGRAM_BOT_KEY,
+                ses_client=ses,
+                sender=EMAIL_SENDER,
+                recipient=EMAIL_RECIPIENT,
+                subject=f"{day_label or date} — the detail (2 of 2)",
+                filename=f"recap-{date}-detail.png",
+            )
 
     record = {
         **base,
         "outcome": "sent" if deliver else "rendered",
         "s3_key": key,
+        "detail_s3_key": detail_key,
         "privacy": verdict.to_dict(),
         "delivered": delivered,
+        "delivered_detail": delivered_detail,
         "caption": caption,
+        "detail_caption": detail_caption or None,
     }
     _record(sk, record)
     return record

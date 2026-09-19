@@ -104,6 +104,21 @@ def _query_range(table, source: str, start: str, end: str) -> list[dict[str, Any
 
 
 @dataclass
+class ExerciseFact:
+    """One movement as the detail card names it: sets × reps at the heaviest working weight.
+
+    `reps` is the reps AT the top weight, not a total — "4 × 10 · 140 lb" is a sentence a
+    lifter reads at a glance; "40 reps" is not. A bodyweight or timed movement has no
+    weight, and the card says so by omitting it, never by printing "0 lb".
+    """
+
+    name: str
+    n_sets: int
+    top_weight_lb: float | None = None
+    reps: int | None = None
+
+
+@dataclass
 class WorkoutFact:
     """A lift session, reduced to what a card can draw. Titles only, never notes."""
 
@@ -113,6 +128,8 @@ class WorkoutFact:
     volume_lbs: float
     top_exercise: str | None = None
     exercises: list[str] = field(default_factory=list)
+    duration_min: int | None = None
+    detail: list[ExerciseFact] = field(default_factory=list)
 
 
 @dataclass
@@ -135,10 +152,28 @@ class DayFacts:
     tier0_total: int | None = None
     tier0_pct: float | None = None
     tier0_streak: int | None = None
-    # nutrition — rollups only, never item names (macrofactor is TIER_OWNER_ONLY)
+    # nutrition — rollups only, never item names (macrofactor is TIER_OWNER_ONLY). The
+    # macros are the published projection the site's own nutrition page serves; the
+    # food_log stays where it is.
     calories: float | None = None
+    cal_target: float | None = None
     protein_g: float | None = None
     protein_target_g: float | None = None
+    carbs_g: float | None = None
+    fat_g: float | None = None
+    fiber_g: float | None = None
+    meals: int | None = None
+    snacks: int | None = None
+    # the night and the body, as the compute cron scored them — read from
+    # computed_metrics.component_details, so the detail card and the day's grade are
+    # built from the same numbers and cannot disagree.
+    sleep_hrs: float | None = None
+    sleep_score: float | None = None
+    recovery_pct: float | None = None
+    rhr_bpm: float | None = None
+    steps: float | None = None
+    water_oz: float | None = None
+    water_target_oz: float | None = None
     # mind
     journal_templates: list[str] = field(default_factory=list)
     # the one free-text field on the card — SELECTED from a coach's public_summary,
@@ -245,8 +280,11 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
         sets = 0
         volume = 0.0
         best = (0.0, None)
+        detail: list[ExerciseFact] = []
         for ex in exercises:
             ex_vol = 0.0
+            ex_sets = 0
+            top: tuple[float, int] | None = None  # (weight_lb, reps at that weight)
             for s in ex.get("sets") or []:
                 reps = s.get("reps") or 0
                 kg = s.get("weight_kg")
@@ -258,10 +296,27 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
                 except (TypeError, ValueError):
                     continue
                 sets += 1
+                ex_sets += 1
+                if lbs is not None and float(lbs) > 0 and (top is None or float(lbs) > top[0]):
+                    top = (float(lbs), int(reps or 0))
             volume += ex_vol
             name = ex.get("name") or ex.get("title")
             if name and ex_vol > best[0]:
                 best = (ex_vol, name)
+            if name and ex_sets:
+                detail.append(
+                    ExerciseFact(
+                        name=str(name),
+                        n_sets=ex_sets,
+                        top_weight_lb=round(top[0]) if top else None,
+                        reps=top[1] if top and top[1] else None,
+                    )
+                )
+        duration = r.get("duration_sec")
+        try:
+            duration_min = int(round(float(duration) / 60)) if duration else None
+        except (TypeError, ValueError):
+            duration_min = None
         out.append(
             WorkoutFact(
                 title=(r.get("workout_name") or r.get("title") or "Training"),
@@ -270,6 +325,8 @@ def _workout_facts(rows: list[dict[str, Any]]) -> list[WorkoutFact]:
                 volume_lbs=round(volume, 1),
                 top_exercise=best[1],
                 exercises=[e.get("name") or e.get("title") for e in exercises if (e.get("name") or e.get("title"))],
+                duration_min=duration_min,
+                detail=detail,
             )
         )
     return out
@@ -309,6 +366,24 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.sleep_debt_hrs = computed.get("sleep_debt_7d_hrs")
         facts.hrv_ms = computed.get("hrv_ms")
         facts.vice_streaks = {k: v for k, v in (computed.get("vice_streaks") or {}).items() if v}
+        # The detail card (#3741, two cards a day): what the grade was scored FROM.
+        details = computed.get("component_details") or {}
+        nut = details.get("nutrition") or {}
+        facts.calories = nut.get("calories")
+        facts.cal_target = nut.get("cal_target")
+        facts.carbs_g = nut.get("carbs_g")
+        facts.fat_g = nut.get("fat_g")
+        slp = details.get("sleep_quality") or {}
+        facts.sleep_hrs = slp.get("duration_hrs")
+        facts.sleep_score = slp.get("sleep_score")
+        facts.recovery_pct = computed.get("recovery_pct")
+        if facts.recovery_pct is None:
+            facts.recovery_pct = (details.get("recovery") or {}).get("recovery_score")
+        facts.rhr_bpm = computed.get("rhr_bpm")
+        facts.steps = (details.get("movement") or {}).get("steps")
+        hyd = details.get("hydration") or {}
+        facts.water_oz = hyd.get("water_oz")
+        facts.water_target_oz = hyd.get("target_oz")
 
     habits = _get_day(table, "habit_scores", date)
     if habits is None:
@@ -349,9 +424,18 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
     if mf is None:
         facts.absent.append("macrofactor")
     else:
-        facts.calories = mf.get("total_calories_kcal")
+        # The source row outranks the compute cron's copy of it when both exist.
+        if mf.get("total_calories_kcal") is not None:
+            facts.calories = mf.get("total_calories_kcal")
         if facts.protein_g is None:
             facts.protein_g = mf.get("total_protein_g") or mf.get("protein_g")
+        if facts.carbs_g is None:
+            facts.carbs_g = mf.get("total_carbs_g")
+        if facts.fat_g is None:
+            facts.fat_g = mf.get("total_fat_g")
+        facts.fiber_g = mf.get("total_fiber_g")
+        facts.meals = mf.get("total_meals")
+        facts.snacks = mf.get("total_snacks")
 
     # The throughline. Where he started, where he is going — the two numbers that make a
     # single card legible to someone who has never seen another one.
