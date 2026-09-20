@@ -166,11 +166,11 @@ def test_vice_streaks_are_a_count_and_never_a_name():
 
 
 def test_the_text_screen_covers_every_name_a_layout_can_draw():
-    strings = L.gate_strings(_facts(), caption="Day 7 · attempt #17")
+    strings = L.gate_strings(_facts(), caption="Day 7 · the experiment")
     assert "Foundation - Pull - 2 - 6" in strings  # workout title
     assert "Lat Pulldown (Cable)" in strings  # exercise
     assert "Walk 5k" in strings  # missed habit
-    assert "Day 7 · attempt #17" in strings  # the caption is screened with the card
+    assert "Day 7 · the experiment" in strings  # the caption is screened with the card
 
 
 def test_the_text_screen_excludes_only_what_no_layout_draws():

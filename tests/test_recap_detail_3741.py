@@ -129,9 +129,9 @@ def test_a_day_with_nothing_logged_still_gets_a_card_when_two_fillers_can_draw()
 
 
 def test_below_two_blocks_there_is_no_second_card():
-    # No weight, no series, no coach line: only the stakes can draw. One block is not a card.
+    # No weight, no series, no coach line: nothing true is left to draw. No card.
     nothing = DayFacts(date="2026-09-17", day_n=12)
-    assert L.detail_plan(nothing) == [("stakes", "no training logged")]
+    assert L.detail_plan(nothing) == []
     with pytest.raises(ValueError):
         L.detail(nothing, date_label="x")
 
@@ -148,12 +148,12 @@ def test_a_filler_that_cannot_draw_today_is_not_a_candidate():
     ctx = {"weight_series": [], "grade_series": []}
     names = L.pick_fillers(_full(coach_line=None), ctx, 5)
     assert "arc" not in names and "graded" not in names and "coach" not in names
-    assert "stakes" in names and "road" in names
+    assert names == ["road"]
 
 
 def test_the_second_caption_is_assembled_from_the_card_and_capped():
     cap = L.detail_caption(_full(), day_label="Day 11")
-    assert cap.startswith("Day 11 · attempt #17 · the detail")
+    assert cap.startswith("Day 11 · the experiment · the detail")
     assert "Pull Day, 22 sets, 16,710 lb moved" in cap
     assert "1,493 kcal, 200 g protein" in cap
     assert "habits 6/7" in cap
@@ -212,7 +212,7 @@ def test_day_zero_renders_from_the_baseline_and_goal_alone():
     eve = DayFacts(date="2026-09-05", day_n=0, baseline_weight_lb=327.34, goal_weight_lb=185.0)
     assert L.dayzero(eve, date_label="Sat 5 Sep").size == PORTRAIT
     cap = L.dayzero_caption(eve)
-    assert cap.startswith("Day 0 · attempt #17") and "327.3 lb" in cap and "142 lb to lose" in cap
+    assert cap.startswith("Day 0 · the experiment") and "327.3 lb" in cap and "142 lb to lose" in cap
 
 
 def test_day_zero_refuses_without_an_anchor():
@@ -290,7 +290,7 @@ def test_a_full_day_stores_two_cards_and_delivers_both(lambda_harness, monkeypat
     out = C.render_for_date("2026-09-16", deliver=True, force=True, dry_run=True)
     assert set(puts) == {"recap/2026-09-16.png", "recap/2026-09-16-detail.png"}
     assert out["detail_s3_key"] == "recap/2026-09-16-detail.png"
-    assert out["detail_caption"].startswith("Day 11 · attempt #17 · the detail")
+    assert out["detail_caption"].startswith("Day 11 · the experiment · the detail")
     assert [f for f, _c in sends] == ["recap-2026-09-16.png", "recap-2026-09-16-detail.png"]
     assert records["DATE#2026-09-16"]["delivered_detail"] == {"telegram": "dry_run", "email": "dry_run"}
 

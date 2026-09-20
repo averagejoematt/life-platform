@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from web import card_engine as ce, recap_charts as ch
 from web.recap_layouts import (
-    ATTEMPT_NUMBER,
     DIM,
     FLOOR_Y,
     W_CONTENT,
@@ -207,7 +206,7 @@ def detail_plan(facts, weight_series=None, grade_series=None) -> list[tuple[str,
 
     A day with all three bands has no fillers. A day missing one takes one filler in its
     place, labelled with what it replaces. A day with nothing real still gets a card if
-    two fillers can draw — the arc and the stakes are true on a day nothing was logged —
+    two fillers can draw — the arc and the road are true on a day nothing was logged —
     and the notes on both say so.
     """
     real = detail_bands(facts)
@@ -248,7 +247,7 @@ def detail(facts, *, date_label: str, weight_series=None, grade_series=None):
 
 def detail_caption(facts, *, day_label: str) -> str:
     """The words beside the second card — the same rule as the first: assembled, never generated."""
-    head = " · ".join(x for x in (day_label, f"attempt #{ATTEMPT_NUMBER}", "the detail") if x)
+    head = " · ".join(x for x in (day_label, "the experiment", "the detail") if x)
     bits: list[str] = []
     if facts.workouts:
         w = facts.workouts[0]
