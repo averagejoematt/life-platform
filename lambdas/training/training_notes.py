@@ -618,18 +618,147 @@ def raw_pk(user: str = "matthew") -> str:
     return f"USER#{user}#SOURCE#{RAW_SOURCE}"
 
 
-def build_note_item(date, workout_uid, exercise, extraction, user="matthew", now_iso=None):
-    """One exercise-keyed signal record. sk = DATE#YYYY-MM-DD#WORKOUT#<id>."""
+# ──────────────────────────────────────────────────────────────────────────────
+# The head key: one per (workout, exercise template, OCCURRENCE)  (#3918)
+#
+# The key was `DATE#<d>#WORKOUT#<id>` inside the per-template partition — one key per
+# (workout, template) — so a workout that logs the SAME template TWICE with two
+# different notes had both notes land on ONE key. Measured live 2026-09-19: 2026-06-23
+# and 2026-09-10, both Treadmill. #3816/#3899 stopped the second write DESTROYING the
+# first (it versions instead), but the two notes were still not separately addressable
+# and every pass re-versioned them against each other.
+#
+# The occurrence suffix is the 0-based ordinal of that exercise among the appearances of
+# ITS TEMPLATE in the workout's exercise list — counted over ALL appearances, noted or
+# not. Counting only the noted ones would be cheaper and wrong: adding a note to the
+# first Treadmill block later would silently RE-KEY the second block's existing record.
+#
+# READ COMPAT, no rewrite: a row written under the old scheme (no suffix) READS as
+# occurrence 0 (`occurrence_from_sk`), and the writer looks for it at its legacy key
+# before deciding whether anything changed — so the dominant path (an unchanged
+# re-extraction over history) still writes NOTHING and mints no duplicate.
+# `deploy/backfill_training_notes.py --migrate` is the durable re-key.
+# ──────────────────────────────────────────────────────────────────────────────
+def workout_id_from_uid(workout_uid) -> str:
+    """`hevy:e5c2f877` → `e5c2f877`. The id the head key carries."""
+    return str(workout_uid).split(":")[-1] if workout_uid else ""
+
+
+def head_sk(date, workout_id, occurrence: int = 0) -> str:
+    """The current head key: `DATE#<d>#WORKOUT#<id>#<occurrence>`."""
+    return f"DATE#{date}#WORKOUT#{workout_id}#{int(occurrence)}"
+
+
+def legacy_head_sk(date, workout_id) -> str:
+    """The pre-#3918 head key: `DATE#<d>#WORKOUT#<id>` (reads as occurrence 0)."""
+    return f"DATE#{date}#WORKOUT#{workout_id}"
+
+
+def _head_parts(sk) -> list:
+    """Head-key tokens, a `#CORRECTION` overlay suffix stripped; [] when not a head key."""
+    parts = str(sk or "").split("#")
+    if parts and parts[-1] == "CORRECTION":
+        parts = parts[:-1]
+    if len(parts) >= 4 and parts[0] == "DATE" and parts[2] == "WORKOUT":
+        return parts
+    return []
+
+
+def occurrence_from_sk(sk) -> int:
+    """The occurrence a head key names. An old-scheme row (no suffix) IS occurrence 0.
+
+    Position-keyed, not suffix-keyed: an `ARCHIVE#…` row (whose key ends in a content
+    digest that can be all-digits) never poses as an occurrence, because its token 0 is
+    not `DATE`. Archived rows are outside every reader's key range anyway (#3816) — this
+    is the second lock, not the first.
+    """
+    parts = _head_parts(sk)
+    if len(parts) >= 5 and parts[4].isdigit():
+        return int(parts[4])
+    return 0
+
+
+def is_legacy_head_sk(sk) -> bool:
+    """True for a head key written before #3918 (no occurrence suffix)."""
+    parts = _head_parts(sk)
+    return bool(parts) and (len(parts) == 4 or not parts[4].isdigit())
+
+
+def head_sk_base(sk) -> str:
+    """`DATE#<d>#WORKOUT#<id>` — the (workout, template) group a head row belongs to."""
+    parts = _head_parts(sk)
+    return "#".join(parts[:4]) if parts else str(sk or "")
+
+
+def occurrence_indices(exercises) -> list:
+    """Per exercise, its 0-based ordinal among ITS TEMPLATE's appearances in this workout."""
+    seen: dict[str, int] = {}
+    out = []
+    for ex in exercises or []:
+        tid, _ = normalize_exercise_key(ex)
+        n = seen.get(tid, 0)
+        out.append(n)
+        seen[tid] = n + 1
+    return out
+
+
+def noted_occurrences_by_template(exercises) -> dict:
+    """{template_id: [occurrence, …]} for the exercises in this workout that CARRY a note.
+
+    The occurrence is counted over every appearance of the template, so an unnoted first
+    block still consumes index 0 — the key of a noted second block never moves because a
+    note was added to (or removed from) the first.
+    """
+    out: dict[str, list] = {}
+    for ex, occ in zip(exercises or [], occurrence_indices(exercises)):
+        if not (ex.get("notes") or "").strip():
+            continue
+        tid, _ = normalize_exercise_key(ex)
+        out.setdefault(tid, []).append(occ)
+    return out
+
+
+def workout_id_of_raw_row(row) -> str:
+    """The workout id a RAW Hevy row names, from its sk (authoritative) or its uid."""
+    parts = str((row or {}).get("sk") or "").split("#")
+    if len(parts) >= 4 and parts[0] == "DATE" and parts[2] == "WORKOUT":
+        return parts[3]
+    return workout_id_from_uid((row or {}).get("workout_uid") or (row or {}).get("source_workout_id") or "")
+
+
+def dedupe_head_rows(rows) -> dict:
+    """{occurrence: row} for the head rows of ONE (workout, template) group.
+
+    A legacy row and a new-scheme row can coexist for occurrence 0 while the re-key is
+    pending (the writer versions in place; `--migrate` is the separate, owner-run step).
+    The new-scheme row wins; a correction overlay and an archived prior are not head rows
+    at all and never enter the map.
+    """
+    best: dict[int, dict] = {}
+    for r in rows or []:
+        sk = str(r.get("sk") or "")
+        if sk.endswith("#CORRECTION") or r.get("record_kind") == RECORD_KIND_PRIOR:
+            continue
+        occ = occurrence_from_sk(sk)
+        cur = best.get(occ)
+        if cur is None or (is_legacy_head_sk(cur.get("sk")) and not is_legacy_head_sk(sk)):
+            best[occ] = r
+    return best
+
+
+def build_note_item(date, workout_uid, exercise, extraction, user="matthew", now_iso=None, occurrence: int = 0):
+    """One exercise-SESSION signal record. sk = DATE#YYYY-MM-DD#WORKOUT#<id>#<occurrence>."""
     tid, name = normalize_exercise_key(exercise)
     now_iso = now_iso or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    wid = workout_uid.split(":")[-1] if workout_uid else ""
+    wid = workout_id_from_uid(workout_uid)
     return {
         "pk": notes_pk(tid, user),
-        "sk": f"DATE#{date}#WORKOUT#{wid}",
+        "sk": head_sk(date, wid, occurrence),
         "date": date,
         "source": SOURCE_LABEL,
         "exercise_name": name,
         "exercise_template": tid,
+        "occurrence": int(occurrence),  # which logging of this template within the workout
         "workout_uid": workout_uid,
         "inferred": True,
         "extracted_at": now_iso,
@@ -640,12 +769,12 @@ def build_note_item(date, workout_uid, exercise, extraction, user="matthew", now
 def build_workout_note_items(date, workout_uid, exercises, user="matthew", now_iso=None, llm_fn=None):
     """Build records for every NON-EMPTY note in a workout (conservation: one per note)."""
     items = []
-    for ex in exercises or []:
+    for ex, occ in zip(exercises or [], occurrence_indices(exercises)):
         note = (ex.get("notes") or "").strip()
         if not note:
             continue  # dominant path → no record, no model call ($0)
         extraction = extract_signals(note, llm_fn=llm_fn, date=date, user=user)
-        items.append(build_note_item(date, workout_uid, ex, extraction, user=user, now_iso=now_iso))
+        items.append(build_note_item(date, workout_uid, ex, extraction, user=user, now_iso=now_iso, occurrence=occ))
     return items
 
 
@@ -653,7 +782,17 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
     """Silent-failure guard (brief §8): are recent NON-EMPTY notes producing real records,
     or is the extractor dark? Flags when noted sessions have no projection record
     (extractor never ran) or only degraded records (LLM dark). Mirrors the meal-layer
-    daily_summary drift guard; hook into get_freshness_status."""
+    daily_summary drift guard; hook into get_freshness_status.
+
+    #3918 — THE MEASUREMENT THAT WAS HIDING THE COLLISION. This used to query the note
+    partition with `Limit=1` and count ONE record per noted exercise, so a workout that
+    logged the same template twice had two noted exercise-sessions and exactly one
+    findable record, and the check reported 2 noted / … / 0 missing. It now counts ALL
+    occurrence rows for each (workout, template) group and compares that against the
+    number of times the template is NOTED in the Hevy row itself; the disagreements are
+    reported as `occurrence_mismatches` (with `occurrence_mismatch_detail`), which is the
+    number the collision was invisible inside of.
+    """
     from datetime import date as _date
 
     from boto3.dynamodb.conditions import Key as _K
@@ -665,40 +804,52 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
     have_record = 0
     degraded = 0
     missing = 0
+    mismatches = 0
+    mismatch_detail: list[dict] = []
     reasons: dict[str, int] = {}  # #3699: WHY the degraded ones degraded, tallied by code
     try:
         wresp = table.query(
             KeyConditionExpression=_K("pk").eq(f"USER#{user}#SOURCE#{RAW_SOURCE}") & _K("sk").between(f"DATE#{start}", f"DATE#{today}~"),
-            ProjectionExpression="#d, exercises",
-            ExpressionAttributeNames={"#d": "date"},
+            ProjectionExpression="#d, #s, exercises, workout_uid",
+            ExpressionAttributeNames={"#d": "date", "#s": "sk"},
         )
     except Exception as e:  # noqa: BLE001
         return {"checked": False, "error": str(e)}
 
     for w in wresp.get("Items", []):
         wdate = w.get("date")
-        for ex in w.get("exercises", []) or []:
-            if not (ex.get("notes") or "").strip():
-                continue
-            noted += 1
-            tid, _ = normalize_exercise_key(ex)
+        wid = workout_id_of_raw_row(w)
+        for tid, occs in noted_occurrences_by_template(w.get("exercises", []) or []).items():
+            noted += len(occs)
             try:
                 r = table.query(
-                    KeyConditionExpression=_K("pk").eq(notes_pk(tid, user)) & _K("sk").begins_with(f"DATE#{wdate}#WORKOUT#"),
-                    ProjectionExpression="degraded, degraded_reason",
-                    Limit=1,
+                    KeyConditionExpression=_K("pk").eq(notes_pk(tid, user)) & _K("sk").begins_with(f"DATE#{wdate}#WORKOUT#{wid}"),
+                    ProjectionExpression="#s, degraded, degraded_reason",
+                    ExpressionAttributeNames={"#s": "sk"},
                 )
-                items = r.get("Items", [])
-                if not items:
-                    missing += 1
-                else:
-                    have_record += 1
-                    if items[0].get("degraded"):
-                        degraded += 1
-                        code = str(items[0].get("degraded_reason") or "").split(":")[0].strip() or DEGRADE_UNRECORDED
-                        reasons[code] = reasons.get(code, 0) + 1
+                found = dedupe_head_rows(r.get("Items", []))
             except Exception:  # noqa: BLE001
-                missing += 1
+                missing += len(occs)
+                continue
+            # One noted occurrence + one stored row is the OLD scheme matching itself:
+            # a legacy row reads as occurrence 0 even when the noted block was the
+            # template's second appearance. Never report that as a miss.
+            if len(occs) == 1 and len(found) == 1:
+                matched = [(occs[0], list(found.values())[0])]
+            else:
+                matched = [(occ, found.get(occ)) for occ in occs]
+            if len(found) != len(occs):
+                mismatches += 1
+                mismatch_detail.append({"date": wdate, "workout_id": wid, "template_id": tid, "noted": len(occs), "records": len(found)})
+            for _occ, item in matched:
+                if item is None:
+                    missing += 1
+                    continue
+                have_record += 1
+                if item.get("degraded"):
+                    degraded += 1
+                    code = str(item.get("degraded_reason") or "").split(":")[0].strip() or DEGRADE_UNRECORDED
+                    reasons[code] = reasons.get(code, 0) + 1
 
     dark = noted > 0 and (missing == noted or (have_record > 0 and degraded == have_record))
     return {
@@ -710,13 +861,18 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
         "degraded_reasons": reasons,  # #3699: {code: count}; `unrecorded` = written before the reason field existed
         "degraded_reasons_note": describe_degrade_reasons(reasons),
         "missing_records": missing,
+        # #3918: (workout, template) groups whose stored occurrence rows do not equal the
+        # number of times that template carries a note in the raw Hevy row.
+        "occurrence_mismatches": mismatches,
+        "occurrence_mismatch_detail": mismatch_detail[:20],
         "extractor_dark": bool(dark),
         "note": (
             "Notes present but the derived layer is dark (no records or all degraded) — "
             f"degrade reasons: {describe_degrade_reasons(reasons)}."
             if dark
             else "Training-note extractor healthy."
-        ),
+        )
+        + (f" {mismatches} (workout, template) group(s) have fewer note records than noted occurrences." if mismatches else ""),
     }
 
 
@@ -916,22 +1072,28 @@ def certain_change_reason(stored: dict, note_text: str, user: str = "matthew"):
     return None
 
 
-def prior_extraction_sk(head_sk: str, prior_record: dict) -> str:
+def prior_extraction_sk(head_key: str, prior_record: dict) -> str:
     """The archive key of one superseded extraction — CONTENT-addressed, not time-addressed.
 
     The obvious key is `…#<prior extracted_at>`, and it is wrong here. The live corpus
     (measured 2026-09-19) contains workouts logging the SAME exercise template twice with
-    two different notes — they collide on one head key by construction, so each pass over
-    that workout replaces A with B and then B with A. Timestamped archive keys would mint
-    two NEW rows on every invoke, forever. Digesting the extraction instead bounds the
-    archive at the number of DISTINCT extractions that ever stood at this key, which is
-    the thing worth keeping, and makes re-archiving idempotent.
+    two different notes — under the pre-#3918 key scheme they collided on one head key by
+    construction, so each pass over that workout replaced A with B and then B with A.
+    Timestamped archive keys would mint two NEW rows on every invoke, forever. Digesting
+    the extraction instead bounds the archive at the number of DISTINCT extractions that
+    ever stood at this key, which is the thing worth keeping, and makes re-archiving
+    idempotent.
+
+    #3918 removed that flapping CAUSE (the occurrence suffix gives each logging its own
+    head key), and the content-addressed archive key stays: the legacy rows it already
+    bounded are still in the partition, and idempotent re-archiving is the property this
+    was chosen for, not a workaround for the collision.
 
     Chronology is not lost: each archived row is a verbatim copy and carries its own
     `extracted_at`, and the head's `supersedes` names this key outright.
     """
     digest = hashlib.sha256(extraction_fingerprint(prior_record).encode("utf-8")).hexdigest()[:16]
-    return f"{ARCHIVE_PREFIX}{head_sk}#{digest}"
+    return f"{ARCHIVE_PREFIX}{head_key}#{digest}"
 
 
 def _sk_not_exists():
@@ -949,6 +1111,24 @@ def _sk_not_exists():
 def _already_archived(exc: BaseException) -> bool:
     """A failed `attribute_not_exists` is the SUCCESS case: the prior is already stored."""
     return "ConditionalCheckFailed" in type(exc).__name__ or "ConditionalCheckFailed" in str(exc)
+
+
+def delete_head_row(table, pk: str, sk: str) -> bool:
+    """Best-effort removal of a head row whose content is already stored elsewhere (#3918).
+
+    Used ONLY to retire a legacy-key row after its extraction has been archived verbatim
+    and re-written under the occurrence key. Never deletes an archived prior. A table
+    object with no `delete_item` (the pure-core unit path) is a no-op, reported as False.
+    """
+    fn = getattr(table, "delete_item", None)
+    if fn is None:
+        return False
+    try:
+        fn(Key={"pk": pk, "sk": sk})
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("training_notes legacy head delete failed (%s): %s", sk, type(e).__name__)
+        return False
 
 
 def read_head_record(table, pk: str, sk: str):
@@ -1017,6 +1197,15 @@ def write_workout_notes(table, date, workout_uid, exercises, user="matthew", dry
       * stored record whose extraction DIFFERS -> copy the prior verbatim to its archive
         key FIRST, then write the head stamped with `supersedes`.
 
+    #3918: for occurrence 0 the stored record may still live at the LEGACY key
+    (`DATE#<d>#WORKOUT#<id>`, no suffix). It is read from there, so an unchanged
+    re-extraction over history still writes nothing at all and no duplicate row is
+    minted. When it HAS changed, the prior is archived from its legacy key, the new head
+    is written under the occurrence key stamped `migrated_from_sk`, and the now-stale
+    legacy row is deleted BEST-EFFORT and only after the archive succeeded — a failed
+    delete leaves a duplicate the readers already de-duplicate (`dedupe_head_rows`),
+    never a lost record.
+
     Provenance-guarded: only ever writes the training_notes partition (Invariant 1).
     """
     items = build_workout_note_items(date, workout_uid, exercises, user=user, now_iso=now_iso, llm_fn=llm_fn)
@@ -1029,6 +1218,8 @@ def write_workout_notes(table, date, workout_uid, exercises, user="matthew", dry
         "versioned": 0,
         "archive_failed": 0,
         "prior_unverified": 0,
+        "legacy_rekeyed": 0,
+        "legacy_delete_failed": 0,
         "pain": 0,
         "dry_run": dry_run,
         "items": items,
@@ -1036,11 +1227,14 @@ def write_workout_notes(table, date, workout_uid, exercises, user="matthew", dry
     if dry_run:
         return result
     raw_guard = raw_pk(user)
+    wid = workout_id_from_uid(workout_uid)
     for it in items:
         assert it["pk"] != raw_guard, f"training_notes refused to write the raw Hevy pk: {it['pk']!r}"
         assert f"#SOURCE#{NOTES_SOURCE}#" in it["pk"], f"unexpected pk: {it['pk']!r}"
         try:
             stored = read_head_record(table, it["pk"], it["sk"])
+            if stored is None and int(it.get("occurrence") or 0) == 0:
+                stored = read_head_record(table, it["pk"], legacy_head_sk(date, wid))
             head_readable = True
         except Exception as e:  # noqa: BLE001
             # Fail-soft (this runs inside ingestion) but never fail SILENT: the head is
@@ -1065,6 +1259,14 @@ def write_workout_notes(table, date, workout_uid, exercises, user="matthew", dry
                 result["archive_failed"] += 1
             it.update(supersede_stamp(stored))
             result["versioned"] += 1
+            legacy_sk = str(stored.get("sk") or "")
+            if legacy_sk and legacy_sk != it["sk"] and is_legacy_head_sk(legacy_sk):
+                # #3918: the head moved from the old key to its occurrence key.
+                it["migrated_from_sk"] = legacy_sk
+                result["legacy_rekeyed"] += 1
+                if archived and not delete_head_row(table, it["pk"], legacy_sk):
+                    it["legacy_row_delete_failed"] = True
+                    result["legacy_delete_failed"] += 1
         elif head_readable:
             it.setdefault("version", 1)
             it.setdefault("first_extracted_at", it.get("extracted_at"))

@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
-from training.training_notes import DEGRADE_UNRECORDED
+from training.training_notes import DEGRADE_UNRECORDED, dedupe_head_rows, head_sk_base
 
 from mcp.config import table
 from mcp.core import LAYER_DARK, decimal_to_float, derived_layer_status
@@ -77,16 +77,33 @@ def tool_get_exercise_notes(args):
     rows = [decimal_to_float(it) for it in resp.get("Items", [])]
     # Corrections win on read (sk …#CORRECTION) and survive recompute.
     corrections = {r["sk"].replace("#CORRECTION", ""): r for r in rows if r.get("sk", "").endswith("#CORRECTION")}
+    # #3918: the head key is one per (workout, template, OCCURRENCE), so a workout that
+    # logged this template twice now yields TWO entries instead of one. A legacy row (no
+    # suffix) reads as occurrence 0 and yields to the new-scheme row for the same
+    # occurrence while the re-key is pending — a migrated record is never listed twice.
+    grouped: dict[str, list] = {}
+    for r in rows:
+        grouped.setdefault(head_sk_base(r.get("sk", "")), []).append(r)
+    ordered = []
+    for base in sorted(grouped):
+        for occ, row in sorted(dedupe_head_rows(grouped[base]).items()):
+            ordered.append((occ, row))
+
     timeline = []
     latest_progression = None
     pain_dates = []
-    for r in sorted([x for x in rows if not x.get("sk", "").endswith("#CORRECTION")], key=lambda x: x.get("sk", "")):
-        ov = corrections.get(r.get("sk", ""))
+    for occurrence, r in ordered:
+        # A correction written against the pre-migration key still applies to the record
+        # it corrected — it is found by the head's `migrated_from_sk`.
+        ov = corrections.get(r.get("sk", "")) or corrections.get(str(r.get("migrated_from_sk") or ""))
         signals = (ov or {}).get("signals", r.get("signals", []))
         pain = (ov or {}).get("pain_flag", r.get("pain_flag", False))
         entry = {
             "date": r.get("date"),
             "workout_uid": r.get("workout_uid"),
+            # Which logging of this template within that workout (0-based). Two entries
+            # with the same date + workout_uid are two real, separately-noted blocks.
+            "occurrence": occurrence,
             "note_raw": r.get("note_raw"),
             "signals": signals,
             "pain_flag": pain,

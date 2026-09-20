@@ -44,7 +44,8 @@ CYCLING = "Low effort level 10 for whole thing"
 EXS = [{"template_id": "D8F7F851", "name": "Cycling", "notes": CYCLING}]
 DATE = "2026-09-07"
 WUID = "hevy:e5c2f877"
-HEAD_SK = f"DATE#{DATE}#WORKOUT#e5c2f877"
+# #3918: the head key gained the occurrence suffix — one key per exercise-SESSION.
+HEAD_SK = f"DATE#{DATE}#WORKOUT#e5c2f877#0"
 PK = tn.notes_pk("D8F7F851")
 
 
@@ -249,21 +250,29 @@ def test_a_third_extraction_keeps_both_priors():
 # ── 2b. The archive is bounded by DISTINCT extractions, not by passes ─────────
 # Measured live on 2026-09-19 with `--report-overwrites`: of 42 stored note records, the
 # only two a re-run would version today are `2026-06-23 Treadmill` and `2026-09-10
-# Treadmill` — and both are there because that workout logs the SAME exercise template
-# TWICE with two different notes. They collide on one head key by construction, so every
-# pass writes A over B and then B over A. A timestamped archive key would mint two NEW
-# rows per pass, forever, in a measured partition. (The collision itself is a separate,
-# pre-existing conservation defect — named as residual in the PR, not fixed here.)
-COLLIDING = [
-    {"template_id": "D8F7F851", "name": "Treadmill", "notes": "Level 9 - 5.6 miles"},
-    {"template_id": "D8F7F851", "name": "Treadmill", "notes": "Level 4 - 1.2 miles"},
-]
+# Treadmill` — and both were there because that workout logs the SAME exercise template
+# TWICE with two different notes, which under the pre-#3918 key scheme collided on one
+# head key: every pass wrote A over B and then B over A. A timestamped archive key would
+# have minted two NEW rows per pass, forever, in a measured partition.
+#
+# #3918 removed that CAUSE (each logging now owns `…#WORKOUT#<id>#<occurrence>`; the
+# conservation property is pinned in tests/test_training_notes_occurrence_key_3918.py),
+# so the flap is reproduced here directly instead of through the collision: a model tail
+# that alternates between two answers across six passes. The property under test is the
+# archive key's, and it is unchanged — a head that flips between N distinct extractions
+# stores N archive rows, however many passes it takes.
+OTHER_TAIL = [{"class": "limiter", "summary": "legs gave out", "confidence": 0.5}]
+
+
+def _flap(t, passes=6):
+    for i in range(passes):
+        tail = LOGGING_QUIRK if i % 2 == 0 else OTHER_TAIL
+        tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=_llm(tail), now_iso=f"2026-09-{7 + i:02d}T00:00:00Z")
 
 
 def test_a_flapping_head_does_not_mint_an_archive_row_per_pass():
     t = FakeTable()
-    for i in range(6):
-        tn.write_workout_notes(t, DATE, WUID, COLLIDING, llm_fn=None, now_iso=f"2026-09-{7 + i:02d}T00:00:00Z")
+    _flap(t)
     archived = sorted(sk for (_pk, sk) in t.items if sk.startswith(tn.ARCHIVE_PREFIX))
     assert len(archived) == 2, f"6 passes minted {len(archived)} archive rows — the archive is unbounded: {archived}"
 
@@ -272,10 +281,12 @@ def test_an_already_archived_extraction_keeps_its_first_timestamps():
     """Write-once: re-archiving the same extraction must not move `archived_at` or
     overwrite the copy with a later pass's view of it."""
     t = FakeTable()
-    tn.write_workout_notes(t, DATE, WUID, COLLIDING, llm_fn=None, now_iso="2026-09-07T00:00:00Z")
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=_llm(LOGGING_QUIRK), now_iso="2026-09-07T00:00:00Z")
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=_llm(OTHER_TAIL), now_iso="2026-09-08T00:00:00Z")
     first = {sk: dict(it) for (_pk, sk), it in t.items.items() if sk.startswith(tn.ARCHIVE_PREFIX)}
     assert first
-    tn.write_workout_notes(t, DATE, WUID, COLLIDING, llm_fn=None, now_iso="2026-09-30T00:00:00Z")
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=_llm(LOGGING_QUIRK), now_iso="2026-09-29T00:00:00Z")
+    tn.write_workout_notes(t, DATE, WUID, EXS, llm_fn=_llm(OTHER_TAIL), now_iso="2026-09-30T00:00:00Z")
     for sk, was in first.items():
         now = t.items[(PK, sk)]
         assert now["archived_at"] == was["archived_at"]

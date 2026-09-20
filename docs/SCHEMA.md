@@ -1535,15 +1535,29 @@ LLM namer for residual `uncategorized` clusters is Phase 2 (deferred).
 
 ---
 
-### training_notes (derived note-signal layer — versioned, #951/#3816)
+### training_notes (derived note-signal layer — versioned, #951/#3816; occurrence-keyed, #3918)
 
 Derived, exercise-keyed projection of Matthew's freeform Hevy exercise notes, written by
 `lambdas/training/training_notes.py` (deterministic floor + bounded Haiku tail). Raw is
 never mutated. Read by `get_exercise_notes` and `training_notes_health`.
 
 **pk:** `USER#matthew#SOURCE#training_notes#EXERCISE#<template_id>` ·
-**sk (head):** `DATE#YYYY-MM-DD#WORKOUT#<workout_id>` · one head per exercise per workout.
-Corrections overlay at `DATE#…#WORKOUT#<id>#CORRECTION` (win on read).
+**sk (head):** `DATE#YYYY-MM-DD#WORKOUT#<workout_id>#<occurrence>` · one head per exercise
+**SESSION** (#3918). Corrections overlay at `DATE#…#WORKOUT#<id>#<occ>#CORRECTION` (win on read).
+
+**2026-09-20 (#3918) — the head key names the OCCURRENCE.** It was one key per (workout,
+template), so a workout logging the same template twice with two different notes put both
+notes on ONE key (live: 2026-06-23 and 2026-09-10, both Treadmill). `<occurrence>` is the
+0-based ordinal of that block among ALL appearances of its template in the workout's
+exercise list — counted over every appearance, noted or not, so adding a note to the first
+block never re-keys the second. New head field `occurrence` (number). **Read-compat, no
+rewrite:** a pre-#3918 row (no suffix) READS as occurrence 0 (`occurrence_from_sk`), the
+writer looks for it at its legacy key before deciding anything changed (an unchanged
+re-extraction still writes nothing), and both readers de-duplicate a legacy row against
+its migrated twin (`dedupe_head_rows`). `deploy/backfill_training_notes.py --migrate` is
+the durable re-key of the two collision workouts (dry-run by default). `training_notes_health`
+now counts ALL occurrence rows per (workout, template) and reports `occurrence_mismatches`
+— under `Limit=1` it had counted one stored row twice and reported the collision as healthy.
 
 **2026-09-19 (#3816) — a re-extraction no longer overwrites the head in place.** The
 writer compares the candidate extraction against the stored head first and takes one of
@@ -1572,8 +1586,10 @@ scans `sk >= DATE#<start>` and `training_notes_health` uses
 remember a filter (mirror of the hevy partition's `DELETE#WORKOUT#` markers, which sort
 the other way); (b) the key digests the **extraction content**, not `extracted_at`,
 because the live corpus contains workouts logging one exercise template twice with two
-different notes — they collide on one head key, and a timestamped archive key would mint
-new rows on every pass forever. The archive is therefore bounded by the number of
+different notes — under the pre-#3918 key scheme they collided on one head key, and a
+timestamped archive key would mint new rows on every pass forever (the collision cause is
+gone; the content-addressed key stays, and it is what `--migrate` recovers the displaced
+notes from). The archive is therefore bounded by the number of
 DISTINCT extractions that ever stood at that key. Chronology survives on the rows
 themselves (each archived copy carries its own `extracted_at`).
 
