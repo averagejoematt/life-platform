@@ -6,11 +6,11 @@
   "surface": "/api/coaching-dashboard coaches[*].data_phase",
   "verbatim": true,
   "status": "open",
-  "closes_with": "#3519",
+  "closes_with": "#3946",
   "gate": null,
   "expect_type": null,
   "specimen": "{\"coach_id\": \"physical\", \"data_phase\": \"established\", \"position_summary\": \"\", \"analysis_generated_at\": \"\"}",
   "control": "{\"coach_id\": \"physical\", \"data_phase\": \"pre_start\", \"position_summary\": \"\", \"analysis_generated_at\": \"\"}",
   "inputs": null,
-  "why_open": "A structured field, not prose: site_api_lambda hard-codes data_phase='established' for every coach (the only assignment). No text gate can replay it; #3519 (PR #3632) derives it. Recorded so the corpus count is the review's eight, not a prose-only seven."
+  "why_open": "A structured field, not prose: site_api_lambda hard-coded data_phase='established' for every coach; #3519 (PR #3632) derives it from day_n and closed on live proof 2026-09-06. The corpus cannot replay a structured specimen (gate null), so it stays open under #3946 — the replay path for structured-field specimens — rather than under a closed closer. Recorded so the corpus count is the review's eight, not a prose-only seven."
 }
