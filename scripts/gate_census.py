@@ -523,6 +523,21 @@ ATTEMPTED_UNPROVEN: dict[str, str] = {
         "live infrastructure, which #2578's guardrail and this worktree's brief both forbid. "
         "A verdict needs a stubbed CloudFormation client, i.e. a harness — slice 3."
     ),
+    "ci::pii-endpoint-sweep.yml::sweep::3": (
+        "NOT PROVED — same shape as the ci-lint.yml gitleaks entry above. The step's failing "
+        "arm needs EITHER a genuine PII/vice-vocabulary tell on the deployed production "
+        "/api/* surface, or a broken content-filter channel (env/local-file/S3 all absent — "
+        "which is exactly what makes it fail CLOSED); reproducing either locally means "
+        "planting a leak on prod or faking an AWS outage the CI runner does not actually "
+        "have, so a local exit code would be a verdict on a different gate (#3620's own "
+        "bucket-policy-drift entry in tests/gate_census_unproven_residue.py records the "
+        "identical reasoning for the live-AWS half of that check). What IS mutation-proven, "
+        "at the unit level, is the function this step wires: "
+        "tests/test_public_surface_pii_guard.py::test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass "
+        "and its sibling planted-tell tests inject a fake fetcher into scan_endpoints() and "
+        "assert it reports a violation rather than a silent pass. Needs a scratch site "
+        "deployment (or a staged fixture endpoint) to prove the CLI wiring itself — future work."
+    ),
 }
 
 

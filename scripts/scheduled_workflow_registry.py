@@ -159,6 +159,19 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "reason": "Same shape as config-drift, on the webhook ingest path — the near-real-time "
         "sources (CGM, water, BP, State of Mind) have no other daily structural check.",
     },
+    "pii-endpoint-sweep.yml": {
+        "watched": True,
+        "grace_hours": 14.0,
+        "basis": "newly added (#3620 box 1) — no fire history of its own yet. Same daily class "
+        "and the same declared-vs-observed lateness as its two siblings above "
+        "(config-drift, hae-webhook-ingress-drift); 14h is carried forward from their "
+        "measured gap until this workflow accumulates enough runs to re-derive its own.",
+        "reason": "The live `/api/*` PII-surface sweep (deploy/pii_surface_guard.py --endpoints) "
+        "ran in exactly zero workflows before this — the dynamic surface's only prior "
+        "evidence was a human running curl during the review that graded it (#3620's "
+        "own finding). A cron that silently stops here puts the surface straight back "
+        "to that state with nothing saying so.",
+    },
     "remediation-agent.yml": {
         "watched": True,
         "grace_hours": 12.0,
