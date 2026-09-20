@@ -1,7 +1,7 @@
 """
 tools_hevy_routine.py — `manage_hevy_routine` fat MCP tool (ADR-066, ADR-069).
 
-One tool, ten actions:
+One tool, eleven actions:
 
   draft         — generate IR via the deterministic programmer (no Hevy write)
   draft_custom  — author an IR from an explicit exercise/set/weight list (ADR-069)
@@ -13,6 +13,7 @@ One tool, ten actions:
   floor         — generate floor variant explicitly
   re_entry      — force re-entry mode regardless of last-workout date
   adherence     — programmed-vs-performed report for a routine_id
+  stall_check   — prescribed-vs-performed stall verdict for ONE movement (#3928)
 
 `draft` is the opinionated, deterministic volume-landmark programmer — it
 builds its own routine from your state and never takes an exercise list.
@@ -65,6 +66,7 @@ _VALID_ACTIONS = {
     "floor",
     "re_entry",
     "adherence",
+    "stall_check",
 }
 
 _LB_TO_KG = 0.45359237
@@ -1185,6 +1187,10 @@ def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     return {"status": "ok", "routine_id": routine_id, "adherence": calculate_adherence(ir, performed)}
 
 
+# #3928: the stall check's fetch half lives in `mcp/hevy_stall_report.py` (this module
+# sits at the #1665 ratchet's ceiling — extract, don't raise the cap).
+from mcp.hevy_stall_report import stall_check as _action_stall_check  # noqa: E402
+
 _DISPATCH = {
     "draft": _action_draft,
     "draft_custom": _action_draft_custom,
@@ -1196,6 +1202,7 @@ _DISPATCH = {
     "floor": _action_floor,
     "re_entry": _action_re_entry,
     "adherence": _action_adherence,
+    "stall_check": _action_stall_check,
 }
 
 
