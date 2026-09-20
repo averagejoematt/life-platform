@@ -353,11 +353,15 @@ def format_inverse_census(audit: dict) -> str:
     box-4 sentence: the four families are enumerated by the check, never invisible to it.
 
     Written here rather than in the caller so the nightly (qa_smoke_lambda) and any
-    operator report render the same sentence from the same derivation.
+    operator report render the same sentence from the same derivation. Never returns
+    an empty string: an empty census is still a verdict (zero cross-phase rows carry
+    forbidden provenance TONIGHT), not the absence of one — a caller that only appends
+    this on a truthy check would make the sentence disappear on the one night it
+    would most reassuringly say "none" (#3915 box 4).
     """
     census = audit.get("inverse_census") or {}
     if not census:
-        return ""
+        return " INVERSE census (#3915): 0 cross-phase row(s) carry forbidden provenance across the audited families."
     parts = []
     for fam, e in sorted(census.items(), key=lambda kv: (-kv[1]["rows"], kv[0])):
         parts.append(f"{fam} {e['rows']} [{'+'.join(e['attrs'])}] {e['verdict']}")

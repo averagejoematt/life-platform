@@ -77,7 +77,7 @@ def _tripwire_states(
     distinction is the whole #3767 lesson applied to safety conditions: a guard that reads
     as clear because nobody could look is worse than no guard, because it is trusted.
     """
-    by_id = {t["id"]: t for t in owner_redlines.TRIPWIRES}
+    by_id = {t["id"]: t for t in owner_redlines.engine_evaluated_tripwires()}  # the v2 additions are named, not computed
     out: list[dict[str, Any]] = []
 
     def _row(tid: str, state: str, observed: Any, detail: str = "") -> dict[str, Any]:
@@ -292,6 +292,8 @@ def constraint_block(
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
         "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
+        # #3753 v2: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
+        "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
         "recovery_tier": recovery_tier,
         "acwr_flag": acwr_flag,
         "muscle_volume": muscle_volume or {},
@@ -324,6 +326,12 @@ def constraint_block(
                     None
                     if redlines["active"]
                     else "the owner's redlines are PROPOSED, not confirmed — this plan follows a posture he has not yet signed (#3753)"
+                ),
+                (
+                    f"{len(owner_redlines.unevaluated_tripwires())} proposed v2 tripwire(s) are reported but NOT evaluated by this "
+                    f"engine: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753)"
+                    if owner_redlines.unevaluated_tripwires()
+                    else None
                 ),
                 f"{len(unknown)} tripwire(s) could not be evaluated: {', '.join(unknown)}" if unknown else None,
                 (

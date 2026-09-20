@@ -345,6 +345,14 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
 # five are a decision rather than five contracts.
 _RECAP_READ_REASON = "#3741 recap card: a READ-ONLY consumer that cannot make a false claim from a shape change. Verified on the module, not assumed: recap_data does no [] indexing on any source row (every field goes through .get()), DayFacts declares 21 Optional fields and the non-Optional ones default to empty list/dict, and web/recap_templates raises RecapNullFact on any None at RENDER rather than formatting it — fmt(None) == '-' is forbidden on this surface. So a renamed or dropped field makes the beat that needs it DECLINE; it can never become a wrong number on a public card. Residual risk stated plainly rather than waved: the card would then degrade to a fallback beat silently, and the only record is `absent_sources` on the SOURCE#recap_cards row per run, which is queryable but not alarmed. Contracting five read seams whose worst case is 'draws less' is disproportionate (ADR-103/144) while that holds; if a card ever derives a number from two partitions that must agree, that seam gets a PairContract instead of this row."
 
+_HEVY_WORKED_SET_REASON = (
+    "#3931 routed all three TDEE surfaces through ONE shared hevy reader (health.tdee.worked_set_seconds), whose "
+    "dependence on the exercises[].sets[] wire shape is pinned against hevy_compiler._set_to_wire; a shape drift "
+    "collapses sets to 0 and flips the PUBLISHED basis string to lifting_duration_x0.25_no_set_log, so the two "
+    "sides cannot disagree silently."
+)
+
+
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     # #3900 (2026-09-20): the writer gained a write-time `phase`/`cycle` stamp via
     # experiment_stamp_for(); the reader (mcp/tools_coach_intelligence.py) never inspects
@@ -377,6 +385,33 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     "strava::lambdas/content/recap_data.py::read": (
         "2026-09-13",
         _RECAP_READ_REASON,
+    ),
+    # #3931 (2026-09-20): three TDEE surfaces began reading the `hevy` partition so the
+    # lifting energy term can be charged on WORKED-SET time instead of the full logged
+    # session duration (rest between sets included). All three read it through ONE shared
+    # accessor — `health.tdee.worked_set_seconds` — never inline, and that accessor's
+    # dependence on the wire shape (`exercises[].sets[].reps` / `.duration_seconds` /
+    # `.type`) is asserted against the shape `lambdas/training/hevy_compiler._set_to_wire`
+    # writes in tests/test_tdee_worked_set_3931_behavior.py.
+    #
+    # VERIFIED (not asserted): the two sides cannot disagree SILENTLY here. The accessor
+    # treats every unmatched set row as contributing zero, so a shape drift collapses
+    # `sets` to 0, which routes `lifting_energy` to its NAMED fallback branch — the
+    # published `basis` string flips from "worked_set_time_from_hevy_set_log…" to
+    # "lifting_duration_x0.25_no_set_log" on every calorie surface. That flip is pinned by
+    # test_without_a_set_log_the_lifting_duration_is_charged_at_the_stated_work_fraction.
+    # A drift changes a published label, not just a number.
+    "hevy::lambdas/web/site_api_nutrition.py::read": (
+        "2026-09-20",
+        _HEVY_WORKED_SET_REASON,
+    ),
+    "hevy::mcp/tools_health.py::read": (
+        "2026-09-20",
+        _HEVY_WORKED_SET_REASON,
+    ),
+    "hevy::mcp/tools_nutrition.py::read": (
+        "2026-09-20",
+        _HEVY_WORKED_SET_REASON,
     ),
 }
 

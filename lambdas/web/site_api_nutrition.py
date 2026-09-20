@@ -110,7 +110,7 @@ def _resolve_mf_tdee(items):
     return None, None
 
 
-def _mifflin_tdee(weight_lbs, strava_items=None, profile=None):
+def _mifflin_tdee(weight_lbs, strava_items=None, profile=None, hevy_items=None):
     """The ADR-152 TDEE estimate — Mifflin-St Jeor BMR + MEASURED trailing-7-day exercise
     energy — from the ONE shared implementation in ``health.tdee`` (#2310).
 
@@ -128,7 +128,9 @@ def _mifflin_tdee(weight_lbs, strava_items=None, profile=None):
     height_in = prof.get("height_inches")
     age_years, age_basis, _ = health_tdee.resolve_age(prof.get("date_of_birth"))
     wkg = _num(weight_lbs)
-    ex = health_tdee.exercise_energy(strava_items, (wkg or 0.0) * health_tdee.LB_TO_KG)
+    # #3931: the Hevy set log is the worked-set input. Absent, the lifting term uses the
+    # stated 0.25 work fraction of logged duration — never the full duration with rest in it.
+    ex = health_tdee.exercise_energy(strava_items, (wkg or 0.0) * health_tdee.LB_TO_KG, hevy_items)
     budget = health_tdee.energy_budget(
         weight_lbs=weight_lbs,
         height_inches=height_in,
@@ -139,6 +141,7 @@ def _mifflin_tdee(weight_lbs, strava_items=None, profile=None):
         exercise_energy_days=ex["days"],
         exercise_energy_basis=ex["basis"],
         deficit_kcal=0,  # TDEE means MAINTENANCE (ADR-152)
+        lifting=ex.get("lifting"),
     )
     return budget["tdee"] if budget else None
 
@@ -342,6 +345,12 @@ def nutrition_overview(*, _g) -> dict:
                     "protein_floor_hit_days": 0,
                     "days_logged": 0,
                     "tdee": None,
+                    # #3931 box 4: the populated block carries the TDEE method and the
+                    # impossibility basis, so the empty one must too — a field that
+                    # appears only when data exists is a field a reader learns to ignore.
+                    "tdee_method": None,
+                    "basis": "no_nutrition_data_in_window",
+                    "avg_deficit_published": False,
                     # #2221: the populated block always publishes tdee_source (the
                     # measured-vs-estimated label the front-end renders next to the
                     # number); on a genesis week the key was simply absent.
@@ -384,6 +393,11 @@ def nutrition_overview(*, _g) -> dict:
                     "implied_rate_lb_wk": None,
                     "deficit_pct": None,
                     "deficit_label": None,
+                    # #3931 box 4 + #2221 shape parity: method/basis on the empty branch too.
+                    "tdee_method": None,
+                    "basis": "no_nutrition_data_in_window",
+                    "deficit_published": False,
+                    "trend_check": None,
                     "protein_hit_pct": None,
                     "protein_floor_hit_pct": None,
                     "protein_floor_g": protein_floor,
@@ -472,12 +486,24 @@ def nutrition_overview(*, _g) -> dict:
     # profile-derived estimate from the latest weigh-in — labeled, so the deficit panel
     # shows a real (honestly-flagged) number instead of None.
     tdee, tdee_source = _resolve_mf_tdee(items)
+    tdee_method = "macrofactor_adaptive_expenditure" if tdee is not None else None
     if tdee is None:
-        est = _mifflin_tdee(_latest_weight_lbs(d30, today, _g=_g), _g["_query_source"]("strava", d7, today))
+        est = _mifflin_tdee(
+            _latest_weight_lbs(d30, today, _g=_g),
+            _g["_query_source"]("strava", d7, today),
+            hevy_items=_g["_query_source"]("hevy", d7, today),
+        )
         if est:
-            tdee, tdee_source = est, "estimate_mifflin"
+            tdee, tdee_source, tdee_method = est, "estimate_mifflin", health_tdee.METHOD
     avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
     deficit = round(tdee - avg_cal) if tdee and avg_cal else None
+    # #3931 box 2/4: the published deficit is checked against the MEASURED weight trend
+    # before it is published. `trend_check["basis"]` begins with "refused: " when the two
+    # cannot both be true — the loss_rate block below then says refused instead of
+    # publishing a rate that the same page's weight chart contradicts.
+    _trend_lb_wk, _trend_days = health_tdee.weight_trend_lb_per_wk(_g["_query_source"]("withings", d30, today))
+    trend_check = health_tdee.implied_deficit_vs_trend(tdee, avg_cal, _trend_lb_wk, _trend_days)
+    deficit_published = bool(trend_check.get("publish"))
 
     # Daily trend for chart
     trend = []
@@ -627,16 +653,23 @@ def nutrition_overview(*, _g) -> dict:
     TARGET_RATE_LB_WK = _TARGET_RATE_LB_WK
     KCAL_PER_LB = _KCAL_PER_LB
     required_deficit = _REQUIRED_DEFICIT_KCAL
-    deficit_pct = round(deficit / tdee * 100, 1) if (deficit is not None and tdee) else None
+    deficit_pct = round(deficit / tdee * 100, 1) if (deficit is not None and tdee and deficit_published) else None
     deficit_label = _deficit_label(deficit_pct)
     loss_rate = {
         "target_rate_lb_wk": TARGET_RATE_LB_WK,
         "required_deficit_kcal": required_deficit,
-        "actual_deficit_kcal": deficit,
-        "gap_kcal": (required_deficit - deficit) if deficit is not None else None,
-        "implied_rate_lb_wk": round(deficit * 7 / KCAL_PER_LB, 1) if deficit is not None else None,
+        "actual_deficit_kcal": deficit if deficit_published else None,
+        "gap_kcal": (required_deficit - deficit) if (deficit is not None and deficit_published) else None,
+        "implied_rate_lb_wk": round(deficit * 7 / KCAL_PER_LB, 1) if (deficit is not None and deficit_published) else None,
         "deficit_pct": deficit_pct,
         "deficit_label": deficit_label,
+        # #3931 box 4: every calorie/deficit surface carries the method it came from and
+        # a basis. When the impossibility check refuses, these fields are the answer —
+        # the numbers above are None rather than a figure the weight trend contradicts.
+        "tdee_method": tdee_method,
+        "basis": trend_check.get("basis"),
+        "deficit_published": deficit_published,
+        "trend_check": trend_check,
         "protein_hit_pct": protein_hit_pct,
         # The floor (170) is what "the protein floor holds" language grades against —
         # the target (190) is the stretch line, not the floor.
@@ -914,7 +947,11 @@ def nutrition_overview(*, _g) -> dict:
                 "days_logged": len(items),
                 "tdee": round(tdee) if tdee else None,
                 "tdee_source": tdee_source,
-                "avg_deficit": deficit,
+                # #3931 box 4: the method behind the number, and the impossibility verdict.
+                "tdee_method": tdee_method,
+                "basis": trend_check.get("basis"),
+                "avg_deficit": deficit if deficit_published else None,
+                "avg_deficit_published": deficit_published,
                 "cal_7d_avg": (round(sum(cal_7d) / len(cal_7d)) if cal_7d else None) if _w7["full"] else None,
                 "pro_7d_avg": (round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None) if _w7["full"] else None,
                 "cal_avg_recent": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
@@ -1006,19 +1043,28 @@ def deficit_sustainability(*, _g) -> dict:
     cals = [_mf(i, "calories") for i in mf if _mf(i, "calories") is not None]
     avg_cal = round(sum(cals) / len(cals)) if cals else 0
     tdee, tdee_source = _resolve_mf_tdee(mf)
+    tdee_method = "macrofactor_adaptive_expenditure" if tdee else None
     if not tdee:  # Fallback: profile-derived Mifflin estimate from the latest weigh-in (#484)
+        _d7 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
         est = _mifflin_tdee(
             _latest_weight_lbs(start, today, _g=_g),
-            _query_source("strava", (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d"), today),
+            _query_source("strava", _d7, today),
+            hevy_items=_query_source("hevy", _d7, today),
         )
         if est:
-            tdee, tdee_source = est, "estimate_mifflin"
+            tdee, tdee_source, tdee_method = est, "estimate_mifflin", health_tdee.METHOD
         else:
-            tdee, tdee_source = 2400, "estimate_default"
+            tdee, tdee_source, tdee_method = 2400, "estimate_default", "flat_default_no_weight_or_height"
     deficit_kcal = round(tdee - avg_cal)
     deficit_pct = round(deficit_kcal / tdee * 100, 1) if tdee else 0
     in_deficit = deficit_kcal > 200
     deficit_label = _deficit_label(deficit_pct)  # #2221: one ladder, and it has a surplus branch
+    # #3931 box 2/4: the same impossibility check the overview runs. The five channels
+    # below are measured independently and still report; only the DEFICIT number is
+    # withheld when the model and the measured trend cannot both be true.
+    _trend_lb_wk, _trend_days = health_tdee.weight_trend_lb_per_wk(_query_source("withings", start, today))
+    trend_check = health_tdee.implied_deficit_vs_trend(tdee, avg_cal, _trend_lb_wk, _trend_days)
+    deficit_published = bool(trend_check.get("publish"))
 
     src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava")}
     whoop, habit, strava = src["whoop"], src["habitify"], src["strava"]
@@ -1131,9 +1177,15 @@ def deficit_sustainability(*, _g) -> dict:
                     "avg_intake_kcal": avg_cal,
                     "tdee": round(tdee),
                     "tdee_source": tdee_source,
-                    "deficit_kcal": deficit_kcal,
-                    "deficit_pct": deficit_pct,
-                    "label": deficit_label,
+                    "deficit_kcal": deficit_kcal if deficit_published else None,
+                    "deficit_pct": deficit_pct if deficit_published else None,
+                    "label": deficit_label if deficit_published else None,
+                    # #3931 box 4: method + basis on every deficit surface. `basis`
+                    # begins with "refused: " when the numbers above are withheld.
+                    "tdee_method": tdee_method,
+                    "basis": trend_check.get("basis"),
+                    "deficit_published": deficit_published,
+                    "trend_check": trend_check,
                 },
                 "channels": channels,
                 "degraded_count": degraded,

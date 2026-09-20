@@ -36,6 +36,7 @@ import json
 import os
 import pathlib
 import sys
+import unittest.mock
 
 import pytest
 
@@ -89,9 +90,15 @@ def test_every_anchor_and_knob_carries_provenance():
 
 def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
     """Six lifting days contradicts lifting_sessions_per_wk 2-3. The engine must say so."""
+    # v2 redlines (2026-09-20) allow 5-6 lifting days, so the six-day week no longer conflicts —
+    # the conflict must REAPPEAR under the v1 values (mutation control: the check is live, not deleted).
+    from training import owner_redlines
+
     ids = {c["id"] for c in program_structure.conflicts()}
-    assert "lifting_frequency_vs_redline" in ids
+    assert "lifting_frequency_vs_redline" not in ids
     assert all(c["resolved"] is False for c in program_structure.conflicts())
+    with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 2, "high": 3}):
+        assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
 
 
 # ── 2. shape parity with the JSON the engine runs on ─────────────────────────

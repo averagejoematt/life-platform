@@ -20,7 +20,9 @@ Cycle 17's genesis (2026-09-06) is a SUNDAY, so the experiment week Days 1-7 run
 and closes on a Saturday; its card renders the Sunday morning after. But the rule is
 `day_n % 7 == 0` on the date being rendered, never a weekday — genesis moves every cycle
 (seventeen so far), and a `SAT`/`SUN` literal would be correct until the next reset and
-wrong silently after it.
+wrong silently after it. The check itself lives in `pacific_time.week_close_day` (#3761)
+so the progress-photo protocol's target capture day can never independently drift from
+this card's own week boundary.
 
 TWO CARDS A DAY
 
@@ -56,7 +58,7 @@ from typing import Any
 
 import boto3
 from common.constants import EXPERIMENT_START_DATE
-from common.pacific_time import pacific_day_n, pacific_now
+from common.pacific_time import pacific_day_n, pacific_now, week_close_day
 
 try:
     from common.platform_logger import get_logger
@@ -395,7 +397,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     # The weekly card is derived from the daily run, not a second cron.
     weekly_key = None
     day_n = pacific_day_n(EXPERIMENT_START_DATE, date)
-    if day_n and day_n % 7 == 0:
+    if day_n and week_close_day(date, EXPERIMENT_START_DATE) == date:
         try:
             week_n = day_n // 7
             wk_start = recap_data._day_range(EXPERIMENT_START_DATE, date)[-7]

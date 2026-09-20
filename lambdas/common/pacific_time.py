@@ -209,3 +209,28 @@ def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
         return max((date.fromisoformat(on) - date.fromisoformat(start_date)).days + 1, 0)
     except (ValueError, TypeError):
         return 0
+
+
+def week_close_day(on_date: str, genesis: str) -> str | None:
+    """The day key (``YYYY-MM-DD``) the experiment week containing ``on_date`` closes on.
+
+    THE one week-close derivation (#3761). A week closes on ``day_n % 7 == 0`` — day 7,
+    14, 21 ... — relative to ``genesis``, NEVER a weekday: genesis moves every experiment
+    reset (seventeen so far) and a ``SAT``/``SUN`` literal would be right until the next
+    reset and silently wrong after it (see ``recap_card_lambda.py``'s "THE WEEKLY CARD IS
+    DERIVED" note, which this replaces the inline copy of).
+
+    Two callers share this rather than each recomputing "the end of the week": the weekly
+    recap card (is *today* the close day?) and the progress-photo protocol (what date IS
+    the close day for a photo taken any day this week?) — one arithmetic, so neither can
+    independently drift from the other's definition of a week.
+
+    Returns None when ``on_date`` can't be resolved to a day-1-or-later day — an
+    unparseable input, or a date before ``genesis`` (``pacific_day_n`` clamps those to 0,
+    and a week has no close before day 1 exists).
+    """
+    n = pacific_day_n(genesis, on_date)
+    if n < 1:
+        return None
+    days_into_week = (n - 1) % 7
+    return shift_day_key(on_date, 6 - days_into_week)

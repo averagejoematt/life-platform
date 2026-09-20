@@ -349,13 +349,51 @@ def handle(
         chat_id=order.get("chat_id"),
     )
     week_phrase = f"week {week_n}" if week_n else "off-cycle"
+    protocol_phrase = _protocol_offset_phrase(date, experiment_start)
+    detail = f"{week_phrase}, {protocol_phrase}" if protocol_phrase else week_phrase
     return {
         "ok": True,
         "reason": "stored",
-        "reply": f"Stored — {pose}, {date} ({week_phrase}).\n{row['s3_key']}",
+        "reply": f"Stored — {pose}, {date} ({detail}).\n{row['s3_key']}",
         "s3_key": row["s3_key"],
         "week_n": week_n,
     }
+
+
+def expected_capture_day(date: str, experiment_start: str = "") -> Optional[str]:
+    """The protocol's target capture date (`YYYY-MM-DD`) for the week containing `date`.
+
+    A thin wrapper over `pacific_time.week_close_day` (#3761) — the same derivation the
+    weekly recap card uses to decide when a week closes — so the protocol's target day and
+    the card's week boundary can never independently drift. Returns None off-cycle (no
+    `experiment_start`, or `date` before genesis), matching `_week_of`'s contract below.
+    """
+    if not experiment_start:
+        return None
+    try:
+        from common.pacific_time import week_close_day
+
+        return week_close_day(date, experiment_start)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _protocol_offset_phrase(date: str, experiment_start: str) -> str:
+    """`"on the protocol day"` or `"N days off the protocol day"`, or `""` off-cycle.
+
+    Told to him on every stored capture so a back-dated or early/late set is visible at
+    the moment it lands, not weeks later when the comparison is being made.
+    """
+    target = expected_capture_day(date, experiment_start)
+    if not target:
+        return ""
+    from common.pacific_time import parse_day_key
+
+    d, t = parse_day_key(date), parse_day_key(target)
+    if d is None or t is None:
+        return ""
+    off = abs((d - t).days)
+    return "on the protocol day" if off == 0 else f"{off} day{'s' if off != 1 else ''} off the protocol day"
 
 
 def _week_of(experiment_start: str, date: str):

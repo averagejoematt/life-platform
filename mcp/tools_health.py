@@ -775,10 +775,32 @@ def _get_energy_expenditure(args):
     strava_30d = query_source("strava", d30_start, end_date)
 
     weight_kg = current_weight_lbs * tdee_core.LB_TO_KG
-    ex_7d = tdee_core.exercise_energy(strava_7d, weight_kg)
-    ex_30d = tdee_core.exercise_energy(strava_30d, weight_kg)
+    # #3931: the Hevy set log is the worked-set input — without it the lifting term falls
+    # back to the stated 0.25 work fraction of logged duration, never to full duration.
+    try:
+        hevy_7d = query_source("hevy", d7_start, end_date) or []
+        hevy_30d = query_source("hevy", d30_start, end_date) or []
+    except Exception:
+        hevy_7d, hevy_30d = [], []
+    ex_7d = tdee_core.exercise_energy(strava_7d, weight_kg, hevy_7d)
+    ex_30d = tdee_core.exercise_energy(strava_30d, weight_kg, hevy_30d)
 
-    def _budget(ex, window_days):
+    # #3931 box 2: the impossibility check needs the measured intake and the measured
+    # weight trend. Both are read here rather than assumed — an absent one is reported as
+    # "unverified", never as agreement.
+    try:
+        mf_7d = query_source("macrofactor", d7_start, end_date) or []
+    except Exception:
+        mf_7d = []
+    _logged = [float(i["total_calories_kcal"]) for i in mf_7d if i.get("total_calories_kcal") not in (None, "")]
+    intake_avg = round(sum(_logged) / len(_logged), 1) if _logged else None
+    try:
+        wt_trend_rows = query_source("withings", (_end_dt - timedelta(days=14)).strftime("%Y-%m-%d"), end_date) or []
+    except Exception:
+        wt_trend_rows = []
+    trend_lb_wk, trend_days = tdee_core.weight_trend_lb_per_wk(wt_trend_rows)
+
+    def _budget(ex, window_days, trend_check=None):
         return tdee_core.energy_budget(
             weight_lbs=current_weight_lbs,
             height_inches=height_in,
@@ -790,9 +812,13 @@ def _get_energy_expenditure(args):
             exercise_energy_basis=ex["basis"],
             window_days=window_days,
             deficit_kcal=target_deficit_kcal,
+            trend_check=trend_check,
+            lifting=ex.get("lifting"),
         )
 
-    budget_7d = _budget(ex_7d, _d7_days)
+    _probe = _budget(ex_7d, _d7_days)
+    check_7d = tdee_core.implied_deficit_vs_trend(_probe["tdee"], intake_avg, trend_lb_wk, trend_days) if intake_avg is not None else None
+    budget_7d = _budget(ex_7d, _d7_days, check_7d)
     budget_30d = _budget(ex_30d, _d30_days)
 
     bmr = budget_7d["inputs"]["bmr_kcal"]
@@ -848,6 +874,20 @@ def _get_energy_expenditure(args):
         "target_deficit_kcal": target_deficit_kcal,
         "calorie_target_based_on_7d": calorie_target_7d,
         "calorie_target_based_on_30d": calorie_target_30d,
+        # #3931 box 4: the method name (DERIVED from health.tdee, never re-typed) and the
+        # impossibility verdict, on the surface that publishes the number. When `basis`
+        # begins with "refused: ", `calorie_target_based_on_7d` is None — the surface says
+        # refused rather than publishing a figure the weight trend contradicts.
+        "calorie_target_method": tdee_core.METHOD,
+        # #3931 box 3: the SECOND method, offered alongside rather than folded in. It
+        # never touches a MET table or a Mifflin coefficient, so it fails in different
+        # directions than `calorie_target_method` does — and when the two disagree,
+        # `calorie_target_check` below is what refuses. `None` when no intake average or
+        # no measured trend exists to back-solve from (ADR-104: absent, not zero).
+        "tdee_second_method": tdee_core.tdee_from_trend(intake_avg, trend_lb_wk, days=trend_days),
+        "calorie_target_basis": budget_7d.get("target_basis"),
+        "calorie_target_published": budget_7d.get("target_published", True),
+        "calorie_target_check": check_7d,
         # ADR-152/ADR-105: the same target, with its method and its inputs attached, so a
         # reader can check the number without reading this source — and so this tool and
         # `get_nutrition view=macros` are visibly answering from ONE definition.

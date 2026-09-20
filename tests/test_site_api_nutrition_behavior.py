@@ -1996,3 +1996,57 @@ def test_a_zero_or_negative_weight_never_produces_an_estimated_tdee():
 def test_a_non_positive_expenditure_is_not_accepted_as_a_measured_tdee():
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=2000, expenditure_kcal=0)])
     assert overview(src)["nutrition"]["tdee_source"] is None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# The impossibility check on the reader-facing deficit surfaces (#3931)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_loss_rate_block_names_the_method_behind_its_deficit():
+    """#3931 box 4: every calorie/deficit surface carries a method name and a basis.
+
+    MacroFactor's own adaptive expenditure is the primary; when it is the source, the
+    method says so rather than naming the Mifflin model that did not run.
+    """
+    sources = FakeSources(macrofactor=[mf(TODAY, total_calories_kcal=2400, expenditure_kcal=2900)])
+    body = overview(sources)
+    assert body["nutrition"]["tdee_method"] == "macrofactor_adaptive_expenditure"
+    assert isinstance(body["loss_rate"]["basis"], str) and body["loss_rate"]["basis"]
+    assert body["loss_rate"]["tdee_method"] == "macrofactor_adaptive_expenditure"
+
+
+def test_the_site_refuses_to_publish_a_deficit_the_weight_trend_contradicts():
+    """A 2,900 TDEE against 400 kcal/day of intake implies an 86% deficit.
+
+    The reader sees "refused" with both numbers, not a rate chart the same page's own
+    weight series cannot support (#3931). `implied_rate_lb_wk` — the number that reads as
+    "you are losing X lb/week" — is withheld, not softened.
+    """
+    days = [(datetime.strptime(TODAY, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14)]
+    sources = FakeSources(
+        macrofactor=[mf(d, total_calories_kcal=400, expenditure_kcal=2900) for d in days],
+        withings=[row("withings", days[-1], weight_lbs=320.0), row("withings", days[0], weight_lbs=308.3)],
+    )
+    body = overview(sources)
+    lr = body["loss_rate"]
+    assert lr["basis"].startswith("refused: ")
+    assert lr["deficit_published"] is False
+    assert lr["actual_deficit_kcal"] is None
+    assert lr["implied_rate_lb_wk"] is None
+    assert lr["deficit_pct"] is None
+    assert lr["trend_check"]["implied_deficit_kcal_per_day"] == 2500
+    # the TDEE itself still publishes — it is maintenance, not a target (ADR-152)
+    assert body["nutrition"]["tdee"] == 2900
+    assert body["nutrition"]["avg_deficit"] is None
+
+
+def test_the_sustainability_deficit_block_carries_its_method_and_basis():
+    """The five channels are measured independently and still report; only the DEFICIT
+    number is withheld when the model and the measured trend cannot both be true."""
+    days = [(datetime.strptime(TODAY, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14)]
+    sources = FakeSources(macrofactor=[mf(d, total_calories_kcal=2400, expenditure_kcal=2900) for d in days])
+    block = sustainability(sources)["deficit_sustainability"]["deficit"]
+    assert block["tdee_method"] == "macrofactor_adaptive_expenditure"
+    assert isinstance(block["basis"], str) and block["basis"]
+    assert "deficit_published" in block
