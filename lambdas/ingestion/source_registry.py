@@ -174,12 +174,18 @@ DEFAULT_STALE_HOURS = 48
 #   day_key_frame  (#3257) WHICH CALENDAR the source's `DATE#YYYY-MM-DD` sort key names.
 #                  Absent = 'pacific', the platform default: `ingestion_framework.py`
 #                  stamps `pacific_today()` (truth audit 2026-07-10), so a framework
-#                  source's day key is a PACIFIC calendar day. The single exception is
-#                  'utc', carried by apple_health: TD-19 Phase 2 (2026-05-03,
+#                  source's day key is a PACIFIC calendar day. TWO sources declare 'utc':
+#                  apple_health, where TD-19 Phase 2 (2026-05-03,
 #                  docs/audits/TD-19_DATE_PARTITION_AUDIT.md) made
 #                  health_auto_export_lambda.parse_date_str convert the device's source-tz
 #                  timestamp to UTC BEFORE extracting the day, deliberately, so HAE's
-#                  many sub-streams share one partition frame.
+#                  many sub-streams share one partition frame; and whoop (#3913), where the
+#                  day key is UTC even though the framework stamps the LABEL — `fetch_day`
+#                  turns each Pacific label into a UTC WINDOW and files what comes back
+#                  under that label, measured 2,249/2,249 straddling rows UTC-keyed (#3677).
+#                  The second entry is the reason this is a FACET and not "the HAE
+#                  exception": the frame follows the fetch, not the stamp, and the only way
+#                  to know which is to measure the partition.
 #                  WHY THIS IS A FACET AND NOT A CONSTANT IN EACH CONSUMER: a `DATE#` day
 #                  is a DAY, not an instant, so any consumer that ages it must anchor it —
 #                  and it must anchor it in the frame that NAMED it. Anchoring a Pacific
@@ -348,6 +354,28 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 7,
         "qa_tier": "required",
         "method": "OAuth API pull, 5x daily",
+        # #3913: the SECOND source whose DATE# key names a UTC calendar day — declared here
+        # after measurement, not inherited from a default. #3677 measured the store and left
+        # this facet as its named residual precisely because flipping it moves a reader-facing
+        # age by 7h; #3913 is that flip, with the consumer sweep in the audit.
+        "day_key_frame": "utc",
+        "day_key_frame_consequence": (
+            "MEASURED-UTC RULING (#3913, closing the residual #3677 named; measurement + consumer sweep in "
+            "docs/audits/TD-19_DATE_PARTITION_AUDIT.md). A whoop DATE#{d} names the UTC day d, not the Pacific one: "
+            "ingestion_framework enumerates Pacific date LABELS, but whoop's fetch_day turns each label into a UTC "
+            "WINDOW ({d}T00:00:00.000Z..{d+1}T00:00:00.000Z) and transform files whatever that window returns under "
+            "the same label. So every whoop reading from 17:00 PT (PDT; 16:00 PST) until Pacific midnight — an "
+            "evening workout, the night's sleep onset — is stored under the FOLLOWING Pacific day's key: the sleep "
+            "begun 2026-09-18 21:44 PT is on DATE#2026-09-19. Measured read-only on the live partition (#3677): of "
+            "2,249 stored rows whose start straddles that boundary, ALL 2,249 are keyed by the UTC day and ZERO by "
+            "the Pacific day, 2020-03-23..2026-09-19; re-measured for #3913 over 2026-07-01..09-19, 66 of 66 "
+            "straddling rows UTC-keyed, 0 Pacific. NOT a defect in the store and NOT flipped at the writer: the "
+            "reconciler agrees (MissingActivityCount{Source=whoop} = 0 on 30 of 30 daily runs) and re-framing the "
+            "writer to Pacific would mint a phantom nightly gap — tests/test_whoop_reconciler_frame_3677.py fails "
+            "anyone who tries. What this facet changes is only the ARITHMETIC that AGES the key: freshness_checker "
+            "and site_api_freshness anchor whoop at UTC midnight through anchor_day_key, so whoop's reported age is "
+            "7h (PDT) / 8h (PST) larger than the pre-#3913 Pacific anchor and no longer understates staleness."
+        ),
         "metrics": "Recovery, sleep, HRV, resting HR, strain",
         "posture": "load-bearing",
         "raw_layout": {

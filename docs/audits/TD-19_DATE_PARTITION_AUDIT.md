@@ -236,3 +236,97 @@ a reader-facing freshness number for whoop by 7 hours — the #3257 shape, needi
 consumer sweep and its own `day_key_frame_consequence`. It is declared in-place at the
 skip in `test_the_declared_frames_agree_with_the_live_source_registry` rather than changed
 here, so the disagreement is visible to the next reader instead of resolved by silence.
+
+**CLOSED 2026-09-19 by #3913** — the facet now says `utc`. The flip, its consumer sweep
+and the live before/after are the next section; this paragraph is left as written so the
+residual and its closure can be read in order.
+
+---
+
+# 2026-09-19 (late) — closing the residual: `whoop` takes the `utc` facet (#3913)
+
+*Added by #3913. Scope: **one facet and the arithmetic it feeds.** No ingestion code, no
+stored key and no backfill — the store was already measured correct by #3677 above, and
+`tests/test_whoop_reconciler_frame_3677.py` still fails anyone who re-frames the writer.*
+
+## The ruling
+
+`lambdas/ingestion/source_registry.py`'s `whoop` entry carries
+`"day_key_frame": "utc"` plus the required `day_key_frame_consequence`. `whoop` is
+therefore the **second** member of `utc_day_key_source_ids()`, and the set is now a set
+rather than "the HAE exception" — which matters, because the two members got there by
+different routes: apple_health converts to UTC *in the handler* (TD-19 Phase 2), whoop
+never converts anything — `fetch_day` turns a Pacific date **label** into a UTC **window**
+and files what comes back under that label. The frame follows the fetch, not the stamp,
+and the only way to know which is to measure the partition.
+
+## The measurement, re-run for this flip
+
+Read-only `aws dynamodb query` on `USER#matthew#SOURCE#whoop`, projecting
+`sk, sleep_start, start_time`, 2026-07-01 … 2026-09-19 (134 rows):
+
+| Rows whose start straddles the boundary (17:00 PT–midnight) | n | keyed by **UTC** day | keyed by **Pacific** day |
+|---|---|---|---|
+| daily aggregates (`sleep_start`) | 57 | **57** | **0** |
+| workout sub-records (`start_time`) | 9 | **9** | **0** |
+| **total** | **66** | **66** | **0** |
+
+Consistent with #3677's whole-history count (2,249 of 2,249, 2020-03-23 …). Two live rows
+show the shape directly: `DATE#2026-09-18` holds a sleep begun **21:46 PT on 09-17**, and
+`DATE#2026-09-19` one begun **21:44 PT on 09-18** — the key names the UTC day, never the
+Pacific day the sleep started in.
+
+*(4 workout rows in that window match neither frame: they start 23:0x–23:5x **UTC** and are
+filed on the next UTC day — the provider window catches a workout that *ends* inside it.
+Start-vs-end, not Pacific-vs-UTC; none of them is a Pacific keying, so the ruling is
+unaffected. Named here rather than rounded away.)*
+
+## The consumer sweep (#3257's shape)
+
+Derived, not recalled:
+
+```bash
+grep -rn "utc_day_key_source_ids\|day_key_frame_for" lambdas mcp scripts deploy --include="*.py"
+```
+
+**Every reader of the facet, and what the flip does to it:**
+
+| Reader | Verdict |
+|---|---|
+| `lambdas/common/pacific_time.py::anchor_day_key` | THE anchor, and the only code path that behaves differently: a whoop `DATE#{d}` is now anchored at `{d}T00:00Z` instead of `{d}T00:00-07:00`. |
+| `lambdas/emails/freshness_checker_lambda.py:654` | Ops staleness alert. Age +7h (PDT) / +8h (PST). **Tier unchanged at the instant it runs** — `cron(45 16 * * ? *)` = 09:45 PT, where a 0/1/2-day-old key scores 16.75h / 40.75h / 64.75h against thresholds 24 (warn) and 48 (stale), the same three tiers the Pacific anchor produced (9.75h / 33.75h / 57.75h). No new alarm noise; pinned by `test_the_ops_alert_tier_is_unchanged_at_the_checkers_own_schedule`. |
+| `lambdas/web/site_api_freshness.py:173` | Public freshness board, same helper, so the two consumers still agree to 0.05h. Live 24/7, so this one *can* mark whoop `stale` up to 7h earlier after a ≥2-day gap — the intended effect: the data was that old the whole time. |
+| `lambdas/web/vitals_resolver.py:207` | Reads the facet only to LABEL steps (`steps_as_of_frame`), and whoop is not a steps source. Its whoop scan is guarded by `reached_in_pacific`, which compares a stored day against the Pacific calendar and never asks the frame — so it was already correct for a UTC-keyed whoop. **No change.** |
+| `utc_day_key_source_ids()` | Production callers: none. Read by `tests/test_freshness_age_frame_3257.py` and `tests/test_ingestion_day_key_derivation_3666.py` (the latter derives the "a UTC frame must state its price" requirement over it, which is how whoop acquired its consequence note). Both updated. |
+
+**Adjacent, frame-blind by construction (checked, unchanged):**
+`lambdas/web/site_api_sleep.py` presents a whoop `DATE#` row as the **wake date** — which
+for an overnight sleep *is* the UTC day of the start (a 22:00 PT bedtime is 05:00Z the
+next morning), so the convention it publishes is already the UTC frame under another name.
+It ages nothing. `lambdas/ingestion/whoop_lambda.py`'s reconciler derives the key itself
+and never reads the facet.
+
+## The live before/after
+
+Measured 2026-09-19 23:07 PT — deliberately **inside** the straddling window, since the
+defect is invisible for the other 17 hours of the day.
+
+| | value |
+|---|---|
+| newest stored key | `DATE#2026-09-19#WORKOUT#d9c333af…` (the `[:10]` slice both consumers take → `2026-09-19`) |
+| live board, pre-flip (`/api/source_freshness`) | `last_update 2026-09-19`, `age_hours 23.1`, `last_update_ts 2026-09-19T00:00:00-07:00` |
+| this branch, same key, same instant | `age 30.12h`, anchor `2026-09-19T00:00:00+00:00` |
+| understatement removed | **7.00h**, exactly the PDT offset |
+
+The anchor is now the start of the window the record actually came from: the row's own
+instant falls inside `[anchor, anchor+24h)`. **Post-merge, the same curl should report
+`last_update_ts … +00:00` for whoop and an age ~7h higher than the Pacific-anchored one**
+— that is the deploy proof, and it needs `site-api` deployed before it can be true.
+
+## What this does NOT do
+
+- It does not re-key anything. `#3232`'s ruling (the stored key is correct, clamping is the
+  wrong fix) stands, and an ahead-of-PT whoop day still ages honestly from its own UTC
+  midnight and keeps its own date, with the board's derived `frame: "utc"` label.
+- It does not touch the reconciler or the writer. Re-framing either would mint a phantom
+  nightly gap — the thing #3677 measured and pinned.

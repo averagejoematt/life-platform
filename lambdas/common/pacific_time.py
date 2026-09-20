@@ -71,8 +71,12 @@ def anchor_day_key(date_str: str, source: str) -> datetime:
     ``strptime`` is the INVERSE of a clock, which is why both PT-sweep matchers
     (#2811/#2414) are blind to this: they look for something that ASKS the time. Nothing
     here does. The frame comes from the registry's ``day_key_frame`` facet — apple_health
-    is UTC by TD-19 Phase 2, everything else Pacific — and an unknown source defaults to
-    Pacific, the platform default, so a new source fails toward the right answer.
+    is UTC by TD-19 Phase 2 and whoop is UTC by measurement (#3913: ``fetch_day`` turns a
+    Pacific date LABEL into a UTC window, so the key names the UTC day), everything else
+    Pacific — and an unknown source defaults to Pacific, the platform default, so a new
+    source fails toward the right answer. Two members is the point: "the HAE exception"
+    was a story about one writer, and the facet is the only thing that survived meeting a
+    second one.
 
     NOT a clamp. #3232 ruled the stored key correct and refused to clamp a legitimately-UTC
     day back to PT-today; that ruling stands. This changes the ARITHMETIC's frame, nothing

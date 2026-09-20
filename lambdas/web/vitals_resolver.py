@@ -93,12 +93,19 @@ def reached_in_pacific(date_str, pt_today):
     rewritten; the record is simply not "today, so far". Its own day will be reachable
     tomorrow and it wins then, with its own date on it.
 
-    Per-source, not blanket: for every Pacific-keyed source (11 of 12 — the framework
+    Per-source, not blanket: for every Pacific-keyed source (the majority — the framework
     stamps ``pacific_today()``) this predicate is a no-op by construction, because a
-    Pacific key can never name a day Pacific has not reached. It only ever bites the
+    Pacific key can never name a day Pacific has not reached. It only ever bites a
     UTC-keyed source, which is why the frame is read from the registry rather than
     assumed. A blanket Pacific *anchor* would have made apple_health's age negative
     for the same 7 hours — see tests/test_freshness_age_frame_3257.py's hazard control.
+
+    #3913: the UTC-keyed set is now apple_health AND whoop, and this resolver needed no
+    change for that — the predicate compares a stored day against the Pacific calendar and
+    never asks which frame named it, so the whoop scan above was already covered. The facet
+    is read HERE only to LABEL the steps answer (``steps_as_of_frame``), and whoop is not a
+    steps source. Recorded because "it needed no change" is a sweep result, not an absence
+    of one.
     """
     return not (date_str and pt_today and date_str > pt_today)
 

@@ -887,11 +887,15 @@ def _utc_day(s) -> str | None:
     and hold the reconciliation alarm red; tests/test_whoop_reconciler_frame_3677.py
     fails if anyone tries.
 
-    The residual #3677 leaves open is the opposite direction and lives in the registry,
-    not here: ``source_registry`` carries no ``day_key_frame`` for whoop, so the facet
-    reads as the 'pacific' default while the keys are UTC. Flipping the facet moves a
-    reader-facing freshness age by 7h (it feeds ``utc_day_key_source_ids()``), so it is
-    its own ruling with its own consumer sweep — see the audit's 2026-09-19 section.
+    CLOSED (#3913): the residual #3677 left open was in the registry, not here —
+    ``source_registry`` carried no ``day_key_frame`` for whoop, so the facet read as the
+    'pacific' default while these keys are UTC, and the two consumers that AGE a whoop key
+    (``freshness_checker_lambda``, ``site_api_freshness``, both via
+    ``common.pacific_time.anchor_day_key``) anchored it 7h late and understated whoop's
+    staleness by exactly that. The facet is now declared ``"utc"`` with its
+    ``day_key_frame_consequence``, so the store, this reconciler and the freshness
+    arithmetic all name the same calendar. Nothing in THIS module changed: the flip is
+    about ageing the key, never about deriving it.
 
     #1964: parses via the canonical ``parse_iso_utc``. The private ``_parse_iso``
     this replaces left a tz-less stamp NAIVE, so ``.astimezone(timezone.utc)``
