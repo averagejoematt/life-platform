@@ -211,28 +211,40 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-19 (Fable 5.1, **Session AL — the Fable drain: 25 closed, 10 filed, and the two reds the merge posture bought**;
-owner brief *"drive the DEBT COUNT as low as it honestly goes"*, autonomous, standing merge+deploy authority incl. CDK, auto-merge on the two
-REQUIRED checks only, deploy via `deploy_fleet.sh`, reject every lease, **no `--deliver`**, target 84 → 60–65 honest / 40 stretch).
-**105 → 90 open, measured two ways (search `total_count` AND a paginated id-set, agreeing): 25 closed (9 on the owner's in-session
-answers to the §2 sheet, 16 on engineering evidence), 10 filed (2 lane finds + 8 residuals), 21 PRs merged, 3 fleet deploys (106/106 each,
-verified by shipped content), 4 MCP deploys, four stacks redeployed by hand via `cdk_deploy.sh`, 1 auto site-deploy green, 15 leases REJECTED by name, 0 approved.**
-Debt count 84 → 74; Roadmap 21 → 16. **The through-line:** auto-merge on the required lane let 21 PRs land in 8h, and the full suite,
-running post-merge, caught what the lane could not — twice (F's tests keyed on the CI EVENT passed under `pull_request` and failed on
-main's `push`; H's new module tripped a full-suite-only ratchet) — both fixed forward by their lanes; nine of fourteen engineering
-closures needed a second CI round the lane's targeted tests could not see. **Findings:** the widened phase-stamp audit's first nightly
-found 194 unstamped rows / 17 families — 35 on 4 tagger-BLIND families are real (#3900), 159 are tagger-reachable in-cycle rows the reset
-stamps anyway, so #3901 split the chronic leg by tagger reach (a gate nobody can clear is the #3851 class) · three boxes were
-unsatisfiable as written and recorded rather than look-alike-paid (3654 box 4: every injectable failure is one the scope check DECLINES;
-3646 box 2: the system-model gate is a second bot-owned artifact; 3620 box 1: deploy/ is never bundled) · the fullreview-delta was
-INVALID by the rubric's own two tests (896-file surface; #3904 rewrote the instrument) → dated hold to 2026-09-26 (#3910), next run a
-NEW BASELINE · a `backfill_training_notes.py --apply` without `--since` walked the whole corpus and created the ~515 absent notes #3918
-had reserved for an owner call — my omission, recorded on the issue · 3717's 09-18 question was stale (the record was active since 09-08;
-today's statement EXTENDED it to 2021-04-12 → 2026-09-19) · `agent_commit.sh` silently reverts `platform_counts.py` even when the branch
-legitimately carries the sync output · filed member counts were low again in both directions (3513: 6 → 120; 3543: 8 → 10 pages; 3620:
-2 → 6 doors; 3677: 1 fix → 0). **Owner acts:** 3770 · 1738 · 1571 (left open on today's answers) · 3654 box 4 (a `site-shell` injection
-lever or an attended rollback run) · 3918's key collision · 3741 (0 posted; a parallel posting-session prompt was handed over) · the 5
-`acceptance_count` violations (3607 3611 3615 3617 3621). **Post-wrap:** 3608 closed on its live CI outputs (#3908 merged); the owner's seven coaching amendments written verbatim into the
-owner-private `TRAINING_CALIBRATION.md` §7 / `TRAINING_PROGRAM.md` at the S3 coaching home and their six platform defects filed as
-#3927–#3932 (3 × P1 on Now: the planner's conditional up-branches + carry-forward floor, the Strava-only walking calc, the TDEE proxy
-charging rest time); the stale walking string purged (PR #3926). **Final measured: 96 open (25 closed, 16 filed).**
+**Verified:** 2026-09-19 (Opus 5, **Sessions AM + AN — the posting pack, and the weekly card that could not be
+found**; two sessions under one handover because AM's terminal was closed before it wrapped). **AM (unwrapped,
+reconstructed from its #3741 comment + git + live AWS):** merged #3922 + #3923, deployed `recap-card-generator`
+from main at `dd2deb04`, verified by unzipping and grepping the artifact, re-rendered **28 cards through the
+deployed function** (`deliver=false`, every one `qa: cleared`) and built the Desktop posting pack — 15 folders,
+`CHECKLIST.md`, a flattened `airdrop/`. Its lease steward blanket-rejected #3926's deploy at 23:20Z (the
+allowlist-your-own-shas class, again) and remedied it by deploying `life-platform-mcp` from the same tip on a
+transitive-import walk showing zero other consumers. **AN opened as a recovery sweep for that closed terminal and
+found nothing lost** — the cards intact, the code all merged and deployed, and the one alarming artefact (a
+worktree carrying 677 uncommitted lines) a **stale duplicate** of what #3923 had already shipped from a different
+branch, archived and pruned. Two real gaps, both closed: the pack's generator existed **only in `/private/tmp`**,
+one purge from going with the session that wrote it → `deploy/build_recap_posting_pack.py`, with its unconditional
+`shutil.rmtree(OUT)` (which destroyed a ticked checklist on any re-run) turned into a refusal; and AM's missing
+wrap, which is that handover. **Then the owner's ask:** *"on instagram its really hard to differentiate the day
+cards to the weekly cards."* Six grounds were rendered on the REAL week-1 card and judged in a simulated profile
+grid by the six seats that graded the first set — **they split 3–3**, and the tie broke on a rule rather than on
+taste: **green means EARNED in this palette**, so a permanent green ground would say "good week" identically on a
+week of B's and on this one (C, B-, B-, B-, C-, C-, C-, headline *"biggest miss: recovery — 24/100 at its
+worst"*). The regainer seat — the reader the honesty promise exists for — raised it unprompted. The contrast
+arithmetic then **agreed with the rule rather than against it**: the faintest tone falls to 3.20:1 on the deepest
+green and holds 3.62:1 on the chosen navy (daily ground 3.90:1), so the honest choice was also the legible one —
+worth keeping, because the split had been framed as honesty *versus* visibility. `WEEKLY_GROUND = (11, 20, 44)`,
+fixed and result-neutral (PR #3941; 7 tests, each mutation-proved). **Shipped end to end in-session:** merged on
+ten green checks (the full pre-merge suite, not the required-two lane), `recap-card-generator` deployed from main at
+`c3032efe0` and verified by unzipping and grepping the artifact, day 7 re-rendered THROUGH the deployed function
+(`qa: cleared`, stored `week-01.png` navy at the pixel), and the Desktop pack rebuilt by the newly-landed script —
+15 folders, 87 files, the weekly navy and all 26 daily frames untouched at `(8, 12, 10)`. **The lease for
+`c3032efe0` was REJECTED by name on purpose**: the behavioural change was already hand-deployed and main had moved
+to `24b83c5b3` in the parallel lane, so approving would have shipped an OLDER tip over a newer one. **Two defects found by looking rather than by
+running:** the goal bar's track was a green-black pinned to the daily ground and lay across the navy card as a
+foreign strip while every automated gate passed — derived now; and **#3942**, `dry_run=True` on
+`recap-card-generator` gates delivery but NOT storage, found by causing it (one "dry run" meant to inspect a card
+republished three live `recap/` objects and moved the row's `rendered_at`; no harm landed, but a dry run is the
+thing you reach for *because* you believe it cannot mutate). **Owner acts left:** #3719's tape-measurement ruling
+(still open from Session Z) · #3741 box 4 — **0 posted by hand**, and nothing here posts itself · **week-02 is TODAY's
+card, not 09-21** (genesis 09-06 is day 1, so 09-19 is day 14 — AM's note had it wrong and the live render agrees
+with the arithmetic), so the first weekly the CRON draws on the new ground needs no further deploy.
