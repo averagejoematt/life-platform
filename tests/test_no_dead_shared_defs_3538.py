@@ -99,6 +99,11 @@ _BATCH_REASON = (
 )
 
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    # #3915 box 4: the inverse-census prose for qa_smoke's cross-phase coverage leg. PR #3974 landed the
+    # formatter but left its caller (qa_smoke_lambda.py) out because #3965 owned that file at the time;
+    # the wire-up is owed on #3915 and this entry leaves with it. Seen first by this lane's widened guard
+    # (#3609 box 2 derives the package list from stage_tree, which the literal list never covered).
+    "lambdas/experiment/pk_census.py:format_inverse_census": "#3915 box 4 wire-up pending — caller is qa_smoke's inverse-census leg",
     "lambdas/ai/bedrock_batch.py:build_jsonl_record": _BATCH_REASON,
     "lambdas/ai/bedrock_batch.py:submit_batch": _BATCH_REASON,
     "lambdas/ai/bedrock_batch.py:wait_for_batch": _BATCH_REASON,

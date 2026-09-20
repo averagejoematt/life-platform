@@ -800,7 +800,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # re-verified here, so this line does not depend on it being exact): a disposable
         # `git archive origin/main` export at c32e58c31 measures 114 proven, this lane merged
         # measures 115 (unproven UNCHANGED at 540 — a proven entrant, not a new unproven one).
-        <= 115
+        # 115 -> 116 (2026-09-20, Session AN, third merge of main into this lane): main itself reached
+        # 115 via #3625 + #3772 while this lane was open, so this lane's ONE proven entrant (the GSI-set
+        # gate above) lands at 116 on the merged tree. CI's premerge lane measured n=116 on a3ffd27c.
+        <= 116
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
