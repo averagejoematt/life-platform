@@ -145,16 +145,24 @@ def test_agent_commit_refuses_the_generated_module_with_no_override():
     assert re.search(r"git diff --name-only -- docs/ CLAUDE\.md \.claude/README\.md lambdas/web/platform_counts\.py", src)
 
 
-def test_the_pre_commit_hook_stages_the_generated_module_and_not_site_api_common():
+def test_the_pre_commit_hook_stages_the_generated_module_on_main_only_and_never_site_api_common():
+    """#3984: TWO arms. On `main` the counter is staged; off main it is restored to HEAD and the
+    pathspec omits it. site_api_common.py is in neither."""
     src = _read(_INSTALL_HOOKS)
-    stage = re.search(r"SYNCED_CHANGED=\$\(git -C \"\$PROJ_ROOT\" diff --name-only -- ([^)]+?)\|\|", src)
-    assert stage, "could not find the hook's doc-sync stage pathspec"
-    spec = stage.group(1)
-    assert "lambdas/web/platform_counts.py" in spec
-    assert "site_api_common.py" not in spec, (
-        "the sync no longer writes site_api_common.py, so staging it would sweep the committer's "
-        "own unstaged edits to a hot shared module into their commit"
-    )
+    specs = re.findall(r"SYNCED_CHANGED=\$\(git -C \"\$PROJ_ROOT\" diff --name-only -- ([^)]+?)\|\|", src)
+    assert len(specs) == 2, f"expected the main arm and the off-main arm of the hook's stage pathspec, found {len(specs)}"
+    main_arm, off_main_arm = specs
+    assert "lambdas/web/platform_counts.py" in main_arm, "on main the hook must stage the regenerated counter"
+    assert "lambdas/web/platform_counts.py" not in off_main_arm, "off main the counter must never be staged (#3984)"
+    assert re.search(
+        r'git -C "\$PROJ_ROOT" checkout HEAD -- lambdas/web/platform_counts\.py', src
+    ), "off main the hook must restore the counter to HEAD before staging (#3984)"
+    assert re.search(r'if \[\[ "\$HOOK_BRANCH" == "main" \]\]', src), "the two arms must key on the checked-out branch"
+    for spec in specs:
+        assert "site_api_common.py" not in spec, (
+            "the sync no longer writes site_api_common.py, so staging it would sweep the committer's "
+            "own unstaged edits to a hot shared module into their commit"
+        )
 
 
 def test_the_reconcile_whitelist_permits_the_generated_module():

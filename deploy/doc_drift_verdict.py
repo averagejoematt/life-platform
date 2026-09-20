@@ -58,6 +58,7 @@ a `::warning::` and exit 0.
 """
 
 import os
+import subprocess
 import sys
 
 EXIT_SUCCESS = 0
@@ -89,6 +90,35 @@ def reconcile_bot_follows_this_run():
     return os.environ.get("GITHUB_EVENT_NAME") == "push" and os.environ.get("GITHUB_REF") == "refs/heads/main"
 
 
+def _checked_out_ref_is_main():
+    """True when the tree under test IS `main` (#3984). Inside GitHub Actions `GITHUB_REF`
+    is authoritative (`refs/pull/N/merge` and `refs/heads/<branch>` are both off-main);
+    on a laptop it is the checked-out branch name. A detached HEAD is off-main. If git
+    cannot answer, the answer is MAIN — fail-closed to the strict verdict."""
+    ref = os.environ.get("GITHUB_REF")
+    if ref:
+        return ref == "refs/heads/main"
+    try:
+        out = subprocess.run(  # nosec B603 B607 — fixed argv
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True
+    if out.returncode != 0:
+        return True
+    return out.stdout.strip() == "main"
+
+
+def bot_owns_pending_drift_here():
+    """True wherever `~` (bot-owned) drift is NOT this checkout's to fix (#3984):
+    on a push to main the reconcile job commits it next; OFF main the only writer of
+    those files is that same job, later, on main — a branch that regenerated them would
+    be carrying files it may not carry (#3101). The strict `pending-reconcile` exit
+    survives in exactly one place: `main` with no bot following (a laptop on main, a
+    `workflow_dispatch` on main), where a human has to run `--apply` and commit."""
+    return reconcile_bot_follows_this_run() or not _checked_out_ref_is_main()
+
+
 def bot_owned(records):
     """The subset of `records` that `--apply` would itself rewrite."""
     return [c for c in records if c.startswith(BOT_REWRITE_PREFIX)]
@@ -116,7 +146,7 @@ def report(total_drift, bot_drift, drifted_docs, out=None):
         print("     job rewrites and commits these within ~60 s (#3646); this is not a red main.", file=out)
         for d in drifted_docs:
             print(f"       - {d}", file=out)
-        print("  Fix (on a branch, where no bot follows): python3 deploy/sync_doc_metadata.py --apply", file=out)
+        print("  Fix (on main, where no bot follows): python3 deploy/sync_doc_metadata.py --apply", file=out)
         if reconcile_bot_follows_this_run():
             print(
                 "::warning title=pending-reconcile::Doc-sync literals are stale and every one of them "
@@ -125,6 +155,18 @@ def report(total_drift, bot_drift, drifted_docs, out=None):
                 file=out,
             )
             print(f"  VERDICT: {verdict} (tolerated: a push to main, the reconcile job runs next)", file=out)
+            print(f"{'='*60}\n", file=out)
+            return EXIT_SUCCESS
+        if bot_owns_pending_drift_here():
+            # #3984: off main these files are not this branch's to regenerate — the
+            # reconcile job rewrites them on main after the merge. A notice, never a red.
+            print(
+                "::notice title=pending-reconcile::Doc-sync literals are stale off main and every one of them "
+                "is bot-owned — the reconcile job regenerates them on main after this merges (#3984). "
+                "Do NOT commit lambdas/web/platform_counts.py on a branch.",
+                file=out,
+            )
+            print(f"  VERDICT: {verdict} (tolerated: off main, the reconcile job owns these files)", file=out)
             print(f"{'='*60}\n", file=out)
             return EXIT_SUCCESS
     else:

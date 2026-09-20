@@ -34,12 +34,26 @@ import json
 import pathlib
 import sys
 
+import pytest
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import generate_platform_model as gen  # noqa: E402
 
 _REGEN = "run: python3 scripts/generate_platform_model.py and commit the result"
+
+
+def _skip_if_stale_off_main(name: str, committed: str, fresh: str) -> None:
+    """#3984: the model + its rendering are bot-owned — the reconcile job regenerates them on
+    main after every merge, and a branch may not carry them. Off main a stale copy is a
+    visible skip naming the artifact; on main it is the byte-equality defect it always was."""
+    if committed != fresh:
+        sys.path.insert(0, str(ROOT / "deploy"))
+        import doc_drift_verdict as _verdict  # noqa: E402
+
+        if not _verdict._checked_out_ref_is_main():
+            pytest.skip(f"#3984: {name} is stale off main — bot-owned, regenerated on main after the merge")
 
 
 @functools.lru_cache(maxsize=1)
@@ -52,6 +66,7 @@ def test_model_json_is_current():
     """The committed model must equal a fresh regeneration byte-for-byte."""
     _, model_text, _ = _built()
     committed = gen.MODEL_PATH.read_text(encoding="utf-8")
+    _skip_if_stale_off_main("model/platform_model.json", committed, model_text)
     assert committed == model_text, f"model/platform_model.json is stale or hand-edited — {_REGEN}"
 
 
@@ -59,6 +74,7 @@ def test_dependency_graph_is_current():
     """docs/DEPENDENCY_GRAPH.md is a RENDERING of the model — never hand-edited."""
     _, _, doc_text = _built()
     committed = gen.DOC_PATH.read_text(encoding="utf-8")
+    _skip_if_stale_off_main("docs/DEPENDENCY_GRAPH.md", committed, doc_text)
     assert committed == doc_text, f"docs/DEPENDENCY_GRAPH.md is stale or hand-edited — {_REGEN}"
 
 

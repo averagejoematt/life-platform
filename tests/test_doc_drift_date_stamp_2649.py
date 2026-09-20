@@ -56,7 +56,7 @@ _SCRIPT = _REPO / "deploy" / "sync_doc_metadata.py"
 _DOC = _REPO / "docs" / "ARCHITECTURE.md"
 
 
-def _gate_env(event_name="pull_request"):
+def _gate_env(event_name="pull_request", strict=True):
     """A child env whose verdict is the GATE's, never CI's (#3646).
 
     `GITHUB_REF` is REMOVED, which is what disarms the push-to-main tolerance in
@@ -72,12 +72,15 @@ def _gate_env(event_name="pull_request"):
     of inheriting whatever the runner exported.
     """
     env = dict(os.environ)
-    env.pop("GITHUB_REF", None)
+    # #3984: `strict=True` pins the ref to main (the off-main tolerance is disarmed, the
+    # push-to-main tolerance stays disarmed by the non-push event) — the planted drift below
+    # must red. `strict=False` is the branch arm: the same drift is a notice and exit 0.
+    env["GITHUB_REF"] = "refs/heads/main" if strict else "refs/heads/feature-3984"
     env["GITHUB_EVENT_NAME"] = event_name
     return env
 
 
-def _check() -> int:
+def _check(strict=True) -> int:
     """Run the real gate exactly as CI does, and return its exit code.
 
     #3646 moved the non-zero code these tests assert from 1 to 3. The drift they plant
@@ -94,7 +97,7 @@ def _check() -> int:
         cwd=str(_REPO),
         capture_output=True,
         text=True,
-        env=_gate_env(),
+        env=_gate_env(strict=strict),
     ).returncode
 
 
@@ -160,6 +163,13 @@ def test_b_a_substantive_drift_still_fails(doc_text):
 
 
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
+def test_b2_off_main_the_same_substantive_drift_is_a_tolerated_notice(doc_text):
+    """#3984: a branch never carries the regenerables — the bot rewrites them on main."""
+    phrase = _live_lambda_phrase(doc_text)
+    _DOC.write_text(doc_text.replace(phrase, "999 Lambdas", 1), encoding="utf-8")
+    assert _check(strict=False) == 0, "off main, bot-owned drift must be pending-reconcile with exit 0 (#3984)"
+
+
 def test_c_a_stale_date_does_not_hide_a_substantive_drift(doc_text):
     """The subtle one. Both literals live on the SAME line, so masking the date must
     not mask the count that shares it."""

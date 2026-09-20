@@ -146,6 +146,20 @@ output may already be live — leaving `main` both behind production and red.
   regenerate on `main`. Policy lives in §4a1/§4c; the read-it command is in the "Facts that
   drift" table.
 
+- **The bot-owned invariant (#3984).** `lambdas/web/platform_counts.py`,
+  `model/platform_model.json` and `docs/DEPENDENCY_GRAPH.md` have ONE writer: the reconcile
+  job on `main`. No gate reds a branch for `~` (bot-owned) drift in them — `sync_doc_metadata.py
+  --check` and `generate_platform_model.py --check` exit 0 with a `pending-reconcile` notice
+  off main (`deploy/doc_drift_verdict.bot_owns_pending_drift_here`), the stats/model
+  byte-equality tests skip visibly off main naming both values, and the pre-commit hook
+  restores the counter to HEAD off main instead of staging it. `!` (human) drift — a rule
+  that matched nothing, a missing marker pair — still reds everywhere. The strict exit 3
+  survives in exactly one place: `main` with no bot following (a laptop on main, a
+  `workflow_dispatch`). **If you find a counter in a branch's diff, the guard that let it
+  through is the bug** — fix the guard, not the branch. Session AN resolved this conflict
+  by hand eight times in one night; 33 non-bot commits touched the counter in the ten days
+  before the fix.
+
 Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpushed_commits`).
 
 **A docs-only push could red every PR while main's badge stayed green (#2899 class) — CURED 2026-09-01 by #3378.** ci-cd.yml's push-to-main `paths:` filter used to decline a docs/CLAUDE.md-only commit, so a tree-evaluated gate that the commit tripped (the as-of-future-date budget scan, any doc-facts assertion) never ran on main — it ran on every PR's merge ref instead, as one identical red across unrelated PRs. **There is no longer a `paths:` filter on that trigger: every push to main mints a real verdict** (see §4a0). Three consequences worth keeping: (a) the wrap's `pytest tests/test_doc_facts_budget_2899.py -q` on the FINAL tree is now belt-and-braces rather than the only defence — keep running it, because catching a red before pushing still beats catching it after; (b) at boot, several PRs sharing ONE failing test still means suspect main's tail first, though it is now a genuinely red main rather than an untested one; (c) `check_main_green`'s `path-filter-skip` state is **unreachable for ci-cd on main**, so a zero-run HEAD there is unambiguously a swallow — the classifier still implements the state for other workflows and for the recorded incidents its tests replay.
@@ -1506,8 +1520,9 @@ These values change and must **never** be hand-written in docs or memory. Read t
 
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it
-touches (`docs/`, `CLAUDE.md`, `.claude/README.md`,
-`lambdas/web/platform_counts.py`). If you run the script by hand outside a commit
+touches (`docs/`, `CLAUDE.md`, `.claude/README.md`, and — **on `main` only, #3984** —
+`lambdas/web/platform_counts.py`; off main the hook restores the counter to HEAD and stages
+only the docs). If you run the script by hand outside a commit
 (or add a new doc to its `RULES` table that falls outside that stage glob), fold
 the changes into the commit yourself (`git add … && git commit --amend --no-edit
 --no-verify`) or `test_platform_stats_truth.py` reds CI.

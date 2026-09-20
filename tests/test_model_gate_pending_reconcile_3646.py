@@ -2,7 +2,7 @@
 literal gate gives: on a push to main, `generate_platform_model.py --check` warns and exits 0 when
 its artifacts are stale (the reconcile job regenerates them next); everywhere else it still exits 1.
 
-Mutation control: delete the `if _reconcile_bot_follows_this_run():` branch → the push-to-main
+Mutation control: delete the `if _bot_owns_pending_drift_here():` branch → the push-to-main
 case below exits 1 and `test_a_stale_model_on_a_push_to_main_is_pending_reconcile_not_red` reds."""
 
 from __future__ import annotations
@@ -48,16 +48,43 @@ def test_a_stale_model_on_a_push_to_main_is_pending_reconcile_not_red(stale_mode
 
 @pytest.mark.parametrize(
     "event, ref",
-    [("pull_request", "refs/pull/1/merge"), ("push", "refs/heads/feature"), ("workflow_dispatch", "refs/heads/main"), (None, None)],
+    [("pull_request", "refs/pull/1/merge"), ("push", "refs/heads/feature")],
 )
-def test_everywhere_else_a_stale_model_still_fails(stale_model, monkeypatch, capsys, event, ref):
-    for k, v in (("GITHUB_EVENT_NAME", event), ("GITHUB_REF", ref)):
-        if v is None:
-            monkeypatch.delenv(k, raising=False)
-        else:
-            monkeypatch.setenv(k, v)
+def test_off_main_a_stale_model_is_pending_reconcile_too(stale_model, monkeypatch, capsys, event, ref):
+    """#3984: a branch never carries model/platform_model.json — the reconcile job regenerates it on
+    main after the merge, so a stale model on a PR or a branch push is the same tolerated verdict."""
+    monkeypatch.setenv("GITHUB_EVENT_NAME", event)
+    monkeypatch.setenv("GITHUB_REF", ref)
+    assert stale_model.main() == 0
+    assert "VERDICT: pending-reconcile" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "event, ref",
+    [("workflow_dispatch", "refs/heads/main"), (None, "refs/heads/main")],
+)
+def test_on_main_with_no_bot_following_a_stale_model_still_fails(stale_model, monkeypatch, capsys, event, ref):
+    """The strict half survives in exactly one place: main with no reconcile job next (#3984)."""
+    if event is None:
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_EVENT_NAME", event)
+    monkeypatch.setenv("GITHUB_REF", ref)
     assert stale_model.main() == 1
     assert "pending-reconcile" not in capsys.readouterr().out
+
+
+def test_a_laptop_on_main_with_no_ci_env_is_strict(stale_model, monkeypatch, capsys):
+    """No GITHUB_* at all: the predicate asks git. Pin git's answer to `main` → strict."""
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.delenv("GITHUB_REF", raising=False)
+    sys.path.insert(0, os.path.join(REPO, "deploy"))
+    import doc_drift_verdict as ddv  # noqa: E402
+
+    monkeypatch.setattr(ddv, "_checked_out_ref_is_main", lambda: True)
+    assert stale_model.main() == 1
+    monkeypatch.setattr(ddv, "_checked_out_ref_is_main", lambda: False)
+    assert stale_model.main() == 0
 
 
 def test_a_current_model_is_a_plain_pass_on_main_too(stale_model, monkeypatch, capsys):
@@ -69,8 +96,13 @@ def test_a_current_model_is_a_plain_pass_on_main_too(stale_model, monkeypatch, c
     assert "pending-reconcile" not in capsys.readouterr().out
 
 
-def test_the_verdict_is_the_literal_gates_own_derivation():
-    """One predicate, imported — the two gates cannot disagree about when a bot follows."""
+def test_the_verdict_is_the_literal_gates_own_derivation(monkeypatch):
+    """One predicate, imported — the two gates cannot disagree about when a bot follows.
+
+    #3984: uses monkeypatch, not a bare `os.environ.pop` — the old finally-block POPPED the
+    runner's real GITHUB_EVENT_NAME/GITHUB_REF and never restored them, so every later test
+    in the same xdist worker (test_platform_stats_truth's PR-exempt skip among them) ran as
+    if it were not in CI at all."""
     sys.path.insert(0, os.path.join(REPO, "deploy"))
     import doc_drift_verdict as ddv  # noqa: E402
 
@@ -78,11 +110,8 @@ def test_the_verdict_is_the_literal_gates_own_derivation():
     for env in (
         {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main"},
         {"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF": "refs/pull/9/merge"},
+        {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main"},
     ):
         for k, v in env.items():
-            os.environ[k] = v
-        try:
-            assert gpm._reconcile_bot_follows_this_run() == ddv.reconcile_bot_follows_this_run()
-        finally:
-            for k in env:
-                os.environ.pop(k, None)
+            monkeypatch.setenv(k, v)
+        assert gpm._bot_owns_pending_drift_here() == ddv.bot_owns_pending_drift_here()
