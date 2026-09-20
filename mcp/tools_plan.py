@@ -375,6 +375,19 @@ def _run_stage_2(
             ),
         }
 
+    # LIVE FINDING 2026-09-20 (routine 73bc228c v5 -> v6): a re-run on an already-critiqued
+    # routine compounded the joints critic's cut (22 -> 18 -> 14) because every `session.total_sets`
+    # change is relative to the draft the critic sees. Stage 2 must be a re-EVALUATION of the
+    # coach's draft, never a second cut on its own output: restore the pre-critics exercise list
+    # first, and keep that snapshot on the record so the next run can do the same.
+    prior = (getattr(ir, "inputs_snapshot", None) or {}).get("critics") or {}
+    if prior.get("draft_exercises"):
+        from training.routine_ir import _exercise_from_raw
+
+        ir.exercises = [_exercise_from_raw(dict(e)) for e in prior["draft_exercises"]]
+    from dataclasses import asdict
+
+    draft_exercises = [asdict(e) for e in ir.exercises]
     draft = critics.draft_summary(ir)
     packets = build(draft)
     allowed, paused = _model_allowed()
@@ -400,6 +413,8 @@ def _run_stage_2(
         "recheck": rc,
         "veto": any(v.get("verdict") == "veto" for v in verdicts),
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
+        # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
+        "draft_exercises": draft_exercises,
     }
     ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "critics": record}
     # LIVE FINDING 2026-09-20: Hevy's routine object carries NO `notes` field on the API (GET keys
