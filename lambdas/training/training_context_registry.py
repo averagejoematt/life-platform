@@ -82,12 +82,13 @@ S3_URI = f"s3://{S3_BUCKET}/{S3_KEY}"
 
 ISSUE = "#3715"
 
-CONFIRMED_BY_OWNER = False
-"""Flip to True only after Matthew has reviewed RECORDED_CONSTRAINTS AND the rendered
-document at S3_URI. gate:owner (#3715, acceptance box 5). Must not be flipped to True by
-an agent session — see the structural test that pairs this with LAST_REVIEWED_BY_OWNER."""
+CONFIRMED_BY_OWNER = True
+"""Flipped to True on the owner's ruling of 2026-09-20 (session AO boot, recorded on #3715):
+"the list is current, with one update — the calf lesion is resolved, no restriction". gate:owner
+(#3715, acceptance box 5). An agent session may not flip this on its own — the flip below is
+the owner's recorded answer, and the structural test pairs it with LAST_REVIEWED_BY_OWNER."""
 
-LAST_REVIEWED_BY_OWNER: str | None = None
+LAST_REVIEWED_BY_OWNER: str | None = "2026-09-20"
 """ISO date Matthew last reviewed the constraint list. None means never."""
 
 
@@ -107,9 +108,20 @@ RECORDED_CONSTRAINTS: list[dict[str, Any]] = [
         ),
         "source": f"issue {ISSUE} Evidence block, quoting the 2026-09-08 coaching session",
         "dated": "2026-09-08",
-        "confirmed": False,
+        "confirmed": True,
+        # Owner ruling 2026-09-20 (session AO boot, on #3715): "Resolved — no restriction; the
+        # coach may load calves normally." Kept on the record rather than deleted so a future
+        # session can see it WAS a constraint and WHEN it stopped being one.
+        "status": "resolved",
+        "resolved_on": "2026-09-20",
+        "resolution_source": f"owner ruling recorded on {ISSUE}, 2026-09-20",
     },
 ]
+
+
+def active_constraints() -> list[dict[str, Any]]:
+    """The constraints a coach must still plan around: confirmed AND not resolved."""
+    return [c for c in RECORDED_CONSTRAINTS if c.get("confirmed") and c.get("status", "active") != "resolved"]
 
 
 def format_unconfirmed_notice() -> str:
@@ -120,6 +132,14 @@ def format_unconfirmed_notice() -> str:
     already used, generalised to however many constraints are on record.
     """
     names = ", ".join(c["id"] for c in RECORDED_CONSTRAINTS) or "none recorded"
+    if CONFIRMED_BY_OWNER:
+        active = ", ".join(c["id"] for c in active_constraints()) or "none active"
+        return (
+            f"Could not verify {S3_KEY} is current at {S3_URI}. "
+            f"{len(RECORDED_CONSTRAINTS)} constraint(s) are on record ({names}), owner-confirmed "
+            f"{LAST_REVIEWED_BY_OWNER} ({ISSUE}); active today: {active}. Anything that has moved since "
+            f"{LAST_REVIEWED_BY_OWNER} is NOT on this record — ask before this session prescribes load."
+        )
     return (
         f"Could not verify {S3_KEY} is current at {S3_URI}. "
         f"{len(RECORDED_CONSTRAINTS)} standing constraint(s) are on record from prior sessions/issues "
@@ -135,11 +155,12 @@ def summary() -> dict[str, Any]:
         "confirmed_by_owner": CONFIRMED_BY_OWNER,
         "last_reviewed_by_owner": LAST_REVIEWED_BY_OWNER,
         "constraints": RECORDED_CONSTRAINTS,
+        "active_constraints": active_constraints(),
         "status_note": (
             f"UNCONFIRMED — drafted from the platform's own recorded history, not yet reviewed by the owner "
             f"({ISSUE}, gate:owner). Do not treat as cleared until confirmed_by_owner is True."
             if not CONFIRMED_BY_OWNER
-            else f"CONFIRMED — owner-reviewed {LAST_REVIEWED_BY_OWNER}."
+            else f"CONFIRMED — owner-reviewed {LAST_REVIEWED_BY_OWNER}; {len(active_constraints())} active constraint(s)."
         ),
         "if_unreadable": format_unconfirmed_notice(),
     }
