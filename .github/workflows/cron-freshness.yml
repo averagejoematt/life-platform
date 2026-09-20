@@ -103,6 +103,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # #3982: check_cron_freshness.py::first_commit_time() runs `git log
+          # --diff-filter=A` to find a NEWBORN cron's birth commit on main — the
+          # default fetch-depth: 1 checkout carries only the tip commit, which would
+          # make every zero-run row read as birth-unknown (an immediate finding)
+          # forever, for any workflow file older than the last push.
+          fetch-depth: 0
 
       # setup-python via the shared composite (#1655). No `aws-role`, so the OIDC half
       # is skipped entirely — this job touches no AWS and the token stays narrow.
