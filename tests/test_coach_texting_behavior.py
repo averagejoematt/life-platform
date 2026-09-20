@@ -309,7 +309,10 @@ def test_summary_written_for_last_unsummarized_past_day():
     row = table.put_calls[-1]
     assert row["sk"] == "CHAT#summary#2026-08-08"
     assert row["type"] == "chat_summary"
-    assert row["cycle"] == 13
+    # #3915 reversed this line (it pinned `cycle == 13`): CHAT#summary# is inside the
+    # ADR-153 cross-phase family, and the compressed long memory must no more carry the
+    # cycle it was written in than the turns it compresses. The caller still passes one.
+    assert "cycle" not in row
 
 
 def test_summary_not_rewritten_when_row_exists():

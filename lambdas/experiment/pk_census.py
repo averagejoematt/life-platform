@@ -199,6 +199,172 @@ def row_date(item: dict) -> str | None:
     return m.group(1) if m else None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# #3915 — THE INVERSE LEG'S RULINGS
+#
+# WHAT WAS MEASURED (read-only, full provenance scan of the live table, twice,
+# 2026-09-20; 45,513 rows both times)
+#   3,185 CROSS_PHASE rows carry an attribute `phase_taxonomy.forbidden_provenance`
+#   names, on exactly four families — calibration 2,211, recall_embeddings 883,
+#   retired-/chat-tier COACH# CHAT# 64, milestones 27. The number matches #3890's
+#   count to the row, and it added the fact the count alone did not carry:
+#   **every one of the 3,185 carries `cycle`, and ONLY `cycle`.** Not one carries a
+#   `phase`; not one carries a tombstone attribute. So the inverse leg was never
+#   looking at three thousand mis-tagged rows — it was looking at one attribute
+#   whose meaning the taxonomy itself rules on differently per family, and three of
+#   the four rulings were already written down, in the SOURCE_CLASS comments, by the
+#   people who put the attribute there.
+#
+# WHY A RULING PER FAMILY AND NOT ONE PREDICATE
+#   `forbidden_provenance` is right that a *phase* on a CROSS_PHASE row is wrong by
+#   construction — that row would be phase-filtered, wiped or tombstoned. A bare
+#   `cycle` does none of those: nothing filters on it, `is_wipeable` never selects
+#   the class, and on three of these families a reader or a writer DEPENDS on it
+#   (see each entry). Lumping the two attributes together is what made the leg
+#   unclearable: widening it would have alarmed 3,121 rows whose only remedy would
+#   have been to delete a label the platform reads.
+#
+# THE SHAPE OF THE REGISTRY
+#   family (as `pk_family` keys it) -> ruling. `allowed` is the provenance the
+#   family's ruling SANCTIONS; anything outside it is never silently excluded —
+#   a `phase` appearing on calibration tomorrow is `unruled` and reported, because
+#   nobody has ruled on that. A CROSS_PHASE family with provenance and NO entry here
+#   is `unruled` too, which is the clause that keeps this from being an allowlist
+#   that only grows quiet (the #3851 shape inverted).
+# ─────────────────────────────────────────────────────────────────────────────
+RULED_LABEL = "excluded:cycle-label"  # sanctioned content label; counted, never a finding
+RULED_IN_SCOPE = "in-scope:remediable"  # a real defect, with a named remediation that clears it
+UNRULED = "unruled"  # provenance nobody has ruled on — the leg's only able-to-fail clause
+
+CROSS_PHASE_PROVENANCE_RULINGS: dict[str, dict] = {
+    "SOURCE#calibration": {
+        "ruled_on": "2026-09-20",
+        "ruled_by": 3915,
+        "disposition": RULED_LABEL,
+        "allowed": ("cycle",),
+        "measured_2026_09_20": 2211,
+        "reason": (
+            "The `cycle` on a CALIB# row is CONTENT, written by two deliberate writers. The hypothesis "
+            "writers stamp the cycle a bet was CREATED in; deploy/reconcile_prereg_voids.py stamps the "
+            "cycle whose reset CLOSED it, and its own docstring says the two disagree and keeps the "
+            "creation stamp separately as `bet_cycle_stamp` rather than reconciling them. Strip it and a "
+            "void row stops saying which reset voided the bet — the only thing that distinguishes a void "
+            "from a missing grade (ADR-105). Live: cycles 5..17, 1,433 of them from cycle 5's void pass."
+        ),
+    },
+    "SOURCE#recall_embeddings": {
+        "ruled_on": "2026-09-20",
+        "ruled_by": 3915,
+        "disposition": RULED_LABEL,
+        "allowed": ("cycle",),
+        "measured_2026_09_20": 883,
+        "reason": (
+            "The class's own SOURCE_CLASS comment (#1384) REQUIRES it: 'each item carries its own cycle "
+            "stamp, so a precedent from cycle N is still labeled cycle N in cycle N+1 — the archive stays "
+            "navigable, not wiped.' It is read, not decorative: ai/semantic_recall.load_corpus carries "
+            "`cycle` per doc and AC5 labels each precedent with its source cycle; a row without one yields "
+            "no cycle claim at all (ADR-104). Stripping 883 of these would silently delete the labels."
+        ),
+    },
+    "SOURCE#milestones": {
+        "ruled_on": "2026-09-20",
+        "ruled_by": 3915,
+        "disposition": RULED_LABEL,
+        "allowed": ("cycle",),
+        "measured_2026_09_20": 27,
+        "reason": (
+            "compute/daily_metrics_compute_lambda writes the ledger with experiment_stamp(include_phase="
+            "False) under a comment that names the weight_episodes precedent: cycle-only provenance, never "
+            "a phase, and milestone_ledger's reads take NO phase filter — so the cycle cannot hide a "
+            "consumed rung (the #1626 no-re-fire guarantee). Live: all 27 carry cycle 11 and no phase."
+        ),
+    },
+    "COACH": {
+        "ruled_on": "2026-09-20",
+        "ruled_by": 3915,
+        "disposition": RULED_IN_SCOPE,
+        "allowed": (),
+        "measured_2026_09_20": 64,
+        "remediation": (
+            "#3915: (a) the write-time half — coach_chat.turn_records and coach_chat_summary no longer put "
+            "a `cycle` on a row whose class forbids it (the same predicate this audit uses), and (b) the "
+            "row half — deploy/reconcile_provenance_2026_09.py --only 3514 now scans the chat-tier "
+            "partitions too, so its group-A strip reaches these 64. Owner-gated (--apply)."
+        ),
+        "reason": (
+            "The issue called these 'retired-coach CHAT#'; they are not retired — COACH#eli_marsh (53) and "
+            "COACH#career_coach (11) are persona_registry.CHAT_COACH_IDS, the lead and the career coach, "
+            "newest row 2026-09-17. They are the SAME defect #3514 already stripped from the operational "
+            "partitions and the nightly already alarms on; they escaped only because the alarmed set is "
+            "built from OPERATIONAL_COACH_IDS and the reconcile's partitions from wipe.COACH_PARTITIONS, "
+            "and neither list knows about the chat tier. Nothing reads `cycle` off a chat row. The write "
+            "half is not optional: the operational partitions are clean today and their newest chat turn "
+            "predates that strip, so the next Telegram turn would re-mint what the reconcile removed."
+        ),
+    },
+}
+
+
+def provenance_ruling(pk: str) -> dict | None:
+    """The #3915 ruling for `pk`'s family, or None when nobody has ruled on it."""
+    return CROSS_PHASE_PROVENANCE_RULINGS.get(pk_family(pk))
+
+
+def ruling_verdict(pk: str, bad: list) -> tuple[str, dict | None]:
+    """(verdict, ruling) for a CROSS_PHASE row carrying the provenance attrs `bad`.
+
+    RULED_LABEL when every attribute is one the family's ruling sanctions,
+    RULED_IN_SCOPE when the family is ruled a defect with a named remediation,
+    UNRULED when there is no ruling — or when the row carries an attribute OUTSIDE
+    the one its ruling sanctions, which is the case nobody has decided yet and must
+    never be swallowed by the entry that covers its neighbour.
+    """
+    ruling = provenance_ruling(pk)
+    if ruling is None:
+        return UNRULED, None
+    residue = [a for a in bad if a not in ruling["allowed"]]
+    if not residue:
+        return RULED_LABEL, ruling
+    return (RULED_IN_SCOPE, ruling) if ruling["disposition"] == RULED_IN_SCOPE else (UNRULED, ruling)
+
+
+def cycle_label_forbidden(pk: str, sk: str = "") -> bool:
+    """#3915 — the WRITE-side face of the same ruling: may a writer put a bare `cycle`
+    on the row at (pk, sk)?
+
+    False when the row's class permits provenance at all (it is not CROSS_PHASE, so the
+    ordinary `experiment_stamp*` contract applies), and False when the family's ruling
+    SANCTIONS a cycle label (milestones, recall_embeddings, calibration — where the
+    writers were right and the blanket predicate was too wide). True otherwise, which is
+    where a writer must drop the attribute rather than mint a row the audit will report.
+
+    One function for both directions on purpose. The whole shape of #3514 was a predicate
+    that was correct and unread; a writer that re-derives "is a cycle OK here?" beside the
+    audit is the same defect with an import in front (#3792).
+    """
+    bad = taxonomy.forbidden_provenance(pk, sk, {"cycle": 1})
+    if not bad:
+        return False
+    return ruling_verdict(pk, bad)[0] != RULED_LABEL
+
+
+def format_inverse_census(audit: dict) -> str:
+    """One line naming EVERY family carrying forbidden provenance and its ruling — the
+    box-4 sentence: the four families are enumerated by the check, never invisible to it.
+
+    Written here rather than in the caller so the nightly (qa_smoke_lambda) and any
+    operator report render the same sentence from the same derivation.
+    """
+    census = audit.get("inverse_census") or {}
+    if not census:
+        return ""
+    parts = []
+    for fam, e in sorted(census.items(), key=lambda kv: (-kv[1]["rows"], kv[0])):
+        parts.append(f"{fam} {e['rows']} [{'+'.join(e['attrs'])}] {e['verdict']}")
+    total = sum(e["rows"] for e in census.values())
+    return f" INVERSE census (#3915): {total} cross-phase row(s) carry provenance, ruled — " + "; ".join(parts) + "."
+
+
 def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dict:
     """#3599 box 2 / #3513 / #3877 — the phase-stamp audit over ROWS, not writers.
 
@@ -237,7 +403,15 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
         leg is ALARMED and measured 2026-09-19 at 3,185 rows table-wide (calibration 2,211,
         recall_embeddings 883, milestones 27, retired-coach CHAT# 64) with no remediation
         naming them. Widening an alarmed leg by three thousand members nobody can clear
-        trains the reader to skip it (#3851/#3853); that Set is a follow-up, filed by number.
+        trains the reader to skip it (#3851/#3853).
+      * inverse CENSUS (#3915) — the same rows, table-wide, ENUMERATED rather than
+        alarmed: `inverse_census[family]` carries the count, the attributes and the
+        family's ruling (CROSS_PHASE_PROVENANCE_RULINGS above). Two derived leaves come
+        out of it: `remediable` (ruled a defect, remediation named) and
+        `unruled_provenance` (no ruling, or an attribute outside the family's ruling) —
+        the clause that can still fail, and the reason this is not an allowlist. The
+        ALARMED set is unchanged by it: a row is in `wrongly_stamped` iff its pk is in
+        `inverse_pks`, exactly as before, so this census mints no new alarm member.
       * `by_design` counts the unstamped CROSS_PHASE / SYSTEM_STATE rows on `inverse_pks`
         (the ADR-153 conversation history), so the exclusion is visible, not silent (#2520).
       * `unclassified` counts rows `classify()` cannot resolve; the totality census is the
@@ -254,6 +428,9 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
     unstamped: dict = {}
     deferred: dict = {}  # tagger-reachable, in-cycle: stamped by the next reset's tagger, by design
     wrongly_stamped: list = []
+    inverse_census: dict = {}  # #3915: every CROSS_PHASE family carrying provenance, with its ruling
+    remediable: dict = {}  # ruled a defect; the ruling names the tool that clears it
+    unruled_provenance: dict = {}  # provenance nobody has ruled on — a finding by construction
     families_audited: set = set()
     rows = by_design = unclassified = 0
     for page in pages:
@@ -265,10 +442,26 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
             except KeyError:
                 unclassified += 1
                 continue
-            if pk in inverse:
+            if cls == taxonomy.CROSS_PHASE:
+                # #3915: the census runs over EVERY cross-phase row (the same predicate the
+                # writer and the reconcile use), the ALARM only over `inverse_pks`.
                 bad = taxonomy.forbidden_provenance(pk, sk, it)
                 if bad:
-                    wrongly_stamped.append(f"{pk}/{sk}[{'+'.join(bad)}]")
+                    verdict, _ruling = ruling_verdict(pk, bad)
+                    fam = pk_family(pk)
+                    entry = inverse_census.setdefault(fam, {"rows": 0, "attrs": set(), "verdict": verdict, "pks": set()})
+                    entry["rows"] += 1
+                    entry["attrs"].update(bad)
+                    entry["pks"].add(pk)
+                    if verdict != entry["verdict"]:
+                        # Two verdicts inside one family: report the stricter one, never the quieter.
+                        entry["verdict"] = UNRULED if UNRULED in (verdict, entry["verdict"]) else RULED_IN_SCOPE
+                    if verdict == RULED_IN_SCOPE:
+                        remediable.setdefault(fam, []).append(f"{pk}/{sk}[{'+'.join(bad)}]")
+                    elif verdict == UNRULED:
+                        unruled_provenance.setdefault(fam, []).append(f"{pk}/{sk}[{'+'.join(bad)}]")
+                    if pk in inverse:
+                        wrongly_stamped.append(f"{pk}/{sk}[{'+'.join(bad)}]")
             if cls != taxonomy.EXPERIMENT_SCOPED:
                 if pk in inverse and it.get("phase") is None:
                     by_design += 1
@@ -286,6 +479,9 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
             "phase-stamp row audit: the provenance scan returned ZERO rows. Refusing to certify "
             "stamp coverage on an empty scan (the vacuous-scan trap)."
         )
+    for entry in inverse_census.values():
+        entry["attrs"] = sorted(entry["attrs"])
+        entry["pks"] = sorted(entry["pks"])
     return {
         "rows": rows,
         "families_audited": families_audited,
@@ -294,6 +490,10 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
         "wrongly_stamped": wrongly_stamped,
         "by_design": by_design,
         "unclassified": unclassified,
+        # #3915 — the inverse leg, enumerated. Additive: no existing key changed meaning.
+        "inverse_census": inverse_census,
+        "remediable": remediable,
+        "unruled_provenance": unruled_provenance,
     }
 
 

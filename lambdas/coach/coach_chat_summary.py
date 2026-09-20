@@ -194,6 +194,23 @@ def summary_sk(date_str: str) -> str:
     return f"{SUMMARY_SK_PREFIX}{date_str}"
 
 
+def _cycle_label(pk: str, sk: str, cycle) -> dict:
+    """#3915: `{"cycle": cycle}` only when the row's class may carry one, else `{}`.
+
+    All three rows this module writes (CHAT#summary#, RELATIONSHIP#bits,
+    RELATIONSHIP#people) are CROSS_PHASE by ADR-153/#2487, so in practice this returns
+    `{}` — which is the point: the compressed long memory must not be labelled with the
+    cycle it was written in any more than the turns it compresses. Routed through
+    `pk_census.cycle_label_forbidden` so the writer reads the SAME ruling the nightly
+    audit and the reconcile read, rather than a second copy of the judgment.
+    """
+    if cycle is None:
+        return {}
+    from experiment.pk_census import cycle_label_forbidden
+
+    return {} if cycle_label_forbidden(pk, sk) else {"cycle": cycle}
+
+
 def is_summary_row(item: dict) -> bool:
     return str((item or {}).get("sk", "")).startswith(SUMMARY_SK_PREFIX)
 
@@ -527,9 +544,8 @@ def _store_bits(table, pk: str, new_bits, date: str, coach_name: str = "", cycle
             "bits": merged,
             "coach_name": coach_name,
             "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            **_cycle_label(pk, BITS_SK, cycle),  # #3915: cross-phase row — no cycle label
         }
-        if cycle is not None:
-            item["cycle"] = cycle
         table.put_item(Item=item)
         logger.info("[chat_summary] stored %d inside references for %s", len(merged), pk)
         return merged
@@ -562,9 +578,8 @@ def _store_people(table, pk: str, new_people, date: str, coach_name: str = "", c
             "people": merged,
             "coach_name": coach_name,
             "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            **_cycle_label(pk, PEOPLE_SK, cycle),  # #3915: cross-phase row — no cycle label
         }
-        if cycle is not None:
-            item["cycle"] = cycle
         table.put_item(Item=item)
         logger.info("[chat_summary] stored %d remembered people for %s", len(merged), pk)
         return merged
@@ -718,9 +733,8 @@ def ensure_daily_summary(
             "text": text,
             "coach_name": coach_name,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            **_cycle_label(pk, summary_sk(target), cycle),  # #3915: cross-phase row — no cycle label
         }
-        if cycle is not None:
-            item["cycle"] = cycle
         table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
         logger.info("[chat_summary] wrote %s for %s", summary_sk(target), pk)
         # Only the worker that WON the conditional summary put gets here, so the

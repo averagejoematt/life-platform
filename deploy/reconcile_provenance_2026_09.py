@@ -322,9 +322,25 @@ def scanned_partitions() -> list[tuple[str, str]]:
     """(pk, sk_prefix) pairs groups A and B read. DERIVED, never hand-listed:
     every COACH#* partition the wipe registry knows (they carry both the
     CROSS_PHASE CHAT#/RELATIONSHIP# rows and the scoped ones), plus the
-    insights partition #3513 names."""
+    insights partition #3513 names, plus (#3915) the CHAT-TIER coach partitions.
+
+    #3915: the chat tier is the fourth family of the 3,185-row inverse census, and the
+    reason it had no remediation naming it is visible right here — `wipe.COACH_PARTITIONS`
+    is the OPERATIONAL set, and `COACH#eli_marsh` / `COACH#career_coach` are neither
+    operational coaches nor sources, so group A's strip has never reached them. Live on
+    2026-09-20: 64 CHAT# rows carrying a `cycle` the ADR-153 class forbids, newest
+    2026-09-17, while the operational partitions this function already covered read clean.
+    Derived from `persona_registry.CHAT_COACH_IDS` through `coach_chat.chat_pk` — the same
+    two functions the writer keys by — so a coach added to the chat tier is reached here
+    without anyone remembering to add it.
+    """
     parts = [(pk, "") for pk, _label, _mode, _extra in wipe.COACH_PARTITIONS]
     parts.append((INSIGHTS_PK, ""))
+    from coach import coach_chat
+    from coach.persona_registry import CHAT_COACH_IDS
+
+    known = {pk for pk, _ in parts}
+    parts.extend((coach_chat.chat_pk(cid), "") for cid in CHAT_COACH_IDS if coach_chat.chat_pk(cid) not in known)
     return parts
 
 

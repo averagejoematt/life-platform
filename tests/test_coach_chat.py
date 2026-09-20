@@ -340,11 +340,20 @@ def test_a_grounded_turn_records_no_findings_key():
     assert "findings" not in recs[1]
 
 
-def test_the_cycle_is_stamped_when_known_and_omitted_when_not():
+def test_the_cycle_is_never_stamped_on_a_chat_row_known_or_not():
+    """#3915 REVERSED this assertion deliberately — it used to pin `cycle == 12`.
+
+    A CHAT# row is CROSS_PHASE (ADR-153: the relationship survives the reset), so a
+    `cycle` on one is the same provenance #3514 stripped off the operational partitions
+    and the nightly alarms on. The writer kept minting it because nothing here asked the
+    taxonomy: 64 live rows on the chat tier (eli_marsh 53, career_coach 11) on 2026-09-20.
+    The caller still PASSES a cycle — the class gate is what drops it — and both coach
+    tiers are asserted, because they key by different pk shapes.
+    """
     with_cycle = cc.turn_records("nutrition", "X", "hi", cc.TurnResult("y", "sent"), cycle=12)
+    lead = cc.turn_records("eli_marsh", "X", "hi", cc.TurnResult("y", "sent"), cycle=12)
     without = cc.turn_records("nutrition", "X", "hi", cc.TurnResult("y", "sent"))
-    assert all(r["cycle"] == 12 for r in with_cycle)
-    assert all("cycle" not in r for r in without)
+    assert all("cycle" not in r for r in with_cycle + lead + without)
 
 
 def test_provenance_distinguishes_a_text_from_an_mcp_checkin():
