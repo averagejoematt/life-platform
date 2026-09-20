@@ -20,9 +20,10 @@ BENCH-1.4 — episodes + maintenance views (next commit).
 
 from datetime import datetime, timedelta
 
+from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
-from mcp.core import get_profile, query_source
+from mcp.core import decimal_to_float, get_profile, query_source
 
 # Run gate from PROVEN_BLUEPRINT.md (owner-private: s3://matthew-life-platform/config/coaching/,
 # #3043) — zero runs logged above ~240 lb in his own history.
@@ -693,6 +694,128 @@ def _benchmark_campaign(args: dict) -> dict:
     return out
 
 
+def _read_prescription_forecasts(end_date: str, lookback_days: int = 400) -> list:
+    """Every PRESCRIPTION# row in the forecast partition, oldest→newest (#3712).
+
+    `query_source` cannot serve this: it keys `sk BETWEEN DATE#lo AND DATE#hi~`, and
+    the week's claim is deliberately NOT a DATE# row (see the sk-prefix note in
+    episode_detect_lambda — the prefix is what keeps the daily forecast engine's
+    resolver and its published coverage headline from swallowing a different model's
+    forecasts). The upper bound runs past `end_date` because the OPEN row's target
+    week is in the future by construction.
+    """
+    from mcp.core import USER_PREFIX, table
+
+    lo = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    hi = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=21)).strftime("%Y-%m-%d")
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}forecast") & Key("sk").between(f"PRESCRIPTION#{lo}", f"PRESCRIPTION#{hi}~"),
+    }
+    items: list = []
+    while True:
+        r = table.query(**kwargs)
+        items.extend(r.get("Items", []))
+        if "LastEvaluatedKey" not in r:
+            break
+        kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+    rows = decimal_to_float(items)
+    return sorted(rows, key=lambda x: str(x.get("target_week_end") or ""))
+
+
+def _read_prescription_resolutions(end_date: str, lookback_days: int = 400) -> list:
+    """The graded rows from the SHARED CALIB# ledger (#3712).
+
+    Read from the calibration partition rather than from the forecast rows on
+    purpose: the calibration ledger is the platform's cross-phase graded record and
+    survives a reset, so the track record answers "is the coaching working" across
+    campaigns rather than only within the current one. `track_record` filters on the
+    model id, because this partition also holds the daily engine's resolutions.
+    """
+    from mcp.core import USER_PREFIX, table
+
+    lo = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}calibration") & Key("sk").between(f"CALIB#{lo}", f"CALIB#{end_date}~"),
+    }
+    items: list = []
+    while True:
+        r = table.query(**kwargs)
+        items.extend(r.get("Items", []))
+        if "LastEvaluatedKey" not in r:
+            break
+        kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+    return decimal_to_float(items)
+
+
+def _benchmark_forecast(args: dict) -> dict:
+    """Is the weekly plan committing to a number, and is it getting them right? (#3712)
+
+    Three things in one read, because they are one question:
+      open       — the claim the current week is under, with its interval and n
+      last_grade — how the week that just closed actually came out
+      adjustment — what the miss changed about next week's number, and the arithmetic
+      track_record — the answer to "is the coaching actually working", or an
+                     explicit refusal to answer when too few weeks have been graded.
+
+    Read-only. The forecasts are ISSUED weekly by episode-detect; nothing here
+    writes, so calling this view can never mint a bet.
+    """
+    from training import prescription_forecast as pf
+
+    end_date = args.get("date") or _today()
+    rows = _read_prescription_forecasts(end_date)
+    if not rows:
+        return {
+            "view": "forecast",
+            "applicable": False,
+            "reason": (
+                "no weekly prescription forecast has been issued yet — episode-detect writes one "
+                "every Sunday, so this is empty until the first run after deploy"
+            ),
+            "_disclaimer": _BENCHMARK_DISCLAIMER,
+        }
+
+    open_rows = [r for r in rows if not r.get("resolved_at")]
+    closed = [r for r in rows if r.get("resolved_at")]
+    resolutions = _read_prescription_resolutions(end_date)
+    record = pf.track_record(resolutions)
+    last = closed[-1] if closed else None
+
+    out: dict = {
+        "view": "forecast",
+        "applicable": True,
+        "date": end_date,
+        "model": pf.MODEL_ID,
+        "open": (open_rows[-1] if open_rows else None),
+        "last_grade": last,
+        # The derivation travels WITH the number it produced — a target a reader
+        # cannot trace back to the miss that moved it is re-authoring by another name.
+        "adjustment": (last or {}).get("adjustment"),
+        "track_record": record,
+        "intake_comparable": False,
+        "intake_note": pf.INTAKE_NOTE,
+        "basis_note": pf.BASIS_NOTE,
+        "confidence": pf.CONFIDENCE,
+        "n": record.get("n_graded"),
+        "_disclaimer": _BENCHMARK_DISCLAIMER,
+    }
+    bits: list = []
+    cur: dict = out["open"] or {}
+    if cur and cur.get("issued"):
+        bits.append(cur.get("statement") or "")
+    elif cur:
+        bits.append(cur.get("statement") or f"This week's forecast was declined: {cur.get('declined_reason')}")
+    if last and last.get("grade_status") == "graded":
+        verdict = "inside" if last.get("covered") else "outside"
+        bits.append(
+            f"The week ending {last.get('target_week_end')} came in at {last.get('actual_lb_wk')} lb/wk — "
+            f"{verdict} the stated interval."
+        )
+    bits.append(record.get("verdict") or "")
+    out["signal"] = " ".join(b for b in bits if b)
+    return out
+
+
 # ── the tool's own description (#3710) ─────────────────────────────────────────
 # Extracted from mcp/registry.py, which is FULL against the #1665 module-size
 # ceiling. A tool describing itself beside its own implementation is where this
@@ -719,10 +842,16 @@ GET_BENCHMARK_DESCRIPTION = (
     "explains the gap — day-N cumulative loss vs the proven curve at the same day, plus the "
     "levers RANKED by how far each sits below its comparable losing-phase value. Windows "
     "shorter than the 28-day chronic window are flagged as artifacts, not printed as rates. "
+    "'forecast' = the week's prescription AS A GRADED BET (#3712) — the open claim "
+    "('at X cardio hr/wk this plan expects Y lb/wk, 80% interval, n weeks'), how the week "
+    "that just closed graded, the arithmetic that turned that miss into next week's volume "
+    "target, and the running track record (coverage vs the nominal 80%, error vs a no-model "
+    "baseline) — or an explicit refusal to answer while too few weeks have been graded. "
     "All views forward-framed (what works next), never a failure tally. "
     "Use for: 'how does my pace compare to last time?', 'am I walking enough?', 'can I run yet?', "
     "'show my cut history', 'am I holding the loss?', 'what was I doing last time I weighed this?', "
-    "'what heart rate should I target?', 'how many miles this week?'."
+    "'what heart rate should I target?', 'how many miles this week?', 'is the coaching actually working?', "
+    "'what did the plan predict and did it happen?'."
 )
 
 
@@ -737,6 +866,7 @@ def tool_get_benchmark(args):
         "maintenance": _benchmark_maintenance,
         "prescription": _benchmark_prescription,
         "campaign": _benchmark_campaign,
+        "forecast": _benchmark_forecast,
     }
     view = (args.get("view") or "pace").lower().strip()
     if view not in VALID_VIEWS:
