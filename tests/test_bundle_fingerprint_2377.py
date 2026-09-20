@@ -330,7 +330,7 @@ def _fake_git(commit_iso):
     def fake(args, cwd=None):
         if args[:3] == ["show", "-s", "--format=%cI"]:
             return commit_iso
-        if args == ["status", "--porcelain"]:
+        if args[:2] == ["status", "--porcelain"]:
             return ""
         return None
 
@@ -365,8 +365,8 @@ def test_a_dirty_local_tree_keeps_the_wall_clock(monkeypatch):
     def dirty_git(args, cwd=None):
         if args == ["rev-parse", "HEAD"]:
             return "0123456789abcdef0123456789abcdef01234567"
-        if args == ["status", "--porcelain"]:
-            return " M deploy/build_bundle.py"
+        if args[:2] == ["status", "--porcelain"]:
+            return " M deploy/build_bundle.py"  # inside BUNDLE_DIRTY_SCOPE
         if args[:3] == ["show", "-s", "--format=%cI"]:
             return "2026-09-20T17:20:13+00:00"
         return None
@@ -398,3 +398,34 @@ def test_the_real_checkout_fingerprints_head_from_its_commit_date():
         assert expected is not None
         assert info["built_at"] == expected.strftime("%Y-%m-%dT%H:%M:%SZ")
         assert info["built_at_source"] == "commit"
+
+
+def test_dirty_is_measured_over_the_bundle_roots_not_the_whole_checkout(monkeypatch):
+    """#3625: a modified file OUTSIDE what the bundle stages (the owner's .claude/settings.local.json
+    was the live case) must not flip `dirty` — it made every local CDK synth stamp the clock."""
+    monkeypatch.delenv("BUNDLE_GIT_SHA", raising=False)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    seen = {}
+
+    def scoped_git(args, cwd=None):
+        if args == ["rev-parse", "HEAD"]:
+            return "0123456789abcdef0123456789abcdef01234567"
+        if args[:3] == ["status", "--porcelain", "--"]:
+            seen["scope"] = tuple(args[3:])
+            return ""  # clean inside the scope
+        if args[:3] == ["show", "-s", "--format=%cI"]:
+            return "2026-09-20T17:20:13+00:00"
+        return None
+
+    monkeypatch.setattr(build_bundle, "_git", scoped_git)
+    info = build_bundle.git_fingerprint()
+    assert seen["scope"] == build_bundle.BUNDLE_DIRTY_SCOPE
+    assert "lambdas" in seen["scope"] and "mcp" in seen["scope"] and "config" in seen["scope"]
+    assert ".claude" not in " ".join(seen["scope"])
+    assert info["dirty"] is False and info["built_at_source"] == "commit" and info["dirty_scope"] == list(build_bundle.BUNDLE_DIRTY_SCOPE)
+
+
+def test_the_real_checkout_dirty_scope_ignores_settings_local():
+    """Mutation control against the real repo: the scoped porcelain must not list .claude/ paths."""
+    out = build_bundle._git(["status", "--porcelain", "--", *build_bundle.BUNDLE_DIRTY_SCOPE]) or ""
+    assert ".claude/" not in out
