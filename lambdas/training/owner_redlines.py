@@ -149,7 +149,7 @@ REDLINES: dict[str, dict[str, Any]] = {
     "walking_floor_hr_wk": {
         "value": 8.5,
         "target_hr_wk": [12, 15],
-        "hr_ceiling_bpm": 105,
+        "hr_ceiling_bpm": 105,  # drift-ok: a heart-rate ceiling in bpm, not a budget ceiling (ADR-133 scanner false-positive)
         "permanent": True,
         "provenance": "owner-history",
         "stated": "2026-06-19",
