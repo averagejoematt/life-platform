@@ -178,7 +178,10 @@ def test_the_daily_summarizer_stores_grounded_bits_and_keeps_them_out_of_the_not
     summary = [p for p in table.put_calls if p["sk"].startswith(ccs.SUMMARY_SK_PREFIX)][0]
     assert "BITS" not in summary["text"] and "hamster" not in summary["text"]
     bits_row = [p for p in table.put_calls if p["sk"] == ccs.BITS_SK][0]
-    assert bits_row["cycle"] == 13
+    # #3915 reversed this line (it pinned `cycle == 13`): RELATIONSHIP#bits rides the
+    # ADR-153 cross-phase rule ON PURPOSE (#2487 — "a reset does not un-say a shared
+    # joke"), so the row carries no cycle label. The caller still passes one.
+    assert "cycle" not in bits_row
     # "our secret handshake" is not in the transcript -> it never lands.
     assert [b["text"] for b in bits_row["bits"]] == ["the hamster wheel"]
 

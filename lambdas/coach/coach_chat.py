@@ -655,7 +655,14 @@ def turn_records(coach_id: str, coach_name: str, inbound: str, result: TurnResul
         "provenance": PROVENANCE,
         "created_at": stamp,
     }
-    if cycle is not None:
+    # #3915: a CHAT# row is CROSS_PHASE by ADR-153 — the relationship survives the reset —
+    # and a `cycle` on it is the exact provenance #3514 stripped from the operational
+    # partitions. It kept landing on the chat-tier ones (eli_marsh 53, career_coach 11 live
+    # on 2026-09-20) because nothing here asked. The predicate is the AUDIT's own, so the
+    # writer and the nightly cannot disagree about which rows may carry a cycle label.
+    from experiment.pk_census import cycle_label_forbidden
+
+    if cycle is not None and not cycle_label_forbidden(pk, f"{CHAT_SK_PREFIX}{d}"):
         base["cycle"] = cycle
     items: list[dict] = [
         dict(base, sk=new_chat_sk(d), role=ROLE_MATTHEW, text=clip_inbound(inbound)),

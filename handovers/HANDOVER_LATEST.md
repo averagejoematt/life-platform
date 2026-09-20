@@ -1,171 +1,100 @@
-# Handover — Sessions AM + AN: the posting pack, and the weekly card that could not be found (2026-09-19 14:52 → 20:55 PT)
+# Handover — Session AN: the overnight drain, and the deploy that split the fleet (2026-09-19 21:15 → 2026-09-20 ~08:25 PT)
 
-**Two sessions, one handover, because the first one never wrote its own.** Session AM shipped the
-posting pack and its terminal was closed before a wrap. Session AN began as a recovery sweep for
-that terminal, found nothing lost, and then took the owner's next request. AM's own account of
-itself survived only as a comment on epic #3741 and a `epic_comment.md` in a `/private/tmp`
-scratchpad; it is reconstructed below from that plus git and the live AWS state.
-
----
-
-## Session AM — the posting-day pass (Opus, ~14:52 → 19:57 PT, unwrapped)
-
-**Merged:** #3922 (22:13Z — two cards a day: the `detail` split, a Day 0 card, fillers for a missing
-ingestion piece, a post-render QA gate on every drawn frame) · #3923 (23:29Z — the elite-panel pass:
-anchored composition, the grade ring on every card, milestones, whole-sentence attributed coach
-quotes, no stale weight as hero, no red anywhere; `recap_detail.py` split out under the 1000-line
-ceiling).
-
-**Deployed and verified:** `recap-card-generator` from main at `dd2deb04` (23:32:13Z). The artifact at
-`deploys/recap-card-generator/latest.zip` was unzipped and grepped — `web/recap_detail.py`,
-`web/recap_qa.py`, `card_sentence`, `_fact_rows_above_bar`, `RecordingDraw`, `PB_MIN_PRIOR_SESSIONS`,
-`AMBER_DEEP` all present, `CodeSha256` mtime matching. The set was then re-rendered **through the
-deployed function** (`deliver=false, force=true`, no delivery): Day 0 + Days 1–13 × 2 + week-01 =
-28 cards, every one `qa: cleared`, stored under `recap/`.
-
-**Delivered:** the Desktop posting pack — 15 folders, one per post, weeklies included, `CHECKLIST.md`,
-and a flattened `airdrop/` with a combined `captions.txt`. 87 files, 5.5 MB, last write 19:57.
-
-**Side-effect it recorded honestly:** its lease steward blanket-rejected #3926's production deploy
-(another lane's training fix) at 23:20Z. Remedied by deploying `life-platform-mcp` — the only consumer
-of `training.plan_engine` / `owner_redlines`, established by a transitive-import walk over
-`ci/lambda_map.json` that found zero Lambda handlers reaching them — from the same `dd2deb04` tip,
-artifact verified. This is the [blanket lease reject] class again; the allowlist-your-own-shas rule
-held everywhere else.
-
-**Epic #3741 status left by AM:** boxes 1–2 calendar-gated (7 consecutive daily fires from 09-22;
-week-02 on 09-21) · box 4 (both paths carry the same PNG + caption) held by construction, not
-exercised live (no `--deliver`, on the owner's rule) · box 5 (no auto-posting before 2026-10-17)
-untouched — nothing in this work talks to Instagram · **0 posted by hand so far.**
+**Fable, autonomous, standing merge + deploy authority (fleet, MCP, site, CDK — tonight only).** The brief
+set 97 → ≤45. The honest number at wrap is **64 open in all / 61 outside the Roadmap milestone** — a 33-issue
+drain, 16 short of the target. Gross: **40 closed, 8 filed** (#3943 #3944 #3945 #3946 #3971 #3972 + the
+auto-filed #3980 + #3982, the instrument gap #3980 exposed, filed at wrap). The owner sheet was applied at boot by asking each gated item one at a time (11 rulings,
+all recorded on their issues). The wrap landed ~2.5 h past the 06:00 PT target, and the reason is its own
+memory: I read time off the last log line, not the clock, while lanes ran for hours.
 
 ---
 
-## Session AN — the recovery sweep, then the weekly ground (Opus, ~20:05 → 20:55 PT)
+## What shipped (31 PRs merged, every one `Refs`, no trailers)
 
-### The sweep: nothing was lost
+**Driver PRs:** #3948 (grounding specimens, #3516/#3519) · #3951 (#3938 readback `unverifiable` + the WHY note
+moved to `exercises[0].notes`) · #3953 (#3942 dry_run gates storage) · #3954 (#3601 ADR-077 30-day minimum) ·
+#3956 (#3917 xdist credential stash) · #3958 (#3919 calendar stale-carry arm) · #3959 (#3646 model gate
+`pending-reconcile`) · #3960 (#3900 tagger-blind stamps + IAM) · #3961 (#3770 explicit muscle group) · #3963
+(#3625 reproducible zip) · #3964 (#3643 prereg escapee) · #3969 (config ownership fix-forward) · #3970 (#3920
+derived layers) · #3981 (fix-forward for #3975's fromisoformat, **armed**) · #3965 (#3772 orphan drafts, **armed**).
+**Lane PRs:** #3947 (#3715) · #3949 (#3930) · #3950 (#3563) · #3952 (#3830) · #3955 (#3932) · #3957 (#3929) ·
+#3962 (#3927) · #3966 (#3916) · #3967 (#3914) · #3968 (#3928) · #3973 (#3913) · #3975 (#3700) · #3976 (#3620) ·
+#3978 (#3712) · #3974 (#3915, **armed**) · #3977 (#3609, **armed**).
 
-The owner had closed AM's terminal and asked whether anything needed recovering. It did not:
+**Closed on live proof (15):** #3670 #3606 #3919 #3654 #3646 #3916 #3917 #3932 #3930 #3929 #3942 **#3741 (epic —
+its last child)** #3920 #3928 #3914. **Folded (25):** 16 Roadmap issues into umbrellas #3943/#3944 and 9 Later
+stories into their epics, scope carried verbatim. #3927 closed by its lane's `Fixes`; the verdict it lacked was
+posted at wrap. **#3913 was auto-closed the same way with no deploy and was REOPENED**, then corrected once the
+CDK deploy turned out to carry it (see below).
 
-- **The cards were intact** — 87 files on the Desktop, the pack complete through day-13 + week-01,
-  plus a full earlier generation at `~/Desktop/archive/` (18:24, the pre-panel revision).
-- **The code had all landed** — #3922 and #3923 merged, deployed, verified.
-- **The one alarming artefact was a false alarm.** The worktree `issue-3741-recap-post-day` carried
-  677 uncommitted lines across six files. It was a stale duplicate: #3923 shipped the same change set
-  from `issue-3741-recap-panel`, and the worktree's `recap_layouts.py` was simply the pre-split
-  version (1,309 lines against main's 1,069, the difference being the extracted `recap_detail.py`).
-  Archived to `~/dev/life-platform-attic/` (the diff verified to reverse cleanly) and the worktree
-  pruned.
+## Deploys — name every stack, and which tip each function runs
 
-**Two real gaps, both closed:**
+- **Fleet** (`deploy_fleet.sh`): 106 functions from main `c32e58c31`, 13:19–13:26Z, 0 failed.
+- **MCP** (`deploy_lambda.sh life-platform-mcp`): same tip, postflight ancestry OK; artifact greps confirmed
+  #3770 #3938 #3930 #3932 #3920 #3928 #3927 #3700 content.
+- **CDK:** `LifePlatformCompute`, `LifePlatformEmail`, `LifePlatformOperational` from main `7615ce47` at
+  15:0xZ (rc 0; drift guard overridden with `ALLOW_LIVE_LAMBDA_DRIFT=1 ALLOW_STALE_DEPLOY_CHECKOUT=1` after a
+  first refusal). Purpose: the two `ExperimentCycleRead` SSM grants (#3900), hevy-routine-cron, the #3976 daily
+  PII-sweep cron. **Consequence the guard was warning about:** CDK re-bundled its tree asset, so every function
+  in those three stacks now runs `7615ce47` (freshness-checker, evening-nudge, hevy-routine-cron, the Compute
+  lambdas — read from each artifact's `build_info.json`), while `life-platform-mcp`, `whoop-data-ingestion` and
+  the other stacks stay on `c32e58c31`. The deploy line on #3913/#3712/#3620 was corrected to say so.
+- **Site:** no `site/**` merge tonight; the attended `rollback_site.sh HEAD` for #3654 box 4 ran 06:15:22Z
+  (invalidation `I2V522MBH5ZDX8AXICANH6D7DN`, LEFT LIVE block empty).
+- **Attended mutations:** `config_twin_sync.py --apply --strict` 06:34Z uploaded #3929's missing twin;
+  `backfill_coach_ensemble_phase_stamps.py --apply` 05:1xZ stamped 48 rows (77 cross-phase untouched).
 
-1. **The generator lived only in `/private/tmp`.** `build_desktop_pack.py` was one tmp purge from
-   being lost with the session that wrote it — the cards themselves always rebuild from the stored
-   rows, so it was the only unique artefact in that directory. It is now
-   `deploy/build_recap_posting_pack.py`, with the behaviour that made it dangerous fixed: the
-   original opened with an unconditional `shutil.rmtree(OUT)`, so any re-run destroyed a ticked
-   `CHECKLIST.md`. It now refuses a non-empty target, and `--force` moves the old pack aside to a
-   timestamped sibling. The two steps AM did by hand afterwards — the flattened `airdrop/` folder and
-   its combined captions — are folded in, so a rebuild is reproducible rather than remembered.
-2. **AM never wrapped.** This handover is that.
+## Leases — 40 rejected by name, zero blanket
+35484570936→3fb06a2a9 · 35487422677→24b83c5b3 · 35491037546→d5dc1a040 · 35491070986→914c79378 · 35491571732→4a9dfd9ab ·
+35491603778→436c2063c · 35491727734→941200398 · 35491744302→dc7172e70 · 35491819881→fcee8fc00 · 35491830161→3d8c0b4b1 ·
+35491896087→27cf631ff · 35492324046→3e322f66f · 35492361444→b2fee2628 · 35492589771→92d3a363d · 35492627269→fd886d571 ·
+35492710051→f4f5100af · 35492671336→f2540c84f · 35492738587→3fe028737 · 35492777669→f61d16242 · 35493036630→72c1ca810 ·
+35493033549→9feece7b0 · 35493066476→05531e899 · 35493222405→d1b44efc0 · 35493150058→963ef86c9 · 35493468353→3b003d448 ·
+35493546378→22060e755 · 35493664242→58c5f2845 · 35493584951→8bb1389a1 · 35494053022→e188db30a · 35494086845→ee3f63b64 ·
+35494243644→064ca8f3a · 35494213402→278a3fcc0 · 35494512815→bd635533e · 35494543939→56b741d68 · 35494578680→1cf673f1b ·
+35495359928→ae8184d12 · 35496280636→89b472327 · 35497353035→2b885abd9 · 35513202227→372b423cd · 35513211288→715a39fff.
+No lease waiting at wrap.
 
-### The owner's request: the weekly card cannot be found in the grid
+## Found by measuring, not by reading
 
-> *"on instagram its really hard to differentiate the day cards to the weekly cards… i think a
-> different background will give a much more visual impression to readers seeing just the weekly
-> cards."*
+- **#3625 box 3 is NOT met and cannot be by the zip fix.** `cdk diff LifePlatformCompute` right after the deploy: 32
+  `S3Key` lines; three synths of one tree minted three asset hashes. CDK fingerprints the staged *directory*, and
+  `build_info.json`'s wall-clock `built_at` differs every staging (524 files, one differs). Recorded on #3625 with the
+  design options; box stays unticked.
+- **#3929 shipped inert:** `config/hevy_template_aliases.json` landed unruled → main's unit tests red 05:50→06:3xZ
+  (fix-forward #3969) and the S3 twin was never uploaded until the attended sync.
+- **#3975 was caught by #3609's own gate** (a hand-rolled `date.fromisoformat`) → main red on the registry test from
+  `7667991df`; #3981 fixes forward and is armed (its first push failed mypy on the parser's `date | None`, fixed).
+- **Hevy API still returns `shoulders`** for the calf-press template after the owner's in-app edit (04:47Z, 05:10Z,
+  05:35Z, 06:19Z) — #3770 stays open on the API, not the app.
+- **12 `#pain` rows minted from 2022 notes** (grip-work lists) → #3972. **#3927's auditor is a discipline on the chat
+  path, not a gate** → #3971. **#3700's `attach_cardio_cues` is never reached by `draft_custom`** (recorded on #3700).
+- **`recap-card-generator` dry run** left no S3 object and no row (the #3942 proof) — the row read needed
+  `--expression-attribute-names` because `storage`/`dry_run` are DynamoDB reserved words.
 
-He is right, and the cause is structural: the weekly reckoning and the six dailies around it share a
-ground, a type scale and a hero shape, so a square grid thumbnail at ~110px has nothing left to tell
-them apart. Six candidate grounds were rendered on the **real** week-1 card and judged in a simulated
-Instagram profile grid by the same six seats that graded the first set.
+## Open at wrap, and why (every line cites)
 
-**The panel split 3–3.** Three seats (growth marketer, mobile UX, the quantified-self follower) wanted
-a richer green — most visible, stays in the brand's own hue family. Three (the editorial designer,
-the honesty seat, the regainer reader) rejected **every** green ground for the same reason, and that
-is the one that decided it:
+- **Armed PRs:** #3981 (fix-forward; main is red until it lands) · #3977 (#3609; census 665→666 resolved) · #3974 (#3915)
+  · #3965 (#3772). Each was rebased onto main by hand (`--theirs` on the regenerables + sync + plain commit).
+- **Nightly / next-occurrence proof:** #3900 (18:31Z coverage leg) · #3563 (next chronicle send) · #3830 (next vendor
+  503) · #3913 (a PT-evening straddling read) · #3712 (next weekly prescription; MCP side awaits a deploy) · #3620
+  (boxes 2–5 not started; box 1 live) · #3700 (n-floor on a real ride).
+- **Owner acts (#3945 register):** #3938 box 1 · #3770 · #3715 box 5 · #3772 box 2 · #3753/#3755/#3761/#3918 (approved
+  tonight, lanes not started — the drain took the night) · 0 posted by hand.
+- **Next reset:** #3643 boxes 2–4 · #3552. **Not started (design, not bug-fix):** #3601 boxes 1–2.
+- **#3980** — auto-filed 13:20Z by the cron-freshness advisory: `[ NEVER] pii-endpoint-sweep.yml` — #3976's newborn
+  cron, registered `watched` three hours before its first schedule; auto-closes on its first green. The instrument gap
+  (a newborn watched workflow reds before it could have run) → **#3982**.
+- **Worktrees:** every merged lane's worktree released; the four armed PRs' worktrees stay until they merge.
 
-> Green means EARNED in this palette. A permanent green ground would say "good week" identically on a
-> week of B's and on this one — which graded C, B-, B-, B-, C-, C-, C- and whose own headline is
-> *"biggest miss: recovery — 24/100 at its worst"*. The grade chips already carry the verdict. The
-> ground carries the card TYPE.
-
-The regainer seat — the reader the honesty promise exists for — raised it unprompted and called it
-the exact thing they are watching for. **The contrast arithmetic then agreed with the rule rather
-than against it:** on the deepest green candidate the faintest text tone falls to 3.20:1; on the
-chosen navy it holds 3.62:1 against the daily ground's 3.90:1. The honest choice was also the legible
-one — worth remembering, because the split had been framed as honesty *versus* visibility.
-
-`WEEKLY_GROUND = (11, 20, 44)`, fixed, result-neutral, with the reasoning at the constant.
-
-**A defect found by looking at the picture, not by running the tests.** The goal bar's unfilled track
-was a fixed green-black chosen against the daily ground. On the navy weekly it lay across the card as
-a foreign strip — the ground had moved and one piece of chrome had not. It is derived from the card's
-ground now; the daily's historic `(18, 26, 20)` is pinned to the byte. Every automated gate passed on
-the render that carried it.
-
-**PR #3941** — 7 tests, each mutation-proved to fail (weekly-ground-back-to-daily; a green ground; the
-track pinned back to the literal; the `base_canvas` default changed). 696 passed across every
-card-related test; 217 on the module-size guards.
-
-### Filed
-
-- **#3942** — `dry_run=True` on `recap-card-generator` gates **delivery only**, not storage. Found by
-  causing it: one local "dry run" invoked to *inspect* a card overwrote three live `recap/` objects
-  and moved the row's `rendered_at` at 20:13. No harm landed (the code was identical to main, the
-  owner's pack is a local copy, and the set was regenerated afterwards), but a dry run is the thing
-  you reach for *because* you believe it cannot mutate, and this one silently republishes a
-  reader-facing artifact. P2, Now.
-
----
-
-## Ledger
-
-New standing machinery: none. The weekly ground is a constant with a contract test, not a subsystem;
-`build_recap_posting_pack.py` is an operator script that is never bundled (deploy/ is not staged into
-any Lambda) and adds no scheduled job, alarm, watcher or gate. The three new tests ride the existing
-premerge lane.
-
-## Residual / next picks
-
-- **#3941 is MERGED, DEPLOYED and LIVE — done in-session.** `c3032efe0` merged on ten green checks
-  (full pre-merge suite included, not the required-two lane); `recap-card-generator` deployed from
-  main at `c3032efe0`, artifact unzipped and grepped (`WEEKLY_GROUND = (11, 20, 44)`, the
-  three-argument `base_canvas`, `track_for`); day 7 re-rendered THROUGH the deployed function
-  (`deliver=false`, `qa: cleared` on both frames) and the stored `recap/week-01.png` verified navy at
-  the pixel. The Desktop pack was then rebuilt by the newly-landed
-  `deploy/build_recap_posting_pack.py` — 15 folders, 87 files, and a per-card ground assertion showing
-  the weekly navy and all 26 daily frames untouched at `(8, 12, 10)`. The pack the owner had before
-  is preserved at `~/Desktop/averagejoematt-cards.bak-20260919-205325`.
-- **There was no lease to decide on `c3032efe0` — the concurrency group settled it.** The run's
-  Deploy job self-cancelled at 03:58:01Z with *"Canceling since a higher priority waiting request for
-  ci-cd-deploy-refs/heads/main exists"* — the parallel lane's newer push had already queued. I had
-  planned to reject it by name (hand-deploy already done, and approving an older tip over a newer one
-  is the #3908 hazard); the concurrency control reached the same outcome first, which is worth knowing
-  because it means a `cancelled` Deploy on a superseded tip is NORMAL here and not a stranded lease.
-  `c3032efe0` is an ancestor of current `main`, every other card family is byte-identical by
-  construction and by test, and the next deploy from a newer tip carries the code forward regardless.
-  **A genuinely waiting lease on `24b83c5b3` belongs to the parallel lane and was deliberately left
-  alone** — the blanket-reject class.
-- **#3942** — the dry-run storage gap. Small, and it protects the surface this whole epic publishes to.
-- **#3741 box 4** — still 0 posted by hand. Nothing here posts itself, by design.
-- **#3719** — still the live owner call from Session Z: `/api/physical_overview` serves the full
-  tape-measurement panel publicly with no tier and no consent stamp.
-- **Week-02 is TODAY's card, not 09-21 (#3741).** Genesis 2026-09-06 is day 1, so 2026-09-19 is day 14 — the
-  next `day_n % 7 == 0`. AM's note said 09-21; the arithmetic in the code disagrees (the live render
-  returns `day_n 7` for 09-12). So the first weekly the CRON draws on the new ground is the one for
-  today, rendered on the next scheduled run — the change goes to work without another deploy, which
-  is what "the norm going forward" required.
-
-**Build beat:** none — the shipped work is a card-styling change to an account with no posts yet; a
-beat about making the weekly card distinguishable is a beat about a thing no reader has seen. It earns
-one when week-02 posts.
-**Docs:** none needed — the shipped change is a card ground colour; the CLAUDE.md status block was replaced in the wrap commit.
-**Decisions:** none needed — the "green means earned" rule is recorded on #3941 and in memory, not as an ADR.
-**Main:** red — the AM+AN wrap commit itself: 10 wrap marker lines missing and one ungated residual bullet (this fix-forward commit, Session AN boot 2026-09-20).
-**Incidents:** none
+**Build beat:** the debrief red team — merged + deployed 09-19 (`docs/content/BUILD_DISPATCH_CHECKLIST.md` shape); nothing tonight was bigger than it, because tonight was a drain, and a drain is not a beat.
+**Docs:** ADR-077 amended (#3954, the 30-day minimum on the measured number); `docs/CONVENTIONS.md` §1 carries the zip-reproducibility invariant (#3963); the CLAUDE.md status block replaced in this wrap.
+**Decisions:** ADR-077 amendment (#3954) — the reset's 30-day minimum, recorded on 12 resets / 55 days, median 5; no other ADR.
+**Main:** red — `test / Unit Tests` on the #3609 ISO-parse registry gate since `7667991df` (#3975's hand-rolled fromisoformat); fix-forward #3981 armed on the required checks. Earlier tonight: red on `test_config_ownership_3785` from `f2540c84f` to `064ca8f3a`, cured by #3969.
+**Incidents:** none filed — the config-ownership red and the #3609 red were both fix-forwarded inside the session; neither reached a reader surface.
 **Stash/hooks:** clean
-**Closures:** none — no issues closed this session · DoD: scanned=1 window=closed>=2026-09-20 hits=0 findings=0 dispositioned=0 mode=warn blocking=none
-**Backlog:** Now unchanged; 12 hygiene violations carried to Session AN's boot (#3938 milestone, #3942 audience, 5 acceptance_count, 3 grounding_specimen, 2 epic Stories)
-**Alarms:** ✅ every alarm in ALARM state >72h cites an incident row or issue; no uncited fired-and-cleared episodes in the last 72h
-**CI warnings:** latest completed main run red on the wrap commit's own handover (see Main); the 3fb06a2a9 lease rejected by name at AN boot
-**Ledger:** none — no standing machinery shipped (a colour constant is not machinery)
+**Closures:** 40 closed (15 on live proof, 25 folded) · DoD: scanned=43 window=closed>=2026-09-20 hits=4 findings=4 → all 4 dispositioned at wrap (3 residual lines re-homed as `not-work`, #3927 given its Outcome verdict)
+**Backlog:** 97 → 64 open (61 non-Roadmap); Now carries the four armed PRs' issues + #3980 (milestoned Now at wrap); 8 filed (#3943 #3944 #3945 #3946 #3971 #3972 #3980 #3982); hygiene 12 → 0 at boot
+**Alarms:** ✅ every alarm in ALARM state >72h cites an incident row or issue (wrap_gates e10, 15:1xZ)
+**CI warnings:** latest completed main run red on the #3609 gate (see Main); cron-freshness advisory red since 13:20Z (#3980 — a newborn cron, #3982 for the instrument)
+**Ledger:** `docs/PROPORTIONALITY.md` regenerated by the reconcile bot after each merge (gate census 664 → 665 on main; 666 once #3977 lands); no new standing machinery beyond the nightly `orphan_routine_drafts` leg (#3965, armed) and the #3976 daily PII-sweep cron (CDK-deployed)

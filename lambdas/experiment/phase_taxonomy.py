@@ -760,6 +760,16 @@ def experiment_stamp_for(pk: str, sk: str = "", **kwargs) -> dict:
 # The attributes a reset (or a write-time stamp) puts on a row to say WHICH run it
 # belongs to. On a CROSS_PHASE row every one of them is wrong by construction — the
 # class is "never tagged, never wiped, never phase-filtered".
+#
+# #3915 (2026-09-20) narrows that sentence where it was too wide, WITHOUT changing this
+# predicate: measured over the live table, all 3,185 flagged cross-phase rows carry
+# `cycle` and only `cycle`, and on three families (calibration, recall_embeddings,
+# milestones) a bare cycle is a LABEL their own SOURCE_CLASS comments above require and a
+# reader consumes — nothing filters, wipes or tombstones on it. The per-family ruling
+# therefore lives one layer up, in `pk_census.CROSS_PHASE_PROVENANCE_RULINGS`, which reads
+# this function and then says whether the attribute it found was sanctioned. This one
+# stays the wide, mechanical answer to "what provenance is on this row" so every
+# instrument still starts from the same list.
 PROVENANCE_ATTRS = ("phase", "cycle", "tombstone", "tombstoned_at", "tombstoned_reason")
 
 
