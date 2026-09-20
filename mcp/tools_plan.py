@@ -95,7 +95,10 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
 
     floor_g = owner_redlines.REDLINES["protein_floor_g"]["value"]
     res = tool_get_nutrition({"view": "summary", "start_date": _minus_days(end_date, 6), "end_date": end_date}) or {}
-    rows = [r for r in (res.get("daily_rows") or []) if r.get("protein_g") is not None]
+    # LIVE SHAPE (2026-09-20): the summary view returns `daily_breakdown`, not `daily_rows`. The
+    # first deployed stage-2 run read the wrong key and reported protein UNKNOWN on a week with
+    # six logged days — the #3767 class this module's own comment claims to have checked.
+    rows = [r for r in (res.get("daily_breakdown") or res.get("daily_rows") or []) if r.get("protein_g") is not None]
     if not rows:
         return None, None
     return sum(1 for r in rows if float(r["protein_g"]) < floor_g), len(rows)
@@ -168,8 +171,12 @@ def tool_plan_next_session(args):
         # a planner reading a key that does not exist degrades to "unknown" silently,
         # which is the #3767 failure wearing different clothes.
         recovery_tier=_recovery_tier(readiness),
-        acwr_flag=(acwr.get("alert") or acwr.get("interpretation")),
-        muscle_volume=(volume.get("muscle_sets") or volume.get("by_muscle") or {}),
+        # LIVE SHAPES (2026-09-20, read off the deployed tools, not assumed): get_acwr_status
+        # carries the flag as `zone` (`alert` is a bool that is False when safe, so `alert or
+        # interpretation` returned the METHODOLOGY PROSE as the flag); get_muscle_volume keys its
+        # per-muscle table as `muscle_volume`, each row with `total_sets` / `avg_sets_per_week`.
+        acwr_flag=(acwr.get("zone") or acwr.get("alert_reason")),
+        muscle_volume=_muscle_sets(volume),
         days_since_movement=(
             {e["label"]: e["days_since"] for e in evidence["exercises"] if e.get("days_since") is not None} if evidence else None
         ),
@@ -453,7 +460,11 @@ def _recovery_tier(readiness: dict) -> str | None:
     a branch. Doing the mapping here keeps the engine's input in the vocabulary the
     cues are written in.
     """
-    score = readiness.get("score")
+    # LIVE SHAPE (2026-09-20): get_readiness_score returns `readiness_score`; the two names read
+    # before it were guesses and the tier came back None on a GREEN 80.1 day.
+    score = readiness.get("readiness_score")
+    if score is None:
+        score = readiness.get("score")
     if score is None:
         score = readiness.get("recovery_score")
     try:
@@ -465,6 +476,20 @@ def _recovery_tier(readiness: dict) -> str | None:
     if score >= 34:
         return "yellow"
     return "red"
+
+
+def _muscle_sets(volume: dict[str, Any]) -> dict[str, Any]:
+    """{muscle: weekly sets} from get_muscle_volume's live shape, or {} when it is absent."""
+    table = volume.get("muscle_volume") or volume.get("muscle_sets") or volume.get("by_muscle") or {}
+    out: dict[str, Any] = {}
+    for muscle, row in table.items():
+        if isinstance(row, dict):
+            v = row.get("avg_sets_per_week", row.get("total_sets"))
+            if v is not None:
+                out[muscle] = v
+        elif isinstance(row, (int, float)):
+            out[muscle] = row
+    return out
 
 
 def _minus_days(date_str: str, days: int) -> str:
