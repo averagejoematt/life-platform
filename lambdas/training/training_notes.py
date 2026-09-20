@@ -42,6 +42,7 @@ from common.pacific_time import pacific_today  # #2798: workout DATE# keys name 
 # existing `training_notes.<helper>` caller — and every monkeypatch of one — is unchanged.
 from training.training_notes_keys import (  # noqa: F401
     ARCHIVE_PREFIX,
+    PREFLIGHT_LOOKBACK_DAYS,
     RECORD_KIND_PRIOR,
     dedupe_head_rows,
     head_sk,
@@ -129,6 +130,37 @@ _JOINT_REGIONS = [
 _JOINT_SENSATION = _PAIN_WORDS + ["ache", "aching", "achy"]
 # Ambiguous terms → NOT auto-pain; surfaced to the coach as a judgment call (not here).
 PAIN_REVIEW_TERMS = ["burn", "sore", "soreness", "tight", "tightness"]
+
+# ── Grip-work / training-modality negative control (#3972) ──────────────────
+# A grip-strength note names its OWN vocabulary — "plate pinch", "pinch gripping",
+# "captains of crush" — that collides with `_PAIN_WORDS` on the substring "pinch" alone.
+# "pinch" stays a pain word (a genuine "pinched my wrist" must still fire); the fix is to
+# strip these specific multi-word MODALITY phrases out of the text before the pain scan,
+# never to remove "pinch" from the lexicon. Terms derived verbatim from the 2022-03-30
+# Zercher Squat note the backfill mis-flagged: "Also thick bar or heavy dB holds, plate
+# pinch gripping, captains of crush gripper, rice digs".
+_GRIP_MODALITY_PHRASES = [
+    "thick bar",
+    "plate pinch",
+    "pinch gripping",
+    "pinch grip",
+    "captains of crush",
+    "heavy db holds",
+    "heavy dumbbell holds",
+    "gripper",
+    "grip work",
+    "holds",
+    "rice digs",
+]
+
+
+def _strip_grip_modality(text: str) -> str:
+    """Blank out known grip-modality phrases so they can't stand in for a pain word."""
+    out = text
+    for phrase in _GRIP_MODALITY_PHRASES:
+        out = out.replace(phrase, " ")
+    return out
+
 
 # ── Deterministic keyword sets for the rule-pass classes ──
 _EQUIPMENT_KW = [
@@ -294,10 +326,12 @@ def note_hash(note_text: str) -> str:
 
 def pain_lexicon_hit(note_text: str) -> bool:
     """Authoritative pain net (Invariant 5). Over-inclusive by design; the LLM can add
-    but never clear this. burn/sore/tight are NOT here (Phase-0 red-team)."""
+    but never clear this. burn/sore/tight are NOT here (Phase-0 red-team). Grip-work
+    modality phrases (#3972) are stripped before the scan — a training-modality list is
+    not a pain note."""
     if not note_text:
         return False
-    t = note_text.lower()
+    t = _strip_grip_modality(note_text.lower())
     if any(w in t for w in _PAIN_WORDS):
         return True
     # joint/region + a sensation word co-occurring (e.g. "knee felt sharp")
@@ -796,10 +830,35 @@ def compute_deviation(pushed_exercises, performed_exercises) -> dict:
     return {"by_template": by_template, "added": added, "removed": removed}
 
 
-def elevate_pain(table, item, user="matthew") -> dict:
+def _is_historical_pain_note(note_date, now=None) -> bool:
+    """True when `note_date` is more than PREFLIGHT_LOOKBACK_DAYS before `now` (#3972).
+
+    A backfill/sweep can re-derive a note written years ago; the pre-flight surface that
+    reads pain_flag (`get_exercise_notes`) never looks back further than this same
+    constant, so a note outside that window can never be the thing a live pre-flight is
+    asking about — raising a "confirm or dismiss" prompt about it is a false ask.
+    Unparseable/missing dates fail OPEN (not historical) — Invariant 5 is "pain never
+    missed"; a date this function can't read is never grounds to suppress the flag.
+    """
+    try:
+        d = datetime.strptime(str(note_date), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return False
+    today = (now or datetime.now(timezone.utc)).date()
+    return (today - d).days > PREFLIGHT_LOOKBACK_DAYS
+
+
+def elevate_pain(table, item, user="matthew", now=None) -> dict:
     """Pain elevation (brief §7): durable insight + training-coach thread annotation.
     The pre-flight surface is get_exercise_notes returning pain_flag prominently. Best-
-    effort — a failure here never blocks ingestion. Returns what was elevated."""
+    effort — a failure here never blocks ingestion. Returns what was elevated.
+
+    Refuses BOTH writes for a historical note (#3972) — `historical: true` on the
+    result, no insight, no thread — so a backfill over old Hevy history cannot raise a
+    live pre-flight prompt about a movement note from years ago. `pain_flag` itself is
+    untouched (Invariant 5 lives in the extractor, not here)."""
+    if _is_historical_pain_note(item.get("date"), now):
+        return {"insight": False, "thread": False, "historical": True}
     ex = item.get("exercise_name") or item.get("exercise_template") or "an exercise"
     note = item.get("note_raw", "")
     out = {"insight": False, "thread": False}
