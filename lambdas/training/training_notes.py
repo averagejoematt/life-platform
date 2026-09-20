@@ -830,25 +830,29 @@ def compute_deviation(pushed_exercises, performed_exercises) -> dict:
     return {"by_template": by_template, "added": added, "removed": removed}
 
 
-def _is_historical_pain_note(note_date, now=None) -> bool:
-    """True when `note_date` is more than PREFLIGHT_LOOKBACK_DAYS before `now` (#3972).
+def _is_historical_pain_note(note_date, today: str | None = None) -> bool:
+    """True when `note_date` is more than PREFLIGHT_LOOKBACK_DAYS before `today` (#3972).
 
-    A backfill/sweep can re-derive a note written years ago; the pre-flight surface that
-    reads pain_flag (`get_exercise_notes`) never looks back further than this same
-    constant, so a note outside that window can never be the thing a live pre-flight is
-    asking about — raising a "confirm or dismiss" prompt about it is a false ask.
-    Unparseable/missing dates fail OPEN (not historical) — Invariant 5 is "pain never
-    missed"; a date this function can't read is never grounds to suppress the flag.
+    `today` names the Pacific calendar day the check runs against — default
+    `pacific_today()`, the SAME day-boundary frame every DATE# key in this partition
+    already uses (#2811); a caller pins it explicitly rather than freezing a system
+    clock. A backfill/sweep can re-derive a note written years ago; the pre-flight
+    surface that reads pain_flag (`get_exercise_notes`) never looks back further than
+    this same constant, so a note outside that window can never be the thing a live
+    pre-flight is asking about — raising a "confirm or dismiss" prompt about it is a
+    false ask. Unparseable/missing dates fail OPEN (not historical) — Invariant 5 is
+    "pain never missed"; a date this function can't read is never grounds to suppress
+    the flag.
     """
     try:
         d = datetime.strptime(str(note_date), "%Y-%m-%d").date()
+        t = datetime.strptime(today or pacific_today(), "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return False
-    today = (now or datetime.now(timezone.utc)).date()
-    return (today - d).days > PREFLIGHT_LOOKBACK_DAYS
+    return (t - d).days > PREFLIGHT_LOOKBACK_DAYS
 
 
-def elevate_pain(table, item, user="matthew", now=None) -> dict:
+def elevate_pain(table, item, user="matthew", today: str | None = None) -> dict:
     """Pain elevation (brief §7): durable insight + training-coach thread annotation.
     The pre-flight surface is get_exercise_notes returning pain_flag prominently. Best-
     effort — a failure here never blocks ingestion. Returns what was elevated.
@@ -857,7 +861,7 @@ def elevate_pain(table, item, user="matthew", now=None) -> dict:
     result, no insight, no thread — so a backfill over old Hevy history cannot raise a
     live pre-flight prompt about a movement note from years ago. `pain_flag` itself is
     untouched (Invariant 5 lives in the extractor, not here)."""
-    if _is_historical_pain_note(item.get("date"), now):
+    if _is_historical_pain_note(item.get("date"), today):
         return {"insight": False, "thread": False, "historical": True}
     ex = item.get("exercise_name") or item.get("exercise_template") or "an exercise"
     note = item.get("note_raw", "")
