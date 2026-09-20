@@ -73,7 +73,40 @@ def _latest_weight_lbs(wt_items):
 _DEFAULT_CALORIE_TARGET = 2400
 
 
-def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight_lbs=None):
+def _trend_check(end_date, tdee, intake_avg, days=14):
+    """#3931 box 2: the impossibility verdict for `end_date`, from live weigh-ins.
+
+    Queries Withings over the trailing `days` window, takes the endpoint trend, and asks
+    `health.tdee.implied_deficit_vs_trend` whether the model-implied deficit and the
+    measured trend can both be true. A Withings outage is an ABSENT trend, which the
+    check reports as `published_unverified_...` — never as agreement.
+    """
+    try:
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return tdee_core.implied_deficit_vs_trend(tdee, intake_avg, None, 0)
+    try:
+        wt_rows = query_source("withings", (end_dt - timedelta(days=days)).strftime("%Y-%m-%d"), end_date)
+    except Exception:
+        wt_rows = []
+    trend, span = tdee_core.weight_trend_lb_per_wk(wt_rows)
+    return tdee_core.implied_deficit_vs_trend(tdee, intake_avg, trend, span)
+
+
+def _hevy_workouts(start_date, end_date):
+    """The Hevy set log over the window — the worked-set input to `exercise_energy`.
+
+    #3931: without it the lifting term falls back to the stated 0.25 work fraction of
+    logged duration. A Hevy outage therefore costs precision, never correctness, and the
+    branch names itself in the returned `basis`.
+    """
+    try:
+        return query_source("hevy", start_date, end_date) or []
+    except Exception:
+        return []
+
+
+def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight_lbs=None, intake_avg=None):
     """The ADR-152 energy budget for `end_date`, or None when it cannot be computed.
 
     ONE definition, shared with `mcp/tools_health._get_energy_expenditure` and the site's
@@ -115,7 +148,24 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
         strava_7d = query_source("strava", d7_start, end_date)
     except Exception:
         strava_7d = []
-    ex = tdee_core.exercise_energy(strava_7d, weight_kg)
+    ex = tdee_core.exercise_energy(strava_7d, weight_kg, _hevy_workouts(d7_start, end_date))
+
+    # #3931: TDEE first, then the impossibility check against the measured weight trend,
+    # then the target — in that order, because the check needs a TDEE to judge.
+    probe = tdee_core.energy_budget(
+        weight_lbs=weight_lbs,
+        height_inches=height_in,
+        age_years=age_years,
+        age_basis=age_basis,
+        sex=(profile.get("biological_sex") or "male"),
+        exercise_kcal=ex["kcal"],
+        exercise_energy_days=ex["days"],
+        exercise_energy_basis=ex["basis"],
+        window_days=tdee_core.EXERCISE_WINDOW_DAYS,
+        deficit_kcal=deficit_kcal,
+        lifting=ex.get("lifting"),
+    )
+    check = _trend_check(end_date, probe["tdee"], intake_avg) if (probe and intake_avg is not None) else None
 
     return tdee_core.energy_budget(
         weight_lbs=weight_lbs,
@@ -128,6 +178,8 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
         exercise_energy_basis=ex["basis"],
         window_days=tdee_core.EXERCISE_WINDOW_DAYS,
         deficit_kcal=deficit_kcal,
+        trend_check=check,
+        lifting=ex.get("lifting"),
     )
 
 
@@ -648,10 +700,20 @@ def _get_macro_targets(args):
     # `get_daily_metrics view=energy` told him to eat ~1500 kcal less. Adherence is now
     # re-based on the target he is actually asked to hit — changeover 2026-08-09, cycle
     # 13's genesis, so the denominator break lands on a cycle boundary.
-    budget = None if calorie_target else _energy_budget(end_date)
-    if budget:
+    # #3931: the impossibility check needs the measured intake, so it is averaged BEFORE
+    # the budget is built. A day MacroFactor could not total carries no rollup and is
+    # absent from this mean (ADR-104) — it is not a zero-calorie day.
+    _logged = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal") not in (None, "")]
+    _intake_avg = round(sum(_logged) / len(_logged), 1) if _logged else None
+
+    budget = None if calorie_target else _energy_budget(end_date, intake_avg=_intake_avg)
+    # #3931 box 4: where the check refused, `budget["target"]` is None and the surface
+    # says REFUSED. It does NOT silently fall through to the flat default — that would
+    # republish a number under a different label, which is the failure this closes.
+    refused = bool(budget) and not budget.get("target_published", True)
+    if budget and not refused:
         calorie_target = budget["target"]
-    calorie_target = calorie_target or _DEFAULT_CALORIE_TARGET
+    calorie_target = None if refused else (calorie_target or _DEFAULT_CALORIE_TARGET)
     protein_target = protein_target or 180  # Matthew-specific: 180g protein (~0.8g/lb BW)
 
     def measured(item, field):
@@ -680,7 +742,7 @@ def _get_macro_targets(args):
         fat = measured(item, "total_fat_g")
         carbs = measured(item, "total_carbs_g")
 
-        hit_cal = (0.85 <= cal / calorie_target <= 1.10) if cal is not None else None
+        hit_cal = (0.85 <= cal / calorie_target <= 1.10) if (cal is not None and calorie_target) else None
         hit_prot = (prot >= protein_target * 0.95) if prot is not None else None
         hit_fiber = (fiber >= _FIBER_TARGET_G) if fiber is not None else None
         for axis, hit in (("calorie", hit_cal), ("protein", hit_prot), ("fiber", hit_fiber)):
@@ -692,7 +754,7 @@ def _get_macro_targets(args):
             {
                 "date": item.get("date", ""),
                 "calories_kcal": round(cal, 0) if cal is not None else None,
-                "calories_pct": round(cal / calorie_target * 100, 1) if cal is not None else None,
+                "calories_pct": round(cal / calorie_target * 100, 1) if (cal is not None and calorie_target) else None,
                 "protein_g": round(prot, 1) if prot is not None else None,
                 "protein_pct": round(prot / protein_target * 100, 1) if prot is not None else None,
                 "fat_g": round(fat, 1) if fat is not None else None,
@@ -719,17 +781,28 @@ def _get_macro_targets(args):
             # checkable without reading this source. `None` when it was overridden by the
             # caller or fell back to the flat default — see `calorie_target_basis`.
             "calorie_target_detail": budget,
+            # #3931: the method name is DERIVED, never re-typed, so a rename can never
+            # leave a surface publishing the old number under the old label again.
+            "calorie_target_method": tdee_core.METHOD if budget else None,
             "calorie_target_basis": (
                 "caller_override"
                 if args.get("calorie_target")
-                else ("mifflin_bmr_plus_measured_7d_exercise_minus_deficit" if budget else "flat_default_no_weight_or_height")
+                else (budget.get("target_basis") if budget else "flat_default_no_weight_or_height")
             ),
+            "calorie_target_check": budget.get("trend_check") if budget else None,
             "note": (
-                "Calorie target = TDEE − deficit, where TDEE is Mifflin-St Jeor BMR plus MEASURED trailing-7-day "
-                "exercise energy (ADR-152). It is the same figure get_daily_metrics(view='energy') publishes as "
-                "calorie_target_based_on_7d. Adherence below is graded against this target."
-                if budget
-                else "No weigh-in or profile height available, so no TDEE could be computed — this is a flat default, not an estimate."
+                "REFUSED: the deficit this model implies cannot be reconciled with the measured weight trend, so no "
+                "calorie target is published and calorie adherence is not graded. Both figures are in "
+                "calorie_target_check. Protein (180 g floor) is unaffected and remains the primary nutrition gate."
+                if refused
+                else (
+                    "Calorie target = TDEE − deficit, where TDEE is Mifflin-St Jeor BMR plus the WORKED-SET exercise "
+                    "term (#3931: rest between sets is no longer charged; a weight-rep set with no logged duration is "
+                    "assumed to be 40 s of work). It is the same figure get_daily_metrics(view='energy') publishes as "
+                    "calorie_target_based_on_7d. Adherence below is graded against this target."
+                    if budget
+                    else "No weigh-in or profile height available, so no TDEE could be computed — this is a flat default, not an estimate."
+                )
             ),
         },
         "adherence": {
@@ -805,12 +878,21 @@ def tool_get_deficit_sustainability(args):
         # ADR-152: TDEE means MAINTENANCE. This tracker's whole signal is `tdee - intake`,
         # so no deficit may be folded into the TDEE itself — `budget["tdee"]`, not
         # `budget["target"]`. One definition, shared with the macros and energy views.
-        _b = _energy_budget(end_date)
+        _b = _energy_budget(end_date, intake_avg=avg_cal)
         tdee_estimate = _b["tdee"] if _b else _DEFAULT_CALORIE_TARGET
+        _tdee_method = tdee_core.METHOD if _b else "flat_default_no_weight_or_height"
+        _tdee_check = _b.get("trend_check") if _b else None
+    else:
+        _tdee_method, _tdee_check = "macrofactor_profile_tdee_estimate", None
 
     deficit_kcal = round(tdee_estimate - avg_cal)
     deficit_pct = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
     in_deficit = deficit_kcal > 200
+    # #3931 box 4: this tracker publishes a deficit, so it carries the method behind the
+    # TDEE it subtracted from, plus the impossibility verdict. `deficit_published` is
+    # False when the check refused — the channels below still report (they are measured
+    # independently), but the deficit number must not be read as a fact.
+    _deficit_published = bool(_tdee_check is None or _tdee_check.get("publish", True))
 
     # ── 2. Pull multi-source data ──
     sources = parallel_query_sources(["whoop", "habitify", "strava", "hevy"], start_date, end_date)
@@ -953,6 +1035,13 @@ def tool_get_deficit_sustainability(args):
             "deficit_label": (
                 "aggressive" if deficit_pct > 25 else "moderate" if deficit_pct > 15 else "mild" if deficit_pct > 5 else "maintenance"
             ),
+            # #3931 box 4: the method behind `estimated_tdee`, and the impossibility
+            # verdict against the measured weight trend. `basis` begins with "refused: "
+            # whenever this deficit must not be read as a published number.
+            "tdee_method": _tdee_method,
+            "basis": (_tdee_check or {}).get("basis", _tdee_method),
+            "deficit_published": _deficit_published,
+            "trend_check": _tdee_check,
         },
         "channels": channels,
         "degraded_count": degraded_count,
