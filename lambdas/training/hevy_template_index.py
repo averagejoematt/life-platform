@@ -41,6 +41,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from training.template_muscle_overrides import is_retired_template  # #3770
+
 logger = logging.getLogger(__name__)
 
 INDEX_KEY = "config/hevy_template_index.json"
@@ -78,7 +80,7 @@ def build_payload(templates: list[dict[str, Any]], now: datetime | None = None) 
     for t in templates:
         title = (t.get("title") or "").strip()
         tid = t.get("id")
-        if not title or not tid:
+        if not title or not tid or is_retired_template(str(tid)):  # #3770: a retired id is never published
             continue
         by_title.setdefault(normalize_title(title), {"id": str(tid), "title": title})
     body = json.dumps(by_title, sort_keys=True).encode("utf-8")

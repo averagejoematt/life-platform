@@ -2,6 +2,24 @@
 Strength training helpers: exercise classification, 1RM estimation, volume tracking.
 """
 
+from training.template_muscle_overrides import muscle_override_for
+
+# #3770: a corrected muscle group carries no movement_pattern of its own — this maps
+# the override's label (this module's own vocabulary) onto the Push/Pull/Legs/Core
+# taxonomy classify_exercise otherwise derives from the name-keyword map below.
+_MUSCLE_TO_PATTERN = {
+    "Chest": "Push",
+    "Shoulders": "Push",
+    "Triceps": "Push",
+    "Back": "Pull",
+    "Biceps": "Pull",
+    "Quads": "Legs",
+    "Glutes": "Legs",
+    "Hamstrings": "Legs",
+    "Calves": "Legs",
+    "Core": "Core",
+}
+
 _EXERCISE_MUSCLE_MAP = [
     # (keywords, muscle_groups, movement_pattern)
     (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"], ["Chest", "Triceps", "Shoulders"], "Push"),
@@ -72,8 +90,18 @@ _BODYWEIGHT_EXERCISES = [
 ]
 
 
-def classify_exercise(name: str) -> dict:
-    """Return {muscle_groups, movement_pattern} for an exercise name."""
+def classify_exercise(name: str, template_id: str | None = None) -> dict:
+    """Return {muscle_groups, movement_pattern} for an exercise name.
+
+    #3770: a Hevy template id's own (permanently wrong, un-editable) muscle group can
+    poison this by NAME classification's own logic too — "Calf Press on Leg Press
+    Machine" matches the "leg press" keyword before it ever reaches "calf". `template_id`
+    is checked against the id-keyed override table FIRST, ahead of any name matching, so
+    a corrected id always wins regardless of what its title would otherwise classify as.
+    """
+    override = muscle_override_for(template_id)
+    if override:
+        return {"muscle_groups": [override], "movement_pattern": _MUSCLE_TO_PATTERN.get(override, "Other")}
     nl = name.lower()
     for keywords, muscles, pattern in _EXERCISE_MUSCLE_MAP:
         if any(kw in nl for kw in keywords):
