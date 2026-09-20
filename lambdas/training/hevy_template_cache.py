@@ -80,6 +80,27 @@ def _load_cache() -> dict[str, Any]:
     return cache
 
 
+def peek_template_id(movement_key: str) -> str | None:
+    """READ-ONLY resolution: ADR-069 "tmpl:<id>" key → cached id → catalog hint. None on miss.
+
+    `resolve_movement` below is the write-capable path: on a cache miss it PROMOTES the
+    catalog hint into the cache and puts the file back to S3. That is correct for the
+    authoring/commit loop and wrong for a read-only report (#3928's stall check), which
+    must not mutate `config/` to answer a question. Same tiers, same precedence, no
+    writeback — and no exception, because "I don't know this movement" is an answer a
+    read surface has to be able to return.
+    """
+    if not movement_key:
+        return None
+    if movement_key.startswith("tmpl:"):
+        return movement_key[len("tmpl:") :]
+    cached_id = _load_cache().get("movements", {}).get(movement_key, {}).get("hevy_template_id")
+    if cached_id:
+        return str(cached_id)
+    hint = (_load_catalog().get("movements", {}).get(movement_key) or {}).get("hevy_template_id_hint")
+    return str(hint) if hint else None
+
+
 def resolve_movement(movement_key: str) -> str:
     """Return the 8-char hex template id for a movement_key. Raises on miss."""
     cache = _load_cache()
