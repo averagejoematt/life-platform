@@ -178,14 +178,13 @@ def list_stale_drafts(older_than_days: int = 7, lookback_days: int = 120, today:
     the #3765 soft-timeout leaves behind (the draft lands, the client is told it timed out, and
     nothing ever lists it). Walks the date index over `lookback_days` (a draft targets a date
     near its creation), so no Scan. Sorted oldest first."""
-    from datetime import date, timedelta
+    from common.pacific_time import pacific_today, shift_day_key
 
-    from common.pacific_time import pacific_today
-
-    today_d = date.fromisoformat(today or pacific_today())
-    start = (today_d - timedelta(days=lookback_days)).isoformat()
-    end = (today_d + timedelta(days=7)).isoformat()  # a draft may target a day still ahead
-    cutoff = (today_d - timedelta(days=older_than_days)).isoformat()
+    # #3609: day keys move through the platform's one day-key shifter, never a hand-rolled fromisoformat
+    today_key = today or pacific_today()
+    start = shift_day_key(today_key, -lookback_days)
+    end = shift_day_key(today_key, 7)  # a draft may target a day still ahead
+    cutoff = shift_day_key(today_key, -older_than_days)
     out = []
     for ir in list_by_date_range(start, end, limit=500):
         created = str(ir.created_at or "")[:10]
@@ -207,11 +206,9 @@ def list_for_tool(args: dict) -> dict:
         items = [ir for ir in items if (ir.status or "").lower() == status_filter]
     older = args.get("older_than_days")
     if older is not None and str(older).strip() != "":
-        from datetime import date, timedelta
+        from common.pacific_time import pacific_today, shift_day_key
 
-        from common.pacific_time import pacific_today
-
-        cutoff = (date.fromisoformat(pacific_today()) - timedelta(days=int(older))).isoformat()
+        cutoff = shift_day_key(pacific_today(), -int(older))  # #3609: no hand-rolled fromisoformat
         items = [ir for ir in items if str(ir.created_at or "")[:10] and str(ir.created_at or "")[:10] <= cutoff]
     return {
         "status": "ok",
