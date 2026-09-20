@@ -33,5 +33,6 @@ programmed variable, tightened over weeks. Warm-up cues before key lifts.
 | legs | `legs/foundation_legs_w1.md` | a98f6295-0e6e-42b5-86da-93df6eb854a8 | committed (2026-06-18) |
 | engine | `engine/foundation_engine_w1.md` | 997d764a-d41d-4b4a-b7c3-7565105b78c1 | committed (2026-06-19) |
 | push | `push/foundation_push_w1.md` | 7f906e65-3362-4fef-bd86-52fbbf665eb3 | committed (2026-09-08) |
+| pull | `pull/foundation_pull_w4.md` | 720eee53-8e43-49c7-9b56-25e991b5cdea | committed (2026-09-19) — first red-teamed routine (#3752) |
 
 *(append as routines are built)*
