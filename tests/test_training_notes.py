@@ -146,7 +146,7 @@ def test_conservation_five_notes_five_records():
     for it in items:
         assert it["source"] == SOURCE_LABEL
         assert f"#SOURCE#{NOTES_SOURCE}#EXERCISE#" in it["pk"]
-        assert it["sk"] == "DATE#2026-06-20#WORKOUT#dc3e3b10"
+        assert it["sk"] == f"DATE#2026-06-20#WORKOUT#dc3e3b10#{it['occurrence']}"  # #3918: one key per exercise-SESSION
         assert it["note_raw"]  # verbatim preserved
         assert all(s["class"] in TAXONOMY for s in it["signals"])
 
@@ -345,7 +345,7 @@ def test_the_new_signals_survive_the_versioned_writer_and_stay_in_taxonomy():
     exs = [{"template_id": "D8F7F851", "name": "Cycling", "notes": TWO_BLOCK_0622}]
     res = write_workout_notes(t, "2026-06-22", "hevy:1a06d0c8", exs, llm_fn=None)
     assert res["wrote"] == 1 and res["versioned"] == 0
-    stored = t.items[("USER#matthew#SOURCE#training_notes#EXERCISE#D8F7F851", "DATE#2026-06-22#WORKOUT#1a06d0c8")]
+    stored = t.items[("USER#matthew#SOURCE#training_notes#EXERCISE#D8F7F851", "DATE#2026-06-22#WORKOUT#1a06d0c8#0")]
     assert all(s["class"] in TAXONOMY for s in stored["signals"])
     assert len(_progressions(stored["signals"])) == 2
     joined = [s for s in stored["signals"] if (s.get("value") or {}).get("readiness_join")]

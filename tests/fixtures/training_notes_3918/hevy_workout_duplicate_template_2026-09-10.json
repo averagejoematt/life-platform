@@ -1,0 +1,69 @@
+[
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-10#WORKOUT#7f1c9a24-1d50-4a0e-9ad2-1b4c5f9e77aa",
+  "source": "hevy",
+  "source_workout_id": "7f1c9a24-1d50-4a0e-9ad2-1b4c5f9e77aa",
+  "hevy_routine_id": "",
+  "workout_uid": "hevy:7f1c9a24-1d50-4a0e-9ad2-1b4c5f9e77aa",
+  "date": "2026-09-10",
+  "title": "Evening workout",
+  "start_time": "2026-09-11T01:02:10+00:00",
+  "end_time": "2026-09-11T02:14:38+00:00",
+  "duration_sec": 4348.0,
+  "total_volume_kg": 0.0,
+  "exercises": [
+   {
+    "name": "Treadmill",
+    "template_id": "D8F7F851",
+    "notes": "Level 9 - 5.6 miles",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 9012.0,
+      "duration_sec": 2400.0
+     }
+    ]
+   },
+   {
+    "name": "Seated Cable Row - V Grip (Cable)",
+    "template_id": "0393F233",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "D8F7F851",
+    "notes": "Level 4 - 1.2 miles",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 1931.0,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ],
+  "exercise_count": 3.0,
+  "set_count": 3.0,
+  "original_unit": "imperial",
+  "raw_ref": "s3://matthew-life-platform/raw/hevy/7f1c9a24-1d50-4a0e-9ad2-1b4c5f9e77aa.json",
+  "schema_version": "1.0",
+  "ingested_at": "2026-09-11T03:05:44.112903+00:00"
+ }
+]
