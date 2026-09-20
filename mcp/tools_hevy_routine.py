@@ -725,12 +725,19 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
 
     warnings: list[str] = []
     try:
+        # #3755 — through the SAME seam the generator uses. This used to call
+        # `_load_json("training_week.json")` directly, which meant a program served from
+        # `program_structure` would have left this ceiling warning grading a custom
+        # session against the old JSON grid, silently.
+        from training.program_seam import resolve_week_grid
         from training.routine_generator import _load_json
 
-        ceiling = (_load_json("training_week.json") or {}).get("session_set_ceiling")
+        resolved_week = resolve_week_grid(_load_json)
+        ceiling = (resolved_week.week or {}).get("session_set_ceiling")
         if ceiling and total_sets > int(ceiling):
             warnings.append(
-                f"total_sets {total_sets} exceeds session_set_ceiling {ceiling}; " "allowed for a custom session, just flagging."
+                f"total_sets {total_sets} exceeds session_set_ceiling {ceiling} "
+                f"(week grid source={resolved_week.source}); allowed for a custom session, just flagging."
             )
     except Exception:
         pass

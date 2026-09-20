@@ -73,6 +73,11 @@ PR_CHECKS_WORKFLOW = os.path.join(REPO, ".github", "workflows", "pr-checks.yml")
 # entry must carry `@pytest.mark.serial`; `test_every_registered_writer_is_marked_serial`
 # is what makes that true rather than intended.
 IN_TREE_WRITERS = {
+    "tests/test_branch_never_carries_platform_counts_3984.py": (
+        "rewrites the REAL lambdas/web/platform_counts.py (a bumped `lambdas`, a deleted `test_count` line) "
+        "to prove the literal gate tolerates bot-owned drift off main and still reds a broken counter — "
+        "the gate under test runs as a subprocess against the checkout, so the checkout is the fixture."
+    ),
     "tests/test_doc_drift_date_stamp_2649.py": (
         "rewrites the REAL docs/ARCHITECTURE.md to prove the drift gate distinguishes a "
         "date-only re-stamp from substantive drift; a copy would prove only that the gate "

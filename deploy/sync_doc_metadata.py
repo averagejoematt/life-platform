@@ -1189,9 +1189,13 @@ def main():
 
     # Get unique docs to process
     docs_to_process = sorted(set(doc for doc, _, _ in RULES))
-    total_changes = len([c for c in stats_changes if c.startswith("  ~")])
-    bot_drift = total_changes  # #3646: every stats '  ~' IS a rewrite --apply performs
-    drifted_docs = [str(_PLATFORM_COUNTS_PATH.relative_to(ROOT))] if any(c.startswith("  ~") for c in stats_changes) else []
+    # #3984: a '  !' here (a DISCOVERED_COUNTS field the sync cannot find) used to be printed
+    # and then IGNORED by the verdict — `--check` passed over a broken counter file. It is
+    # human-owned drift exactly as it is for MONITORING.md below; '  i PR-EXEMPT' is not drift.
+    stats_drift = [c for c in stats_changes if c.startswith("  ~") or c.startswith("  !")]
+    total_changes = len(stats_drift)
+    bot_drift = len(_verdict.bot_owned(stats_drift))  # #3646: every stats '  ~' IS a rewrite --apply performs
+    drifted_docs = [str(_PLATFORM_COUNTS_PATH.relative_to(ROOT))] if stats_drift else []
     # A "~" (regenerated) or "!" (markers missing / discovery failed) both count as drift
     # that --check must fail on and --apply must resolve.
     alarm_inv_drift = [c for c in alarm_inv_changes if c.startswith("  ~") or c.startswith("  !")]

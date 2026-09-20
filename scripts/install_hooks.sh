@@ -104,7 +104,18 @@ if [[ -f "$PROJ_ROOT/deploy/sync_doc_metadata.py" ]]; then
   # site_api_common.py here after the move would be actively harmful — the sync no
   # longer writes it, so the only diff this pathspec could pick up would be the
   # committer's OWN unstaged edits to a hot shared module, swept in unasked.
-  SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/platform_counts.py || true)
+  # #3984: the counter file is bot-owned. ON main the hook stages it (a human on main
+  # with no bot following is the one place a regenerated counter must be committed);
+  # OFF main it is restored to HEAD and never staged — the reconcile job regenerates it on
+  # main after the merge, and a branch carrying it conflicts on every reconcile commit.
+  HOOK_BRANCH="$(git -C "$PROJ_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
+  if [[ "$HOOK_BRANCH" == "main" ]]; then
+    SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/platform_counts.py || true)
+  else
+    git -C "$PROJ_ROOT" checkout HEAD -- lambdas/web/platform_counts.py 2>/dev/null || true
+    SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md || true)
+    echo "[pre-commit] off main ($HOOK_BRANCH): lambdas/web/platform_counts.py restored to HEAD, not staged (#3984)"
+  fi
   if [[ -n "$SYNCED_CHANGED" ]]; then
     git -C "$PROJ_ROOT" add $SYNCED_CHANGED
     echo "[pre-commit] Staged doc-sync updates:"

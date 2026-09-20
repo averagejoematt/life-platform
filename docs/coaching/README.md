@@ -13,7 +13,15 @@ prefix, owner-credential access only). Relocated there 2026-08-23 (#3043):
 
 - `PROVEN_BLUEPRINT.md` — the empirical anchor (owner's own history, mined)
 - `TRAINING_CALIBRATION.md` — how the coach calibrates the owner
-- `TRAINING_PROGRAM.md` — the current plan
+- `TRAINING_PROGRAM.md` — the current plan, in prose. **The machine-readable half is
+  `lambdas/training/program_structure.py`** (#3755): the anchors, the rotating accessory
+  pool, the rotation rule and the v0.2 week grid as data the engine reads, plus the
+  computed `accessory_rotation` check that `plan_engine.constraint_block` reports. It ships
+  in the Lambda bundle because `config/*.json` does not (#3675). Both readers of the week
+  grid go through one seam, `training.program_seam.resolve_week_grid`, which serves the live
+  `config/training_week.json` until `program_structure.ACTIVE` flips — **PROPOSED and
+  UNAPPROVED** (`gate:owner`, #3755) until the owner reviews v0.2 and sets `ACTIVE = True`
+  with a review date.
 - `TRAINING_CONTEXT.md` — standing injury + equipment constraints, each dated (#3715).
   **Not yet uploaded** (no AWS write access from this agent) — render it from the
   registry with `python3 scripts/render_training_context_md.py`, then pipe to

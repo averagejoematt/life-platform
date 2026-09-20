@@ -235,6 +235,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
+        "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
         # #3688: source sweep of lambdas/ mcp/ scripts/ deploy/ cdk/ + the three QA
         # harness files for every site that DECIDES on `stop_reason == "max_tokens"`.
@@ -662,6 +663,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # check in test_integration_aws.py only runs post-deploy, by which point a third
         # GSI is already an online backfill against production.
         "test_gsi_set_premerge_3609.py",
+        # #3755: an AST sweep of lambdas/ + mcp/ asserting the week-grid config filename
+        # has exactly ONE reader (training/program_seam.py) and that both consumers reach
+        # it through that seam. Pure repo shape, and the reason it must run pre-merge is
+        # the defect it exists to stop: a second direct reader of training_week.json is
+        # invisible at runtime — the generator would plan a PPL week while another caller
+        # graded a session against the old grid, with nothing red anywhere.
+        "test_program_structure_3755.py",
     }
 )
 

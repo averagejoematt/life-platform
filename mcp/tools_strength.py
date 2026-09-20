@@ -43,7 +43,7 @@ def tool_get_muscle_volume(args):
             aggregated_dates.append(wd)
         for ex in workout["exercises"]:
             name = ex["name"]
-            cls = classify_exercise(name)
+            cls = classify_exercise(name, ex.get("template_id"))  # #3770: id override wins over name
             normal_sets = [s for s in ex["sets"] if s["set_type"] != "warmup"]
             n = len(normal_sets)
             vol = sum(s["weight_lbs"] * s["reps"] for s in normal_sets)
@@ -132,7 +132,7 @@ def _summarize_exercise_sessions(template_id: str, sessions: list) -> dict:
     of these PER `template_id` instead of folding sessions from different movements into
     a single series — see the docstring on the caller for the incident this fixes.
     """
-    classification = classify_exercise(sessions[0]["exercise_name"])
+    classification = classify_exercise(sessions[0]["exercise_name"], template_id)  # #3770: id override wins over name
     pr_weight = 0.0
     pr_1rm = 0.0
     pr_log_weight = []

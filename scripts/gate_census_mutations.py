@@ -206,6 +206,17 @@ _UNSANCTIONED_GSI_QUERY_PY = (
     '    return table.query(IndexName="GSI9", KeyConditionExpression=key_condition)\n'
 )
 
+# #3755: a SECOND direct reader of the week-grid config, bypassing
+# training.program_seam.resolve_week_grid. This is the exact defect the seam exists to
+# make impossible — a caller that grades a session against the JSON grid while the
+# generator plans against program_structure.week_grid(), with nothing red anywhere.
+_SECOND_WEEK_GRID_READER_PY = (
+    '"""probe."""\n\n'
+    "from training.routine_generator import _load_json\n\n\n"
+    "def probe():\n"
+    '    return (_load_json("training_week.json") or {}).get("session_set_ceiling")\n'
+)
+
 # These carry a secret NAME, never a secret value (Secrets-Manager-only, per CLAUDE.md).
 # The identifiers deliberately say `ID` rather than `SECRET`: ruff's flake8-bandit S105
 # rules on the TARGET NAME, and `_..._SECRET_PY = "<string>"` reads to it as a hardcoded
@@ -712,6 +723,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("docs/_census_probe_3731.md", _DOC_FACTS_INDEX_PROBE_MD),),
         track=False,
     ),
+    "structural::test_program_structure_3755.py": MutationSpec(
+        gate_id="structural::test_program_structure_3755.py",
+        target="tests/test_program_structure_3755.py",
+        detects=(
+            "a SECOND module reading config/training_week.json directly instead of through "
+            "training.program_seam.resolve_week_grid — the split the seam exists to close, and one that is "
+            "invisible at runtime: the generator would plan a PPL week from program_structure while the "
+            "second reader graded a session against the old upper/lower grid, with nothing red anywhere"
+        ),
+        plants=(("lambdas/training/_census_probe_3755.py", _SECOND_WEEK_GRID_READER_PY),),
+        track=False,  # the gate walks lambdas/ + mcp/ on disk (os.walk), so an untracked module is in scope
+    ),
 }
 
 
@@ -1144,6 +1167,25 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "status header), which is what test_g exists to prove. Does NOT cover the disk layer's cross-process "
         "sharing — that is exactly what the three records above, run as separate OS processes, prove instead.",
         proved_on="2026-09-19",
+    ),
+    "structural::test_program_structure_3755.py": _proof(
+        "structural::test_program_structure_3755.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 24 passed in 2.27s | mutated: 1 failed, 23 passed in 2.26s "
+        ":: tests/test_program_structure_3755.py::test_only_the_seam_names_the_week_config_filename | "
+        "reverted: 24 passed in 2.23s",
+        "Covers the seam's SET, not its two current instances: an os.walk of lambdas/ + mcp/ (.py only, "
+        "program_seam.py itself excluded) parsing each module for the literal `training_week.json`, so a THIRD "
+        "reader added by any future PR reds before merge rather than after. The two known consumers are held "
+        "separately and structurally (routine_generator.generate_routines and tools_hevy_routine."
+        "_action_draft_custom must each CALL resolve_week_grid, asserted over the function body with docstrings "
+        "stripped so prose about the seam cannot read as a call to it — the #3792 discriminator — with an in-file "
+        "must-fail control on a synthetic body). The plant is UNTRACKED and still in scope because the sweep "
+        "walks the filesystem, not the git index. STILL INVISIBLE, stated rather than papered over: a reader that "
+        "assembles the filename at runtime (concatenation, an env var, or an S3 key built from a variable) is not "
+        "a literal this AST scan can see; and the gate proves only that the seam is the single READER — it cannot "
+        "prove the served grid is the right one, which is what the week_grid()-vs-JSON key-parity test and the "
+        "ACTIVE mutation control cover instead.",
+        proved_on="2026-09-20",
     ),
 }
 
