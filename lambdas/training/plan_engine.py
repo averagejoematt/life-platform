@@ -53,9 +53,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from training import owner_redlines, training_context_registry
+from training import owner_redlines, program_structure, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.0.0"
+ENGINE_VERSION = "plan-engine@1.1.0"  # #3755: the program block + the computed rotation check
 
 
 def _tripwire_states(
@@ -174,6 +174,8 @@ def constraint_block(
     pain_layer_status: str | None = None,
     weight_stall_days: int | None = None,
     adherence_on_plan: bool | None = None,
+    hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
+    rotation_window_start: str | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -259,6 +261,19 @@ def constraint_block(
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
 
+    # #3755 — "is the accessory layer rotating" is COMPUTED from the performed Hevy record
+    # over the program's own 14-day window, with its n and window stated (ADR-105), not
+    # asserted from the pool the program declares. A program can list six accessories per
+    # day and still have produced the same four movements every session; only the record
+    # knows. The rows are injected (`mcp.tools_plan` reads them) so this function stays
+    # pure, and an unreadable window reports `unknown`, never `ok`.
+    program = program_structure.summary()
+    rotation = program_structure.accessory_rotation(
+        window_start=rotation_window_start or date,
+        window_end=date,
+        hevy_workouts=hevy_workouts_rotation_window,
+    )
+
     return {
         "engine_version": ENGINE_VERSION,
         "date": date,
@@ -284,6 +299,12 @@ def constraint_block(
         "tripped": tripped,
         "unreadable_tripwires": unknown,
         "redlines": redlines,
+        # #3755 — the program the plan is supposed to be executing, as data, with its own
+        # unresolved conflicts attached. `accessory_rotation_ok` is the computed answer to
+        # the question the owner actually asked ("why is there so little variety?").
+        "program": program,
+        "accessory_rotation_ok": rotation["ok"],
+        "accessory_rotation": rotation,
         "critics": {
             "ran": False,
             "note": (
@@ -303,6 +324,27 @@ def constraint_block(
                     else "the owner's redlines are PROPOSED, not confirmed — this plan follows a posture he has not yet signed (#3753)"
                 ),
                 f"{len(unknown)} tripwire(s) could not be evaluated: {', '.join(unknown)}" if unknown else None,
+                (
+                    None
+                    if program["active"]
+                    else f"TRAINING_PROGRAM v{program['program_version']} ({program['split']}) is PROPOSED, not approved — the engine is still running on the live week grid (#3755)"
+                ),
+                (
+                    "the program has UNRESOLVED conflicts with the owner's own redlines: "
+                    + ", ".join(c["id"] for c in program["conflicts"])
+                    if program["conflicts"]
+                    else None
+                ),
+                (
+                    f"accessory rotation is {rotation['state']}: {rotation['detail']}"
+                    if rotation["ok"] is None
+                    else (
+                        None
+                        if rotation["ok"]
+                        else "the accessory layer is NOT rotating — "
+                        + ", ".join(f"{r['movement']} on {r['n_days']} days" for r in rotation["repeats_within_window"][:4])
+                    )
+                ),
                 (
                     "population-derived thresholds in play: " + ", ".join(redlines["population_derived_thresholds"])
                     if redlines["population_derived_thresholds"]

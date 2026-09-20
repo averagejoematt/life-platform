@@ -37,6 +37,7 @@ from typing import Any
 from common.repo_config import config_dir
 
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
+from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 logger = logging.getLogger("routine_generator")
@@ -658,7 +659,12 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     """
     landmarks = _load_json("training_landmarks.json")
     catalog = _load_json("movement_catalog.json")
-    week_cfg = _load_json("training_week.json")
+    # #3755 — ONE seam decides whether the week grid comes from the live JSON or from
+    # `program_structure.week_grid()`. `mcp.tools_hevy_routine` reads the same function,
+    # so the generator and the session-ceiling warning can never grade against two
+    # different weeks. The seam names its source; the rationale records it.
+    resolved_week = resolve_week_grid(_load_json)
+    week_cfg = resolved_week.week
 
     archetype = _archetype_for_date(inputs.target_date, week_cfg)
     targets = week_cfg["archetype_targets"].get(archetype, [])
@@ -669,6 +675,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     z2_ok = _portfolio_guard(inputs.z2_minutes_7d, week_cfg.get("z2_floor_minutes", 90))
     rationale: list[str] = []
+    rationale.append(f"week grid source={resolved_week.source} ({resolved_week.detail})")
     rationale.append(f"archetype={archetype}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})")
     if not z2_ok:
         rationale.append(f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {week_cfg['z2_floor_minutes']}; portfolio guard active")
