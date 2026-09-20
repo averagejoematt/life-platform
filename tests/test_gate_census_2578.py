@@ -782,7 +782,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # never-stale property it depends on, both observed on the live tree in one batch.
         # {can-fail (proven) 113, unproven 537, not-applicable 6, attempted-unproven 3} over
         # 659 rows, measured on this branch after rebasing onto origin/main (#3889, #3894).
-        <= 113
+        # 2026-09-20 (#3625 + #3772): 113 -> 115. TWO entrants, both PROVEN in gate_census_proofs —
+        # the bundle-reproducibility gate and the orphan-drafts nightly leg; one ceiling so the two
+        # PRs land in either order.
+        <= 115
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

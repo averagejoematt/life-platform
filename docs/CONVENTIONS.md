@@ -78,6 +78,8 @@ requires already knowing which symbol to look for.
   Deliberate: §2's "unexpected 0-diff" tell is replaced by a stronger one, an
   explicit sha comparison the deploy path performs for you.
 
+**The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control.
+
 ## 2. Deploy from `main`, not the worktree branch
 
 > **Authority, not mechanics:** who may run a production deploy, what a standing grant is,
