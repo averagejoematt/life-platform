@@ -306,7 +306,7 @@ def week_grid() -> dict[str, Any]:
         "schedule": dict(_SCHEDULE),
         "archetype_targets": {k: list(v) for k, v in _ARCHETYPE_TARGETS.items()},
         "session_set_ceiling": 18,
-        "session_minutes_ceiling": 60,
+        "session_minutes_ceiling": 60,  # drift-ok: MINUTES per lifting session, not the ADR-133 AI budget ceiling in dollars
         "weekly_volume_cap_per_muscle": 22,
         "skill_ceiling": 2,
         "re_entry_days_threshold": 7,
