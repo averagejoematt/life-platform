@@ -641,7 +641,7 @@ def lambda_handler(event, context):
             # an instant. The Pacific anchor is DST-correct — zoneinfo
             # resolves the offset from the wall time, unlike a fixed -7/-8.
             #
-            # #3257 AMENDMENT: Pacific for 11 of the 12 sources — but not for ALL of them.
+            # #3257 AMENDMENT: Pacific for most board sources — but not for ALL of them.
             # apple_health's DATE# key is a UTC calendar day by TD-19 Phase 2
             # (health_auto_export_lambda.parse_date_str converts to UTC before taking the
             # day), so a blanket Pacific anchor overstated its freshness by the offset and,
@@ -651,6 +651,14 @@ def lambda_handler(event, context):
             # /api/source_freshness call — so the ops alert and the public board can never
             # again disagree about the age of the same key (they disagreed by 7h between
             # 452929f17 and #3257, and the reader-facing one was the wrong one).
+            #
+            # #3913 AMENDMENT: the UTC-framed set is apple_health AND whoop. whoop's DATE#
+            # key names a UTC day (fetch_day turns a Pacific date LABEL into a UTC WINDOW;
+            # 2,249 of 2,249 straddling rows measured UTC-keyed, #3677), so anchoring it at
+            # Pacific midnight put the day's start 7h AFTER it began and made whoop look 7h
+            # FRESHER than it was — the opposite direction to the #3257 defect, invisible
+            # for the same reason. Read from the facet, never listed here: this comment
+            # names today's membership, `day_key_frame_for` decides it.
             last_date = anchor_day_key(date_str, source_key)
             age_hours = (now - last_date).total_seconds() / 3600
 

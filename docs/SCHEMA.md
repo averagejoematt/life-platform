@@ -108,6 +108,19 @@ Where multiple sources measure the same thing:
 | Lab provider metadata | `PROVIDER#<provider>#<period>` | `PROVIDER#function_health#2025-spring` |
 | User profile | `PROFILE#v1` | `PROFILE#v1` |
 
+**Which calendar is `YYYY-MM-DD`?** Not a formality — a `DATE#` key names a DAY, and any
+consumer that AGES one has to anchor it in the calendar that named it or be wrong by
+exactly the Pacific offset (7h PDT / 8h PST), silently. The answer per source is the
+`day_key_frame` facet in `lambdas/ingestion/source_registry.py`, read through
+`day_key_frame_for()` — **never** hardcoded at a call site. The default is **Pacific** (the
+SIMP-2 framework stamps `pacific_today()`); as of 2026-09-19 the non-default members are
+**`apple_health`** (UTC — `parse_date_str` converts the reading's offset-aware stamp to UTC
+before taking the day, TD-19 Phase 2) and **`whoop`** (UTC — `fetch_day` turns each Pacific
+date *label* into a UTC *window*, so the key names the UTC day; measured 2,249/2,249
+straddling rows, #3677/#3913). Both carry a `day_key_frame_consequence` stating what the
+frame costs a reader; `docs/audits/TD-19_DATE_PARTITION_AUDIT.md` carries the rulings and
+the consumer sweeps.
+
 ---
 
 ## Key-Family Catalog

@@ -170,6 +170,14 @@ def source_freshness(*, _g) -> dict:
                 # UTC-today runs ahead of PT-today. Same helper the ops checker uses, so the
                 # public board and the alert can no longer disagree about one key (452929f17
                 # fixed one of the two and created that disagreement).
+                #
+                # #3913: whoop joined apple_health on the UTC side — and the row #3257 quoted
+                # as ITS evidence was whoop's, so this call site was over-correcting it by the
+                # same 7h it had just removed from the other ten. Nothing here changes: the
+                # facet moved, the arithmetic is unchanged, and that is what "resolve the frame
+                # per source" is FOR. Measured: 2,249 of 2,249 straddling whoop rows are keyed
+                # by the UTC day (#3677), because whoop's fetch_day turns each Pacific date
+                # LABEL into a UTC WINDOW.
                 last_dt = anchor_day_key(date_str, sid)
                 last_update_ts = last_dt.isoformat()
                 age_hours = round((now - last_dt).total_seconds() / 3600, 1)

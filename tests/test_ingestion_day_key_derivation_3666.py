@@ -258,18 +258,13 @@ def test_the_declared_frames_agree_with_the_live_source_registry():
         if not source:
             continue
         facet = day_key_frame_for(source)
-        if source == "whoop":
-            # #3677: the ONE declared disagreement, and it is the FACET that is behind.
-            # Measured on the live partition (2,249 straddling rows, all UTC-keyed, zero
-            # Pacific-keyed), whoop's DATE# names a UTC day, so this module's "utc" is the
-            # true one and the registry's silent default of "pacific" is not. The facet is
-            # deliberately NOT flipped here: day_key_frame feeds utc_day_key_source_ids(),
-            # which freshness_checker_lambda and site_api_freshness use to anchor an AGE —
-            # moving whoop shifts a reader-facing freshness number by 7h and is its own
-            # ruling with its own consumer sweep (#3257's shape), not a rider on this one.
-            # Recorded in the audit's 2026-09-19 section as the residual this PR does not
-            # close. Pinned meanwhile by tests/test_whoop_reconciler_frame_3677.py.
-            continue
+        # #3913: THE EXEMPTION THAT USED TO SIT HERE IS GONE. #3677 left whoop as a declared
+        # disagreement — this module said "utc" (measured: 2,249 of 2,249 straddling rows
+        # UTC-keyed, zero Pacific) while the registry facet was silently the "pacific" default
+        # — because flipping the facet moves a reader-facing freshness age by 7h and needed its
+        # own ruling and consumer sweep. #3913 is that ruling: source_registry now carries
+        # day_key_frame="utc" + a day_key_frame_consequence for whoop, so whoop goes through
+        # the same comparison as every other entry and a re-divergence reds this test.
         if facet != entry["frame"]:
             disagreements.append(f"{name}: declares {entry['frame']!r}, source_registry.day_key_frame says {facet!r}")
     assert not disagreements, "\n".join(disagreements)
