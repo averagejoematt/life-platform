@@ -147,6 +147,14 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
         "retention_cutoff_iso(now) is a pure function of its argument; the local "
         "`now` exists only to compute the expected value of that same call."
     ),
+    "test_som_checkin_frame_3914.py": (
+        "_check_how_we_feel(date_str)/_som_count(item) take the Pacific day as an "
+        "explicit argument and consult no call-time clock on any asserted path; "
+        "evening_nudge_lambda.py's one pacific_today() read lives in lambda_handler, "
+        "which this file never drives. PACIFIC_TODAY also builds the fixture sk "
+        "('DATE#{PACIFIC_TODAY}') and its next-UTC-day sibling, so both sides "
+        "co-derive from the same literal and cannot disagree at UTC midnight."
+    ),
 }
 
 _ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")

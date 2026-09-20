@@ -214,7 +214,17 @@ def tool_read_platform_memory(args: dict) -> dict:
     limit = args.get("limit", 10)
 
     # Accept aliases on read too (failure_pattern → failure_patterns, …).
-    category = _pm.canonical_category(category) or category
+    canonical = _pm.canonical_category(category)
+    if canonical is None:
+        # #3920: the SAME error the write path returns — a read of a category that does not exist
+        # is a caller's mistake, not a measured `count: 0` with `sanctioned: false` beside it.
+        return {
+            "error": f"unknown category '{category}' — reads must name a sanctioned taxonomy category (#1482)",
+            "sanctioned_categories": _pm.sanctioned_categories(),
+            "conversation_categories": _pm.conversation_categories(),
+            "hint": "call list_memory_categories for the full taxonomy (descriptions, channels, privacy tiers)",
+        }
+    category = canonical
 
     table = _get_table()
     days = min(max(1, int(days)), 365)

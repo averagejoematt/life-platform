@@ -57,9 +57,22 @@ os.environ.setdefault("UNSUB_TOKEN_SECRET", "test-unsub-signing-key")
 #
 # Tests that intentionally exercise live AWS are marked `@pytest.mark.integration`
 # (see pytest.ini) and are exempted below.
+_AWS_CRED_KEYS = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN", "AWS_PROFILE")
+# #3917: the snapshot must happen ONCE, in the controller, BEFORE the fakes go on — and it must
+# survive into xdist workers. A worker is a fresh process forked by the controller AFTER this
+# module already faked the controller's environment, so a plain `os.environ.get(key)` snapshot
+# taken in the worker captures `testing`, and "restoring" real credentials around an
+# `integration` test restores the fake. The stash below is itself an environment variable, so
+# workers inherit it; the controller writes it only when it is absent, so a worker never
+# re-snapshots the fakes over it. `_UNSET_SENTINEL` keeps "the key was absent" distinct from
+# "the key was empty".
+_REAL_AWS_STASH_PREFIX = "LP_REAL_AWS_ENV__"
+_UNSET_SENTINEL = "__unset__"
+for _key in _AWS_CRED_KEYS:
+    os.environ.setdefault(_REAL_AWS_STASH_PREFIX + _key, os.environ.get(_key) if os.environ.get(_key) is not None else _UNSET_SENTINEL)
 _REAL_AWS_ENV = {
-    key: os.environ.get(key)
-    for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN", "AWS_PROFILE")
+    key: (None if os.environ[_REAL_AWS_STASH_PREFIX + key] == _UNSET_SENTINEL else os.environ[_REAL_AWS_STASH_PREFIX + key])
+    for key in _AWS_CRED_KEYS
 }
 _FAKE_AWS_ENV = {
     "AWS_ACCESS_KEY_ID": "testing",
