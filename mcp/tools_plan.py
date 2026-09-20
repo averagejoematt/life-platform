@@ -51,35 +51,67 @@ def _safe(fn, *a, **kw):
         return None
 
 
-def _walk_hours_last_7d(end_date: str) -> float | None:
-    """Walking hours in the trailing 7 days, from Strava.
+def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
+    """The derived walking-volume layer for the trailing 7 days: Strava UNION Hevy (#3930).
 
-    Hours, not miles: the blueprint's floor is stated in hours per week, and converting
-    between them needs a pace assumption that would be invented here.
+    Was Strava-only, and that single-source read is what reported 5.09 hr/wk — "the largest
+    gap on the board" — for a week carrying 8.33 hr of treadmill and cycling duration logged
+    INSIDE Hevy sessions. A floor stated in hours must be measured in hours from every source
+    that produces them; `training.walking_volume` is the union and the per-source breakdown.
+
+    Hours, not miles and not steps: the blueprint's floor is stated in hours per week, and
+    converting from either needs an assumption this module would be inventing.
+
+    Reads both partitions DIRECTLY rather than through `get_workouts`: that tool's
+    `_slim_workout` projection drops `exercises`, which is where the cardio blocks live, and
+    the per-workout detail tool costs a five-year scan each. A source that RAISES is passed
+    to the layer as None — unreadable, never zero.
     """
     from common.pacific_time import shift_day_key
+    from training import walking_volume
 
     from mcp.core import query_source_range
 
     start = shift_day_key(end_date, -6)
     if start == end_date:  # unparseable day key — shift_day_key returns it unchanged
         return None
-    items = query_source_range("strava", start, end_date) or []
-    seconds = 0.0
-    found = False
-    for it in items:
-        for a in it.get("activities") or []:
-            if (a.get("type") or a.get("sport_type") or "").lower() not in ("walk", "hike"):
-                continue
-            secs = a.get("moving_time_seconds") or a.get("moving_time") or 0
-            try:
-                seconds += float(secs)
-                found = True
-            except (TypeError, ValueError):
-                continue
-    if not items and not found:
-        return None
-    return round(seconds / 3600.0, 2)
+    # `query_source` always returns a list, so None here means the read RAISED — the one
+    # case the layer must not read as "he did nothing".
+    return walking_volume.build(
+        window_start=start,
+        window_end=end_date,
+        strava_items=_safe(query_source_range, "strava", start, end_date),
+        hevy_workouts=_safe(query_source_range, "hevy", start, end_date),
+    )
+
+
+def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -> None:
+    """Put the per-source breakdown on the block's walking read, beside the total (#3930).
+
+    The engine computes state/gap from one number. That number is now a union of two sources,
+    and a union whose parts you cannot see is exactly the shape that produced the wrong flag
+    in the first place — so the breakdown, the counting rule, the overlap ruling and the
+    steps exclusion all travel WITH the verdict rather than in a separate payload a caller
+    may not read. The engine keeps its single-float contract; this is presentation.
+    """
+    w = block.get("walking")
+    if not isinstance(w, dict):
+        return
+    if not layer:
+        w["sources"] = {"status": "unreadable", "detail": "the walking-volume layer could not be built for this window"}
+        return
+    w["sources"] = layer["by_source"]
+    w["by_modality"] = layer["by_modality"]
+    w["counted_modalities"] = layer["counted_modalities"]
+    w["counting_rule"] = layer["counting_rule"]
+    w["overlap_rule"] = layer["overlap_rule"]
+    w["excluded_proxies"] = layer["excluded_proxies"]
+    w["derived_steps_estimate"] = layer["derived_steps_estimate"]
+    w["window"] = layer["window"]
+    w["volume_layer"] = layer["version"]
+    w["total_is_floor"] = layer["total_is_floor"]
+    if layer["honesty"]:
+        w["honesty"] = list(layer["honesty"])
 
 
 def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
@@ -163,10 +195,15 @@ def tool_plan_next_session(args):
     evidence = _gather_draft_evidence(ir, target_date, layer_status) if ir is not None else None
     worst = _worst_anchor(evidence) if evidence else (None, None)
 
+    # #3930: the walking read is a UNION layer (Strava + Hevy treadmill/cycling blocks), not a
+    # Strava-only number. The engine takes the total in hours — the floor's own unit — and the
+    # per-source breakdown is merged onto the block below so no reader has to trust the total.
+    walk_layer = _safe(_walking_volume_last_7d, target_date)
+
     block = plan_engine.constraint_block(
         date=target_date,
         weight_lb=weight,
-        walk_hr_wk_now=_safe(_walk_hours_last_7d, target_date),
+        walk_hr_wk_now=(walk_layer or {}).get("total_hr"),
         # Key names verified against each tool's live return shape rather than assumed —
         # a planner reading a key that does not exist degrades to "unknown" silently,
         # which is the #3767 failure wearing different clothes.
@@ -188,6 +225,7 @@ def tool_plan_next_session(args):
         # with a draft in hand the per-movement note reads report the layer's status themselves
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
     )
+    _merge_walking_volume(block, walk_layer)
 
     out: dict[str, Any] = {
         "target_date": target_date,
