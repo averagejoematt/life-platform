@@ -1,10 +1,10 @@
-# Handover — Session AN: the overnight drain, and the deploy that split the fleet (2026-09-19 21:15 → 2026-09-20 ~09:45 PT)
+# Handover — Session AN: the overnight drain, and the deploy that split the fleet (2026-09-19 21:15 → 2026-09-20 ~08:25 PT)
 
 **Fable, autonomous, standing merge + deploy authority (fleet, MCP, site, CDK — tonight only).** The brief
 set 97 → ≤45. The honest number at wrap is **64 open in all / 61 outside the Roadmap milestone** — a 33-issue
 drain, 16 short of the target. Gross: **40 closed, 8 filed** (#3943 #3944 #3945 #3946 #3971 #3972 + the
 auto-filed #3980 + #3982, the instrument gap #3980 exposed, filed at wrap). The owner sheet was applied at boot by asking each gated item one at a time (11 rulings,
-all recorded on their issues). The wrap landed ~3.5 h past the 06:00 PT target, and the reason is its own
+all recorded on their issues). The wrap landed ~2.5 h past the 06:00 PT target, and the reason is its own
 memory: I read time off the last log line, not the clock, while lanes ran for hours.
 
 ---
