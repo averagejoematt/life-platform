@@ -1,8 +1,8 @@
 # Handover — Session AN: the overnight drain, and the deploy that split the fleet (2026-09-19 21:15 → 2026-09-20 ~08:25 PT)
 
 **Fable, autonomous, standing merge + deploy authority (fleet, MCP, site, CDK — tonight only).** The brief
-set 97 → ≤45. The honest number at wrap is **64 open in all / 61 outside the Roadmap milestone** — a 33-issue
-drain, 16 short of the target. Gross: **40 closed, 8 filed** (#3943 #3944 #3945 #3946 #3971 #3972 + the
+set 97 → ≤45. The honest number at wrap is **63 open in all / 60 outside the Roadmap milestone** (#3609 closed after the wrap on its merged gates) — a 34-issue
+drain, 15 short of the target. Gross: **40 closed, 8 filed** (#3943 #3944 #3945 #3946 #3971 #3972 + the
 auto-filed #3980 + #3982, the instrument gap #3980 exposed, filed at wrap). The owner sheet was applied at boot by asking each gated item one at a time (11 rulings,
 all recorded on their issues). The wrap landed ~2.5 h past the 06:00 PT target, and the reason is its own
 memory: I read time off the last log line, not the clock, while lanes ran for hours.
@@ -39,6 +39,9 @@ CDK deploy turned out to carry it (see below).
   in those three stacks now runs `7615ce47` (freshness-checker, evening-nudge, hevy-routine-cron, the Compute
   lambdas — read from each artifact's `build_info.json`), while `life-platform-mcp`, `whoop-data-ingestion` and
   the other stacks stay on `c32e58c31`. The deploy line on #3913/#3712/#3620 was corrected to say so.
+- **Checkpoint 2 (after the wrap, 16:5xZ):** the four late PRs (#3974 #3981 #3965 #3977) merged, so fleet +
+  `life-platform-mcp` were re-deployed from main `7e8cf3ec` (fleet rc 0; MCP postflight ancestry OK). Every
+  function is back on ONE tip — the split above is history. CDK stacks were not re-run (no infra change).
 - **Site:** no `site/**` merge tonight; the attended `rollback_site.sh HEAD` for #3654 box 4 ran 06:15:22Z
   (invalidation `I2V522MBH5ZDX8AXICANH6D7DN`, LEFT LIVE block empty).
 - **Attended mutations:** `config_twin_sync.py --apply --strict` 06:34Z uploaded #3929's missing twin;
@@ -52,8 +55,9 @@ CDK deploy turned out to carry it (see below).
 35493033549→9feece7b0 · 35493066476→05531e899 · 35493222405→d1b44efc0 · 35493150058→963ef86c9 · 35493468353→3b003d448 ·
 35493546378→22060e755 · 35493664242→58c5f2845 · 35493584951→8bb1389a1 · 35494053022→e188db30a · 35494086845→ee3f63b64 ·
 35494243644→064ca8f3a · 35494213402→278a3fcc0 · 35494512815→bd635533e · 35494543939→56b741d68 · 35494578680→1cf673f1b ·
-35495359928→ae8184d12 · 35496280636→89b472327 · 35497353035→2b885abd9 · 35513202227→372b423cd · 35513211288→715a39fff.
-No lease waiting at wrap.
+35495359928→ae8184d12 · 35496280636→89b472327 · 35497353035→2b885abd9 · 35513202227→372b423cd · 35513211288→715a39fff ·
+35519809867→009708045 (#3974) · 35520060333→7d0eefa49 (#3981) · 35521783340→adb8a4805 (#3965) — 43 in all.
+#3977's merge (`7e8cf3ec`) mints one more; the next session rejects it by name (plan Step 0).
 
 ## Found by measuring, not by reading
 
@@ -74,8 +78,9 @@ No lease waiting at wrap.
 
 ## Residual / next picks (every line cites)
 
-- **Armed PRs:** #3981 (fix-forward; main is red until it lands) · #3977 (#3609; census 665→666 resolved) · #3974 (#3915)
-  · #3965 (#3772). Each was rebased onto main by hand (`--theirs` on the regenerables + sync + plain commit).
+- **Armed PRs — ALL MERGED after the wrap** (#3974 15:30Z · #3981 15:35Z · #3965 16:08Z · #3977 16:48Z) and deployed at
+  checkpoint 2. Each was rebased onto main by hand, some three times (`--theirs` on the regenerables + sync + plain commit)
+  — the treadmill the next session's plan fixes (`~/.claude/plans/clever-scribbling-locket.md`, Driver PR B).
 - **Nightly / next-occurrence proof:** #3900 (18:31Z coverage leg) · #3563 (next chronicle send) · #3830 (next vendor
   503) · #3913 (a PT-evening straddling read) · #3712 (next weekly prescription; MCP side awaits a deploy) · #3620
   (boxes 2–5 not started; box 1 live) · #3700 (n-floor on a real ride).
@@ -94,7 +99,7 @@ No lease waiting at wrap.
 **Incidents:** none filed — the config-ownership red and the #3609 red were both fix-forwarded inside the session; neither reached a reader surface.
 **Stash/hooks:** clean
 **Closures:** 40 closed (15 on live proof, 25 folded) · DoD: scanned=43 window=closed>=2026-09-20 hits=4 findings=4 → all 4 dispositioned at wrap (3 residual lines re-homed as `not-work`, #3927 given its Outcome verdict)
-**Backlog:** 97 → 64 open (61 non-Roadmap); Now carries the four armed PRs' issues + #3980 (milestoned Now at wrap); 8 filed (#3943 #3944 #3945 #3946 #3971 #3972 #3980 #3982); hygiene 12 → 0 at boot
+**Backlog:** 97 → 63 open (60 non-Roadmap); Now carries the four armed PRs' issues + #3980 (milestoned Now at wrap); 8 filed (#3943 #3944 #3945 #3946 #3971 #3972 #3980 #3982); hygiene 12 → 0 at boot
 **Alarms:** ✅ every alarm in ALARM state >72h cites an incident row or issue (wrap_gates e10, 15:1xZ)
 **CI warnings:** latest completed main run red on the #3609 gate (see Main); cron-freshness advisory red since 13:20Z (#3980 — a newborn cron, #3982 for the instrument)
 **Ledger:** `docs/PROPORTIONALITY.md` regenerated by the reconcile bot after each merge (gate census 664 → 665 on main; 666 once #3977 lands); no new standing machinery beyond the nightly `orphan_routine_drafts` leg (#3965, armed) and the #3976 daily PII-sweep cron (CDK-deployed)
