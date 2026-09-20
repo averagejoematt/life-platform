@@ -81,6 +81,13 @@ def names_missing_provenance(source: str, provenance) -> list:
     return sorted(set(module_thresholds(source)) - set(provenance))
 
 
+def facets() -> dict:
+    """Every threshold's facet, keyed by module-level name. Built here rather than in the
+    module: a public `all_gate_provenance()` with only this caller would ship unreferenced
+    in ~104 Lambda zips, which tests/test_no_dead_shared_defs_3538.py correctly refuses."""
+    return {name: gates.gate_provenance(name) for name in gates._PROVENANCE}
+
+
 # ── completeness ──────────────────────────────────────────────────────────────
 
 
@@ -134,7 +141,7 @@ def test_the_sweep_ignores_non_numeric_module_state():
 
 
 def test_every_facet_has_value_kind_and_source():
-    for name, facet in gates.all_gate_provenance().items():
+    for name, facet in facets().items():
         assert set(facet) == {"value", "kind", "source"}, f"{name}: {sorted(facet)}"
         assert facet["kind"] in gates.THRESHOLD_KINDS, f"{name}: kind={facet['kind']!r}"
 
@@ -144,12 +151,12 @@ def test_a_facet_value_is_the_live_constant_never_a_copy():
     `gate_provenance` reads the live attribute, so that drift is impossible by construction
     — pinned here so a future refactor cannot reintroduce a stored copy."""
     swept = module_thresholds(GATES_SOURCE.read_text())
-    for name, facet in gates.all_gate_provenance().items():
+    for name, facet in facets().items():
         assert facet["value"] == swept[name] == getattr(gates, name), name
 
 
 def test_population_constants_cite_a_source_in_prose():
-    for name, facet in gates.all_gate_provenance().items():
+    for name, facet in facets().items():
         if facet["kind"] != gates.POPULATION_CONSTANT:
             continue
         assert isinstance(facet["source"], str) and len(facet["source"].strip()) > 40, f"{name}: source is not a citation"
@@ -161,7 +168,7 @@ def test_a_personal_derivation_must_carry_the_3552_derived_from_block():
     shape the first real one must arrive in — #3552's `derived_from`, not a second
     spelling of the same idea."""
     required = {"metric", "sd", "n", "window_days"}
-    for name, facet in gates.all_gate_provenance().items():
+    for name, facet in facets().items():
         if facet["kind"] != gates.PERSONAL_DERIVATION:
             continue
         assert isinstance(facet["source"], dict), f"{name}: a personal derivation's source must be the derivation block"
@@ -172,7 +179,7 @@ def test_todays_honest_answer_is_recorded_as_population_constant():
     """ADR-104/105: the facet labels these numbers, it does not upgrade them. If a gate
     ever flips to `personal_derivation`, that is a real measurement landing and this
     assertion is the place to record it — not a line to delete quietly."""
-    kinds = {name: f["kind"] for name, f in gates.all_gate_provenance().items()}
+    kinds = {name: f["kind"] for name, f in facets().items()}
     assert set(kinds.values()) == {gates.POPULATION_CONSTANT}, f"a gate changed kind: {kinds}"
 
 

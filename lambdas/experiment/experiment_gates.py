@@ -170,12 +170,6 @@ def gate_provenance(name: str) -> dict:
     return {"value": dict(value) if isinstance(value, dict) else value, "kind": facet["kind"], "source": facet["source"]}
 
 
-def all_gate_provenance() -> dict:
-    """Every threshold's facet, keyed by module-level name — what the completeness sweep
-    grades this module against, and what any surface publishing the whole registry reads."""
-    return {name: gate_provenance(name) for name in _PROVENANCE}
-
-
 def measured_n(current_n, *, metric: str, window: str) -> dict:
     """The facet for a payload's ``current_n`` — a COUNT the caller measured, not a
     threshold, so it carries ``kind='measurement'`` and names what was counted over what
