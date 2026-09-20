@@ -285,7 +285,11 @@ def test_the_daily_summarizer_stores_grounded_people_and_keeps_them_out_of_the_n
     row = [p for p in table.put_calls if p["sk"] == ccs.PEOPLE_SK][0]
     # "Nils" was never said; "Eli" is the coach. Neither lands.
     assert [p["text"] for p in row["people"]] == ["Dana", "Priya"]
-    assert row["cycle"] == 13 and row["sensitivity"] == "internal_only" and row["type"] == "relationship_people"
+    # #3915 reversed the cycle clause (it pinned `cycle == 13`): RELATIONSHIP#people is in
+    # the ADR-153/#2487 cross-phase family — a person he mentioned is a fact about his
+    # life, not about the cycle it was said in — so the row carries no cycle label. The
+    # sensitivity and type clauses are untouched.
+    assert "cycle" not in row and row["sensitivity"] == "internal_only" and row["type"] == "relationship_people"
 
 
 def test_only_one_model_call_is_made_for_both_tails():
