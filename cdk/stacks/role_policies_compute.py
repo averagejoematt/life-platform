@@ -235,11 +235,22 @@ def compute_daily_insight() -> list[iam.PolicyStatement]:
 
 
 def intelligence_ai_expert() -> list[iam.PolicyStatement]:
-    """Observatory AI expert analyzer (weekly): reads DDB, uses ai-keys for Bedrock narrative, writes analysis to DDB."""
+    """Observatory AI expert analyzer (weekly): reads DDB, uses ai-keys for Bedrock narrative, writes analysis to DDB.
+
+    #3900: + ssm:GetParameter on experiment-cycle — intelligence_common.write_coach_thread
+    now stamps its bare-USER#matthew/SOURCE#coach_thread# rows via experiment_stamp_for(),
+    which reads the cycle (fail-soft, but an un-granted read is a stamp with no cycle)."""
     return _compute_base(
         needs_kms=True,  # writes observatory/insight records to DDB
         needs_ai_keys=True,
         needs_s3_config=True,
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
     )
 
 

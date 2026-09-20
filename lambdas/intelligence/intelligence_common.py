@@ -1297,14 +1297,13 @@ def write_coach_thread(coach_id: str, entry: dict) -> bool:
     stance_changes, emotional_investment, open_questions, learning_log.
     """
     today = pacific_today()
-    week = _iso_week(today)
 
     item = {
         "pk": f"USER#{USER_ID}",
         "sk": f"SOURCE#coach_thread#{coach_id}#{today}",
         "coach_id": coach_id,
         "date": today,
-        "week": week,
+        "week": _iso_week(today),
         "generation_context": entry.get("generation_context", "observatory"),
         "position_summary": entry.get("position_summary", ""),
         "predictions": entry.get("predictions", []),
@@ -1315,10 +1314,12 @@ def write_coach_thread(coach_id: str, entry: dict) -> bool:
         "learning_log": entry.get("learning_log", []),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3900: tagger-BLIND pk — a row with no stamp is CURRENT forever
+
+    item = {**experiment_stamp_for(item["pk"], item["sk"]), **item}
 
     try:
-        clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
-        table.put_item(Item=clean)
+        table.put_item(Item=json.loads(json.dumps(item, default=str), parse_float=Decimal))
         logger.info("Thread entry written for %s on %s", coach_id, today)
         return True
     except Exception as e:

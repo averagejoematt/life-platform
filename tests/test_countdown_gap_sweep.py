@@ -281,3 +281,54 @@ def test_reconcile_update_uses_if_not_exists_and_its_own_reason():
 
 def test_reconcile_reason_is_distinct_from_the_wipe_reason():
     assert reconcile.RECONCILE_REASON != wipe.TOMBSTONE_REASON
+
+
+# ── #3643: the cycle's own pre-registration post is not an escapee; a prior cycle's is ──
+
+_CURRENT_SHA = "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d"
+
+
+def _prereg_post(sha: str) -> dict:
+    """The Day-1 specimen shape (2026-09-05 → cycle 17): published, in-window, sha-stamped."""
+    return {
+        "pk": CHRONICLE_PK,
+        "sk": "DATE#" + (BOUNDARY.date() - timedelta(days=1)).isoformat(),
+        "status": "published",
+        "title": "The Plan, On the Record",
+        "pre_registration": True,
+        "prereg_sha256": sha,
+        "cycle": CYCLE,
+        "created_at": IN_WINDOW.isoformat(),
+        "last_updated": IN_WINDOW.isoformat(),
+    }
+
+
+def test_the_cycles_own_prereg_post_is_sanctioned_by_its_sealed_sha():
+    """The specimen check 14 reported on 2026-09-06 Day 1. Mutation control: delete the
+    `pre_registration`/`prereg_sha256` branch in sanctioned_reason → this reads ESCAPEE."""
+    row = _prereg_post(_CURRENT_SHA)
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE, current_prereg_sha=_CURRENT_SHA) == sweep.SANCTIONED
+    assert "pre-registration" in (sweep.sanctioned_reason(row, GENESIS, CYCLE, _CURRENT_SHA) or "")
+
+
+def test_a_prior_cycles_prereg_post_is_still_an_escapee():
+    row = _prereg_post("0" * 64)
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE, current_prereg_sha=_CURRENT_SHA) == sweep.ESCAPEE
+
+
+def test_no_stamp_to_compare_against_sanctions_nothing():
+    """Fail-closed: the marker alone never sanctions — the sha must match a stamp the sweep could read."""
+    row = _prereg_post(_CURRENT_SHA)
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE, current_prereg_sha=None) == sweep.ESCAPEE
+
+
+def test_the_stamp_reader_only_answers_for_its_own_genesis(monkeypatch, tmp_path):
+    import genesis_prereg_stamp as gps
+
+    stamp = tmp_path / "s.json"
+    stamp.write_text('{"genesis": "%s", "sha256": "%s"}' % (GENESIS, _CURRENT_SHA))
+    monkeypatch.setattr(gps, "STAMP_PATH", stamp)
+    assert sweep.current_prereg_sha_for(GENESIS) == _CURRENT_SHA
+    assert sweep.current_prereg_sha_for("2001-01-01") is None
+    monkeypatch.setattr(gps, "STAMP_PATH", tmp_path / "missing.json")
+    assert sweep.current_prereg_sha_for(GENESIS) is None

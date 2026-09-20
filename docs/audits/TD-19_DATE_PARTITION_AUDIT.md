@@ -238,8 +238,22 @@ skip in `test_the_declared_frames_agree_with_the_live_source_registry` rather th
 here, so the disagreement is visible to the next reader instead of resolved by silence.
 
 **CLOSED 2026-09-19 by #3913** — the facet now says `utc`. The flip, its consumer sweep
-and the live before/after are the next section; this paragraph is left as written so the
-residual and its closure can be read in order.
+and the live before/after are the last section of this file; this paragraph is left as
+written so the residual and its closure can be read in order.
+
+---
+
+# 2026-09-19 — Box B consumer fixed: `evening_nudge_lambda.py:138` (#3914)
+
+The line named above as "the sharpest one" — the 8 PM PT nudge's `som_check_in_count`
+read — now folds in the next UTC day's row (the `reached_in_pacific` shape from #3287,
+gated on the registry's `day_key_frame` facet so it only bites a UTC-framed source). A
+check-in logged 17:00–20:00 PT counts on the same evening's nudge instead of being
+reported missing until tomorrow. `apple_health`'s stored key frame is unchanged (#3677's
+KEEP-UTC ruling stands) — this is the reader, not a re-key. Test:
+`tests/test_som_checkin_frame_3914.py`. The remaining Box B rows
+(`dashboard_refresh_lambda.py:365`, `site_stats_refresh_lambda.py:86`,
+`daily_brief_lambda.py:664`) and all of Box C are untouched.
 
 ---
 
@@ -297,6 +311,7 @@ grep -rn "utc_day_key_source_ids\|day_key_frame_for" lambdas mcp scripts deploy 
 | `lambdas/emails/freshness_checker_lambda.py:654` | Ops staleness alert. Age +7h (PDT) / +8h (PST). **Tier unchanged at the instant it runs** — `cron(45 16 * * ? *)` = 09:45 PT, where a 0/1/2-day-old key scores 16.75h / 40.75h / 64.75h against thresholds 24 (warn) and 48 (stale), the same three tiers the Pacific anchor produced (9.75h / 33.75h / 57.75h). No new alarm noise; pinned by `test_the_ops_alert_tier_is_unchanged_at_the_checkers_own_schedule`. |
 | `lambdas/web/site_api_freshness.py:173` | Public freshness board, same helper, so the two consumers still agree to 0.05h. Live 24/7, so this one *can* mark whoop `stale` up to 7h earlier after a ≥2-day gap — the intended effect: the data was that old the whole time. |
 | `lambdas/web/vitals_resolver.py:207` | Reads the facet only to LABEL steps (`steps_as_of_frame`), and whoop is not a steps source. Its whoop scan is guarded by `reached_in_pacific`, which compares a stored day against the Pacific calendar and never asks the frame — so it was already correct for a UTC-keyed whoop. **No change.** |
+| `lambdas/emails/evening_nudge_lambda.py:162` | Added by #3914 between this flip's sweep and its merge (re-derived after the merge, not assumed): it reads the facet for **`apple_health` by name** to decide whether to fold in the next UTC day's row. The nudge never reads the whoop partition, so the flip does not reach it. |
 | `utc_day_key_source_ids()` | Production callers: none. Read by `tests/test_freshness_age_frame_3257.py` and `tests/test_ingestion_day_key_derivation_3666.py` (the latter derives the "a UTC frame must state its price" requirement over it, which is how whoop acquired its consequence note). Both updated. |
 
 **Adjacent, frame-blind by construction (checked, unchanged):**

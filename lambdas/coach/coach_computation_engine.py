@@ -782,12 +782,17 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
     }
 
     # Write-time provenance (#1233): NARRATIVE#arc is EXPERIMENT_SCOPED and
-    # tagger-blind, but its `phase` attribute is the narrative-arc STATE (not the
-    # taxonomy phase) — stamp cycle ONLY (include_phase=False) so the arc semantic
-    # is preserved. Fail-soft, cached; the item's own keys win.
+    # tagger-blind. On STATE#current the `phase` attribute is the narrative-arc STATE (not
+    # the taxonomy phase) — stamp cycle ONLY (include_phase=False) so the arc semantic is
+    # preserved. #3900 ruling (2026-09-20): a HISTORY# row carries no arc state in `phase`
+    # (its content is `transition`), so it takes the FULL stamp — which is exactly what every
+    # reset wipe already wrote onto the older HISTORY rows (`phase: pilot`, tombstoned); the
+    # cycle-only stamp had left each cycle's newest HISTORY row served as current forever.
+    # Fail-soft, cached; the item's own keys win.
     from experiment.phase_taxonomy import experiment_stamp_for  # #3514: per-row class gate
 
     _arc_stamp = experiment_stamp_for("NARRATIVE#arc", "STATE#current", include_phase=False)
+    _history_stamp = experiment_stamp_for("NARRATIVE#arc", f"HISTORY#{today_str}")
     try:
         table.put_item(
             Item=floats_to_decimal(
@@ -807,7 +812,7 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
         table.put_item(
             Item=floats_to_decimal(
                 {
-                    **_arc_stamp,
+                    **_history_stamp,
                     "pk": "NARRATIVE#arc",
                     "sk": f"HISTORY#{today_str}",
                     "transition": transition,

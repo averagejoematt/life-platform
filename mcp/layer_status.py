@@ -64,6 +64,34 @@ DERIVED_LAYERS: dict[str, dict] = {
         "health": None,
         "cadence_days": None,  # per category; retention_days in ai.platform_memory is a RELEVANCE window, not a cadence
     },
+    # #3920 (2026-09-20): four more readers of computed partitions were outside the registry, so a
+    # dark or failed read came back as an unlabelled `total: 0`. The COACH#<id>_coach sk families
+    # below are keyed by their sk prefix (the readers spell it, `_names_layer` matches `s == name`).
+    "PREDICTION#": {
+        "producer": "coach crons via coach_state_updater (the bet) + coach-prediction-evaluator (the grade); diary_claims for the subject's own",
+        "health": None,
+        "cadence_days": 7,  # a coach that made no bet in two weeks is a producer worth naming, not a zero
+    },
+    "LEARNING#": {
+        "producer": "coach-prediction-evaluator (daily) — the audit trail behind get_coach_track_record",
+        "health": None,
+        "cadence_days": 7,
+    },
+    "COMMITMENT#": {
+        "producer": "coach crons via coach_state_updater; graded by commitment_grading",
+        "health": None,
+        "cadence_days": 7,
+    },
+    "QUALITY#": {
+        "producer": "ai_calls quality gate (per coach run)",
+        "health": None,
+        "cadence_days": 7,
+    },
+    "intelligence_quality": {
+        "producer": "intelligence validator (nightly, post-generation) — USER#matthew / SOURCE#intelligence_quality#<date>",
+        "health": None,
+        "cadence_days": 1,
+    },
 }
 
 

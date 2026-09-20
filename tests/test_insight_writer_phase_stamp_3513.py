@@ -248,8 +248,16 @@ class _QueryTable:
         self.updates = []
 
     def query(self, **kwargs):
-        pk = kwargs["KeyConditionExpression"].get_expression()["values"][1]
-        return {"Items": [it for it in self.items_by_pk.get(pk, []) if "phase" not in it]}
+        cond = kwargs["KeyConditionExpression"].get_expression()
+        if cond["operator"] == "AND":  # #3900: a prefixed family (pk & begins_with(sk))
+            pk, prefix = cond["values"][0].get_expression()["values"][1], cond["values"][1].get_expression()["values"][1]
+        else:
+            pk, prefix = cond["values"][1], None
+        return {
+            "Items": [
+                it for it in self.items_by_pk.get(pk, []) if "phase" not in it and (not prefix or str(it.get("sk", "")).startswith(prefix))
+            ]
+        }
 
     def update_item(self, **kwargs):
         self.updates.append(kwargs)

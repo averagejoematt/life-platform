@@ -267,6 +267,13 @@ jobs:
       # pass, and run afterwards in one process where no concurrent reader exists.
       # tests/test_suite_parallel_safety_3025.py is the registry + guard and asserts BOTH
       # steps here — a contract that reads only the first line is how a second step drifts.
+      # #3917 (2026-09-20): `--ignore=tests/test_integration_aws.py` STAYS, and the reason is
+      # written here rather than left implicit. Those ten tests need live AWS (an OIDC role the
+      # PR lane deliberately does not assume — fork PRs run here), and four of them run by name
+      # in ci-cd.yml's post-deploy job against the deployed fleet, which is the only moment
+      # their assertions mean anything. The credential-restore defect #3917 fixed (xdist
+      # workers inheriting the controller's fakes) was never what kept this file out — it is
+      # out because a PR lane has nothing real to point it at.
       - name: Full unit suite — parallel pass (same selection as the post-merge coverage gate)
         if: always()
         run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25 -n auto --dist loadfile -m "not serial"
