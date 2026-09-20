@@ -789,9 +789,12 @@ def elevate_pain(table, item, user="matthew") -> dict:
         pass
     try:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        from experiment.phase_taxonomy import experiment_stamp_for  # #3900: tagger-blind pk, class-gated stamp
+
         table.put_item(
             Item=floats_to_decimal(
                 {
+                    **experiment_stamp_for(f"USER#{user}", f"SOURCE#coach_thread#training_coach#{ts}#pain"),
                     "pk": f"USER#{user}",
                     "sk": f"SOURCE#coach_thread#training_coach#{ts}#pain",
                     "coach_id": "training_coach",

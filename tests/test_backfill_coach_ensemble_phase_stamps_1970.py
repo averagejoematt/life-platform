@@ -50,6 +50,15 @@ def test_target_pks_covers_every_operational_coach_and_ensemble_singleton_but_no
     assert "ENSEMBLE#influence_graph" not in pks
 
 
+def _pk_and_prefix(cond):
+    """Resolve `Key("pk").eq(pk)` or `Key("pk").eq(pk) & Key("sk").begins_with(prefix)` (#3900)."""
+    expr = cond.get_expression()
+    if expr["operator"] == "AND":
+        left, right = expr["values"]
+        return left.get_expression()["values"][1], right.get_expression()["values"][1]
+    return expr["values"][1], None
+
+
 class _FakeTable:
     def __init__(self, items_by_pk, page_size=10):
         self.items_by_pk = items_by_pk
@@ -57,8 +66,10 @@ class _FakeTable:
         self.updates = []
 
     def query(self, **kwargs):
-        pk = kwargs["KeyConditionExpression"].get_expression()["values"][1]
-        unstamped = [it for it in self.items_by_pk.get(pk, []) if "phase" not in it]
+        pk, prefix = _pk_and_prefix(kwargs["KeyConditionExpression"])
+        unstamped = [
+            it for it in self.items_by_pk.get(pk, []) if "phase" not in it and (not prefix or str(it.get("sk", "")).startswith(prefix))
+        ]
         start = (kwargs.get("ExclusiveStartKey") or {}).get("_offset", 0)
         page = unstamped[start : start + self.page_size]
         resp = {"Items": page}

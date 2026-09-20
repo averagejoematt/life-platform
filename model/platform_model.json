@@ -3394,6 +3394,13 @@
       "via": "pk"
     },
     {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/intelligence/intelligence_common.py",
@@ -7126,7 +7133,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 683,
+      "edges": 684,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7140,9 +7147,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 336,
-        "sites_resolved": 845,
-        "sites_total": 1181
+        "sites_dynamic": 337,
+        "sites_resolved": 847,
+        "sites_total": 1184
       },
       "schedule_resolution": {
         "dynamic": 0,

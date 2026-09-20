@@ -164,6 +164,26 @@ def render_branches_note(branches: list[RoutineBranch]) -> str:
     return "\n".join(lines)
 
 
+# #3938 (2026-09-20): Hevy's v1 routine object has NO routine-level `notes` field. A PUT/POST
+# that carries `routine.notes` is accepted and the field is silently dropped — every routine the
+# platform ever committed read back with routine-level notes ABSENT while exercise-level notes on
+# the same routines landed (12 of 12 September routines, `GET /v1/routines`; the object's keys are
+# created_at, exercises, folder_id, id, title, updated_at). So the WHY line, the critics' verdicts
+# and the branch menu — the text a reader needs at the gym — were written to a field nothing can
+# read back, for the life of the feature. The wire no longer carries `routine.notes` at all; the
+# composed note is placed on the FIRST exercise's notes (the channel that provably lands), ahead
+# of whatever that exercise already carries. `verify_commit_landed` reports any sent field the
+# readback lacks as `unverifiable`, so this class cannot go dark again.
+def _place_routine_note(exercises: list[dict[str, Any]], composed: str) -> list[dict[str, Any]]:
+    """Prepend the routine-level note to exercises[0].notes; a routine with no exercises has nowhere to
+    carry it and Hevy would reject the routine anyway (the tool's precheck names that)."""
+    if composed and exercises:
+        first = exercises[0]
+        existing = first.get("notes") or ""
+        first["notes"] = f"{composed}\n\n{existing}" if existing else composed
+    return exercises
+
+
 def _compose_notes(ir: RoutineSpec, why_note: str | None) -> str:
     """Base WHY note (or ir.notes) + the branch menu, both sanitized for the wire."""
     base = sanitize_note(why_note if why_note is not None else ir.notes)
@@ -200,12 +220,14 @@ def to_create_body(
     why_note: optional one-line WHY summary projected into the Hevy notes
     field. If None, falls back to ir.notes.
     """
+    exercises = _place_routine_note(
+        [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], _compose_notes(ir, why_note)
+    )
     return {
         "routine": {
             "title": _resolve_title(ir, title_context),
             "folder_id": ir.hevy_folder_id,
-            "notes": _compose_notes(ir, why_note),
-            "exercises": [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)],
+            "exercises": exercises,
         },
     }
 
@@ -219,11 +241,13 @@ def to_update_body(
     """IR -> PUT /v1/routines/{id} body. folder_id deliberately omitted
     (immutable per Hevy). title_context + why_note semantics match
     to_create_body."""
+    exercises = _place_routine_note(
+        [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], _compose_notes(ir, why_note)
+    )
     return {
         "routine": {
             "title": _resolve_title(ir, title_context),
-            "notes": _compose_notes(ir, why_note),
-            "exercises": [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)],
+            "exercises": exercises,
         },
     }
 

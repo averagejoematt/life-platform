@@ -283,6 +283,32 @@ UNVERIFIED_NOTE = (
 )
 
 
+def _norm_note(text) -> str:
+    return " ".join(str(text or "").split())
+
+
+def _exercise_field_mismatches(sent_exercises: list, live_exercises: list) -> list[str]:
+    """#3938: per-exercise, for the fields the readback carries: notes (whitespace-normalised),
+    rest_seconds, and the set count. Only fields PRESENT in both sides are compared — a field the
+    readback lacks is `unverifiable`, not a mismatch."""
+    out: list[str] = []
+    for i, (s_ex, l_ex) in enumerate(zip(sent_exercises, live_exercises)):
+        if "notes" in s_ex and "notes" in l_ex and _norm_note(s_ex.get("notes")) != _norm_note(l_ex.get("notes")):
+            out.append(
+                f"exercises[{i}].notes differ (sent {len(str(s_ex.get('notes') or ''))} chars, Hevy holds {len(str(l_ex.get('notes') or ''))})"
+            )
+        if (
+            "rest_seconds" in s_ex
+            and "rest_seconds" in l_ex
+            and s_ex.get("rest_seconds") is not None
+            and s_ex.get("rest_seconds") != l_ex.get("rest_seconds")
+        ):
+            out.append(f"exercises[{i}].rest_seconds differ (sent {s_ex.get('rest_seconds')}, Hevy holds {l_ex.get('rest_seconds')})")
+        if "sets" in s_ex and "sets" in l_ex and len(s_ex.get("sets") or []) != len(l_ex.get("sets") or []):
+            out.append(f"exercises[{i}].sets count differs (sent {len(s_ex.get('sets') or [])}, Hevy holds {len(l_ex.get('sets') or [])})")
+    return out
+
+
 def readback_fields(check: dict, took_update_branch: bool) -> dict:
     """The commit-result keys that describe what Hevy ACTUALLY holds (#3718).
 
@@ -297,6 +323,11 @@ def readback_fields(check: dict, took_update_branch: bool) -> dict:
     }
     if took_update_branch:
         out["branch"] = UPDATE_BRANCH_NOTE
+    # #3938: sent-but-unreturned fields ride in the result by name; a quiet commit stays quiet.
+    if check.get("unverifiable"):
+        out["unverifiable"] = list(check["unverifiable"])
+    if check.get("mismatches"):
+        out["mismatches"] = list(check["mismatches"])
     return out
 
 
@@ -320,7 +351,7 @@ def verify_commit_landed(routine_id: str, body: dict, before_updated_at: str | N
     not evidence of state. This asks Hevy what it now holds and compares it to
     what we sent — template ids and set counts, plus whether updated_at moved.
     """
-    out = {"verified": False, "reason": None, "folder_id": None, "updated_at": None}
+    out: dict[str, Any] = {"verified": False, "reason": None, "folder_id": None, "updated_at": None, "unverifiable": []}
     if not routine_id:
         out["reason"] = "no routine id returned"
         return out
@@ -339,10 +370,25 @@ def verify_commit_landed(routine_id: str, body: dict, before_updated_at: str | N
     out["folder_id"] = rt.get("folder_id")
     out["updated_at"] = rt.get("updated_at")
 
-    sent = [str(e.get("exercise_template_id")) for e in (body.get("routine") or body).get("exercises", []) or []]
-    live = [str(e.get("exercise_template_id")) for e in (rt.get("exercises") or [])]
+    sent_routine: dict[str, Any] = body["routine"] if isinstance(body.get("routine"), dict) else body
+    sent_exercises = sent_routine.get("exercises", []) or []
+    live_exercises = rt.get("exercises") or []
+    # #3938: a field we SENT that the readback does not carry cannot be verified — say so by
+    # name instead of passing over it in silence. Routine-level `notes` was exactly this for
+    # the life of the feature (Hevy's routine object has no such field; the write is dropped).
+    out["unverifiable"] = sorted(k for k in sent_routine if k not in rt)
+    sent = [str(e.get("exercise_template_id")) for e in sent_exercises]
+    live = [str(e.get("exercise_template_id")) for e in live_exercises]
     if sent and live != sent:
         out["reason"] = f"content mismatch — sent {len(sent)} exercise(s), Hevy holds {len(live)}"
+        return out
+    # #3938: compare every per-exercise field the readback DOES carry against what was sent —
+    # notes and rest_seconds are where the gym-readable text now lives, so a note that did not
+    # land (truncated, dropped) is a write that did not apply, not a detail.
+    mismatches = _exercise_field_mismatches(sent_exercises, live_exercises)
+    if mismatches:
+        out["mismatches"] = mismatches
+        out["reason"] = "content mismatch — " + "; ".join(mismatches[:3])
         return out
     if before_updated_at and str(rt.get("updated_at") or "") == str(before_updated_at):
         # The decisive check for the #3718 case: a PUT that changed nothing.

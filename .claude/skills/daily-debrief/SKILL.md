@@ -161,6 +161,31 @@ Matthew authors at night and trains the next morning with zero chance to adjust.
   on); 🟡 YELLOW (34-66) = the baseline plan (the safe default with no signal); 🔴 RED
   (1-33) = subtract to the floor (Z2/mobility, cut top sets, or rest). Plus: use the
   LOWER of (wrist band, how Matthew feels) — feel only downgrades.
+- **Autoregulation is subtract-only, and it has a FLOOR (#3927 — owner ruling
+  2026-09-19, §7 of TRAINING_CALIBRATION.md).** Carried verbatim from
+  `training.routine_generator.SUBTRACT_ONLY_RULE`, which is the same sentence the cron
+  generator writes into the routine:
+  > Autoregulation is subtract-only. The prescribed load IS the floor: take it down on
+  > the day if you have to, never up, and never wait to be asked to progress. A load
+  > below one already achieved at this bodyweight band, with no layoff, is a bug — not
+  > conservatism.
+
+  In practice, when you write a load into a cue:
+  - Derive it, don't feel it. `prescription_floor(template_id, …)` in
+    `lambdas/training/routine_generator.py` returns the best load that movement has
+    actually carried at his CURRENT 10-lb bodyweight band, out of the Hevy partition.
+    The number you prescribe is `>=` that floor. Full stop.
+  - The ONLY sanctioned way below it is a layoff: `>=` the re-entry threshold
+    (7d) since the last logged session, which applies the documented 10–15% detraining
+    discount and says so in the cue. No layoff, no discount — a lower number with no
+    layoff is the bug, not caution.
+  - **Never write a conditional UP-branch.** Not "if set 1 is ≤7.5 go 80", not "GREEN
+    only: a 2nd set at 185", not "climb toward 175 if set 1 is 4+ RIR". Progression is
+    never his job to trigger mid-set at 5am — if the platform knows he hit 80, the
+    prescription says 80. Down-branches are the sanctioned form ("drop to 40x10 if set 1
+    exceeds the cap"). `recovery_authoring.find_conditional_up(text)` is the detector,
+    and `audit_prescription(exercises, routine_notes, floors)` reds on both classes —
+    run it over the draft before `dry_run`.
 - Lower the GREEN ceiling / raise floors for week-position (consecutive training days),
   deep deficit, and novel-pattern tendons — green recovery does not clear a
   3-sessions-in tendon.

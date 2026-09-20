@@ -59,6 +59,7 @@ from operational import (
     acwr_liveness_qa,  # noqa: E402
     canary_precision_qa,  # noqa: E402  (#3485 size-split)
     chronicle_manifest_qa,  # noqa: E402  (#3485)
+    chronicle_status_row_qa,  # noqa: E402  (#3563 dead-man)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
@@ -1075,6 +1076,13 @@ def check_steps():
         # #3564: and the promise must state the cadence the senders actually deliver
         ("subscriber_promise_cadence", check_subscriber_promise_cadence),
         ("podcast_parity", check_podcast_parity),
+        # #3563 dead-man: a chronicle DELIVERY with no email_log status row within 60s. Three sends
+        # in Aug 2026 delivered and had their status write denied-and-swallowed; /api/status read RED
+        # for 44 days while the delivery heartbeat was correctly silent, because delivery worked.
+        (
+            "chronicle_status_row",
+            lambda: chronicle_status_row_qa.check_chronicle_status_row_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now),
+        ),
         # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
         (
             "chronicle_manifest_provenance",

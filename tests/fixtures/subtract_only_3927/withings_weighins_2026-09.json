@@ -1,0 +1,16 @@
+{
+  "_source": "DDB USER#matthew#SOURCE#withings, sk DATE#2026-09-01..2026-09-19, attribute weight_lbs; read 2026-09-19",
+  "_shape": "the value shape training.exercise_history.load_bodyweight_index returns: {YYYY-MM-DD: weight_lbs}",
+  "_note": "DATE#2026-09-09 exists on the wire with weight_lbs absent (a body-composition-only row); load_bodyweight_index drops it, so it is absent here too rather than interpolated.",
+  "weigh_ins": {
+    "2026-09-01": 328.13,
+    "2026-09-03": 324.64,
+    "2026-09-05": 326.2,
+    "2026-09-06": 327.34,
+    "2026-09-12": 319.68,
+    "2026-09-15": 318.91,
+    "2026-09-17": 317.31,
+    "2026-09-18": 315.13,
+    "2026-09-19": 315.63
+  }
+}

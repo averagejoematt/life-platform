@@ -209,8 +209,8 @@ def _apply_recovery_adaptation(ir: Any, ctx: dict[str, Any], inputs_current_thro
     """Write the always-present session block + per-lift top-set branches into the IR.
 
     Tier-agnostic (brief §2.1): the routine carries GREEN/YELLOW/RED in its notes; the
-    morning selects one. Renders into EXERCISE notes (the routine-level notes is reserved
-    for the WHY line, which the compiler overrides). Stashes structured branches in the
+    morning selects one. Renders into EXERCISE notes (#3938: Hevy has no routine-level notes
+    field — the compiler now places the WHY line ahead of this block on exercises[0]). Stashes structured branches in the
     existing inputs_snapshot so no layer-resident IR schema bump is needed for v1.
     """
     from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches, render_branch_block, render_session_block
@@ -503,11 +503,18 @@ def _infer_from_keywords(name: str, keywords: list, allowed: set, default: str) 
     return default
 
 
-def _infer_muscle_group(ex: dict[str, Any], name: str) -> str:
+def _explicit_muscle_group(ex: dict[str, Any], name: str) -> str:
+    """#3770: a NEW Hevy template's muscle group must be stated, never guessed. Hevy exposes no
+    template edit, so a guessed group is permanent: on 2026-09-08 the keyword guess filed
+    'Calf Press on Leg Press Machine' under SHOULDERS and every set since counted there in
+    get_muscle_volume. A caller that wants the template created says which group it is."""
     override = (ex.get("muscle_group") or ex.get("primary_muscle") or "").strip().lower()
     if override in _HEVY_MUSCLE_GROUPS:
         return override
-    return _infer_from_keywords(name, _MUSCLE_KEYWORDS, _HEVY_MUSCLE_GROUPS, "other")
+    raise ValueError(
+        f"refusing to create {name!r} without an explicit muscle_group (got {override!r}) — Hevy has no template "
+        f"edit, so a guessed group is permanent (#3770). Pass muscle_group as one of: {', '.join(sorted(_HEVY_MUSCLE_GROUPS))}"
+    )
 
 
 def _infer_equipment(ex: dict[str, Any], name: str) -> str:
@@ -530,7 +537,7 @@ def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str,
 
     meta = {
         "title": title,
-        "muscle_group": _infer_muscle_group(ex, title),
+        "muscle_group": _explicit_muscle_group(ex, title),  # #3770: explicit or refused, never guessed
         "exercise_type": _infer_exercise_type(ex),
         "equipment_category": _infer_equipment(ex, title),
     }
@@ -860,10 +867,11 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     # Preview the title the way commit will actually render it (the compiler
     # convention), not the raw ir.title placeholder — else dry_run lies about
     # the title (the 2026-06-15 "Push — {date}" false alarm).
-    from coach.critics import with_notes_block
-
     title_ctx, why = _resolve_title_inputs(ir)
-    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=with_notes_block(why, ir))
+    # #3938: the critics' block already rides on ir.exercises[0].notes (placed at plan time); the
+    # compiler puts the WHY line ahead of it there. Composing the block into `why` again would
+    # stack it twice on the one channel that lands.
+    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
     out = {
         "status": "preview",
         "routine_id": routine_id,
@@ -919,7 +927,7 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     # rename landed that never did. Warn by name rather than discard in silence.
     warnings: list[str] = _discarded_commit_title_warnings(args, ir)
     # #3752: a critic veto blocks the commit; the verdicts ride into the notes (create AND update).
-    from coach.critics import commit_status, veto_reason, with_notes_block
+    from coach.critics import commit_status, veto_reason
 
     veto = veto_reason(ir)
     if veto:
@@ -927,8 +935,7 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     folder_note: str | None = None
     try:
         resolve = _make_resolver()
-        title_ctx, why = _resolve_title_inputs(ir)
-        why = with_notes_block(why, ir)
+        title_ctx, why = _resolve_title_inputs(ir)  # #3938: the verdict block is already on exercises[0].notes
         before_updated_at = ir.hevy_updated_at
         took_update_branch = bool(ir.hevy_routine_id)
         if ir.hevy_routine_id:

@@ -1,0 +1,257 @@
+{
+  "_source": "DDB USER#matthew#SOURCE#hevy, per-workout rows (sk DATE#YYYY-MM-DD#WORKOUT#<id>), read 2026-09-19 us-west-2",
+  "_shape": "the value shape training.exercise_history.load_recent_history builds per template_id: most-recent-first sessions of {date, sets:[{weight_kg, reps}], top_weight_kg}. `rpe`/`type` are carried here as provenance only \u2014 the real loader drops them.",
+  "_templates": {
+    "07B38369": "incline_db_press \u2014 Incline Bench Press (Dumbbell); the specimen movement",
+    "93A552C6": "cable_tricep_pushdown \u2014 carries history the deterministic generator's 2026-09-14 upper archetype selects",
+    "37FCC2BB": "db_curl \u2014 history exists but only OUTSIDE the current band (the 09-08 session sits at 327.3 lb)"
+  },
+  "by_template_id": {
+    "07B38369": [
+      {
+        "date": "2026-09-19",
+        "sets": [
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 8.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 8.0,
+            "rpe": 9.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 8.0,
+            "rpe": 10.0,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 36.28743275485118
+      },
+      {
+        "date": "2026-09-14",
+        "sets": [
+          {
+            "weight_kg": 34.01946820767298,
+            "reps": 8.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 34.01946820767298,
+            "reps": 8.0,
+            "rpe": 9.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 34.01946820767298,
+            "reps": 8.0,
+            "rpe": 9.5,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 34.01946820767298
+      },
+      {
+        "date": "2026-09-11",
+        "sets": [
+          {
+            "weight_kg": 29.483539113316585,
+            "reps": 8.0,
+            "rpe": 7.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 34.01946820767298,
+            "reps": 8.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 8.0,
+            "rpe": 9.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 8.0,
+            "rpe": 9.0,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 36.28743275485118
+      },
+      {
+        "date": "2026-09-07",
+        "sets": [
+          {
+            "weight_kg": 29.483539113316585,
+            "reps": 10.0,
+            "rpe": 8.5,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 29.483539113316585,
+            "reps": 10.0,
+            "rpe": 9.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 29.483539113316585,
+            "reps": 10.0,
+            "rpe": 10.0,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 29.483539113316585
+      }
+    ],
+    "93A552C6": [
+      {
+        "date": "2026-09-19",
+        "sets": [
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 7.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 36.28743275485118,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 36.28743275485118
+      },
+      {
+        "date": "2026-09-14",
+        "sets": [
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.5,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 32.88548593408388
+      },
+      {
+        "date": "2026-09-11",
+        "sets": [
+          {
+            "weight_kg": 29.483539113316585,
+            "reps": 15.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 32.88548593408388
+      },
+      {
+        "date": "2026-09-07",
+        "sets": [
+          {
+            "weight_kg": 22.67964547178199,
+            "reps": 12.0,
+            "rpe": 7.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 29.483539113316585,
+            "reps": 12.0,
+            "rpe": 8.0,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 32.88548593408388,
+            "reps": 12.0,
+            "rpe": 8.5,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 32.88548593408388
+      }
+    ],
+    "37FCC2BB": [
+      {
+        "date": "2026-09-08",
+        "sets": [
+          {
+            "weight_kg": 11.339822735890994,
+            "reps": 12.0,
+            "rpe": 8.5,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 11.339822735890994,
+            "reps": 12.0,
+            "rpe": 8.5,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 11.339822735890994,
+            "reps": 12.0,
+            "rpe": 8.5,
+            "type": "normal"
+          },
+          {
+            "weight_kg": 11.339822735890994,
+            "reps": 12.0,
+            "rpe": 9.0,
+            "type": "normal"
+          }
+        ],
+        "top_weight_kg": 11.339822735890994
+      }
+    ]
+  }
+}
