@@ -223,9 +223,17 @@ def test_unconfirmed_standing_constraints_are_disclosed_in_honesty_not_implied_o
     """Acceptance box 4, extended to the server-side surface: a plan built on this block
     must carry the same disclosure the conversational S3-read path already gives — an
     MCP caller that never reads COACH_SESSION.md must not be able to assume coverage."""
+    import unittest.mock
+
+    # #3715 box 5 flipped on the owner's 2026-09-20 ruling: the live block carries NO
+    # unconfirmed line. The disclosure path is still pinned by mutating the registry back.
     block = plan_engine.constraint_block(**_FULL)
-    assert block["standing_constraints"]["confirmed_by_owner"] is False
-    assert any("NOT owner-confirmed" in line and "calf_lesion" in line for line in block["honesty"])
+    assert block["standing_constraints"]["confirmed_by_owner"] is True
+    assert not any("NOT owner-confirmed" in line for line in block["honesty"])
+    with unittest.mock.patch.object(training_context_registry, "CONFIRMED_BY_OWNER", False):
+        block = plan_engine.constraint_block(**_FULL)
+        assert block["standing_constraints"]["confirmed_by_owner"] is False
+        assert any("NOT owner-confirmed" in line and "calf_lesion" in line for line in block["honesty"])
 
 
 def test_a_confirmed_registry_would_not_repeat_the_unconfirmed_notice():
