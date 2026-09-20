@@ -194,6 +194,45 @@ def list_stale_drafts(older_than_days: int = 7, lookback_days: int = 120, today:
     return sorted(out, key=lambda r: (str(r.created_at or ""), r.routine_id))
 
 
+def list_for_tool(args: dict) -> dict:
+    """#3772: the `manage_hevy_routine list` payload — date range plus `status` / `older_than_days` filters.
+    Lives beside the listing it filters (and out of the 1000-line tool module)."""
+    start = args.get("start_date") or args.get("date") or "2026-05-31"
+    end = args.get("end_date") or args.get("date") or start
+    items = list_by_date_range(start, end, limit=int(args.get("limit") or 50))
+    # #3772: `status` and `older_than_days` filters, so orphaned drafts can be listed at all
+    # (a draft the #3765 soft-timeout left behind was invisible to every caller).
+    status_filter = (args.get("status") or "").strip().lower()
+    if status_filter:
+        items = [ir for ir in items if (ir.status or "").lower() == status_filter]
+    older = args.get("older_than_days")
+    if older is not None and str(older).strip() != "":
+        from datetime import date, timedelta
+
+        from common.pacific_time import pacific_today
+
+        cutoff = (date.fromisoformat(pacific_today()) - timedelta(days=int(older))).isoformat()
+        items = [ir for ir in items if str(ir.created_at or "")[:10] and str(ir.created_at or "")[:10] <= cutoff]
+    return {
+        "status": "ok",
+        "count": len(items),
+        "filters": {k: v for k, v in (("status", status_filter or None), ("older_than_days", older)) if v is not None},
+        "routines": [
+            {
+                "routine_id": ir.routine_id,
+                "target_date": ir.target_date,
+                "archetype": ir.archetype,
+                "variant": ir.variant,
+                "status": ir.status,
+                "hevy_routine_id": ir.hevy_routine_id,
+                "version": ir.version,
+                "created_at": ir.created_at,
+            }
+            for ir in items
+        ],
+    }
+
+
 def upsert_id_map(routine_id: str, hevy_routine_id: str) -> None:
     """Persist platform <-> Hevy id mapping. Conditional on neither side present."""
     try:

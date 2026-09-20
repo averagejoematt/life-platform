@@ -1126,6 +1126,25 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-07",
     },
+    "qa::lambdas/operational/qa_smoke_lambda.py::check_orphan_routine_drafts": {
+        "gate_name": "check_orphan_routine_drafts",
+        "command": "python3 -B -m pytest tests/test_orphan_routine_drafts_3772.py -q -p no:cacheprovider",
+        "mutation": (
+            "in qa_smoke_lambda.check_orphan_routine_drafts, the `if stale:` branch inverted so a "
+            "non-empty stale-draft list returns the ok line — the silent-pass shape."
+        ),
+        "observed": (
+            "MUTATED: test_the_nightly_warns_by_name_and_is_ok_at_zero FAILED (passed is True where None/WARN "
+            "was required, and the specimen id is absent from the message). RESTORED: 3 passed. The two "
+            "positive controls (a planted 12-day-old draft → WARN naming it; an empty list → PASS) were both "
+            "exercised in the same run."
+        ),
+        "scope": (
+            "the nightly count of routine drafts older than 7 days (the #3765 soft-timeout orphans) — a "
+            "bounded index Query over the routine date index, reported by id; the archive/commit is the owner's."
+        ),
+        "proved_on": "2026-09-20",
+    },
     "structural::test_v4_build_sitemap_3567.py": {
         "gate_name": "test_v4_build_sitemap_3567.py",
         "command": "python3 -m pytest tests/test_v4_build_sitemap_3567.py -q -p no:cacheprovider",
