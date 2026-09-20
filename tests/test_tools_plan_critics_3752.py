@@ -368,3 +368,73 @@ def test_weeks_in_block_counts_trailing_consistent_weeks_only():
     assert tp._weeks_in_block(dates, "2026-09-19") == 2
     assert tp._weeks_in_block([], "2026-09-19") == 0
     assert tp._weeks_in_block(["2026-09-19"], "2026-09-19") == 0, "the target day itself is not a trailing week"
+
+
+# ── the stage-1 readers, held to the LIVE wire shapes (2026-09-20) ───────────
+# The first deployed stage-2 run reported protein, recovery tier, ACWR and muscle volume
+# all UNKNOWN on a day every one of them had data — each reader keyed on a name the live
+# tool does not return. These fixtures are the wire shapes copied off the deployed tools.
+_LIVE_NUTRITION = {
+    "period": {"days_with_data": 6},
+    "daily_breakdown": [
+        {"date": "2026-09-13", "protein_g": 245.0},
+        {"date": "2026-09-14", "protein_g": 105.0},
+        {"date": "2026-09-15", "protein_g": 90.0},
+        {"date": "2026-09-16", "protein_g": 200.0},
+        {"date": "2026-09-17", "protein_g": 124.0},
+        {"date": "2026-09-18", "protein_g": 164.0},
+    ],
+}
+_LIVE_READINESS = {"date": "2026-09-19", "readiness_score": 80.1, "label": "GREEN"}
+_LIVE_ACWR = {
+    "date": "2026-09-18",
+    "acwr": 1.241,
+    "zone": "safe",
+    "alert": False,
+    "alert_reason": "ACWR 1.24 is within the safe zone (0.8–1.3).",
+    "interpretation": "ACWR = EWMA(7d) ...",
+}
+_LIVE_VOLUME = {
+    "muscle_volume": {"Back": {"total_sets": 20, "avg_sets_per_week": 23.3}, "Chest": {"total_sets": 37, "avg_sets_per_week": 43.2}}
+}
+
+
+def test_protein_days_read_the_live_daily_breakdown_key():
+    with patch("mcp.tools_nutrition.tool_get_nutrition", return_value=_LIVE_NUTRITION):
+        assert tp._protein_days_7d("2026-09-20") == (4, 6)
+    with patch("mcp.tools_nutrition.tool_get_nutrition", return_value={"error": "No MacroFactor data"}):
+        assert tp._protein_days_7d("2026-09-20") == (None, None)
+
+
+def test_recovery_tier_reads_the_live_readiness_score_key():
+    assert tp._recovery_tier(_LIVE_READINESS) == "green"
+    assert tp._recovery_tier({"readiness_score": 50}) == "yellow"
+    assert tp._recovery_tier({"readiness_score": 20}) == "red"
+    assert tp._recovery_tier({}) is None
+
+
+def test_muscle_sets_reads_the_live_muscle_volume_table():
+    assert tp._muscle_sets(_LIVE_VOLUME) == {"Back": 23.3, "Chest": 43.2}
+    assert tp._muscle_sets({}) == {}
+
+
+def test_stage_1_block_is_populated_from_the_live_shapes_not_unknown():
+    with ExitStack() as st:
+        for cm in [
+            patch("mcp.tools_benchmark.tool_get_benchmark", return_value=_REFERENCE),
+            patch("mcp.tools_health.tool_get_readiness_score", return_value=_LIVE_READINESS),
+            patch("mcp.tools_training.tool_get_acwr_status", return_value=_LIVE_ACWR),
+            patch("mcp.tools_strength.tool_get_muscle_volume", return_value=_LIVE_VOLUME),
+            patch("mcp.tools_nutrition.tool_get_nutrition", return_value=_LIVE_NUTRITION),
+            patch("mcp.tools_plan._walk_hours_last_7d", return_value=5.09),
+            patch("training.training_notes.training_notes_health", side_effect=RuntimeError("offline")),
+        ]:
+            st.enter_context(cm)
+        out = tp.tool_plan_next_session({"target_date": "2026-09-20"})
+    block = out["constraint_block"]
+    assert block["recovery_tier"] == "green"
+    assert block["acwr_flag"] == "safe"
+    assert block["muscle_volume"] == {"Back": 23.3, "Chest": 43.2}
+    tw = {t_["id"]: t_ for t_ in block["tripwires"]}
+    assert tw["protein_floor_missed"]["state"] == "tripped" and "4 of 7" in tw["protein_floor_missed"]["observed"]
+    assert out["protein_days_measured_7d"] == 6
