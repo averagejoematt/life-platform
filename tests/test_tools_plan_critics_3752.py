@@ -109,6 +109,23 @@ _REFERENCE = {
 }
 
 
+def _walk_layer(total_hr):
+    """#3930: the walking reader now returns the derived UNION layer, not a bare float.
+
+    Built through `training.walking_volume.build` rather than hand-shaped, so a change to the
+    layer's keys cannot leave this stub agreeing with a shape the tool no longer produces.
+    """
+    from training import walking_volume
+
+    secs = float(total_hr) * 3600.0
+    return walking_volume.build(
+        window_start="2026-09-13",
+        window_end="2026-09-19",
+        strava_items=[{"date": "2026-09-19", "activities": [{"type": "Walk", "moving_time_seconds": secs}]}],
+        hevy_workouts=[{"date": "2026-09-19", "exercises": []}],
+    )
+
+
 def _stage2_patches(ir, evidence, *, invoke, allowed=(True, None), stored=None, thread=None):
     """Offline patch set for a stage-2 run. `stored` collects put_versioned calls."""
     stored = stored if stored is not None else []
@@ -118,7 +135,7 @@ def _stage2_patches(ir, evidence, *, invoke, allowed=(True, None), stored=None, 
         patch("mcp.tools_health.tool_get_readiness_score", return_value={"score": 55}),
         patch("mcp.tools_training.tool_get_acwr_status", return_value={"alert": "safe"}),
         patch("mcp.tools_strength.tool_get_muscle_volume", return_value={"muscle_sets": {"quads": 8}}),
-        patch("mcp.tools_plan._walk_hours_last_7d", return_value=1.1),
+        patch("mcp.tools_plan._walking_volume_last_7d", return_value=_walk_layer(1.1)),
         patch("mcp.tools_plan._protein_days_7d", return_value=(1, 7)),
         patch("mcp.tools_plan._gather_draft_evidence", return_value=evidence),
         patch("mcp.tools_plan._model_allowed", return_value=allowed),
@@ -426,7 +443,7 @@ def test_stage_1_block_is_populated_from_the_live_shapes_not_unknown():
             patch("mcp.tools_training.tool_get_acwr_status", return_value=_LIVE_ACWR),
             patch("mcp.tools_strength.tool_get_muscle_volume", return_value=_LIVE_VOLUME),
             patch("mcp.tools_nutrition.tool_get_nutrition", return_value=_LIVE_NUTRITION),
-            patch("mcp.tools_plan._walk_hours_last_7d", return_value=5.09),
+            patch("mcp.tools_plan._walking_volume_last_7d", return_value=_walk_layer(5.09)),
             patch("training.training_notes.training_notes_health", side_effect=RuntimeError("offline")),
         ]:
             st.enter_context(cm)

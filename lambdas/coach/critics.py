@@ -334,6 +334,31 @@ def build_joints_packet(
     return {"critic": "joints_tendons", "numbers": numbers, "flags": flags, "unknown": unknown, "violations": violations}
 
 
+def _walking_split_sentence(walking: dict[str, Any]) -> str:
+    """The per-source split, inline in the critic's sentence: " (strava 6.04 + hevy 8.33)".
+
+    #3930: a walking verdict the coach reads should never be a bare total again. A source that
+    could not be read is named as such, and the total is declared a FLOOR, because "6.04 hr"
+    from one readable source reads identically to "6.04 hr" from two — which is precisely how
+    the Strava-only number passed for the week's volume.
+    """
+    sources = walking.get("sources")
+    if not isinstance(sources, dict):
+        return ""
+    # the source names are taken from the layer's own breakdown, never hand-typed here:
+    # a third walking source would join this sentence by existing (#2844 conformance guard)
+    parts = []
+    for name, row in sources.items():
+        if not isinstance(row, dict):
+            continue
+        hours = row.get("hours")
+        parts.append(f"{name} {hours}" if hours is not None else f"{name} {row.get('status', 'unreadable')}")
+    if not parts:
+        return ""
+    tail = ", a FLOOR" if walking.get("total_is_floor") else ""
+    return f" ({' + '.join(parts)}{tail})"
+
+
 def build_rate_advocate_packet(
     draft: dict[str, Any],
     *,
@@ -357,6 +382,11 @@ def build_rate_advocate_packet(
         "tripwires_unreadable": len(unknown_tw),
         "walking_gap_hr_wk": (walking or {}).get("gap_hr_wk"),
         "walking_pct_of_floor": (walking or {}).get("pct_of_floor"),
+        # #3930: this critic's loudest sentence was built on a Strava-only walking read. It now
+        # argues from the union and carries the split, so a source that could not be read lands
+        # in `unknown` as None instead of silently contributing zero hours to the case.
+        "walking_hr_wk_strava": (((walking or {}).get("sources") or {}).get("strava") or {}).get("hours"),
+        "walking_hr_wk_hevy": (((walking or {}).get("sources") or {}).get("hevy") or {}).get("hours"),
         "rate_band_high_lb_wk": (rate_target or {}).get("high_lb_wk"),
         "rate_band_low_lb_wk": (rate_target or {}).get("low_lb_wk"),
         "current_rate_lb_wk": current_rate_lb_wk,
@@ -386,12 +416,28 @@ def build_rate_advocate_packet(
         )
     w = walking or {}
     rt = rate_target or {}
+    split = _walking_split_sentence(w)
     if w.get("state") == "below_floor":
         flags.append(
             _flag(
                 "walking_gap_hr_wk",
                 "info",
-                f"walking {w.get('now_hr_wk')} hr/wk vs the proven {w.get('floor_hr_wk')} hr/wk floor — the largest lever is not in this routine",
+                f"walking {w.get('now_hr_wk')} hr/wk{split} vs the proven {w.get('floor_hr_wk')} hr/wk floor — "
+                "the largest lever is not in this routine",
+                provenance=w.get("provenance", "owner-history"),
+            )
+        )
+    elif w.get("state") == "at_or_above_floor":
+        # #3930: the floor being MET is an argument too, and it was unsayable while the read
+        # was Strava-only — every week came back below floor and the advocate never had to
+        # reason about a met one. Naming it stops "the largest gap on the board" from being
+        # the standing verdict on a week he actually walked.
+        flags.append(
+            _flag(
+                "walking_pct_of_floor",
+                "info",
+                f"walking {w.get('now_hr_wk')} hr/wk{split} is AT OR ABOVE the {w.get('floor_hr_wk')} hr/wk floor — "
+                "the walking lever is not the gap this week; argue from something else",
                 provenance=w.get("provenance", "owner-history"),
             )
         )
