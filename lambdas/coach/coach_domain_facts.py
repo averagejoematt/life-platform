@@ -114,7 +114,10 @@ def _nutrition_pack(table, today: str) -> list:
             if weight_lbs and height_in:
                 age_years, age_basis, _ = health_tdee.resolve_age(profile.get("date_of_birth"))
                 strava = _query_source(table, "strava", d7, today)
-                ex = health_tdee.exercise_energy(strava, weight_lbs * health_tdee.LB_TO_KG)
+                # #3931: the Hevy set log is the worked-set input — the lifting term no
+                # longer charges rest between sets at the cardio duration proxy.
+                hevy = _query_source(table, "hevy", d7, today)
+                ex = health_tdee.exercise_energy(strava, weight_lbs * health_tdee.LB_TO_KG, hevy)
                 budget = health_tdee.energy_budget(
                     weight_lbs=weight_lbs,
                     height_inches=height_in,
@@ -124,6 +127,7 @@ def _nutrition_pack(table, today: str) -> list:
                     exercise_kcal=ex["kcal"],
                     exercise_energy_days=ex["days"],
                     exercise_energy_basis=ex["basis"],
+                    lifting=ex.get("lifting"),
                 )
             if budget:
                 tdee, source = budget["tdee"], "estimate_mifflin"
@@ -131,15 +135,18 @@ def _nutrition_pack(table, today: str) -> list:
             logger.warning("[domain_facts] energy budget fallback failed: %s", e)
 
     if tdee:
-        from health.tdee import DEFAULT_DEFICIT_KCAL
+        from health.tdee import DEFAULT_DEFICIT_KCAL, METHOD as TDEE_METHOD
 
         target = round(tdee - DEFAULT_DEFICIT_KCAL)
         label = (
             "MacroFactor adaptive expenditure (measured)"
             if source == "macrofactor_adaptive"
-            else "Mifflin-St Jeor + measured 7d exercise energy (estimate)"
+            else "Mifflin-St Jeor + WORKED-SET 7d exercise energy (estimate, #3931 — rest between sets is not charged)"
         )
-        lines.append(f"TDEE (maintenance): {round(tdee)} kcal — source: {label}.")
+        # #3931 box 4: the method name rides with the number, DERIVED from health.tdee so
+        # a rename can never leave this surface publishing the old figure's old label.
+        method_name = "macrofactor_adaptive_expenditure" if source == "macrofactor_adaptive" else TDEE_METHOD
+        lines.append(f"TDEE (maintenance): {round(tdee)} kcal — source: {label}; method: {method_name}.")
         lines.append(
             f"ADR-152 calorie target: {target} kcal (TDEE minus the {DEFAULT_DEFICIT_KCAL} kcal deficit — the deficit lives in the target, never in TDEE)."
         )

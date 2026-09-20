@@ -941,7 +941,9 @@ def test_macros_publishes_the_method_and_the_inputs_behind_its_calorie_target(mo
     install(monkeypatch, MACRO_ROWS + [withings("2026-05-02", weight_lbs=220.0)], profile=PROFILE_WITH_HEIGHT)
     t = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})["targets"]
     detail = t["calorie_target_detail"]
-    assert detail["method"] == "mifflin_bmr_plus_measured_7d_exercise"
+    # #3931: the label changed WITH the number it names — the old string named a TDEE
+    # that charged rest between sets at the cardio duration proxy.
+    assert detail["method"] == "mifflin_bmr_plus_worked_set_exercise"
     assert (detail["tdee"], detail["deficit"], detail["target"]) == (1971, 500, 1471)
     assert detail["target"] == t["calories_kcal"]  # the published target IS the payload's
     assert detail["inputs"]["bmr_kcal"] == 1971 and detail["inputs"]["weight_lbs"] == 220.0
@@ -949,7 +951,12 @@ def test_macros_publishes_the_method_and_the_inputs_behind_its_calorie_target(mo
     # honest absence, never a fabricated multiplier: no strava in the window
     assert detail["inputs"]["exercise_energy_days"] == 0
     assert detail["inputs"]["exercise_kcal_7d"] == 0
-    assert t["calorie_target_basis"] == "mifflin_bmr_plus_measured_7d_exercise_minus_deficit"
+    assert t["calorie_target_method"] == "mifflin_bmr_plus_worked_set_exercise"
+    # No MacroFactor intake average is measurable here beyond the two fixture days and no
+    # second weigh-in exists, so the impossibility check has no trend to judge and says so
+    # rather than reading "no data" as agreement (#3931 box 2).
+    assert t["calorie_target_basis"] == "published_unverified_no_measured_weight_trend"
+    assert t["calorie_target_check"]["method"] == "implied_deficit_vs_measured_weight_trend"
 
 
 def test_macros_grades_adherence_against_the_target_not_against_maintenance(monkeypatch):
@@ -1016,6 +1023,34 @@ def test_macros_excludes_a_day_with_no_calorie_rollup_from_the_hit_rate(monkeypa
     assert day2["calories_kcal"] is None and day2["calories_pct"] is None and day2["hit_calorie_target"] is None
 
 
+def test_macros_refuses_the_calorie_target_when_the_weight_trend_contradicts_it(monkeypatch):
+    """#3931 box 2/4: a 3,500-kcal-per-lb impossibility is never published as a target.
+
+    220 lb / 72 in -> BMR 1,971, no exercise rows -> TDEE 1,971. Intake averages 400
+    kcal/day across the window, so the model implies a 1,571 kcal/day deficit — 79.7% of
+    TDEE, past the stated 50% ceiling. The surface says REFUSED and grades no calorie
+    adherence; the protein floor is untouched and still grades.
+    """
+    rows = [
+        mf("2026-05-01", total_calories_kcal=400, total_protein_g=190),
+        mf("2026-05-02", total_calories_kcal=400, total_protein_g=190),
+        withings("2026-05-01", weight_lbs=225.0),
+        withings("2026-05-02", weight_lbs=220.0),
+    ]
+    install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
+    t = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
+    assert t["targets"]["calories_kcal"] is None
+    assert t["targets"]["calorie_target_basis"].startswith("refused: ")
+    assert t["targets"]["calorie_target_method"] == "mifflin_bmr_plus_worked_set_exercise"
+    assert t["targets"]["calorie_target_check"]["implied_deficit_kcal_per_day"] == 1571
+    assert t["targets"]["note"].startswith("REFUSED:")
+    # ...and it does NOT quietly fall back to the 2400 flat default under another label
+    assert t["daily_breakdown"][0]["calories_pct"] is None
+    assert t["adherence"]["calorie_target_hit_pct"] is None
+    # the 180 g protein floor is unaffected and stays the primary nutrition gate (#3931)
+    assert t["adherence"]["protein_target_hit_pct"] == 100.0
+
+
 def test_the_macro_target_and_the_energy_view_agree_on_todays_calorie_target(monkeypatch):
     """ADR-152 / #2310 — the marker this replaces was accurate: both tools answered "what
     should I eat?" from the SAME weight, both called it Mifflin-St Jeor, and they disagreed
@@ -1039,8 +1074,16 @@ def test_the_macro_target_and_the_energy_view_agree_on_todays_calorie_target(mon
     macros = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": PT_TODAY})
     energy = th.tool_get_daily_metrics({"view": "energy"})
     assert macros["targets"]["calories_kcal"] == energy["calorie_target_based_on_7d"] == 1557
-    # ...and not merely equal by luck: the same TDEE, deficit and method underneath.
-    assert macros["targets"]["calorie_target_detail"] == energy["calorie_target"]
+    # ...and not merely equal by luck: the same TDEE, deficit, method and inputs
+    # underneath. #3931 added a per-surface `trend_check`/`target_basis` pair, and the two
+    # surfaces measure intake over DIFFERENT windows by construction (macros over the
+    # caller's range, energy over a fixed trailing 7 days), so those two keys are compared
+    # separately below rather than folded into an equality that would pin an accident.
+    _shared = ("tdee", "deficit", "target", "method", "inputs", "target_published")
+    assert {k: macros["targets"]["calorie_target_detail"][k] for k in _shared} == {k: energy["calorie_target"][k] for k in _shared}
+    # both publish — neither surface is refusing here — and both name the same method.
+    assert macros["targets"]["calorie_target_detail"]["target_published"] is True
+    assert energy["calorie_target_method"] == macros["targets"]["calorie_target_method"]
     assert energy["calorie_target"]["tdee"] == energy["tdee_7d_avg"] == 2057
     assert energy["calorie_target"]["inputs"]["exercise_energy_days"] == 1
 
@@ -1097,6 +1140,13 @@ def test_deficit_detects_the_deficit_and_labels_its_aggressiveness(monkeypatch):
         "in_deficit": True,
         "avg_intake_kcal": 1800,
         "estimated_tdee": 2500,
+        # #3931 box 4: the method behind `estimated_tdee` and the impossibility verdict
+        # ride with the number. The profile's own `tdee_estimate` short-circuits the
+        # model, so there is nothing for the weight-trend check to judge here.
+        "tdee_method": "macrofactor_profile_tdee_estimate",
+        "basis": "macrofactor_profile_tdee_estimate",
+        "deficit_published": True,
+        "trend_check": None,
         "deficit_kcal": 700,
         "deficit_pct": 28.0,
         "deficit_label": "aggressive",
