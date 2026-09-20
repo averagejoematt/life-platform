@@ -816,7 +816,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # `git archive origin/main` export at d7bbecdd5 -> 666 {116, 540, 6, 4}. Exactly
         # {structural::test_program_structure_3755.py} enters, {} leaves — so unproven does NOT move
         # and BASELINE_UNPROVEN_GATES is untouched.
-        <= 117
+        # Upper bound raised 117 -> 118 (2026-09-20, #3621 box 4): the 118th proof is
+        # `guard::scripts/verify_citations.py` — the citation NETWORK re-resolution arm's own
+        # script, mutation-backed by monkeypatching its one transport seam (`_fetch_json`) to
+        # each of the three eutils/Crossref failure shapes it exists to catch (404, retraction,
+        # title mismatch), each with a matching-title PASS control on the same code path
+        # (tests/test_verify_citations_3621.py, 21 cases, ARMED). The scheduled CI wiring this
+        # script gained (`ci::citation-network-check.yml::verify::1`) arrives `attempted-unproven`
+        # instead — the failing arm needs a genuine live retraction/reassignment on NCBI/Crossref,
+        # which is a third-party public record this lane cannot mutate.
+        <= 118
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
