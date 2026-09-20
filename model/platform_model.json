@@ -5335,6 +5335,13 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
+      "module": "mcp/nutrition_micronutrients.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_benchmark.py",
       "partition": "strava",
       "via": "seam"
@@ -7203,7 +7210,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 694,
+      "edges": 695,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
