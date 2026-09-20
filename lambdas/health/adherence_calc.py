@@ -37,6 +37,19 @@ whole story, and `sets_adherence.pct` is its named twin.
 
 Movement matching: by Hevy exercise_template_id when present; falls back to
 title prefix on the catalog title.
+
+TEMPLATE-ID ALIASES (#3929). Hevy's own catalog carries the same movement under more
+than one exercise_template_id (specimen: `21310F5F` "Triceps Extension (Cable)" vs
+`B5EFBF9C` "Overhead Triceps Extension (Cable)" — one movement, two ids). Matched by
+raw template_id alone, a performed set logged under the alias id scored as BOTH one
+missing (the prescribed id never seen performed) and one extra (the alias id never
+seen prescribed) — a single real movement double-penalized. `config/hevy_template_aliases.json`
+(`aliases`: alias `template_id` -> canonical `movement_key`, read by `_load_template_aliases`)
+is resolved to a canonical template_id via the SAME `_ir_movement_to_template` path
+programmed exercises already use, and applied to the performed side BEFORE missing/extra
+are computed. The registry is shrink-only-honest: it is the ONLY source of resolution —
+nothing here infers or auto-merges a pairing at runtime. `find_alias_candidates()` is the
+reporting tool for an unconfirmed pairing; it never feeds back into scoring.
 """
 
 from __future__ import annotations
@@ -44,6 +57,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -98,6 +112,27 @@ def _load_template_cache() -> dict[str, Any]:
         return {}
 
 
+def _load_template_aliases() -> dict[str, Any]:
+    """The confirmed template-ID alias registry (`config/hevy_template_aliases.json`,
+    #3929) — alias `exercise_template_id` -> canonical `movement_key`. Absent registry
+    is non-fatal: no aliasing applied, matching pre-#3929 behavior exactly."""
+    local = os.path.join(CONFIG_DIR, "hevy_template_aliases.json")
+    if os.path.exists(local):
+        with open(local, encoding="utf-8") as f:
+            return json.load(f)
+    global _s3_loader_client
+    if _s3_loader_client is None:
+        import boto3
+
+        _s3_loader_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+    try:
+        obj = _s3_loader_client.get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}hevy_template_aliases.json")
+        return json.loads(obj["Body"].read())
+    except Exception as e:  # noqa: BLE001 — resolution is best-effort; absence must not break scoring
+        logger.warning("template alias registry load failed (non-fatal, no aliasing applied): %s", e)
+        return {}
+
+
 def _ir_movement_to_template(catalog: dict[str, Any], movement_key: str, cache: dict[str, Any] | None = None) -> str | None:
     """Resolve a programmed movement_key to the Hevy template id it was pushed as.
     Three tiers: (1) ADR-069 template-index keys of the form "tmpl:<id>" already carry
@@ -111,6 +146,76 @@ def _ir_movement_to_template(catalog: dict[str, Any], movement_key: str, cache: 
     if hint:
         return hint
     return ((cache or {}).get("movements", {}).get(movement_key) or {}).get("hevy_template_id")
+
+
+def _resolve_alias_canonical_tids(catalog: dict[str, Any], cache: dict[str, Any], aliases: dict[str, str]) -> dict[str, str]:
+    """Resolve the alias registry's `template_id -> movement_key` entries down to
+    `template_id -> canonical template_id`, through the SAME movement_key namespace
+    `_ir_movement_to_template` already reads (catalog hint / cache / the ADR-069
+    `tmpl:<id>` escape hatch). An entry whose movement_key does not resolve to a
+    template id is skipped (logged, non-fatal) rather than applied half-resolved —
+    an unresolvable alias must fail open to pre-#3929 behavior, never raise."""
+    resolved: dict[str, str] = {}
+    for alias_tid, movement_key in (aliases or {}).items():
+        canonical_tid = _ir_movement_to_template(catalog, movement_key, cache)
+        if canonical_tid:
+            resolved[alias_tid] = canonical_tid
+        else:
+            logger.warning(
+                "template alias %s -> %s: movement_key did not resolve to a template id; alias skipped",
+                alias_tid,
+                movement_key,
+            )
+    return resolved
+
+
+# Conservative on purpose (#3929): only orientation/variant words known to describe the
+# SAME movement pattern under a different Hevy catalog entry. Deliberately excludes
+# words like "incline"/"decline" that name a genuinely different movement (see
+# `incline_db_press` vs `db_bench_press_flat` in config/movement_catalog.json) — a wider
+# list would surface false candidates faster than a human could review them.
+_ALIAS_TITLE_MODIFIER_WORDS = {"overhead"}
+
+
+def _normalize_alias_title(title: str) -> str:
+    """The grouping key `find_alias_candidates` groups titles by: lowercase, collapse
+    whitespace, drop `_ALIAS_TITLE_MODIFIER_WORDS` tokens. NOT used for scoring —
+    candidate generation only."""
+    t = re.sub(r"\s+", " ", (title or "").strip().lower())
+    words = [w for w in t.split(" ") if w and w not in _ALIAS_TITLE_MODIFIER_WORDS]
+    return " ".join(words)
+
+
+def find_alias_candidates(titles: dict[str, str], known_aliases: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    """Report UNCONFIRMED alias candidates — never applied to scoring (shrink-only-honest,
+    #3929's acceptance: "an unrecognized template pairing is reported as a candidate,
+    never silently merged"). `titles` is `{exercise_template_id: title}` (e.g. from
+    `config/hevy_template_aliases.json`'s own `titles` map, or a Hevy template-index
+    walk); `known_aliases` is the registry's confirmed `aliases` map, used only to
+    exclude ids the registry already accounts for so the output is the unconfirmed
+    residue a human still needs to review.
+
+    A group of >=2 template ids that normalize (see `_normalize_alias_title`) to the
+    same core title is a candidate. This function performs NO resolution — it is a
+    reporting tool, called by a human/script curating the registry, never by
+    `calculate_adherence`."""
+    known_aliases = known_aliases or {}
+    groups: dict[str, list[str]] = {}
+    for tid, title in (titles or {}).items():
+        key = _normalize_alias_title(title)
+        if not key:
+            continue
+        groups.setdefault(key, []).append(tid)
+
+    candidates: list[dict[str, Any]] = []
+    for key, ids in groups.items():
+        if len(ids) < 2:
+            continue
+        unconfirmed = sorted(tid for tid in ids if tid not in known_aliases)
+        if len(unconfirmed) < 2:
+            continue  # the registry already accounts for every id but one in this group
+        candidates.append({"normalized_title": key, "template_ids": unconfirmed})
+    return sorted(candidates, key=lambda c: c["normalized_title"])
 
 
 def _intensity_rollup(movements: list[dict[str, Any]]) -> dict[str, Any]:
@@ -189,6 +294,7 @@ def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[d
 def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str, Any]:
     catalog = _load_catalog()
     cache = _load_template_cache()
+    alias_to_canonical_tid = _resolve_alias_canonical_tids(catalog, cache, _load_template_aliases().get("aliases", {}))
     routine_notes = getattr(ir, "notes", "") or ""
     recovery_branches = ((getattr(ir, "inputs_snapshot", None) or {}) or {}).get("recovery_branches")
     programmed: list[dict[str, Any]] = []
@@ -207,6 +313,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
         tid = ex.get("exercise_template_id")
         if not tid:
             continue
+        tid = alias_to_canonical_tid.get(tid, tid)  # #3929 — resolved BEFORE missing/extra
         ex_sets = ex.get("sets", []) or []
         performed_by_tid[tid] = performed_by_tid.get(tid, 0) + len(ex_sets)
         performed_sets_by_tid.setdefault(tid, []).extend(ex_sets)
@@ -272,7 +379,12 @@ def _best_by_overlap(candidates: list[RoutineSpec], performed: dict[str, Any]) -
     guess between equally-plausible plans (ADR-104)."""
     catalog = _load_catalog()
     cache = _load_template_cache()
-    performed_tids = {ex.get("exercise_template_id") for ex in performed.get("exercises", []) if ex.get("exercise_template_id")}
+    alias_to_canonical_tid = _resolve_alias_canonical_tids(catalog, cache, _load_template_aliases().get("aliases", {}))
+    performed_tids = {
+        alias_to_canonical_tid.get(t, t)  # #3929 — same alias resolution as calculate_adherence
+        for t in (ex.get("exercise_template_id") for ex in performed.get("exercises", []))
+        if t
+    }
     scored: list[tuple[int, RoutineSpec]] = []
     for c in candidates:
         prog_tids = {t for t in (_ir_movement_to_template(catalog, ex.movement_key, cache) for ex in c.exercises) if t}
