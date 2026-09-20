@@ -655,6 +655,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
 # the detector returns to be in EITHER this dict or _PREMERGE_EXTRA_FILES above —
 # so a new exclusion still has to be a deliberate, reasoned decision, not silence.
 _PREMERGE_TREE_SWEEP_EXCLUDED = {
+    # #3625: walks ONLY the synthetic tree it builds under tmp_path (os.walk over a 4-file
+    # fixture) to prove the bundle zip is byte-reproducible — it never touches the repo,
+    # so its covered population cannot change when the repo does. Not a repo-shape ratchet.
+    "test_bundle_zip_reproducible_3625.py": "walks its own tmp_path fixture tree, never the repo — the bundle-reproducibility proof (#3625)",
     "test_diary_publish_1845.py": (
         "behaviour suite over diary-publishing semantics (63 tests), not a repo-shape " "ratchet — #2345's own call, made explicit here"
     ),
