@@ -72,7 +72,7 @@ No lease waiting at wrap.
 - **`recap-card-generator` dry run** left no S3 object and no row (the #3942 proof) — the row read needed
   `--expression-attribute-names` because `storage`/`dry_run` are DynamoDB reserved words.
 
-## Open at wrap, and why (every line cites)
+## Residual / next picks (every line cites)
 
 - **Armed PRs:** #3981 (fix-forward; main is red until it lands) · #3977 (#3609; census 665→666 resolved) · #3974 (#3915)
   · #3965 (#3772). Each was rebased onto main by hand (`--theirs` on the regenerables + sync + plain commit).
@@ -90,7 +90,7 @@ No lease waiting at wrap.
 **Build beat:** the debrief red team — merged + deployed 09-19 (`docs/content/BUILD_DISPATCH_CHECKLIST.md` shape); nothing tonight was bigger than it, because tonight was a drain, and a drain is not a beat.
 **Docs:** ADR-077 amended (#3954, the 30-day minimum on the measured number); `docs/CONVENTIONS.md` §1 carries the zip-reproducibility invariant (#3963); the CLAUDE.md status block replaced in this wrap.
 **Decisions:** ADR-077 amendment (#3954) — the reset's 30-day minimum, recorded on 12 resets / 55 days, median 5; no other ADR.
-**Main:** red — `test / Unit Tests` on the #3609 ISO-parse registry gate since `7667991df` (#3975's hand-rolled fromisoformat); fix-forward #3981 armed on the required checks. Earlier tonight: red on `test_config_ownership_3785` from `f2540c84f` to `064ca8f3a`, cured by #3969.
+**Main:** red — three causes in sequence tonight, each fixed forward: `test_config_ownership_3785` from `f2540c84f` to `064ca8f3a` (cured by #3969); the #3609 ISO-parse registry gate from `7667991df` (#3975's hand-rolled fromisoformat, cured by #3981 at `7d0eefa49`); then `test_residual_queue_gate_1340` on this handover's own section name from `5650ac83f` (the open-work section was not titled `Residual / next picks` — renamed in this commit).
 **Incidents:** none filed — the config-ownership red and the #3609 red were both fix-forwarded inside the session; neither reached a reader surface.
 **Stash/hooks:** clean
 **Closures:** 40 closed (15 on live proof, 25 folded) · DoD: scanned=43 window=closed>=2026-09-20 hits=4 findings=4 → all 4 dispositioned at wrap (3 residual lines re-homed as `not-work`, #3927 given its Outcome verdict)
