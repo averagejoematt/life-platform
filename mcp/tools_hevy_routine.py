@@ -1045,27 +1045,9 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _action_list(args: dict[str, Any]) -> dict[str, Any]:
-    from training.routine_repo import list_by_date_range
+    from training.routine_repo import list_for_tool  # #3772: the payload is built beside the listing it filters
 
-    start = args.get("start_date") or args.get("date") or "2026-05-31"
-    end = args.get("end_date") or args.get("date") or start
-    items = list_by_date_range(start, end, limit=int(args.get("limit") or 50))
-    return {
-        "status": "ok",
-        "count": len(items),
-        "routines": [
-            {
-                "routine_id": ir.routine_id,
-                "target_date": ir.target_date,
-                "archetype": ir.archetype,
-                "variant": ir.variant,
-                "status": ir.status,
-                "hevy_routine_id": ir.hevy_routine_id,
-                "version": ir.version,
-            }
-            for ir in items
-        ],
-    }
+    return list_for_tool(args)
 
 
 def _action_get(args: dict[str, Any]) -> dict[str, Any]:
