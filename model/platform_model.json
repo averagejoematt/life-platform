@@ -3677,6 +3677,13 @@
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/training/exercise_history.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/exercise_history.py",
       "partition": "withings",
       "via": "pk"
     },
@@ -7133,7 +7140,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 684,
+      "edges": 685,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7148,8 +7155,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 337,
-        "sites_resolved": 847,
-        "sites_total": 1184
+        "sites_resolved": 848,
+        "sites_total": 1185
       },
       "schedule_resolution": {
         "dynamic": 0,
