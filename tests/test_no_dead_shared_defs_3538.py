@@ -1,14 +1,28 @@
 """tests/test_no_dead_shared_defs_3538.py — #3538: nothing dead rides in every bundle.
 
-THE COST. ``lambdas/common`` and ``lambdas/ai`` are not ordinary packages: under the
-one-bundle rule (#781, CONVENTIONS §1) their entire source tree is staged into EVERY
-Lambda zip — ~104 of them. A public function nothing calls is not merely clutter, it is
-carried ~104 times, appears in every reader's grep, and reads as API. #1239 established
-the discipline and deleted eight such functions, but scoped its guard to the word
-"intelligence": the two packages that ship the most widely had no guard at all.
+THE COST. Under the one-bundle rule (#781, CONVENTIONS §1) ``deploy/build_bundle.py``'s
+``stage_tree()`` copies the ENTIRE ``lambdas/`` tree into EVERY Lambda zip — ~104 of them
+(ADR-146, #1653: "the bundle stages the tree at the zip root"). A public function nothing
+calls is not merely clutter, it is carried ~104 times, appears in every reader's grep, and
+reads as API — for ANY package under ``lambdas/``, not just ``common/`` and ``ai/``.
+#1239 established the discipline and deleted eight such functions, but scoped its guard to
+the word "intelligence" (a fixed list of 8 named symbols, not a general scan); #3538 added
+a general AST scan but still hard-typed its package list to ``("lambdas/common",
+"lambdas/ai")`` — 2 of the ~15 packages actually staged. #3609 box 2 (the forensic RCA's
+principal ROW4, docs/reviews/FORENSIC_RCA_2026-09-05.md) closes that gap: the package list
+below is DERIVED from ``build_bundle.stage_tree()``'s own output rather than hand-typed, so
+a new package under ``lambdas/`` is covered the day it is created, with zero code change
+here. Widening the scan from 2 packages to ~15 surfaced 101 previously-invisible
+unreferenced defs (recorded below, dated 2026-09-19) — each is either a genuinely orphaned
+function (0 references anywhere, not even a test) or a test-only helper with no production
+caller yet. None are deleted in this PR: this is a STRUCTURAL fix (the scan's own reach),
+and a bulk deletion campaign across a dozen packages — several owned by other concurrent
+lanes the night this landed — is its own scoped follow-up, not a side effect of fixing the
+package list. The registry entries below say so explicitly and name the evidence.
 
-WHAT IS FLAGGED. A top-level, non-underscore ``def``/``async def`` in ``lambdas/common``
-or ``lambdas/ai`` with ZERO references across the live surface:
+WHAT IS FLAGGED. A top-level, non-underscore ``def``/``async def`` in any package
+``build_bundle.stage_tree()`` stages (i.e. any top-level ``lambdas/<pkg>``) with ZERO
+references across the live surface:
 
     lambdas/  mcp/  deploy/  scripts/  cdk/  and the harnesses in tests/ that are
     not themselves tests (tests/visual_qa.py, tests/visual_ai_qa.py, …)
@@ -29,17 +43,40 @@ HOW A REFERENCE IS COUNTED — both ways, because either alone is wrong:
     the exact "string/getattr dispatch is invisible to the scan" caveat #3538 carries.
 
 THE ALLOWLIST IS SHRINK-ONLY. An entry for a def the scan no longer flags fails, so it
-can only get smaller. Prefer deletion; an entry has to say what would call the function.
+can only get smaller. Prefer deletion; an entry has to say what would call the function
+— or, for the #3609 widen's batch, honestly say that NOTHING does (see above).
 """
 
 import ast
 import os
 import pathlib
+import sys
+import tempfile
 
 _TESTS = pathlib.Path(__file__).resolve().parent
 _REPO = _TESTS.parent
 
-SCAN_PACKAGES = ("lambdas/common", "lambdas/ai")
+_DEPLOY_DIR = str(_REPO / "deploy")
+if _DEPLOY_DIR not in sys.path:
+    sys.path.insert(0, _DEPLOY_DIR)
+import build_bundle  # noqa: E402
+
+
+def _staged_package_names() -> tuple[str, ...]:
+    """The scan's package list, read from ``build_bundle.stage_tree()``'s OWN output —
+    not a hand-typed tuple (#3609 box 2). Actually invoking ``stage_tree()`` (into a
+    scratch dir, same pattern as tests/test_deploy_bundle_paths.py) means a change to
+    what the bundle excludes (``build_bundle.EXCLUDE_DIRS``) or a brand-new package
+    dropped under ``lambdas/`` changes this list automatically, with no edit here.
+    Non-Python staged directories (``config/``, ``fonts/``) fall out on their own: they
+    carry no top-level ``def`` for ``_public_top_level_defs()`` to find."""
+    with tempfile.TemporaryDirectory() as td:
+        out = build_bundle.stage_tree(os.path.join(td, "stage"))
+        names = sorted(p.name for p in pathlib.Path(out).iterdir() if p.is_dir())
+    return tuple(f"lambdas/{name}" for name in names)
+
+
+SCAN_PACKAGES = _staged_package_names()
 LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 
 # "package/module.py:name" -> what actually calls it. Deletion is the default; an entry
@@ -62,6 +99,11 @@ _BATCH_REASON = (
 )
 
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    # #3915 box 4: the inverse-census prose for qa_smoke's cross-phase coverage leg. PR #3974 landed the
+    # formatter but left its caller (qa_smoke_lambda.py) out because #3965 owned that file at the time;
+    # the wire-up is owed on #3915 and this entry leaves with it. Seen first by this lane's widened guard
+    # (#3609 box 2 derives the package list from stage_tree, which the literal list never covered).
+    "lambdas/experiment/pk_census.py:format_inverse_census": "#3915 box 4 wire-up pending — caller is qa_smoke's inverse-census leg",
     "lambdas/ai/bedrock_batch.py:build_jsonl_record": _BATCH_REASON,
     "lambdas/ai/bedrock_batch.py:submit_batch": _BATCH_REASON,
     "lambdas/ai/bedrock_batch.py:wait_for_batch": _BATCH_REASON,
@@ -149,6 +191,336 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "drive directly. Its production callers are the ones #2888/#3085 are still "
         "converting; the record of which callers have and have not engaged caching lives "
         "in CACHING_DECISIONS in this same module."
+    ),
+    # ── #3609 box 2: the widened-scan batch (101 entries, dated 2026-09-19). ────────
+    #
+    # SCAN_PACKAGES went from 2 hand-typed packages (common, ai) to ~15 derived from
+    # build_bundle.stage_tree()'s own output (ADR-146: the bundle stages the WHOLE
+    # lambdas/ tree, so every package ships in every one of the ~104 zips, not just
+    # its own handler's). Every entry below was found by that widen and is registered
+    # (not deleted) in this structural PR — each states the actual evidence a repo-wide
+    # grep found (a specific test, a comment-only mention, or nothing at all). The
+    # ~19 entries reading "zero references ANYWHERE" are the strongest deletion
+    # candidates; deleting them is a separate, scoped follow-up (named in the #3609 PR
+    # body) rather than bundled into the guard-mechanism fix itself.
+    "lambdas/coach/board_loader.py:build_panel_prompt": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/coach/board_loader.py:get_matthew_context": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/coach/board_loader.py:get_member_color": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/coach/coach_checkin.py:recent_checkins_block": (
+        "#3609 box 2 widen: exercised by tests/test_coach_checkin_tools.py; named only in a COMMENT in lambdas/ai/platform_memory.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/coach/coach_corrections.py:get_correction": (
+        "#3609 box 2 widen: exercised only by tests/test_coach_corrections.py (also named in docs/SCHEMA.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/coach_corrections.py:stale_cycle_corrections": (
+        "#3609 box 2 widen: exercised only by tests/test_coach_corrections.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/coach_register.py:compose_coach_prompt": (
+        "#3609 box 2 widen: exercised by tests/test_coach_register_1390.py; named only in a COMMENT in scripts/v4_build_tone.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/coach/coach_register.py:extract_deterministic_slice": (
+        "#3609 box 2 widen: exercised only by tests/test_coach_register_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/coach_register.py:is_register": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/coach/coach_sim_scoreboard.py:read_limitations": (
+        "#3609 box 2 widen: exercised only by tests/test_coach_sim_scoreboard_2539.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/critics.py:with_notes_block": (
+        "#3609 box 2 widen: exercised only by tests/test_plan_critics_3752.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/persona_registry.py:board_personas": (
+        "#3609 box 2 widen: exercised only by tests/test_persona_registry.py (also named in docs/ADD_A_COACH.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/persona_registry.py:by_coach_config_key": (
+        "#3609 box 2 widen: exercised only by tests/test_persona_registry.py (also named in docs/ADD_A_COACH.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/persona_registry.py:by_short_id": (
+        "#3609 box 2 widen: exercised only by tests/test_persona_registry.py (also named in docs/ADD_A_COACH.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/coach/spiral_breaker.py:is_suppressed": (
+        "#3609 box 2 widen: exercised only by tests/test_spiral_breaker.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/compute/adaptive_mode_lambda.py:fetch_recent_dates": (
+        "#3609 box 2 widen: exercised only by tests/test_adaptive_mode_behavior.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/content/journal_quotes.py:is_markable": (
+        "#3609 box 2 widen: exercised only by tests/test_journal_quotes_1568.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/content/recap_deliver.py:caption_for": (
+        "#3609 box 2 widen: exercised only by tests/test_recap_deliver_3747.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/emails/panelcast_ident.py:render_ident": (
+        "#3609 box 2 widen: exercised only by tests/test_panelcast_ident.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/emails/panelcast_ident.py:render_outro": (
+        "#3609 box 2 widen: exercised only by tests/test_panelcast_ident.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/emails/partner_email_lambda.py:weight_sentence": (
+        "#3609 box 2 widen: exercised only by tests/test_partner_email_lambda.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/calibration_core.py:classify_calibration_rows": (
+        "#3609 box 2 widen: exercised only by tests/test_calibration_core_parity.py (also named in oss/calibration-core/src/calibration_core.py); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/canonical_facts.py:numeric_facts": (
+        "#3609 box 2 widen: exercised only by tests/test_canonical_facts.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/config_anchor_registry.py:anchors_for_treatment": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:build_estimate_item": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:build_grade_item": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:estimate_from_photo": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:estimated_monthly_cost": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:grade_against_truth": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:list_estimates": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:write_estimate": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/eyeball_calibration.py:write_grade": (
+        "#3609 box 2 widen: exercised only by tests/test_eyeball_isolation_1390.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/methods_registry.py:get_registry": (
+        "#3609 box 2 widen: exercised only by tests/test_methods_registry.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/methods_registry.py:get_stat": (
+        "#3609 box 2 widen: exercised only by tests/test_conversation_enrichment_1577.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/methods_registry.py:verify_fingerprints": (
+        "#3609 box 2 widen: exercised only by tests/test_methods_registry.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/experiment/phase_taxonomy.py:is_wipeable": (
+        "#3609 box 2 widen: exercised by tests/test_phase_taxonomy.py; named only in a COMMENT in deploy/reconcile_provenance_2026_09.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/experiment/phase_taxonomy.py:never_touch": (
+        "#3609 box 2 widen: exercised only by tests/test_mcp_tools_labs_behavior.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/health/adherence_calc.py:find_alias_candidates": (
+        "#3609 box 2 widen: exercised by tests/test_adherence_calc.py; named only in a COMMENT in deploy/config_ownership_audit.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/health/sick_day_checker.py:delete_sick_day": (
+        "#3609 box 2 widen: exercised only by tests/test_shared_modules.py (also named in docs/archive/CHANGELOG_v341.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/health/sick_day_checker.py:write_sick_day": (
+        "#3609 box 2 widen: exercised by tests/test_shared_modules.py; named only in a COMMENT in mcp/layer_status.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/health/vocal_metrics.py:vocal_metrics_state": (
+        "#3609 box 2 widen: exercised only by tests/test_vocal_metrics.py (also named in docs/SCHEMA.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/ingestion_validator.py:list_supported_sources": (
+        "#3609 box 2 widen: exercised only by tests/test_shared_modules.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/ingestion_validator.py:validate_and_write": (
+        "#3609 box 2 widen: exercised by tests/test_ddb_patterns.py; named only in a COMMENT in lambdas/compute/daily_metrics_compute_lambda.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/ingestion/source_registry.py:day_key_frame_consequence_for": (
+        "#3609 box 2 widen: exercised only by tests/test_ingestion_day_key_derivation_3666.py (also named in docs/audits/TD-19_DATE_PARTITION_AUDIT.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/source_registry.py:manual_hae_datatype_keys": (
+        "#3609 box 2 widen: exercised only by tests/test_manual_source_reliability_746.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/source_registry.py:manual_method_source_ids": (
+        "#3609 box 2 widen: exercised by tests/test_source_registry_coverage_3669.py; named only in a COMMENT in lambdas/ingestion/source_registry_closed_social.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/ingestion/source_registry.py:oauth_digest_only_source_ids": (
+        "#3609 box 2 widen: exercised by tests/test_oauth_alarm_coverage.py; named only in a COMMENT in cdk/stacks/monitoring_stack.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/ingestion/source_registry.py:provider_reconcile_source_ids": (
+        "#3609 box 2 widen: named in docs/DECISIONS.md. No production caller found; registered pending owner triage."
+    ),
+    "lambdas/ingestion/source_registry.py:qa_required_oauth_source_ids": (
+        "#3609 box 2 widen: exercised only by tests/test_oauth_alarm_coverage.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/source_registry.py:raw_date_key_candidates": (
+        "#3609 box 2 widen: exercised only by tests/test_dil028_raw_layout_replay.py (also named in docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/source_registry.py:retired_source_ids": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/ingestion/source_registry.py:unregistered_source_partitions": (
+        "#3609 box 2 widen: exercised only by tests/test_source_registry_coverage_3669.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/ingestion/source_registry.py:utc_day_key_source_ids": (
+        "#3609 box 2 widen: exercised by tests/test_freshness_age_frame_3257.py; named only in a COMMENT in lambdas/ingestion/whoop_lambda.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/ingestion/strava_population.py:is_decided": (
+        "#3609 box 2 widen: exercised only by tests/test_strava_population.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/intelligence/intelligence_common.py:complete_action": (
+        "#3609 box 2 widen: exercised only by tests/test_intelligence_common_behavior.py (also named in docs/MCP_TOOL_AUDIT.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/intelligence/intelligence_common.py:compute_credibility": (
+        "#3609 box 2 widen: exercised by tests/test_coach_intelligence.py; named only in a COMMENT in lambdas/experiment/calibration_core.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/intelligence/intelligence_common.py:get_action_history": (
+        "#3609 box 2 widen: exercised only by tests/test_intelligence_common_behavior.py (also named in docs/archive/intelligence-layer/INTELLIGENCE_LAYER_V2_SPEC.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/intelligence/intelligence_common.py:get_open_actions": (
+        "#3609 box 2 widen: exercised only by tests/test_intelligence_common_behavior.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/intelligence/intelligence_common.py:update_prediction_status": (
+        "#3609 box 2 widen: exercised only by tests/test_intelligence_common_behavior.py (also named in docs/CHANGELOG.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/operational/continuity_watch.py:liveness_role": (
+        "#3609 box 2 widen: exercised only by tests/test_continuity_watch_1400.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/operational/continuity_watch.py:watched_sources": (
+        "#3609 box 2 widen: exercised only by tests/test_continuity_watch_1400.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/operational/reader_truth_qa.py:check_midword_truncation": (
+        "#3609 box 2 widen: exercised only by tests/test_reader_truth_qa.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/operational/reader_truth_qa.py:check_vitals_freshness": (
+        "#3609 box 2 widen: exercised only by tests/test_reader_truth_qa.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/broadcast_sensitivity_gate.py:cleared_filter_expression": (
+        "#3609 box 2 widen: exercised by tests/test_broadcast_sensitivity_gate_1673.py; named only in a COMMENT in lambdas/web/site_api_social.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/privacy/broadcast_sensitivity_gate.py:filter_cleared": (
+        "#3609 box 2 widen: exercised by tests/test_broadcast_sensitivity_gate_1673.py; named only in a COMMENT in lambdas/web/site_api_social.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/privacy/broadcast_sensitivity_gate.py:held_filter_expression": (
+        "#3609 box 2 widen: exercised only by tests/test_broadcast_sensitivity_gate_1673.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/broadcast_sensitivity_gate.py:is_held": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/privacy/broadcast_sensitivity_gate.py:review_record": (
+        "#3609 box 2 widen: exercised only by tests/test_broadcast_sensitivity_gate_1673.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/content_filter_channel.py:last_channel_errors": (
+        "#3609 box 2 widen: exercised only by tests/test_content_filter_channel_errors_2655.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/content_filter_channel.py:reset_cache": (
+        "#3609 box 2 widen: exercised by tests/test_between_chronicle_scrub_2654.py; named only in a COMMENT in lambdas/privacy/privacy_guard.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/privacy/diary_claims.py:is_gradable_record": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/privacy/diary_publish.py:engagement_by_entry": (
+        "#3609 box 2 widen: exercised only by tests/test_diary_publish_1845.py (also named in docs/SCHEMA.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/diary_publish.py:format_publish_log_row": (
+        "#3609 box 2 widen: exercised only by tests/test_diary_publish_1845.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/field_tiers.py:is_publishable": (
+        "#3609 box 2 widen: exercised only by tests/test_privacy_tier_wiring_2803.py (also named in docs/DECISIONS.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/field_tiers.py:source_tier_of": (
+        "#3609 box 2 widen: exercised only by tests/test_privacy_tier_wiring_2803.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/field_tiers.py:tier_of": (
+        "#3609 box 2 widen: exercised only by tests/test_privacy_tier_wiring_2803.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/privacy_guard.py:reset_vocabulary_cache": (
+        "#3609 box 2 widen: exercised only by tests/test_between_chronicle_scrub_2654.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/social_consent.py:is_reactable": (
+        "#3609 box 2 widen: exercised only by tests/test_social_coach_reaction_1675.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/social_provenance.py:filter_human": (
+        "#3609 box 2 widen: exercised only by tests/test_social_provenance_1670.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/privacy/social_provenance.py:human_origin_filter_expression": (
+        "#3609 box 2 widen: exercised by tests/test_social_provenance_1670.py; named only in a COMMENT in lambdas/privacy/broadcast_sensitivity_gate.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/reading/horizons_calibration.py:is_publishable_reaction": (
+        "#3609 box 2 widen: exercised by tests/test_horizons_calibration_1708.py; named only in a COMMENT in lambdas/web/site_api_reading.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/reading/reading_store.py:current_horizon_pick": (
+        "#3609 box 2 widen: exercised only by tests/test_horizons.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/reading/reading_store.py:get_note": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/training/exercise_history.py:load_recent_history": (
+        "a deliberate backward-compat shim, not a leftover — landed WITH the split it "
+        "postdates (#3700, merged into this branch): load_history_indexes() now returns a "
+        "(weighted, cardio) TUPLE so a cardio ride's duration-bearing sets no longer vanish "
+        "from the weighted index's reps>0 filter; load_recent_history()'s own docstring says "
+        "why it still exists — 'kept as the public name every existing caller and test "
+        "already uses, with an unchanged return shape ON PURPOSE... the load-floor machinery "
+        "(routine_generator.band_matched_best) can never start counting zero-weight cycling "
+        "blocks among a movement's sessions.' tests/test_cardio_progression_3700.py's own "
+        "test_load_recent_history_still_returns_the_weighted_index_alone pins the exact "
+        "contract with a mutation control (return the tuple instead -> reds). The one "
+        "PRODUCTION caller migrated to load_history_indexes() directly in the same PR "
+        "(routine_generator.py), which is why the AST+string scan finds it live only in "
+        "tests — deleting it would break the compatibility promise the docstring makes, not "
+        "clean up dead code."
+    ),
+    "lambdas/training/hevy_common.py:fetch_events_since": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/training/hevy_common.py:ingest_workout_by_id": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/training/hevy_common.py:load_cursor": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/training/hevy_common.py:save_cursor": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/training/hevy_write_client.py:get_workout_events": (
+        "#3609 box 2 widen: exercised only by tests/test_hevy_write_client.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/training/routine_repo.py:get_version": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/training/routine_repo.py:lookup_hevy_id": (
+        "#3609 box 2 widen: exercised only by tests/test_routine_repo.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/training/training_notes.py:compute_deviation": (
+        "#3609 box 2 widen: exercised only by tests/test_training_notes.py (also named in docs/BACKLOG.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/web/card_engine.py:draw_uncertainty": (
+        "#3609 box 2 widen: exercised by tests/test_card_engine.py; named only in a COMMENT in scripts/doc_facts_og.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
+    ),
+    "lambdas/web/card_engine.py:registered_types": (
+        "#3609 box 2 widen: exercised only by tests/test_card_engine.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/web/fingerprint.py:fingerprint_svg": (
+        "#3609 box 2 widen: exercised only by tests/test_fingerprint.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/web/recap_canvas.py:render_card": (
+        "#3609 box 2 widen: exercised only by tests/test_recap_render_3744.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/web/recap_charts.py:draw_dots": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/web/recap_charts.py:draw_kv_row": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/web/recap_charts.py:draw_rule": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
+    ),
+    "lambdas/web/recap_templates.py:all_strings": (
+        "#3609 box 2 widen: exercised only by tests/test_recap_templates_3745.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/web/recap_templates.py:copy_for": (
+        "#3609 box 2 widen: exercised only by tests/test_recap_render_3744.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
+    ),
+    "lambdas/web/site_api_common.py:get_request_route": (
+        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
     ),
 }
 

@@ -654,6 +654,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # — a PR that reintroduces the pattern must red BEFORE merge, not after the
         # site auto-deploys on it.
         "test_a11y_ledger_3548.py",
+        # #3609 box 3: an AST sweep of lambdas/ + mcp/ for every literal `IndexName=`
+        # (plus a text sweep of deploy/deploy_reading_gsis.sh's add_gsi calls, the only
+        # mechanism that can add a GSI to the out-of-CDK `life-platform` table). Verdict
+        # is pure repo shape — a new query naming an unsanctioned GSI, or a third
+        # `add_gsi` line, must red BEFORE the merge; the existing live `describe_table`
+        # check in test_integration_aws.py only runs post-deploy, by which point a third
+        # GSI is already an online backfill against production.
+        "test_gsi_set_premerge_3609.py",
     }
 )
 

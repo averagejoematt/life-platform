@@ -196,6 +196,16 @@ _UNTYPED_HANDLERS_PY = '"""probe."""\n\n' + "\n\n".join("def lambda_handler(even
 
 _XFAIL_PY = '"""probe."""\n\n' "import pytest\n\n\n" "@pytest.mark.xfail\n" "def test_probe():\n" "    assert False\n"
 
+# #3609 box 3: a hand-rolled DynamoDB query naming an unsanctioned GSI (ADR-097's set is
+# exactly {GSI1, GSI2}) — the shape the literal-IndexName scan in
+# tests/test_gsi_set_premerge_3609.py exists to catch before it ever reaches AWS.
+_UNSANCTIONED_GSI_QUERY_PY = (
+    '"""probe."""\n\n'
+    "\n"
+    "def probe(table, key_condition):\n"
+    '    return table.query(IndexName="GSI9", KeyConditionExpression=key_condition)\n'
+)
+
 # These carry a secret NAME, never a secret value (Secrets-Manager-only, per CLAUDE.md).
 # The identifiers deliberately say `ID` rather than `SECRET`: ruff's flake8-bandit S105
 # rules on the TARGET NAME, and `_..._SECRET_PY = "<string>"` reads to it as a hardcoded
@@ -414,6 +424,17 @@ _HAND_TYPED_PHASE_DOOR_PY = (
 )
 
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_gsi_set_premerge_3609.py": MutationSpec(
+        gate_id="structural::test_gsi_set_premerge_3609.py",
+        target="tests/test_gsi_set_premerge_3609.py",
+        detects=(
+            "a hand-rolled boto3 query naming a THIRD, unsanctioned GSI (ADR-097's set is exactly "
+            "{GSI1, GSI2}) — the shape a lambdas/ or mcp/ module could introduce without ever touching "
+            "reading_keys.py's constants, which the AST-based GSI*_NAME scan alone would not see"
+        ),
+        plants=(("lambdas/coach/_census_probe_3609.py", _UNSANCTIONED_GSI_QUERY_PY),),
+        track=False,  # the gate walks lambdas/+mcp/ on disk (os.walk), so an untracked module is in scope
+    ),
     "structural::test_grounding_sets_3614.py": MutationSpec(
         gate_id="structural::test_grounding_sets_3614.py",
         target="tests/test_grounding_sets_3614.py",
@@ -749,6 +770,26 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_gsi_set_premerge_3609.py": _proof(
+        "structural::test_gsi_set_premerge_3609.py",
+        "baseline: 7 passed in 4.54s | mutated: 1 failed, 6 passed in 5.24s :: "
+        "test_every_indexname_literal_on_the_live_surface_is_sanctioned | reverted: 7 passed in 5.26s",
+        "lambdas/ + mcp/ on disk (os.walk, .py only) for literal IndexName= references and "
+        "reading_keys.py's GSI*_NAME constants, plus a text sweep of "
+        "deploy/deploy_reading_gsis.sh's add_gsi call list — the only mechanism that can "
+        "actually create a GSI on the out-of-CDK `life-platform` table (its own header says "
+        "why: `dynamodb.Table.from_table_name` in core_stack.py is read-only). An UNTRACKED "
+        "module is in scope (os.walk, not git ls-files). Two of the three legs (the literal "
+        "scan, the deploy-script scan) are separately mutation-proven in-file by "
+        "test_planted_indexname_literal_is_caught / test_planted_add_gsi_call_is_caught, "
+        "run every collection; this harness run proves the THIRD leg end-to-end against the "
+        "real tracked tree — an untracked lambdas/ module naming an unsanctioned GSI in a "
+        "live boto3 call, which the in-file controls (which parse hand-typed source strings, "
+        "not a planted file) do not reach. STILL INVISIBLE, stated rather than papered over: "
+        "an IndexName built from a variable/f-string rather than a literal, and a GSI name "
+        "reused for a table this gate does not know about.",
+        proved_on="2026-09-20",
+    ),
     "structural::test_grounding_sets_3614.py": _proof(
         "structural::test_grounding_sets_3614.py",
         "M1 (harness, ARMED 1/1) baseline: 27 passed in 15.14s | mutated: 3 failed, 24 passed in 16.59s :: test_every_prompt_builder_with_its_own_phase_prose_is_decided; test_the_census_finds_the_modules_it_is_supposed_to_find; test_planting_a_fourth_hand_typed_phase_line_reds_the_census | reverted: 27 passed in 14.43s. Three tests red on one plant is the census working in all three of its directions: the live verdict, the member/decision key-parity check, and the in-file control's own 'the real tree is still clean' tail. M2, the OTHER box, hand-run on the real registry 2026-09-18 and not mechanisable as a file plant because the mutation is a DECLARATION: flipping lambdas/web/site_api_ai_lambda.py::_handle_explain from fail_closed to keep_best in tests/grounding_wiring.py (diff against a pre-mutation copy: one line, FAIL_CLOSED -> KEEP_BEST) gave 2 failed, 25 passed -- test_the_public_keep_best_residual_is_pinned_by_name ('the public keep-best residual moved ... Extra items in the left set: _handle_explain') AND test_every_surface_carries_the_facets_and_the_tree_agrees ('declared keep_best, but _handle_explain BRANCHES on grounding_findings and drops/falls back -- the declaration and the call site disagree'). Reverted byte-for-byte, 27 passed. The same flip runs on every build against a deepcopy of the registry (test_flipping_one_public_surface_to_keep_best_reds_the_facets), plus its inverse, which is the assertion that matters most here: the AST derivation reads acts=False on 4 of the 32 surfaces, so it is not a constant-true detector.",
