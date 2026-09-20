@@ -190,3 +190,32 @@ def test_the_correction_note_quotes_the_registrys_caveat():
     note = gate.source_facet_correction(gate.source_facet_findings(LIVE_GARMIN))
     assert sr.availability_facet("garmin")["caveat"] in note
     assert "Rewrite those sentences" in note
+
+
+# ── 2026-09-19: the gate became replayable by the sealed corpus (#3516 specimens) ──
+
+
+def test_the_denial_of_a_sync_failure_is_not_a_finding_and_the_guard_actually_applied():
+    """The Garmin specimen's positive CONTROL says "that is not a sync problem" — `sync problem`
+    is in the vocabulary, so the guard is what keeps the honest sentence clean. Both sides:
+    the denial passes, and the SAME sentence with the denial removed is still a finding, so a
+    mutation that widens the guard into a bare negation (which would also swallow "isn't
+    syncing yet") or deletes it is red here."""
+    denial = "Garmin is paused (ADR-074) and cannot report steps; that is not a sync problem."
+    assertion = "Garmin is paused (ADR-074) and cannot report steps; that is a sync problem."
+    assert gate.source_facet_findings(denial) == []
+    assert gate.source_facet_findings(assertion), "the un-denied sentence must still be a finding — the guard must be narrow"
+    assert gate.source_facet_findings(LIVE_GARMIN), "the live misattribution must survive the guard"
+
+
+def test_registry_view_freezes_the_caveated_set_instead_of_reading_the_live_registry():
+    """A replayed specimen must reproduce against the registry facts of the day it was caught.
+    With a frozen view naming ONLY macrofactor, the Garmin sentence is not this gate's business
+    (Garmin is not caveated in that view) — and with a view naming garmin as paused it is,
+    whatever the live registry says. A view that names nothing is a gate that watches nothing."""
+    assert gate.source_facet_findings(LIVE_GARMIN, registry_view={"macrofactor": "lagging"}) == []
+    found = gate.source_facet_findings(LIVE_GARMIN, registry_view={"garmin": "paused"})
+    assert found and found[0]["source"] == "garmin" and found[0]["status"] == "paused"
+    assert gate.source_facet_findings(LIVE_GARMIN, registry_view={}) == []
+    # production callers pass nothing and read the live registry — unchanged behaviour
+    assert gate.source_facet_findings(LIVE_GARMIN)[0]["source"] == "garmin"
