@@ -1126,6 +1126,26 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-07",
     },
+    "structural::test_bundle_zip_reproducible_3625.py": {
+        "gate_name": "test_bundle_zip_reproducible_3625.py",
+        "command": "python3 -B -m pytest tests/test_bundle_zip_reproducible_3625.py -q -p no:cacheprovider",
+        "mutation": (
+            "in deploy/build_bundle.zip_dir, the fixed-timestamp ZipInfo/writestr path replaced by the "
+            "pre-fix `zf.write(full, arcname)` (which stamps each entry with the file's mtime) — the "
+            "exact code the fix removed, restored verbatim."
+        ),
+        "observed": (
+            "MUTATED: 2 failed, 1 passed — test_the_same_tree_zips_to_identical_bytes reds (the "
+            "mtime-shifted rebuild hashes differently) and test_entries_are_sorted_dated_1980_and_carry_no_bytecode "
+            "reds on the entry date_time; the one-byte-change positive control still passes. RESTORED: 3 passed; "
+            "deploy/build_bundle.py md5-identical to the pre-mutation copy."
+        ),
+        "scope": (
+            "the reproducibility invariant of the ONE deploy bundle (#781): identical staged tree → identical "
+            "zip bytes, so a post-deploy `cdk diff` on an unchanged tree shows zero Code.S3Key changes."
+        ),
+        "proved_on": "2026-09-20",
+    },
     "structural::test_v4_build_sitemap_3567.py": {
         "gate_name": "test_v4_build_sitemap_3567.py",
         "command": "python3 -m pytest tests/test_v4_build_sitemap_3567.py -q -p no:cacheprovider",

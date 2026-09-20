@@ -448,19 +448,93 @@ def _build_exercise_note(
     history_index: dict[str, list],
     notes_mode: str,
     weight_index: dict[str, float] | None = None,
+    cardio_index: dict[str, list] | None = None,
+    whoop_index: dict[str, list] | None = None,
 ) -> str:
     """ADR-068: deterministic per-exercise note from real workout records.
 
     No LLM, no math. The hevy_template_id_hint is the lookup key into the
     pre-loaded history_index; render_history_cue formats the facts. AI
     comment hook is wired but currently always None — see ADR-068.
+
+    #3700: the SAME path now carries cardio. `history_facts` falls through to the cardio
+    arm when a template has rides and no weighted sessions, so a cycling block reaches the
+    generated routine through this one function rather than a parallel one.
     """
     from training.exercise_history import history_facts, pick_note, render_history_cue
 
     template_id = catalog.get("movements", {}).get(movement_key, {}).get("hevy_template_id_hint")
-    facts = history_facts(template_id, history_index)
+    facts = history_facts(template_id, history_index, cardio_index=cardio_index, whoop_index=whoop_index)
     history_cue = render_history_cue(facts, weight_index=weight_index)
     return pick_note(history_cue, ai_comment=None, mode=notes_mode)
+
+
+def attach_cardio_cues(
+    spec: Any,
+    catalog: dict[str, Any] | None = None,
+    cardio_index: dict[str, list] | None = None,
+    whoop_index: dict[str, list] | None = None,
+) -> int:
+    """Stamp the deterministic cardio cue onto every cardio block of a RoutineSpec (#3700).
+
+    Returns how many blocks were stamped. Idempotent: a block whose note already opens
+    with "Last:" is left alone, so re-drafting a routine never stacks cues.
+
+    WHY THIS EXISTS SEPARATELY from `_build_exercise_note`. That function is the ADR-068
+    path and now carries cardio too — but `generate_routines`'s selector budgets by
+    LANDMARK MUSCLE (`config/training_landmarks.json` names eleven, none of them cardio),
+    so it never picks a bike. Matthew's real routines get their `cycling` block through
+    `draft_custom`, which builds its blocks from arguments and never reaches
+    `_build_exercise_note`. This is the one call that path needs — it loads its own
+    indexes, fails soft, and takes no plumbing.
+
+    Indexes are loaded here only when not supplied; a failed load leaves every note
+    untouched rather than emptying one.
+    """
+    exercises = list(getattr(spec, "exercises", None) or [])
+    if not exercises:
+        return 0
+    if catalog is None:
+        try:
+            catalog = _load_json("movement_catalog.json")
+        except Exception as e:  # pragma: no cover - config read
+            logger.warning(f"cardio cue: catalog load failed ({e}); notes untouched")
+            return 0
+    if cardio_index is None:
+        try:
+            from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_history_indexes
+
+            cardio_index = load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[1]
+        except Exception as e:
+            logger.warning(f"cardio cue: history load failed ({e}); notes untouched")
+            return 0
+    if whoop_index is None:
+        try:
+            from training.exercise_history import load_whoop_workout_index
+
+            whoop_index = load_whoop_workout_index()
+        except Exception as e:
+            logger.warning(f"cardio cue: whoop load failed ({e}); cue renders without HR-at-level: {e}")
+            whoop_index = {}
+
+    from training.cardio_progression import cardio_cue
+
+    movements = (catalog or {}).get("movements", {})
+    stamped = 0
+    for ex in exercises:
+        key = str(getattr(ex, "movement_key", "") or "")
+        tid = movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
+        if not tid or not (cardio_index or {}).get(tid):
+            continue
+        cue = cardio_cue(tid, cardio_index, whoop_index)
+        if not cue:
+            continue
+        existing = (getattr(ex, "notes", "") or "").strip()
+        if existing.startswith("Last:"):
+            continue  # already carries a cue — never stack
+        ex.notes = f"{cue} — {existing}" if existing else cue
+        stamped += 1
+    return stamped
 
 
 def _enforce_load_floors(
@@ -609,12 +683,14 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     # downstream renderers can quote but cannot invent.
     history_index: dict[str, list] = {}
     weight_index: dict[str, float] = {}
+    cardio_index: dict[str, list] = {}
+    whoop_index: dict[str, list] = {}
     if notes_mode != "off":
         try:
             from training.exercise_history import (
                 DEFAULT_LOOKBACK_DAYS,
                 FLOOR_LOOKBACK_DAYS,
-                load_recent_history,
+                load_history_indexes,
             )
 
             # #3708 — the floor is enforced HERE, not in the config file.
@@ -626,7 +702,10 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
             # bundle, and let config widen the window but never narrow it
             # below the floor.
             configured = int(week_cfg.get("exercise_notes_lookback_days", DEFAULT_LOOKBACK_DAYS))
-            history_index = load_recent_history(lookback_days=max(configured, FLOOR_LOOKBACK_DAYS))
+            # #3700 — ONE Query returns both indexes. The cardio one is separate rather
+            # than merged so the load-floor pass below cannot start counting zero-weight
+            # cycling blocks among a movement's sessions.
+            history_index, cardio_index = load_history_indexes(lookback_days=max(configured, FLOOR_LOOKBACK_DAYS))
         except Exception as e:
             logger.warning(f"exercise_history load failed (notes will be empty): {e}")
         # #3708 — bodyweight context for historical cues. Failing this load
@@ -638,6 +717,15 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
             weight_index = load_bodyweight_index()
         except Exception as e:
             logger.warning(f"bodyweight index load failed (cues lose the 'at X lb' clause): {e}")
+        # #3700 — HR-at-level. Fail-soft in the same shape: without it the cardio cue
+        # still renders speed-at-level, and the verdict reports the HR arm as absent by
+        # name rather than substituting the day-level (24h) average heart rate.
+        try:
+            from training.exercise_history import load_whoop_workout_index
+
+            whoop_index = load_whoop_workout_index()
+        except Exception as e:
+            logger.warning(f"whoop workout index load failed (cardio cue loses HR-at-level): {e}")
 
     for muscle in targets:
         budget = _muscle_budget(muscle, landmarks, week_cfg, inputs.volume_7d, autoreg, inputs.add_load_enabled)
@@ -657,7 +745,15 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         muscle_sets = 0
         for movement_key, mdef in picks:
             tag = f"{muscle}_MEV_{landmarks['muscles'][muscle]['MEV']}_remaining_{max(0, landmarks['muscles'][muscle]['MEV'] - inputs.volume_7d.get(muscle, 0))}"
-            note = _build_exercise_note(movement_key, catalog, history_index, notes_mode, weight_index=weight_index)
+            note = _build_exercise_note(
+                movement_key,
+                catalog,
+                history_index,
+                notes_mode,
+                weight_index=weight_index,
+                cardio_index=cardio_index,
+                whoop_index=whoop_index,
+            )
             exercises.append(_block_from_pick(movement_key, mdef, tag, note=note))
             muscle_sets += mdef["_sets"]
         budget_used[muscle] = muscle_sets
@@ -706,6 +802,13 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         rationale=rationale,
         caps=caps,
     )
+
+    # #3700 — any cardio block in the generated routine carries the deterministic cue.
+    # Today the selector above never picks one (it budgets by landmark muscle and none of
+    # the eleven is cardio), so this is a no-op on a pure lifting day; it is the SAME call
+    # the `draft_custom` path needs, wired here so the generator path can never diverge
+    # from it.
+    attach_cardio_cues(ideal, catalog=catalog, cardio_index=cardio_index, whoop_index=whoop_index)
 
     floor = _make_floor(inputs, archetype, targets, catalog, week_cfg, ideal.routine_id)
     ideal.sibling_routine_id = floor.routine_id

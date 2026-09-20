@@ -30,6 +30,14 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_tools_hevy_routine.py"),
     # adherence_calc reads template ids from Hevy responses — read-only, allowed.
     os.path.join(ROOT, "lambdas", "health", "adherence_calc.py"),
+    # #3928 — the prescribed-vs-performed readback module. Same shape as adherence_calc: it READS
+    # template ids off inbound Hevy workouts to pair performed sets with the routine
+    # that prescribed them, and constructs no wire body. Deliberately the ONLY module
+    # of that feature to touch the key — `training/stall_detector.py` is handed the
+    # already-grouped {template_id: sets} mapping precisely so this rule keeps holding
+    # ("an API change touches one file").
+    os.path.join(ROOT, "mcp", "hevy_readback_report.py"),
+    os.path.join(ROOT, "tests", "test_stall_detector_3928.py"),
     # MCP tool delegates to compiler; it only PASSES the IR through, doesn't
     # construct wire bodies. Still excluded from the scan because a key match
     # is acceptable in a docstring there.

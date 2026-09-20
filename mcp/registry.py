@@ -1597,7 +1597,7 @@ TOOLS = {
                 "properties": {
                     "action": {
                         "type": "string",
-                        "description": "One of: draft, draft_custom, dry_run, commit, list, get, archive, floor, re_entry, adherence.",
+                        "description": "One of: draft, draft_custom, dry_run, commit, list, get, archive, floor, re_entry, adherence, stall_check.",
                     },
                     "exercises": {
                         "type": "array",
@@ -1657,6 +1657,9 @@ TOOLS = {
                         "type": "string",
                         "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence.",
                     },
+                    "movement_key": {"type": "string", "description": "stall_check: the movement to assess (e.g. 'lat_pulldown')."},
+                    "template_id": {"type": "string", "description": "stall_check: exact Hevy template id, when movement_key misses."},
+                    "sessions": {"type": "integer", "default": 6, "description": "stall_check: recent sessions to read (3-20)."},
                     "target_date": {"type": "string", "description": "ISO YYYY-MM-DD. Defaults to today (UTC)."},
                     "start_date": {"type": "string", "description": "List action: range start (YYYY-MM-DD)."},
                     "end_date": {"type": "string", "description": "List action: range end (YYYY-MM-DD)."},
