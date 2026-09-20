@@ -6,7 +6,10 @@ import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
+from health import (
+    deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
+    tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
+)
 
 from mcp.core import get_profile, pacific_today, parallel_query_sources, query_source
 
@@ -740,6 +743,10 @@ def _get_macro_targets(args):
             "days_scored": dict(measured_days),
         },
         "daily_breakdown": daily_rows,
+        # #3754 box 5: adherence read as "is this the same discipline as last time" is a
+        # natural question this view invites and cannot answer — reuse the ADR-104 sentence
+        # verbatim rather than let the omission read as silence.
+        "prior_cut_comparability": deficit_disclosures.INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT,
     }
 
 
@@ -810,7 +817,10 @@ def tool_get_deficit_sustainability(args):
 
     deficit_kcal = round(tdee_estimate - avg_cal)
     deficit_pct = round(deficit_kcal / tdee_estimate * 100, 1) if tdee_estimate else 0
-    in_deficit = deficit_kcal > 200
+    # #3754 box 2: every cutoff from here down is population-derived and lives in
+    # deficit_disclosures so the value graded and the value disclosed in `thresholds`
+    # below can never drift apart. Verdict logic is unchanged — only named.
+    in_deficit = deficit_kcal > deficit_disclosures.IN_DEFICIT_FLOOR_KCAL["value"]
 
     # ── 2. Pull multi-source data ──
     sources = parallel_query_sources(["whoop", "habitify", "strava", "hevy"], start_date, end_date)
@@ -821,6 +831,8 @@ def tool_get_deficit_sustainability(args):
     def safe_avg(vals):
         v = [x for x in vals if x is not None]
         return round(sum(v) / len(v), 2) if v else None
+
+    _stable_band_pct = deficit_disclosures.TREND_WINDOW_METHOD["stable_band_pct"]
 
     def trend_direction(vals):
         """Simple: compare last-third avg to first-third avg."""
@@ -833,17 +845,18 @@ def tool_get_deficit_sustainability(args):
         if first_avg == 0:
             return "stable", 0
         delta_pct = round((last_avg - first_avg) / abs(first_avg) * 100, 1)
-        if delta_pct < -5:
+        if delta_pct < -_stable_band_pct:
             return "declining", delta_pct
-        elif delta_pct > 5:
+        elif delta_pct > _stable_band_pct:
             return "improving", delta_pct
         return "stable", delta_pct
 
     # ── Channel 1: HRV trend ──
+    _hrv_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["hrv"]["decline_pct"]
     hrv_vals = [float(w.get("hrv", 0)) for w in whoop_items if w.get("hrv")]
     hrv_dir, hrv_delta = trend_direction(hrv_vals)
     hrv_avg = safe_avg(hrv_vals)
-    hrv_degraded = hrv_dir == "declining" and abs(hrv_delta) > 8
+    hrv_degraded = hrv_dir == "declining" and abs(hrv_delta) > _hrv_cutoff
 
     # ── Channel 2: Sleep quality ──
     eff_vals = [
@@ -856,15 +869,20 @@ def tool_get_deficit_sustainability(args):
         for w in whoop_items
         if w.get("slow_wave_sleep_hours") and w.get("sleep_duration_hours")
     ]
+    _eff_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["sleep_efficiency"]["decline_pct"]
+    _deep_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["sleep_deep_pct"]["decline_pct"]
     eff_dir, eff_delta = trend_direction(eff_vals)
     deep_dir, deep_delta = trend_direction(deep_vals)
-    sleep_degraded = (eff_dir == "declining" and abs(eff_delta) > 3) or (deep_dir == "declining" and abs(deep_delta) > 8)
+    sleep_degraded = (eff_dir == "declining" and abs(eff_delta) > _eff_cutoff) or (
+        deep_dir == "declining" and abs(deep_delta) > _deep_cutoff
+    )
 
     # ── Channel 3: Recovery trend ──
+    _recovery_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["recovery"]["decline_pct"]
     rec_vals = [float(w.get("recovery_score", 0)) for w in whoop_items if w.get("recovery_score")]
     rec_dir, rec_delta = trend_direction(rec_vals)
     rec_avg = safe_avg(rec_vals)
-    recovery_degraded = rec_dir == "declining" and abs(rec_delta) > 10
+    recovery_degraded = rec_dir == "declining" and abs(rec_delta) > _recovery_cutoff
 
     # ── Channel 4: Habit completion ──
     # Reader/writer agreement: `ingestion/habitify_lambda.py` writes `completion_pct`
@@ -882,11 +900,13 @@ def tool_get_deficit_sustainability(args):
             t0 = h.get("completion_pct_strict")
         if t0 is not None:
             t0_rates.append(float(t0))
+    _habit_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["habit_completion"]["decline_pct"]
     t0_dir, t0_delta = trend_direction(t0_rates)
     t0_avg = safe_avg(t0_rates)
-    habits_degraded = t0_dir == "declining" and abs(t0_delta) > 10
+    habits_degraded = t0_dir == "declining" and abs(t0_delta) > _habit_cutoff
 
     # ── Channel 5: Training output ──
+    _training_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["training_output"]["decline_pct"]
     daily_kj = {}
     for s in strava_items:
         d = s.get("date", "")
@@ -894,18 +914,38 @@ def tool_get_deficit_sustainability(args):
         daily_kj[d] = daily_kj.get(d, 0) + kj
     training_vals = [daily_kj[d] for d in sorted(daily_kj)] if daily_kj else []
     train_dir, train_delta = trend_direction(training_vals)
-    training_degraded = train_dir == "declining" and abs(train_delta) > 15
+    training_degraded = train_dir == "declining" and abs(train_delta) > _training_cutoff
 
     # ── Composite assessment ──
+    # #3754 box 2: every channel carries the cutoff it was graded against plus its
+    # provenance, ON OUTPUT — not just in a separate `thresholds` block a caller might
+    # not read.
     channels = [
-        {"name": "HRV", "status": "degraded" if hrv_degraded else "stable", "direction": hrv_dir, "delta_pct": hrv_delta, "avg": hrv_avg},
-        {"name": "Sleep Quality", "status": "degraded" if sleep_degraded else "stable", "direction": eff_dir, "delta_pct": eff_delta},
+        {
+            "name": "HRV",
+            "status": "degraded" if hrv_degraded else "stable",
+            "direction": hrv_dir,
+            "delta_pct": hrv_delta,
+            "avg": hrv_avg,
+            "cutoff_pct": _hrv_cutoff,
+            "provenance": deficit_disclosures.CHANNEL_CUTOFFS["hrv"]["provenance"],
+        },
+        {
+            "name": "Sleep Quality",
+            "status": "degraded" if sleep_degraded else "stable",
+            "direction": eff_dir,
+            "delta_pct": eff_delta,
+            "cutoff_pct": {"efficiency": _eff_cutoff, "deep_sleep_share": _deep_cutoff},
+            "provenance": deficit_disclosures.CHANNEL_CUTOFFS["sleep_efficiency"]["provenance"],
+        },
         {
             "name": "Recovery",
             "status": "degraded" if recovery_degraded else "stable",
             "direction": rec_dir,
             "delta_pct": rec_delta,
             "avg": rec_avg,
+            "cutoff_pct": _recovery_cutoff,
+            "provenance": deficit_disclosures.CHANNEL_CUTOFFS["recovery"]["provenance"],
         },
         {
             "name": "Habit Completion",
@@ -913,31 +953,47 @@ def tool_get_deficit_sustainability(args):
             "direction": t0_dir,
             "delta_pct": t0_delta,
             "avg": t0_avg,
+            "cutoff_pct": _habit_cutoff,
+            "provenance": deficit_disclosures.CHANNEL_CUTOFFS["habit_completion"]["provenance"],
         },
         {
             "name": "Training Output",
             "status": "degraded" if training_degraded else "stable",
             "direction": train_dir,
             "delta_pct": train_delta,
+            "cutoff_pct": _training_cutoff,
+            "provenance": deficit_disclosures.CHANNEL_CUTOFFS["training_output"]["provenance"],
         },
     ]
     degraded_count = sum(1 for c in channels if c["status"] == "degraded")
 
+    _bands = deficit_disclosures.CONCURRENT_DEGRADATION_BANDS
     if not in_deficit:
         severity = "NOT_IN_DEFICIT"
         recommendation = "No active deficit detected. Monitor normally."
-    elif degraded_count >= 4:
+    elif degraded_count >= _bands["critical"]["min_channels"]:
         severity = "CRITICAL"
         recommendation = f"4+ channels degrading under {deficit_kcal} kcal/day deficit. Increase intake by 300-400 kcal for 5-7 days. Prioritise sleep and reduce training intensity."
-    elif degraded_count >= 3:
+    elif degraded_count >= _bands["warning"]["min_channels"]:
         severity = "WARNING"
         recommendation = f"3 channels degrading under {deficit_kcal} kcal/day deficit. Consider adding 200 kcal/day for 3-5 days and scheduling a deload."
-    elif degraded_count >= 2:
+    elif degraded_count >= _bands["watch"]["min_channels"]:
         severity = "WATCH"
         recommendation = "2 channels showing stress. Monitor closely — this may resolve or escalate."
     else:
         severity = "SUSTAINABLE"
         recommendation = "Deficit appears sustainable. All systems holding."
+
+    _label_bands = deficit_disclosures.DEFICIT_LABEL_BANDS
+    deficit_label = (
+        "aggressive"
+        if deficit_pct > _label_bands["aggressive_above_pct"]
+        else (
+            "moderate"
+            if deficit_pct > _label_bands["moderate_above_pct"]
+            else "mild" if deficit_pct > _label_bands["mild_above_pct"] else "maintenance"
+        )
+    )
 
     return {
         # ADR-105/#1917: `days` is the REQUESTED window; every intake figure below is
@@ -950,9 +1006,7 @@ def tool_get_deficit_sustainability(args):
             "estimated_tdee": tdee_estimate,
             "deficit_kcal": deficit_kcal,
             "deficit_pct": deficit_pct,
-            "deficit_label": (
-                "aggressive" if deficit_pct > 25 else "moderate" if deficit_pct > 15 else "mild" if deficit_pct > 5 else "maintenance"
-            ),
+            "deficit_label": deficit_label,
         },
         "channels": channels,
         "degraded_count": degraded_count,
@@ -963,6 +1017,15 @@ def tool_get_deficit_sustainability(args):
             "Compares first-third vs last-third of the window. 3+ concurrent degradations = deficit unsustainable. "
             "Based on Attia, Huberman: aggressive deficits erode adherence, sleep, and lean mass."
         ),
+        # #3754 box 2: the values graded above, named, with provenance — one block so a
+        # caller never has to reverse-engineer a cutoff from the verdict logic.
+        "thresholds": deficit_disclosures.thresholds_block(),
+        # #3754 box 2: SUSTAINABLE is a statement about five behavioural/physiological
+        # channels, never about the deficit's nutritional soundness (no intake floor,
+        # protein channel, electrolyte or DXA input feeds this tool at all).
+        "honesty": deficit_disclosures.DEFICIT_SUSTAINABILITY_HONESTY,
+        # #3754 box 5: reused verbatim — see lambdas/health/deficit_disclosures.py.
+        "prior_cut_comparability": deficit_disclosures.INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT,
     }
 
 

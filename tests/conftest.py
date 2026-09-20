@@ -256,6 +256,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # deploy/write_pk_family_census.py regenerates — a PR that lands a refreshed
         # artifact must red on that PR, not on whoever pushes next (#2975).
         "test_schema_families_census.py",
+        # #3754: os.walk sweep of lambdas/ + mcp/ for a literal copy of the ADR-104
+        # "not comparable to the prior cut" sentence — a new nutrition surface that
+        # hand-types a drifted paraphrase (rather than importing the shared constant)
+        # must red on the PR that adds it, not sit invisible post-merge.
+        "test_prior_cut_disclosure_3754.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the

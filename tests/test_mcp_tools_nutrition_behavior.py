@@ -54,6 +54,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config reads 
 os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
+from health import deficit_disclosures as dd  # noqa: E402 — #3754 provenance + ADR-104 constant
 from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import core as mcore, tools_nutrition as tn  # noqa: E402
@@ -908,6 +909,9 @@ def test_macros_scores_daily_adherence_against_the_given_targets(monkeypatch):
         "fiber_target_hit_pct": 50.0,
         "days_scored": {"calorie": 2, "protein": 2, "fiber": 2},
     }
+    # #3754 box 5: adherence read as "same discipline as last time" is a natural
+    # question this view invites — the ADR-104 sentence, reused verbatim.
+    assert out["prior_cut_comparability"] == dd.INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT
 
 
 def test_macros_rolling_window_spans_exactly_the_days_requested(monkeypatch):
@@ -1101,6 +1105,24 @@ def test_deficit_detects_the_deficit_and_labels_its_aggressiveness(monkeypatch):
         "deficit_pct": 28.0,
         "deficit_label": "aggressive",
     }
+
+
+def test_deficit_output_carries_thresholds_honesty_and_prior_cut_disclosure(monkeypatch):
+    """#3754 boxes 2 + 5, on the LIVE call path (not just the disclosures module in
+    isolation): every channel names its own cutoff + provenance, the top-level
+    `thresholds` block exists, the honesty line is present, and the ADR-104 sentence is
+    reused verbatim rather than hand-typed."""
+    install(monkeypatch, sust_rows(hrv=FLAT))
+    out = tn.tool_get_deficit_sustainability(SUST_ARGS)
+
+    for name in ("HRV", "Sleep Quality", "Recovery", "Habit Completion", "Training Output"):
+        ch = channel(out, name)
+        assert ch["provenance"] == "population-derived", name
+        assert "cutoff_pct" in ch, name
+
+    assert out["thresholds"] == dd.thresholds_block()
+    assert out["honesty"] == dd.DEFICIT_SUSTAINABILITY_HONESTY
+    assert out["prior_cut_comparability"] == dd.INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT
 
 
 def test_deficit_raises_a_warning_when_three_channels_degrade_together(monkeypatch):
