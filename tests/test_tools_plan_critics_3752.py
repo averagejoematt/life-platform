@@ -438,3 +438,26 @@ def test_stage_1_block_is_populated_from_the_live_shapes_not_unknown():
     tw = {t_["id"]: t_ for t_ in block["tripwires"]}
     assert tw["protein_floor_missed"]["state"] == "tripped" and "4 of 7" in tw["protein_floor_missed"]["observed"]
     assert out["protein_days_measured_7d"] == 6
+
+
+def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually_returns():
+    """LIVE FINDING 2026-09-20: Hevy's API routine object has no `notes` field; twelve September
+    routines read back with 0-char routine notes while exercise notes landed. The block therefore
+    goes on exercise[0].notes too, and a re-run replaces it rather than stacking.
+    Mutation control: drop the `_place_block_on_first_exercise(ir)` call → this reds."""
+    ir = _ir(squat_lbs=200.0)
+    ir.exercises[0].notes = "Anchor cue."
+    out, _, _ = _run(ir, _evidence())
+    assert ir.exercises[0].notes.startswith("RED TEAM (critics@1.0.0, 4 critics,")
+    assert ir.exercises[0].notes.endswith("Anchor cue.")
+    assert "- historian CHANGE" in ir.exercises[0].notes
+    # re-run: one block, not two
+    ir.version = 1
+    _run(ir, _evidence())
+    assert ir.exercises[0].notes.count("RED TEAM (") == 1 and ir.exercises[0].notes.endswith("Anchor cue.")
+    # and the compiled body carries it where the app shows it
+    with ExitStack() as st:
+        for cm in _commit_patches(ir, []):
+            st.enter_context(cm)
+        preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
+    assert preview["wire_body"]["routine"]["exercises"][0]["notes"].startswith("RED TEAM (")
