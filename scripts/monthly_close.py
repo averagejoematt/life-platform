@@ -344,8 +344,181 @@ def _attribution_stability(start: date) -> tuple[dict | None, list[str]]:
 
 
 # ── Assembly ─────────────────────────────────────────────────────────────────
-def reset_cadence(month_start: date, month_end: date, today: date | None = None) -> dict:
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _cycle_geneses() -> list[tuple[int, str]]:
+    """[(cycle, genesis), ...] parsed from the ONE registry (#3601).
+
+    Raises rather than returning [] — "the registry parsed empty" and "there have been
+    no resets" are opposite facts, and a cadence of zero printed from the first is the
+    vacuous-pass class this repo keeps re-learning.
+    """
+    import re as _re
+
+    src_path = os.path.join(_REPO_ROOT, "lambdas", "web", "site_api_data.py")
+    try:
+        src = open(src_path, encoding="utf-8").read()
+        blk = src[src.index("CYCLE_GENESES = {") :]
+        blk = blk[: blk.index("\n}")]
+        pairs = sorted((int(a), b) for a, b in _re.findall(r'(\d+):\s*"(\d{4}-\d{2}-\d{2})"', blk))
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(f"CYCLE_GENESES unreadable: {e}") from e
+    if not pairs:
+        raise RuntimeError("CYCLE_GENESES parsed EMPTY — a vacuous zero is not a cadence")
+    return pairs
+
+
+def reset_price() -> dict:
+    """The measured $ per reset (#3601 box 2), from `deploy/restart_cost_model.py`.
+
+    The model is frozen literals WITH their derivation, not a guess: each component is a
+    marginal delta on the platform's own `LifePlatform/AI::EstimatedCostUSD` instrument,
+    and the module can re-derive every one of them live (`measure_marginal`, read-only).
+    Imported rather than restated here so the close and the proportionality row quote one
+    number — the two-copies failure row 86 already demonstrated with "a few times a
+    quarter".
+    """
+    deploy_dir = os.path.join(_REPO_ROOT, "deploy")
+    if deploy_dir not in sys.path:
+        sys.path.insert(0, deploy_dir)
+    try:
+        import restart_cost_model
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"deploy/restart_cost_model.py unimportable: {e}"}
+    try:
+        restart_cost_model.validate()
+    except ValueError as e:
+        return {"error": f"reset cost model REFUSED to price itself: {e}"}
+    return {
+        "usd": restart_cost_model.total_usd(),
+        "high_usd": restart_cost_model.high_usd(),
+        "measured_at": restart_cost_model.MEASURED_AT.isoformat(),
+        "stale": restart_cost_model.is_stale(),
+        "lines": restart_cost_model.format_lines(),
+        "per_quarter": restart_cost_model.per_quarter_usd,
+    }
+
+
+def findings_per_reset() -> dict:
+    """Confirmed review findings per reset, over the newest full review's own window.
+
+    A RATE, not an attribution: it does not claim the resets caused the findings. The
+    attribution is stated separately and comes from the RCA that filed #3601 — 39 of the
+    99 confirmed findings in `docs/reviews/FULLREVIEW_2026-09-05.md` live in the
+    reset -> first-cron window.
+
+    Window = (previous FULLREVIEW date, this FULLREVIEW date]; resets = geneses in it.
+    Every failure mode returns an `error` rather than a number, because a
+    findings-per-reset of 0.0 printed from an unparsed doc is worse than no line.
+    """
+    import re as _re
+
+    rev_dir = os.path.join(_REPO_ROOT, "docs", "reviews")
+    try:
+        files = sorted(f for f in os.listdir(rev_dir) if _re.match(r"^FULLREVIEW_\d{4}-\d{2}-\d{2}.*\.md$", f))
+    except OSError as e:
+        return {"error": f"docs/reviews unreadable: {e}"}
+    if len(files) < 2:
+        return {"error": f"need two FULLREVIEW_*.md files to bound a window; found {len(files)}"}
+    latest, previous = files[-1], files[-2]
+    latest_date = date.fromisoformat(latest[len("FULLREVIEW_") :][:10])
+    prev_date = date.fromisoformat(previous[len("FULLREVIEW_") :][:10])
+    text = open(os.path.join(rev_dir, latest), encoding="utf-8").read()
+    m = _re.search(r"(\d+)\s+findings\s+CONFIRMED", text)
+    if not m:
+        return {"error": f"{latest} states no '<N> findings CONFIRMED' — not parsed, so not reported as zero"}
+    findings = int(m.group(1))
+    try:
+        pairs = _cycle_geneses()
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+    resets = [g for _, g in pairs if prev_date < date.fromisoformat(g) <= latest_date]
+    if not resets:
+        return {"error": f"no reset genesis in ({prev_date}, {latest_date}] — a per-reset rate needs at least one"}
+    return {
+        "review": latest,
+        "window": f"{prev_date.isoformat()} -> {latest_date.isoformat()}",
+        "findings": findings,
+        "resets": len(resets),
+        "reset_dates": resets,
+        "rate": round(findings / len(resets), 1),
+    }
+
+
+def reset_block_lines(month_start: date, month_end_exclusive: date) -> tuple[list[str], list[tuple[str, str]]]:
+    """The close's `[6/6]` reset block (#3601): the four lines, as data.
+
+    Window is half-open, `[month_start, month_end_exclusive)` — the same `_month_window()`
+    pair every other query in this file takes.
+
+    Returns `(lines, problems)` and touches no AWS, so the whole block is testable
+    without credentials — the half of #3375 that previously could only be checked by
+    running a live close. `problems` is `[(label, message), ...]`; `main()` routes each
+    through `_problem()`, which is what makes the close exit non-zero.
+    """
+    lines = ["\n[6/6] Reset cadence + price (#3601 — CYCLE_GENESES + deploy/restart_cost_model.py, both derived)"]
+    problems: list[tuple[str, str]] = []
+    rc = reset_cadence(month_start, month_end_exclusive)
+    if rc.get("error"):
+        problems.append(("RESET-CADENCE", rc["error"]))
+    else:
+        dates = ", ".join(rc["in_month_dates"]) or "none"
+        lines.append(f"  resets this month              : {rc['in_month']}  ({dates})")
+        lines.append(
+            f"  lifetime cadence              : {rc['lifetime_reanchors']} re-anchors / {rc['lifetime_span_days']}d "
+            f"= {rc['per_quarter']:.1f} per quarter   (median gap {rc['median_gap']}d, min {rc['min_gap']}d)"
+        )
+        lines.append(
+            f"  current cycle                 : {rc['current_cycle']} since {rc['current_genesis']}, running {rc['current_age_days']}d"
+        )
+        lines.append(
+            f"  gaps under the 30d minimum    : {len(rc['under_minimum'])} of {rc['lifetime_reanchors']} "
+            "(historic; the [0a] preflight has enforced the rule since 2026-09-16)"
+        )
+
+    # #3601 box 2: the PRICE of the cadence above. Printed next to the count deliberately
+    # — a cadence without a price and a price without a cadence are each half of the
+    # demote trigger every reset-machinery row in docs/PROPORTIONALITY.md is judged on.
+    rp = reset_price()
+    if rp.get("error"):
+        problems.append(("RESET-PRICE", rp["error"]))
+    else:
+        lines.append(f"  {rp['lines'][0]}")
+        lines.extend(f"  {ln}" for ln in rp["lines"][1:])
+        if not rc.get("error"):
+            lines.append(
+                f"  reset spend this month        : {rc['in_month']} x ${rp['usd']:.2f} = ${rc['in_month'] * rp['usd']:.2f} "
+                f"(cash only); at the measured {rc['per_quarter']:.1f}/quarter cadence = "
+                f"${rp['per_quarter'](rc['per_quarter']):.2f}/quarter"
+            )
+    fpr = findings_per_reset()
+    if fpr.get("error"):
+        problems.append(("RESET-FINDINGS", f"findings-per-reset: {fpr['error']}"))
+    else:
+        lines.append(
+            f"  findings per reset            : {fpr['findings']} confirmed / {fpr['resets']} resets in {fpr['window']} "
+            f"= {fpr['rate']}  (a RATE over {fpr['review']}'s window, not an attribution; the RCA's own attribution is "
+            "39 of 99 in the reset -> first-cron window)"
+        )
+    lines.append(
+        "  NOT PRINTED, and not invented : the DEMOTE-candidate list (#3601's fourth line). It needs a\n"
+        "                                  per-instrument zero-output ledger — 30 days of non-degraded output per\n"
+        "                                  instrument — which no registry in this tree holds yet. Named as missing\n"
+        "                                  rather than approximated, so a shorter report cannot read as a complete one."
+    )
+    return lines, problems
+
+
+def reset_cadence(month_start: date, month_end_exclusive: date, today: date | None = None) -> dict:
     """Reset cadence for the close (#3601), derived from CYCLE_GENESES — never hand-typed.
+
+    THE WINDOW IS HALF-OPEN, `[month_start, month_end_exclusive)`, and the parameter is
+    named for it. Every other query in this file takes `_month_window()`'s `end`, which is
+    the FIRST of the next month; this function compared `<= month_end` and so counted a
+    2026-09-01 re-anchor inside the August close — found by running the close against
+    August 2026 on 2026-09-20, not by reading it. An off-by-one in a cadence line is
+    exactly the kind of small wrong number the rest of this ledger is trying to stop.
 
     The reset is the platform's most expensive recurring EVENT and no row priced it. Row 86
     of `docs/PROPORTIONALITY.md` said "a few times a quarter" against a measured 9.2, and
@@ -356,26 +529,20 @@ def reset_cadence(month_start: date, month_end: date, today: date | None = None)
     month is how that ruling stays observed rather than merely recorded.
 
     PARTIAL, and stated as such rather than left to look complete: this returns the COUNT
-    and the GAPS. `$ per reset` and the DEMOTE-candidate list — the other two lines #3601's
-    box 2 asks for — need a measured per-reset cost model and a per-instrument
-    zero-output ledger; neither is derivable from this registry and neither is invented here.
+    and the GAPS. `$ per reset` now comes from `reset_price()` (the measured model in
+    `deploy/restart_cost_model.py`, #3601 box 2) and findings-per-reset from
+    `findings_per_reset()`. The DEMOTE-candidate list — the fourth line #3601 asks for —
+    needs a per-instrument zero-output ledger that does not exist yet; it is named as
+    missing in the printout rather than invented here.
     """
-    import re as _re
-
     today = today or date.today()
-    src_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "web", "site_api_data.py")
     try:
-        src = open(src_path, encoding="utf-8").read()
-        blk = src[src.index("CYCLE_GENESES = {") :]
-        blk = blk[: blk.index("\n}")]
-        pairs = sorted((int(a), b) for a, b in _re.findall(r'(\d+):\s*"(\d{4}-\d{2}-\d{2})"', blk))
+        pairs = _cycle_geneses()
     except Exception as e:  # noqa: BLE001
-        return {"error": f"CYCLE_GENESES unreadable: {e}"}
-    if not pairs:
-        return {"error": "CYCLE_GENESES parsed EMPTY — a vacuous zero is not a cadence"}
+        return {"error": str(e)}
 
     dates = [date.fromisoformat(d) for _, d in pairs]
-    in_month = [d for d in dates if month_start <= d <= month_end]
+    in_month = [d for d in dates if month_start <= d < month_end_exclusive]
     gaps = [(b - a).days for a, b in zip(dates, dates[1:])]
     span = (dates[-1] - dates[0]).days
     current_age = (today - dates[-1]).days
@@ -551,29 +718,11 @@ def main(argv=None) -> int:
 
     # #3601: the reset cadence, printed every month so the owner's 30-day ruling stays
     # OBSERVED rather than merely recorded. Derived from CYCLE_GENESES, never hand-typed.
-    print("\n[6/6] Reset cadence (#3601 — CYCLE_GENESES, derived)")
-    rc = reset_cadence(start, end)
-    if rc.get("error"):
-        _problem(rc["error"], "RESET-CADENCE")
-    else:
-        dates = ", ".join(rc["in_month_dates"]) or "none"
-        print(f"  resets this month              : {rc['in_month']}  ({dates})")
-        print(
-            f"  lifetime cadence              : {rc['lifetime_reanchors']} re-anchors / {rc['lifetime_span_days']}d "
-            f"= {rc['per_quarter']:.1f} per quarter   (median gap {rc['median_gap']}d, min {rc['min_gap']}d)"
-        )
-        print(
-            f"  current cycle                 : {rc['current_cycle']} since {rc['current_genesis']}, " f"running {rc['current_age_days']}d"
-        )
-        print(
-            f"  gaps under the 30d minimum    : {len(rc['under_minimum'])} of {rc['lifetime_reanchors']} "
-            "(historic; the [0a] preflight has enforced the rule since 2026-09-16)"
-        )
-        print(
-            "  NOT PRINTED, and not invented : $ per reset, and the DEMOTE-candidate list. Both are #3601 box 2\n"
-            "                                  and both need a measurement this registry does not hold — a per-reset\n"
-            "                                  cost model, and a per-instrument zero-output ledger."
-        )
+    lines, problems = reset_block_lines(start, end)
+    for ln in lines:
+        print(ln)
+    for label, msg in problems:
+        _problem(msg, label)
 
     # The candidate row
     fmt = lambda v, spec=".2f": format(v, spec) if v is not None else "??"  # noqa: E731
