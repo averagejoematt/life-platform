@@ -9,6 +9,12 @@ Invariants:
   - Asymmetric autoregulation: red recovery / high ACWR may only SUBTRACT
     load. Add-load is gated by autoreg_add_load_enabled (default false)
     and never increases beyond the MEV baseline anyway.
+  - Subtract-only has a FLOOR as well as a ceiling (#3927): the prescribed
+    load for a movement is never below the best load already achieved for it
+    at the current bodyweight band, unless a documented layoff applies the
+    detraining discount. `prescription_floor` derives it, `_enforce_load_floors`
+    applies it, and `inputs_snapshot["load_floors"]` records what it did —
+    including every movement that got no floor, and why.
   - Bounded outputs: session_set_ceiling, session_minutes_ceiling,
     weekly_volume_cap_per_muscle. Hard asserts.
   - Joint-friendly bias: catalog skill_ceiling filter; selection sorts by
@@ -30,6 +36,7 @@ from typing import Any
 
 from common.repo_config import config_dir
 
+from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 logger = logging.getLogger("routine_generator")
@@ -107,6 +114,241 @@ def _autoreg_multiplier(recovery: str, acwr_flag: str) -> float:
     if recovery == "yellow" or acwr_flag == "caution":
         return 0.85
     return 1.0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUBTRACT-ONLY AUTOREGULATION — the prescription FLOOR (#3927)
+# ══════════════════════════════════════════════════════════════════════════════
+# Owner ruling, 2026-09-19 (§7 of the owner-private TRAINING_CALIBRATION.md at the
+# S3 coaching home): autoregulation subtracts, it never adds. The athlete may take a
+# prescribed load DOWN on the day; he is never handed the job of triggering his own
+# progression ("if set 1 is <=7.5 go 80" — the live 2026-09-19 incline cue, against a
+# 80x8 @RPE9 he had already put on the board on 09-11). A prescription below a load
+# already achieved at the CURRENT bodyweight band, with no layoff, is a bug.
+#
+# The three numbers below are the whole rule, and each says where it comes from:
+#   • the band is `band_reference.band_key` — the platform's ONE definition of a
+#     bodyweight band (10 lb), reused rather than redefined so the planner and the
+#     weight-matched reference cannot drift apart;
+#   • the layoff threshold is the platform's OWN re-entry threshold
+#     (`training_week.re_entry_days_threshold`, 7d) — the same gap that already makes
+#     the generator emit a re-entry variant. Nothing new is invented here;
+#   • the detraining discount is the owner's documented 10-15% band. The FLOOR takes
+#     the deepest end (15%), because a floor is the lowest load the rule permits — a
+#     post-layoff prescription anywhere in 85-100% of best is legal, below 85% is not.
+#
+# ABSENCE IS ABSENCE (ADR-104). A session whose bodyweight cannot be resolved from a
+# real weigh-in inside `BODYWEIGHT_TOLERANCE_DAYS` is not band-matched and does not
+# raise the floor; no bodyweight is ever interpolated to make a session countable, and
+# a movement with no band-matched history yields NO floor rather than a guessed one.
+SUBTRACT_ONLY_RULE = (
+    "Autoregulation is subtract-only. The prescribed load IS the floor: take it down on the day if you have to, "
+    "never up, and never wait to be asked to progress. A load below one already achieved at this bodyweight band, "
+    "with no layoff, is a bug — not conservatism."
+)
+
+# The exact international definition, not an approximation — the same factor
+# `hevy_common._lbs_to_kg` puts on the wire, so a floor round-trips to the pound
+# Matthew actually reads on the dumbbell.
+LB_IN_KG = 0.45359237
+
+# The owner's documented detraining band. The floor takes the deepest end.
+DETRAINING_DISCOUNT_PCT_RANGE = (10, 15)
+
+# Fallback only — `generate_routines` passes `training_week.re_entry_days_threshold`.
+LAYOFF_DAYS_DEFAULT = 7
+
+
+def _kg_to_lb(kg: float) -> float:
+    return kg / LB_IN_KG
+
+
+def _floor_half_kg(kg: float) -> float:
+    """Round DOWN to the nearest 0.5 kg — the precision `exercise_history` already
+    renders at. Down, because rounding a floor up would invent load the rule does not
+    license; 0.5 kg rather than a plate/dumbbell increment, because equipment
+    granularity is an assumption this module has no evidence for."""
+    return int(kg * 2) / 2
+
+
+def _fmt_load(kg: float) -> str:
+    lb = _kg_to_lb(kg)
+    return f"{lb:.0f} lb" if abs(lb - round(lb)) < 0.05 else f"{lb:.1f} lb"
+
+
+def band_matched_best(
+    template_id: str | None,
+    history_index: dict[str, list],
+    weight_index: dict[str, float] | None,
+    current_weight_lb: float | None,
+    as_of: str | None = None,
+    tolerance_days: int | None = None,
+) -> dict[str, Any]:
+    """Best load this movement has ACTUALLY carried at the current bodyweight band.
+
+    Pure: every input is a value the caller already loaded (`load_recent_history`,
+    `load_bodyweight_index`). `as_of` excludes sessions on or after the target date —
+    a routine authored the night before cannot cite a session that has not happened.
+
+    Returns a dict that always carries `status`, so "no floor" is legible as WHICH
+    absence it is (`no_history`, `no_band_matched_history`, `no_current_bodyweight`)
+    and never as "no floor needed".
+    """
+    from training.exercise_history import BODYWEIGHT_TOLERANCE_DAYS, nearest_bodyweight
+
+    tol = BODYWEIGHT_TOLERANCE_DAYS if tolerance_days is None else tolerance_days
+    out: dict[str, Any] = {
+        "template_id": template_id,
+        "band": None,
+        "best_kg": None,
+        "basis": None,
+        "sessions_in_band": 0,
+        "sessions_other_band": 0,
+        "sessions_unweighed": 0,
+        "status": "",
+    }
+    if not template_id:
+        out["status"] = "no_template_id"
+        return out
+    if not current_weight_lb:
+        out["status"] = "no_current_bodyweight"
+        return out
+
+    band = band_key(float(current_weight_lb))
+    out["band"] = band
+    sessions = list((history_index or {}).get(template_id) or [])
+    if as_of:
+        sessions = [s for s in sessions if str(s.get("date") or "") < as_of]
+    if not sessions:
+        out["status"] = "no_history"
+        return out
+
+    best: dict[str, Any] | None = None
+    for s in sessions:
+        lbs = nearest_bodyweight(str(s.get("date") or ""), weight_index, tol)
+        if lbs is None:
+            out["sessions_unweighed"] += 1
+            continue
+        if band_key(lbs) != band:
+            out["sessions_other_band"] += 1
+            continue
+        out["sessions_in_band"] += 1
+        top = float(s.get("top_weight_kg") or 0)
+        if top <= 0:
+            continue
+        if best is None or top > best["weight_kg"]:
+            best = {
+                "date": str(s.get("date") or ""),
+                "weight_kg": top,
+                "reps": [int(x.get("reps") or 0) for x in (s.get("sets") or []) if float(x.get("weight_kg") or 0) >= top - 1e-9],
+                "bodyweight_lb": round(float(lbs), 1),
+            }
+
+    if best is None:
+        out["status"] = "no_band_matched_history"
+        return out
+    out["best_kg"] = best["weight_kg"]
+    out["basis"] = best
+    out["status"] = "ok"
+    return out
+
+
+def prescription_floor(
+    template_id: str | None,
+    history_index: dict[str, list],
+    weight_index: dict[str, float] | None,
+    current_weight_lb: float | None,
+    days_since_last_workout: int | None = 1,
+    layoff_days: int = LAYOFF_DAYS_DEFAULT,
+    as_of: str | None = None,
+    tolerance_days: int | None = None,
+) -> dict[str, Any]:
+    """`band_matched_best` plus the ONE sanctioned subtraction: the layoff discount.
+
+    Without a layoff the floor IS the best achieved load. With one, the floor drops by
+    the deepest documented detraining percentage and carries `layoff_reason` — the
+    "documented layoff reason" acceptance box 1 requires. There is no other path to a
+    floor below an achieved load.
+    """
+    out = band_matched_best(template_id, history_index, weight_index, current_weight_lb, as_of=as_of, tolerance_days=tolerance_days)
+    out.update({"floor_kg": None, "discount_pct": 0, "days_since_last_workout": days_since_last_workout, "layoff_reason": None})
+    if out["status"] != "ok":
+        return out
+
+    floor = float(out["best_kg"])
+    if days_since_last_workout is not None and int(days_since_last_workout) >= int(layoff_days):
+        low, deep = DETRAINING_DISCOUNT_PCT_RANGE
+        out["discount_pct"] = deep
+        out["layoff_reason"] = (
+            f"{int(days_since_last_workout)}d since the last logged session (>= the {int(layoff_days)}d re-entry "
+            f"threshold) — the documented {low}-{deep}% detraining discount applies, and the floor takes the deepest end."
+        )
+        # ONLY the discounted floor is rounded. The undiscounted floor is an achieved
+        # load and is passed through EXACTLY: a 80 lb dumbbell reaches DDB as
+        # 36.28743275485118 kg, and rounding that down to 36.0 would land at 79.4 lb —
+        # a floor below the very set it was derived from, which is the defect.
+        out["floor_kg"] = _floor_half_kg(floor * (100 - deep) / 100.0)
+        return out
+    out["floor_kg"] = floor
+    return out
+
+
+def render_floor_cue(floor: dict[str, Any]) -> str:
+    """The reader-facing line. Factual only — a load, a date, a bodyweight band.
+
+    Never a conditional: the whole defect is a cue that makes the athlete decide
+    whether to 'go for' a number the platform already watched him hit.
+    """
+    if not floor or floor.get("status") != "ok" or not floor.get("floor_kg"):
+        return ""
+    basis = floor.get("basis") or {}
+    reps = "/".join(str(r) for r in (basis.get("reps") or []))
+    got = f"{_fmt_load(float(basis.get('weight_kg') or 0))}"
+    if reps:
+        got += f" x {reps}"
+    cue = f"Floor {_fmt_load(float(floor['floor_kg']))} — you did {got} on {basis.get('date')} at {basis.get('bodyweight_lb')} lb."
+    if floor.get("layoff_reason"):
+        cue += f" Discounted {floor['discount_pct']}% for the layoff."
+    return cue + " Down on the day if you must, never up."
+
+
+def _set_field(s: Any, name: str, value: Any) -> None:
+    if isinstance(s, dict):
+        s[name] = value
+    else:
+        setattr(s, name, value)
+
+
+def _get_field(s: Any, name: str, default: Any = None) -> Any:
+    return s.get(name, default) if isinstance(s, dict) else getattr(s, name, default)
+
+
+def apply_prescription_floor(sets: list[Any], floor: dict[str, Any]) -> list[str]:
+    """Raise every working set to the floor, IN PLACE. Returns one line per correction.
+
+    Works on IR `Set` dataclasses and on plain dicts (the wire/replay shape), because
+    the two specimens this exists for are stored routines, not freshly generated ones.
+    Warm-ups and non-load sets (distance/duration) are untouched — a floor is a claim
+    about working load, and stamping it on a warm-up would be a different lie.
+    """
+    corrections: list[str] = []
+    floor_kg = (floor or {}).get("floor_kg")
+    if not floor_kg:
+        return corrections
+    floor_kg = float(floor_kg)
+    for i, s in enumerate(sets or []):
+        if str(_get_field(s, "type", "normal") or "normal").lower() == "warmup":
+            continue
+        if _get_field(s, "distance_meters") or _get_field(s, "duration_seconds"):
+            continue
+        current = _get_field(s, "weight_kg")
+        if current is None:
+            _set_field(s, "weight_kg", floor_kg)
+            corrections.append(f"set {i + 1}: no load prescribed -> {_fmt_load(floor_kg)} (the floor)")
+        elif float(current) < floor_kg - 1e-6:
+            corrections.append(f"set {i + 1}: {_fmt_load(float(current))} -> {_fmt_load(floor_kg)} (below the floor)")
+            _set_field(s, "weight_kg", floor_kg)
+    return corrections
 
 
 def _muscle_budget(
@@ -219,6 +461,73 @@ def _build_exercise_note(
     facts = history_facts(template_id, history_index)
     history_cue = render_history_cue(facts, weight_index=weight_index)
     return pick_note(history_cue, ai_comment=None, mode=notes_mode)
+
+
+def _enforce_load_floors(
+    exercises: list[ExerciseBlock],
+    catalog: dict[str, Any],
+    history_index: dict[str, list],
+    weight_index: dict[str, float],
+    target_date: str,
+    days_since_last_workout: int | None,
+    layoff_days: int,
+    rationale: list[str],
+) -> dict[str, Any]:
+    """Derive and APPLY the prescription floor for every block. Returns the audit dict.
+
+    This is acceptance box 1's enforcement point: one place where a prescribed load is
+    compared against what he has already done at this bodyweight, and raised if it is
+    lower. It is deliberately the LAST thing that touches load, so nothing downstream
+    of it can undercut the floor without going through it.
+
+    The audit dict lands in `inputs_snapshot["load_floors"]` — with the `status` of
+    every block, including the ones that got NO floor and why. A silent absence would
+    read as "the rule was satisfied"; it usually means the bodyweight or the history
+    was missing.
+    """
+    from training.exercise_history import nearest_bodyweight
+
+    current_lb = nearest_bodyweight(target_date, weight_index)
+    audit: dict[str, Any] = {
+        "rule": SUBTRACT_ONLY_RULE,
+        "current_bodyweight_lb": round(float(current_lb), 1) if current_lb else None,
+        "band": band_key(float(current_lb)) if current_lb else None,
+        "movements": {},
+    }
+    if not current_lb:
+        audit["status"] = "no_current_bodyweight"
+        rationale.append("load floors UNAVAILABLE: no weigh-in within tolerance of the target date — no floor was asserted (#3927)")
+        return audit
+    audit["status"] = "applied"
+
+    for block in exercises:
+        template_id = catalog.get("movements", {}).get(block.movement_key, {}).get("hevy_template_id_hint")
+        floor = prescription_floor(
+            template_id,
+            history_index,
+            weight_index,
+            current_lb,
+            days_since_last_workout=days_since_last_workout,
+            layoff_days=layoff_days,
+            as_of=target_date,
+        )
+        corrections = apply_prescription_floor(block.sets, floor)
+        cue = render_floor_cue(floor)
+        if cue:
+            block.notes = f"{block.notes} {cue}".strip() if block.notes else cue
+        audit["movements"][block.movement_key] = {
+            "status": floor["status"],
+            "template_id": template_id,
+            "floor_kg": floor.get("floor_kg"),
+            "best_kg": floor.get("best_kg"),
+            "basis": floor.get("basis"),
+            "discount_pct": floor.get("discount_pct"),
+            "layoff_reason": floor.get("layoff_reason"),
+            "corrections": corrections,
+        }
+        if corrections:
+            rationale.append(f"{block.movement_key}: floor applied — " + "; ".join(corrections))
+    return audit
 
 
 def _portfolio_guard(z2_minutes_7d: float, z2_floor: float) -> bool:
@@ -354,6 +663,21 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         budget_used[muscle] = muscle_sets
         rationale.append(f"{muscle}: {muscle_sets} sets ({len(picks)} movements)")
 
+    # #3927 — the subtract-only pass. Runs AFTER selection, over the same history the
+    # notes were rendered from, so the load a block carries and the load its cue quotes
+    # cannot disagree. Ideal variant only: `floor`/`re_entry` prescribe no load at all,
+    # and a floor stamped on a deliberately-easy variant would be the opposite rule.
+    load_floors = _enforce_load_floors(
+        exercises,
+        catalog,
+        history_index,
+        weight_index,
+        target_date=inputs.target_date,
+        days_since_last_workout=inputs.days_since_last_workout,
+        layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
+        rationale=rationale,
+    )
+
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],
@@ -378,7 +702,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         status="draft",
         exercises=exercises,
         budget_used=budget_used,
-        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog),
+        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog) | {"load_floors": load_floors},
         rationale=rationale,
         caps=caps,
     )

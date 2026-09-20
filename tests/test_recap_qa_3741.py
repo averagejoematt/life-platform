@@ -133,7 +133,7 @@ def test_the_lambda_holds_a_card_the_qa_fails(monkeypatch):
     monkeypatch.setattr(recap_data, "day_facts", lambda *a, **k: facts)
     # Plant the defect at the frame, not the facts: the audit sees a clipped string.
     monkeypatch.setattr(recap_qa, "audit_image", lambda img, **k: recap_qa.QaResult(hard=["clipped [72,1080] 'planted'"], strings=1))
-    out = C.render_for_date("2026-09-16", deliver=True, force=True, dry_run=True)
+    out = C.render_for_date("2026-09-16", deliver=True, force=True, dry_run=False)  # #3942: a dry run records nothing
     assert out["outcome"] == "held_qa"
     assert puts == {}, "nothing stored"
     assert records["DATE#2026-09-16"]["qa"]["status"] == "held"

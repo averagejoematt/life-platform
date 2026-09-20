@@ -1167,6 +1167,16 @@ jobs:
           # rather than with a suppression list. Nothing here string-matches a
           # check name (box 4); the wrapper calls the SAME smoke_oracle_decision
           # and simply counts its verdict.
+          #
+          # #3830 parity, the other direction: the wrapper's re-invoke carries
+          # `gate_recheck=true`. The alerter emails when the SAME check fails in
+          # two CONSECUTIVE RUNS of the 4-hourly cadence; a retry 20s later would
+          # otherwise read the state attempt 1 just wrote and hand the alerter its
+          # own second occurrence, mailing "persistent failure" about a 30-second
+          # vendor blip. A re-check runs every check and emits every metric (the
+          # alarms stay as loud) but leaves CANARY#last_state alone and never
+          # sends. The gate must not be more confident than the alerter — and it
+          # must not manufacture the alerter's confidence either.
           python3 deploy/lib/canary_gate_retry.py \
             --function life-platform-canary \
             --region ${{ env.AWS_REGION }} \

@@ -275,7 +275,7 @@ def test_restamp_repush_body_carries_new_recommended_branch_exercises(restamp):
     pushed_ids = [e["exercise_template_id"] for e in pushed_body["routine"]["exercises"]]
     assert pushed_ids == ["T2"]  # easier's own exercise — now recommended, now pushed
     # The notes menu still shows BOTH branches — self-selection preserved.
-    assert "AS-WRITTEN" in pushed_body["routine"]["notes"] and "EASIER" in pushed_body["routine"]["notes"]
+    assert "AS-WRITTEN" in pushed_body["routine"]["exercises"][0]["notes"] and "EASIER" in pushed_body["routine"]["exercises"][0]["notes"]
 
 
 def test_conflict_fails_open(restamp):

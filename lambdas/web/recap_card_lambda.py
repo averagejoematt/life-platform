@@ -49,6 +49,7 @@ only way to know why is this row.
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from typing import Any
@@ -230,6 +231,23 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     from web import recap_canvas, recap_layouts, recap_qa
 
     sk = f"DATE#{date}"
+
+    # #3942: `dry_run` gates EVERY write, not only delivery. Before this, a "dry run" meant to
+    # inspect a card republished three live `recap/` objects and moved the row's `rendered_at`
+    # — a dry run is the thing you reach for BECAUSE you believe it cannot mutate. Under
+    # dry_run nothing is put to S3 and no row is written; the returned record carries the
+    # would-be keys marked `storage: "dry_run"` and the rendered bytes (base64) so the run is
+    # still useful for inspection.
+    def _rec(row_sk: str, payload: dict[str, Any]) -> None:
+        if dry_run:
+            return
+        _record(row_sk, payload)
+
+    def _store(key: str, body: bytes) -> None:
+        if dry_run:
+            return
+        _s3.put_object(Bucket=S3_BUCKET, Key=key, Body=body, ContentType="image/png")
+
     if not force:
         prior = _existing(sk)
         if prior and (prior.get("delivered") or {}).get("telegram") in ("ok", "dry_run"):
@@ -294,6 +312,8 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         "coach_line_status": coach_line_status,
         "rendered_at": pacific_now().isoformat(),
         "dry_run": dry_run,
+        # #3942: a would-be key and a written key must not read the same.
+        "storage": "dry_run" if dry_run else "written",
         **base_extra,
     }
 
@@ -314,7 +334,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         free_text=facts.free_text(),
     )
     if not verdict.may_send:
-        _record(sk, {**base, "outcome": "held", "privacy": verdict.to_dict()})
+        _rec(sk, {**base, "outcome": "held", "privacy": verdict.to_dict()})
         logger.warning("recap for %s held by the privacy gate: %s", date, verdict.reason)
         return {**base, "outcome": "held"}
 
@@ -330,14 +350,14 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
             base["beat"] = layout = "scorecard"
             base["beat_reason"] = f"fell back from {layout} — {type(e).__name__}"
         except Exception as e2:  # noqa: BLE001
-            _record(sk, {**base, "outcome": "no_signal", "error": f"{type(e2).__name__}: {e2}"})
+            _rec(sk, {**base, "outcome": "no_signal", "error": f"{type(e2).__name__}: {e2}"})
             return {**base, "outcome": "no_signal"}
 
     # QA AFTER RENDER, BEFORE STORE. The frame is judged, not the inputs.
     qa1 = recap_qa.audit_image(img, margin=recap_layouts.M)
     base["qa"] = qa1.to_dict()
     if not qa1.may_store:
-        _record(sk, {**base, "outcome": "held_qa", "privacy": verdict.to_dict()})
+        _rec(sk, {**base, "outcome": "held_qa", "privacy": verdict.to_dict()})
         logger.warning("recap for %s held by render QA: %s", date, qa1.hard[:3])
         return {**base, "outcome": "held_qa"}
 
@@ -347,7 +367,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         # No CacheControl and no CloudFront invalidation: this object is NOT served. There
         # is no /recap/* behaviour on the distribution, deliberately — the card is private
         # until he posts it (ADR-140 rule 5, human selection only).
-        _s3.put_object(Bucket=S3_BUCKET, Key=key, Body=png, ContentType="image/png")
+        _store(key, png)
     except Exception as e:  # noqa: BLE001
         logger.error("recap put_object failed for %s: %s: %s", key, type(e).__name__, e)
 
@@ -365,7 +385,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
                 raise RuntimeError(f"render QA held the detail card: {qa2.hard[:3]}")
             detail_png = recap_canvas.to_png_bytes(dimg)
             detail_key = f"{RECAP_PREFIX}{date}-detail.png"
-            _s3.put_object(Bucket=S3_BUCKET, Key=detail_key, Body=detail_png, ContentType="image/png")
+            _store(detail_key, detail_png)
         except Exception as e:  # noqa: BLE001
             logger.warning("detail card could not render for %s: %s: %s", date, type(e).__name__, e)
             base["detail_error"] = f"{type(e).__name__}: {e}"
@@ -393,8 +413,11 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
             if not qa3.may_store:
                 raise RuntimeError(f"render QA held the weekly card: {qa3.hard[:3]}")
             weekly_key = f"{RECAP_PREFIX}week-{week_n:02d}.png"
-            _s3.put_object(Bucket=S3_BUCKET, Key=weekly_key, Body=recap_canvas.to_png_bytes(wimg), ContentType="image/png")
-            base["weekly"] = {"week": week_n, "s3_key": weekly_key, "totals": totals}
+            weekly_png = recap_canvas.to_png_bytes(wimg)
+            _store(weekly_key, weekly_png)
+            base["weekly"] = {"week": week_n, "s3_key": weekly_key, "totals": totals, "storage": base["storage"]}
+            if dry_run:
+                base["weekly"]["png_base64"] = base64.b64encode(weekly_png).decode("ascii")
         except Exception as e:  # noqa: BLE001
             logger.error("weekly card failed for %s: %s: %s", date, type(e).__name__, e)
             base["weekly"] = {"error": f"{type(e).__name__}: {e}"}
@@ -442,7 +465,12 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         "caption": caption,
         "detail_caption": detail_caption or None,
     }
-    _record(sk, record)
+    if dry_run:
+        # The bytes ride in the result so a dry run is still an inspection, not a no-op.
+        record["png_base64"] = base64.b64encode(png).decode("ascii")
+        if detail_png:
+            record["detail_png_base64"] = base64.b64encode(detail_png).decode("ascii")
+    _rec(sk, record)
     return record
 
 

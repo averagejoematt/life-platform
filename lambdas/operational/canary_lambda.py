@@ -41,6 +41,20 @@ Severity lanes (#2051):
   same key qa-smoke publishes for #1921) and `failed_stored_state`. `all_pass`
   and `failures` remain the honest UNION of both lanes.
 
+Gate re-check — `{"gate_recheck": true}` (#3830):
+  The deploy gate re-invokes this canary ~20s after a gating verdict
+  (deploy/lib/canary_gate_retry.py) so that no single observation can revert a
+  fleet. That second look is the SAME look taken again — it is not a second
+  RUN, and the alerter's "failed in 2 consecutive runs" window means two runs of
+  the 4-hourly cadence, not two invocations 20 seconds apart. Without this flag
+  the gate's own retry would supply the alerter's second occurrence and email
+  "persistent failure" about a 30-second vendor blip the alerter had already
+  decided to suppress. A `gate_recheck` invocation therefore neither READS nor
+  WRITES USER#system / CANARY#last_state and never emails; everything else —
+  every check, every CloudWatch metric, every lane count, the statusCode and the
+  full body — is identical, so the alarms stay exactly as loud and the gate
+  still gets an honest verdict to read.
+
 Lambda: life-platform-canary
 Schedule: rate(4 hours)
 IAM role: lambda-canary-role
@@ -605,6 +619,45 @@ def send_alert(failures: list[dict], canary_ts: str, dry_run: bool = False) -> N
         print(f"[WARN] SES alert failed: {e}")
 
 
+# ── Gate re-check (#3830) ──────────────────────────────────────────────────────
+
+#: The event key the deploy gate's retry sets on its SECOND and later looks.
+#: Named once here; `deploy/lib/canary_gate_retry.py` is the only caller.
+#: Deliberately NOT given a `GATE_` prefix (#3315): `gate_census._REGISTRY_NAME`
+#: matches that shape and expands the binding entry-by-entry as a gate registry, so
+#: a one-string constant named that way mints a phantom unproven gate in the census
+#: ledger. The fix for a registry-shaped name is the name, never a ledger line.
+RECHECK_EVENT_KEY = "gate_recheck"
+
+
+def is_gate_recheck(event: Any) -> bool:
+    """True when this invocation is the deploy gate taking a SECOND look.
+
+    Why the canary has to know. On 2026-09-15 a Bedrock 503 reached three
+    consumers of one datapoint and the most destructive one — the deploy gate —
+    was the most confident. #3831 demoted recognised vendor transients out of the
+    gating lane and `canary_gate_retry.py` added the backstop for the failure
+    modes nobody has named yet: re-invoke, and gate only if the second look fails
+    too.
+
+    That retry buys the gate parity with the alerter and, unguarded, takes it
+    straight back out the other side. The alerter suppresses a failure it has not
+    seen before and emails only when the SAME check fails in two consecutive runs
+    — two runs of `rate(4 hours)`. A retry 20 seconds later reads the state the
+    first attempt just wrote, so the gate's own second look becomes the alerter's
+    second occurrence, and a 30-second vendor blip mails the operator claiming a
+    persistent failure. The gate would once again be manufacturing confidence the
+    datapoint does not support; it would just be doing it through the alerter.
+
+    So a re-check is an observation, not a run: it reports its verdict and leaves
+    the first-occurrence window exactly as it found it. Deliberately conservative
+    on the parse — anything other than a literal `True` is a normal run, because
+    the failure mode of a mis-read flag must be "the alerter behaves as it always
+    has", never "the canary silently stopped emailing".
+    """
+    return isinstance(event, dict) and event.get(RECHECK_EVENT_KEY) is True
+
+
 # ── Handler ────────────────────────────────────────────────────────────────────
 
 
@@ -729,41 +782,58 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         # USER#system / CANARY#last_state — read previous failed checks, alert
         # only on the intersection, then persist current.
         current_failed = sorted({f["check"] for f in failures})
-        try:
-            _state_key = {"pk": {"S": "USER#system"}, "sk": {"S": "CANARY#last_state"}}
-            _ddb_cli = boto3.client("dynamodb", region_name=REGION)
-            _prev = _ddb_cli.get_item(TableName=TABLE_NAME, Key=_state_key).get("Item") or {}
-            prev_failed = set((_prev.get("failed_checks", {}).get("SS") or []))
-            # Persist current state for the next run's comparison
-            _ddb_cli.put_item(
-                TableName=TABLE_NAME,
-                Item={
-                    **_state_key,
-                    "failed_checks": {"SS": current_failed} if current_failed else {"SS": ["__none__"]},
-                    "ts": {"S": canary_ts},
-                },
-            )
-        except Exception as _se:
-            print(f"[WARN] canary state read/write failed (defaulting to no-alert): {_se}")
-            prev_failed = set()
-
-        # #2051: the two-consecutive-runs suppression is right for INFRA checks
-        # (a Bedrock 503 or an MCP cold start is genuinely transient) and wrong
-        # for stored state — a leftover row is not a blip, it is a fact that
-        # persists until someone deletes it, and it no longer has a rollback to
-        # make it loud. So stored-state failures alert on FIRST occurrence.
-        persistent_failures = [f for f in failures if f["check"] in prev_failed]
-        _persistent_keys = {f["check"] for f in persistent_failures}
-        first_occurrence_stored_state = [f for f in failures if f["lane"] == LANE_STORED_STATE and f["check"] not in _persistent_keys]
-        to_alert = persistent_failures + first_occurrence_stored_state
-        if to_alert:
+        # #3830: a re-check is the deploy gate's SECOND LOOK at the same
+        # observation, ~20s after the first — not a second RUN. It takes no part
+        # in the consecutive-runs window: it neither reads it (nothing here may
+        # be promoted to "persistent" by the attempt that preceded it seconds
+        # ago) nor writes it (the scheduled cadence's memory must be exactly what
+        # it would have been had the gate never re-invoked), and it never emails.
+        # Without this, the retry that exists to stop the gate being more
+        # confident than the alerter would hand the alerter its own second
+        # occurrence and mail "persistent failure" about a 30-second blip.
+        gate_recheck = is_gate_recheck(event)
+        if gate_recheck:
             print(
-                f"  Sending alert: {len(persistent_failures)} persistent + "
-                f"{len(first_occurrence_stored_state)} first-occurrence stored-state failure(s)"
+                f"  Alerting: SKIPPED — deploy-gate re-check (#3830). {len(failures)} failure(s) observed and "
+                "reported below; CANARY#last_state left untouched, no email — a second look is not a second "
+                "run, and the 4-hourly cadence owns the first-occurrence window."
             )
-            send_alert(to_alert, canary_ts, dry_run=dry_run)
-        elif failures:
-            print(f"  Suppressed first-occurrence alert ({len(failures)} new infra failure(s)); will alert if repeat next run")
+        else:
+            try:
+                _state_key = {"pk": {"S": "USER#system"}, "sk": {"S": "CANARY#last_state"}}
+                _ddb_cli = boto3.client("dynamodb", region_name=REGION)
+                _prev = _ddb_cli.get_item(TableName=TABLE_NAME, Key=_state_key).get("Item") or {}
+                prev_failed = set((_prev.get("failed_checks", {}).get("SS") or []))
+                # Persist current state for the next run's comparison
+                _ddb_cli.put_item(
+                    TableName=TABLE_NAME,
+                    Item={
+                        **_state_key,
+                        "failed_checks": {"SS": current_failed} if current_failed else {"SS": ["__none__"]},
+                        "ts": {"S": canary_ts},
+                    },
+                )
+            except Exception as _se:
+                print(f"[WARN] canary state read/write failed (defaulting to no-alert): {_se}")
+                prev_failed = set()
+
+            # #2051: the two-consecutive-runs suppression is right for INFRA checks
+            # (a Bedrock 503 or an MCP cold start is genuinely transient) and wrong
+            # for stored state — a leftover row is not a blip, it is a fact that
+            # persists until someone deletes it, and it no longer has a rollback to
+            # make it loud. So stored-state failures alert on FIRST occurrence.
+            persistent_failures = [f for f in failures if f["check"] in prev_failed]
+            _persistent_keys = {f["check"] for f in persistent_failures}
+            first_occurrence_stored_state = [f for f in failures if f["lane"] == LANE_STORED_STATE and f["check"] not in _persistent_keys]
+            to_alert = persistent_failures + first_occurrence_stored_state
+            if to_alert:
+                print(
+                    f"  Sending alert: {len(persistent_failures)} persistent + "
+                    f"{len(first_occurrence_stored_state)} first-occurrence stored-state failure(s)"
+                )
+                send_alert(to_alert, canary_ts, dry_run=dry_run)
+            elif failures:
+                print(f"  Suppressed first-occurrence alert ({len(failures)} new infra failure(s)); will alert if repeat next run")
 
         # ── Lane verdicts (#2051) ───────────────────────────────────────────
         # Derived from `results` itself, so the lane counts and the reported

@@ -57,6 +57,7 @@ jobs:
             0) echo "::notice::Every ritual is inside its window AND has run at least once." ;;
             1) echo "::error::A judgment ritual is OVERDUE. Run it — its dated artifact is the only honest reset (never re-anchor)." ;;
             3) echo "::error::A ritual has NEVER produced its artifact (#3250): anchored is not run. Run it, or retire it with a dated EXEMPT row." ;;
+            4) echo "::error::EXIT_STALE_CARRY (#3603/#3919): nothing is late, but a lens grade has been CARRIED past the 28-day cap — the next review must grade it from scratch (carrying is not grading)." ;;
             *) echo "::error::scripts/operating_calendar.py exited ${rc} — unexpected; read the output above." ;;
           esac
           exit "${rc}"

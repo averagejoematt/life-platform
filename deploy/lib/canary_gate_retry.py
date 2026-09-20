@@ -39,6 +39,18 @@ WHAT IT DELIBERATELY DOES NOT DO
     gate to keep working. (The opposite-direction control is
     `test_a_persistent_access_denied_still_gates_through_every_attempt`.)
   * **It does not retry a PASS.** A healthy first look costs exactly one invocation.
+  * **Its retry does not become the alerter's second occurrence.** Every attempt after the
+    first carries `{"gate_recheck": true}`, which tells the canary this is the same look
+    taken again rather than a second RUN: it leaves `USER#system / CANARY#last_state`
+    untouched and sends no email. Without it this wrapper would buy gate/alerter parity
+    and immediately spend it — the alerter emails when the SAME check fails in two
+    consecutive runs (two runs of `rate(4 hours)`), and a re-invoke 20 seconds later reads
+    the state attempt 1 just wrote, so a 30-second vendor blip would mail the operator
+    "persistent failure" about the datapoint the alerter had already suppressed. The
+    canary keeps running every check and emitting every CloudWatch metric on a re-check,
+    so the alarms stay exactly as loud; only the email window is left alone. An older
+    deployed canary ignores the unknown key and behaves as it does today, so the flag is
+    safe to ship ahead of the fleet deploy that honours it.
 
 WHY NOT IN THE WORKFLOW'S SHELL
   The decision this makes is worth a must-fail control, and a `||` chain in a YAML `run:`
@@ -119,10 +131,27 @@ def run_attempts(invoke, attempts: int, delay: float, sleep=time.sleep, log=prin
             log(
                 f"::warning::Canary attempt {n}/{attempts} was {verdict} ({detail}) — "
                 f"re-invoking in {delay:g}s before gating the deploy (#3830). "
-                f"A single observation must not revert a fleet; a persistent fault will fail this retry too."
+                f"A single observation must not revert a fleet; a persistent fault will fail this retry too. "
+                f"The re-invoke carries gate_recheck=true, so it reports its verdict without touching the "
+                f"alerter's first-occurrence window."
             )
             sleep(delay)
     return verdicts
+
+
+#: The payload for attempt 1: an ordinary canary run, byte-identical to the scheduled one.
+FIRST_LOOK_PAYLOAD = "{}"
+#: The payload for every attempt AFTER the first. `gate_recheck` is read by
+#: `lambdas/operational/canary_lambda.is_gate_recheck`: the run reports its verdict in full
+#: but takes no part in the alerter's consecutive-runs window and sends no email. This is
+#: not a check name and not a failure classification — the lane decision stays entirely in
+#: `canary_lanes.py` (#3830 box 4).
+RECHECK_PAYLOAD = json.dumps({"gate_recheck": True})
+
+
+def payload_for(attempt: int) -> str:
+    """Attempt 1 is a run; every later attempt is the same look, taken again."""
+    return FIRST_LOOK_PAYLOAD if attempt <= 1 else RECHECK_PAYLOAD
 
 
 def _aws_invoke(function: str, region: str, out: Path, label: str, ok_extra: tuple):
@@ -133,7 +162,7 @@ def _aws_invoke(function: str, region: str, out: Path, label: str, ok_extra: tup
         cmd = [
             "aws", "lambda", "invoke",
             "--function-name", function,
-            "--payload", "{}",
+            "--payload", payload_for(n),
             "--region", region,
             "--cli-binary-format", "raw-in-base64-out",
             str(target),

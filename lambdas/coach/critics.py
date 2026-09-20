@@ -948,6 +948,9 @@ def notes_block(ir: Any) -> str:
 
 
 def with_notes_block(why_note: str, ir: Any) -> str:
+    """#3938 (2026-09-20): no longer called at commit/dry_run — the block rides on exercises[0].notes
+    via `_place_block_on_first_exercise` (Hevy has no routine-level notes field), and composing it
+    here as well stacked it twice on that channel. Kept for callers that want the composed form."""
     block = notes_block(ir)
     return f"{why_note}\n\n{block}" if block and why_note else (block or why_note)
 
@@ -967,7 +970,10 @@ def thread_entry(ir: Any, *, today: str) -> dict[str, Any]:
         f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" + (f" on {v['metric']}={_fmt(v.get('value'))}" if v.get("metric") else "")
         for v in verdicts
     )
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3900: tagger-blind pk, class-gated stamp
+
     return {
+        **experiment_stamp_for("USER#matthew", f"SOURCE#coach_thread#training#{today}#critics"),
         "pk": "USER#matthew",
         "sk": f"SOURCE#coach_thread#training#{today}#critics",
         "coach_id": "training",

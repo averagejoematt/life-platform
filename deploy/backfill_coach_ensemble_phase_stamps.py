@@ -110,6 +110,24 @@ INSIGHTS_PK = f"USER#{USER_ID}#SOURCE#insights"
 _ENSEMBLE_PKS = ["ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "ENSEMBLE#docket"]
 
 
+# #3900 (2026-09-20): the four tagger-blind families the widened nightly audit surfaced — 35 live
+# rows on 2026-09-19 (PERSONA 19, bare-USER coach_thread 14, COACH#commitments 1, NARRATIVE 1).
+# A family here is (pk, sk_prefix | None): the bare `USER#matthew` pk holds many sk families and
+# only `SOURCE#coach_thread#` is in scope; NARRATIVE#arc is limited to HISTORY# because
+# STATE#current's `phase` is the arc state (cycle-only by ruling — see phase_taxonomy).
+TAGGER_BLIND_FAMILIES: list[tuple[str, str | None]] = [
+    ("PERSONA#elena", None),
+    ("COACH#commitments", None),
+    ("NARRATIVE#arc", "HISTORY#"),
+    ("USER#matthew", "SOURCE#coach_thread#"),
+]
+
+
+def target_families() -> list[tuple[str, str | None]]:
+    """Every (pk, sk_prefix) this tool repairs: the original COACH#/ENSEMBLE#/insights set plus the #3900 four."""
+    return [(pk, None) for pk in target_pks()] + list(TAGGER_BLIND_FAMILIES)
+
+
 def target_pks() -> list[str]:
     """The tagger-blind COACH#/ENSEMBLE# set this tool was born for, plus (#3513) the
     insights partition. The nightly (`qa_smoke_lambda.check_coach_ensemble_phase_stamp_
@@ -132,13 +150,14 @@ def row_stamp(pk: str, item: dict, default_stamp: dict) -> dict | None:
     return experiment_stamp(as_of=d)
 
 
-def query_unstamped(table, pk: str) -> list[dict]:
-    """Every item under `pk` with no `phase` attribute. Paginated Query, no Scan."""
+def query_unstamped(table, pk: str, sk_prefix: str | None = None) -> list[dict]:
+    """Every item under `pk` (optionally under `sk_prefix`) with no `phase` attribute. Paginated Query, no Scan."""
     items: list[dict] = []
     lek = None
     while True:
+        cond = Key("pk").eq(pk) if not sk_prefix else (Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix))
         kw = {
-            "KeyConditionExpression": Key("pk").eq(pk),
+            "KeyConditionExpression": cond,
             "FilterExpression": "attribute_not_exists(#phase)",
             "ExpressionAttributeNames": {"#phase": "phase"},
         }
@@ -214,14 +233,16 @@ def main() -> int:
     total_found = 0
     total_fixed = 0
     total_protected = 0
-    for pk in target_pks():
-        items = query_unstamped(table, pk)
+    for pk, sk_prefix in target_families():
+        items = query_unstamped(table, pk, sk_prefix)
         if not items:
             continue
         stampable, protected = split_by_class(pk, items)  # #2520: never stamp a non-EXPERIMENT_SCOPED row
         total_found += len(stampable)
         total_protected += len(protected)
-        print(f"\n{pk}: {len(items)} unstamped row(s) — {len(stampable)} to stamp, {len(protected)} protected")
+        print(
+            f"\n{pk}{('/' + sk_prefix + '*') if sk_prefix else ''}: {len(items)} unstamped row(s) — {len(stampable)} to stamp, {len(protected)} protected"
+        )
         for sk, cls in protected:
             print(f"    {sk} -> SKIP ({cls}) — correctly unstamped; a stamp here marks it for the next reset wipe")
         for it in stampable:
