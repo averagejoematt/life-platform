@@ -127,7 +127,8 @@ def test_exercise_notes_populated_from_history_index(monkeypatch):
     }
     from training import exercise_history
 
-    monkeypatch.setattr(exercise_history, "load_recent_history", lambda lookback_days=180, today=None: fake_index)
+    # #3700: the generator now takes BOTH indexes from one Query — (weighted, cardio).
+    monkeypatch.setattr(exercise_history, "load_history_indexes", lambda lookback_days=180, today=None: (fake_index, {}))
     routines = generate_routines(_green_inputs("2026-06-01"))
     ideal = next(r for r in routines if r.variant == "ideal")
     notes = [(ex.movement_key, ex.notes) for ex in ideal.exercises]
@@ -160,9 +161,9 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
 
     def _spy(*a, **k):
         called["loaded"] = True
-        return {}
+        return ({}, {})
 
-    monkeypatch.setattr(exercise_history, "load_recent_history", _spy)
+    monkeypatch.setattr(exercise_history, "load_history_indexes", _spy)
 
     routines = generate_routines(_green_inputs("2026-06-01"))
     ideal = next(r for r in routines if r.variant == "ideal")

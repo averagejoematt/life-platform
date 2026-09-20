@@ -369,7 +369,8 @@ def _generated(monkeypatch):
     from training import exercise_history, routine_generator as rg
 
     monkeypatch.setattr(rg, "CONFIG_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config")))
-    monkeypatch.setattr(exercise_history, "load_recent_history", lambda **kw: _history_index())
+    # #3700: one Query now returns (weighted, cardio); this fixture carries no cardio blocks.
+    monkeypatch.setattr(exercise_history, "load_history_indexes", lambda **kw: (_history_index(), {}))
     monkeypatch.setattr(exercise_history, "load_bodyweight_index", lambda **kw: _weight_index())
     return rg.generate_routines(
         rg.GeneratorInputs(
