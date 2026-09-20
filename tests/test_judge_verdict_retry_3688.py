@@ -382,6 +382,16 @@ _RESIDUAL = {
         "branch, which needs EVERY record degraded, so one truncated note among healthy ones is "
         "silent. Folded onto #3828.",
     ),
+    "lambdas/coach/critics.py": (
+        "#3828",
+        "#3752's four debrief critics — `parse_model_verdict` names a `max_tokens` stop as a parse "
+        "error and the DETERMINISTIC verdict stands (the model is bounded to escalating one step on a "
+        "flagged metric; a lost reply loses the sentence, never the verdict). It does not retry, for "
+        "the same reason as training_notes_llm above: MAX_TOKENS and the packet are both fixed, so a "
+        "truncation here is deterministic and N retries bill N times for N identical failures. What "
+        "is missing is the same thing #3828 box 1 names — a live truncation is recorded on the verdict "
+        "(`model.error`) and in the routine's inputs_snapshot, but counted nowhere an operator reads.",
+    ),
     "lambdas/ai/bedrock_client.py": (
         "#2893",
         "the fleet-wide truncation METER (_meter_truncation) — it WARNs and returns the response "

@@ -922,7 +922,7 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 18,
+    "ai_features": 19,
     "alarms": 131,
     "emf_namespaces": 31,
     "schedules": 90,
@@ -1102,6 +1102,13 @@
       "lambda": "coach-prediction-evaluator",
       "module": "lambdas/coach/coach_prediction_evaluator.py",
       "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/critics.py",
+      "partition": "coach_thread",
       "via": "pk"
     },
     {
@@ -7119,7 +7126,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 682,
+      "edges": 683,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7134,8 +7141,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 336,
-        "sites_resolved": 844,
-        "sites_total": 1180
+        "sites_resolved": 845,
+        "sites_total": 1181
       },
       "schedule_resolution": {
         "dynamic": 0,

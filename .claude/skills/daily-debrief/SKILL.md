@@ -40,6 +40,15 @@ blending to consensus: Sarah Chen (sports science/periodization), Victor Reyes
 (adherence), Henning (rigor). Be science-led and willing to push back — never the generic
 answer, never what Matthew wants to hear.
 
+**The board is a lens, not the red team.** The red team is `plan_next_session` stage 2
+(#3752): four critics that each hold a DIFFERENT evidence packet and each make a separate
+model call — muscle-defense (anchor-lift trend + protein), joints/tendons (pain flags,
+novelty, streak), rate-advocate (the owner's redlines and which tripwires are clear),
+blueprint historian (the band reference + the #3717 attestation, labelled). One model
+role-playing six personas cannot disagree with itself about data it was handed all at
+once; the critics can, and each must name the number it argued from. Do not describe a
+plan as red-teamed unless stage 2 ran on the routine you are committing.
+
 ### 1. FRESHNESS & COMPLETENESS FIRST (carries over verbatim from COACH_SESSION.md §1)
 
 Before trusting any computed number: `get_freshness_status`, and verify completeness —
@@ -141,10 +150,23 @@ Matthew authors at night and trains the next morning with zero chance to adjust.
 - Before programming any core/carry/finisher, read the ACTUAL exercise list of the last
   2-3 sessions via `get_workout_detail` (not `get_muscle_volume` — it hides
   Pallof/carries). Don't repeat the same anti-movement pattern on consecutive days.
-- When Matthew's happy with the plan: `manage_hevy_routine` `draft_custom` → `dry_run`
+- When Matthew's happy with the plan: `manage_hevy_routine` `draft_custom` →
+  **`plan_next_session(routine_id=<the draft>)` — the red team (#3752)** → `dry_run`
   (show him the compiled preview, with an "inputs current through X" line so he can
   trust it) → `commit`. **Never pass a title** — it's auto-rendered from
   `Phase - Type - N - Y`.
+  - Read every verdict in `critics.verdicts` and say which metric and number each critic
+    pointed at. A **`veto`** blocks commit (`CRITIC_VETO`): redraft against the reason
+    (substitute the flagged movement, drop the to-failure set, warm one axial pattern) and
+    run stage 2 again. A **`change`** is already applied to the draft — `dry_run` shows
+    the revised body; do not re-apply it by hand. `model: {paused: …}` on a verdict means
+    the deterministic layer alone decided at this budget tier — say so; it is not an
+    approval by a critic that ran.
+  - The historian's packet carries the #3717 attestation with `OWNER-ATTESTED, NOT
+    MEASURED` on it. Whenever you cite a band the attestation covers, say that the
+    measured figure is a floor and the attested minutes are his statement, not a record.
+  - A routine committed without stage 2 carries a `not red-teamed` warning in its
+    result. That is the honest state — never describe such a plan as reviewed.
 - After commit: log the decision to the training coach thread, save the routine spec to
   `docs/coaching/routines/<type>/` (README convention + annotation standard — see that
   README before creating a new file), and remind Matthew to `git commit` the spec.

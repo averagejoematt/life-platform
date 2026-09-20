@@ -858,8 +858,10 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     # Preview the title the way commit will actually render it (the compiler
     # convention), not the raw ir.title placeholder — else dry_run lies about
     # the title (the 2026-06-15 "Push — {date}" false alarm).
+    from coach.critics import with_notes_block
+
     title_ctx, why = _resolve_title_inputs(ir)
-    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=why)
+    body = to_create_body(ir, _make_resolver(), title_context=title_ctx, why_note=with_notes_block(why, ir))
     out = {
         "status": "preview",
         "routine_id": routine_id,
@@ -914,10 +916,17 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     # been a no-op — and the call still returned "committed", so the caller believed a
     # rename landed that never did. Warn by name rather than discard in silence.
     warnings: list[str] = _discarded_commit_title_warnings(args, ir)
+    # #3752: a critic veto blocks the commit; the verdicts ride into the notes (create AND update).
+    from coach.critics import commit_status, veto_reason, with_notes_block
+
+    veto = veto_reason(ir)
+    if veto:
+        return mcp_error("Refusing to commit — critic veto (#3752): " + veto, error_code="CRITIC_VETO")
     folder_note: str | None = None
     try:
         resolve = _make_resolver()
         title_ctx, why = _resolve_title_inputs(ir)
+        why = with_notes_block(why, ir)
         before_updated_at = ir.hevy_updated_at
         took_update_branch = bool(ir.hevy_routine_id)
         if ir.hevy_routine_id:
@@ -967,6 +976,8 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # "unfoldered: <reason>" is how a caller reading nothing but this dict
             # learns the routine landed in the Hevy account root instead of its folder.
             "folder": folder_note or _UPDATE_FOLDER_NOTE,
+            # #3752 — whether the red team ran on THIS routine, in the result, never only in a log.
+            "critics": commit_status(ir),
             # #3718 — what Hevy actually holds, read back after the write.
             **wc.readback_fields(check, took_update_branch),
         }

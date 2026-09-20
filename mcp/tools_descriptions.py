@@ -116,13 +116,18 @@ GET_DAILY_METRICS_DESCRIPTION = (
 GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), and % complete toward goal. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
 
 PLAN_NEXT_SESSION_DESCRIPTION = (
-    "The DETERMINISTIC constraint block for a training session — the same inputs, computed the same way, "
-    "whichever client asks. Returns: the walking-volume gap against his own proven floor (FIRST, because it "
-    "is the largest lever at his current weight), recovery tier, ACWR, 28d per-muscle volume, the "
-    "weight-matched reference WITH the sentences its evidence cannot support, and each owner tripwire as "
-    "tripped / clear / UNKNOWN. No model runs in this tool. Stage 1 of 3: it does not draft the session and "
-    "the adversarial critics are not wired, so a plan built on it is not red-teamed — the payload says so. "
-    "Use before authoring any session, in chat or in Claude Code, so both get the same constraints."
+    "The planning engine, from one place whichever client asks. STAGE 1 (no routine_id): the DETERMINISTIC "
+    "constraint block — the walking-volume gap against his own proven floor (FIRST, because it is the largest "
+    "lever at his current weight), recovery tier, ACWR, 28d per-muscle volume, the weight-matched reference "
+    "WITH the sentences its evidence cannot support, and each owner tripwire as tripped / clear / UNKNOWN. No "
+    "model runs in stage 1. STAGE 2 (pass a drafted routine_id): the RED TEAM (#3752) — four critics, each a "
+    "separate model call over a DISJOINT evidence packet (muscle-defense: anchor-lift trend + protein; "
+    "joints/tendons: pain flags, novelty, streak; rate-advocate: the owner's redlines and which tripwires are "
+    "clear; blueprint historian: the band reference + the labelled #3717 attestation). Each returns approve / "
+    "change <field> to <value> / veto with the metric and number it argued from. Changes are APPLIED to the "
+    "draft and re-checked; a veto BLOCKS commit; the verdicts ride in the Hevy notes and the training coach "
+    "thread. Order: plan_next_session → manage_hevy_routine draft_custom → plan_next_session(routine_id) → "
+    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning."
 )
 
 GET_EXERCISE_HISTORY_DESCRIPTION = (
