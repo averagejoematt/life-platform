@@ -591,8 +591,12 @@ def tool_get_intelligence_quality(args):
             )
         )
         items = [decimal_to_float(i) for i in resp.get("Items", [])]
-    except Exception as e:
-        return {"error": str(e)}
+    except Exception as e:  # noqa: BLE001
+        # #3920: an unreadable validator ledger is not a week with zero flags.
+        from mcp.layer_status import DERIVED_LAYERS, layer_fields, read_status
+
+        status, reason = read_status(error=e)
+        return {"error": str(e), **layer_fields(status, reason, producer=DERIVED_LAYERS["intelligence_quality"]["producer"])}
 
     # Filter
     if coach_filter:
@@ -624,10 +628,16 @@ def tool_get_intelligence_quality(args):
     # number. Guarded by tests/test_mcp_tools_data_behavior.py.
     total_checks = sum(int(i["checks_run"]) for i in items if i.get("checks_run") is not None)
 
+    # #3920: the layer verdict — nightly validator; two silent nights is degraded, and says so.
+    from mcp.layer_status import DERIVED_LAYERS, counted, layer_fields, read_status
+
+    newest = max((str(i.get("date") or "") for i in items), default="") or None
+    status, reason = read_status(newest_date=newest, cadence_days=DERIVED_LAYERS["intelligence_quality"]["cadence_days"])
     return {
         "period": {"start": start_date, "end": end_date},
-        "total_checks": total_checks,
-        "total_flags": len(all_flags),
+        **layer_fields(status, reason, producer=DERIVED_LAYERS["intelligence_quality"]["producer"], newest_date=newest),
+        "total_checks": counted(status, total_checks),
+        "total_flags": counted(status, len(all_flags)),
         "errors": total_errors,
         "warnings": total_warnings,
         "flags": all_flags[:20],  # Cap at 20 for readability

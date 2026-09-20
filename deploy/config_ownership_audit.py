@@ -169,6 +169,15 @@ RULINGS: tuple[Ruling, ...] = (
     ),
     # ── hand_owned: a human edits the repo copy; it is the authority ──
     Ruling(
+        "config/hevy_template_aliases.json",
+        HAND_OWNED,
+        "#3929's confirmed template-ID alias registry (alias exercise_template_id -> canonical movement_key), "
+        "seeded by hand with the Overhead Triceps Extension pair and grown only by a human confirming a "
+        "find_alias_candidates() report — the scoring path never writes it. Read by lambdas/health/adherence_calc.py "
+        "(local copy first, S3 twin as the Lambda fallback); no writer in lambdas/mcp, no repo-side generator. "
+        "Landed 2026-09-20 (PR #3957) without a ruling — the serial pass of every PR red on it until this line.",
+    ),
+    Ruling(
         "config/action_detection_rules.json",
         HAND_OWNED,
         "Hand-authored rule list read by lambdas/intelligence/intelligence_common.py. No writer in lambdas/mcp "

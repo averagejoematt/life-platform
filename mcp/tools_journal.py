@@ -12,6 +12,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific
 
 from mcp.config import USER_PREFIX, table
 from mcp.core import decimal_to_float
+from mcp.layer_status import DERIVED_LAYERS, LAYER_OK, layer_fields  # #3920
 
 # R22-SCI-02 (#820): fit-quality floor for the sentiment-trajectory regressions below.
 # r² < 0.09 is |r| < 0.3 — the same "below moderate" floor already used as the weak/moderate
@@ -551,6 +552,7 @@ def tool_manage_diary_claims(args):
         return {
             "count": len(due),
             "due": due,
+            **layer_fields(LAYER_OK, producer=DERIVED_LAYERS["PREDICTION#"]["producer"]),  # #3920: a derived-layer read says so
             "track_record": dc.track_record(records),
             "how_to_use": (
                 "Call these back ON TAPE, in his own words, before asking anything new — read the claim "
@@ -569,6 +571,7 @@ def tool_manage_diary_claims(args):
         return {
             "count": len(rows),
             "track_record": dc.track_record(records),
+            **layer_fields(LAYER_OK, producer=DERIVED_LAYERS["PREDICTION#"]["producer"]),  # #3920
             "store": "USER#matthew#SOURCE#diary_claims / PREDICTION# — graded by the same evaluator as coach predictions",
             "claims": [
                 {

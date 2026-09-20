@@ -697,7 +697,14 @@ def test_intelligence_quality_surfaces_a_query_failure_as_an_error_payload(quali
     quality_table(boom="ProvisionedThroughputExceeded")
     out = td.tool_get_intelligence_quality({})
     assert "ProvisionedThroughputExceeded" in out["error"]
-    assert set(out) == {"error"}, "a failed read must not also report zero flags as if it had looked"
+    # #3920: the failed read now carries the layer verdict beside the error — still no flag counts.
+    assert set(out) == {
+        "error",
+        "layer_status",
+        "layer_reason",
+        "layer_health",
+    }, "a failed read must not also report zero flags as if it had looked"
+    assert out["layer_status"] == "unavailable" and "total_flags" not in out
 
 
 def test_intelligence_quality_total_checks_is_the_sum_of_each_rows_own_checks_run(quality_table):
