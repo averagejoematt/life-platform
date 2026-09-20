@@ -115,6 +115,7 @@ def tool_get_predictions(args):
     limit = int(args.get("limit", 20))
 
     all_predictions = []
+    unreadable: dict[str, str] = {}  # #3920: a partition that could not be READ is named, never a silent zero
     coaches_to_check = [coach_filter.removesuffix("_coach")] if coach_filter else COACH_IDS
 
     for cid in coaches_to_check:
@@ -156,8 +157,8 @@ def tool_get_predictions(args):
                         "outcome_notes": rec.get("outcome_notes"),
                     }
                 )
-        except Exception:
-            pass
+        except Exception as ex:  # noqa: BLE001
+            unreadable[f"{cid}_coach"] = f"{type(ex).__name__}: {ex}"
 
     # #1841: the subject's OWN on-tape diary claims are prediction-store records too —
     # same shape, same statuses, graded by the same daily evaluator — so they belong in
@@ -207,8 +208,8 @@ def tool_get_predictions(args):
                         "outcome_notes": rec.get("outcome_notes"),
                     }
                 )
-        except Exception:
-            pass
+        except Exception as ex:  # noqa: BLE001
+            unreadable["diary_claims"] = f"{type(ex).__name__}: {ex}"
 
     # Sort by date descending
     all_predictions.sort(key=lambda p: p.get("date") or "", reverse=True)
@@ -217,15 +218,32 @@ def tool_get_predictions(args):
     for p in all_predictions:
         summary[p.get("status", "unknown")] += 1
 
+    # #3920: the layer verdict. Any unreadable partition withholds the totals (they would read
+    # as measured zeros); a readable-but-stale ledger is degraded, and says so.
+    if unreadable:
+        status, reason = read_status(error=RuntimeError("; ".join(f"{k}: {v}" for k, v in unreadable.items())))
+    else:
+        newest = max((p.get("date") or "" for p in all_predictions), default="") or None
+        status, reason = read_status(newest_date=newest, cadence_days=DERIVED_LAYERS["PREDICTION#"]["cadence_days"])
     return {
-        "total": len(all_predictions),
-        "summary": dict(summary),
+        "total": counted(status, len(all_predictions)),
+        "summary": dict(summary) if status in (LAYER_OK, LAYER_DEGRADED) else None,
+        **layer_fields(status, reason, producer=DERIVED_LAYERS["PREDICTION#"]["producer"], unreadable=unreadable),
         "store": (
             "COACH#/PREDICTION# (canonical, evaluator-graded — same store the public site reads), "
             "plus the subject's own on-tape diary claims (#1841, claimant='matthew', PRIVATE — not on the public site)"
         ),
         "predictions": all_predictions[:limit],
     }
+
+
+def _learning_layer(learnings: list) -> dict:
+    """#3920: the LEARNING# ledger's verdict for one coach — ok, or degraded when the newest
+    evaluation is older than two evaluator cadences (the rows are real; the evaluator may be dark)."""
+    dates = [str(l.get("date") or str(l.get("sk", "")).replace("LEARNING#", "").split("#")[0]) for l in learnings]
+    newest = max((d for d in dates if d), default="") or None
+    status, reason = read_status(newest_date=newest, cadence_days=DERIVED_LAYERS["LEARNING#"]["cadence_days"])
+    return layer_fields(status, reason, producer=DERIVED_LAYERS["LEARNING#"]["producer"], newest_date=newest)
 
 
 def tool_get_coach_track_record(args):
@@ -266,8 +284,10 @@ def tool_get_coach_track_record(args):
                 }
             )
         )
-    except Exception as ex:
-        return {"error": str(ex)}
+    except Exception as ex:  # noqa: BLE001
+        # #3920: an unreadable ledger is not a coach with no track record.
+        status, reason = read_status(error=ex)
+        return {"error": str(ex), "coach_id": bare_cid, **layer_fields(status, reason, producer=DERIVED_LAYERS["LEARNING#"]["producer"])}
 
     learnings = [decimal_to_float(i) for i in resp.get("Items", [])]
     if subdomain_filter:
@@ -365,6 +385,7 @@ def tool_get_coach_track_record(args):
         "by_outcome": dict(by_outcome),
         "decided_count": decided,
         "hit_rate_pct": hit_rate_pct,
+        **_learning_layer(learnings),
         "calibration": calibration,
         "by_subdomain": {k: dict(v) for k, v in by_subdomain.items()},
         "by_metric": {k: dict(v) for k, v in by_metric.items()},
@@ -557,6 +578,7 @@ def tool_audit_coach_dossier(args):
 
     # action=view — the full unfiltered memory (PRIVATE; never rendered publicly).
     records = {}
+    dossier_unreadable: dict[str, str] = {}
     for prefix in _DOSSIER_PREFIXES:
         try:
             resp = table.query(
@@ -571,6 +593,8 @@ def tool_audit_coach_dossier(args):
             if isinstance(r, dict) and _cd.is_conversation_channel(r):
                 r["_private_channel"] = "conversation — ADR-141 §4: never appears in the public dossier"
         records[prefix.rstrip("#").lower()] = rows
+        if rows and isinstance(rows[0], dict) and set(rows[0]) == {"error"}:
+            dossier_unreadable[prefix] = rows[0]["error"]  # #3920: a prefix that could not be read is named
     for sk in _DOSSIER_SINGLETONS:
         try:
             item = table.get_item(Key={"pk": coach_pk, "sk": sk}).get("Item")
@@ -587,6 +611,16 @@ def tool_audit_coach_dossier(args):
         "coach_name": COACH_NAMES.get(bare, bare),
         "view": "FULL UNFILTERED memory — private to Matthew; the public dossier applies the privacy filter, the ADR-141 conversation exclusion, and these corrections",
         "records": records,
+        # #3920: a prefix that could not be read is named and withholds the verdict.
+        **(
+            layer_fields(
+                *read_status(error=RuntimeError("; ".join(f"{k}: {v}" for k, v in dossier_unreadable.items()))),
+                producer="coach crons (COMMITMENT#/LEARNING#/QUALITY#)",
+                unreadable=dossier_unreadable,
+            )
+            if dossier_unreadable
+            else layer_fields(LAYER_OK, producer="coach crons (COMMITMENT#/LEARNING#/QUALITY#)", unreadable={})
+        ),
         "dossier_corrections": corrections,
         "how_to_correct": "call again with action='retract' (remove from public dossier) or action='correct' (annotate) + record_sk + note — the correction is logged, the record is never edited in place",
     }
