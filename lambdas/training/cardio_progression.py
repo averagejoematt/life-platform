@@ -609,4 +609,7 @@ def cardio_cue(
 def _today() -> date:  # pragma: no cover - trivial seam kept for symmetry with exercise_history
     from common.pacific_time import pacific_today
 
-    return parse_day_key(pacific_today())  # #3609: the platform's one day-key parser, never a hand-rolled fromisoformat
+    parsed = parse_day_key(pacific_today())  # #3609: the platform's one day-key parser, never a hand-rolled fromisoformat
+    if parsed is None:  # pacific_today() always emits a well-formed key; a None here is a programming error, not a data gap
+        raise ValueError(f"pacific_today() returned an unparseable day key: {pacific_today()!r}")
+    return parsed
