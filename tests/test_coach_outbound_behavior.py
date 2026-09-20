@@ -469,7 +469,10 @@ def test_the_referral_lands_in_the_referred_coachs_partition_with_provenance(wir
     assert row["referred_by"] == "sleep_coach"
     assert row["role"] == coach_chat.ROLE_COACH
     assert row["sk"].startswith("CHAT#")
-    assert row["cycle"] == 13
+    # #3915 reversed this line (it pinned `cycle == 13`): a referral row is a CHAT# row
+    # like any other, so it is CROSS_PHASE (ADR-153) and carries no cycle label. The
+    # provenance that MATTERS on this row — telegram_referral + referred_by — is above.
+    assert "cycle" not in row
 
 
 def test_the_ledger_is_claimed_before_the_referred_bot_is_touched(wired):
