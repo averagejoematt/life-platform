@@ -461,3 +461,55 @@ def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually
             st.enter_context(cm)
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
     assert preview["wire_body"]["routine"]["exercises"][0]["notes"].startswith("RED TEAM (")
+
+
+def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
+    """LIVE FINDING 2026-09-20: routine 73bc228c went 22 -> 18 -> 14 across two runs because the
+    joints cut was applied to an already-cut draft. Mutation control: drop the restore-from-
+    `draft_exercises` block → the second run sees 18 and this reds."""
+    ir = RoutineSpec(
+        routine_id="r-rerun",
+        target_date="2026-09-20",
+        archetype="pull",
+        version=1,
+        source_action="draft_custom",
+        notes="Pull.",
+        exercises=[
+            ExerciseBlock(movement_key=f"tmpl:{i}", rationale_tag=f"Move {i}", sets=[Set(weight_kg=40, reps=10) for _ in range(4)])
+            for i in range(5)
+        ],
+    )  # 20 sets
+
+    def cut_to_16(body):
+        if "joints_tendons" in body["system"]:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": '{"verdict":"change","metric":"consecutive_training_days","value":9,"field":"session.total_sets","to":16,"sentence":"Streak; trim to 16."}',
+                    }
+                ],
+                "stop_reason": "end_turn",
+            }
+        return _approving(body)
+
+    ev = _evidence()
+    ev["consecutive_days"] = 9  # info flag on the metric the model cites
+    ev["exercises"] = [
+        {
+            "idx": i,
+            "label": f"Move {i}",
+            "template_id": str(i),
+            "days_since": 3,
+            "pain_flag_any": False,
+            "pain_dates": [],
+            "pain_layer_status": "ok",
+        }
+        for i in range(5)
+    ]
+    out1, _, _ = _run(ir, ev, invoke=cut_to_16)
+    assert out1["critics"]["recheck"]["total_sets"] == 16
+    assert len(out1["critics"]["draft_exercises"]) == 5 and sum(len(e["sets"]) for e in out1["critics"]["draft_exercises"]) == 20
+    out2, _, _ = _run(ir, ev, invoke=cut_to_16)
+    assert out2["critics"]["recheck"]["total_sets"] == 16, "a re-run must land on the same cut, not cut again"
+    assert sum(len(e.sets) for e in ir.exercises) == 16
