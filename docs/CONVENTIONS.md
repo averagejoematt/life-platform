@@ -78,7 +78,7 @@ requires already knowing which symbol to look for.
   Deliberate: §2's "unexpected 0-diff" tell is replaced by a stronger one, an
   explicit sha comparison the deploy path performs for you.
 
-**The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control.
+**The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control. **And the CDK asset is content-addressed because `build_info.json`'s `built_at` is the COMMIT's timestamp, not the clock's** (`built_at_source: commit`; the wall clock only on a dirty local tree, labelled `clock`) — CDK hashes the staged *directory*, and a per-synth timestamp in one file minted a new asset hash every synth (32 `S3Key` lines on an unchanged tree, measured 2026-09-20) which made the zip invariant inert on the CDK path. `tests/test_bundle_fingerprint_2377.py` pins two fingerprints of one commit byte-equal.
 
 ## 2. Deploy from `main`, not the worktree branch
 

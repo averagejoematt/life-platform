@@ -11,6 +11,7 @@ is injected):
      landing after a newer merge must come back REFUSED, not green.
 """
 
+import datetime
 import json
 import os
 import subprocess
@@ -317,3 +318,83 @@ def test_ancestry_gate_script_is_executable_and_fail_soft():
     # An AWS/network failure must not block a deploy — it must be visible instead.
     assert "unverified, allowing" in text
     assert "SKIP_ANCESTRY_CHECK" in text
+
+
+# ── #3625 box 3: `built_at` is the commit's timestamp, so the CDK asset hash is content-addressed ──
+
+
+def _fake_git(commit_iso):
+    """A `_git` double: answers `show -s --format=%cI <sha>` with a fixed committer date and
+    reports a CLEAN tree; every other query returns None."""
+
+    def fake(args, cwd=None):
+        if args[:3] == ["show", "-s", "--format=%cI"]:
+            return commit_iso
+        if args == ["status", "--porcelain"]:
+            return ""
+        return None
+
+    return fake
+
+
+def test_built_at_is_the_commit_timestamp_when_the_sha_is_known(monkeypatch):
+    monkeypatch.setenv("BUNDLE_GIT_SHA", "abcdef12" * 5)
+    monkeypatch.setattr(build_bundle, "_git", _fake_git("2026-09-19T21:15:03-07:00"))
+    info = build_bundle.git_fingerprint(now=datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc))
+    assert info["built_at"] == "2026-09-20T04:15:03Z", "the committer date, normalised to UTC — never the clock"
+    assert info["built_at_source"] == "commit"
+    assert info["schema"] == 1, "additive field: the schema does not move"
+
+
+def test_two_fingerprints_of_one_commit_are_byte_equal(monkeypatch):
+    """The reproducibility claim itself: two stagings seconds apart carry the SAME build_info,
+    so the CDK directory asset hashes identically (#3625 box 3)."""
+    monkeypatch.setenv("BUNDLE_GIT_SHA", "feedface" * 5)
+    monkeypatch.setattr(build_bundle, "_git", _fake_git("2026-09-20T17:20:13+00:00"))
+    first = build_bundle.git_fingerprint(now=datetime.datetime(2026, 9, 20, 18, 0, 0, tzinfo=datetime.timezone.utc))
+    second = build_bundle.git_fingerprint(now=datetime.datetime(2026, 9, 20, 18, 0, 7, tzinfo=datetime.timezone.utc))
+    assert first == second
+    assert first["built_at"] == "2026-09-20T17:20:13Z"
+
+
+def test_a_dirty_local_tree_keeps_the_wall_clock(monkeypatch):
+    """A dirty tree does not describe any commit — the honest stamp is the clock, labelled."""
+    monkeypatch.delenv("BUNDLE_GIT_SHA", raising=False)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+
+    def dirty_git(args, cwd=None):
+        if args == ["rev-parse", "HEAD"]:
+            return "0123456789abcdef0123456789abcdef01234567"
+        if args == ["status", "--porcelain"]:
+            return " M deploy/build_bundle.py"
+        if args[:3] == ["show", "-s", "--format=%cI"]:
+            return "2026-09-20T17:20:13+00:00"
+        return None
+
+    monkeypatch.setattr(build_bundle, "_git", dirty_git)
+    info = build_bundle.git_fingerprint(now=datetime.datetime(2026, 9, 20, 18, 0, 0, tzinfo=datetime.timezone.utc))
+    assert info["dirty"] is True
+    assert info["built_at"] == "2026-09-20T18:00:00Z"
+    assert info["built_at_source"] == "clock"
+
+
+def test_an_unparseable_commit_date_falls_back_to_the_clock_labelled(monkeypatch):
+    """A shallow clone without the object: git answers nothing — stamp the clock, say so."""
+    monkeypatch.setenv("BUNDLE_GIT_SHA", "abcdef12" * 5)
+    monkeypatch.setattr(build_bundle, "_git", _fake_git(None))
+    info = build_bundle.git_fingerprint(now=datetime.datetime(2026, 9, 20, 18, 0, 0, tzinfo=datetime.timezone.utc))
+    assert info["built_at"] == "2026-09-20T18:00:00Z"
+    assert info["built_at_source"] == "clock"
+
+
+def test_the_real_checkout_fingerprints_head_from_its_commit_date():
+    """Against the real repo: HEAD's committer date (`git show -s --format=%cI HEAD`) is what
+    build_info carries when the tree is clean; when it is dirty the source says so. Either way
+    the field is present — the box-3 reader (`cdk diff` on an unchanged tree) depends on it."""
+    info = build_bundle.git_fingerprint()
+    assert info["built_at_source"] in ("commit", "clock")
+    if info["dirty"] is False:
+        expected = build_bundle._parse_commit_timestamp(build_bundle._git(["show", "-s", "--format=%cI", "HEAD"]))
+        assert expected is not None
+        assert info["built_at"] == expected.strftime("%Y-%m-%dT%H:%M:%SZ")
+        assert info["built_at_source"] == "commit"
