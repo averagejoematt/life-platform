@@ -96,8 +96,13 @@ def test_a_current_model_is_a_plain_pass_on_main_too(stale_model, monkeypatch, c
     assert "pending-reconcile" not in capsys.readouterr().out
 
 
-def test_the_verdict_is_the_literal_gates_own_derivation():
-    """One predicate, imported — the two gates cannot disagree about when a bot follows."""
+def test_the_verdict_is_the_literal_gates_own_derivation(monkeypatch):
+    """One predicate, imported — the two gates cannot disagree about when a bot follows.
+
+    #3984: uses monkeypatch, not a bare `os.environ.pop` — the old finally-block POPPED the
+    runner's real GITHUB_EVENT_NAME/GITHUB_REF and never restored them, so every later test
+    in the same xdist worker (test_platform_stats_truth's PR-exempt skip among them) ran as
+    if it were not in CI at all."""
     sys.path.insert(0, os.path.join(REPO, "deploy"))
     import doc_drift_verdict as ddv  # noqa: E402
 
@@ -105,11 +110,8 @@ def test_the_verdict_is_the_literal_gates_own_derivation():
     for env in (
         {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main"},
         {"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF": "refs/pull/9/merge"},
+        {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main"},
     ):
         for k, v in env.items():
-            os.environ[k] = v
-        try:
-            assert gpm._bot_owns_pending_drift_here() == ddv.bot_owns_pending_drift_here()
-        finally:
-            for k in env:
-                os.environ.pop(k, None)
+            monkeypatch.setenv(k, v)
+        assert gpm._bot_owns_pending_drift_here() == ddv.bot_owns_pending_drift_here()
