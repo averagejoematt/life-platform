@@ -26,6 +26,8 @@ import os
 import re
 from typing import Any
 
+from training.template_muscle_overrides import is_retired_template  # #3770
+
 
 # The index was re-read from S3 once PER EXERCISE. `_load_json` is deliberately
 # uncached (routine_generator.py:46 says so), and a 20-exercise draft therefore paid 20
@@ -104,10 +106,11 @@ def _index_fuzzy(name: str) -> str | None:
         return None
     hits = []
     for norm, v in _template_index().items():
-        if not v.get("id"):
+        tid = v.get("id")
+        if not tid or is_retired_template(str(tid)):  # #3770: never resolve TO a retired id
             continue
         if tokens <= _title_tokens(norm):
-            hits.append(str(v["id"]))
+            hits.append(str(tid))
             if len(hits) > 1:
                 return None
     return hits[0] if len(hits) == 1 else None
@@ -146,8 +149,9 @@ class _LiveWalk:
             if not items:
                 return
             for t in items:
-                if t.get("id"):
-                    self._by_title.setdefault(_normalize_title(t.get("title")), str(t["id"]))
+                tid = t.get("id")
+                if tid and not is_retired_template(str(tid)):  # #3770: never resolve TO a retired id
+                    self._by_title.setdefault(_normalize_title(t.get("title")), str(tid))
             if len(items) < 100:
                 return
             page += 1
@@ -177,8 +181,9 @@ def _live_template_id_by_title(name: str) -> str | None:
         if not items:
             return None
         for t in items:
-            if _normalize_title(t.get("title")) == target and t.get("id"):
-                return str(t["id"])
+            tid = t.get("id")
+            if tid and not is_retired_template(str(tid)) and _normalize_title(t.get("title")) == target:  # #3770
+                return str(tid)
         if len(items) < 100:
             return None
         page += 1

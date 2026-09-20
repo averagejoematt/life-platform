@@ -16,6 +16,7 @@ from typing import Any, cast
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from training.template_muscle_overrides import muscle_override_for  # #3770
 
 from web.site_api_common import (
     CORS_HEADERS,
@@ -98,7 +99,13 @@ _LANDMARKS = {
 }
 
 
-def _classify_muscles(name):
+def _classify_muscles(name, template_id=None):
+    # #3770: an id-keyed override (a Hevy template whose OWN primary_muscle_group is
+    # permanently wrong) wins over any name match — including a false "leg press"
+    # substring match that would otherwise fire ahead of "calf" below.
+    override = muscle_override_for(template_id)
+    if override:
+        return [override]
     nl = (name or "").lower()
     for kws, muscles in _MUSCLE_MAP:
         if any(k in nl for k in kws):
@@ -116,7 +123,7 @@ def _compute_muscle_volume(hevy_items, num_weeks):
             n = len(working)
             if not n:
                 continue
-            for m in _classify_muscles(nm):
+            for m in _classify_muscles(nm, ex.get("template_id")):
                 if m == "Other":
                     continue
                 sets_by_muscle[m] = sets_by_muscle.get(m, 0) + n
