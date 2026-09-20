@@ -150,7 +150,7 @@ premerge lane.
 - **#3741 box 4** — still 0 posted by hand. Nothing here posts itself, by design.
 - **#3719** — still the live owner call from Session Z: `/api/physical_overview` serves the full
   tape-measurement panel publicly with no tier and no consent stamp.
-- **Week-02 is TODAY's card, not 09-21.** Genesis 2026-09-06 is day 1, so 2026-09-19 is day 14 — the
+- **Week-02 is TODAY's card, not 09-21 (#3741).** Genesis 2026-09-06 is day 1, so 2026-09-19 is day 14 — the
   next `day_n % 7 == 0`. AM's note said 09-21; the arithmetic in the code disagrees (the live render
   returns `day_n 7` for 09-12). So the first weekly the CRON draws on the new ground is the one for
   today, rendered on the next scheduled run — the change goes to work without another deploy, which
@@ -159,3 +159,13 @@ premerge lane.
 **Build beat:** none — the shipped work is a card-styling change to an account with no posts yet; a
 beat about making the weekly card distinguishable is a beat about a thing no reader has seen. It earns
 one when week-02 posts.
+**Docs:** none needed — the shipped change is a card ground colour; the CLAUDE.md status block was replaced in the wrap commit.
+**Decisions:** none needed — the "green means earned" rule is recorded on #3941 and in memory, not as an ADR.
+**Main:** red — the AM+AN wrap commit itself: 10 wrap marker lines missing and one ungated residual bullet (this fix-forward commit, Session AN boot 2026-09-20).
+**Incidents:** none
+**Stash/hooks:** clean
+**Closures:** none — no issues closed this session · DoD: scanned=1 window=closed>=2026-09-20 hits=0 findings=0 dispositioned=0 mode=warn blocking=none
+**Backlog:** Now unchanged; 12 hygiene violations carried to Session AN's boot (#3938 milestone, #3942 audience, 5 acceptance_count, 3 grounding_specimen, 2 epic Stories)
+**Alarms:** ✅ every alarm in ALARM state >72h cites an incident row or issue; no uncited fired-and-cleared episodes in the last 72h
+**CI warnings:** latest completed main run red on the wrap commit's own handover (see Main); the 3fb06a2a9 lease rejected by name at AN boot
+**Ledger:** none — no standing machinery shipped (a colour constant is not machinery)
