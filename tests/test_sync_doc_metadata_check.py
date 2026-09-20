@@ -72,7 +72,7 @@ def _gate_env(event_name="pull_request"):
     env = dict(os.environ)
     env.pop("GITHUB_REF", None)
     env["GITHUB_EVENT_NAME"] = event_name
-    return env
+    return env  # #3984: with GITHUB_REF absent the child asks git — main is strict, a branch tolerant
 
 
 def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
@@ -93,6 +93,9 @@ def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
 
 
 def test_check_exits_pending_reconcile_on_bot_owned_drift(tmp_path, monkeypatch):
+    # #3984: pin the ref to main with no event — the STRICT arm (a laptop on main, no bot next).
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
     """A deliberately-wrong literal (doc says 99, truth is 42) is BOT-OWNED drift.
 
     #3646 changed this expectation from 1 to 3, deliberately. `--apply` — the exact
@@ -161,10 +164,13 @@ def test_push_to_main_tolerates_pending_reconcile_but_nothing_else_does(tmp_path
 
     for env, expected in (
         ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_SUCCESS),
-        ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/issue-1-x"}, _verdict.EXIT_PENDING_RECONCILE),
-        ({"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF": "refs/pull/1/merge"}, _verdict.EXIT_PENDING_RECONCILE),
+        # #3984: OFF main the bot-owned drift is tolerated too — a branch never carries these files.
+        ({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/issue-1-x"}, _verdict.EXIT_SUCCESS),
+        ({"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF": "refs/pull/1/merge"}, _verdict.EXIT_SUCCESS),
+        # the strict verdict survives in exactly one place: main with no bot following.
         ({"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_PENDING_RECONCILE),
-        ({}, _verdict.EXIT_PENDING_RECONCILE),  # a laptop
+        ({"GITHUB_REF": "refs/heads/main"}, _verdict.EXIT_PENDING_RECONCILE),  # a laptop on main
+        ({"GITHUB_REF": "refs/heads/feature"}, _verdict.EXIT_SUCCESS),  # a laptop on a branch
     ):
         monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
         monkeypatch.delenv("GITHUB_REF", raising=False)
@@ -315,10 +321,10 @@ def test_check_is_clean_on_repo_head():
             "is blocking (a network read that should not be there, a lock, an infinite walk). (#3849)"
         ) from e
     assert result.returncode == 0, (
-        "sync_doc_metadata.py --check found drift on repo HEAD — run "
-        "`python3 deploy/sync_doc_metadata.py --apply` and commit the fix. NB #3646: exit 3 "
-        "(pending-reconcile) is not clean HERE — the reconcile bot only follows a push to "
-        "main, so a branch must carry its own regenerated literals as it always has."
+        "sync_doc_metadata.py --check found drift on repo HEAD. On MAIN that is exit 3 "
+        "(pending-reconcile, #3646): run `python3 deploy/sync_doc_metadata.py --apply` and commit. "
+        "On a branch `~` drift is tolerated (#3984 — a branch never carries the regenerables), so "
+        "a non-zero here off main is `!` drift: a rule matched nothing or a marker pair is gone."
         f"\n{result.stdout}\n{result.stderr}"
     )
 

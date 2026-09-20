@@ -24,21 +24,34 @@ sys.path.insert(0, os.path.join(_REPO, "deploy"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
+import doc_drift_verdict as _verdict  # noqa: E402 — #3984: the off-main predicate, imported not restated
 import doc_platform_counts as counts  # noqa: E402 — #3384: the PR-exempt registry (single source, never a second hand-list)
 import sync_doc_metadata as sync  # noqa: E402
+
+
+def _assert_or_skip_off_main(field: str, actual) -> None:
+    """#3984: every DISCOVERED field in PLATFORM_STATS is bot-owned (#3101) — a branch may not
+    regenerate `lambdas/web/platform_counts.py`, so off main a stale literal is not this
+    checkout's defect. Skip VISIBLY, naming both values; on main the equality is enforced."""
+    literal = PLATFORM_STATS[field]
+    if literal != actual and not _verdict._checked_out_ref_is_main():
+        pytest.skip(f"#3984: {field} literal {literal} vs discovered {actual} — bot-owned (#3101), reconciled on main; main runs enforce")
+    assert literal == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+
+
 from web.site_api_common import PLATFORM_STATS  # noqa: E402
 
 
 def test_mcp_tools_matches_registry():
     actual = sync._auto_discover_tool_count()
     assert actual is not None
-    assert PLATFORM_STATS["mcp_tools"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("mcp_tools", actual)
 
 
 def test_adr_count_matches_decisions_doc():
     actual = sync._count_adrs()
     assert actual is not None
-    assert PLATFORM_STATS["adrs"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("adrs", actual)
 
 
 def test_test_count_matches_suite():
@@ -52,14 +65,14 @@ def test_test_count_matches_suite():
         pytest.skip(
             f"#3384: test_count {PLATFORM_STATS['test_count']} vs actual {actual} — bot-owned literal (#3101), reconciled on main; push runs enforce"
         )
-    assert PLATFORM_STATS["test_count"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("test_count", actual)
 
 
 def test_lambda_count_matches_cdk():
     actual = sync._auto_discover_lambda_count()
     if actual is None:  # discoverer bails when stacks unreadable — nothing to pin
         return
-    assert PLATFORM_STATS["lambdas"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("lambdas", actual)
 
 
 def test_alarm_count_matches_cdk():
@@ -69,7 +82,7 @@ def test_alarm_count_matches_cdk():
     actual = sync._auto_discover_alarm_count()
     assert actual is not None, "discoverer bailed (unreadable/suspiciously-low stack parse) — investigate before trusting a fallback"
     assert isinstance(actual, int) and actual > 0
-    assert PLATFORM_STATS["alarms"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("alarms", actual)
 
 
 def test_cdk_stacks_matches_glob():
@@ -84,7 +97,7 @@ def test_cdk_stacks_matches_glob():
     """
     actual = sync._auto_discover_cdk_stack_count()
     assert actual is not None
-    assert PLATFORM_STATS["cdk_stacks"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("cdk_stacks", actual)
     stacks_dir = os.path.join(_REPO, "cdk", "stacks")
     fresh_glob_count = len(glob.glob(os.path.join(stacks_dir, "*_stack.py")))
     assert fresh_glob_count >= 5, "sanity: too few *_stack.py files found — check the glob path"
@@ -104,7 +117,7 @@ def test_alarms_and_sources_share_the_maintained_fact():
     the DISCOVERED value; the literal is only the fallback when discovery bails.
     """
     facts = sync._apply_auto_discovered(dict(sync.PLATFORM_FACTS))
-    assert PLATFORM_STATS["alarms"] == facts["alarm_count"], "run: python3 deploy/sync_doc_metadata.py --apply"
+    _assert_or_skip_off_main("alarms", facts["alarm_count"])
     # data_sources has no auto-discoverer (the public count is curated) — the
     # literal comparison stands, and the fact moves ~never.
     assert PLATFORM_STATS["data_sources"] == facts["data_sources"]

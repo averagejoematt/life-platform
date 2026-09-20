@@ -78,7 +78,7 @@ requires already knowing which symbol to look for.
   Deliberate: §2's "unexpected 0-diff" tell is replaced by a stronger one, an
   explicit sha comparison the deploy path performs for you.
 
-**The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control.
+**The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control. **And the CDK asset is content-addressed because `build_info.json`'s `built_at` is the COMMIT's timestamp, not the clock's** (`built_at_source: commit`; the wall clock only on a dirty local tree, labelled `clock`) — CDK hashes the staged *directory*, and a per-synth timestamp in one file minted a new asset hash every synth (32 `S3Key` lines on an unchanged tree, measured 2026-09-20) which made the zip invariant inert on the CDK path. `tests/test_bundle_fingerprint_2377.py` pins two fingerprints of one commit byte-equal.
 
 ## 2. Deploy from `main`, not the worktree branch
 
@@ -145,6 +145,20 @@ output may already be live — leaving `main` both behind production and red.
   not be: `git checkout origin/main -- lambdas/web/platform_counts.py`, then let the bot
   regenerate on `main`. Policy lives in §4a1/§4c; the read-it command is in the "Facts that
   drift" table.
+
+- **The bot-owned invariant (#3984).** `lambdas/web/platform_counts.py`,
+  `model/platform_model.json` and `docs/DEPENDENCY_GRAPH.md` have ONE writer: the reconcile
+  job on `main`. No gate reds a branch for `~` (bot-owned) drift in them — `sync_doc_metadata.py
+  --check` and `generate_platform_model.py --check` exit 0 with a `pending-reconcile` notice
+  off main (`deploy/doc_drift_verdict.bot_owns_pending_drift_here`), the stats/model
+  byte-equality tests skip visibly off main naming both values, and the pre-commit hook
+  restores the counter to HEAD off main instead of staging it. `!` (human) drift — a rule
+  that matched nothing, a missing marker pair — still reds everywhere. The strict exit 3
+  survives in exactly one place: `main` with no bot following (a laptop on main, a
+  `workflow_dispatch`). **If you find a counter in a branch's diff, the guard that let it
+  through is the bug** — fix the guard, not the branch. Session AN resolved this conflict
+  by hand eight times in one night; 33 non-bot commits touched the counter in the ten days
+  before the fix.
 
 Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpushed_commits`).
 
@@ -1506,8 +1520,9 @@ These values change and must **never** be hand-written in docs or memory. Read t
 
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it
-touches (`docs/`, `CLAUDE.md`, `.claude/README.md`,
-`lambdas/web/platform_counts.py`). If you run the script by hand outside a commit
+touches (`docs/`, `CLAUDE.md`, `.claude/README.md`, and — **on `main` only, #3984** —
+`lambdas/web/platform_counts.py`; off main the hook restores the counter to HEAD and stages
+only the docs). If you run the script by hand outside a commit
 (or add a new doc to its `RULES` table that falls outside that stage glob), fold
 the changes into the commit yourself (`git add … && git commit --amend --no-edit
 --no-verify`) or `test_platform_stats_truth.py` reds CI.

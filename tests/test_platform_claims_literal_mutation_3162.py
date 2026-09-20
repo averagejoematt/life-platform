@@ -62,9 +62,13 @@ def test_the_three_rules_are_actually_registered():
 # this file runs.
 @pytest.fixture(autouse=True)
 def _gate_verdict_not_ci_exemption(monkeypatch):
-    """Strip the CI event vars from every test in this module (#3646)."""
+    """Strip the CI event var and pin the ref to `main` for every test in this module (#3646, #3984).
+
+    With no event the reconcile bot does not follow; with the ref pinned to main the #3984
+    off-main tolerance is disarmed too — so `--check` here is the STRICT gate on a laptop
+    on main, and the planted drift below must red as `pending-reconcile`, never as 0."""
     monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
-    monkeypatch.delenv("GITHUB_REF", raising=False)
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
 
 
 def _isolate(monkeypatch, tmp_path, rel_path, doc_text, rule):

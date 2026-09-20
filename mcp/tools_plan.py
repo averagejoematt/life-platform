@@ -85,6 +85,27 @@ def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
     )
 
 
+def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | None]:
+    """(window start, Hevy rows) for the program's trailing accessory-rotation window (#3755).
+
+    Read DIRECTLY from the hevy partition, the same way `_walking_volume_last_7d` does and
+    for the same reason: `get_workouts`'s `_slim_workout` projection drops `exercises`,
+    which is the only place the movement NAMES live — and the names ARE the measurement
+    here. A read that RAISES yields None, so the engine reports rotation `unknown` rather
+    than reading an empty window as a clean rotation.
+    """
+    from common.pacific_time import shift_day_key
+    from training import program_structure
+
+    from mcp.core import query_source_range
+
+    window_days = int(program_structure.ROTATION_RULE["window_days"])
+    start = shift_day_key(end_date, -(window_days - 1))
+    if start == end_date:  # unparseable day key — shift_day_key returns it unchanged
+        return None, None
+    return start, _safe(query_source_range, "hevy", start, end_date)
+
+
 def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -> None:
     """Put the per-source breakdown on the block's walking read, beside the total (#3930).
 
@@ -200,6 +221,10 @@ def tool_plan_next_session(args):
     # per-source breakdown is merged onto the block below so no reader has to trust the total.
     walk_layer = _safe(_walking_volume_last_7d, target_date)
 
+    # #3755: the performed Hevy record over the program's rotation window, so the engine
+    # can COMPUTE whether the accessory layer is rotating instead of assuming the pool.
+    rotation_start, rotation_rows = _safe(_rotation_window, target_date) or (None, None)
+
     block = plan_engine.constraint_block(
         date=target_date,
         weight_lb=weight,
@@ -224,6 +249,8 @@ def tool_plan_next_session(args):
         pain_flag_sites=([e["label"] for e in evidence["exercises"] if e.get("pain_flag_any")] if evidence else None),
         # with a draft in hand the per-movement note reads report the layer's status themselves
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
+        hevy_workouts_rotation_window=rotation_rows,
+        rotation_window_start=rotation_start,
     )
     _merge_walking_volume(block, walk_layer)
 

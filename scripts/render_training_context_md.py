@@ -49,7 +49,9 @@ def render() -> str:
         )
     lines += ["", "## Standing constraints", ""]
     for c in reg.RECORDED_CONSTRAINTS:
-        lines.append(f"### {c['id']} ({c['kind']}) — dated {c['dated']}, confirmed={c['confirmed']}")
+        status = c.get("status", "active")
+        resolved = f", {status} {c['resolved_on']} ({c['resolution_source']})" if status == "resolved" else ""
+        lines.append(f"### {c['id']} ({c['kind']}) — dated {c['dated']}, confirmed={c['confirmed']}{resolved}")
         lines.append("")
         lines.append(c["detail"])
         lines.append("")
