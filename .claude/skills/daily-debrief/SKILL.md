@@ -140,6 +140,18 @@ If authoring tomorrow's session (skip this if `$ARGUMENTS` is `review`):
     needs redeploying. It is not a finding about his history; do not report it as one.
   - Intake is never comparable (no nutrition data before 2025-11-24). Say so whenever the
     comparison is used, per ADR-104.
+- **The standing bet: `get_benchmark(view="forecast")` (#3712).** The week's prescription is
+  registered as a graded forecast, so there is a number the plan already committed to and a
+  record of whether it has been right. Read it as follows:
+  - `open.prescribed_cardio_hr_wk` is the week's volume target and it OVERRIDES a freehand
+    number. When `adjustment.basis` is `adherence_shortfall` or `model_over_predicted`, that
+    target was DERIVED from last week's miss (`adjustment.derivation` shows the arithmetic) —
+    quote the derivation, do not re-author the number.
+  - `open.declined` means no forecast was issued and `declined_reason` says which floor failed.
+    That is a result. Do not substitute a guess for it.
+  - `track_record.answerable: false` means too few weeks have been graded to say whether the
+    coaching is working. Say that, rather than quoting a coverage percentage at n=2.
+  - Every figure here is descriptive of his own history and excludes intake (ADR-104).
 - Mood/journal continuity: `get_mood` — mood continuity is a make-or-break signal for
   whether tomorrow's session should push or hold.
 - Muscle volume vs MEV/MAV/MRV (`get_muscle_volume`) for the muscle groups in tomorrow's
