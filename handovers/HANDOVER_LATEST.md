@@ -136,11 +136,16 @@ premerge lane.
   `deploy/build_recap_posting_pack.py` — 15 folders, 87 files, and a per-card ground assertion showing
   the weekly navy and all 26 daily frames untouched at `(8, 12, 10)`. The pack the owner had before
   is preserved at `~/Desktop/averagejoematt-cards.bak-20260919-205325`.
-- **The CI lease for `c3032efe0` was REJECTED by name, deliberately.** The behavioural change was
-  already hand-deployed and verified, and main had moved to `24b83c5b3` in the parallel lane — so
-  approving would have shipped an OLDER tip over a newer one, the #3908 hazard. Every other card
-  family is byte-identical by construction and by test, so nothing is stranded; the next fleet or
-  CDK deploy from a newer tip carries the code forward.
+- **There was no lease to decide on `c3032efe0` — the concurrency group settled it.** The run's
+  Deploy job self-cancelled at 03:58:01Z with *"Canceling since a higher priority waiting request for
+  ci-cd-deploy-refs/heads/main exists"* — the parallel lane's newer push had already queued. I had
+  planned to reject it by name (hand-deploy already done, and approving an older tip over a newer one
+  is the #3908 hazard); the concurrency control reached the same outcome first, which is worth knowing
+  because it means a `cancelled` Deploy on a superseded tip is NORMAL here and not a stranded lease.
+  `c3032efe0` is an ancestor of current `main`, every other card family is byte-identical by
+  construction and by test, and the next deploy from a newer tip carries the code forward regardless.
+  **A genuinely waiting lease on `24b83c5b3` belongs to the parallel lane and was deliberately left
+  alone** — the blanket-reject class.
 - **#3942** — the dry-run storage gap. Small, and it protects the surface this whole epic publishes to.
 - **#3741 box 4** — still 0 posted by hand. Nothing here posts itself, by design.
 - **#3719** — still the live owner call from Session Z: `/api/physical_overview` serves the full

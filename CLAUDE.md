@@ -237,9 +237,10 @@ fixed and result-neutral (PR #3941; 7 tests, each mutation-proved). **Shipped en
 ten green checks (the full pre-merge suite, not the required-two lane), `recap-card-generator` deployed from main at
 `c3032efe0` and verified by unzipping and grepping the artifact, day 7 re-rendered THROUGH the deployed function
 (`qa: cleared`, stored `week-01.png` navy at the pixel), and the Desktop pack rebuilt by the newly-landed script —
-15 folders, 87 files, the weekly navy and all 26 daily frames untouched at `(8, 12, 10)`. **The lease for
-`c3032efe0` was REJECTED by name on purpose**: the behavioural change was already hand-deployed and main had moved
-to `24b83c5b3` in the parallel lane, so approving would have shipped an OLDER tip over a newer one. **Two defects found by looking rather than by
+15 folders, 87 files, the weekly navy and all 26 daily frames untouched at `(8, 12, 10)`. **There was no lease to decide**: the run's Deploy
+self-cancelled — *"a higher priority waiting request for ci-cd-deploy-refs/heads/main exists"* — so a `cancelled`
+Deploy on a superseded tip is NORMAL here, not a stranded lease. A genuinely waiting lease on `24b83c5b3` belongs
+to the parallel lane and was left alone (the blanket-reject class). **Two defects found by looking rather than by
 running:** the goal bar's track was a green-black pinned to the daily ground and lay across the navy card as a
 foreign strip while every automated gate passed — derived now; and **#3942**, `dry_run=True` on
 `recap-card-generator` gates delivery but NOT storage, found by causing it (one "dry run" meant to inspect a card
