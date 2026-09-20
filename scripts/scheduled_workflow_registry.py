@@ -172,6 +172,27 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "own finding). A cron that silently stops here puts the surface straight back "
         "to that state with nothing saying so.",
     },
+    "citation-network-check.yml": {
+        "watched": True,
+        "grace_hours": 24.0,
+        "basis": "newly added (#3621 box 4) — no fire history of its own yet. Monthly (5th, "
+        "16:47 UTC) -> derived cadence dominates the deadline regardless of grace "
+        "(cron_max_gap_hours ~31d); 24h is carried forward from the daily-class rows "
+        "purely as a floor until this workflow accumulates the >=20-run sample "
+        "derive_live_grace_hours needs to re-derive its own.",
+        "reason": "The offline half of tests/test_citation_resolution_1892.py gates every "
+        "commit, but the NETWORK half (scripts/verify_citations.py — a retraction or a "
+        "PMID reassignment across the ~40 supplement_registry PubMed citations plus "
+        "the 3 experiment_library DOIs) ran in exactly zero workflows before this, so "
+        "drift was invisible until a human happened to run the integration test by "
+        "hand. Watched DESPITE eval-harvest.yml's monthly-cadence argument against "
+        "watching (~31d report latency): eval-harvest's escape hatch is a human who "
+        "notices a missing candidate artifact every month regardless; this cron has "
+        "no such human backstop, so a silently-stopped month is strictly worse than a "
+        "silently-stopped eval-harvest month. RE-RULE IF: demoted to quarterly per "
+        "#3621's own pricing note (12 consecutive clean monthly runs) — re-derive "
+        "grace/basis from that cadence's own cron line at that point.",
+    },
     "remediation-agent.yml": {
         "watched": True,
         "grace_hours": 12.0,

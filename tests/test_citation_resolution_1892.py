@@ -23,54 +23,38 @@ fetched from NCBI at the time it was verified. That turns an unverifiable claim
     'emerging' evidence.
   * NETWORK (scripts/verify_citations.py, and the `integration` test below):
     re-resolves every PMID against NCBI and fails on a 404, a retraction, or a
-    title that no longer matches what is stored.
+    title that no longer matches what is stored. Wired to a monthly schedule by
+    #3621 box 4 (.github/workflows/citation-network-check.yml) — the offline half
+    below is the one that gates every commit; the network half used to run only
+    when a human remembered to invoke it by hand.
 
 The offline half is the one that gates every commit; the network half catches
 retractions and PMID reassignment on demand without making the unit lane depend
 on eutils being up.
+
+The enumeration (`_all_sources` / `_cited`) is owned by `scripts/verify_citations.py`,
+not duplicated here — that module is also what the scheduled workflow runs, so the
+offline contract and the network re-check always walk the exact same citation set.
 """
 
 import json
 import os
-import re
+import sys
 
 import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_PM = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
+sys.path.insert(0, os.path.join(_REPO, "scripts"))
+
+import verify_citations as vc  # noqa: E402
+
+_all_sources = vc.all_sources
+_cited = vc.cited_pmid
 
 
 def _load(name):
     with open(os.path.join(_REPO, "config", name), encoding="utf-8") as fh:
         return json.load(fh)
-
-
-def _supplement_sources():
-    """(location, source_dict) for every source in the supplement registry."""
-    sup = _load("supplement_registry.json")
-    for gname, g in sup["groups"].items():
-        for i, item in enumerate(g["items"]):
-            for j, s in enumerate(item.get("sources", []) or []):
-                yield f"supplements/{gname}[{i}]:{item['key']}#{j}", s
-
-
-def _experiment_sources():
-    exp = _load("experiment_library.json")
-    for e in exp["experiments"]:
-        eid = e.get("id") or e.get("key") or "?"
-        for fld in ("evidence_for", "evidence_against"):
-            for j, s in enumerate(e.get(fld) or []):
-                if isinstance(s, dict):
-                    yield f"experiments/{eid}.{fld}#{j}", s
-
-
-def _all_sources():
-    return list(_supplement_sources()) + list(_experiment_sources())
-
-
-def _cited(source):
-    m = _PM.search(source.get("url") or "")
-    return m.group(1) if m else None
 
 
 # ── the offline contract ────────────────────────────────────────────────────
@@ -168,19 +152,17 @@ def test_the_supplement_registry_twin_stays_in_sync():
 
 @pytest.mark.integration
 def test_every_citation_still_resolves_to_its_stored_title():
-    import urllib.request
-
-    pairs = [(loc, _cited(s), s["resolved_title"]) for loc, s in _all_sources() if _cited(s)]
-    ids = sorted({p for _l, p, _t in pairs})
-    url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=" + ",".join(ids)
-    with urllib.request.urlopen(url, timeout=30) as fh:
-        result = json.load(fh)["result"]
-    drift = []
-    for loc, pmid, stored in pairs:
-        rec = result.get(pmid) or {}
-        live_title = (rec.get("title") or "").strip()
-        if not live_title:
-            drift.append(f"{loc}: PMID {pmid} did not resolve (404/withdrawn)")
-        elif live_title.rstrip(".").lower() != stored.rstrip(".").lower():
-            drift.append(f"{loc}: PMID {pmid} is now {live_title!r}, stored {stored!r}")
+    """Reuses scripts/verify_citations.py's own PubMed check — the SAME code path
+    the scheduled workflow runs, so this test is a local rehearsal of it, not a
+    second implementation that could drift from the one that actually gates."""
+    drift = vc.check_pubmed(vc.pubmed_citations())
     assert not drift, "citation drift:\n  " + "\n  ".join(drift)
+
+
+@pytest.mark.integration
+def test_every_doi_citation_still_resolves_to_its_stored_title():
+    """The 3 DOIs #3621 box 4 names (deep-work-block, date-night-weekly,
+    digital-free-dinner) sit outside evidence_for/evidence_against, so
+    _all_sources()/the PubMed test above never touches them."""
+    drift = vc.check_doi(vc.doi_citations())
+    assert not drift, "DOI citation drift:\n  " + "\n  ".join(drift)
