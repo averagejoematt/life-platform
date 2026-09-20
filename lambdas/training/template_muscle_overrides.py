@@ -68,4 +68,6 @@ def muscle_override_for(template_id: str | None) -> str | None:
 
 def is_retired_template(template_id: str | None) -> bool:
     """True when `template_id` must be excluded from title-resolution results."""
-    return bool(template_id) and template_id.strip().lower() in RETIRED_TEMPLATE_IDS
+    if not template_id:
+        return False
+    return template_id.strip().lower() in RETIRED_TEMPLATE_IDS
