@@ -173,6 +173,27 @@ def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list
     return routines
 
 
+def list_stale_drafts(older_than_days: int = 7, lookback_days: int = 120, today: str | None = None) -> list[RoutineSpec]:
+    """#3772: routines still `draft` whose creation is older than `older_than_days` — the orphans
+    the #3765 soft-timeout leaves behind (the draft lands, the client is told it timed out, and
+    nothing ever lists it). Walks the date index over `lookback_days` (a draft targets a date
+    near its creation), so no Scan. Sorted oldest first."""
+    from datetime import date, timedelta
+
+    from common.pacific_time import pacific_today
+
+    today_d = date.fromisoformat(today or pacific_today())
+    start = (today_d - timedelta(days=lookback_days)).isoformat()
+    end = (today_d + timedelta(days=7)).isoformat()  # a draft may target a day still ahead
+    cutoff = (today_d - timedelta(days=older_than_days)).isoformat()
+    out = []
+    for ir in list_by_date_range(start, end, limit=500):
+        created = str(ir.created_at or "")[:10]
+        if ir.status == "draft" and created and created <= cutoff:
+            out.append(ir)
+    return sorted(out, key=lambda r: (str(r.created_at or ""), r.routine_id))
+
+
 def upsert_id_map(routine_id: str, hevy_routine_id: str) -> None:
     """Persist platform <-> Hevy id mapping. Conditional on neither side present."""
     try:
