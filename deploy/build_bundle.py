@@ -104,6 +104,11 @@ def _git(args, cwd=REPO_ROOT):
     return proc.stdout.strip() or None
 
 
+# The paths whose working-tree state can change bundle bytes: what stage_tree()/stage_mcp()
+# copy, plus this builder. Everything else in the checkout is irrelevant to the artifact.
+BUNDLE_DIRTY_SCOPE = ("lambdas", "mcp", "config", "deploy/build_bundle.py")
+
+
 def git_fingerprint(repo_root=REPO_ROOT, now=None):
     """Build the {git_sha, built_at, …} payload staged as build_info.json (#2377).
 
@@ -125,7 +130,12 @@ def git_fingerprint(repo_root=REPO_ROOT, now=None):
     # from the environment we are describing that commit, not this worktree.
     dirty = None
     if sha and not (os.environ.get("BUNDLE_GIT_SHA") or os.environ.get("GITHUB_SHA")):
-        porcelain = _git(["status", "--porcelain"], repo_root)
+        # #3625: "dirty" means THE CODE IN THIS BUNDLE may not equal the commit — so it is
+        # measured over the roots the bundle stages, not the whole checkout. A modified
+        # `.claude/settings.local.json` cannot change a Lambda zip, yet it made every local
+        # CDK synth stamp the wall clock (measured 2026-09-20: 32 `S3Key` lines on an
+        # unchanged tree right after a deploy, `dirty: true`, `built_at_source: clock`).
+        porcelain = _git(["status", "--porcelain", "--", *BUNDLE_DIRTY_SCOPE], repo_root)
         dirty = bool(porcelain)
     # #3625 box 3: `built_at` is the COMMIT's timestamp whenever the bundle describes a
     # commit (a known sha and a tree that is not dirty — `dirty is None` means the sha came
@@ -149,6 +159,7 @@ def git_fingerprint(repo_root=REPO_ROOT, now=None):
         "built_at": built_at,
         "built_at_source": built_at_source,
         "dirty": dirty,
+        "dirty_scope": list(BUNDLE_DIRTY_SCOPE) if dirty is not None else None,
         "builder": os.environ.get("GITHUB_WORKFLOW") or os.environ.get("USER") or "unknown",
         "schema": 1,
     }
