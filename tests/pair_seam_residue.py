@@ -346,6 +346,18 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
 _RECAP_READ_REASON = "#3741 recap card: a READ-ONLY consumer that cannot make a false claim from a shape change. Verified on the module, not assumed: recap_data does no [] indexing on any source row (every field goes through .get()), DayFacts declares 21 Optional fields and the non-Optional ones default to empty list/dict, and web/recap_templates raises RecapNullFact on any None at RENDER rather than formatting it — fmt(None) == '-' is forbidden on this surface. So a renamed or dropped field makes the beat that needs it DECLINE; it can never become a wrong number on a public card. Residual risk stated plainly rather than waved: the card would then degrade to a fallback beat silently, and the only record is `absent_sources` on the SOURCE#recap_cards row per run, which is queryable but not alarmed. Contracting five read seams whose worst case is 'draws less' is disproportionate (ADR-103/144) while that holds; if a card ever derives a number from two partitions that must agree, that seam gets a PairContract instead of this row."
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    # #3900 (2026-09-20): the writer gained a write-time `phase`/`cycle` stamp via
+    # experiment_stamp_for(); the reader (mcp/tools_coach_intelligence.py) never inspects
+    # those keys — it selects rows through with_phase_filter, which IS the contract between
+    # them (taxonomy-derived on both sides). The shape the reader depends on
+    # (position_summary, predictions, surprises, …) did not change, so there is no field
+    # the two sides could disagree about; a PairContract here would pin the filter, which
+    # tests/test_tagger_blind_writers_stamp_3900.py already does from the writer's side.
+    "coach_thread::lambdas/intelligence/intelligence_common.py::write": (
+        "2026-09-20",
+        "#3900 added the write-time phase/cycle stamp to write_coach_thread; the MCP reader selects through "
+        "with_phase_filter and reads none of the stamped keys, so the stamp is the contract, not a shape to agree on.",
+    ),
     "computed_metrics::lambdas/content/recap_data.py::read": (
         "2026-09-13",
         _RECAP_READ_REASON,
