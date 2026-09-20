@@ -128,5 +128,5 @@ def test_cron_pushes_branch_model_not_ideal_floor_pair(cron_module):
     assert len(pushed) == 1  # exactly one routine pushed
     assert set(pushed[0]["branches"]) == {"as-written", "easier"}  # floor folded in, not dropped
     # The pushed body's notes carry the branch menu.
-    assert "CHOOSE YOUR BRANCH" in captured["body"]["routine"]["notes"]
-    assert "EASIER" in captured["body"]["routine"]["notes"]
+    assert "CHOOSE YOUR BRANCH" in captured["body"]["routine"]["exercises"][0]["notes"]
+    assert "EASIER" in captured["body"]["routine"]["exercises"][0]["notes"]

@@ -213,7 +213,7 @@ def test_stage_2_applies_a_change_before_storing_and_the_dry_run_shows_the_revis
         for cm in _commit_patches(ir, []):
             st.enter_context(cm)
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
-    notes = preview["wire_body"]["routine"]["notes"]
+    notes = preview["wire_body"]["routine"]["exercises"][0]["notes"]
     assert notes.startswith("Legs — quality day.\n\nRED TEAM (critics@1.0.0, 4 critics,")
     assert f"applied: exercises[0].weight_lbs -> {h['to']}" in notes
     assert preview["wire_body"]["routine"]["exercises"][0]["sets"][0]["weight_kg"] == pytest.approx(h["to"] * KG, abs=0.01)
@@ -300,13 +300,14 @@ def test_commit_without_stage_2_says_the_routine_was_not_red_teamed():
     assert res["status"] == "committed", res
     assert "NOT red-teamed" in res["critics"], res
     assert "warnings" not in res, "the note rides in its own key — a quiet commit keeps no warnings key (test_tools_hevy_routine)"
-    assert "RED TEAM" not in created[0]["routine"]["notes"]
+    assert "RED TEAM" not in created[0]["routine"]["exercises"][0]["notes"]
 
 
 def test_commit_carries_the_verdicts_and_their_numbers_into_the_hevy_notes():
     """Box 4 (#3752): the routine's notes carry the four verdicts and the numbers they argued
-    from. Mutation control: in `_action_commit`, drop `why = with_notes_block(why, ir)` →
-    the wire notes lose the block and this reds."""
+    from. Mutation control (re-based 2026-09-20, #3938): drop the `_place_block_on_first_exercise(ir)`
+    call in the plan engine → the wire notes (exercises[0], the channel Hevy returns) lose the block
+    and this reds."""
     ir = _ir(squat_lbs=200.0)
     out, _, _ = _run(ir, _evidence())
     created = []
@@ -316,7 +317,7 @@ def test_commit_carries_the_verdicts_and_their_numbers_into_the_hevy_notes():
         res = t.tool_manage_hevy_routine({"action": "commit", "routine_id": ir.routine_id})
     assert res["status"] == "committed", res
     assert res["critics"] == "critics@1.0.0: muscle-defense approve, joints/tendons approve, rate-advocate approve, historian change"
-    notes = created[0]["routine"]["notes"]
+    notes = created[0]["routine"]["exercises"][0]["notes"]
     assert "RED TEAM (critics@1.0.0, 4 critics," in notes
     for line in (
         "- muscle-defense APPROVE",
@@ -460,7 +461,8 @@ def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually
         for cm in _commit_patches(ir, []):
             st.enter_context(cm)
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
-    assert preview["wire_body"]["routine"]["exercises"][0]["notes"].startswith("RED TEAM (")
+    wire_notes = preview["wire_body"]["routine"]["exercises"][0]["notes"]
+    assert "RED TEAM (" in wire_notes and wire_notes.count("RED TEAM (") == 1  # #3938: WHY line first, block once
 
 
 def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
