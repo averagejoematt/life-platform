@@ -455,8 +455,10 @@ def build_historian_packet(draft: dict[str, Any], *, reference: dict[str, Any] |
         "band_n_effective_days": proven.get("n_effective"),
         "band_volume_citable": proven.get("volume_citable"),
         "band_evidence_tier": proven.get("evidence_tier"),
-        "attested_cardio_min_typical": (
-            (proven.get("attested") or {}).get("minutes_typical") if isinstance(proven.get("attested"), dict) else None
+        # LIVE SHAPE (2026-09-20): the prescription view's overlay carries HOURS PER WEEK
+        # (`cardio_hr_wk_attested`, with _low/_high), not per-session minutes.
+        "attested_cardio_hr_wk": (
+            (proven.get("attested") or {}).get("cardio_hr_wk_attested") if isinstance(proven.get("attested"), dict) else None
         ),
         "attested_basis": "OWNER-ATTESTED, NOT MEASURED" if proven.get("attested") else None,
         "detraining_discount_pct": [disc_lo, disc_hi],
@@ -497,9 +499,9 @@ def build_historian_packet(draft: dict[str, Any], *, reference: dict[str, Any] |
     if proven.get("attested"):
         flags.append(
             _flag(
-                "attested_cardio_min_typical",
+                "attested_cardio_hr_wk",
                 "info",
-                f"band carries an OWNER-ATTESTED overlay (~{numbers['attested_cardio_min_typical']} min post-lift cardio, NOT MEASURED) — the measured figure is a floor (#3717)",
+                f"band carries an OWNER-ATTESTED overlay (~{numbers['attested_cardio_hr_wk']} hr/wk post-lift cardio, NOT MEASURED) — the measured figure is a floor (#3717)",
                 provenance="owner-attested",
             )
         )
@@ -784,11 +786,19 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
                 exercises[-1].sets.append(_clone(exercises[-1].sets[-1]))
                 current += 1
             return True, None
-        # trim from the LAST exercise backwards, never below one set per exercise
-        for ex in reversed(exercises):
-            while current > target and len(ex.sets) > 1:
-                ex.sets.pop()
-                current -= 1
+        # LIVE FINDING 2026-09-20 (routine 73bc228c v2): trimming from the LAST exercise backwards
+        # took a 22 -> 18 cut entirely out of face pulls and hammer curls (3 -> 1 each) and left
+        # the two 4-set anchors untouched — a deload shape no coach would write. Round-robin:
+        # one set at a time from the exercise with the MOST sets (ties -> the later one), never
+        # below one set per exercise, so a cut spreads across the session instead of hollowing
+        # out its tail.
+        while current > target:
+            candidates = [ex for ex in exercises if len(ex.sets) > 1]
+            if not candidates:
+                break
+            victim = max(candidates, key=lambda ex: (len(ex.sets), exercises.index(ex)))
+            victim.sets.pop()
+            current -= 1
         return current == target, None if current == target else f"could only trim to {current}"
     idx, attr = int(m.group(2)), m.group(3)
     if idx >= len(exercises):
