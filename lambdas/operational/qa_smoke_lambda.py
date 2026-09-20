@@ -903,7 +903,7 @@ def check_coach_ensemble_phase_stamp_coverage():
     (including an EMPTY scan — the vacuous-scan trap) stay on the alarmed side."""
     from coach.persona_registry import OPERATIONAL_COACH_IDS
     from experiment.phase_taxonomy import PROVENANCE_ATTRS
-    from experiment.pk_census import scan_provenance_pages, scoped_stamp_audit
+    from experiment.pk_census import format_inverse_census, scan_provenance_pages, scoped_stamp_audit
 
     c = Check("data:coach_ensemble_phase_stamp_coverage", "Phase Stamping", CONTENT_TRUTH)
     inverse_pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
@@ -911,6 +911,10 @@ def check_coach_ensemble_phase_stamp_coverage():
         audit = scoped_stamp_audit(scan_provenance_pages(table), inverse_pks=inverse_pks)
     except Exception as e:
         return [c.warn(f"phase-stamp coverage check errored: {e}")]
+
+    # #3915 box 4: the inverse census, rendered every night regardless of which branch
+    # below fires — the four families are enumerated by THIS check, never invisible to it.
+    census_note = format_inverse_census(audit)
 
     by_design = audit["by_design"]
     n_families = len(audit["families_audited"])
@@ -939,6 +943,7 @@ def check_coach_ensemble_phase_stamp_coverage():
                 f"class forbids ({'/'.join(PROVENANCE_ATTRS)}): {sample}{more}. A cross-phase row is never tagged, "
                 "never wiped and never phase-filtered — a stamp on one marks durable relationship state as "
                 "belonging to a single cycle. Remediate with deploy/reconcile_provenance_2026_09.py --only 3514."
+                f"{census_note}"
             )
         ]
     unstamped = audit["unstamped"]
@@ -959,14 +964,15 @@ def check_coach_ensemble_phase_stamp_coverage():
                 f"or tagger-reachable and dated before genesis — served as current by PHASE_FILTER_EXPRESSION until "
                 f"stamped: {fam_summary}{fam_more}; e.g. {sample}{more}. "
                 "Run deploy/backfill_coach_ensemble_phase_stamps.py --apply for the COACH#/ENSEMBLE#/SOURCE#insights "
-                f"families it covers; any other family named here is a writer with no write-time stamp.{protected}{tagger}{unresolved}",
+                f"families it covers; any other family named here is a writer with no write-time stamp."
+                f"{protected}{tagger}{unresolved}{census_note}",
                 chronic=True,
             )
         ]
     return [
         c.ok(
             f"all stampable rows across {n_families} EXPERIMENT_SCOPED pk families ({audit['rows']} rows scanned) "
-            f"carry a phase stamp.{protected}{tagger}{unresolved}"
+            f"carry a phase stamp.{protected}{tagger}{unresolved}{census_note}"
         )
     ]
 
