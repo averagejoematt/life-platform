@@ -64,6 +64,10 @@ BODYWEIGHT_TOLERANCE_DAYS = 7
 # top set lifted 30 lb lighter is not the same evidence.
 STALE_AFTER_DAYS = 180
 
+# #3700 — the Whoop workout window for the HR-at-level join. Short on purpose: HR-at-level
+# is only ever read as a recent trend, and the Whoop partition holds several rows per day.
+WHOOP_JOIN_LOOKBACK_DAYS = int(os.environ.get("WHOOP_JOIN_LOOKBACK_DAYS", "180"))
+
 _ddb_table = None
 
 
@@ -104,9 +108,35 @@ def load_recent_history(
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
     today: date | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Single batched Query over the SOURCE#hevy partition. Returns a dict
-    keyed by Hevy template_id → list of session dicts ordered most-recent
-    first. Each session: {date, sets: [{weight_kg, reps}], top_weight_kg}.
+    """The weighted index alone — `load_history_indexes(...)[0]`.
+
+    Kept as the public name every existing caller and test already uses, with an
+    unchanged return shape ON PURPOSE (#3700): the cardio sessions live in a SEPARATE
+    index, so the load-floor machinery (`routine_generator.band_matched_best`) can never
+    start counting zero-weight cycling blocks among a movement's sessions.
+    """
+    return load_history_indexes(lookback_days=lookback_days, today=today)[0]
+
+
+def load_history_indexes(
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    today: date | None = None,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[dict[str, Any]]]]:
+    """ONE batched Query over the SOURCE#hevy partition → (weighted, cardio).
+
+    **weighted** — keyed by Hevy template_id → session dicts ordered most-recent first,
+    each {date, sets: [{weight_kg, reps}], top_weight_kg}. Unchanged since ADR-068.
+
+    **cardio** (#3700) — keyed the same way, each {date, name, note, duration_sec,
+    distance_m, session_start, session_end}. It exists because the weighted index
+    structurally cannot hold a ride: it drops every set whose `reps` is not > 0, which is
+    every cardio set, so a cycling block was not merely unrendered by the routine cue —
+    it never reached the index at all.
+
+    The per-exercise note is read from `exercises[].notes` — the live wire field, verified
+    against DynamoDB 2026-09-19: `notes` PLURAL, on the EXERCISE, and not the
+    workout-level `description`, which was empty on the very record this issue was filed
+    against.
 
     Only the new per-workout schema (sk = DATE#YYYY-MM-DD#WORKOUT#<id>,
     item has `source_workout_id`) is consumed. Legacy daily aggregates are
@@ -120,6 +150,7 @@ def load_recent_history(
     start = (today - timedelta(days=lookback_days)).isoformat()
     pk = f"USER#{USER_ID}#SOURCE#hevy"
     index: dict[str, list[dict[str, Any]]] = {}
+    cardio: dict[str, list[dict[str, Any]]] = {}
 
     last_key = None
     # ADR-058: training continuity — weight selection needs the most recent
@@ -142,11 +173,35 @@ def load_recent_history(
             if not item.get("source_workout_id"):
                 continue  # legacy aggregate — skip
             workout_date = item.get("date") or ""
-            for ex in item.get("exercises") or []:
+            # #3700 — every duration-bearing block in this session, keyed by its position.
+            # The HR join needs a block's SIBLINGS: a Whoop workout that matches two
+            # blocks of the same length is attributable to neither.
+            block_secs_by_pos = {
+                i: sum(_to_float(s.get("duration_sec")) for s in (ex.get("sets") or [])) for i, ex in enumerate(item.get("exercises") or [])
+            }
+            for pos, ex in enumerate(item.get("exercises") or []):
                 tid = ex.get("template_id")
                 if not tid:
                     continue
                 sets_raw = ex.get("sets") or []
+                # #3700 — the cardio arm. A duration-bearing block is collected BEFORE
+                # the reps filter below, which would otherwise discard it silently.
+                block_seconds = block_secs_by_pos.get(pos, 0.0)
+                if block_seconds > 0:
+                    block_meters = sum(_to_float(s.get("distance_m")) for s in sets_raw)
+                    cardio.setdefault(tid, []).append(
+                        {
+                            "date": workout_date,
+                            "name": ex.get("name") or "",
+                            # the live wire field is `notes`, plural, on the EXERCISE
+                            "note": (ex.get("notes") or ex.get("note") or "") or "",
+                            "duration_sec": block_seconds,
+                            "distance_m": block_meters if block_meters > 0 else None,
+                            "session_start": item.get("start_time"),
+                            "session_end": item.get("end_time"),
+                            "sibling_block_seconds": [v for k, v in block_secs_by_pos.items() if k != pos and v > 0],
+                        }
+                    )
                 sets = [
                     {
                         "weight_kg": _to_float(s.get("weight_kg")),
@@ -171,7 +226,9 @@ def load_recent_history(
 
     for tid in index:
         index[tid].sort(key=lambda s: s["date"], reverse=True)
-    return index
+    for tid in cardio:
+        cardio[tid].sort(key=lambda s: s["date"], reverse=True)
+    return index, cardio
 
 
 def load_bodyweight_index(
@@ -213,6 +270,54 @@ def load_bodyweight_index(
     return out
 
 
+def load_whoop_workout_index(
+    lookback_days: int = WHOOP_JOIN_LOOKBACK_DAYS,
+    today: date | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Whoop WORKOUT records → {YYYY-MM-DD: [{start_time, end_time, average_heart_rate, …}]}.
+
+    #3700's HR arm. Only `DATE#...#WORKOUT#<id>` rows are kept — the day-level Whoop row
+    carries a 24-hour average heart rate, which is a number about sleeping, not about a
+    bike, and joining it to a ride would be the exact fabrication ADR-104 forbids.
+
+    Deliberately a SHORTER window than the exercise history (#3708's 10-year floor): the
+    weighted cue quotes a single historical top set, while HR-at-level is only ever read
+    as a recent trend, and the Whoop partition holds several rows per day.
+    """
+    today = today or date.fromisoformat(pacific_today())
+    start = (today - timedelta(days=lookback_days)).isoformat()
+    pk = f"USER#{USER_ID}#SOURCE#whoop"
+    out: dict[str, list[dict[str, Any]]] = {}
+    last_key = None
+    while True:
+        kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start}"),
+            "ProjectionExpression": "sk, #d, workout_id, sport_name, start_time, end_time, average_heart_rate",
+            "ExpressionAttributeNames": {"#d": "date"},
+        }
+        if last_key:
+            kwargs["ExclusiveStartKey"] = last_key
+        resp = _table().query(**kwargs)
+        for item in resp.get("Items", []):
+            sk = str(item.get("sk") or "")
+            if "#WORKOUT#" not in sk:
+                continue  # the day-level row's average HR is a 24h figure, not a ride's
+            day = (item.get("date") or sk[5:15])[:10]
+            out.setdefault(str(day), []).append(
+                {
+                    "workout_id": item.get("workout_id"),
+                    "sport_name": item.get("sport_name"),
+                    "start_time": item.get("start_time"),
+                    "end_time": item.get("end_time"),
+                    "average_heart_rate": _to_float(item.get("average_heart_rate")) or None,
+                }
+            )
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+    return out
+
+
 def nearest_bodyweight(
     iso_date: str,
     weight_index: dict[str, float] | None,
@@ -243,12 +348,28 @@ def nearest_bodyweight(
     return weight_index[best[1]] if best else None
 
 
-def history_facts(template_id: str | None, index: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
-    """Return the facts the renderer can quote. Empty dict on no history."""
+def history_facts(
+    template_id: str | None,
+    index: dict[str, list[dict[str, Any]]],
+    cardio_index: dict[str, list[dict[str, Any]]] | None = None,
+    whoop_index: dict[str, list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Return the facts the renderer can quote. `{"sessions_count": 0}` on no history.
+
+    #3700 — the cardio arm. The top-weight-tier selection below is a concept a ride does
+    not have, so when a template has no weighted sessions and `cardio_index` does hold
+    one, the facts come from `cardio_progression.cardio_facts` instead and carry
+    `modality == "cardio"`. Strength wins when both exist; nothing about the weighted
+    path changed.
+    """
     if not template_id:
         return {"sessions_count": 0}
     sessions = index.get(template_id) or []
     if not sessions:
+        if cardio_index and (cardio_index.get(template_id) or []):
+            from training.cardio_progression import cardio_facts
+
+            return cardio_facts(template_id, cardio_index, whoop_index)
         return {"sessions_count": 0}
     last = sessions[0]
     # Take sets at the top-weight tier (drop warmup-style lighter sets so the
@@ -317,6 +438,13 @@ def render_history_cue(
     """
     if facts.get("sessions_count", 0) == 0:
         return ""
+    # #3700 — the cardio branch. A ride carries duration + distance and NEITHER a top-set
+    # weight nor a reps list, so every cardio block fell out of the `if not weight or not
+    # reps: return ""` below and the routine cue for cycling was empty by construction.
+    if facts.get("modality") == "cardio":
+        from training.cardio_progression import level_verdict, render_cardio_cue
+
+        return render_cardio_cue(facts, level_verdict(facts.get("series"), facts.get("last_level")))
     weight = _round_weight(facts.get("last_top_weight_kg", 0))
     reps = facts.get("last_reps_list") or []
     if not weight or not reps:

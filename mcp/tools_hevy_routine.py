@@ -1,7 +1,7 @@
 """
 tools_hevy_routine.py — `manage_hevy_routine` fat MCP tool (ADR-066, ADR-069).
 
-One tool, ten actions:
+One tool, eleven actions:
 
   draft         — generate IR via the deterministic programmer (no Hevy write)
   draft_custom  — author an IR from an explicit exercise/set/weight list (ADR-069)
@@ -13,6 +13,7 @@ One tool, ten actions:
   floor         — generate floor variant explicitly
   re_entry      — force re-entry mode regardless of last-workout date
   adherence     — programmed-vs-performed report for a routine_id
+  stall_check   — prescribed-vs-performed stall verdict for ONE movement (#3928)
 
 `draft` is the opinionated, deterministic volume-landmark programmer — it
 builds its own routine from your state and never takes an exercise list.
@@ -39,7 +40,7 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from common.pacific_time import pacific_date_of, pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
+from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 
 # #3670: everything the commit result must report honestly lives in its own module
 # (the module-size ratchet's own instruction: extract, don't raise the cap).
@@ -65,6 +66,7 @@ _VALID_ACTIONS = {
     "floor",
     "re_entry",
     "adherence",
+    "stall_check",
 }
 
 _LB_TO_KG = 0.45359237
@@ -1150,29 +1152,15 @@ def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
     return {"status": "drafted_re_entry", "routine_id": re_entry.routine_id, "target_date": re_entry.target_date}
 
 
-def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
-    routine_id = args.get("routine_id")
-    if not routine_id:
-        return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
-    from health.adherence_calc import calculate_adherence
-    from training import hevy_write_client as wc
-    from training.routine_repo import get_current
-
-    ir = get_current(routine_id)
-    if not ir:
-        return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
-    workouts = wc.get_workouts(page=1, page_size=10).get("workouts") or []
-    performed: dict[str, Any] = {}
-    for w in workouts:
-        # #2798: `start_time` is a UTC instant; its DAY is Pacific (`health.adherence_calc`
-        # already resolves it that way). A raw [:10] compared an evening workout to tomorrow.
-        if pacific_date_of(w.get("start_time")) == ir.target_date:
-            performed = w
-            break
-    if not performed:
-        return {"status": "no_workout_for_date", "routine_id": routine_id, "target_date": ir.target_date}
-    return {"status": "ok", "routine_id": routine_id, "adherence": calculate_adherence(ir, performed)}
-
+# #3928: both prescribed-vs-performed readbacks — `adherence` (one session) and
+# `stall_check` (one movement across sessions) — live in `mcp/hevy_readback_report.py`.
+# This module sits at the #1665 ratchet's ceiling and that ratchet's own instruction is
+# extract, don't raise the cap (the #3670 precedent). Re-exported under the historical
+# private name so existing call sites and tests are unchanged.
+from mcp.hevy_readback_report import (  # noqa: E402
+    action_adherence as _action_adherence,
+    stall_check as _action_stall_check,
+)
 
 _DISPATCH = {
     "draft": _action_draft,
@@ -1185,6 +1173,7 @@ _DISPATCH = {
     "floor": _action_floor,
     "re_entry": _action_re_entry,
     "adherence": _action_adherence,
+    "stall_check": _action_stall_check,
 }
 
 
