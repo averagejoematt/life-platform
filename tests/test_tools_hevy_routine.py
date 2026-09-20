@@ -620,3 +620,42 @@ def test_tool_description_tells_the_caller_both_title_args_are_draft_time_only()
     props = spec["inputSchema"]["properties"]
     for arg in ("title", "force_title"):
         assert "draft_custom only" in props[arg]["description"], props[arg]["description"]
+
+
+def test_create_missing_refuses_a_template_without_an_explicit_muscle_group():
+    """#3770: the keyword guess that filed 'Calf Press on Leg Press Machine' under SHOULDERS is
+    gone — a new template's group is stated or the creation is refused by name, and NO create
+    call reaches Hevy. Mutation control: restore the `_infer_from_keywords(...)` fallback in
+    `_explicit_muscle_group` → a create call happens and this reds on `create_calls`."""
+    create_calls = []
+
+    def fake_create(body):
+        create_calls.append(body)
+        return body["exercise"]["title"]
+
+    with (
+        patch("training.routine_repo.draft_versioned", side_effect=lambda ir: ir),
+        patch.object(t, "_template_index", return_value={}),
+        patch("mcp.hevy_resolution._template_index", return_value={}),
+        patch("training.hevy_write_client.create_template", side_effect=fake_create),
+        patch.object(res, "_LiveWalk", _MissingWalk),
+        patch.object(t, "_LiveWalk", _MissingWalk),
+        patch.object(t, "_live_template_id_by_title", return_value="NEWID999"),
+    ):
+        out = t.tool_manage_hevy_routine(
+            {
+                "action": "draft_custom",
+                "archetype": "legs",
+                "create_missing": True,
+                "exercises": [
+                    {
+                        "title": "Calf Press on Leg Press Machine",
+                        "equipment_category": "machine",
+                        "sets": [{"weight_lbs": 200, "reps": 12}],
+                    },
+                ],
+            }
+        )
+    assert create_calls == [], "a template was created with a GUESSED muscle group"
+    errors = " ".join(out.get("creation_errors") or []) + " " + str(out.get("error") or "")
+    assert "Calf Press on Leg Press Machine" in errors and "muscle_group" in errors and "#3770" in errors, out

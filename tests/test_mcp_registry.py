@@ -25,6 +25,7 @@ import re
 import sys
 
 import pytest
+from mcp_registry_ast import registered_tool_names
 
 # #416 / ADR-117: deploy-critical lane (MCP registry integrity — every tool wired).
 pytestmark = pytest.mark.deploy_critical
@@ -154,15 +155,15 @@ def test_r2_all_fn_references_exist():
 
 
 def _get_tool_names(src):
-    """Extract top-level tool names from TOOLS dict."""
-    tools_start = src.find("TOOLS = {")
-    if tools_start == -1:
-        tools_start = src.find("TOOLS={")
-    if tools_start == -1:
-        return []
-    tools_section = src[tools_start:]
-    # [a-z0-9_]+ to handle names like get_zone2_breakdown
-    return re.findall(r'^\s{4}"([a-z0-9_]+)"\s*:\s*\{', tools_section, re.MULTILINE)
+    """Extract top-level tool names from the `TOOLS` dict.
+
+    #3916: this used to regex-scan from the `TOOLS = {` text marker to EOF —
+    a separate ad-hoc pass from test_mcp_orphan_tools.py's own whole-file
+    regex, and the two could drift independently. Both now derive from the
+    ONE AST-structural parse in `mcp_registry_ast.py`, scoped to the `TOOLS`
+    dict literal itself (see #3891 for what a text-based pass can miss).
+    """
+    return registered_tool_names(src)
 
 
 def test_r3_schema_structure():

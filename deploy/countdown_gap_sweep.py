@@ -233,7 +233,9 @@ def extract_write_ts(item: dict):
     return (None, None)
 
 
-def sanctioned_reason(item: dict, genesis_date_str: str, current_cycle: int | None = None) -> str | None:
+def sanctioned_reason(
+    item: dict, genesis_date_str: str, current_cycle: int | None = None, current_prereg_sha: str | None = None
+) -> str | None:
     """Reset-pipeline provenance: rows the reset itself seeds for the NEW cycle.
 
     Every rule keys on provenance only the reset tooling (or a #1233 write-time
@@ -243,6 +245,16 @@ def sanctioned_reason(item: dict, genesis_date_str: str, current_cycle: int | No
     """
     if item.get("redated_from_sk") is not None:
         return "chronicle keep-resurrection (redated_from_sk)"
+    # #3643: the cycle's OWN pre-registration chronicle post. publish_genesis_preregistration
+    # writes it inside the wipe→genesis window by construction (an attended step the pipeline
+    # deliberately does not fold) and stamps `pre_registration` + `prereg_sha256`. It is
+    # sanctioned ONLY when that sha is the CURRENT frozen artifact's — a prior cycle's
+    # pre-registration post carries a different sha and stays whatever its timestamp makes
+    # it. No stamp to compare against (None) is fail-closed: the marker alone is not enough.
+    if item.get("pre_registration") and item.get("prereg_sha256"):
+        if current_prereg_sha and str(item["prereg_sha256"]) == str(current_prereg_sha):
+            return f"the cycle's own pre-registration post (prereg_sha256 {str(current_prereg_sha)[:12]}… matches the frozen artifact)"
+        return None
     # A current-cycle stamp is NOT reset provenance by itself. Since #1233 every live
     # writer stamps `cycle` at write time via phase_taxonomy.experiment_stamp(), and the
     # reset bumps SSM /life-platform/experiment-cycle BEFORE genesis — so every countdown-
@@ -265,8 +277,30 @@ def sanctioned_reason(item: dict, genesis_date_str: str, current_cycle: int | No
     return None
 
 
+def current_prereg_sha_for(genesis_date_str: str) -> str | None:
+    """#3643: the frozen pre-registration's sha for THIS genesis, from the pipeline's own stamp
+    (deploy/generated/genesis_preregistration.sha256.json, written by genesis_prereg_stamp).
+    None when there is no stamp or it names another genesis — fail-closed for the sweep."""
+    try:
+        import genesis_prereg_stamp as _stamp  # same directory; the ONE stamp reader
+
+        stamp = _stamp.load_stamp() or {}
+    except Exception:  # noqa: BLE001 — an unreadable stamp sanctions nothing
+        return None
+    if str(stamp.get("genesis") or "") != str(genesis_date_str):
+        return None
+    sha = stamp.get("sha256")
+    return str(sha) if sha else None
+
+
 def classify_item(
-    item: dict, mode: str, window_start: datetime, window_end: datetime, genesis_date_str: str, current_cycle: int | None = None
+    item: dict,
+    mode: str,
+    window_start: datetime,
+    window_end: datetime,
+    genesis_date_str: str,
+    current_cycle: int | None = None,
+    current_prereg_sha: str | None = None,
 ) -> str:
     """Classify one row against the countdown window. See module docstring."""
     if item.get("tombstone"):
@@ -285,7 +319,7 @@ def classify_item(
     # ADR-153 exists to protect, and would have undone the #3514 reconcile.
     if not wipe.should_tombstone(item, mode, pk=str(item.get("pk", ""))):
         return MODE_SKIP
-    if sanctioned_reason(item, genesis_date_str, current_cycle) is not None:
+    if sanctioned_reason(item, genesis_date_str, current_cycle, current_prereg_sha) is not None:
         return SANCTIONED
     kind, val = extract_write_ts(item)
     if kind == "full":
@@ -349,6 +383,7 @@ def run_sweep(
     window_end = genesis_boundary or genesis_boundary_utc(genesis_date_str)
     if current_cycle is None:
         current_cycle = wipe.current_cycle()
+    current_prereg_sha = current_prereg_sha_for(genesis_date_str)
     partitions = scoped_partitions()
 
     rows: list[tuple[str, str, dict, dict]] = []
@@ -378,7 +413,7 @@ def run_sweep(
     sanctioned: list[tuple[str, str, str, str]] = []
     totals: Counter = Counter()
     for label, mode, extra, item in rows:
-        cat = classify_item(item, mode, wipe_ts, window_end, genesis_date_str, current_cycle)
+        cat = classify_item(item, mode, wipe_ts, window_end, genesis_date_str, current_cycle, current_prereg_sha)
         per_partition.setdefault(label, Counter())[cat] += 1
         totals[cat] += 1
         pk, sk = item.get("pk", ""), item.get("sk", "")
@@ -388,7 +423,7 @@ def run_sweep(
         elif cat in FLAG_CATEGORIES:
             flagged.append((label, pk, sk, cat))
         elif cat == SANCTIONED:
-            sanctioned.append((label, pk, sk, sanctioned_reason(item, genesis_date_str, current_cycle) or ""))
+            sanctioned.append((label, pk, sk, sanctioned_reason(item, genesis_date_str, current_cycle, current_prereg_sha) or ""))
     return {
         "window_start": wipe_ts,
         "window_end": window_end,

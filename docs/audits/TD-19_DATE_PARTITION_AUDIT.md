@@ -236,3 +236,15 @@ a reader-facing freshness number for whoop by 7 hours — the #3257 shape, needi
 consumer sweep and its own `day_key_frame_consequence`. It is declared in-place at the
 skip in `test_the_declared_frames_agree_with_the_live_source_registry` rather than changed
 here, so the disagreement is visible to the next reader instead of resolved by silence.
+
+# 2026-09-19 — Box B consumer fixed: `evening_nudge_lambda.py:138` (#3914)
+
+The line named above as "the sharpest one" — the 8 PM PT nudge's `som_check_in_count`
+read — now folds in the next UTC day's row (the `reached_in_pacific` shape from #3287,
+gated on the registry's `day_key_frame` facet so it only bites a UTC-framed source). A
+check-in logged 17:00–20:00 PT counts on the same evening's nudge instead of being
+reported missing until tomorrow. `apple_health`'s stored key frame is unchanged (#3677's
+KEEP-UTC ruling stands) — this is the reader, not a re-key. Test:
+`tests/test_som_checkin_frame_3914.py`. The remaining Box B rows
+(`dashboard_refresh_lambda.py:365`, `site_stats_refresh_lambda.py:86`,
+`daily_brief_lambda.py:664`) and all of Box C are untouched.
