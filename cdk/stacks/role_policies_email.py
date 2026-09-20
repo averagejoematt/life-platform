@@ -678,6 +678,13 @@ def email_elena_state_updater() -> list[iam.PolicyStatement]:
             resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
         iam.PolicyStatement(
+            # #3900: every PERSONA#elena write now carries the write-time stamp
+            # (experiment_stamp_for reads the cycle; fail-soft, but un-granted = no cycle).
+            sid="ExperimentCycleRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+        ),
+        iam.PolicyStatement(
             sid="CloudWatchMetrics",  # retry_utils token telemetry
             actions=["cloudwatch:PutMetricData"],
             resources=["*"],

@@ -501,11 +501,18 @@ def _infer_from_keywords(name: str, keywords: list, allowed: set, default: str) 
     return default
 
 
-def _infer_muscle_group(ex: dict[str, Any], name: str) -> str:
+def _explicit_muscle_group(ex: dict[str, Any], name: str) -> str:
+    """#3770: a NEW Hevy template's muscle group must be stated, never guessed. Hevy exposes no
+    template edit, so a guessed group is permanent: on 2026-09-08 the keyword guess filed
+    'Calf Press on Leg Press Machine' under SHOULDERS and every set since counted there in
+    get_muscle_volume. A caller that wants the template created says which group it is."""
     override = (ex.get("muscle_group") or ex.get("primary_muscle") or "").strip().lower()
     if override in _HEVY_MUSCLE_GROUPS:
         return override
-    return _infer_from_keywords(name, _MUSCLE_KEYWORDS, _HEVY_MUSCLE_GROUPS, "other")
+    raise ValueError(
+        f"refusing to create {name!r} without an explicit muscle_group (got {override!r}) — Hevy has no template "
+        f"edit, so a guessed group is permanent (#3770). Pass muscle_group as one of: {', '.join(sorted(_HEVY_MUSCLE_GROUPS))}"
+    )
 
 
 def _infer_equipment(ex: dict[str, Any], name: str) -> str:
@@ -528,7 +535,7 @@ def _create_template_for(ex: dict[str, Any], title: str) -> tuple[str, dict[str,
 
     meta = {
         "title": title,
-        "muscle_group": _infer_muscle_group(ex, title),
+        "muscle_group": _explicit_muscle_group(ex, title),  # #3770: explicit or refused, never guessed
         "exercise_type": _infer_exercise_type(ex),
         "equipment_category": _infer_equipment(ex, title),
     }

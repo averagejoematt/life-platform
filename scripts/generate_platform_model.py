@@ -1106,6 +1106,15 @@ def render_doc(model: dict) -> str:
     return "\n".join(lines)
 
 
+def _reconcile_bot_follows_this_run() -> bool:
+    """The ONE derivation of 'a bot commits the regenerated artifacts next' — deploy/doc_drift_verdict's,
+    imported rather than restated, so the literal gate and the model gate cannot disagree about it."""
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "deploy"))
+    from doc_drift_verdict import reconcile_bot_follows_this_run  # noqa: E402
+
+    return bool(reconcile_bot_follows_this_run())
+
+
 def main() -> int:
     model = build_model()
     model_text = serialize(model)
@@ -1118,6 +1127,19 @@ def main() -> int:
             stale.append(str(DOC_PATH.relative_to(ROOT)))
         if stale:
             print(f"DRIFT: {', '.join(stale)} — run: python3 scripts/generate_platform_model.py")
+            # #3646: on a push to main the reconcile job (ci-cd.yml Job 0) regenerates and
+            # commits EXACTLY these two files within ~60 s, so a merge commit carrying them
+            # stale is not a red main — it is the same pending-reconcile verdict the literal
+            # gate gives (deploy/doc_drift_verdict.py). Every other context stays strict:
+            # a branch, a PR, a dispatch and a laptop all fail here. Both files are on the
+            # reconcile whitelist by construction; nothing else can reach `stale`.
+            if _reconcile_bot_follows_this_run():
+                print(
+                    "::warning title=pending-reconcile::model/platform_model.json and/or docs/DEPENDENCY_GRAPH.md "
+                    "are stale on a push to main — the reconcile job regenerates and commits them next; not a red main (#3646)."
+                )
+                print("VERDICT: pending-reconcile (tolerated: a push to main, the reconcile job runs next)")
+                return 0
             return 1
         print("model + rendering current")
         return 0

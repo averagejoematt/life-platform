@@ -284,3 +284,99 @@ def test_a_session_trained_inside_its_ceiling_reads_yes():
     assert result["intensity_adherence"]["pct"] == 100.0
     assert result["intensity_adherence"]["sets_over_ceiling"] == 0
     assert result["as_prescribed"]["verdict"] == "yes"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #3929 — a Hevy template ALIAS (the same movement under two catalog template ids)
+# resolves BEFORE missing/extra, instead of scoring one missing + one extra.
+#
+# Specimen (the issue's own): prescribed `21310F5F` ("Triceps Extension (Cable)") vs
+# performed `B5EFBF9C` ("Overhead Triceps Extension (Cable)") — one physical movement,
+# two Hevy catalog ids. The registry is `config/hevy_template_aliases.json`, seeded
+# with exactly this pair; these tests exercise the SHIPPED config, not a synthetic one,
+# except where a test is explicitly about the pre-fix (registry-absent) contrast.
+#
+# `tmpl:<id>` is the existing ADR-069 escape hatch in `_ir_movement_to_template` — used
+# here so the specimen needs no `config/movement_catalog.json` entry of its own (the
+# real Hevy catalog has no `movements` entry for either triceps-extension id today).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _triceps_alias_ir() -> RoutineSpec:
+    return RoutineSpec(
+        routine_id="r-alias",
+        target_date="2026-09-15",
+        archetype="push",
+        exercises=[ExerciseBlock(movement_key="tmpl:21310F5F", sets=[Set(), Set(), Set()])],
+    )
+
+
+def _triceps_alias_performed() -> dict:
+    return {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": [{}, {}, {}]}]}
+
+
+def test_template_alias_resolves_before_missing_and_extra():
+    """Acceptance: a planted alias pair yields ZERO missing/extra, under the shipped
+    (not monkeypatched) registry."""
+    result = calculate_adherence(_triceps_alias_ir(), _triceps_alias_performed())
+    assert result["missing"] == []
+    assert result["extra"] == []
+    assert result["overall_pct"] == 100.0
+
+
+def test_template_alias_fix_scores_at_or_above_the_broken_pre_fix_value(monkeypatch):
+    """Before #3929, template_id was the ONLY join key, so this exact session scored
+    one missing (`21310F5F` never seen performed) + one extra (`B5EFBF9C` never seen
+    prescribed) — demonstrated here by forcing the pre-fix state (an empty registry)
+    for contrast. The alias-resolved score must read AT OR ABOVE that broken value,
+    never below it."""
+    ir, performed = _triceps_alias_ir(), _triceps_alias_performed()
+    real_load_aliases = adherence_calc._load_template_aliases
+
+    monkeypatch.setattr(adherence_calc, "_load_template_aliases", lambda: {})
+    broken = calculate_adherence(ir, performed)
+    assert broken["missing"] == ["tmpl:21310F5F"]
+    assert broken["extra"] == ["B5EFBF9C"]
+    assert broken["overall_pct"] < 100.0
+
+    monkeypatch.setattr(adherence_calc, "_load_template_aliases", real_load_aliases)
+    fixed = calculate_adherence(ir, performed)
+    assert fixed["overall_pct"] >= broken["overall_pct"]
+    assert fixed["overall_pct"] == 100.0
+    assert fixed["missing"] == []
+    assert fixed["extra"] == []
+
+
+def test_unresolvable_alias_movement_key_fails_open(monkeypatch):
+    """An alias entry whose movement_key resolves to no template id (a bad config
+    entry) must not raise — it fails open to pre-#3929 behavior rather than half-apply."""
+    monkeypatch.setattr(adherence_calc, "_load_template_aliases", lambda: {"aliases": {"B5EFBF9C": "no_such_movement_key"}})
+    result = calculate_adherence(_triceps_alias_ir(), _triceps_alias_performed())
+    assert result["extra"] == ["B5EFBF9C"]
+    assert "tmpl:21310F5F" in result["missing"]
+
+
+# ── find_alias_candidates — the shrink-only-honest reporting tool ──────────────
+
+
+def test_find_alias_candidates_surfaces_the_specimen_pair_unconfirmed():
+    titles = {"21310F5F": "Triceps Extension (Cable)", "B5EFBF9C": "Overhead Triceps Extension (Cable)"}
+    candidates = adherence_calc.find_alias_candidates(titles, known_aliases={})
+    assert candidates == [{"normalized_title": "triceps extension (cable)", "template_ids": ["21310F5F", "B5EFBF9C"]}]
+
+
+def test_find_alias_candidates_excludes_an_already_confirmed_pair():
+    """Shrink-only-honest: once the registry confirms a pairing, it drops out of the
+    candidate list — the residue is exactly what still needs a human decision. Nothing
+    here writes the registry; this only proves the candidate report shrinks to match it."""
+    titles = {"21310F5F": "Triceps Extension (Cable)", "B5EFBF9C": "Overhead Triceps Extension (Cable)"}
+    candidates = adherence_calc.find_alias_candidates(titles, known_aliases={"B5EFBF9C": "tmpl:21310F5F"})
+    assert candidates == []
+
+
+def test_find_alias_candidates_never_merges_a_genuinely_different_movement():
+    """Negative control: incline vs flat bench are DIFFERENT movements (see
+    `config/movement_catalog.json` — different default rep ranges, different primary
+    emphasis) — the conservative modifier word list must not fold them together."""
+    titles = {"3601968B": "Bench Press (Dumbbell)", "07B38369": "Incline Bench Press (Dumbbell)"}
+    assert adherence_calc.find_alias_candidates(titles) == []

@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "Template-ID alias registry (#3929). Hevy's exercise catalog carries the same",
+    "movement under more than one exercise_template_id (near-duplicate catalog entries,",
+    "e.g. a plain vs. an orientation-qualified name for the same lift). Without this",
+    "registry adherence_calc.py matches purely by raw template_id, so a performed set",
+    "logged under the alias id scores as one missing (the prescribed id never seen",
+    "performed) PLUS one extra (the alias id never seen prescribed) — a single real",
+    "movement double-penalized.",
+    "",
+    "Shape: `aliases` maps an ALIAS exercise_template_id (the id actually observed on a",
+    "performed set) to the CANONICAL movement_key adherence_calc.py should resolve it",
+    "as — the exact movement_key namespace `training.routine_ir` and",
+    "`lambdas/health/adherence_calc.py::_ir_movement_to_template` already read (a",
+    "catalog key like `db_bench_press_flat`, or the ADR-069 `tmpl:<id>` escape hatch",
+    "when the canonical side has no catalog entry of its own — used below, since",
+    "neither triceps-extension variant is in `config/movement_catalog.json`).",
+    "",
+    "SHRINK-ONLY-HONEST (acceptance #3929): this file is the ONLY source of alias",
+    "resolution — adherence_calc.py never infers or auto-merges a pairing at runtime.",
+    "An unconfirmed pairing (two different template ids that MIGHT be the same",
+    "movement) is a CANDIDATE, surfaced by",
+    "`lambdas/health/adherence_calc.py::find_alias_candidates()` for a human to",
+    "confirm, never written here automatically and never silently merged into a score."
+  ],
+  "_version": 1,
+  "aliases": {
+    "B5EFBF9C": "tmpl:21310F5F"
+  },
+  "titles": {
+    "21310F5F": "Triceps Extension (Cable)",
+    "B5EFBF9C": "Overhead Triceps Extension (Cable)"
+  }
+}

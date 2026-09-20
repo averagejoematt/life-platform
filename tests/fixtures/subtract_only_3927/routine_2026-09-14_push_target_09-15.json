@@ -1,0 +1,141 @@
+{
+  "_source": "DDB USER#matthew#ROUTINE#2db74166aa3c13cd9e6b1d915aca061b VERSION#current, read 2026-09-19 (us-west-2 life-platform)",
+  "routine_id": "2db74166aa3c13cd9e6b1d915aca061b",
+  "target_date": "2026-09-15",
+  "created_at": "2026-09-14T02:54:49.315253+00:00",
+  "created_by": "chat",
+  "title": "Push \u2014 2026-09-15",
+  "notes": "Day 8 consecutive \u2014 barbell bench restored and prioritised; volume cut elsewhere to pay for it. Hold 185, don't chase.",
+  "exercises": [
+    {
+      "movement_key": "barbell_bench_press",
+      "notes": "Warm-ups then 3 working. HOLD 185x5 \u2014 do not add load. GREEN only: a 2nd set at 185. If set 3 is RPE9+, that's the session.",
+      "rest_seconds": 180.0,
+      "sets": [
+        {
+          "type": "warmup",
+          "weight_kg": 20.4117,
+          "reps": 10.0
+        },
+        {
+          "type": "warmup",
+          "weight_kg": 61.235,
+          "reps": 3.0
+        },
+        {
+          "type": "warmup",
+          "weight_kg": 70.3068,
+          "reps": 5.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 61.235,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 70.3068,
+          "reps": 5.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 83.9146,
+          "reps": 5.0
+        }
+      ]
+    },
+    {
+      "movement_key": "incline_db_press",
+      "notes": "75lb because you're second in the queue now. RPE 8 cap. RED: drop.",
+      "rest_seconds": 150.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 34.0194,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 34.0194,
+          "reps": 8.0
+        }
+      ]
+    },
+    {
+      "movement_key": "db_shoulder_press",
+      "notes": "Seated, back supported. 40lb \u2014 RPE fell 8.5>7.0 across four sets at 35lb on 11 Sep. RED: 2x10 @35lb.",
+      "rest_seconds": 120.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 18.1437,
+          "reps": 10.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 18.1437,
+          "reps": 10.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 18.1437,
+          "reps": 10.0
+        }
+      ]
+    },
+    {
+      "movement_key": "cable_tricep_pushdown",
+      "notes": "RED: drop.",
+      "rest_seconds": 90.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 32.8854,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 32.8854,
+          "reps": 12.0
+        }
+      ]
+    },
+    {
+      "movement_key": "db_lateral_raise",
+      "notes": "RPE 8 cap. RED: drop.",
+      "rest_seconds": 90.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 6.8039,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 6.8039,
+          "reps": 12.0
+        }
+      ]
+    },
+    {
+      "movement_key": "treadmill",
+      "notes": "3.0mph / 1.0% incline. Survives every tier \u2014 on RED this plus stretching IS the session, at 0% incline.",
+      "rest_seconds": 0.0,
+      "sets": [
+        {
+          "type": "normal"
+        }
+      ]
+    },
+    {
+      "movement_key": "tmpl:527DA061",
+      "notes": "",
+      "rest_seconds": 0.0,
+      "sets": [
+        {
+          "type": "normal"
+        }
+      ]
+    }
+  ]
+}

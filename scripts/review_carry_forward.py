@@ -64,6 +64,33 @@ GRADES_RE = re.compile(r"^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partia
 CALIBRATED = "CALIBRATED"
 UNCALIBRATED = "UNCALIBRATED"  # verifiers confirmed a planted false finding — the run is not evidence
 UNSTATED = "UNSTATED"  # the artifact carries no calibration block (every run before #3603)
+# #3919 (2026-09-20): calibration is MANDATORY for every review run from the day #3603's
+# planted controls landed. An UNSTATED artifact dated on/after this day is treated as a
+# MISSING run — it neither advances a lens's from-scratch date nor satisfies a review clock.
+# Artifacts before it could not have stated a calibration and are grandfathered (the six
+# committed runs 2026-07-16 → 2026-09-05 are all UNSTATED; arming a gate over history is how
+# a gate is born red and then ignored). The date is #3603's own: v1.4.0 of operating_calendar.
+CALIBRATION_REQUIRED_FROM = date(2026, 9, 19)
+
+
+def run_counts(run: dict, when: date | None) -> bool:
+    """May THIS artifact advance a clock? UNCALIBRATED never; UNSTATED only when dated
+    before CALIBRATION_REQUIRED_FROM (or undated — a parse gap is not a verdict)."""
+    verdict = calibration_verdict(run)
+    if verdict == UNCALIBRATED:
+        return False
+    if verdict == UNSTATED and when is not None and when >= CALIBRATION_REQUIRED_FROM:
+        return False
+    return True
+
+
+def artifact_date(path: str, run: dict | None = None) -> date | None:
+    """The run's date: the filename's (the calendar's own keying), else the JSON's `date`."""
+    m = GRADES_RE.match(os.path.basename(path))
+    if m:
+        return _parse_date(m.group(1))
+    return _parse_date(str((run or {}).get("date", ""))[:10])
+
 
 _DATE_IN_TEXT = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
@@ -100,7 +127,7 @@ def calibrated_run(path: str) -> bool:
             run = json.load(fh)
     except (OSError, ValueError):
         return True
-    return calibration_verdict(run) != UNCALIBRATED
+    return run_counts(run, artifact_date(path, run))  # #3919: UNSTATED after the cutoff is a missing run
 
 
 def carried_lenses(run: dict) -> dict[str, date | None]:
@@ -153,7 +180,9 @@ def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
     out: dict[str, date | None] = {}
     for run_date, run in sorted(runs, key=lambda r: r[0]):
         carried = carried_lenses(run)
-        graded = {str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried)
+        # #3919: a run that does not count (UNCALIBRATED, or UNSTATED after the cutoff) grades
+        # nothing from scratch — it may still SEED a lens through a citation, never advance one.
+        graded = ({str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried)) if run_counts(run, run_date) else set()
         for lens in graded:
             if lens not in out or out[lens] is None or run_date > out[lens]:
                 out[lens] = run_date
@@ -231,8 +260,13 @@ def carry_forward_report(today: date, repo: str = REPO) -> tuple[list[str], list
         f"carry-forward cap: {CARRY_FORWARD_MAX_DAYS}d since a lens was graded from scratch "
         f"(newest artifact {newest_date}, calibration {verdict})",
     ]
-    if verdict == UNSTATED:
+    if verdict == UNSTATED and run_counts(newest, newest_date):
         lines.append("   calibration UNSTATED — the run recorded no planted-control outcome; it counts, and says so (#3603).")
+    elif verdict == UNSTATED:
+        lines.append(
+            f"   calibration UNSTATED on a run dated {newest_date} ≥ {CALIBRATION_REQUIRED_FROM} — calibration is mandatory; "
+            "this artifact counts as a MISSING run and advances nothing (#3919)."
+        )
     if not expired:
         lines.append("   ✅ every graded lens is within the cap.")
         return lines, expired

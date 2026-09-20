@@ -970,7 +970,10 @@ def thread_entry(ir: Any, *, today: str) -> dict[str, Any]:
         f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" + (f" on {v['metric']}={_fmt(v.get('value'))}" if v.get("metric") else "")
         for v in verdicts
     )
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3900: tagger-blind pk, class-gated stamp
+
     return {
+        **experiment_stamp_for("USER#matthew", f"SOURCE#coach_thread#training#{today}#critics"),
         "pk": "USER#matthew",
         "sk": f"SOURCE#coach_thread#training#{today}#critics",
         "coach_id": "training",
