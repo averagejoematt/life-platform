@@ -23,14 +23,14 @@ v1.1.0 — 2026-07-07 (#769): added the evening-ritual one-tap section.
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from content.ritual_link import sign_ritual_token
-from ingestion.source_registry import manual_capture_sources
+from ingestion.source_registry import day_key_frame_for, manual_capture_sources
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -133,16 +133,37 @@ def _check_journal(date_str: str) -> tuple[bool, str]:
         return False, "Journal check failed"
 
 
-def _check_how_we_feel(date_str: str) -> tuple[bool, str]:
-    """Returns (complete, detail). Looks in apple_health for state_of_mind field."""
-    item = _fetch_date("apple_health", date_str)
+def _som_count(item: dict | None) -> int:
+    """The SoM check-in count on one apple_health row, or 0.
+
+    HAE writes the count as ``som_check_in_count`` (the older
+    ``state_of_mind_count``/``_check_ins`` names were never produced).
+    """
     if not item:
-        return False, "No Apple Health data today"
-    # HAE writes the SoM check-in count as som_check_in_count on the apple_health
-    # record (the older state_of_mind_count/_check_ins names were never produced).
+        return 0
     som = item.get("som_check_in_count") or item.get("state_of_mind_count") or item.get("state_of_mind_check_ins")
-    if som and int(float(som)) > 0:
-        return True, f"{int(float(som))} How We Feel check-in(s)"
+    return int(float(som)) if som else 0
+
+
+def _check_how_we_feel(date_str: str) -> tuple[bool, str]:
+    """Returns (complete, detail). Looks in apple_health for state_of_mind field.
+
+    #3914: apple_health's ``DATE#`` key names a **UTC** day (TD-19 Phase 2 /
+    #3677's KEEP-UTC ruling), so a check-in logged from 17:00 PT to Pacific
+    midnight lands on the FOLLOWING Pacific day's key, not today's — the same
+    boundary ``reached_in_pacific`` (#3287) exists to handle, here read via the
+    registry's ``day_key_frame`` facet rather than assumed. This is the reader
+    catching up to the writer, not a re-key: ``date_str``'s own row is read
+    unchanged, and the next UTC day's row (where the evening's check-in
+    actually lands) is folded in too, so it shows up on the SAME evening's
+    nudge instead of being reported missing until tomorrow.
+    """
+    som = _som_count(_fetch_date("apple_health", date_str))
+    if day_key_frame_for("apple_health") == "utc":
+        next_day = (datetime.strptime(date_str, "%Y-%m-%d").date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        som += _som_count(_fetch_date("apple_health", next_day))
+    if som > 0:
+        return True, f"{som} How We Feel check-in(s)"
     return False, "No How We Feel check-in today"
 
 
