@@ -140,9 +140,20 @@ def test_the_next_line_counts_to_the_week_close():
     assert L.next_line(DayFacts(date="x", day_n=None)) is None
 
 
-def test_the_footer_carries_the_stakes_on_every_card():
-    drawn = _strings(L.scorecard(_facts(), date_label="x"))
-    assert any("16 lost · 0 kept" in t for t in drawn)
+def test_no_card_counts_attempts_or_prior_episodes():
+    """Owner ruling 2026-09-19: no "attempt #17", no "16 lost · 0 kept" — the first true experiment."""
+    f = _facts(weighed_today=True, weight_lb=319.7)
+    for img in (
+        L.scorecard(f, date_label="x"),
+        L.trajectory(f, date_label="x", weight_series=[327.3, None, 319.7]),
+        L.dayzero(f, date_label="x"),
+    ):
+        for t in _strings(img):
+            low = t.lower()
+            assert "attempt" not in low and "16 lost" not in low and "stayed off" not in low, t
+    for cap in (L.caption_for_beat("scorecard", f, day_label="Day 5", date_label="x"), L.dayzero_caption(f), L.HASHTAGS):
+        assert "attempt" not in cap.lower() and "sixteen" not in cap.lower(), cap
+    assert any("THE EXPERIMENT" in t for t in _strings(L.scorecard(f, date_label="x")))
 
 
 # ── milestones ────────────────────────────────────────────────────────────────
@@ -157,14 +168,14 @@ def test_the_first_10_lb_is_a_milestone_once():
 def test_a_volume_best_needs_prior_sessions_to_mean_anything():
     f = _facts(workouts=[WorkoutFact("Legs", 6, 27, 49400.0, None, [], 150, [], 27)])
     assert C._milestone(f, [], 32195.0, prior_sessions=2) is None
-    assert C._milestone(f, [], 32195.0, prior_sessions=4) == "most moved this attempt"
+    assert C._milestone(f, [], 32195.0, prior_sessions=4) == "most moved so far"
     assert C._milestone(f, [], 60000.0, prior_sessions=4) is None
 
 
 def test_a_milestone_picks_the_beat_that_carries_it():
     f = _facts(weighed_today=True, weight_lb=317.31, milestone="first 10 lb")
     assert L.pick_beat(f, [])[0] == "trajectory"
-    g = _facts(workouts=[WorkoutFact("Legs", 6, 12, 49400.0, None, [], 150, [], 12)], milestone="most moved this attempt")
+    g = _facts(workouts=[WorkoutFact("Legs", 6, 12, 49400.0, None, [], 150, [], 12)], milestone="most moved so far")
     assert L.pick_beat(g, [])[0] == "session"
 
 

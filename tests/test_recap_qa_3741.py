@@ -71,7 +71,7 @@ def test_a_glyph_the_fonts_cannot_draw_is_held(text):
 
 
 @pytest.mark.parametrize(
-    "text", ["−12.2 lb", "DAY 8  ·  ATTEMPT #17", "the arc so far…", "3 × 12 · 27 lb", "week 1 · Sun 6 Sep – Sat 12 Sep", "café"]
+    "text", ["−12.2 lb", "DAY 8  ·  THE EXPERIMENT", "the arc so far…", "3 × 12 · 27 lb", "week 1 · Sun 6 Sep – Sat 12 Sep", "café"]
 )
 def test_the_marks_the_layouts_use_on_purpose_are_fine(text):
     res = audit([_s(text, 72, 210, 600, 300)], size=SIZE, margin=M)

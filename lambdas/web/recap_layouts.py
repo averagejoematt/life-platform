@@ -9,7 +9,7 @@ THE BRIEF THAT CHANGED THE ARTEFACT
 A recap answers "what happened yesterday". A campaign post has to earn the next one. The
 difference shows up in three places, and every layout here honours all three:
 
-1. **The serial marker on every card.** `DAY 8 · ATTEMPT #17`. Day one has zero followers,
+1. **The serial marker on every card.** `DAY 8 · THE EXPERIMENT`. Day one has zero followers,
    so each card must be legible to a stranger who sees exactly one of them, mid-scroll, with
    no context. It is also what makes card 40 readable to someone who never saw 1–39.
 2. **The arc on every card.** baseline → now → goal, as a bar that visibly fills over months.
@@ -21,10 +21,11 @@ difference shows up in three places, and every layout here honours all three:
 
 THE SPINE
 
-Sixteen loss episodes since 2012. Zero held. Losing has never been the problem; holding has
-never once been solved. That is the hook, it is true, and it is the reason a stranger would
-follow an attempt rather than scroll past another transformation. It is also why these cards
-must never overstate: the jeopardy IS the draw, and a card that oversells forfeits it.
+The owner's ruling (2026-09-19): *"remove attempt 17, i dont want to talk about that, this is
+the first time true experiment."* So the cards carry no attempt count, no prior-episode
+tally, no "16 lost · 0 kept" — the spine is the experiment itself: instrumented, public,
+graded every day, bad days included. The jeopardy is still real (it is played out in public)
+and the cards must still never overstate: a card that oversells forfeits the draw.
 
 WHAT VARIES
 
@@ -43,7 +44,7 @@ Ingestion is not a promise. Hevy may not have polled, MacroFactor lands a day la
 journal may be empty. The owner's rule (2026-09-19): *"plans for each daily card when
 certain ingestion wasn't available… rotating visuals that show graphs, insights, coach
 points, basically filler."* So `FILLERS` is a small registry of blocks that are TRUE ON
-ANY DAY — the arc so far, the last seven grades, the stakes, the coach's note, the road
+ANY DAY — the arc so far, the last seven grades, the coach's note, the road
 ahead — and a card with an empty slot draws one of them instead, rotated by day number so
 consecutive gaps do not show the same block twice. Every filler is labelled by what it IS
 and carries a faint note naming what it stands in for ("no training logged"), because a
@@ -66,10 +67,10 @@ PORTRAIT = (1080, 1350)
 M = 72  # margin
 W_CONTENT = PORTRAIT[0] - 2 * M
 
-ATTEMPT_NUMBER = 17  # cycle 17 — see CYCLE_GENESES; the serial marker's second half
+#: The serial marker's second half and the caption's. Not a cycle number: the owner ruled
+#: (2026-09-19) that the cards do not count attempts — this is the first true experiment.
+SERIES_LABEL = "THE EXPERIMENT"
 TAGLINE = "proof, not promises"
-#: The spine, as a footer line. Sixteen loss episodes since 2012, zero held (PROVEN_BLUEPRINT).
-STAKES_LINE = "16 lost · 0 kept"
 
 #: The small-text token. `card_engine.FAINT` is 3.9:1 on the card ground — fine for a
 #: 1200×630 unfurl read on a desktop, below WCAG AA on a phone at feed scale. The panel
@@ -103,7 +104,7 @@ def _canvas():
 
 
 def _serial(draw, facts, date_label: str) -> int:
-    """`DAY 8` at display size, `· ATTEMPT #17` beside it, the date under. On every card.
+    """`DAY 8` at display size, `· THE EXPERIMENT` beside it, the date under. On every card.
 
     The day number is the only thing that changes card to card and the one thing a
     profile-grid visitor should be able to read at thumbnail: ninety tiles reading 1→90.
@@ -115,7 +116,7 @@ def _serial(draw, facts, date_label: str) -> int:
         dw = draw.textlength(day, font=df)
     except Exception:  # noqa: BLE001
         dw = 200
-    draw.text((M + dw + 22, 112), f"·  ATTEMPT #{ATTEMPT_NUMBER}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
+    draw.text((M + dw + 22, 112), f"·  {SERIES_LABEL}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
     draw.text((M, 160), date_label.upper(), fill=DIM, font=ce.font(ce.FONT_MONO, 24))
     return 216
 
@@ -239,7 +240,7 @@ FOOTER_Y = 1296
 
 def _footer(draw, right: str = "averagejoematt.com"):
     f = ce.font(ce.FONT_MONO, 20)
-    draw.text((M, FOOTER_Y), f"{TAGLINE}  ·  {STAKES_LINE}", fill=DIM, font=f)
+    draw.text((M, FOOTER_Y), TAGLINE, fill=DIM, font=f)
     draw.text((PORTRAIT[0] - M, FOOTER_Y), right, fill=DIM, font=f, anchor="ra")
 
 
@@ -398,36 +399,6 @@ def _grade_strip(draw, grades: list, *, y: int, h: int = 74, weekdays=None) -> i
         if weekdays and i < len(weekdays):
             draw.text((cx + (cell - 12) / 2, y + h + 8), str(weekdays[i]).upper(), fill=DIM, font=ce.font(ce.FONT_MONO, 20), anchor="ma")
     return y + h + (36 if weekdays else 22)
-
-
-def draw_stakes(draw, *, y: int) -> int:
-    """The spine, stated plainly. The reason a stranger follows an attempt.
-
-    From his own mined history (PROVEN_BLUEPRINT): sixteen loss episodes of 15 lb or more
-    since 2012, and zero that held — "held" meaning he regained less than a third within
-    six months. Losing has never been the problem. Holding has never once been solved.
-
-    That is the most compelling true thing about this account and it belongs on a WEEKLY
-    card, not a daily one: at a daily cadence it would read as self-flagellation, and at a
-    weekly cadence it reads as what it is — the stake the experiment is played for.
-
-    Deliberately flat in register. The jeopardy does the work; adjectives would cheapen it.
-    """
-    draw.rectangle([M, y, M + W_CONTENT, y + 2], fill=ce.BORDER)
-    y += 34
-    draw.text((M, y), "16", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 78))
-    draw.text((M + 118, y + 22), "times the weight came off since 2012", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 27))
-    y += 92
-    draw.text((M, y), "0", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 78))
-    draw.text((M + 118, y + 22), "times it stayed off", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 27))
-    y += 100
-    draw.text(
-        (M, y),
-        "attempt seventeen · instrumented · graded daily, bad days included",
-        fill=DIM,
-        font=ce.font(ce.FONT_MONO, 21),
-    )
-    return y + 44
 
 
 # ── A. SCORECARD — the day, graded, with what earned it ───────────────────────
@@ -651,7 +622,7 @@ def reckoning(
         dw = draw.textlength(wk, font=df)
     except Exception:  # noqa: BLE001
         dw = 240
-    draw.text((M + dw + 22, 112), f"·  ATTEMPT #{ATTEMPT_NUMBER}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
+    draw.text((M + dw + 22, 112), f"·  {SERIES_LABEL}", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 26))
     draw.text((M, 160), date_label.upper(), fill=DIM, font=ce.font(ce.FONT_MONO, 24))
     y = 230
 
@@ -682,10 +653,13 @@ def reckoning(
         draw.text((M, y), "THE WEEK, GRADED", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
         y = _grade_strip(draw, grades, y=y + 44, weekdays=weekdays)
 
-    # The stakes, compact: the weekly close is one of the three places they are spent.
+    # The week's arc, drawn: the weigh-in dots under the grades, on one axis with them.
     y += 14
     draw.rectangle([M, y, M + W_CONTENT, y + 2], fill=ce.BORDER)
-    y = _filler_stakes(draw, facts, {}, y=y + 26)
+    y += 30
+    ctx = {"weight_series": weight_series or [], "grade_series": grade_series or []}
+    for name in pick_fillers(facts, ctx, 1, exclude=("graded", "coach")):
+        y = draw_filler(draw, name, facts, ctx, y=y) + 10
 
     # The week's facts on ONE row, then the miss, then the quote — in that order, so the
     # miss (the content) never gives way to the quote (the colour).
@@ -732,15 +706,6 @@ def _filler_graded(draw, facts, ctx, *, y: int) -> int:
     return _grade_strip(draw, grades, y=y, h=64)
 
 
-def _filler_stakes(draw, facts, ctx, *, y: int) -> int:
-    draw.text((M, y), "16", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 60))
-    draw.text((M + 96, y + 18), "times the weight came off since 2012", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
-    y += 70
-    draw.text((M, y), "0", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 60))
-    draw.text((M + 96, y + 18), "times it stayed off", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
-    return y + 80
-
-
 def _filler_coach_ok(facts, ctx) -> bool:
     return bool(getattr(facts, "coach_line", None))
 
@@ -777,17 +742,14 @@ FILLERS: dict[str, tuple[str, Any, Any]] = {
     "graded": ("the last days, graded", _filler_graded_ok, _filler_graded),
     "coach": ("coach's note", _filler_coach_ok, _filler_coach),
     "road": ("the road", _filler_road_ok, _filler_road),
-    "stakes": ("the stakes", lambda facts, ctx: True, _filler_stakes),
 }
 
 
 def pick_fillers(facts, ctx: dict, n: int, *, exclude: tuple[str, ...] = ()) -> list[str]:
     """Up to `n` filler names that can draw today, rotated by day number. Deterministic."""
-    # The stakes are rationed — Day 0, the reckonings, and the last resort here — so the
-    # best line in the set is not spent as wallpaper. Everything else rotates.
-    names = [n for n in FILLERS if n != "stakes"]
+    names = list(FILLERS)
     start = (facts.day_n or 0) % len(names)
-    order = names[start:] + names[:start] + ["stakes"]
+    order = names[start:] + names[:start]
     out: list[str] = []
     for name in order:
         if name in exclude or len(out) >= n:
@@ -817,66 +779,55 @@ def draw_filler(draw, name: str, facts, ctx: dict, *, y: int, note: str | None =
 
 # ── F. DAY ZERO — the starting line ───────────────────────────────────────────
 def dayzero(facts, *, date_label: str):
-    """The card for the eve of genesis: where attempt seventeen starts from.
+    """The card for the eve of genesis: where the experiment starts from.
 
-    No day data is drawn — the day before Day 1 belongs to the previous cycle and its
-    numbers are not this attempt's. What IS true on the eve: the stakes, the baseline
-    weigh-in the cycle is anchored to, the goal, the distance, and what the platform
-    will grade every day from here. Stakes first: 16 / 0 is the hook a stranger reads.
+    No day data is drawn — the day before Day 1 belongs to before the experiment and its
+    numbers are not the experiment's. What IS true on the eve: the baseline weigh-in the
+    cycle is anchored to, the goal, the distance, and what the platform will grade every
+    day from here. No attempt count, no prior tally (owner ruling, 2026-09-19).
     """
     if facts.baseline_weight_lb is None or facts.goal_weight_lb is None:
         raise ValueError("dayzero layout needs the cycle's baseline and goal")
     img, draw = _canvas()
     y = _serial(draw, facts, date_label)
 
-    y += 10
-    draw.text((M, y), "16", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 150))
-    draw.text((M + 230, y + 52), "times the weight came off", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 30))
-    draw.text((M + 230, y + 94), "since 2012", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 30))
-    y += 176
-    draw.text((M, y), "0", fill=ce.AMBER, font=ce.font(ce.FONT_DISPLAY, 150))
-    draw.text((M + 230, y + 52), "times it stayed off", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 30))
-    y += 196
-
-    draw.rectangle([M, y, M + W_CONTENT, y + 2], fill=ce.BORDER)
-    y += 34
+    y += 40
     hero = f"{facts.baseline_weight_lb:.1f}"
-    hf = ce.font(ce.FONT_DISPLAY, 120)
+    hf = ce.font(ce.FONT_DISPLAY, 168)
     draw.text((M, y), hero, fill=ce.TEXT, font=hf)
     try:
         hw = draw.textlength(hero, font=hf)
     except Exception:  # noqa: BLE001
-        hw = 300
-    draw.text((M + hw + 18, y + 62), "lb  ·  the starting line", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 30))
-    y += 144
-    y = _fact_row(
-        draw,
-        "goal",
-        f"{facts.goal_weight_lb:.0f} lb  ·  {facts.baseline_weight_lb - facts.goal_weight_lb:.0f} lb to lose",
-        y=y,
-        size=30,
-        floor=CONTENT_FLOOR,
-    )
+        hw = 420
+    draw.text((M + hw + 20, y + 92), "lb", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 42))
+    y += 204
+    draw.text((M, y), "the starting line", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 36))
+    y += 90
+
+    draw.rectangle([M, y, M + W_CONTENT, y + 2], fill=ce.BORDER)
+    y += 40
+    y = _fact_row(draw, "goal", f"{facts.goal_weight_lb:.0f} lb", y=y, size=32, floor=CONTENT_FLOOR)
+    y = _fact_row(draw, "to lose", f"{facts.baseline_weight_lb - facts.goal_weight_lb:.0f} lb", y=y + 8, size=32, floor=CONTENT_FLOOR)
     names = [v for k, v in _COMPONENT_NAMES.items() if k != "journal"]
-    y += 8
-    draw.text((M, y), "GRADED EVERY DAY ON", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 20))
-    y += 34
+    y += 30
+    draw.text((M, y), "GRADED EVERY DAY ON", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
+    y += 38
     for line in ce.wrap(" · ".join(names), width=58, max_lines=2):
-        draw.text((M, y), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 24))
-        y += 34
-    draw.text((M, y + 6), "bad days included.", fill=ce.MUTED, font=ce.font(ce.FONT_MONO_BOLD, 26))
+        draw.text((M, y), line, fill=ce.MUTED, font=ce.font(ce.FONT_MONO, 26))
+        y += 36
+    y += 24
+    draw.text((M, y), "instrumented. public. bad days included.", fill=ce.TEXT, font=ce.font(ce.FONT_MONO_BOLD, 28))
 
     _bottom(draw, facts, frac=0.0)
     return img
 
 
 def dayzero_caption(facts) -> str:
-    head = f"Day 0 · attempt #{ATTEMPT_NUMBER}"
+    head = "Day 0 · the experiment"
     body = (
         f"The starting line: {facts.baseline_weight_lb:.1f} lb. Goal {facts.goal_weight_lb:.0f} lb, "
         f"{facts.baseline_weight_lb - facts.goal_weight_lb:.0f} lb to lose. "
-        "Sixteen times the weight came off since 2012. Zero times it stayed off. "
-        "This one is instrumented, public, and graded every day — bad days included."
+        "Instrumented, public, and graded every day — bad days included."
     )
     return cap_caption(head + "\n" + body + "\n" + f"Day 1 tomorrow\n{SITE_LINE}\n{HASHTAGS}")
 
@@ -1043,7 +994,7 @@ def render_beat(layout: str, facts, *, date_label: str, weight_series=None, grad
 #: that has to be expanded to be read is a caption most of the feed never reads (#3749).
 CAPTION_MAX_CHARS = 480
 #: Fixed, never generated. The account's own tags.
-HASHTAGS = "#attempt17 #proofnotpromises #quantifiedself #weightlossjourney #buildinpublic"
+HASHTAGS = "#themeasuredlife #proofnotpromises #quantifiedself #weightlossjourney #buildinpublic"
 SITE_LINE = "averagejoematt.com"
 
 
@@ -1076,7 +1027,7 @@ def caption_for_beat(layout: str, facts, *, day_label: str, date_label: str) -> 
     flourish per card, which is exactly what #3749 was filed to prevent, so it is worth
     stating rather than leaving as an inference from the code.
     """
-    head = " · ".join(x for x in (day_label, f"attempt #{ATTEMPT_NUMBER}") if x)
+    head = " · ".join(x for x in (day_label, "the experiment") if x)
     bits: list[str] = []
     if layout == "trajectory" and facts.total_lost_lb:
         bits.append(f"{facts.total_lost_lb:.1f} lb down since day one. {facts.weight_lb:.1f} lb today.")

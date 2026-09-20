@@ -145,7 +145,7 @@ MILESTONE_DAYS = {30: "one month in", 60: "two months in", 90: "three months in"
 
 
 #: A volume best needs this many earlier sessions in the cycle before it is a milestone —
-#: the third session of an attempt is trivially "the most moved so far".
+#: the third session of the experiment is trivially "the most moved so far".
 PB_MIN_PRIOR_SESSIONS = 3
 
 
@@ -165,7 +165,7 @@ def _milestone(facts, weight_series, volume_best_before: float, prior_sessions: 
     if facts.workouts and prior_sessions >= PB_MIN_PRIOR_SESSIONS:
         vol = max((float(w.volume_lbs or 0) for w in facts.workouts), default=0.0)
         if vol > 0 and vol > volume_best_before:
-            return "most moved this attempt"
+            return "most moved so far"
     if n in MILESTONE_DAYS:
         return MILESTONE_DAYS[n]
     return None
@@ -252,7 +252,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
     day0 = date == _genesis_eve()
     if day0:
         # The starting line. The eve's own numbers belong to the previous cycle and are
-        # not drawn; the card is the baseline, the goal and the stakes.
+        # not drawn; the card is the baseline, the goal and what gets graded.
         facts.day_n = 0
         layout, why = "dayzero", "the eve of genesis — the starting line"
         # The eve's names are the PREVIOUS cycle's — its workouts, its missed habits, its
