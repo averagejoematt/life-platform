@@ -287,7 +287,7 @@ def lambda_harness(monkeypatch):
 def test_a_full_day_stores_two_cards_and_delivers_both(lambda_harness, monkeypatch):
     C, recap_data, puts, records, sends = lambda_harness
     monkeypatch.setattr(recap_data, "day_facts", lambda *a, **k: _full())
-    out = C.render_for_date("2026-09-16", deliver=True, force=True, dry_run=True)
+    out = C.render_for_date("2026-09-16", deliver=True, force=True, dry_run=False)  # #3942: a dry run stores nothing
     assert set(puts) == {"recap/2026-09-16.png", "recap/2026-09-16-detail.png"}
     assert out["detail_s3_key"] == "recap/2026-09-16-detail.png"
     assert out["detail_caption"].startswith("Day 11 · the experiment · the detail")
@@ -307,7 +307,7 @@ def test_day_zero_is_exactly_the_eve_and_carries_none_of_the_eves_names(lambda_h
     monkeypatch.setattr(
         recap_gate, "gate", lambda strings, **k: screened.append(list(strings)) or recap_gate.GateResult(recap_gate.VERDICT_CLEARED)
     )
-    out = C.render_for_date("2026-09-05", deliver=True, force=True, dry_run=True)
+    out = C.render_for_date("2026-09-05", deliver=True, force=True, dry_run=False)  # #3942: a dry run stores nothing
     assert out["beat"] == "dayzero" and out["day_n"] == 0
     assert set(puts) == {"recap/2026-09-05.png"}, "no detail card on the eve"
     assert out["coach_line_status"] == "skipped"
