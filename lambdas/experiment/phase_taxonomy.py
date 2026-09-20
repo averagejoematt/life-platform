@@ -60,6 +60,7 @@ v1.2.0 — 2026-09-05 (#3598; the stamp derives phase + cycle from the WRITE'S D
 from __future__ import annotations
 
 _GENESES_CACHE: dict = {"value": None}
+_ABANDONED_CACHE: dict = {"value": None}
 
 
 def _cycle_geneses() -> dict | None:
@@ -74,6 +75,23 @@ def _cycle_geneses() -> dict | None:
         except Exception:  # noqa: BLE001 — provenance never breaks a write
             return None
     return _GENESES_CACHE["value"]
+
+
+def _abandoned_geneses() -> dict | None:
+    """The abandoned-genesis alias map (site_api_data.ABANDONED_GENESES): a genesis date
+    that was WRITTEN into the record and then re-anchored -> the cycle it was opening.
+
+    Imported lazily and fail-soft exactly like `_cycle_geneses` above, and cached only on
+    success (the #1948 rule: a failed read must not latch). None when unavailable — which
+    degrades a resolution to "unknown", never to a wrong cycle."""
+    if _ABANDONED_CACHE["value"] is None:
+        try:
+            from web.site_api_data import ABANDONED_GENESES
+
+            _ABANDONED_CACHE["value"] = {str(k)[:10]: int(v) for k, v in ABANDONED_GENESES.items()}
+        except Exception:  # noqa: BLE001 — provenance never breaks a write
+            return None
+    return _ABANDONED_CACHE["value"]
 
 
 def _write_date() -> str:
@@ -1030,17 +1048,49 @@ def closing_genesis_of(bet: dict) -> str | None:
     return stamp if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", stamp) else None
 
 
-def closing_cycle_for_genesis(genesis: str | None, cycle_geneses: dict) -> int | None:
+def opening_cycle_for_genesis(genesis: str | None, cycle_geneses: dict, abandoned_geneses: dict | None = None) -> int | None:
+    """The cycle a genesis OPENED, or None when the date is in neither registry.
+
+    Two registries, because a genesis can be written into the record and then moved:
+
+      * `cycle_geneses` — cycle number → genesis date (site_api_data.CYCLE_GENESES), the
+        live anchor of each cycle.
+      * `abandoned_geneses` — genesis date → the cycle it was opening
+        (site_api_data.ABANDONED_GENESES): a date a reset actually RAN on and stamped rows
+        with before the anchor moved. #3621: the cycle-16 re-anchor was corrected in place
+        from 2026-09-04 to 2026-09-05, but the wipe's `tombstoned_reason` is written with
+        if_not_exists (#1202) so the Friday date survives on 328 rows forever, by design.
+        Passing `None` consults the live alias map; pass `{}` for "aliases off" (the
+        pre-#3621 behaviour, which is also the mutation control in the test).
+
+    Separated from `closing_cycle_for_genesis` so a caller can tell "this genesis is not
+    in the record at all" (None here) from "cycle 1 has no predecessor" (1 here, None
+    there) — a distinction the census in deploy/restart_verify.py is built on, and one a
+    single function returning None for both cannot express (ADR-104).
+    """
+    if not genesis:
+        return None
+    key = str(genesis)[:10]
+    for cycle, gen in cycle_geneses.items():
+        if str(gen)[:10] == key:
+            return int(cycle)
+    aliases = _abandoned_geneses() if abandoned_geneses is None else abandoned_geneses
+    if aliases and key in aliases:
+        return int(aliases[key])
+    return None
+
+
+def closing_cycle_for_genesis(genesis: str | None, cycle_geneses: dict, abandoned_geneses: dict | None = None) -> int | None:
     """The cycle that a reset CLOSED, given the genesis it opened.
 
     `cycle_geneses` maps cycle number → genesis date (site_api_data.CYCLE_GENESES).
     The reset that opens cycle N closes cycle N-1 — which is exactly the number the
     wipe stamps onto the records it archives. Returns None for an unregistered or
     unknown genesis (cycle 1 has no predecessor).
+
+    #3621: an ABANDONED genesis resolves too — see `opening_cycle_for_genesis`.
     """
-    if not genesis:
+    opening = opening_cycle_for_genesis(genesis, cycle_geneses, abandoned_geneses)
+    if opening is None or opening <= 1:
         return None
-    for cycle, gen in cycle_geneses.items():
-        if gen == genesis:
-            return int(cycle) - 1 if int(cycle) > 1 else None
-    return None
+    return opening - 1

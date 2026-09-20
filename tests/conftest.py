@@ -670,6 +670,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible at runtime — the generator would plan a PPL week while another caller
         # graded a session against the old grid, with nothing red anywhere.
         "test_program_structure_3755.py",
+        # #3621 box 3: an AST sweep of lambdas/experiment/experiment_gates.py asserting
+        # every module-level arming threshold carries a {value, kind, source} facet. Its
+        # verdict depends only on that file's text, and the failure it catches is a bare
+        # new literal added in the very PR that should red on it — post-merge is too late
+        # for a gate whose whole job is to stop an unpriced number shipping into a public
+        # zero-state payload.
+        "test_gate_threshold_provenance_3621.py",
     }
 )
 
