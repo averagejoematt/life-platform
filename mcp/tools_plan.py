@@ -402,6 +402,13 @@ def _run_stage_2(
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
     }
     ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "critics": record}
+    # LIVE FINDING 2026-09-20: Hevy's routine object carries NO `notes` field on the API (GET keys
+    # are created_at/exercises/folder_id/id/title/updated_at; a PUT with notes reads back without
+    # them). Every routine-level WHY note the compiler has ever sent is invisible there. EXERCISE
+    # notes do land, verifiably — the recovery session block already lives there for that reason
+    # (`_apply_recovery_adaptation`). So the verdicts ride on the FIRST exercise's notes, where he
+    # will actually read them at the gym, as well as the routine-level field.
+    _place_block_on_first_exercise(ir)
     ir.parent_version = ir.version
     ir.version = int(ir.version) + 1
     put_versioned(ir)
@@ -416,6 +423,27 @@ def _run_stage_2(
         else "no veto — manage_hevy_routine dry_run shows the revised body, then commit."
     )
     return out
+
+
+_BLOCK_MARK = "RED TEAM ("
+
+
+def _place_block_on_first_exercise(ir: Any) -> None:
+    """Prepend the critics' block to exercise[0].notes, replacing any earlier block (a re-run
+    must not stack two)."""
+    from coach import critics
+
+    block = critics.notes_block(ir)
+    if not block or not getattr(ir, "exercises", None):
+        return
+    first = ir.exercises[0]
+    existing = first.notes or ""
+    if _BLOCK_MARK in existing:
+        head, _, tail = existing.partition(_BLOCK_MARK)
+        # drop the old block: everything from the mark to the next blank line
+        rest = tail.split("\n\n", 1)
+        existing = (head + (rest[1] if len(rest) > 1 else "")).strip()
+    first.notes = (block + ("\n\n" + existing if existing else "")).strip()
 
 
 def _model_allowed() -> tuple[bool, str | None]:
