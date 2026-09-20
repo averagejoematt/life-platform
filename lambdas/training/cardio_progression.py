@@ -78,7 +78,7 @@ from typing import Any
 # THE canonical ISO parser (#1964) — never a private fork. Hevy and Whoop both emit
 # `Z`-suffixed UTC, and this states the tz-less semantic so a laptop run and the Lambda
 # cannot disagree about what an unsuffixed stamp means.
-from common.pacific_time import parse_iso_utc
+from common.pacific_time import parse_day_key, parse_iso_utc
 
 CARDIO_PROGRESSION_VERSION = "cardio-progression@1.0.0"
 
@@ -609,4 +609,4 @@ def cardio_cue(
 def _today() -> date:  # pragma: no cover - trivial seam kept for symmetry with exercise_history
     from common.pacific_time import pacific_today
 
-    return date.fromisoformat(pacific_today())
+    return parse_day_key(pacific_today())  # #3609: the platform's one day-key parser, never a hand-rolled fromisoformat
