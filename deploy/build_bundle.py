@@ -127,15 +127,45 @@ def git_fingerprint(repo_root=REPO_ROOT, now=None):
     if sha and not (os.environ.get("BUNDLE_GIT_SHA") or os.environ.get("GITHUB_SHA")):
         porcelain = _git(["status", "--porcelain"], repo_root)
         dirty = bool(porcelain)
-    built = now or datetime.datetime.now(datetime.timezone.utc)
+    # #3625 box 3: `built_at` is the COMMIT's timestamp whenever the bundle describes a
+    # commit (a known sha and a tree that is not dirty — `dirty is None` means the sha came
+    # from the environment and describes that commit, not this worktree). The wall clock is
+    # used ONLY for a dirty local tree. WHY: CDK fingerprints the staged directory, and a
+    # wall-clock stamp minted a new asset hash on every synth (32 `S3Key` lines on
+    # `cdk diff` of an unchanged tree, measured 2026-09-20) — the byte-reproducible zip
+    # (#3963) was inert on the CDK path because this one file differed every time.
+    built_at, built_at_source = None, "clock"
+    if sha and dirty is not True:
+        committed = _git(["show", "-s", "--format=%cI", sha], repo_root)
+        parsed = _parse_commit_timestamp(committed)
+        if parsed is not None:
+            built_at, built_at_source = parsed.strftime("%Y-%m-%dT%H:%M:%SZ"), "commit"
+    if built_at is None:
+        built = now or datetime.datetime.now(datetime.timezone.utc)
+        built_at = built.strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
         "git_sha": sha,
         "git_short_sha": sha[:8] if sha else None,
-        "built_at": built.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "built_at": built_at,
+        "built_at_source": built_at_source,
         "dirty": dirty,
         "builder": os.environ.get("GITHUB_WORKFLOW") or os.environ.get("USER") or "unknown",
         "schema": 1,
     }
+
+
+def _parse_commit_timestamp(text):
+    """`git show -s --format=%cI` → an aware UTC datetime, or None when git gave nothing
+    parseable (a sha that is not in this checkout, a shallow clone without the object)."""
+    if not text:
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(text.strip())
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(datetime.timezone.utc)
 
 
 def stage_build_info(out_dir, info=None):
