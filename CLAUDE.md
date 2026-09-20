@@ -211,41 +211,4 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-19 (Opus 5, **Sessions AM + AN — the posting pack, and the weekly card that could not be
-found**; two sessions under one handover because AM's terminal was closed before it wrapped). **AM (unwrapped,
-reconstructed from its #3741 comment + git + live AWS):** merged #3922 + #3923, deployed `recap-card-generator`
-from main at `dd2deb04`, verified by unzipping and grepping the artifact, re-rendered **28 cards through the
-deployed function** (`deliver=false`, every one `qa: cleared`) and built the Desktop posting pack — 15 folders,
-`CHECKLIST.md`, a flattened `airdrop/`. Its lease steward blanket-rejected #3926's deploy at 23:20Z (the
-allowlist-your-own-shas class, again) and remedied it by deploying `life-platform-mcp` from the same tip on a
-transitive-import walk showing zero other consumers. **AN opened as a recovery sweep for that closed terminal and
-found nothing lost** — the cards intact, the code all merged and deployed, and the one alarming artefact (a
-worktree carrying 677 uncommitted lines) a **stale duplicate** of what #3923 had already shipped from a different
-branch, archived and pruned. Two real gaps, both closed: the pack's generator existed **only in `/private/tmp`**,
-one purge from going with the session that wrote it → `deploy/build_recap_posting_pack.py`, with its unconditional
-`shutil.rmtree(OUT)` (which destroyed a ticked checklist on any re-run) turned into a refusal; and AM's missing
-wrap, which is that handover. **Then the owner's ask:** *"on instagram its really hard to differentiate the day
-cards to the weekly cards."* Six grounds were rendered on the REAL week-1 card and judged in a simulated profile
-grid by the six seats that graded the first set — **they split 3–3**, and the tie broke on a rule rather than on
-taste: **green means EARNED in this palette**, so a permanent green ground would say "good week" identically on a
-week of B's and on this one (C, B-, B-, B-, C-, C-, C-, headline *"biggest miss: recovery — 24/100 at its
-worst"*). The regainer seat — the reader the honesty promise exists for — raised it unprompted. The contrast
-arithmetic then **agreed with the rule rather than against it**: the faintest tone falls to 3.20:1 on the deepest
-green and holds 3.62:1 on the chosen navy (daily ground 3.90:1), so the honest choice was also the legible one —
-worth keeping, because the split had been framed as honesty *versus* visibility. `WEEKLY_GROUND = (11, 20, 44)`,
-fixed and result-neutral (PR #3941; 7 tests, each mutation-proved). **Shipped end to end in-session:** merged on
-ten green checks (the full pre-merge suite, not the required-two lane), `recap-card-generator` deployed from main at
-`c3032efe0` and verified by unzipping and grepping the artifact, day 7 re-rendered THROUGH the deployed function
-(`qa: cleared`, stored `week-01.png` navy at the pixel), and the Desktop pack rebuilt by the newly-landed script —
-15 folders, 87 files, the weekly navy and all 26 daily frames untouched at `(8, 12, 10)`. **There was no lease to decide**: the run's Deploy
-self-cancelled — *"a higher priority waiting request for ci-cd-deploy-refs/heads/main exists"* — so a `cancelled`
-Deploy on a superseded tip is NORMAL here, not a stranded lease. A genuinely waiting lease on `24b83c5b3` belongs
-to the parallel lane and was left alone (the blanket-reject class). **Two defects found by looking rather than by
-running:** the goal bar's track was a green-black pinned to the daily ground and lay across the navy card as a
-foreign strip while every automated gate passed — derived now; and **#3942**, `dry_run=True` on
-`recap-card-generator` gates delivery but NOT storage, found by causing it (one "dry run" meant to inspect a card
-republished three live `recap/` objects and moved the row's `rendered_at`; no harm landed, but a dry run is the
-thing you reach for *because* you believe it cannot mutate). **Owner acts left:** #3719's tape-measurement ruling
-(still open from Session Z) · #3741 box 4 — **0 posted by hand**, and nothing here posts itself · **week-02 is TODAY's
-card, not 09-21** (genesis 09-06 is day 1, so 09-19 is day 14 — AM's note had it wrong and the live render agrees
-with the arithmetic), so the first weekly the CRON draws on the new ground needs no further deploy.
+**Verified:** 2026-09-20 (Fable 5.1, **Session AN — the overnight drain, and the deploy that split the fleet**; autonomous 21:15 → ~09:45 PT under standing merge + deploy authority). **97 → 63 open (60 non-Roadmap)** against a ≤45 target: 40 closed (15 on live proof, 25 folded verbatim into umbrellas #3943/#3944 and their epics), 7 filed, 31 PRs merged, 4 armed at wrap (#3981 fix-forward, #3977, #3974, #3965), 40 CI leases rejected by name, zero blanket. **Deploys:** fleet 106 functions + `life-platform-mcp` from `c32e58c31` (13:19–13:26Z); **CDK LifePlatformCompute + LifePlatformEmail + LifePlatformOperational from `7615ce47` (15:0xZ)** — which re-bundled those stacks' functions, so the fleet now runs TWO tips (read each function's `build_info.json` before writing "deployed from"). **Measured, not read:** #3625 box 3 is NOT met — CDK fingerprints the staged directory and `build_info.built_at` mints a new asset hash every synth, so the reproducible zip is inert on the CDK path (recorded with options; stays open) · #3929 shipped inert (unruled `config/` file → red main 05:50→06:3xZ + no S3 twin until an attended sync) · #3913 auto-closed by a lane's `Fixes` with no verdict, reopened, then corrected when the CDK deploy turned out to carry it · #3975 landed the very `date.fromisoformat` that #3609's gate exists to catch — main red on it until #3981 merges · the Hevy API still says `shoulders` for the calf template after the owner's in-app edit (4 reads). **Owner sheet applied at boot** (11 rulings via one-at-a-time prompts; all on their issues; #3753/#3755/#3761/#3918 approved but their lanes never started — the drain took the night). **Main:** red on the #3609 registry gate since `7667991df`, fix forward armed. **Owner acts left:** #3938 box 1 · #3770 · #3715 box 5 · #3772 box 2 · #3945's register · 0 cards posted by hand.
