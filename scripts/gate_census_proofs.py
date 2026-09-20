@@ -1126,22 +1126,23 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-07",
     },
-    "qa::lambdas/operational/qa_smoke_lambda.py::check_orphan_routine_drafts": {
-        "gate_name": "check_orphan_routine_drafts",
-        "command": "python3 -B -m pytest tests/test_orphan_routine_drafts_3772.py -q -p no:cacheprovider",
+    "structural::test_bundle_zip_reproducible_3625.py": {
+        "gate_name": "test_bundle_zip_reproducible_3625.py",
+        "command": "python3 -B -m pytest tests/test_bundle_zip_reproducible_3625.py -q -p no:cacheprovider",
         "mutation": (
-            "in qa_smoke_lambda.check_orphan_routine_drafts, the `if stale:` branch inverted so a "
-            "non-empty stale-draft list returns the ok line — the silent-pass shape."
+            "in deploy/build_bundle.zip_dir, the fixed-timestamp ZipInfo/writestr path replaced by the "
+            "pre-fix `zf.write(full, arcname)` (which stamps each entry with the file's mtime) — the "
+            "exact code the fix removed, restored verbatim."
         ),
         "observed": (
-            "MUTATED: test_the_nightly_warns_by_name_and_is_ok_at_zero FAILED (passed is True where None/WARN "
-            "was required, and the specimen id is absent from the message). RESTORED: 3 passed. The two "
-            "positive controls (a planted 12-day-old draft → WARN naming it; an empty list → PASS) were both "
-            "exercised in the same run."
+            "MUTATED: 2 failed, 1 passed — test_the_same_tree_zips_to_identical_bytes reds (the "
+            "mtime-shifted rebuild hashes differently) and test_entries_are_sorted_dated_1980_and_carry_no_bytecode "
+            "reds on the entry date_time; the one-byte-change positive control still passes. RESTORED: 3 passed; "
+            "deploy/build_bundle.py md5-identical to the pre-mutation copy."
         ),
         "scope": (
-            "the nightly count of routine drafts older than 7 days (the #3765 soft-timeout orphans) — a "
-            "bounded index Query over the routine date index, reported by id; the archive/commit is the owner's."
+            "the reproducibility invariant of the ONE deploy bundle (#781): identical staged tree → identical "
+            "zip bytes, so a post-deploy `cdk diff` on an unchanged tree shows zero Code.S3Key changes."
         ),
         "proved_on": "2026-09-20",
     },
