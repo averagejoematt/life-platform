@@ -160,6 +160,10 @@ own controls and reports whether they fired:
   `{planted_false_findings: {n, confirmed_by_verifiers: [...]}, withheld_known_issues: {n,
   found: [...], missed_by_graders: [...]}, verdict: "CALIBRATED" | "UNCALIBRATED"}`. Name each
   planted item so a reader can check the claim.
+- **Calibration is mandatory from 2026-09-19 (#3919).** A run dated on/after that day with NO
+  `calibration` block (`UNSTATED`) is treated as a MISSING run by `scripts/review_carry_forward.py`
+  — it advances no lens's from-scratch date and satisfies no review clock. Runs before it are
+  grandfathered (they could not have stated one).
 - **An UNCALIBRATED run does not reset the calendar clock.** `scripts/operating_calendar.py`
   reads that block (`calibrated_run`) and skips the artifact, so the lens still counts down
   toward DUE. A run whose instruments were asleep is not evidence that the ritual happened —
