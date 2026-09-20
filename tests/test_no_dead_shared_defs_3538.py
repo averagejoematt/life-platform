@@ -447,6 +447,22 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/reading/reading_store.py:get_note": (
         "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
     ),
+    "lambdas/training/exercise_history.py:load_recent_history": (
+        "a deliberate backward-compat shim, not a leftover — landed WITH the split it "
+        "postdates (#3700, merged into this branch): load_history_indexes() now returns a "
+        "(weighted, cardio) TUPLE so a cardio ride's duration-bearing sets no longer vanish "
+        "from the weighted index's reps>0 filter; load_recent_history()'s own docstring says "
+        "why it still exists — 'kept as the public name every existing caller and test "
+        "already uses, with an unchanged return shape ON PURPOSE... the load-floor machinery "
+        "(routine_generator.band_matched_best) can never start counting zero-weight cycling "
+        "blocks among a movement's sessions.' tests/test_cardio_progression_3700.py's own "
+        "test_load_recent_history_still_returns_the_weighted_index_alone pins the exact "
+        "contract with a mutation control (return the tuple instead -> reds). The one "
+        "PRODUCTION caller migrated to load_history_indexes() directly in the same PR "
+        "(routine_generator.py), which is why the AST+string scan finds it live only in "
+        "tests — deleting it would break the compatibility promise the docstring makes, not "
+        "clean up dead code."
+    ),
     "lambdas/training/hevy_common.py:fetch_events_since": (
         "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
     ),
