@@ -454,7 +454,7 @@ MANAGE_HEVY_ROUTINE_DESCRIPTION = (
     "POST body for preview), 'commit' (push to Hevy — requires explicit routine_id), 'list' (date range), "
     "'get' (one IR by routine_id), 'archive' (RENAME only — Hevy has no DELETE, and folder_id is create-only "
     "so the routine is NOT moved out of its folder), 'floor' (≈20-min variant), 're_entry' (deliberately "
-    "easy after a break), 'adherence' (programmed-vs-performed). Typical custom flow: draft_custom → dry_run "
+    "easy after a break), 'adherence' (programmed-vs-performed), 'stall_check' (prescribed-vs-performed stall verdict for ONE movement — pass movement_key; it returns 'unknown', NEVER 'stall', when he performed exactly what was prescribed at a fixed load x reps, because e1RM is constant by construction there, and it labels any verdict that leaned on RPE as self-reported). Typical custom flow: draft_custom → dry_run "
     "→ commit. Subtract-only autoregulation on the 'draft' path. TITLES ARE AUTO-RENDERED: the compiler names "
     "every routine 'Phase - Type - N - Y' (e.g. 'Foundation - Push - 2 - 2') from config + performed history "
     "— DO NOT pass a title; leave it to the compiler. `title` and `force_title` are DRAFT-TIME arguments, read "
