@@ -259,6 +259,13 @@ jobs:
         if: always()
         run: python3 deploy/sync_doc_metadata.py --apply
 
+      # #3984: the system model + its rendering are the same class — bot-owned, regenerated
+      # on main after the merge, never carried by a branch. Regenerating them here means the
+      # byte-equality tests assert the post-reconcile reality this branch will have on main.
+      - name: Regenerate the system model in-workspace (never committed)
+        if: always()
+        run: python3 scripts/generate_platform_model.py
+
       # TWO PASSES (#3025). The suite's only genuinely shared mutable state is the
       # checkout itself, and four modules MUST write into it — they are mutation proofs
       # whose point is the real file (docs/ARCHITECTURE.md, docs/SLOs.md, a planted module

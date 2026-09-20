@@ -1106,13 +1106,14 @@ def render_doc(model: dict) -> str:
     return "\n".join(lines)
 
 
-def _reconcile_bot_follows_this_run() -> bool:
-    """The ONE derivation of 'a bot commits the regenerated artifacts next' — deploy/doc_drift_verdict's,
-    imported rather than restated, so the literal gate and the model gate cannot disagree about it."""
+def _bot_owns_pending_drift_here() -> bool:
+    """The ONE derivation of 'the regenerated artifacts are not this checkout's to commit' —
+    deploy/doc_drift_verdict's, imported rather than restated, so the literal gate and the model
+    gate cannot disagree about it (#3646 on a push to main; #3984 anywhere off main)."""
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "deploy"))
-    from doc_drift_verdict import reconcile_bot_follows_this_run  # noqa: E402
+    from doc_drift_verdict import bot_owns_pending_drift_here  # noqa: E402
 
-    return bool(reconcile_bot_follows_this_run())
+    return bool(bot_owns_pending_drift_here())
 
 
 def main() -> int:
@@ -1131,14 +1132,16 @@ def main() -> int:
             # commits EXACTLY these two files within ~60 s, so a merge commit carrying them
             # stale is not a red main — it is the same pending-reconcile verdict the literal
             # gate gives (deploy/doc_drift_verdict.py). Every other context stays strict:
-            # a branch, a PR, a dispatch and a laptop all fail here. Both files are on the
+            # #3984: a branch and a PR are tolerated too (a branch never carries these files);
+            # only main with no bot following — a dispatch, a laptop on main — fails here. Both files are on the
             # reconcile whitelist by construction; nothing else can reach `stale`.
-            if _reconcile_bot_follows_this_run():
+            if _bot_owns_pending_drift_here():
                 print(
                     "::warning title=pending-reconcile::model/platform_model.json and/or docs/DEPENDENCY_GRAPH.md "
-                    "are stale on a push to main — the reconcile job regenerates and commits them next; not a red main (#3646)."
+                    "are stale — the reconcile job regenerates and commits them on main; not a red (#3646 push-to-main, "
+                    "#3984 off main: a branch never carries them)."
                 )
-                print("VERDICT: pending-reconcile (tolerated: a push to main, the reconcile job runs next)")
+                print("VERDICT: pending-reconcile (tolerated: the reconcile job owns these files here)")
                 return 0
             return 1
         print("model + rendering current")
