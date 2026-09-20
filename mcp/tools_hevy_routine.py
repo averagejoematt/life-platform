@@ -40,7 +40,7 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from common.pacific_time import pacific_date_of, pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
+from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 
 # #3670: everything the commit result must report honestly lives in its own module
 # (the module-size ratchet's own instruction: extract, don't raise the cap).
@@ -1163,33 +1163,15 @@ def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
     return {"status": "drafted_re_entry", "routine_id": re_entry.routine_id, "target_date": re_entry.target_date}
 
 
-def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
-    routine_id = args.get("routine_id")
-    if not routine_id:
-        return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
-    from health.adherence_calc import calculate_adherence
-    from training import hevy_write_client as wc
-    from training.routine_repo import get_current
-
-    ir = get_current(routine_id)
-    if not ir:
-        return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
-    workouts = wc.get_workouts(page=1, page_size=10).get("workouts") or []
-    performed: dict[str, Any] = {}
-    for w in workouts:
-        # #2798: `start_time` is a UTC instant; its DAY is Pacific (`health.adherence_calc`
-        # already resolves it that way). A raw [:10] compared an evening workout to tomorrow.
-        if pacific_date_of(w.get("start_time")) == ir.target_date:
-            performed = w
-            break
-    if not performed:
-        return {"status": "no_workout_for_date", "routine_id": routine_id, "target_date": ir.target_date}
-    return {"status": "ok", "routine_id": routine_id, "adherence": calculate_adherence(ir, performed)}
-
-
-# #3928: the stall check's fetch half lives in `mcp/hevy_stall_report.py` (this module
-# sits at the #1665 ratchet's ceiling — extract, don't raise the cap).
-from mcp.hevy_stall_report import stall_check as _action_stall_check  # noqa: E402
+# #3928: both prescribed-vs-performed readbacks — `adherence` (one session) and
+# `stall_check` (one movement across sessions) — live in `mcp/hevy_readback_report.py`.
+# This module sits at the #1665 ratchet's ceiling and that ratchet's own instruction is
+# extract, don't raise the cap (the #3670 precedent). Re-exported under the historical
+# private name so existing call sites and tests are unchanged.
+from mcp.hevy_readback_report import (  # noqa: E402
+    action_adherence as _action_adherence,
+    stall_check as _action_stall_check,
+)
 
 _DISPATCH = {
     "draft": _action_draft,

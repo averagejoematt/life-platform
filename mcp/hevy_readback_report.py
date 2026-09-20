@@ -1,5 +1,5 @@
 """
-hevy_stall_report.py — the fetch half of the prescribed-vs-performed stall check (#3928).
+hevy_readback_report.py — the prescribed-vs-performed readbacks (#412, #3714, #3928).
 
 `training.stall_detector` is the pure core: session points in, verdict out, no I/O. This
 is the half that has to go and GET the two things it needs — what was performed (Hevy
@@ -33,7 +33,7 @@ from common.pacific_time import pacific_date_of  # #2798: a Hevy start_time is a
 
 from mcp.utils import mcp_error
 
-logger = logging.getLogger("hevy_stall_report")
+logger = logging.getLogger("hevy_readback_report")
 
 PAGE_SIZE = 10  # Hevy's own /v1/workouts page cap
 MAX_PAGES = 5  # ≤50 workouts walked — bounded I/O, never an open-ended crawl
@@ -197,3 +197,28 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
         "prescription_provenance": provenance,
         "stall": verdict,
     }
+
+
+def action_adherence(args: dict[str, Any]) -> dict[str, Any]:
+    """`manage_hevy_routine action=adherence` — one session, programmed vs performed."""
+    routine_id = args.get("routine_id")
+    if not routine_id:
+        return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
+    from health.adherence_calc import calculate_adherence
+    from training import hevy_write_client as wc
+    from training.routine_repo import get_current
+
+    ir = get_current(routine_id)
+    if not ir:
+        return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
+    workouts = wc.get_workouts(page=1, page_size=10).get("workouts") or []
+    performed: dict[str, Any] = {}
+    for w in workouts:
+        # #2798: `start_time` is a UTC instant; its DAY is Pacific (`health.adherence_calc`
+        # already resolves it that way). A raw [:10] compared an evening workout to tomorrow.
+        if pacific_date_of(w.get("start_time")) == ir.target_date:
+            performed = w
+            break
+    if not performed:
+        return {"status": "no_workout_for_date", "routine_id": routine_id, "target_date": ir.target_date}
+    return {"status": "ok", "routine_id": routine_id, "adherence": calculate_adherence(ir, performed)}

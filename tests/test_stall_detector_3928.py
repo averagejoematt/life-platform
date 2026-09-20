@@ -270,7 +270,7 @@ _TMAP = {"lat_pulldown": LAT_PULLDOWN_TID, "db_curl": DB_CURL_TID}
 def _diff(ir, performed):
     """The wire payload is grouped by template id at the call site (the one module the
     compiler-isolation ledger names); the detector never sees the raw shape."""
-    from mcp.hevy_stall_report import sets_by_template
+    from mcp.hevy_readback_report import sets_by_template
 
     return diff_prescribed_vs_performed(ir, sets_by_template(performed), _TMAP)
 
@@ -328,11 +328,11 @@ def test_action_is_registered_and_dispatched():
 
 
 def test_stall_check_pairs_each_session_with_the_plan_that_was_pushed(monkeypatch):
-    from mcp import hevy_stall_report
+    from mcp import hevy_readback_report
 
     ir = _pull_ir()
-    monkeypatch.setattr(hevy_stall_report, "_prescription_for", lambda w: (ir, "hevy_routine_id"))
-    monkeypatch.setattr(hevy_stall_report, "_template_map_for", lambda _ir: _TMAP)
+    monkeypatch.setattr(hevy_readback_report, "_prescription_for", lambda w: (ir, "hevy_routine_id"))
+    monkeypatch.setattr(hevy_readback_report, "_template_map_for", lambda _ir: _TMAP)
 
     def _fake_get_workouts(page=1, page_size=10):
         if page > 1:
@@ -343,7 +343,7 @@ def test_stall_check_pairs_each_session_with_the_plan_that_was_pushed(monkeypatc
             ]
         }
 
-    out = hevy_stall_report.stall_check({"movement_key": "lat_pulldown", "sessions": 4}, get_workouts=_fake_get_workouts)
+    out = hevy_readback_report.stall_check({"movement_key": "lat_pulldown", "sessions": 4}, get_workouts=_fake_get_workouts)
     assert out["status"] == "ok"
     assert out["template_id"] == LAT_PULLDOWN_TID
     assert out["sessions_examined"] == 4
@@ -356,25 +356,25 @@ def test_stall_check_pairs_each_session_with_the_plan_that_was_pushed(monkeypatc
 
 
 def test_stall_check_says_no_prescription_rather_than_reading_performed_alone(monkeypatch):
-    from mcp import hevy_stall_report
+    from mcp import hevy_readback_report
 
-    monkeypatch.setattr(hevy_stall_report, "_prescription_for", lambda w: (None, None))
+    monkeypatch.setattr(hevy_readback_report, "_prescription_for", lambda w: (None, None))
 
     def _fake_get_workouts(page=1, page_size=10):
         if page > 1:
             return {"workouts": []}
         return {"workouts": [{**_pull_performed(), "start_time": f"2026-09-0{d}T17:30:00+00:00"} for d in (8, 6, 4)]}
 
-    out = hevy_stall_report.stall_check({"template_id": LAT_PULLDOWN_TID}, get_workouts=_fake_get_workouts)
+    out = hevy_readback_report.stall_check({"template_id": LAT_PULLDOWN_TID}, get_workouts=_fake_get_workouts)
     assert out["stall"]["verdict"] == VERDICT_UNKNOWN
     assert "cannot be called from performed data alone" in out["stall"]["reason"]
     assert all(row["prescription"] == "none" for row in out["prescription_provenance"])
 
 
 def test_stall_check_requires_a_movement():
-    from mcp import hevy_stall_report
+    from mcp import hevy_readback_report
 
-    out = hevy_stall_report.stall_check({})
+    out = hevy_readback_report.stall_check({})
     assert out.get("error") or out.get("isError") or out.get("error_code")
 
 
