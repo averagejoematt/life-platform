@@ -258,6 +258,9 @@ def test_the_historian_argues_a_load_down_with_the_detraining_discount_never_up(
     assert h["to"] == pytest.approx(90 * c._LBS_PER_KG * 0.9, abs=0.1)
     nums = P["blueprint_historian"]["numbers"]
     assert nums["attested_basis"] == "OWNER-ATTESTED, NOT MEASURED"
+    assert (
+        nums["attested_cardio_hr_wk"] is None
+    ), "the live overlay key is cardio_hr_wk_attested; a per-session minutes key was never emitted"
     assert any("descriptive only" in f["reason"] for f in P["blueprint_historian"]["flags"])
     assert any("not a mirror" in f["reason"] for f in P["blueprint_historian"]["flags"])
     # under the ceiling: no change
@@ -521,3 +524,44 @@ def test_the_advocate_says_so_when_the_rate_is_already_above_the_band():
     )
     f = next(f for f in P["flags"] if f["metric"] == "current_rate_lb_wk")
     assert f["severity"] == "info" and "ABOVE" in f["reason"]
+
+
+# ── the trim shape — found live on 2026-09-20 ────────────────────────────────
+def test_a_set_cut_is_spread_round_robin_from_the_largest_exercise_never_hollowing_the_tail():
+    """Routine 73bc228c v2: 22 -> 18 came entirely out of the last two accessories (3 -> 1 each).
+    Mutation control: restore the reversed()-pop loop → this reds on the [3, 3, 3, 3, 2, 2] shape."""
+    ir = RoutineSpec(
+        routine_id="r",
+        target_date="2026-09-20",
+        archetype="pull",
+        exercises=[
+            ExerciseBlock(movement_key=k, sets=[Set(weight_kg=40, reps=10) for _ in range(n)])
+            for k, n in (("lat_pulldown", 4), ("close_grip", 3), ("db_row", 4), ("straight_arm", 3), ("face_pull", 3), ("hammer_curl", 3))
+        ]
+        + [
+            ExerciseBlock(movement_key="cycling", sets=[Set(duration_seconds=2700)]),
+            ExerciseBlock(movement_key="stretching", sets=[Set(duration_seconds=900)]),
+        ],
+    )
+    rec = c.apply_changes(ir, [{"critic": "joints_tendons", "verdict": "change", "field": "session.total_sets", "to": 18}])
+    assert rec[0]["applied"] is True
+    assert [len(e.sets) for e in ir.exercises] == [3, 3, 3, 3, 2, 2, 1, 1]
+    # never below one set, and it says so when it cannot reach the target
+    rec2 = c.apply_changes(ir, [{"critic": "joints_tendons", "verdict": "change", "field": "session.total_sets", "to": 3}])
+    assert rec2[0]["applied"] is False and "could only trim to 8" in rec2[0]["why"]
+
+
+def test_the_historian_reads_the_live_attested_overlay_in_hours_per_week():
+    d = c.draft_summary(_ir())
+    live_attested = {
+        "kind": "cycle",
+        "cardio_hr_wk_attested": 0.28,
+        "cardio_hr_wk_attested_low": 0.19,
+        "cardio_hr_wk_attested_high": 0.38,
+        "attestation_id": "post_lift_low_cardio",
+        "basis": "OWNER-ATTESTED, NOT MEASURED",
+    }
+    P = c.build_historian_packet(d, reference={"proven_target": {"band": "300-309", "attested": live_attested}}, weeks_in_block=2)
+    assert P["numbers"]["attested_cardio_hr_wk"] == 0.28
+    f = next(f for f in P["flags"] if f["metric"] == "attested_cardio_hr_wk")
+    assert "0.28 hr/wk" in f["reason"] and "NOT MEASURED" in f["reason"] and f["provenance"] == "owner-attested"
