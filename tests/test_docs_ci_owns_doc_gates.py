@@ -427,11 +427,15 @@ def test_check_counts_only_tilde_lines_from_the_stats_sync():
     """The '  i ' prefix is only an exemption because --check's accounting keys on
     '  ~' for the stats lines — pin the contract between the two files."""
     src = _read(os.path.join(_REPO, "deploy", "sync_doc_metadata.py"))
-    assert '[c for c in stats_changes if c.startswith("  ~")]' in src, (
-        "#3384: sync_doc_metadata's --check no longer counts stats drift by the '  ~' prefix — "
+    # #3984 re-derived it: the stats accounting now counts '  ~' (bot-owned) AND '  !' (a field
+    # the sync cannot find — human-owned, the class --check used to print and then ignore).
+    # '  i ' stays exempt BY CONSTRUCTION: it is neither prefix, so it never reaches the verdict.
+    assert '[c for c in stats_changes if c.startswith("  ~") or c.startswith("  !")]' in src, (
+        "#3384/#3984: sync_doc_metadata's --check no longer counts stats drift by the '  ~' / '  !' prefixes — "
         "re-derive whether an '  i ' INFO line is still exempt from failure before changing this"
     )
-    assert 'any(c.startswith("  ~") for c in stats_changes)' in src, (
-        "#3384: the drifted-docs accounting for platform_counts.py no longer keys on '  ~' — "
-        "the INFO-line exemption contract needs re-deriving"
+    assert "if stats_drift else []" in src, (
+        "#3384/#3984: the drifted-docs accounting for platform_counts.py no longer keys on the stats_drift "
+        "partition — the INFO-line exemption contract needs re-deriving"
     )
+    assert 'c.startswith("  i")' not in src.split("stats_drift = [")[1].split("\n")[0], "an '  i ' line must never count as drift"

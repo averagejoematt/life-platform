@@ -41,7 +41,9 @@ _SCRIPT = _REPO / "deploy" / "sync_doc_metadata.py"
 _COUNTS = _REPO / "lambdas" / "web" / "platform_counts.py"
 _INSTALLER = _REPO / "scripts" / "install_hooks.sh"
 
-pytestmark = pytest.mark.premerge
+# serial: this file rewrites the REAL lambdas/web/platform_counts.py (registered in
+# tests/test_suite_parallel_safety_3025.py::IN_TREE_WRITERS) — never under `-n auto`.
+pytestmark = pytest.mark.serial
 
 
 def _env(ref: str, event: str = "pull_request") -> dict:
