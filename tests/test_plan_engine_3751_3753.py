@@ -188,14 +188,26 @@ def test_unconfirmed_redlines_are_reported_as_proposed():
     assert any("PROPOSED" in line or "not yet" in line for line in block["honesty"])
 
 
-def test_the_unresolved_rate_tension_is_carried_not_hidden():
-    """He stated a 0.5-1.0%/wk window on 09-07 and asked for more aggression on 09-13.
-    Two owner statements in tension must not silently resolve to whichever was read first."""
-    assert "rate_band_pct_bw_per_wk" in owner_redlines.summary()["unresolved"]
+def test_the_rate_tension_is_resolved_as_a_schedule_and_still_proposed():
+    """He stated a 0.5-1.0%/wk window on 09-07 and asked for 3 lb/wk on 09-20. v2 resolves the two
+    as a SCHEDULE (the window's top now, stepping down at 295/260/230/200) rather than silently
+    picking one — and it stays PROPOSED until he approves v0.2."""
+    summ = owner_redlines.summary()
+    assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
+    assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
+    assert summ["active"] is False and summ["version"].endswith("-proposed")
+    rate = owner_redlines.rate_target_lb_per_wk(316.9)
+    assert rate["target_lb_wk"] == 3.0 and rate["cap_lb_wk"] == 3.5 and rate["schedule_step_above_lb"] == 295
+    assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 2.0
+    assert owner_redlines.rate_target_lb_per_wk(199.0)["target_lb_wk"] == 0.0  # the maintenance block
+    # the v2 tripwires the engine cannot compute are named in the block, never silent (ADR-105)
+    block = plan_engine.constraint_block(**_FULL)
+    assert set(block["unevaluated_tripwires"]) == set(owner_redlines.unevaluated_tripwires())
+    assert any("NOT evaluated by this engine" in line and "walking_collapse" in line for line in block["honesty"])
     rate = plan_engine.constraint_block(**_FULL)["rate_target"]
     assert rate["low_lb_wk"] == pytest.approx(1.6, abs=0.05)
     assert rate["high_lb_wk"] == pytest.approx(3.2, abs=0.05)
-    assert rate["owner_to_resolve"]
+    assert rate["owner_to_resolve"] is None and rate["resolution"].startswith("RESOLVED as a schedule")
 
 
 # ── 6. Standing constraints (#3715) — read here, not only by the S3 mirror ────
