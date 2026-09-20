@@ -289,6 +289,14 @@ ALLOWED_ABSENT = (
         "playwright",
         "same reach as deploy-site — the rollback re-runs the canonical build, which runs the PII gate, which never screenshots",
     ),
+    (
+        "pii-endpoint-sweep.yml",
+        "sweep",
+        "deploy/pii_surface_guard.py",
+        "playwright",
+        "same reach as site-deploy.yml's deploy-site/rollback-site-on-failure jobs — capture_api_schemas -> accuracy_audit's "
+        "lazy `import visual_qa` (screenshot sanity scan); the --endpoints live arm fetches JSON payloads only and never screenshots",
+    ),
 )
 
 

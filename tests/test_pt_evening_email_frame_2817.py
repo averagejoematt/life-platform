@@ -127,13 +127,25 @@ def test_the_thresholds_this_file_straddles_are_still_the_shipped_ones():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _whoop_row(day):
-    return {"pk": f"USER#{UID}#SOURCE#whoop", "sk": f"DATE#{day.isoformat()}", "recovery_score": 60}
+# #3913: the exemplar source moved. This file used a `whoop` row as its stand-in for "a
+# source", and whoop's `DATE#` key is now declared `day_key_frame: "utc"` — measured, not
+# assumed: 2,249 of 2,249 straddling rows are keyed by the UTC day, because whoop's
+# `fetch_day` turns each Pacific date LABEL into a UTC WINDOW. A UTC-keyed row anchored at
+# UTC midnight is CORRECT, so with whoop the "mutation" below stops being a mutation and
+# every Pacific claim in this file becomes unprovable on it. The claims are about the
+# Pacific frame, so they now run on a Pacific-keyed source; whoop gets its own test at the
+# bottom, which is where the difference belongs — visible, not deleted.
+PACIFIC_SOURCE = ("eightsleep", "Eight Sleep")
+UTC_SOURCE = ("whoop", "Whoop")
 
 
-def _run_freshness(monkeypatch, *, row_days_back, instant, utc_anchor=False):
-    """Drive the REAL `lambda_handler` at `instant` with one whoop row `row_days_back`
-    Pacific days old. Returns (body, sns_double).
+def _source_row(day, source):
+    return {"pk": f"USER#{UID}#SOURCE#{source}", "sk": f"DATE#{day.isoformat()}", "recovery_score": 60}
+
+
+def _run_freshness(monkeypatch, *, row_days_back, instant, utc_anchor=False, source=None):
+    """Drive the REAL `lambda_handler` at `instant` with one row `row_days_back` Pacific
+    days old, for a single source (Pacific-keyed by default). Returns (body, sns_double).
 
     `utc_anchor=True` is the MUTATION: it replaces the module's `anchor_day_key` with the
     pre-#2817 arithmetic (`strptime(...).replace(tzinfo=timezone.utc)`) — no
@@ -147,10 +159,14 @@ def _run_freshness(monkeypatch, *, row_days_back, instant, utc_anchor=False):
     checker by construction. The lever moved; every behavioural assertion below is
     unchanged, and the mutated run must still fail them.
     """
+    source_id, label = source or PACIFIC_SOURCE
     pt = freeze_pacific(monkeypatch, fc, instant)
     row_day = pt.date() - timedelta(days=row_days_back)  # derived from the HANDLER's clock
-    table = FakeTable(rows=[_whoop_row(row_day)])
+    table = FakeTable(rows=[_source_row(row_day, source_id)])
     sns, _cw = _install(monkeypatch, table)
+    # `_install` pins the imported harness to one deterministic source; re-pin it to the
+    # source under test WITHOUT editing the shared harness, which other files also drive.
+    monkeypatch.setattr(fc, "SOURCES", {source_id: label})
     if utc_anchor:
         monkeypatch.setattr(
             fc, "anchor_day_key", lambda date_str, source: datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -185,7 +201,7 @@ def test_todays_data_reads_fresh_at_2230_pt_and_the_utc_anchor_calls_it_degraded
 
     mutated, _ = _run_freshness(monkeypatch, row_days_back=0, instant=_EVENING_UTC, utc_anchor=True)
     assert mutated["warning_count"] == 1, "MUTATION PROOF FAILED: the UTC anchor no longer inflates today's age past 24h"
-    assert mutated["warning_sources"] == ["Whoop"]
+    assert mutated["warning_sources"] == [PACIFIC_SOURCE[1]]
 
 
 def test_yesterdays_data_does_not_page_at_2230_pt_but_the_utc_anchor_pages(monkeypatch):
@@ -227,6 +243,53 @@ def test_the_inflation_is_the_dst_offset_not_a_fixed_seven_hours(monkeypatch):
     assert winter == timedelta(hours=-8) and summer == timedelta(hours=-7), (
         f"the Pacific offsets this file's arithmetic assumes have changed: " f"winter={winter}, summer={summer}"
     )
+
+
+# ── #3913: the same handler, the source whose key is NOT a Pacific day ───────────────
+# `_OPS_CRON_UTC` is the instant this Lambda actually runs at — `cron(45 16 * * ? *)`,
+# 09:45 PT — as opposed to the 22:30 PT instant the tests above use to expose the frame.
+# Both matter, and they answer different questions: 22:30 PT is where the frames differ,
+# 09:45 PT is where the alert is really produced.
+_OPS_CRON_UTC = datetime(2026, 8, 27, 16, 45, tzinfo=timezone.utc)
+
+
+def test_a_utc_keyed_source_is_anchored_in_its_own_frame_and_the_mutation_stops_biting(monkeypatch):
+    """#3913. whoop's `DATE#{d}` names the UTC day `d`, so at 22:30 PT the row keyed
+    today names a day that BEGAN 29.5h ago (and ended at 17:00 PT) — the honest age is
+    29.5h, and the ADR-052 warning tier is the honest tier.
+
+    The tell that this is a FRAME and not a copy of the bug: the `utc_anchor` mutation,
+    which flips every Pacific-keyed source's answer above, produces the SAME answer here,
+    because UTC midnight is already the anchor whoop's own key names. A test that could
+    not tell those two apart would be pinning the arithmetic, not the frame.
+    """
+    body, _ = _run_freshness(monkeypatch, row_days_back=0, instant=_EVENING_UTC, source=UTC_SOURCE)
+    assert body["warning_count"] == 1, "a whoop row keyed today IS >=24h old at 22:30 PT — its UTC day began at 17:00 PT yesterday"
+    assert body["warning_sources"] == [UTC_SOURCE[1]]
+    assert body["stale_count"] == 0, "29.5h is not 48h — an honest age, not an alarm"
+
+    mutated, _ = _run_freshness(monkeypatch, row_days_back=0, instant=_EVENING_UTC, utc_anchor=True, source=UTC_SOURCE)
+    assert mutated["warning_count"] == body["warning_count"], (
+        "the UTC-anchor mutation changed a UTC-keyed source's answer — then the anchor is NOT being read from the "
+        "registry facet, and #3913's flip did not reach this call site"
+    )
+
+
+def test_the_flip_does_not_change_the_tier_at_the_instant_the_checker_actually_runs(monkeypatch):
+    """#3913's consumer-sweep claim, driven through the real handler rather than asserted
+    in a PR body: at `cron(45 16 * * ? *)` (09:45 PT) a whoop row keyed today is 16.75h
+    old in its own UTC frame — under the 24h warning tier — so the flip corrects a
+    reported number without minting a nightly warning on the ops email. A yesterday row
+    is a warning in BOTH frames (40.75h / 33.75h) and a two-day-old row is stale in both.
+    """
+    for days_back, expected in ((0, (0, 0)), (1, (1, 0)), (2, (0, 1))):
+        utc_body, _ = _run_freshness(monkeypatch, row_days_back=days_back, instant=_OPS_CRON_UTC, source=UTC_SOURCE)
+        pacific_body, _ = _run_freshness(monkeypatch, row_days_back=days_back, instant=_OPS_CRON_UTC, source=PACIFIC_SOURCE)
+        assert (utc_body["warning_count"], utc_body["stale_count"]) == expected, f"{days_back}d: whoop tier moved at the cron instant"
+        assert (
+            pacific_body["warning_count"],
+            pacific_body["stale_count"],
+        ) == expected, f"{days_back}d: the two frames disagree at the cron instant — the 'no new alarm noise' claim is false"
 
 
 def test_the_sibling_day_vs_day_checks_were_already_honest_and_stay_that_way(monkeypatch):

@@ -255,9 +255,11 @@ def test_a_lone_next_utc_day_record_does_not_fabricate_a_zero():
 
 def test_the_guard_covers_the_whole_spine_not_just_steps():
     """Guard the SET, not the instance. recovery and sleep run the same newest-first scan
-    over the same widened window; a whoop row dated past Pacific today (a bad backfill —
-    whoop is Pacific-keyed, so such a row can only be corrupt) must not become "today's"
-    reading either."""
+    over the same widened window; a whoop row dated two days past Pacific today must not
+    become "today's" reading either. (#3913: whoop's DATE# key names a UTC day, so a key
+    ONE day ahead of PT is the ordinary evening case rather than corruption — the row here
+    is +2 days, which no frame can reach, and the predicate refuses it either way because
+    it compares against the Pacific calendar and never asks the frame.)"""
     now = EVENING_PT
     ahead = (now.astimezone(PACIFIC) + timedelta(days=2)).strftime("%Y-%m-%d")
     real = _pt(now)
