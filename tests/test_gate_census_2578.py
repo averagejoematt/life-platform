@@ -803,7 +803,20 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 115 -> 116 (2026-09-20, Session AN, third merge of main into this lane): main itself reached
         # 115 via #3625 + #3772 while this lane was open, so this lane's ONE proven entrant (the GSI-set
         # gate above) lands at 116 on the merged tree. CI's premerge lane measured n=116 on a3ffd27c.
-        <= 116
+        # 116 -> 117 (2026-09-20, #3755): the 117th proof is
+        # `structural::test_program_structure_3755.py` — the week-grid seam gate (exactly ONE reader of
+        # config/training_week.json across lambdas/+mcp/, and both consumers reaching it through
+        # training.program_seam.resolve_week_grid). Mutation-backed via the same re-runnable harness
+        # (`gate_census_mutations.py --run --gate test_program_structure_3755.py`: ARMED 1/1 — an
+        # untracked lambdas/training/_census_probe_3755.py planting a second direct
+        # `_load_json("training_week.json")` read; baseline 24 passed, mutated 1 failed
+        # (test_only_the_seam_names_the_week_config_filename) + 23 passed, reverted 24 passed).
+        # Measured by id-set diff on COMMITTED trees, never by arithmetic: this lane -> 667 rows
+        # {proven 117, unproven 540, not-applicable 6, attempted-unproven 4}; a disposable
+        # `git archive origin/main` export at d7bbecdd5 -> 666 {116, 540, 6, 4}. Exactly
+        # {structural::test_program_structure_3755.py} enters, {} leaves — so unproven does NOT move
+        # and BASELINE_UNPROVEN_GATES is untouched.
+        <= 117
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
