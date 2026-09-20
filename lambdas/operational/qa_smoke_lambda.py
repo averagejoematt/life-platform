@@ -981,6 +981,29 @@ def _blog_links_retired():
     return [Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(msg)]
 
 
+def check_orphan_routine_drafts():
+    """#3772: routines still `draft` more than 7 days after creation. The #3765 soft-timeout
+    lands the draft and tells the client it timed out, so nothing ever lists it — one sat
+    from 2026-09-08 with nobody knowing. A count here is a WARN naming them (the owner
+    archives or commits); zero is the ok line. Read-only: one bounded index Query."""
+    from training.routine_repo import list_stale_drafts
+
+    c = Check("data:orphan_routine_drafts", "Orphaned routine drafts", CONTENT_TRUTH)
+    try:
+        stale = list_stale_drafts(older_than_days=7)
+    except Exception as e:  # noqa: BLE001
+        return [c.warn(f"orphan-draft census errored (no verdict was reached): {e}")]
+    if stale:
+        names = ", ".join(f"{ir.routine_id[:8]}… ({ir.target_date}, created {str(ir.created_at)[:10]})" for ir in stale[:5])
+        more = f" (+{len(stale) - 5} more)" if len(stale) > 5 else ""
+        return [
+            c.warn(
+                f"{len(stale)} routine draft(s) older than 7 days never committed or archived: {names}{more} — `manage_hevy_routine list status=draft older_than_days=7` lists them (#3772)"
+            )
+        ]
+    return [c.ok("no routine draft older than 7 days is left uncommitted (#3772).")]
+
+
 def check_pk_family_census():
     """#3860: every live pk family must classify() under phase_taxonomy — checked NIGHTLY,
     not only when someone types a reset.
@@ -1099,6 +1122,7 @@ def check_steps():
         ("phase_stamp_coverage", check_coach_ensemble_phase_stamp_coverage),  # #1970: tagger-blind COACH#/ENSEMBLE# gap
         # #3860: an unclassified pk family blocks the NEXT reset — report it the day it appears, not at reset time
         ("pk_family_census", check_pk_family_census),
+        ("orphan_routine_drafts", check_orphan_routine_drafts),  # #3772: drafts the soft-timeout left behind
         ("recall_freshness", lambda: recall_freshness_qa.checks(table, f"{USER_PREFIX}chronicle", Check, CONTENT_TRUTH)),  # #1384
         # #2367: sk is identity, `date` is display — mismatch legal only with the carry-forward marker
         ("chronicle_sk_invariant", lambda: check_chronicle_sk_date_invariant(table, Check, CONTENT_TRUTH)),
