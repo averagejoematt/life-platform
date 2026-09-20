@@ -85,6 +85,23 @@ review today's actual session before looking ahead at all.
   the logged number.
 - `get_readiness_score`, `get_acwr_status` — how the session landed against readiness/
   training load, not just whether it happened.
+- **Never call a stall or a plateau off the performed numbers alone (#3928).** At a fixed
+  load × fixed reps, estimated 1RM is constant *by construction* — if the platform
+  prescribed that load and those reps and he did exactly that, a "stall" is the platform
+  re-reading its own prescription, not an observation about Matthew. Diff prescribed vs
+  performed FIRST: `manage_hevy_routine(action="stall_check", movement_key=…)` pairs each
+  of that movement's recent sessions with the routine IR that was pushed for it and
+  returns `stall` / `progressing` / `regressing` / `unknown`. It returns **`unknown`,
+  never `stall`**, on a window he performed as prescribed at a fixed load × reps, and it
+  will not call one at all when no prescription is on file for those days. Report its
+  `reason` — it names both numbers.
+  - RPE is the only residual signal in such a window, and it is **self-reported**. Any
+    verdict that leaned on it comes back with `basis: "self-reported RPE"`; say that out
+    loud whenever you quote it. An RPE drift is his own rating of the set, not a
+    measurement, and it does not license a stall verdict on its own.
+  - `action="adherence"` is the session-level companion (set-count + RPE-ceiling
+    dimensions, never averaged); `stall_check` is the across-sessions one for a single
+    lift.
 - Aerobic — count it from ALL sources: Strava walks/runs AND Z2 bike/elliptical blocks
   logged INSIDE Hevy (invisible to Strava). `search_activities` can undercount; don't
   call the aerobic base "starved" off one source.
@@ -123,6 +140,18 @@ If authoring tomorrow's session (skip this if `$ARGUMENTS` is `review`):
     needs redeploying. It is not a finding about his history; do not report it as one.
   - Intake is never comparable (no nutrition data before 2025-11-24). Say so whenever the
     comparison is used, per ADR-104.
+- **The standing bet: `get_benchmark(view="forecast")` (#3712).** The week's prescription is
+  registered as a graded forecast, so there is a number the plan already committed to and a
+  record of whether it has been right. Read it as follows:
+  - `open.prescribed_cardio_hr_wk` is the week's volume target and it OVERRIDES a freehand
+    number. When `adjustment.basis` is `adherence_shortfall` or `model_over_predicted`, that
+    target was DERIVED from last week's miss (`adjustment.derivation` shows the arithmetic) —
+    quote the derivation, do not re-author the number.
+  - `open.declined` means no forecast was issued and `declined_reason` says which floor failed.
+    That is a result. Do not substitute a guess for it.
+  - `track_record.answerable: false` means too few weeks have been graded to say whether the
+    coaching is working. Say that, rather than quoting a coverage percentage at n=2.
+  - Every figure here is descriptive of his own history and excludes intake (ADR-104).
 - Mood/journal continuity: `get_mood` — mood continuity is a make-or-break signal for
   whether tomorrow's session should push or hold.
 - Muscle volume vs MEV/MAV/MRV (`get_muscle_volume`) for the muscle groups in tomorrow's

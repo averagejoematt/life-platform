@@ -1,0 +1,5450 @@
+[
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-05-31#WORKOUT#c3250e08-a320-4819-91b1-8a2a4bea881a",
+  "source": "hevy",
+  "date": "2026-05-31",
+  "title": "Morning workout \u2600\ufe0f",
+  "source_workout_id": "c3250e08-a320-4819-91b1-8a2a4bea881a",
+  "start_time": "2026-05-31T15:14:04+00:00",
+  "end_time": "2026-05-31T16:36:51+00:00",
+  "duration_sec": 4967.0,
+  "exercises": [
+   {
+    "name": "Seated Cable Row - V Grip (Cable)",
+    "template_id": "0393F233",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Kettlebell Swing",
+    "template_id": "F8A0FCCA",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 19.958088015168148,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 19.958088015168148,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 19.958088015168148,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 19.958088015168148,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 19.27769865101469,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 81.64672369841516,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 81.64672369841516,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 10461.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-01#WORKOUT#6dc7dd9a-80a5-45a9-a1e2-1418f726ae3f",
+  "source": "hevy",
+  "date": "2026-06-01",
+  "title": "Foundation - Push - 1 - 1",
+  "source_workout_id": "6dc7dd9a-80a5-45a9-a1e2-1418f726ae3f",
+  "start_time": "2026-06-01T16:29:47+00:00",
+  "end_time": "2026-06-01T18:13:21+00:00",
+  "duration_sec": 6214.0,
+  "exercises": [
+   {
+    "name": "Bench Press (Barbell)",
+    "template_id": "79D0BB3A",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 3.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "warmup",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 74.84283005688056,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 92.98654643430615,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 27.215574566138386,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Fly Crossovers",
+    "template_id": "651F844C",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Rear Delt Reverse Fly (Machine)",
+    "template_id": "D8281C62",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 27.215574566138386,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 11265.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-16#WORKOUT#ca3e7725-6df6-4c16-a332-da5e3dc45630",
+  "source": "hevy",
+  "date": "2026-06-16",
+  "title": "Foundation - Push - 1 - 1",
+  "source_workout_id": "ca3e7725-6df6-4c16-a332-da5e3dc45630",
+  "start_time": "2026-06-16T12:02:25+00:00",
+  "end_time": "2026-06-16T13:46:35+00:00",
+  "duration_sec": 6250.0,
+  "exercises": [
+   {
+    "name": "Bench Press (Barbell)",
+    "template_id": "79D0BB3A",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 3.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "warmup",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 79.37875915123695,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 92.98654643430615,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 27.215574566138386,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 27.215574566138386,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 27.215574566138386,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Fly Crossovers",
+    "template_id": "651F844C",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 9.071858188712795,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 10.432636917019714,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Rear Delt Reverse Fly (Machine)",
+    "template_id": "D8281C62",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 10139.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-17#WORKOUT#34b0b290-642d-4449-82fa-b45078cb5e0e",
+  "source": "hevy",
+  "date": "2026-06-17",
+  "title": "Foundation - Pull - 1 - 2",
+  "source_workout_id": "34b0b290-642d-4449-82fa-b45078cb5e0e",
+  "start_time": "2026-06-17T12:23:16+00:00",
+  "end_time": "2026-06-17T14:09:44+00:00",
+  "duration_sec": 6388.0,
+  "exercises": [
+   {
+    "name": "Dumbbell Row",
+    "template_id": "F1E57334",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Cable Row",
+    "template_id": "54508215-4069-4f0b-bd2a-718dc159e1e1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shrug (Barbell)",
+    "template_id": "0B841777",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Bicep Curl (Dumbbell)",
+    "template_id": "37FCC2BB",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Hammer Curl (Dumbbell)",
+    "template_id": "7E3BC8B6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 16093.0,
+      "duration_sec": 2700.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-18#WORKOUT#7bf624e3-ff92-4ac3-87e0-1b8655aa2853",
+  "source": "hevy",
+  "date": "2026-06-18",
+  "title": "Foundation - Legs - 1 - 3",
+  "source_workout_id": "7bf624e3-ff92-4ac3-87e0-1b8655aa2853",
+  "start_time": "2026-06-18T12:36:51+00:00",
+  "end_time": "2026-06-18T14:24:55+00:00",
+  "duration_sec": 6484.0,
+  "exercises": [
+   {
+    "name": "Squat (Barbell)",
+    "template_id": "D04AC939",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 79.37875915123695,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 88.45061733994974,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Romanian Deadlift (Barbell)",
+    "template_id": "2B4B7310",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Standing Calf Raise (Barbell)",
+    "template_id": "E53CCBE5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Rear Kick (Machine)",
+    "template_id": "1ADF8723",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 11587.0,
+      "duration_sec": 2400.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-19#WORKOUT#af2e01e1-de66-40d2-bf4e-069b2fcf9f79",
+  "source": "hevy",
+  "date": "2026-06-19",
+  "title": "Foundation - Engine - 1 - 4",
+  "source_workout_id": "af2e01e1-de66-40d2-bf4e-069b2fcf9f79",
+  "start_time": "2026-06-19T13:00:19+00:00",
+  "end_time": "2026-06-19T15:31:27+00:00",
+  "duration_sec": 9068.0,
+  "exercises": [
+   {
+    "name": "Landmine Press",
+    "template_id": "c15174b2-39df-418b-bcb3-c94563278be7",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 24.947610018960187,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 24.947610018960187,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Landmine Row",
+    "template_id": "D7D7FCCE",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 7.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.947610018960187,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 24.947610018960187,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Step Up",
+    "template_id": "128A2381",
+    "notes": "20 inch",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 19.27769865101469,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 19.27769865101469,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Suitcase Carry",
+    "template_id": "056a1c53-c778-4ace-bb18-6f72e81b6724",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 24.040424200088907,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 24.040424200088907,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 24.040424200088907,
+      "distance_m": 40.0,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Kettlebell Swing",
+    "template_id": "F8A0FCCA",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Side Bend (Dumbbell)",
+    "template_id": "026FD047",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Kettlebell High Pull",
+    "template_id": "9B13BA4B",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 24.040424200088907,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Elliptical Trainer",
+    "template_id": "3303376C",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 2575.0,
+      "duration_sec": 1200.0
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 8851.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-20#WORKOUT#dc3e3b10-dfc6-47be-a5a7-c79dc0b8175f",
+  "source": "hevy",
+  "date": "2026-06-20",
+  "title": "Foundation - Recovery - 1 - 5",
+  "source_workout_id": "dc3e3b10-dfc6-47be-a5a7-c79dc0b8175f",
+  "start_time": "2026-06-20T14:48:51+00:00",
+  "end_time": "2026-06-20T17:11:04+00:00",
+  "duration_sec": 8533.0,
+  "exercises": [
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Standing Calf Raise (Barbell)",
+    "template_id": "E53CCBE5",
+    "notes": "Last time i didnt use a platform to stand on as i couldnt find any. This time i did so was much harder than last time from balance perspective",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Cable Row",
+    "template_id": "54508215-4069-4f0b-bd2a-718dc159e1e1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Calf Raise",
+    "template_id": "062AB91A",
+    "notes": "New machine in this gym getting used to it - some of this was more foot and shins then calf RPE",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Pallof Press",
+    "template_id": "ee0911e8-c017-42db-b271-633d99e13507",
+    "notes": "First time ive done this ever today and enjoyed it",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Farmers Walk",
+    "template_id": "50C613D0",
+    "notes": "Did not superset due to equioment logistics.  Grip gave out before strength, then forearm burn. Not yards equals steps so easier for me to count.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 27.215574566138386,
+      "distance_m": 35.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 27.215574566138386,
+      "distance_m": 30.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 27.215574566138386,
+      "distance_m": 25.0,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Low effort level 10 for whole thing",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 17059.0,
+      "duration_sec": 2820.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-21#WORKOUT#36bd9061-190b-43d4-acfd-515f5bb85dd0",
+  "source": "hevy",
+  "date": "2026-06-21",
+  "title": "Foundation - Legs - 2 - 6",
+  "source_workout_id": "36bd9061-190b-43d4-acfd-515f5bb85dd0",
+  "start_time": "2026-06-21T15:00:15+00:00",
+  "end_time": "2026-06-21T16:55:16+00:00",
+  "duration_sec": 6901.0,
+  "exercises": [
+   {
+    "name": "Romanian Deadlift (Barbell)",
+    "template_id": "2B4B7310",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 10.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 5.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Pallof Press",
+    "template_id": "ee0911e8-c017-42db-b271-633d99e13507",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Standing Calf Raise (Barbell)",
+    "template_id": "E53CCBE5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Leg Curl (Machine)",
+    "template_id": "11A123F3",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Hip Thrust (Barbell)",
+    "template_id": "D57C2EC7",
+    "notes": "Need to repoaxe this with the machine at my cutrent size but couldnt figure out machine and then got full with people so had to skip frustratingly - will need to try this another time",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Glute Machine Kickback",
+    "template_id": "ce5b0bba-bb9c-4058-b8bb-2339380e8e10",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 10 for all",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 11265.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-22#WORKOUT#1a06d0c8-ba12-49ce-bd18-89dc6cc270ac",
+  "source": "hevy",
+  "date": "2026-06-22",
+  "title": "Foundation - Push - 2 - 7",
+  "source_workout_id": "1a06d0c8-ba12-49ce-bd18-89dc6cc270ac",
+  "start_time": "2026-06-22T12:56:44+00:00",
+  "end_time": "2026-06-22T14:57:10+00:00",
+  "duration_sec": 7226.0,
+  "exercises": [
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "Increased rest to 2 mins 30",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 10.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Overhead Press (Dumbbell)",
+    "template_id": "9930DF71",
+    "notes": "Prior weeks shoulder work i had bench on high incline.  This exercise has no bench coverage and so most difficulty was in upper middle of back - so needed to be below your target weight.  Also upped rest to 2 mins.  Failed on the last set.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 7.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Chest Press (Machine)",
+    "template_id": "7EB3F7C3",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 49.895220037920375,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 58.96707822663317,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 58.96707822663317,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Fly Crossovers",
+    "template_id": "651F844C",
+    "notes": "Upped rest time to 1:30",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 10.432636917019714,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 10.432636917019714,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 10.432636917019714,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "Upped rest to 1:15",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "dropset",
+      "reps": 24.0,
+      "weight_kg": 4.535929094356398,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 9 for 20 and then level 6 for 10 - more of a flush - despite green recovery - i felt tired today",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 8851.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-23#WORKOUT#4cde7836-9bb2-4d4a-9caf-b3cae6d4c44b",
+  "source": "hevy",
+  "date": "2026-06-23",
+  "title": "Foundation - Aerobic - 1 - 8",
+  "source_workout_id": "4cde7836-9bb2-4d4a-9caf-b3cae6d4c44b",
+  "start_time": "2026-06-23T12:08:48+00:00",
+  "end_time": "2026-06-23T14:23:36+00:00",
+  "duration_sec": 8088.0,
+  "exercises": [
+   {
+    "name": "Rowing Machine",
+    "template_id": "0222DB42",
+    "notes": "Level 7 on concept 2",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 2317.0,
+      "duration_sec": 780.0
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "2.8 and 6 incline for minutes 4-20",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 1481.0,
+      "duration_sec": 1200.0
+     }
+    ]
+   },
+   {
+    "name": "Elliptical Trainer",
+    "template_id": "3303376C",
+    "notes": "Level 10 incline level 5 speed",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 2398.0,
+      "duration_sec": 1200.0
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "2.8 at 5 incline",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 1255.0,
+      "duration_sec": 1020.0
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 9012.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-06-25#WORKOUT#259c2691-4059-4e2b-a543-a482264a1c48",
+  "source": "hevy",
+  "date": "2026-06-25",
+  "title": "Foundation - Pull - 2 - 9",
+  "source_workout_id": "259c2691-4059-4e2b-a543-a482264a1c48",
+  "start_time": "2026-06-25T12:19:27+00:00",
+  "end_time": "2026-06-25T14:25:25+00:00",
+  "duration_sec": 7558.0,
+  "exercises": [
+   {
+    "name": "Dumbbell Row",
+    "template_id": "F1E57334",
+    "notes": "2 minute rest timer.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 38.55539730202938,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 6.0,
+      "weight_kg": 43.091326396385774,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 72.57486550970236,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Cable Row",
+    "template_id": "54508215-4069-4f0b-bd2a-718dc159e1e1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "Upped rest time to 01:30",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Bicep Curl (Dumbbell)",
+    "template_id": "37FCC2BB",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Hammer Curl (Dumbbell)",
+    "template_id": "7E3BC8B6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.473805009480094,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Suitcase Carry",
+    "template_id": "056a1c53-c778-4ace-bb18-6f72e81b6724",
+    "notes": "FYI I log yards equals to steps, so its actually less yards and upper rest to 2 mins. Kettlebell was taken so i took a dumbell. Based on first set could have gone heavier although grip was getting hard.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 22.67964547178199,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 22.67964547178199,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": 22.67964547178199,
+      "distance_m": 40.0,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "L9-10 i think is easy - probably for my weight and heavy legs.  L3-4 is a VERY easy flush.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 15192.0,
+      "duration_sec": 2400.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-07#WORKOUT#e5c2f877-36bc-432e-9427-2e915dcafabf",
+  "source": "hevy",
+  "date": "2026-09-07",
+  "title": "Foundation - Push - 1 - 1",
+  "source_workout_id": "e5c2f877-36bc-432e-9427-2e915dcafabf",
+  "start_time": "2026-09-07T17:59:49+00:00",
+  "end_time": "2026-09-07T20:00:38+00:00",
+  "duration_sec": 7249.0,
+  "exercises": [
+   {
+    "name": "Bench Press (Barbell)",
+    "template_id": "79D0BB3A",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 10.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 3.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "warmup",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 14.741769556658292,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Fly Crossovers",
+    "template_id": "651F844C",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.247008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.247008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.247008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Pallof Press",
+    "template_id": "4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.247008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.247008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 12.247008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 9 - 5.6 miles",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 9012.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-08#WORKOUT#a9abb0cf-b37c-42ca-a75d-a2acffda8cb6",
+  "source": "hevy",
+  "date": "2026-09-08",
+  "title": "Foundation - Pull - 1 - 2",
+  "source_workout_id": "a9abb0cf-b37c-42ca-a75d-a2acffda8cb6",
+  "start_time": "2026-09-08T17:25:52+00:00",
+  "end_time": "2026-09-08T19:29:13+00:00",
+  "duration_sec": 7401.0,
+  "exercises": [
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lat Pulldown - Close Grip (Cable)",
+    "template_id": "4E5257DE",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Cable Row",
+    "template_id": "54508215-4069-4f0b-bd2a-718dc159e1e1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 72.57486550970236,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 72.57486550970236,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 81.64672369841516,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Bicep Curl (Dumbbell)",
+    "template_id": "37FCC2BB",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Walking",
+    "template_id": "33EDD7DB",
+    "notes": "3 incline, 2.8 speed - used rails for the laat 15 minutes - lower back aching probably from my weight",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 3364.0,
+      "duration_sec": 2700.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-09#WORKOUT#1f739e9b-908e-44bc-8e94-463b6ea67443",
+  "source": "hevy",
+  "date": "2026-09-09",
+  "title": "Foundation - Legs - 1 - 3",
+  "source_workout_id": "1f739e9b-908e-44bc-8e94-463b6ea67443",
+  "start_time": "2026-09-09T12:05:33+00:00",
+  "end_time": "2026-09-09T14:20:39+00:00",
+  "duration_sec": 8106.0,
+  "exercises": [
+   {
+    "name": "Romanian Deadlift (Barbell)",
+    "template_id": "2B4B7310",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 8.0,
+      "weight_kg": 43.091326396385774,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 65.77097186816776,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 65.77097186816776,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 65.77097186816776,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 88.45061733994974,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "notes": "Exercise went fine but becuase if the size of my stomach right now - i cant go as deep as my knees drive into my gut",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Calf Press (Machine)",
+    "template_id": "91237BDD",
+    "notes": "Tough thing is with reference exercises is my guess is i last did this on a slightly different machine.  This was the exact one i did leg press on earlier and feels fine",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 81.64672369841516,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Pallof Press",
+    "template_id": "4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+    "notes": "May need to double check form. Didnt feel it as much as i used to. This is a newer exercise to me.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Leg Curl (Machine)",
+    "template_id": "11A123F3",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 8 flat - cardio felt ok - more just saddle sore and uncomfortable with compression shorts",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 13132.0,
+      "duration_sec": 2700.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-10#WORKOUT#d916e78e-8b6a-4175-b50a-fe2319b8a7ba",
+  "source": "hevy",
+  "date": "2026-09-10",
+  "title": "Morning workout \u2600\ufe0f",
+  "source_workout_id": "d916e78e-8b6a-4175-b50a-fe2319b8a7ba",
+  "start_time": "2026-09-10T12:02:59+00:00",
+  "end_time": "2026-09-10T13:59:41+00:00",
+  "duration_sec": 7002.0,
+  "exercises": [
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "3mph at 0.5 incline",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 2398.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "2.7 and 3 incline",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 1062.0,
+      "duration_sec": 900.0
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 8 but after a while i stopped for a water break and machine shut off so lost the true distance and exact length.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 13036.0,
+      "duration_sec": 2700.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-11#WORKOUT#f6e41751-80e7-4146-8552-fe0ade2e7223",
+  "source": "hevy",
+  "date": "2026-09-11",
+  "title": "Foundation - Push - 2 - 5",
+  "source_workout_id": "f6e41751-80e7-4146-8552-fe0ade2e7223",
+  "start_time": "2026-09-11T22:12:16+00:00",
+  "end_time": "2026-09-12T00:30:06+00:00",
+  "duration_sec": 8270.0,
+  "exercises": [
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 15.87575183024739,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Calf Press (Machine)",
+    "template_id": "91237BDD",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "3mp at 1.0 incline though admittedly i was further back in the treadmill",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 4796.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-12#WORKOUT#a54f4796-7b36-4881-92db-c481a5328aae",
+  "source": "hevy",
+  "date": "2026-09-12",
+  "title": "Foundation - Pull - 2 - 6",
+  "source_workout_id": "a54f4796-7b36-4881-92db-c481a5328aae",
+  "start_time": "2026-09-12T18:56:23+00:00",
+  "end_time": "2026-09-12T21:31:38+00:00",
+  "duration_sec": 9315.0,
+  "exercises": [
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Dumbbell Row",
+    "template_id": "F1E57334",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Straight Arm Lat Pulldown (Cable)",
+    "template_id": "D2387AB1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lat Pulldown - Close Grip (Cable)",
+    "template_id": "4E5257DE",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Hammer Curl (Dumbbell)",
+    "template_id": "7E3BC8B6",
+    "notes": "The weight is easy but the fatigue kicks in on the latter reps.  Like id guess i could be doing 40lb if reps were 5-8.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 9 flat",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 10589.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Walking",
+    "template_id": "33EDD7DB",
+    "notes": "3 incline at 2.8",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 2237.0,
+      "duration_sec": 1800.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-13#WORKOUT#29cbd264-ea01-46d6-bccb-f2692721b1b8",
+  "source": "hevy",
+  "date": "2026-09-13",
+  "title": "Foundation - Legs - 3 - 7",
+  "source_workout_id": "29cbd264-ea01-46d6-bccb-f2692721b1b8",
+  "start_time": "2026-09-13T17:31:08+00:00",
+  "end_time": "2026-09-13T20:10:03+00:00",
+  "duration_sec": 9535.0,
+  "exercises": [
+   {
+    "name": "Romanian Deadlift (Barbell)",
+    "template_id": "2B4B7310",
+    "notes": "This felt fine. But i could feel my right side of my lower back more consciously.  And so i decided to not add weight this workout to risk anything.  So more safe - it wasnt pain or ache - i just could tell during the pull movement i could feel it in my lower right back more than i could my lower left.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Calf Press (Machine)",
+    "template_id": "91237BDD",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Leg Extension (Machine)",
+    "template_id": "75A4F6C4",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Pallof Press",
+    "template_id": "4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Glute Machine Kickback",
+    "template_id": "ce5b0bba-bb9c-4058-b8bb-2339380e8e10",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 49.895220037920375,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Walking",
+    "template_id": "33EDD7DB",
+    "notes": "0 incline and 3mph",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 4812.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-14#WORKOUT#f2ee5131-6369-440a-b4e9-381eda85ecc3",
+  "source": "hevy",
+  "date": "2026-09-14",
+  "title": "Foundation - Push - 3 - 8",
+  "source_workout_id": "f2ee5131-6369-440a-b4e9-381eda85ecc3",
+  "start_time": "2026-09-14T12:02:00+00:00",
+  "end_time": "2026-09-14T14:28:04+00:00",
+  "duration_sec": 8764.0,
+  "exercises": [
+   {
+    "name": "Bench Press (Barbell)",
+    "template_id": "79D0BB3A",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 10.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 3.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "warmup",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 92.98654643430615,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 34.01946820767298,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "First 30 i had 0.5 incline, second 30 no incline - at 3mph",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 4812.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-15#WORKOUT#9ddea3a6-9dc0-4fa0-94e1-c3535035695c",
+  "source": "hevy",
+  "date": "2026-09-15",
+  "title": "Foundation - Engine - 1 - 9",
+  "source_workout_id": "9ddea3a6-9dc0-4fa0-94e1-c3535035695c",
+  "start_time": "2026-09-15T22:34:26+00:00",
+  "end_time": "2026-09-16T00:39:26+00:00",
+  "duration_sec": 7500.0,
+  "exercises": [
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 10 flat",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 13921.0,
+      "duration_sec": 2700.0
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "60 min - 1.0 incline at 3mph",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 4828.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-16#WORKOUT#40a3b4cb-fbe1-4a50-ade2-389cb34e1fa2",
+  "source": "hevy",
+  "date": "2026-09-16",
+  "title": "Foundation - Pull - 3 - 10",
+  "source_workout_id": "40a3b4cb-fbe1-4a50-ade2-389cb34e1fa2",
+  "start_time": "2026-09-16T12:05:56+00:00",
+  "end_time": "2026-09-16T14:29:35+00:00",
+  "duration_sec": 8619.0,
+  "exercises": [
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 63.50300732098956,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lat Pulldown - Close Grip (Cable)",
+    "template_id": "4E5257DE",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 54.43114913227677,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Dumbbell Row",
+    "template_id": "F1E57334",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Straight Arm Lat Pulldown (Cable)",
+    "template_id": "D2387AB1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 22.67964547178199,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Face Pull",
+    "template_id": "BE640BA0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 26.081592292549285,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 29.483539113316585,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Hammer Curl (Dumbbell)",
+    "template_id": "7E3BC8B6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 10.205840462301895,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 10 flat.  Swapped cycling for treadmill as all treadmills were in use in the gym.",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 20052.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-17#WORKOUT#4c43e553-48c3-4a57-bb48-af833f38a3d6",
+  "source": "hevy",
+  "date": "2026-09-17",
+  "title": "Foundation - Legs - 4 - 11",
+  "source_workout_id": "4c43e553-48c3-4a57-bb48-af833f38a3d6",
+  "start_time": "2026-09-17T12:10:49+00:00",
+  "end_time": "2026-09-17T14:21:51+00:00",
+  "duration_sec": 7862.0,
+  "exercises": [
+   {
+    "name": "Romanian Deadlift (Barbell)",
+    "template_id": "2B4B7310",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 163.29344739683032,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Calf Press (Machine)",
+    "template_id": "91237BDD",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 15.0,
+      "weight_kg": 122.47008554762273,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Leg Curl (Machine)",
+    "template_id": "11A123F3",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 40.82336184920758,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Leg Extension (Machine)",
+    "template_id": "75A4F6C4",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 31.75150366049478,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Walking",
+    "template_id": "33EDD7DB",
+    "notes": "1.0 incline at 3mph",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 4796.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-18#WORKOUT#e9b80b85-4b1f-4350-9d12-4e19adeaba4d",
+  "source": "hevy",
+  "date": "2026-09-18",
+  "title": "Foundation - Engine - 1 - 9",
+  "source_workout_id": "e9b80b85-4b1f-4350-9d12-4e19adeaba4d",
+  "start_time": "2026-09-18T21:20:19+00:00",
+  "end_time": "2026-09-18T22:25:19+00:00",
+  "duration_sec": 3900.0,
+  "exercises": [
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 10 flat - big toe throbbing from ingrown toe so took it easy",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 14967.0,
+      "duration_sec": 3000.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-19#WORKOUT#4e649dd0-96d9-4870-ad8f-6f46dc074427",
+  "source": "hevy",
+  "date": "2026-09-19",
+  "title": "Foundation - Push - 4 - 13",
+  "source_workout_id": "4e649dd0-96d9-4870-ad8f-6f46dc074427",
+  "start_time": "2026-09-19T15:50:36+00:00",
+  "end_time": "2026-09-19T19:20:36+00:00",
+  "duration_sec": 12600.0,
+  "exercises": [
+   {
+    "name": "Bench Press (Barbell)",
+    "template_id": "79D0BB3A",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "reps": 10.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "reps": 3.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 61.235042773811365,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 70.30690096252415,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 83.91468824559335,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 92.98654643430615,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "reps": 5.0,
+      "weight_kg": 92.98654643430615,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Incline Bench Press (Dumbbell)",
+    "template_id": "07B38369",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 8.0,
+      "weight_kg": 20.41168092460379,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 10.0,
+      "weight_kg": 18.14371637742559,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 32.88548593408388,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 36.28743275485118,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Overhead Triceps Extension (Cable)",
+    "template_id": "B5EFBF9C",
+    "notes": "Felt more of a new area being worked as it just fatigued quickly towards second part of the set",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 11.339822735890994,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Fly Crossovers",
+    "template_id": "651F844C",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 13.607787283069193,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lateral Raise (Dumbbell)",
+    "template_id": "422B08F1",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "reps": 12.0,
+      "weight_kg": 6.8038936415345965,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cycling",
+    "template_id": "D8F7F851",
+    "notes": "Level 15 flat",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 17220.0,
+      "duration_sec": 2700.0
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "notes": "0.5 incline 3mph",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": 4812.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "notes": "",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "reps": null,
+      "weight_kg": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ]
+ }
+]

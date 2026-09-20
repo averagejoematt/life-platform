@@ -1549,6 +1549,20 @@
       "direction": "unknown",
       "lambda": "episode-detect",
       "module": "lambdas/compute/episode_detect_lambda.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "episode-detect",
+      "module": "lambdas/compute/episode_detect_lambda.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "episode-detect",
+      "module": "lambdas/compute/episode_detect_lambda.py",
       "partition": "training_reference",
       "via": "pk"
     },
@@ -3692,6 +3706,13 @@
       "lambda": null,
       "module": "lambdas/training/exercise_history.py",
       "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/exercise_history.py",
+      "partition": "whoop",
       "via": "pk"
     },
     {
@@ -7154,7 +7175,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 687,
+      "edges": 690,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7169,8 +7190,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 337,
-        "sites_resolved": 850,
-        "sites_total": 1187
+        "sites_resolved": 853,
+        "sites_total": 1190
       },
       "schedule_resolution": {
         "dynamic": 0,
