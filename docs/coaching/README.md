@@ -51,3 +51,11 @@ tracked file ever declares itself PRIVATE again.
 orders, routine specs) without the owner-personal specifics that made the six
 files above Tier-2. Anything Tier-2 that a public page could serve is governed by
 `docs/DATA_GOVERNANCE.md`, not by this directory.
+
+`PROGRESS_PHOTO_PROTOCOL.md` (#3761) joins that public list: it documents the
+weekly-photo *capture procedure* (timing, lighting, distance, poses, clothing) —
+none of it owner-personal content — while the photos themselves stay Tier-2
+owner-only per `docs/DATA_GOVERNANCE.md`'s `progress_photos` entry. A working
+copy also lives at `s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PROTOCOL.md`
+beside the rest of the owner-private corpus, for convenience — this repo copy is
+the source of truth.
