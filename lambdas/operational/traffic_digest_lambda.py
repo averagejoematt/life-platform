@@ -136,7 +136,20 @@ _NON_PAGE = (
 
 
 def _ipkey(ip: str, ua: str) -> str:
-    """One-way visitor key for distinct/returning counts — never stored/emitted."""
+    """One-way visitor key for distinct/returning counts — never stored/emitted.
+
+    #3620 (security ROW4) grep sweep found this call site and it is DELIBERATELY
+    left unsalted, unlike every other `sha256(ip...)` site in the fleet: `vkey`
+    lives only in the `visit_days` dict built and consumed inside ONE invocation
+    of `aggregate_visit_days` (below), is never written to DDB/S3, never logged,
+    and never leaves this process — there is no digest at rest for anyone to
+    reverse. Salting a value with no persistence and no exposure surface would add
+    a Secrets Manager read (and a fail-closed path with nothing to fail closed
+    ON: this function has no per-request door to 503) for zero reduction in risk.
+    If `vkey` is ever persisted or logged, route it through
+    `common.client_ip.salted_ip_hash` first — see
+    `tests/test_ip_hash_salt_sweep_3620.py` for the allowlist this line is in.
+    """
     return hashlib.sha256(f"{ip}|{ua}".encode("utf-8", "ignore")).hexdigest()[:16]
 
 

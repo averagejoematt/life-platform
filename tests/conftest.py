@@ -822,6 +822,12 @@ def _write_day_is_genesis_day(monkeypatch):
 # So the suite pins a fixed salt. The fail-closed arm is NOT left unasserted:
 # tests/test_ip_hash_salt_3620.py overrides this by patching `_get_secret` again
 # inside the test, and asserts the None return AND a real handler's 503.
+#
+# `common.client_ip.salted_ip_hash` — the shared helper every OTHER ip_hash call
+# site routes through (tests/test_ip_hash_salt_sweep_3620.py) — reads the SAME
+# secret through its own `_get_secret` reference, patched here too so none of
+# those doors' pre-existing tests start hitting a real (absent, in CI)
+# Secrets Manager either.
 @pytest.fixture(autouse=True)
 def _ip_hash_salt_3620(monkeypatch):
     try:
@@ -830,4 +836,10 @@ def _ip_hash_salt_3620(monkeypatch):
         yield
         return
     monkeypatch.setattr(_engage, "_get_secret", lambda secret_id, client: "conftest-ip-hash-salt")
+    try:
+        from common import client_ip as _client_ip
+
+        monkeypatch.setattr(_client_ip, "_get_secret", lambda secret_id, client: "conftest-ip-hash-salt")
+    except Exception:
+        pass
     yield

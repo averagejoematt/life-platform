@@ -59,6 +59,7 @@ from boto3.dynamodb.conditions import Key
 from common.client_ip import (
     extract_client_ip,  # #1221 — the ONE edge-observed client-IP helper
     extract_idempotency_identity,  # #2932 — fail-OPEN identity for the capture doors' content-keyed ids
+    salted_ip_hash,  # #3620 (security ROW4) — THE salted, fail-closed ip_hash for every rate-limit/dedup key
 )
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE spelling, imported, never retyped
 from content.social_signals import coach_route_of  # #1671 — training/mind coach-route classifier, reused read-side (#1674)
@@ -113,6 +114,7 @@ __reexport__ = (
     Decimal,
     extract_client_ip,
     extract_idempotency_identity,
+    salted_ip_hash,
     coach_route_of,
     with_phase_filter,
     _error,

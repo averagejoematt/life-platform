@@ -37,7 +37,7 @@ from ai.ai_context import (
     wrap_untrusted_reader_text,
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
-from common.client_ip import client_ip_is_trusted, extract_client_ip  # #1221: the ONE rate-limit identity
+from common.client_ip import client_ip_is_trusted, extract_client_ip, salted_ip_hash  # #1221 / #3620
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085 / #2109
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
@@ -926,7 +926,10 @@ def _handle_ask(event: dict) -> dict:
                 "body": json.dumps({"answer": safety_reason, "remaining": 999, "filtered": True}),
             }
 
-        ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+        # #3620 (security ROW4): fail CLOSED — no salt, no digest, no unmetered door.
+        ip_hash = salted_ip_hash(source_ip, logger)
+        if ip_hash is None:
+            return _error(503, "Service temporarily unavailable. Please try again shortly.")
         # WR-24: Check for valid subscriber token → higher rate limit
         sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
         is_subscriber = bool(sub_token) and _validate_subscriber_token(sub_token)
@@ -1114,7 +1117,10 @@ def _handle_explain(event: dict) -> dict:
     if surface not in _EXPLAIN_SURFACES:
         return _error(400, "Unknown surface")
 
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): fail CLOSED — no salt, no digest, no unmetered door.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
     is_subscriber = bool(sub_token) and _validate_subscriber_token(sub_token)
     allowed, remaining = _ask_rate_check(ip_hash, limit=20 if is_subscriber else 5)
@@ -1251,7 +1257,13 @@ def _handle_board_ask(event: dict) -> dict:
     the resource copy at the 6th question of the hour and at budget tier 3 alike.
     """
     source_ip = _rate_limit_identity(event)
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): computed here (same position as before) so a missing
+    # salt is discovered up front, but the fail-closed refusal is deferred to just
+    # before `ip_hash` is actually USED — after the hazard gate, in both the
+    # opening-turn path below and `_handle_board_followup`. A security fix must not
+    # invert #3560's ordering: a question describing an emergency still reaches the
+    # hazard gate's $0 resource copy even when the salt secret is unavailable.
+    ip_hash = salted_ip_hash(source_ip, logger)
 
     body, _err = _req.json_object_body(event.get("body"))
     if body is None:
@@ -1273,6 +1285,10 @@ def _handle_board_ask(event: dict) -> dict:
     if hazard_hit:
         return hazard_hit
 
+    # #3620 (security ROW4): checked here, not at computation time — see the
+    # comment above `ip_hash`'s assignment.
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     _paused = _ai_paused_response()
     if _paused:
         return _paused
@@ -1391,7 +1407,7 @@ def _handle_board_ask(event: dict) -> dict:
     }
 
 
-def _handle_board_followup(body: dict, ip_hash: str) -> dict:
+def _handle_board_followup(body: dict, ip_hash: "str | None") -> dict:
     """POST /api/board_ask {session_token, persona, question} — #546.
 
     Continues a thread with the SAME coach. The prior turns are replayed from
@@ -1423,6 +1439,11 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     if hazard_hit:
         return hazard_hit
 
+    # #3620 (security ROW4): `ip_hash` was computed (possibly None) by the caller
+    # before the opening turn's own hazard gate — see that comment. Checked here,
+    # after THIS path's hazard gate, for the same reason.
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     # #3560: the two spend guards the opening path used to apply on this path's
     # behalf, now applied HERE — after the hazard gate, before anything that costs.
     _paused = _ai_paused_response()

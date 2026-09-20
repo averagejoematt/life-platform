@@ -261,14 +261,14 @@ def test_ungrounded_followup_is_refused_fail_closed(monkeypatch):
 def test_followup_through_board_ask_entrypoint(monkeypatch):
     """A session_token on the main /api/board_ask route dispatches to the
     follow-up path (the frontend posts to one endpoint)."""
-    import hashlib
+    from common.client_ip import salted_ip_hash
 
     ai = _ai()
     table = _FakeTable()
     _wire(ai, monkeypatch, table, bedrock_text="Holding steady is the right call here.")
-    # the entrypoint hashes the source IP — seed the session with that hash so
-    # the IP-binding check passes end-to-end.
-    ip_hash = hashlib.sha256(b"203.0.113.7").hexdigest()[:16]
+    # the entrypoint salts the source IP (#3620) — seed the session with that same
+    # digest so the IP-binding check passes end-to-end.
+    ip_hash = salted_ip_hash("203.0.113.7")
     token = _seed_session(ai, table, ip=ip_hash)
     resp = ai._handle_board_ask(_post({"session_token": token, "persona": "sleep_coach", "question": "and tomorrow?"}))
     assert resp["statusCode"] == 200
