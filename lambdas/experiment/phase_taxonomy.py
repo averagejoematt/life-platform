@@ -483,12 +483,24 @@ _PK_RULES: list = [
     # cycle that produced it — the same sentence that settles outbound_events.
     (lambda pk, sk: pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"), SYSTEM_STATE),
     # Coach intelligence tier — all experiment-scoped.
+    #   #3900 ruling (2026-09-20): COACH#commitments/TALLY#current is EXPERIMENT_SCOPED, not
+    #   SYSTEM_STATE. It is a rolling tally, but of THIS cycle's graded commitments (the payload
+    #   carries a `season` block), its only reader already defers to singleton_visible (#3514),
+    #   and the reset wipe already archives it — a write-time stamp makes the writer agree with
+    #   both. It was the one unstamped row on the partition (live 2026-09-19).
     (lambda pk, sk: pk.startswith("COACH#"), EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#digest", EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#disagreements", EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#dispute", EXPERIMENT_SCOPED),  # #540 inter-coach threads
     (lambda pk, sk: pk == "ENSEMBLE#docket", EXPERIMENT_SCOPED),  # #1386 dispute docket (OPEN#/RESOLVED#)
     (lambda pk, sk: pk == "ENSEMBLE#influence_graph", SYSTEM_STATE),  # static config
+    #   #3900 ruling (2026-09-20): EXPERIMENT_SCOPED for BOTH sks, stamped two ways. STATE#current
+    #   carries the narrative-arc state in `phase` (a non-taxonomy value, e.g. "setback"), so the
+    #   writer stamps it cycle-only (include_phase=False, #1233 — the overload is the reason, and
+    #   the reader guards it with singleton_visible). HISTORY#<date> rows carry `transition`, not
+    #   an arc state, so they take the full stamp — the older ones already carry `phase: pilot`
+    #   from the reset wipes; only each cycle's newest was left served-as-current by a cycle-only
+    #   stamp. The nightly audit treats a NARRATIVE#arc row with a `phase` as stamped either way.
     (lambda pk, sk: pk == "NARRATIVE#arc", EXPERIMENT_SCOPED),
     # #946: Elena's narrative running state (open THREADs, pending CALLBACKs,
     # MOTIF#state, STANCE#) is per-cycle story continuity — pending callbacks

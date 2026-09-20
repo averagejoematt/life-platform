@@ -519,8 +519,17 @@ def write_tally(table, corpus, applied, today_str, logger) -> dict:
     payload["as_of"] = today_str
     try:
         from common.numeric import floats_to_decimal
+        from experiment.phase_taxonomy import experiment_stamp_for  # #3900: COACH#commitments is tagger-blind
 
-        table.put_item(Item={"pk": ROLLUP_PK, "sk": ROLLUP_SK, "as_of": today_str, **floats_to_decimal(payload)})
+        table.put_item(
+            Item={
+                **experiment_stamp_for(ROLLUP_PK, ROLLUP_SK),
+                "pk": ROLLUP_PK,
+                "sk": ROLLUP_SK,
+                "as_of": today_str,
+                **floats_to_decimal(payload),
+            }
+        )
         logger.info(
             "[#3553] commitment tally: %s kept / %s broken / %s ungradeable of %s (as_of %s)",
             payload["lifetime"]["kept"],

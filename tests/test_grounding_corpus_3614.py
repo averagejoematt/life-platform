@@ -53,7 +53,7 @@ CORPUS_DIR = _TESTS / "grounding_corpus"
 # stale_reset_date class, one by the #3518 plan class, one by the #1242 date class, one by
 # the ADR-104 number class), three open (#3516 x2, #3519's structured field).
 MIN_SPECIMENS = 8
-MIN_CAUGHT = 5
+MIN_CAUGHT = 7  # 5 → 7 on 2026-09-19: the two #3516 source-facet specimens (the gate became replayable)
 
 REQUIRED_KEYS = {
     "id",
@@ -70,7 +70,7 @@ REQUIRED_KEYS = {
     "inputs",
 }
 VALID_STATUS = {"caught", "open"}
-VALID_GATE = {"composite", "plan", None}
+VALID_GATE = {"composite", "plan", "source_facet", None}
 
 
 def _fixtures() -> list[dict]:
@@ -92,6 +92,13 @@ def replay(fixture: dict, text: str) -> list:
     inputs = fixture.get("inputs") or {}
     if fixture["gate"] == "plan":
         return plan_facts_gate.plan_figure_findings(text, inputs["plan_facts"], observed=inputs.get("observed"))
+    if fixture["gate"] == "source_facet":
+        # #3516: the paused/lagging misattribution gate, replayed against the FROZEN registry
+        # view of the day the specimen was caught (never the live registry — un-pausing Garmin
+        # must not make a sealed specimen stop reproducing).
+        from coach import coach_brief_input_gate as _cbig
+
+        return _cbig.source_facet_findings(text, registry_view=inputs.get("registry_view") or {})
     if fixture["gate"] == "composite":
         kwargs = {}
         if "allowed" in inputs:

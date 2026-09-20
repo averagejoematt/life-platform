@@ -327,9 +327,22 @@ _SYNC_FAILURE_PATTERNS = (
     r"(?:re)?connect\s+(?:it|the\s+\w+)",
 )
 
+# #3516 corpus (2026-09-19): the Garmin specimen's positive CONTROL is "Garmin is paused (ADR-074)
+# and cannot report steps; that is not a sync problem." — the sentence the platform SHOULD say.
+# `sync problem` matches the vocabulary above, so without this the gate flags the denial of a
+# sync failure as a sync failure. The guard is one explicit shape (not/isn't + "a sync <noun>"),
+# never a bare negation: "isn't syncing yet" is the live misattribution and must stay a finding.
+_DENIAL_PATTERNS = (r"\b(?:not|isn't|is\s+not|never)\s+a\s+sync(?:ing)?\s+(?:failure|issue|problem|error|gap)\b",)
 
-def source_facet_findings(text: str, data: Optional[dict] = None) -> list:
+
+def source_facet_findings(text: str, data: Optional[dict] = None, *, registry_view: Optional[dict] = None) -> list:
     """Sentences that blame a sync failure for a PAUSED or LAG-BY-DESIGN source.
+
+    `registry_view` (#3516 corpus replay, 2026-09-19): `{source_id: status}` freezes WHICH
+    sources count as caveated and their status, so a sealed corpus specimen replays
+    against the registry facts of the day it was caught — not against whatever the
+    live registry says when Garmin is un-paused. Labels still come from the registry.
+    Production callers pass nothing and read the live facets, exactly as before.
 
     Returns a list of `{"type": "source_facet_misattribution", "source": id,
     "status": ..., "detail": ...}` — the grounded_generation finding shape, so a caller
@@ -341,13 +354,14 @@ def source_facet_findings(text: str, data: Optional[dict] = None) -> list:
 
     if not text:
         return []
-    caveated = _sr.caveated_source_ids()
+    caveated = set(registry_view) if registry_view is not None else _sr.caveated_source_ids()
     watched = []
     for name, _keys, source_id in INVENTORY_ROWS:
         if not source_id or source_id not in caveated:
             continue
         label = _sr.source_label(source_id) or name.split()[0]
-        watched.append((source_id, label, _sr.availability_facet(source_id)["status"]))
+        status = registry_view[source_id] if registry_view is not None else _sr.availability_facet(source_id)["status"]
+        watched.append((source_id, label, status))
     if not watched:
         return []
     findings = []
@@ -355,6 +369,8 @@ def source_facet_findings(text: str, data: Optional[dict] = None) -> list:
         low = sentence.lower()
         if not any(re.search(p, low) for p in _SYNC_FAILURE_PATTERNS):
             continue
+        if any(re.search(p, low) for p in _DENIAL_PATTERNS):
+            continue  # "that is not a sync problem" DENIES the attribution — the honest sentence, not the misattribution
         for source_id, label, status in watched:
             if label.lower().replace(" ", "") in low.replace(" ", ""):
                 findings.append(

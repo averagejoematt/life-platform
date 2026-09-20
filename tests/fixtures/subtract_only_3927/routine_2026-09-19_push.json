@@ -1,0 +1,183 @@
+{
+  "_source": "DDB USER#matthew#ROUTINE#a5980a24309cfd159a2db0536e79906a VERSION#current, read 2026-09-19 (us-west-2 life-platform)",
+  "routine_id": "a5980a24309cfd159a2db0536e79906a",
+  "target_date": "2026-09-19",
+  "created_at": "2026-09-19T15:12:46.601506+00:00",
+  "created_by": "chat",
+  "title": "Push \u2014 2026-09-19",
+  "notes": "Push 4. Bench ceiling RPE 9 \u2014 205 read 9.5 on 09-14, do not chase 215. Bike not treadmill: toe-off is what the ingrown nail hates. Overhead ext is new \u2014 direct triceps was below MEV.",
+  "exercises": [
+    {
+      "movement_key": "barbell_bench_press",
+      "notes": "Ceiling RPE 9. 205x5 read 9.5 on 09-14. If 205 lands <=8.5, add one more set at 205. Do not chase 215.",
+      "rest_seconds": 180.0,
+      "sets": [
+        {
+          "type": "warmup",
+          "weight_kg": 20.4117,
+          "reps": 10.0
+        },
+        {
+          "type": "warmup",
+          "weight_kg": 61.235,
+          "reps": 3.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 61.235,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 70.3068,
+          "reps": 5.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 83.9146,
+          "reps": 5.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 92.9864,
+          "reps": 5.0
+        }
+      ]
+    },
+    {
+      "movement_key": "incline_db_press",
+      "notes": "Ceiling RPE 9. If set 1 is <=7.5 go 80 - you had 80x8 on 09-11 leading with incline.",
+      "rest_seconds": 120.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 34.0194,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 34.0194,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 34.0194,
+          "reps": 8.0
+        }
+      ]
+    },
+    {
+      "movement_key": "db_shoulder_press",
+      "notes": "Ceiling RPE 8.5. Drop to 40x10 if set 1 exceeds it.",
+      "rest_seconds": 120.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 20.4117,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 20.4117,
+          "reps": 8.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 20.4117,
+          "reps": 8.0
+        }
+      ]
+    },
+    {
+      "movement_key": "cable_tricep_pushdown",
+      "notes": "Ceiling RPE 8.5.",
+      "rest_seconds": 90.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 32.8854,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 32.8854,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 32.8854,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 32.8854,
+          "reps": 12.0
+        }
+      ]
+    },
+    {
+      "movement_key": "tmpl:21310F5F",
+      "notes": "NEW - overhead, lengthened position. Direct triceps was below MEV (5.4 sets/wk vs MEV 6). Ceiling RPE 8.",
+      "rest_seconds": 90.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 18.1437,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 18.1437,
+          "reps": 12.0
+        }
+      ]
+    },
+    {
+      "movement_key": "db_lateral_raise",
+      "notes": "Ceiling RPE 8.5.",
+      "rest_seconds": 90.0,
+      "sets": [
+        {
+          "type": "normal",
+          "weight_kg": 6.8039,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 6.8039,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 6.8039,
+          "reps": 12.0
+        },
+        {
+          "type": "normal",
+          "weight_kg": 6.8039,
+          "reps": 12.0
+        }
+      ]
+    },
+    {
+      "movement_key": "cycling",
+      "notes": "Level 10 flat, 40 min, hold 115-120 bpm. Bike not treadmill today - toe.",
+      "rest_seconds": 0.0,
+      "sets": [
+        {
+          "type": "normal"
+        }
+      ]
+    },
+    {
+      "movement_key": "tmpl:527DA061",
+      "notes": "15 min.",
+      "rest_seconds": 0.0,
+      "sets": [
+        {
+          "type": "normal"
+        }
+      ]
+    }
+  ]
+}

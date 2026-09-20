@@ -2888,6 +2888,9 @@ The taxonomy is mechanically enforced and test-covered against every live family
 
 **Verified:** 2026-06-07 (ADR-077 — phase taxonomy registry + tests + doc; wiring in progress)
 
+
+**Amendment (2026-09-20, #3601 — the reset cadence is an owner ruling, recorded with the number it was made on: a 30-day minimum between resets).** *What was measured.* 12 resets in 55 days against `docs/PROPORTIONALITY.md` row 86's "a few times a quarter"; cycle lengths since 2026-07-12 of 1, 5, 1, 1, 2, 5, 7, 7, 7, 15 and 4 days (median 5); 39 of the 99 findings and 6 of the 7 P1s in the 2026-09-05 full review lived in the reset→first-cron window; exactly one of eleven cycles could have matured a 14-day pre-registered bet; no commitment ever reached its due date. *The ruling (owner, 2026-09-05, re-confirmed 2026-09-19 on the Session AN owner sheet):* **a cycle lasts at least 30 days.** Rare resets, not weekly resets with weekly-grade verification — the alternative the RCA put to him. *Enforcement:* `deploy/restart_pipeline.py --apply` refuses inside 30 days of the last genesis unless `--reanchor-of` names it (`48333418b`, #3601 boxes 1 + 3a); `scripts/monthly_close.py` prints the month's reset count and cadence beside the ruling so the number stays in front of him. *Consequence:* cycle 17 (genesis 2026-09-06) is eligible for a reset no earlier than 2026-10-06; the demote triggers on reset machinery are judged against the RULED cadence (≤ ~1/month), not the measured 12/quarter; and #3603's reset "event term" and the T+writers truth re-run stay REJECTED in the rent register on this cadence.
+
 ---
 
 ## ADR-078: Commercial wedge — sequence, don't choose (PG-00)

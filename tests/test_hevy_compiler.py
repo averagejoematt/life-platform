@@ -92,14 +92,16 @@ def test_why_note_overrides_default_notes():
     ir = _ir()
     ir.notes = "multi\nline\nrationale\nthat should not reach Hevy"
     body = to_create_body(ir, _resolver_fn, why_note="Readiness green. Programmed.")
-    assert body["routine"]["notes"] == "Readiness green. Programmed."
+    assert "notes" not in body["routine"]  # #3938: Hevy has no routine-level notes field
+    assert body["routine"]["exercises"][0]["notes"] == "Readiness green. Programmed."
 
 
 def test_update_body_also_takes_title_context():
     ctx = {"phase": "Build", "type_count_in_phase": 2, "all_time_count": 99}
     body = to_update_body(_ir(), _resolver_fn, title_context=ctx, why_note="x")
     assert body["routine"]["title"] == "Build - Upper - 2 - 99"
-    assert body["routine"]["notes"] == "x"
+    assert "notes" not in body["routine"]
+    assert body["routine"]["exercises"][0]["notes"] == "x"
     assert "folder_id" not in body["routine"]
 
 
@@ -153,8 +155,9 @@ def test_sanitize_note_applied_to_exercise_and_routine_notes():
     ir = _ir()
     ir.exercises[0].notes = "felt\x07strong"
     body = to_create_body(ir, _resolver_fn, why_note="why\x00note")
-    assert body["routine"]["exercises"][0]["notes"] == "feltstrong"
-    assert body["routine"]["notes"] == "whynote"
+    # #3938: the WHY note rides ahead of the exercise's own note on exercises[0]; both sanitized
+    assert body["routine"]["exercises"][0]["notes"] == "whynote\n\nfeltstrong"
+    assert "notes" not in body["routine"]
 
 
 def _branched_ir() -> RoutineSpec:
@@ -173,15 +176,15 @@ def test_no_branches_notes_unchanged_backward_compat():
     ir.notes = "MEV starter."
     assert ir.branches == []
     body = to_create_body(ir, _resolver_fn)
-    assert body["routine"]["notes"] == "MEV starter."
+    assert body["routine"]["exercises"][0]["notes"] == "MEV starter."  # #3938: on exercises[0], the channel that lands
     body_why = to_create_body(ir, _resolver_fn, why_note="Readiness green.")
-    assert body_why["routine"]["notes"] == "Readiness green."
+    assert body_why["routine"]["exercises"][0]["notes"] == "Readiness green."
 
 
 def test_branches_render_into_notes():
     """#417: the compiler renders branches; every branch is visible, recommended starred."""
     body = to_create_body(_branched_ir(), _resolver_fn, why_note="Readiness yellow.")
-    notes = body["routine"]["notes"]
+    notes = body["routine"]["exercises"][0]["notes"]
     assert notes.startswith("Readiness yellow.")
     assert "CHOOSE YOUR BRANCH" in notes
     assert "AS-WRITTEN" in notes and "EASIER" in notes  # every branch visible
@@ -192,7 +195,7 @@ def test_branches_render_into_notes():
 
 def test_branches_render_in_update_body_too():
     body = to_update_body(_branched_ir(), _resolver_fn, why_note="x")
-    assert "CHOOSE YOUR BRANCH" in body["routine"]["notes"]
+    assert "CHOOSE YOUR BRANCH" in body["routine"]["exercises"][0]["notes"]
     assert "folder_id" not in body["routine"]
 
 
@@ -261,7 +264,7 @@ def test_restamped_recommendation_flips_pushed_exercises():
     assert len(pushed) == 1
     assert pushed[0]["exercise_template_id"] == "MACH001"  # easier (now recommended)
     # The menu still shows BOTH branches — self-selection preserved.
-    notes = body["routine"]["notes"]
+    notes = body["routine"]["exercises"][0]["notes"]
     assert "AS-WRITTEN" in notes and "EASIER" in notes
 
 
@@ -290,7 +293,14 @@ def test_branchless_routine_pushes_ir_exercises_byte_identical():
     ir_with_empty_branches.branches = [RoutineBranch(label="as-written", recommended=True, order=0)]
     branched_body = to_create_body(ir_with_empty_branches, _resolver_fn)
 
-    assert branchless_body["routine"]["exercises"] == branched_body["routine"]["exercises"]
+    # #3938: the branch menu now rides on exercises[0].notes, so compare the exercise payloads with
+    # that one carried note set aside — everything else must still be byte-identical.
+    def _sans_note(exs):
+        return [{k: v for k, v in e.items() if k != "notes"} for e in exs]
+
+    assert _sans_note(branchless_body["routine"]["exercises"]) == _sans_note(branched_body["routine"]["exercises"])
+    assert branchless_body["routine"]["exercises"][0]["notes"] == "MEV starter."
+    assert branched_body["routine"]["exercises"][0]["notes"].startswith("MEV starter.")
 
 
 def test_round_trip_response_to_diff():
@@ -300,7 +310,7 @@ def test_round_trip_response_to_diff():
             "id": "abc12345",
             "title": body["routine"]["title"],
             "folder_id": body["routine"]["folder_id"],
-            "notes": body["routine"]["notes"],
+            # #3938: Hevy returns no routine-level notes — the parser reads "" for it
             "updated_at": "2026-06-01T18:00:00Z",
             "created_at": "2026-06-01T17:55:00Z",
             "exercises": body["routine"]["exercises"],

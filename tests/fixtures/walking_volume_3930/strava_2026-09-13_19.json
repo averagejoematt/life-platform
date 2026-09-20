@@ -1,0 +1,243 @@
+[
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-13",
+    "source": "strava",
+    "date": "2026-09-13",
+    "activity_count": 2,
+    "sport_types": [
+      "Walk",
+      "WeightTraining"
+    ],
+    "total_moving_time_seconds": 12954,
+    "activities": [
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Foundation - Legs - 3 - 7",
+        "moving_time_seconds": 9535,
+        "elapsed_time_seconds": 9535,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Lunch Walk",
+        "moving_time_seconds": 3419,
+        "elapsed_time_seconds": 3419,
+        "distance_meters": 0,
+        "distance_miles": null
+      }
+    ]
+  },
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-14",
+    "source": "strava",
+    "date": "2026-09-14",
+    "activity_count": 3,
+    "sport_types": [
+      "Walk",
+      "WeightTraining"
+    ],
+    "total_moving_time_seconds": 15556,
+    "activities": [
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Foundation - Push - 3 - 8",
+        "moving_time_seconds": 8764,
+        "elapsed_time_seconds": 8764,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Morning Walk",
+        "moving_time_seconds": 3539,
+        "elapsed_time_seconds": 3539,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Afternoon Walk",
+        "moving_time_seconds": 3253,
+        "elapsed_time_seconds": 3281,
+        "distance_meters": 3995.9,
+        "distance_miles": 2.48
+      }
+    ]
+  },
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-15",
+    "source": "strava",
+    "date": "2026-09-15",
+    "activity_count": 2,
+    "sport_types": [
+      "Walk",
+      "Workout"
+    ],
+    "total_moving_time_seconds": 11159,
+    "activities": [
+      {
+        "type": "Workout",
+        "sport_type": "Workout",
+        "name": "Foundation - Engine - 1 - 9",
+        "moving_time_seconds": 7500,
+        "elapsed_time_seconds": 7500,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Afternoon Walk",
+        "moving_time_seconds": 3659,
+        "elapsed_time_seconds": 3659,
+        "distance_meters": 0,
+        "distance_miles": null
+      }
+    ]
+  },
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-16",
+    "source": "strava",
+    "date": "2026-09-16",
+    "activity_count": 3,
+    "sport_types": [
+      "Walk",
+      "WeightTraining"
+    ],
+    "total_moving_time_seconds": 11288,
+    "activities": [
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Foundation - Pull - 3 - 10",
+        "moving_time_seconds": 8619,
+        "elapsed_time_seconds": 8619,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Morning Weight Training",
+        "moving_time_seconds": 1799,
+        "elapsed_time_seconds": 1799,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Evening Walk",
+        "moving_time_seconds": 870,
+        "elapsed_time_seconds": 870,
+        "distance_meters": 1073.2,
+        "distance_miles": 0.67
+      }
+    ]
+  },
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-17",
+    "source": "strava",
+    "date": "2026-09-17",
+    "activity_count": 2,
+    "sport_types": [
+      "Walk",
+      "WeightTraining"
+    ],
+    "total_moving_time_seconds": 11341,
+    "activities": [
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Foundation - Legs - 4 - 11",
+        "moving_time_seconds": 7862,
+        "elapsed_time_seconds": 7862,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Morning Walk",
+        "moving_time_seconds": 3479,
+        "elapsed_time_seconds": 3479,
+        "distance_meters": 0,
+        "distance_miles": null
+      }
+    ]
+  },
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-18",
+    "source": "strava",
+    "date": "2026-09-18",
+    "activity_count": 1,
+    "sport_types": [
+      "Workout"
+    ],
+    "total_moving_time_seconds": 3900,
+    "activities": [
+      {
+        "type": "Workout",
+        "sport_type": "Workout",
+        "name": "Foundation - Engine - 1 - 9",
+        "moving_time_seconds": 3900,
+        "elapsed_time_seconds": 3900,
+        "distance_meters": 0,
+        "distance_miles": null
+      }
+    ]
+  },
+  {
+    "pk": "USER#matthew#SOURCE#strava",
+    "sk": "DATE#2026-09-19",
+    "source": "strava",
+    "date": "2026-09-19",
+    "activity_count": 3,
+    "sport_types": [
+      "Walk",
+      "WeightTraining"
+    ],
+    "total_moving_time_seconds": 18778,
+    "activities": [
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Foundation - Push - 4 - 13",
+        "moving_time_seconds": 12600,
+        "elapsed_time_seconds": 12600,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "WeightTraining",
+        "sport_type": "WeightTraining",
+        "name": "Morning Weight Training",
+        "moving_time_seconds": 2639,
+        "elapsed_time_seconds": 2639,
+        "distance_meters": 0,
+        "distance_miles": null
+      },
+      {
+        "type": "Walk",
+        "sport_type": "Walk",
+        "name": "Lunch Walk",
+        "moving_time_seconds": 3539,
+        "elapsed_time_seconds": 3539,
+        "distance_meters": 0,
+        "distance_miles": null
+      }
+    ]
+  }
+]

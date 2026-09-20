@@ -304,6 +304,16 @@ def _sanitize_stance(stance, prior_stance):
     return stance
 
 
+def _stamp(sk: str) -> dict:
+    """#3900: PERSONA#elena is tagger-BLIND (restart_phase_tag only reaches USER#matthew#SOURCE#*), so
+    a row written here with no `phase` is served as CURRENT across every reset — 19 live rows on
+    2026-09-19. Class-gated through the taxonomy (PERSONA#elena is EXPERIMENT_SCOPED, #946):
+    the same predicate the reset wipe and the nightly audit use, so the three cannot disagree."""
+    from experiment.phase_taxonomy import experiment_stamp_for
+
+    return experiment_stamp_for(PERSONA_PK, sk)
+
+
 def apply_extraction(extraction, date_str, week_number, state):
     """Write the extraction into PERSONA#elena. Returns a summary dict."""
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -318,6 +328,7 @@ def apply_extraction(extraction, date_str, week_number, state):
             continue  # already open — treat as advanced below at most
         table.put_item(
             Item={
+                **_stamp(f"THREAD#{date_str}#{slug}"),
                 "pk": PERSONA_PK,
                 "sk": f"THREAD#{date_str}#{slug}",
                 "slug": slug,
@@ -370,6 +381,7 @@ def apply_extraction(extraction, date_str, week_number, state):
         due_in = max(MIN_CALLBACK_DUE_WEEKS, min(MAX_CALLBACK_DUE_WEEKS, due_in))
         table.put_item(
             Item={
+                **_stamp(f"CALLBACK#{date_str}#{slug}"),
                 "pk": PERSONA_PK,
                 "sk": f"CALLBACK#{date_str}#{slug}",
                 "slug": slug,
@@ -413,7 +425,7 @@ def apply_extraction(extraction, date_str, week_number, state):
         else:
             existing[key] = {"phrase": phrase, "first_week": week_number, "last_week": week_number, "count": 1}
     motifs = sorted(existing.values(), key=lambda m: (int(m.get("last_week") or m.get("first_week") or 0)), reverse=True)[:MAX_MOTIFS]
-    table.put_item(Item={"pk": PERSONA_PK, "sk": "MOTIF#state", "motifs": motifs, "last_updated": now_iso})
+    table.put_item(Item={**_stamp("MOTIF#state"), "pk": PERSONA_PK, "sk": "MOTIF#state", "motifs": motifs, "last_updated": now_iso})
     summary["motifs"] = len(motifs)
 
     # Stance — with receipts, sanitized, vitals-flagged (grounding_flag readers skip)
@@ -427,6 +439,7 @@ def apply_extraction(extraction, date_str, week_number, state):
         }
         _sanitize_stance(stance, state["stance"])
         stance_item = {
+            **_stamp(f"STANCE#{date_str}"),
             "pk": PERSONA_PK,
             "sk": f"STANCE#{date_str}",
             "persona_id": "elena_voss",

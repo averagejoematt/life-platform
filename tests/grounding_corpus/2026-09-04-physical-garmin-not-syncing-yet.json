@@ -5,16 +5,16 @@
   "captured_at": "2026-09-04T17:04:56Z",
   "surface": "/api/coach_analysis?domain=physical",
   "verbatim": true,
-  "status": "open",
+  "status": "caught",
   "closes_with": "#3516",
-  "gate": "composite",
-  "expect_type": null,
+  "gate": "source_facet",
+  "expect_type": "source_facet_misattribution",
   "specimen": "Garmin step data isn't syncing to my dashboard yet, which blocks meaningful tracking.",
   "control": "Garmin is paused (ADR-074) and cannot report steps; that is not a sync problem.",
   "inputs": {
-    "allowed": [],
-    "generation_date_iso": "2026-09-04",
-    "start_date_iso": "2026-09-04"
+    "registry_view": {
+      "garmin": "paused"
+    }
   },
-  "why_open": "A paused source narrated as a sync failure. absence_sourcing (#3252/#3268) is structural and takes no text; the coach brief's inventory line collapses paused to 'not available' (#3516). No text class exists yet — when one lands, flip status to caught and set expect_type."
+  "why_open": "CAUGHT 2026-09-19: the #3516 source-facet gate (coach_brief_input_gate.source_facet_findings, shipped 2026-09-13, live proof on #3516) replays here against the frozen registry view {garmin: paused}. The control is the denial shape the gate now recognises as honest."
 }

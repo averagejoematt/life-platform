@@ -5,16 +5,16 @@
   "captured_at": "2026-09-04T17:04:56Z",
   "surface": "/api/coach_analysis?domain=nutrition",
   "verbatim": true,
-  "status": "open",
+  "status": "caught",
   "closes_with": "#3516",
-  "gate": "composite",
-  "expect_type": null,
+  "gate": "source_facet",
+  "expect_type": "source_facet_misattribution",
   "specimen": "MacroFactor isn't syncing yet and needs to be running by tomorrow.",
   "control": "MacroFactor lands about a day behind by design, so today's nutrition is not in yet.",
   "inputs": {
-    "allowed": [],
-    "generation_date_iso": "2026-09-04",
-    "start_date_iso": "2026-09-04"
+    "registry_view": {
+      "macrofactor": "lagging"
+    }
   },
-  "why_open": "A lag-by-design source (stale_hours 96, ~24h behind) narrated as broken. Same class as the Garmin specimen; closes with #3516."
+  "why_open": "CAUGHT 2026-09-19: the #3516 source-facet gate replays here against the frozen registry view {macrofactor: lagging} (stale_hours 96, ~24h behind by design)."
 }

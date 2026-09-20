@@ -138,7 +138,12 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
     "last squat?', 'how has my bench progressed?', 'what loads did I use at this bodyweight?' — and as "
     "the pre-flight pull before prescribing a load on any movement. This reads raw Hevy; "
     "`get_exercise_notes` reads the DERIVED note-signal layer built from it. Zero notes there with "
-    "sessions here means he logged the work and wrote nothing about it — never that the work is absent."
+    "sessions here means he logged the work and wrote nothing about it — never that the work is absent. "
+    "The summary is always scoped to ONE `template_id` (#3932): `exercise_name` is a substring match, so "
+    "'bench press' matches both 'Bench Press (Barbell)' and 'Bench Press (Incline Dumbbell)' — different "
+    "movements, never folded into one series. When a fuzzy name resolves to more than one template_id, "
+    "this returns `ambiguous: true` with a `candidates` list and one `results` summary per movement "
+    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly."
 )
 
 GET_MUSCLE_VOLUME_DESCRIPTION = "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?'"
