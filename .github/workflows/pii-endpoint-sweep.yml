@@ -1,0 +1,120 @@
+# Live /api/* PII-surface sweep, on a schedule (#3620 security ROW2 / box 1).
+#
+# deploy/pii_surface_guard.py's `--endpoints` arm (#1945) fetches every derivable
+# live GET payload and scans it for the genetic/age/SSN/card/email/blocked-vice
+# tells — the dynamic-surface sibling of the static-site walk that already gates
+# every deploy (sync_site_to_s3.sh). Until now it ran in exactly ONE place:
+# ci-lint.yml's `--tracked` (repo-hygiene) leg, which is a DIFFERENT arm — the
+# live `--endpoints` arm has never run anywhere outside a human's manual sweep
+# during a `/review` session.
+#
+# Session AL (2026-09-19, issue #3620 comment) measured why this couldn't be a
+# qa_smoke leg as the issue first proposed: `deploy/` is never staged into any
+# Lambda bundle (the #3860 class — an instrument in deploy/ cannot run in a
+# Lambda), so `deploy/pii_surface_guard.py` and `deploy/endpoint_registry.py`
+# are structurally unreachable from `qa_smoke_lambda.py`. A dedicated scheduled
+# GitHub Actions workflow is the only host that can run this file as-is.
+#
+# Deliberately its OWN workflow, not a step added to ci-lint.yml or ci-cd.yml
+# (out of scope for this lane, and the wrong home regardless — this is a
+# scheduled READ of the LIVE surface, not a per-push check of the repo). Mirrors
+# config-drift.yml / hae-webhook-ingress-drift.yml: scheduled, blocking, narrow,
+# read-only against AWS (one S3 GetObject for the content-filter vocabulary
+# fallback — already granted to github-actions-deploy-role, see
+# infra/iam/github-actions-deploy-role.permissions.json's S3DeployArtifacts
+# statement) plus GET-only HTTP against the public site. No new IAM grant.
+#
+# Fail-closed by construction: `scan_endpoints()` resolves the blocked-vice
+# vocabulary with `require=True` (lambdas/privacy/content_filter_channel.py),
+# which raises `ContentFilterUnavailable` — an uncaught exception, nonzero exit
+# — rather than silently scanning with an empty list when the channel (env /
+# local file / S3) has nothing to offer. That is the run-time equivalent of the
+# issue's literal `--endpoints --require-vice` invocation: main()'s `--endpoints`
+# branch takes an optional POSITIONAL base_url (not a `--require-vice` flag —
+# passing that token as argv[2] would be read as the base_url and break the
+# arm), and the live arm is unconditionally fail-closed internally regardless.
+#
+# Route count + last-success timestamp, both readable without digging into a
+# run's raw logs:
+#   - route count: printed to the job's $GITHUB_STEP_SUMMARY every run (below).
+#   - last-success timestamp: this workflow is enrolled in
+#     scripts/scheduled_workflow_registry.py (WATCH_POLICY, watched=True), so
+#     `python3 scripts/check_cron_freshness.py` / `--json` reports its newest
+#     successful scheduled run alongside every other watched cron — the
+#     existing dead-man, not a second bespoke timestamp store.
+
+name: PII endpoint sweep
+
+on:
+  schedule:
+    - cron: '5 17 * * *'   # 10:05 PT — after the 17:00 UTC daily brief, before visual-qa's 20:07 UTC slot
+  workflow_dispatch: {}
+#
+# No `pull_request` trigger on purpose — same reasoning as config-drift.yml /
+# hae-webhook-ingress-drift.yml: this reads the LIVE deployed surface, which a
+# PR's repo bytes can't speak to before it merges and deploys.
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+  SITE_URL: https://averagejoematt.com
+
+permissions:
+  id-token: write   # OIDC token for AWS (content-filter S3 fallback read only)
+  contents: read
+
+concurrency:
+  group: pii-endpoint-sweep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: Live /api/* PII surface sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # setup-python + configure-aws-credentials via the shared composite (#1655).
+      # deploy-role, not remediation-role: this reads config/content_filter.json
+      # from S3 (S3DeployArtifacts already grants s3:GetObject on the whole
+      # bucket) — no new IAM grant.
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      # setup-ci installs no packages. pii_surface_guard.py's --endpoints arm pulls
+      # in deploy/capture_api_schemas.py -> tests/accuracy_audit.py, whose reachable
+      # import closure includes boto3/botocore (its DynamoDB path, never exercised
+      # here — this job holds no table access) and pillow (accuracy_audit's optional
+      # visual_qa import). scripts/ci_dark_flag_sweep.py (#3315) walks that closure
+      # regardless of which branch actually runs, so an uninstalled-but-reachable
+      # import reds the sweep even though it is dead code on this path — the same
+      # shape config-drift.yml's own comment names for config_twin_registry. Pins
+      # from requirements-dev.txt via ci_pins.py (#2760), never a bare version.
+      - name: Install sweep dependencies (boto3, botocore, pillow)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow)
+          pip install --quiet $PINS
+
+      - name: Live endpoint PII sweep (read-only, blocking, fail-closed)
+        # Unpiped: a pipe would hand the step the TAIL's exit status and the
+        # gate could not fail (the #3103 class, CONVENTIONS.md §4). The
+        # script's own exit code is captured directly; $GITHUB_STEP_SUMMARY is
+        # populated from a file, never from a `| tee` on the live run.
+        run: |
+          set -u
+          OUT="$(mktemp)"
+          rc=0
+          python3 deploy/pii_surface_guard.py --endpoints "$SITE_URL" > "$OUT" 2>&1 || rc=$?
+          cat "$OUT"
+          {
+            echo "## PII endpoint sweep (#3620 box 1)"
+            echo ""
+            echo "Run (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo '```'
+            cat "$OUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
