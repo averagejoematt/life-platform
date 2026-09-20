@@ -480,17 +480,22 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
         ],
     )  # 20 sets
 
-    def cut_to_16(body):
+    def cut_by_4(body):
+        # RELATIVE, like the live model: four sets off whatever draft it was handed. This is the
+        # shape that compounded live; an absolute "to 16" fake let the first version of this test
+        # pass with the restore disabled (mutation GREEN — a test that cannot fail, caught 2026-09-20).
         if "joints_tendons" in body["system"]:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": '{"verdict":"change","metric":"consecutive_training_days","value":9,"field":"session.total_sets","to":16,"sentence":"Streak; trim to 16."}',
-                    }
-                ],
-                "stop_reason": "end_turn",
+            sent = json.loads(body["messages"][0]["content"].split("\nReturn the JSON object.")[0])
+            to = sent["draft"]["total_sets"] - 4
+            reply = {
+                "verdict": "change",
+                "metric": "consecutive_training_days",
+                "value": 9,
+                "field": "session.total_sets",
+                "to": to,
+                "sentence": f"Streak; trim to {to}.",
             }
+            return {"content": [{"type": "text", "text": json.dumps(reply)}], "stop_reason": "end_turn"}
         return _approving(body)
 
     ev = _evidence()
@@ -507,9 +512,9 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
         }
         for i in range(5)
     ]
-    out1, _, _ = _run(ir, ev, invoke=cut_to_16)
+    out1, _, _ = _run(ir, ev, invoke=cut_by_4)
     assert out1["critics"]["recheck"]["total_sets"] == 16
     assert len(out1["critics"]["draft_exercises"]) == 5 and sum(len(e["sets"]) for e in out1["critics"]["draft_exercises"]) == 20
-    out2, _, _ = _run(ir, ev, invoke=cut_to_16)
+    out2, _, _ = _run(ir, ev, invoke=cut_by_4)
     assert out2["critics"]["recheck"]["total_sets"] == 16, "a re-run must land on the same cut, not cut again"
     assert sum(len(e.sets) for e in ir.exercises) == 16
