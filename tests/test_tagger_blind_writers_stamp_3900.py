@@ -1,9 +1,16 @@
-"""#3900 — the four tagger-blind families stamp `phase`/`cycle` at their write sites.
+"""#3900 — the tagger-blind families stamp `phase`/`cycle` at their write sites.
 
 `deploy/restart_phase_tag.py` reaches only `USER#matthew#SOURCE#*` pks, so a row on PERSONA#elena,
 the bare USER#matthew pk (SOURCE#coach_thread#…), COACH#commitments or NARRATIVE#arc that carries no
 write-time `phase` is admitted by PHASE_FILTER_EXPRESSION's `attribute_not_exists(phase)` as CURRENT
 across every reset. Live 2026-09-19: 35 such rows (PERSONA 19, coach_thread 14, commitments 1, arc 1).
+
+Residual (2026-09-20, the 18:31Z nightly): the box-1 census above was FOUR families, not the whole
+class — `ENSEMBLE#dispute` (the inter-coach dialogue thread, #540) already carried a correct taxonomy
+ruling (EXPERIMENT_SCOPED, pre-dating this issue) and was already in the backfill's `_ENSEMBLE_PKS`
+list, but its writer (`inter_coach_dialogue_lambda._air_one`) never called `experiment_stamp_for` —
+two live W38 rows. `test_the_dispute_thread_writer_is_stamped` below is the fifth writer this file's
+census must not let escape again.
 
 Every assertion here is against the taxonomy's OWN stamp (`experiment_stamp()`), never a literal, and
 each writer is exercised through its real entry point with a capturing table. Mutation control per
@@ -46,7 +53,7 @@ def _assert_stamped(item: dict, where: str):
     assert item.get("cycle") == EXPECTED["cycle"], f"{where}: no cycle stamp"
 
 
-def test_the_taxonomy_still_rules_all_four_families_experiment_scoped():
+def test_the_taxonomy_still_rules_all_five_families_experiment_scoped():
     """The stamps below are CLASS-GATED; if a ruling changes, this names it before a writer goes quiet."""
     for pk, sk in (
         ("PERSONA#elena", "CALLBACK#2026-09-08#x"),
@@ -54,6 +61,7 @@ def test_the_taxonomy_still_rules_all_four_families_experiment_scoped():
         ("USER#matthew", "SOURCE#coach_thread#explorer#2026-09-07"),
         ("COACH#commitments", "TALLY#current"),
         ("NARRATIVE#arc", "HISTORY#2026-09-14"),
+        ("ENSEMBLE#dispute", "THREAD#2026-W38#protein_deficit_urgency"),
     ):
         assert tax.should_phase_stamp(pk, sk), (pk, sk)
 
@@ -144,6 +152,35 @@ def test_the_arc_history_row_takes_the_full_stamp_and_state_current_stays_cycle_
     _assert_stamped(hist, "coach_computation_engine HISTORY#")
 
 
+def test_the_dispute_thread_writer_is_stamped(monkeypatch):
+    """The fifth writer (2026-09-20 residual): ENSEMBLE#dispute's `_air_one` — the only
+    put_item site in inter_coach_dialogue_lambda.py — must carry the write-time stamp."""
+    from coach import inter_coach_dialogue_lambda as icd, persona_registry
+
+    table = _CaptureTable()
+    monkeypatch.setattr(icd, "table", table)
+    monkeypatch.setattr(icd.boto3, "client", lambda *a, **kw: object())
+    monkeypatch.setattr(persona_registry, "load_registry", lambda s3, bucket: {"personas": {}})
+    monkeypatch.setattr(icd, "_voice", lambda s3, coach_config_key: ("", ""))
+    monkeypatch.setattr(icd, "generate_gated_turn", lambda system, user, allowed_sources: ("a reply", []))
+
+    pick = {
+        "topic": {
+            "sk": "ACTIVE#protein_deficit_urgency_and_progression_gating",
+            "topic": "protein deficit urgency",
+            "positions": {"nutrition": "a", "training": "b"},
+            "cycle_count": 2,
+        },
+        "coach_a": "nutrition",
+        "coach_b": "training",
+        "influence_weight": 1.0,
+    }
+    icd._air_one(pick, "2026-W38")
+    (item,) = [p for p in table.puts if p.get("pk") == icd.DISPUTE_PK]
+    assert item["sk"] == "THREAD#2026-W38#protein_deficit_urgency_and_progression_gating"
+    _assert_stamped(item, "inter_coach_dialogue_lambda._air_one")
+
+
 def test_the_backfill_names_the_four_families_with_their_sk_scope():
     import importlib.util
 
@@ -158,6 +195,10 @@ def test_the_backfill_names_the_four_families_with_their_sk_scope():
     assert fams["COACH#commitments"] is None
     assert fams["NARRATIVE#arc"] == "HISTORY#", "STATE#current is cycle-only by ruling; the backfill must not set phase on it"
     assert fams["USER#matthew"] == "SOURCE#coach_thread#", "the bare USER#matthew pk holds many families; only coach_thread is in scope"
+    # #3900 residual: ENSEMBLE#dispute needs no new list entry — it has been in _ENSEMBLE_PKS
+    # (and so in target_pks()/target_families()) since this tool's original creation (#1970),
+    # unprefixed, which already covers both live W38 THREAD# rows.
+    assert fams["ENSEMBLE#dispute"] is None
 
     # the prefixed query really scopes by sk
     class _T:
