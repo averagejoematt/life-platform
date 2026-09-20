@@ -18,6 +18,20 @@ days (truth audit 2026-07-10)". Anchoring a Pacific day at UTC midnight starts i
 A record stamped with today's Pacific date, reported as 21.7 hours old. 21.7h is exactly
 ``2026-08-27T00:00Z → now``; the honest Pacific-anchored age was ~14.7h.
 
+#3913 AMENDMENT — THE EXEMPLAR ROW WAS ITSELF UTC-KEYED
+------------------------------------------------------
+The defect above is real and unchanged for the ten board sources the SIMP-2 framework
+keys in Pacific. What #3257 could not know is that the ROW it quoted was whoop's, and
+whoop's ``DATE#`` key names a **UTC** day: the framework enumerates Pacific date labels,
+but ``whoop_lambda.fetch_day`` turns each label into a UTC window and files what comes
+back under that label (measured #3677: 2,249 of 2,249 straddling rows UTC-keyed, zero
+Pacific). So for whoop the pre-fix 21.7h was right by a route nobody had traced, #3257's
+Pacific anchor made it 14.7h — understating staleness by exactly the offset — and #3913
+declares ``day_key_frame: "utc"`` on the whoop registry entry to put it back. Every
+Pacific assertion below therefore names a genuinely Pacific-keyed source, and whoop is
+asserted with apple_health on the UTC side; the new behaviour is pinned in
+tests/test_whoop_day_key_frame_3913.py.
+
 WHY THE GUARD IS AN AGREEMENT, NOT A NUMBER
 -------------------------------------------
 The ops-side sibling reading the SAME keys was fixed to Pacific two days earlier
@@ -99,7 +113,7 @@ def test_a_record_stamped_today_never_reads_a_day_old(now):
     — and specifically younger than the wall-clock hour count, never older."""
     pt_today = now.astimezone(PACIFIC).strftime("%Y-%m-%d")
     hours_into_the_pacific_day = now.astimezone(PACIFIC).hour + now.astimezone(PACIFIC).minute / 60
-    for source in ("whoop", "eightsleep", "habitify"):
+    for source in ("withings", "eightsleep", "habitify"):  # #3913: whoop is UTC-keyed and is asserted below with apple_health
         age = _board_age(pt_today, source, now)
         # `<= 24` not `< 24`: the LATE_PT case is 23:59 PDT, which is 23.98h and rounds to
         # 24.0 in the payload. The exact-value assertion below is the real pin.
@@ -116,8 +130,13 @@ def test_the_pre_fix_utc_anchor_reproduced_the_filed_number():
     now = datetime(2026, 8, 27, 21, 42, tzinfo=timezone.utc)  # 14:42 PDT
     old_way = datetime.strptime("2026-08-27", "%Y-%m-%d").replace(tzinfo=timezone.utc)
     assert round((now - old_way).total_seconds() / 3600, 1) == 21.7
-    assert _board_age("2026-08-27", "whoop", now) == 14.7  # the honest Pacific-anchored age
+    assert _board_age("2026-08-27", "eightsleep", now) == 14.7  # the honest Pacific-anchored age, on a Pacific-keyed source
     assert round(21.7 - 14.7, 1) == 7.0  # exactly the PDT offset, as the filing predicted
+    # #3913: and the row the filing actually quoted. whoop's key IS the UTC day, so 21.7h was
+    # the honest number for it all along — #3257 moved it to 14.7h and understated staleness by
+    # the same 7h it had just removed from the other ten. Not a reversal of #3257: the frame is
+    # per-source, which is the whole point of the facet.
+    assert _board_age("2026-08-27", "whoop", now) == 21.7
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,18 +169,21 @@ def test_the_agreement_would_have_caught_the_pre_fix_split():
 # ─────────────────────────────────────────────────────────────────────────────
 # The HAE exception, asserted separately (never folded into the Pacific path)
 # ─────────────────────────────────────────────────────────────────────────────
-def test_apple_health_keeps_the_utc_anchor():
+def test_the_utc_anchored_sources_are_apple_health_and_whoop():
     """TD-19 Phase 2: apple_health's DATE# day IS a UTC calendar day. It must not be swept
-    into the Pacific fix."""
+    into the Pacific fix. #3913 added the second member — whoop, by measurement of the live
+    partition rather than by audit of the writer — so this pin is a SET, not an exception."""
     assert day_key_frame_for("apple_health") == "utc"
-    assert utc_day_key_source_ids() == {"apple_health"}, (
-        "the UTC-keyed set changed. It is derived from the day_key_frame facet — if a second "
-        "HAE-fed partition joined the board, declare it in the registry and update this pin "
-        "with the audit that says its key is UTC."
+    assert day_key_frame_for("whoop") == "utc"
+    assert utc_day_key_source_ids() == {"apple_health", "whoop"}, (
+        "the UTC-keyed set changed. It is derived from the day_key_frame facet — a third member "
+        "needs the measurement that says its key is UTC (the shape of #3677/#3913: count the "
+        "straddling rows in both frames), and a member LEAVING needs a backfill, not an edit."
     )
     now = MIDDAY_PT
     assert _board_age("2026-08-27", "apple_health", now) == 19.0  # 19h since 2026-08-27T00:00Z
-    assert _board_age("2026-08-27", "whoop", now) == 12.0  # 12h since 2026-08-27T00:00 PDT
+    assert _board_age("2026-08-27", "whoop", now) == 19.0  # same anchor, same day: whoop's key is the UTC day too
+    assert _board_age("2026-08-27", "eightsleep", now) == 12.0  # 12h since 2026-08-27T00:00 PDT — the Pacific contrast
 
 
 def test_a_blanket_pacific_sweep_would_have_made_apple_health_negative():
@@ -276,7 +298,7 @@ def test_the_served_payload_never_ages_todays_record_by_a_day(monkeypatch, now):
     body, by = _board(monkeypatch, at=now, stored_date=pt_today)
     assert body["pacific_today"] == pt_today
     hours_in = now.astimezone(PACIFIC).hour + now.astimezone(PACIFIC).minute / 60
-    for sid in ("whoop", "eightsleep", "habitify"):
+    for sid in ("withings", "eightsleep", "habitify"):  # #3913: whoop moved to the UTC side
         row = by[sid]
         assert row["last_update"] == pt_today
         assert row["age_hours"] == pytest.approx(hours_in, abs=0.1), (

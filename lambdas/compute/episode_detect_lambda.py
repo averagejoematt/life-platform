@@ -9,6 +9,10 @@ computed sources to the existing single table:
 DynamoDB partitions written (read via query_source(...) exactly like computed_metrics):
   1. SOURCE#weight_episodes    — one item per detected loss/regain episode
   2. SOURCE#training_reference — singleton: proven by-band prescription + proven curve
+  3. SOURCE#forecast (sk PRESCRIPTION#...) + SOURCE#calibration — #3712: the week's
+     prescription registered as a graded forecast, and the previous week's grade.
+     See the section header above run_prescription_forecast for why those two
+     existing partitions rather than a new one.
 
 Keying convention (matches computed_metrics — PK USER#{user}#SOURCE#{source}, SK DATE#...):
   - weight_episodes:    SK = "DATE#{end_date}"   (trough date for loss, peak for regain)
@@ -32,6 +36,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.digest_utils import d2f  # shared bundled helper (#970): DDB Decimal -> float
+from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 try:
@@ -693,6 +699,224 @@ def build_training_reference_record(ref: dict) -> dict:
 
 
 # ==============================================================================
+# THE WEEKLY PRESCRIPTION AS A GRADED FORECAST (#3712, epic #3707)
+# ==============================================================================
+#
+# WHY THIS LAMBDA. The forecast has to be issued at the moment the prescription is
+# derived, by the thing that derives it — otherwise the number the plan commits to
+# and the number the plan states are two computations that can drift. episode-detect
+# already runs weekly (Sun 17:00 UTC), already holds every input the forecast needs
+# in memory, and already writes the reference the prescription is read from.
+#
+# WHERE THE ROWS LIVE, AND WHY NOT IN A NEW PARTITION.
+#   open bet   -> SOURCE#forecast, sk PRESCRIPTION#{target_week_end}
+#   the grade  -> SOURCE#calibration, sk CALIB#{resolved}#prescription-week-{target}
+#                 record_type "forecast_resolution" — the SAME row shape
+#                 forecast_engine_lambda writes and
+#                 calibration_core.pairs_from_forecast_resolution_rows already
+#                 scores (#1246). This is the "existing grading path" the story
+#                 asks for: no second grader, no second ledger.
+#
+# The forecast partition is the right phase class for an open bet by the taxonomy's
+# own reasoning (EXPERIMENT_SCOPED: "graded outcomes live in the CROSS_PHASE
+# calibration ledger, so wiping the raw forecasts loses no grade"), and reusing it
+# means this adds no partition anyone has to classify.
+#
+# THE SK PREFIX IS LOAD-BEARING, NOT COSMETIC. forecast_engine_lambda's
+# resolve_matured() and compute_coverage() both query `sk BETWEEN "FORECAST#{lo}"
+# AND "FORECAST#{hi}#zzzz"`. "PRESCRIPTION#" sorts strictly ABOVE that upper bound
+# ("P" > "F"), so a weekly prescription row can never be picked up by the daily
+# resolver nor folded into the published daily-forecast coverage headline — two
+# different models' coverage numbers would otherwise silently merge into one. The
+# ordering is asserted by tests/test_prescription_forecast_3712.py rather than left
+# as a comment nobody re-checks.
+
+# Spelled as f-strings over a literal partition name, deliberately, and matching
+# forecast_engine_lambda's own FORECAST_PK/CALIBRATION_PK idiom: the #2845 model's
+# AST sweep resolves a literal partition inside an f-string and CANNOT resolve
+# `USER_PREFIX + SOME_CONSTANT`. A write the dependency model cannot see is a write
+# no seam guard, blast-radius query or privacy sweep can see either.
+FORECAST_PK = f"{USER_PREFIX}forecast"
+CALIBRATION_PK = f"{USER_PREFIX}calibration"
+PRESCRIPTION_SK_PREFIX = "PRESCRIPTION#"
+
+# How much weekly history the line is fitted over. 5 years covers the 2024-25 cut
+# and everything since; further back the covariates are not reliable
+# (COVARIATE_RELIABLE_FROM).
+FORECAST_HISTORY_WEEKS = 260
+
+# A matured forecast that cannot be measured is retried for this long (one further
+# weekly run) before it is RETIRED. Retirement is not a verdict — it writes no
+# calibration row and counts as neither a hit nor a miss (the coach evaluator's
+# check_expiry takes the same posture).
+GRADE_GRACE_DAYS = 7
+
+
+def build_prescription_forecast_item(fc: dict) -> dict:
+    """The frozen weekly claim, as a DynamoDB item. Pure builder (tested)."""
+    item = dict(fc)
+    item["pk"] = FORECAST_PK
+    item["sk"] = PRESCRIPTION_SK_PREFIX + str(fc["target_week_end"])
+    item["resolved_at"] = None
+    return floats_to_decimal({k: v for k, v in item.items() if v is not None})
+
+
+def build_prescription_resolution_item(grade: dict, adjustment: dict, resolved_date: str) -> dict:
+    """One CROSS_PHASE calibration row per graded week — the shared, reset-surviving record.
+
+    Deliberately the forecast engine's own `forecast_resolution` shape: `confidence`
+    + `covered` is what pairs_from_forecast_resolution_rows reads, so this lands on
+    the calibration scoreboard with no new reader anywhere.
+    """
+    row = {
+        "pk": CALIBRATION_PK,
+        "sk": f"CALIB#{resolved_date}#prescription-week-{grade['target_week_end']}",
+        "record_type": "forecast_resolution",
+        "metric": "weekly_rate_lb_wk",
+        "model": grade.get("model"),
+        "horizon_days": 7,
+        "issued_date": grade.get("issued_date"),
+        "target_date": grade.get("target_week_end"),
+        "point": grade.get("point_lb_wk"),
+        "lo": grade.get("lo_lb_wk"),
+        "hi": grade.get("hi_lb_wk"),
+        "confidence": grade.get("confidence"),
+        "actual": grade.get("actual_lb_wk"),
+        "covered": grade.get("covered"),
+        "abs_error_lb_wk": grade.get("abs_error_lb_wk"),
+        "signed_error_lb_wk": grade.get("signed_error_lb_wk"),
+        "null_abs_error_lb_wk": grade.get("null_abs_error_lb_wk"),
+        "beats_null": grade.get("beats_null"),
+        "n_weeks": grade.get("n_weeks"),
+        "prescribed_cardio_hr_wk": grade.get("prescribed_cardio_hr_wk"),
+        "delivered_cardio_hr_wk": grade.get("delivered_cardio_hr_wk"),
+        "adherence": grade.get("adherence"),
+        "adjustment_basis": adjustment.get("basis"),
+        "next_cardio_hr_wk": adjustment.get("next_cardio_hr_wk"),
+        "adjustment_derivation": adjustment.get("derivation"),
+        "resolved_at": resolved_date,
+    }
+    return floats_to_decimal({k: v for k, v in row.items() if v is not None})
+
+
+def _read_prescription_rows(lo_date: str, hi_date: str) -> list:
+    """Every PRESCRIPTION# row whose target week ends in [lo_date, hi_date]."""
+    rows: list = []
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
+            ":pk": FORECAST_PK,
+            ":s": PRESCRIPTION_SK_PREFIX + lo_date,
+            ":e": PRESCRIPTION_SK_PREFIX + hi_date + "~",
+        },
+    }
+    while True:
+        r = table.query(**kwargs)
+        rows.extend(d2f(i) for i in r.get("Items", []))
+        if "LastEvaluatedKey" not in r:
+            break
+        kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+    return rows
+
+
+def _latest_weight(weigh_ins: list):
+    """The most recent weigh-in value, or None. The weight the band is resolved at."""
+    pts = sorted((str(d)[:10], float(w)) for d, w in weigh_ins or [] if w)
+    return pts[-1][1] if pts else None
+
+
+def run_prescription_forecast(weigh_ins: list, activities: list, ref: dict, today: str) -> dict:
+    """Grade the week that matured, then issue the next week's claim. #3712.
+
+    Grading runs FIRST and unconditionally: a new bet is never placed before the
+    standing one is settled, so a run that fails midway cannot leave two open claims
+    for overlapping weeks.
+    """
+    from training import prescription_forecast as pf
+    from training.band_reference import resolve_band
+
+    out: dict = {"graded": 0, "retired": 0, "issued": False}
+    today_d = _d(today)
+
+    open_rows = [
+        r for r in _read_prescription_rows((today_d - timedelta(days=180)).isoformat(), (today_d + timedelta(days=21)).isoformat())
+    ]
+    resolved_rows = sorted(
+        (r for r in open_rows if r.get("resolved_at")),
+        key=lambda r: str(r.get("target_week_end") or ""),
+    )
+
+    weight = _latest_weight(weigh_ins)
+    proven = resolve_band(weight, ref.get("proven_bands")) if weight is not None else None
+    proven_cardio = (proven or {}).get("cardio_hr_wk")
+
+    # ── 1. grade what matured ────────────────────────────────────────────────
+    for row in open_rows:
+        target_end = row.get("target_week_end")
+        if row.get("resolved_at") or not target_end or str(target_end) > today:
+            continue
+        weeks = pf.weekly_weeks(weigh_ins, activities, str(target_end), 2)
+        measured = pf.measured_week_rate(weeks, str(target_end))
+        grade = pf.grade_forecast(row, measured)
+        matured_days = (today_d - _d(str(target_end))).days
+        if grade["status"] == "inconclusive" and matured_days <= GRADE_GRACE_DAYS:
+            continue  # a late-arriving weigh-in can still decide it — leave it open
+        adjustment = pf.derive_adjustment(row, grade, proven_cardio)
+        update = {"resolved_at": today, "grade_status": grade["status"], "adjustment": adjustment}
+        if grade["status"] == "graded":
+            table.put_item(Item=build_prescription_resolution_item(grade, adjustment, today))
+            update.update(
+                {k: grade[k] for k in ("covered", "actual_lb_wk", "abs_error_lb_wk", "signed_error_lb_wk", "beats_null", "adherence")}
+            )
+            out["graded"] += 1
+        else:
+            # Retired, not graded: no calibration row, no hit, no miss (#3046's
+            # posture — a claim nothing could decide must not enter the corpus).
+            update["retired_reason"] = grade.get("reason")
+            out["retired"] += 1
+        row.update(update)
+        resolved_rows.append(row)
+        table.put_item(Item=floats_to_decimal({k: v for k, v in row.items() if v is not None}))
+    out["adjustment"] = resolved_rows[-1].get("adjustment") if resolved_rows else None
+
+    # ── 2. issue the coming week's claim ─────────────────────────────────────
+    weeks = pf.weekly_weeks(weigh_ins, activities, today, FORECAST_HISTORY_WEEKS)
+    model = pf.fit_rate_model(pf.rate_observations(weeks))
+    # The miss feeds the next forecast: the point estimate is shifted by the bias
+    # the last few GRADED weeks actually showed, not re-authored.
+    graded_history = [
+        {"status": "graded", "signed_error_lb_wk": r.get("signed_error_lb_wk")}
+        for r in resolved_rows
+        if r.get("grade_status") == "graded" and r.get("signed_error_lb_wk") is not None
+    ]
+    # An adherence-derived target supersedes the proven volume for the coming week:
+    # it is what the miss said to prescribe, and re-issuing the proven number over
+    # the top of it would discard the derivation.
+    adj = out.get("adjustment") or {}
+    prescribed = adj.get("next_cardio_hr_wk") if adj.get("basis") in ("adherence_shortfall", "model_over_predicted") else proven_cardio
+    if prescribed is None:
+        prescribed = proven_cardio
+    target_start = (today_d + timedelta(days=1)).isoformat()
+    target_end = (today_d + timedelta(days=7)).isoformat()
+    fc = pf.build_forecast(
+        model,
+        prescribed,
+        issued_date=today,
+        target_week_start=target_start,
+        target_week_end=target_end,
+        bias_correction_lb_wk=pf.bias_correction(graded_history),
+        reference_band=(proven or {}).get("band"),
+    )
+    fc["current_weight_lb"] = round(weight, 1) if weight is not None else None
+    fc["adjustment_from_last_week"] = adj or None
+    table.put_item(Item=build_prescription_forecast_item(fc))
+    out["issued"] = bool(fc.get("issued"))
+    out["declined_reason"] = fc.get("declined_reason")
+    out["target_week_end"] = target_end
+    return out
+
+
+# ==============================================================================
 # SOURCE READS + HANDLER (BENCH-1.2)
 # ==============================================================================
 
@@ -808,6 +1032,15 @@ def lambda_handler(event, context):
         ref = build_reference(idx, vals, episodes, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date)
         table.put_item(Item=build_training_reference_record(ref))
 
+        # #3712 — the week's prescription, registered as a graded forecast. Fail-soft
+        # by design: the reference above is what every planning surface reads, and a
+        # defect in the betting loop must never cost the run that produces it.
+        try:
+            forecast_result = run_prescription_forecast(weigh_ins, activities, ref, pacific_today())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("prescription forecast skipped: %s", e)
+            forecast_result = {"error": str(e)}
+
         n_loss = sum(1 for e in episodes if e["type"] == "loss")
         n_held = sum(1 for e in episodes if e.get("outcome") == "held")
         logger.info(
@@ -824,6 +1057,7 @@ def lambda_handler(event, context):
             "loss": n_loss,
             "regain": len(episodes) - n_loss,
             "held": n_held,
+            "prescription_forecast": forecast_result,
         }
     except Exception as e:
         logger.error("episode-detect FAILED: %s", e)
