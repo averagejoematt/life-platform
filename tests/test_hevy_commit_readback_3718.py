@@ -123,3 +123,80 @@ def test_create_missing_now_defaults_to_false():
 
     src = inspect.getsource(t._action_draft_custom)
     assert 'args.get("create_missing", False)' in src, "create_missing defaults back to auto-create"
+
+
+# ── #3938 (2026-09-20): a field we sent that the readback cannot show is named, never passed over ──
+
+BODY_WITH_NOTES = {
+    "routine": {
+        "title": "Foundation - Pull - 4 - 14",
+        "notes": "WHY: pull day, quality over load.",
+        "exercises": [
+            {"exercise_template_id": "2B4B7310", "notes": "RED TEAM: 4 critics approve", "rest_seconds": 120, "sets": [{"type": "normal"}]},
+            {"exercise_template_id": "cb2d3813", "notes": "", "rest_seconds": 90, "sets": [{"type": "normal"}, {"type": "normal"}]},
+        ],
+    }
+}
+_LIVE_SHAPE = {  # the wire, read live 2026-09-20: NO routine-level `notes` key; exercises carry notes/rest_seconds/sets
+    "id": "720eee53",
+    "title": "Foundation - Pull - 4 - 14",
+    "folder_id": 3087800,
+    "updated_at": "2026-09-20T03:07:03.432Z",
+    "exercises": [
+        {"exercise_template_id": "2B4B7310", "notes": "RED TEAM: 4 critics approve", "rest_seconds": 120, "sets": [{"type": "normal"}]},
+        {"exercise_template_id": "cb2d3813", "notes": "", "rest_seconds": 90, "sets": [{"type": "normal"}, {"type": "normal"}]},
+    ],
+}
+
+
+def test_a_sent_field_the_readback_lacks_is_named_unverifiable_not_silently_passed(monkeypatch):
+    """Box 4 (#3938): plant a readback WITHOUT `notes` and the result names it. Mutation control:
+    delete the `out["unverifiable"] = ...` line in verify_commit_landed → this reds on the key."""
+    _stub(monkeypatch, dict(_LIVE_SHAPE))
+    out = wc.verify_commit_landed("720eee53", BODY_WITH_NOTES, BEFORE)
+    assert out["verified"] is True, out
+    assert out["unverifiable"] == ["notes"], out
+    fields = wc.readback_fields(out, took_update_branch=False)
+    assert fields["unverifiable"] == ["notes"], "the commit result must carry the name, not only the check dict"
+
+
+def test_a_body_with_no_unreturned_fields_reports_nothing_unverifiable(monkeypatch):
+    _stub(monkeypatch, dict(_LIVE_SHAPE))
+    body = {"routine": {k: v for k, v in BODY_WITH_NOTES["routine"].items() if k != "notes"}}
+    out = wc.verify_commit_landed("720eee53", body, BEFORE)
+    assert out["verified"] is True and out["unverifiable"] == []
+    assert "unverifiable" not in wc.readback_fields(out, took_update_branch=False), "a quiet commit stays quiet"
+
+
+def test_an_exercise_note_that_did_not_land_is_a_mismatch_and_unverified(monkeypatch):
+    """The gym-readable text now lives on exercises[0].notes — a note Hevy truncated or dropped is a
+    write that did not apply. Whitespace differences alone are not a mismatch."""
+    live = dict(_LIVE_SHAPE)
+    live["exercises"] = [dict(_LIVE_SHAPE["exercises"][0], notes="RED TEAM: 4 critics"), _LIVE_SHAPE["exercises"][1]]
+    _stub(monkeypatch, live)
+    out = wc.verify_commit_landed("720eee53", BODY_WITH_NOTES, BEFORE)
+    assert out["verified"] is False
+    assert out["mismatches"] == ["exercises[0].notes differ (sent 27 chars, Hevy holds 19)"], out
+    assert "content mismatch" in out["reason"]
+    live["exercises"][0]["notes"] = "RED TEAM:   4 critics  approve\n"
+    _stub(monkeypatch, live)
+    assert wc.verify_commit_landed("720eee53", BODY_WITH_NOTES, BEFORE)["verified"] is True
+
+
+def test_the_compiler_no_longer_writes_to_the_field_hevy_drops():
+    """Box 3 (#3938): the WHY line and the branch menu ride on exercises[0].notes, ahead of that
+    exercise's own note; `routine.notes` is not on the wire at all."""
+    from training.hevy_compiler import to_create_body, to_update_body
+    from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+    ir = RoutineSpec(
+        routine_id="r-3938",
+        target_date="2026-09-21",
+        archetype="pull",
+        title="x",
+        exercises=[ExerciseBlock(movement_key="row", sets=[Set(type="normal", reps=8)], rest_seconds=90, notes="warm up first")],
+    )
+    for builder in (to_create_body, to_update_body):
+        body = builder(ir, lambda k: "TID", why_note="WHY: pull day.")
+        assert "notes" not in body["routine"]
+        assert body["routine"]["exercises"][0]["notes"] == "WHY: pull day.\n\nwarm up first"

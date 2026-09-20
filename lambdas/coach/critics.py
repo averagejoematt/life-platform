@@ -948,6 +948,9 @@ def notes_block(ir: Any) -> str:
 
 
 def with_notes_block(why_note: str, ir: Any) -> str:
+    """#3938 (2026-09-20): no longer called at commit/dry_run — the block rides on exercises[0].notes
+    via `_place_block_on_first_exercise` (Hevy has no routine-level notes field), and composing it
+    here as well stacked it twice on that channel. Kept for callers that want the composed form."""
     block = notes_block(ir)
     return f"{why_note}\n\n{block}" if block and why_note else (block or why_note)
 
