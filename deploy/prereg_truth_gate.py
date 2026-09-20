@@ -39,6 +39,27 @@ THE THREE CLAUSES (issue #3599, acceptance box 3)
                          literals, and a reader cannot tell a demanding bar from a
                          decorative one.
 
+THE ISSUE'S FOURTH REFUSAL REASON LIVES NEXT DOOR, DELIBERATELY
+───────────────────────────────────────────────────────────────
+#3599 also names "a seed whose season ids ⊄ the artifact". That clause exists and is
+NOT reimplemented here: `deploy/prereg_provenance_gate.py` (#3511) owns it in both
+directions — PRE_GENESIS_WRITE / BACKDATED_UNSEALED for a season row the artifact
+never sealed, SEALED_ROW_MISSING for the mirror — and `genesis_prereg_stamp.py
+--apply` calls its `require_clean_for_publish()` before any byte goes up, which
+`tests/test_prereg_pregenesis_contract_3511.py::test_restart_verify_and_the_seal_
+publisher_both_call_this_predicate` pins. It reads the live ledger, so it belongs on
+the credentialed publish path; this module is pure and runs on every seal path. Two
+implementations of one rule is how a comparison gate goes blind, so the seal
+chokepoint COMPOSES them rather than merging them.
+
+WHAT NO PRE-SEAL CLAUSE CAN REACH — #3599's other half
+──────────────────────────────────────────────────────
+Everything here binds seals being MINTED. Eight seals are already published
+(2026-07-19 through 2026-09-06; all eight still hash-verify, measured 2026-09-20),
+and the live cycle-17 one disagrees with the platform on three counts today.
+`deploy/prereg_amendment.py` is the only instrument that reaches them: a separate,
+append-only, public correction record that leaves the sealed bytes as they stand.
+
 WHY THE BASELINE CLAUSE READS PROSE
 ───────────────────────────────────
 The artifact has no `baseline` field to compare — the baseline lives in the CLAIMS
