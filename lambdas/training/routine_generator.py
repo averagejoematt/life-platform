@@ -36,6 +36,7 @@ from typing import Any
 
 from common.repo_config import config_dir
 
+from training import program_structure  # #3755: the program as data (anchors, accessory pool)
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
 from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
@@ -648,6 +649,11 @@ def _build_inputs_snapshot(inputs: GeneratorInputs, landmarks: dict[str, Any], c
         "add_load_enabled": inputs.add_load_enabled,
         "landmarks_hash": _config_hash(landmarks),
         "catalog_hash": _config_hash(catalog),
+        # #3755 — the program names anchor/accessory movements by catalog key, and a key
+        # the catalog does not carry is one the selector can NEVER pick. Recorded on every
+        # generation, not computed on demand, because the failure is silent by nature: the
+        # session comes out fine, just without the lift the program said was an anchor.
+        "program_catalog_gaps": program_structure.catalog_gaps((catalog.get("movements") or {}).keys()),
     }
 
 

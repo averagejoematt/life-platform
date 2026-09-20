@@ -662,6 +662,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # check in test_integration_aws.py only runs post-deploy, by which point a third
         # GSI is already an online backfill against production.
         "test_gsi_set_premerge_3609.py",
+        # #3755: an AST sweep of lambdas/ + mcp/ asserting the week-grid config filename
+        # has exactly ONE reader (training/program_seam.py) and that both consumers reach
+        # it through that seam. Pure repo shape, and the reason it must run pre-merge is
+        # the defect it exists to stop: a second direct reader of training_week.json is
+        # invisible at runtime — the generator would plan a PPL week while another caller
+        # graded a session against the old grid, with nothing red anywhere.
+        "test_program_structure_3755.py",
     }
 )
 
