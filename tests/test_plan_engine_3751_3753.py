@@ -20,6 +20,8 @@ hold it to:
      could look is worse than no guard, because it is trusted.
   4. PROVENANCE — every population-derived threshold says so where it fires (ADR-105).
   5. NO UNEARNED CREDIT — the block states that the critics have NOT run (#3752).
+  6. STANDING CONSTRAINTS (#3715) — the calf-lesion registry is read here too, not only by
+     the conversational S3 mirror, and its unconfirmed status is disclosed every time.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "lambdas"))
 
-from training import owner_redlines, plan_engine  # noqa: E402
+from training import owner_redlines, plan_engine, training_context_registry  # noqa: E402
 
 _FULL = dict(
     date="2026-09-14",
@@ -194,6 +196,50 @@ def test_the_unresolved_rate_tension_is_carried_not_hidden():
     assert rate["low_lb_wk"] == pytest.approx(1.6, abs=0.05)
     assert rate["high_lb_wk"] == pytest.approx(3.2, abs=0.05)
     assert rate["owner_to_resolve"]
+
+
+# ── 6. Standing constraints (#3715) — read here, not only by the S3 mirror ────
+def test_standing_constraints_is_second_right_after_walking():
+    """Safety-relevant, so it sits ahead of every volume/tripwire detail — same claim
+    the module docstring makes about walking being first."""
+    keys = [k for k in plan_engine.constraint_block(**_FULL) if k not in ("engine_version", "date", "deterministic")]
+    assert keys[:2] == ["walking", "standing_constraints"], f"unexpected lead order: {keys[:3]}"
+
+
+def test_the_calf_lesion_is_on_every_block():
+    block = plan_engine.constraint_block(**_FULL)
+    ids = {c["id"] for c in block["standing_constraints"]["constraints"]}
+    assert "calf_lesion" in ids
+
+
+def test_standing_constraints_reads_the_live_registry_not_a_frozen_copy():
+    """Derivation guard: the block must be the SAME object shape `training_context_registry`
+    produces, not a hand-typed duplicate that can drift from it."""
+    block = plan_engine.constraint_block(**_FULL)
+    assert block["standing_constraints"] == training_context_registry.summary()
+
+
+def test_unconfirmed_standing_constraints_are_disclosed_in_honesty_not_implied_ok():
+    """Acceptance box 4, extended to the server-side surface: a plan built on this block
+    must carry the same disclosure the conversational S3-read path already gives — an
+    MCP caller that never reads COACH_SESSION.md must not be able to assume coverage."""
+    block = plan_engine.constraint_block(**_FULL)
+    assert block["standing_constraints"]["confirmed_by_owner"] is False
+    assert any("NOT owner-confirmed" in line and "calf_lesion" in line for line in block["honesty"])
+
+
+def test_a_confirmed_registry_would_not_repeat_the_unconfirmed_notice():
+    """NEGATIVE CONTROL — the honesty line must be capable of clearing, or it is not a
+    real check on `confirmed_by_owner`, just permanent noise."""
+    import unittest.mock
+
+    fake_summary = {**training_context_registry.summary(), "confirmed_by_owner": True}
+    with (
+        unittest.mock.patch.object(training_context_registry, "CONFIRMED_BY_OWNER", True),
+        unittest.mock.patch.object(training_context_registry, "summary", return_value=fake_summary),
+    ):
+        block = plan_engine.constraint_block(**_FULL)
+    assert not any("NOT owner-confirmed" in line for line in block["honesty"])
 
 
 # ── gather(): a failing reader yields unknown, never a wrong value ────────────

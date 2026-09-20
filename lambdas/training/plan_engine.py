@@ -32,13 +32,28 @@ blocks (13–19 Sep measured >=8.79 hr against the proven ~8.5 hrs/wk; the Strav
 at this bodyweight. A planner that argues about heavy-day conservatism while the engine
 that did the work last time sits near zero is having the wrong argument, and an engine that
 buries that line under six others is helping it.
+
+STANDING CONSTRAINTS ARE READ HERE TOO (#3715)
+
+`training_context_registry` (#3821) drafted the standing injury/equipment list — the calf
+lesion — and the S3-mirrored `TRAINING_CONTEXT.md` a human/chat session reads with `aws s3
+cp` per `docs/coaching/COACH_SESSION.md`. That covers the conversational surface. It did
+NOT cover this one: before this change, `tool_plan_next_session` (`mcp/tools_plan.py`)
+returned a full constraint block with no mention of the calf lesion at all — a fresh MCP
+session asking this tool for tomorrow's plan got nothing about it, because nothing in the
+deterministic engine read the registry. That is acceptance box 2's gap, closed here by a
+plain import of the same bundled registry `owner_redlines` already uses (no S3 read at
+runtime — the #3675 inertness class: a Lambda must never depend on a live S3 fetch for a
+value it can ship in the bundle). Until `training_context_registry.CONFIRMED_BY_OWNER`
+flips (gate:owner), every block carries the same unconfirmed disclosure in `honesty` that
+the conversational surface already gives — never silent coverage it does not have.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable
 
-from training import owner_redlines
+from training import owner_redlines, training_context_registry
 
 ENGINE_VERSION = "plan-engine@1.0.0"
 
@@ -248,8 +263,17 @@ def constraint_block(
         "engine_version": ENGINE_VERSION,
         "date": date,
         "deterministic": True,
-        # The order of these keys is the order the coach should reason in.
+        # The order of these keys is the order the coach should reason in. Standing
+        # constraints (injury/equipment, #3715) sit second, ahead of every volume/tripwire
+        # detail: a session prescribed against an injury nobody re-stated is not a lesser
+        # error than a bad volume choice, it is a different KIND of error, and it must be
+        # visible before the plan gets that far. This is the MCP/server-side surface #3715
+        # asked for — the S3-rendered doc COACH_SESSION.md sends a human/chat session to
+        # is a mirror of this same bundled registry, never the other way around (#3675
+        # class: a Lambda runtime never depends on a live S3 read for a value it can ship
+        # in the bundle).
         "walking": walking,
+        "standing_constraints": training_context_registry.summary(),
         "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
         "recovery_tier": recovery_tier,
         "acwr_flag": acwr_flag,
@@ -272,6 +296,7 @@ def constraint_block(
         "honesty": [
             s
             for s in [
+                (None if training_context_registry.CONFIRMED_BY_OWNER else training_context_registry.format_unconfirmed_notice()),
                 (
                     None
                     if redlines["active"]
