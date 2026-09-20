@@ -1315,6 +1315,12 @@ def write_coach_thread(coach_id: str, entry: dict) -> bool:
         "learning_log": entry.get("learning_log", []),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    # #3900: the bare USER#matthew pk is tagger-BLIND (restart_phase_tag only reaches
+    # USER#matthew#SOURCE#*), so a thread row with no write-time stamp is served as CURRENT
+    # across every reset. Class-gated: the taxonomy rules SOURCE#coach_thread EXPERIMENT_SCOPED.
+    from experiment.phase_taxonomy import experiment_stamp_for
+
+    item = {**experiment_stamp_for(item["pk"], item["sk"]), **item}
 
     try:
         clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
