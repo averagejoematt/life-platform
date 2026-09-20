@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-09-19 (v8.6.0 — 84 MCP tools, 20 data sources, 105 Lambdas, 12 cached tools)
+**Last updated:** 2026-09-20 (v8.6.0 — 84 MCP tools, 20 data sources, 105 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -163,7 +163,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#achievements` / `BADGE#<badge_id>` | **the achievement first-earn ledger (#1624)** — one row per badge the first time its condition is met, carrying `badge_id`, `label`, `earned_date`, `basis` (the measured values that satisfied it) and the write-time phase/cycle stamp. EXPERIMENT_SCOPED, not cross-phase: every badge condition is evaluated over phase-filtered current-cycle data (the Tier-0 streak restarts at 0, the character level returns to 1), so a first-earn carried across a reset would keep asserting "Week Warrior, earned 2026-03-14" while the same endpoint hides the streak that earned it. Tombstoned + cycle-stamped at reset, never deleted, so cycle N's badges stay navigable in the archive | `compute/daily_metrics_compute_lambda.py` via `health/achievement_rules.py::persist_first_earns` | `web/site_api_journey.py` | ✓ |
 | `…SOURCE#insights` / `INSIGHT#<ts>#<digest_type>` | saved insights | `lambdas/content/insight_writer.py`, MCP `save_insight` | site_api_intelligence, `get_insights` | ✓ |
 | `…SOURCE#hypotheses` / `HYPOTHESIS#<ISO-ts>` | pre-registered hypotheses + deterministic verdicts (see `docs/engines/HYPOTHESIS.md`) | `compute/hypothesis_engine_lambda.py` | `/api/hypotheses`, `get_hypotheses`, challenge generator | ✓ |
-| `…SOURCE#forecast` / `FORECAST#<target>#<metric>#h<h>` (legacy `DATE#<d>` rows also live) | daily EWMA expectations (#541) | `compute/forecast_engine_lambda.py` | site_api_data, `get_predictions` | ✓ |
+| `…SOURCE#forecast` / `FORECAST#<target>#<metric>#h<h>` (legacy `DATE#<d>` rows also live; `PRESCRIPTION#<week-end>` since #3712) | daily EWMA expectations (#541) + the weekly prescription bet (#3712) | `compute/forecast_engine_lambda.py`, `compute/episode_detect_lambda.py` | site_api_data, `get_predictions`, `get_benchmark(view="forecast")` | ✓ |
 | `…SOURCE#state_of_matthew` / `DATE#<d>` | weekly narrated synthesis (#552) | `compute/state_of_matthew_lambda.py` | site, brief | ✓ |
 | `…SOURCE#adaptive_mode` / `DATE#<d>` | daily adaptive coaching mode | `compute/adaptive_mode_lambda.py` | `get_adaptive_mode`, orchestrator | ✓ |
 | `…SOURCE#engagement_state` / `STATE#current`, `DATE#<d>` | presence / quiet-stretch state: `presence_class` + `severity` ladder `none\|soft\|loud\|alarm` (#914/#921) + per-channel `channel_detail.<source>.dropout_streak_days` + `experiment_window_start` (#955: manual-channel windows clamp at genesis — pre-genesis logs out-of-window, gaps anchor at genesis, `_detect_return` never crosses the boundary; wearables/weight/travel stay cross-cycle); channels are the `engagement_channel` facet in `lambdas/ingestion/source_registry.py` (incl. withings `measurement`); feeds #913 neglect decay + `engagement_core.presence_prompt_block` (injected into all narrative prompts, deterministic acknowledgment gate à la ADR-108) | `compute/adaptive_mode_lambda.py` | character_sheet_lambda, narrative prompt builders (via `engagement_core`), site_api_ai | ✓ |
@@ -2375,9 +2375,17 @@ the graded record lives in the calibration partition above)
 Written by `forecast-engine` (16:50 UTC daily): deterministic EWMA expectations
 (`stats_core.ewma_forecast`, 80% intervals) for recovery / sleep duration / weight at h=1 and h=7.
 
+**Two writers, one partition (#3712).** `episode-detect` also writes here, under the
+`PRESCRIPTION#` prefix, and its grades land as ordinary `forecast_resolution` rows in the
+calibration partition above — the same shape `calibration_core.pairs_from_forecast_resolution_rows`
+already scores. The phase class is why: an open weekly bet is experiment-scoped and the grade is
+cross-phase, which is exactly this partition's stated contract. Readers that must not mix the two
+filter on `model`.
+
 | sk | Contents |
 |----|----------|
 | `FORECAST#<target-date>#<metric>#h<horizon>` | One frozen forecast: `metric`, `source`, `field`, `unit`, `model` (`ewma-v1`), `horizon_days`, `issued_date`, `target_date`, `point`, `lo`, `hi`, `confidence` (0.8), `alpha`, `n_history`; after grading also `actual`, `covered`, `resolved_at` |
+| `PRESCRIPTION#<target-week-end>` | **#3712 — the week's training prescription as a graded bet**, written weekly by `episode-detect` (Sun 17:00 UTC), NOT by the forecast engine: `model` (`prescription-cardio-loo@1`), `issued_date`, `target_week_start`/`target_week_end`, `prescribed_cardio_hr_wk`, `reference_band`, `point_lb_wk`, `lo_lb_wk`, `hi_lb_wk`, `confidence` (0.8), `n_weeks`, `slope_lb_per_cardio_hour`, `null_point_lb_wk`, `skill_vs_null`, `bias_correction_lb_wk`, `statement`, `intake_comparable` (always false) — or, when declined, `declined`/`declined_reason` and no point at all. After grading: `resolved_at`, `grade_status`, `covered`, `actual_lb_wk`, `abs_error_lb_wk`, `signed_error_lb_wk`, `beats_null`, `adherence`, `adjustment` (the derived next target + its arithmetic). **The `PRESCRIPTION#` prefix sorts strictly above the daily engine's `FORECAST#<lo>..FORECAST#<hi>#zzzz` query range, which is what keeps two models' coverage numbers from merging.** |
 | `DATE#<issued-date>` | Daily summary consumed by `/api/forecast` + the coach prompt block: `forecasts` (today's issues, with `frame`), `resolutions_today` (expected-vs-actual), `coverage` (running interval-coverage overall + per horizon; `null` until something has resolved) |
 
 ---
