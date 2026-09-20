@@ -782,17 +782,25 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # never-stale property it depends on, both observed on the live tree in one batch.
         # {can-fail (proven) 113, unproven 537, not-applicable 6, attempted-unproven 3} over
         # 659 rows, measured on this branch after rebasing onto origin/main (#3889, #3894).
-        # Upper bound raised 113 -> 114 (2026-09-20, #3609 box 3): ONE new proof —
-        # structural::test_gsi_set_premerge_3609.py, the premerge GSI-set gate (ADR-097's
-        # {GSI1, GSI2} asserted against reading_keys.py's constants, every literal
-        # IndexName= on lambdas/+mcp/, and deploy_reading_gsis.sh's add_gsi call list).
-        # MutationSpec in scripts/gate_census_mutations.py: an untracked
+        # 2026-09-20 (#3625 + #3772): 113 -> 115. TWO entrants, both PROVEN in gate_census_proofs —
+        # the bundle-reproducibility gate and the orphan-drafts nightly leg; one ceiling so the two
+        # PRs land in either order.
+        # Upper bound raised 114 -> 115 (2026-09-20, #3609 box 3, merged onto the #3625/#3772
+        # tree): ONE new proof — structural::test_gsi_set_premerge_3609.py, the premerge
+        # GSI-set gate (ADR-097's {GSI1, GSI2} asserted against reading_keys.py's constants,
+        # every literal IndexName= on lambdas/+mcp/, and deploy_reading_gsis.sh's add_gsi call
+        # list). MutationSpec in scripts/gate_census_mutations.py: an untracked
         # lambdas/coach/_census_probe_3609.py plants `table.query(IndexName="GSI9", ...)`.
         # ARMED 1/1: baseline 7 passed in 4.54s, mutated 1 failed (
         # test_every_indexname_literal_on_the_live_surface_is_sanctioned) + 6 passed in
-        # 5.24s, reverted 7 passed in 5.26s. BASELINE_TOTAL_GATES moves 662 -> 663 with it
-        # (unproven UNCHANGED at 540 — a proven entrant, not a new unproven one).
-        <= 114
+        # 5.24s, reverted 7 passed in 5.26s. RE-MEASURED on the MERGED tree AFTER `git add`-ing
+        # the merge's two resolved conflicts (a mid-merge tracked-file listing lists a conflicted
+        # path 3x, once per stage, which briefly triple-counted every registry:: gate keyed on
+        # this file — the prior 113->115 note above is main's OWN prior comment and was not
+        # re-verified here, so this line does not depend on it being exact): a disposable
+        # `git archive origin/main` export at c32e58c31 measures 114 proven, this lane merged
+        # measures 115 (unproven UNCHANGED at 540 — a proven entrant, not a new unproven one).
+        <= 115
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

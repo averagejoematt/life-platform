@@ -280,16 +280,32 @@ def stage_mcp(out_dir):
     return out_dir
 
 
+# #3625: every entry carries this timestamp and a fixed mode, so the zip's bytes are a function
+# of the staged tree's bytes and nothing else. Before this, `zf.write()` stamped each entry with
+# the file's mtime (copytree preserves it, so a fresh checkout re-dated everything) and CDK read
+# every post-deploy `cdk diff` as ~24 `Code.S3Key` changes that were not code changes.
+ZIP_ENTRY_DATE_TIME = (1980, 1, 1, 0, 0, 0)
+ZIP_ENTRY_EXTERNAL_ATTR = 0o644 << 16
+_ZIP_SKIP_SUFFIXES = (".pyc", ".pyo")
+
+
 def zip_dir(src_dir, zip_path):
-    """Deterministic-ish zip of a staged dir (sorted walk, no extra metadata)."""
+    """Byte-reproducible zip of a staged dir: sorted walk, fixed entry timestamp and mode,
+    no `__pycache__`/`.pyc` (the staging copy excludes `__pycache__`; this is the second lock)."""
     if os.path.exists(zip_path):
         os.remove(zip_path)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(src_dir):
-            dirs.sort()
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
             for fname in sorted(files):
+                if fname.endswith(_ZIP_SKIP_SUFFIXES):
+                    continue
                 full = os.path.join(root, fname)
-                zf.write(full, os.path.relpath(full, src_dir))
+                info = zipfile.ZipInfo(os.path.relpath(full, src_dir), date_time=ZIP_ENTRY_DATE_TIME)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = ZIP_ENTRY_EXTERNAL_ATTR
+                with open(full, "rb") as fh:
+                    zf.writestr(info, fh.read())
     return zip_path
 
 

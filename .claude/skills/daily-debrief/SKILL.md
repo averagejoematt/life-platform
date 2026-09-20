@@ -85,6 +85,23 @@ review today's actual session before looking ahead at all.
   the logged number.
 - `get_readiness_score`, `get_acwr_status` — how the session landed against readiness/
   training load, not just whether it happened.
+- **Never call a stall or a plateau off the performed numbers alone (#3928).** At a fixed
+  load × fixed reps, estimated 1RM is constant *by construction* — if the platform
+  prescribed that load and those reps and he did exactly that, a "stall" is the platform
+  re-reading its own prescription, not an observation about Matthew. Diff prescribed vs
+  performed FIRST: `manage_hevy_routine(action="stall_check", movement_key=…)` pairs each
+  of that movement's recent sessions with the routine IR that was pushed for it and
+  returns `stall` / `progressing` / `regressing` / `unknown`. It returns **`unknown`,
+  never `stall`**, on a window he performed as prescribed at a fixed load × reps, and it
+  will not call one at all when no prescription is on file for those days. Report its
+  `reason` — it names both numbers.
+  - RPE is the only residual signal in such a window, and it is **self-reported**. Any
+    verdict that leaned on it comes back with `basis: "self-reported RPE"`; say that out
+    loud whenever you quote it. An RPE drift is his own rating of the set, not a
+    measurement, and it does not license a stall verdict on its own.
+  - `action="adherence"` is the session-level companion (set-count + RPE-ceiling
+    dimensions, never averaged); `stall_check` is the across-sessions one for a single
+    lift.
 - Aerobic — count it from ALL sources: Strava walks/runs AND Z2 bike/elliptical blocks
   logged INSIDE Hevy (invisible to Strava). `search_activities` can undercount; don't
   call the aerobic base "starved" off one source.
