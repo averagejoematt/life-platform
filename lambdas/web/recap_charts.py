@@ -27,6 +27,21 @@ from typing import Any, Sequence
 
 from web import card_engine as ce
 
+#: The unfilled track behind a bar. It is the GROUND, lifted — not a fixed near-black —
+#: because the weekly reckoning is drawn on its own ground (#3741) and a track pinned to
+#: the daily's green-black reads as a foreign strip laid across it. `track_for(ce.BG)`
+#: returns the historic (18, 26, 20) exactly, so every daily card is unchanged.
+_TRACK_LIFT = (10, 14, 10)
+
+
+def track_for(ground=None):
+    """The track tone for a card drawn on `ground`. Defaults to the daily ground."""
+    import web.card_engine as _ce
+
+    g = tuple(ground) if ground else _ce.BG
+    return tuple(min(255, c + d) for c, d in zip(g, _TRACK_LIFT))
+
+
 #: The worst band's colour. Amber, deeper — never red (see draw_component_bars).
 AMBER_DEEP = (176, 116, 36)
 
@@ -141,10 +156,11 @@ def draw_progress(
     w: int,
     h: int = 18,
     colour=None,
+    track=None,
 ) -> None:
     """How far along a long road is. Clamped, never over-filled, never negative."""
     frac = max(0.0, min(1.0, float(fraction)))
-    draw.rounded_rectangle([x, y, x + w, y + h], radius=h // 2, fill=(18, 26, 20))
+    draw.rounded_rectangle([x, y, x + w, y + h], radius=h // 2, fill=track or track_for())
     if frac > 0:
         filled = max(int(w * frac), h)  # a sliver still reads as a sliver, not as nothing
         draw.rounded_rectangle([x, y, x + filled, y + h], radius=h // 2, fill=colour or ce.GREEN)
@@ -162,6 +178,7 @@ def draw_component_bars(
     label_size: int = 24,
     value_size: int = 24,
     bar_h: int = 20,
+    track=None,
 ) -> int:
     """The day's components, each a labelled 0-100 bar. Returns the y it ended at.
 
@@ -183,7 +200,7 @@ def draw_component_bars(
         colour = ce.GREEN if score >= 70 else (ce.AMBER if score >= 35 else AMBER_DEEP)
         draw.text((x, y + 4), str(name).upper(), fill=ce.MUTED, font=ce.font(ce.FONT_MONO, label_size))
         r = bar_h // 2
-        draw.rounded_rectangle([bar_x, y + 4, bar_x + bar_w, y + 4 + bar_h], radius=r, fill=(18, 26, 20))
+        draw.rounded_rectangle([bar_x, y + 4, bar_x + bar_w, y + 4 + bar_h], radius=r, fill=track or track_for())
         if frac > 0:
             draw.rounded_rectangle([bar_x, y + 4, bar_x + max(int(bar_w * frac), bar_h), y + 4 + bar_h], radius=r, fill=colour)
         draw.text((bar_x + bar_w + 16, y + 4), f"{int(round(score))}", fill=ce.MUTED, font=ce.font(ce.FONT_MONO, value_size))

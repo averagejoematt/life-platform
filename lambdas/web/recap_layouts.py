@@ -89,15 +89,46 @@ CONTENT_FLOOR = 1030
 
 
 # ── shared chrome ─────────────────────────────────────────────────────────────
-def _canvas():
+#: The weekly reckoning's ground (#3741 follow-up). The dailies keep `ce.BG`; the weekly
+#: is the one card in the grid that is allowed to differ, because it is the one card a
+#: follower should be able to find without reading it.
+#:
+#: WHY NAVY, AND NOT A DEEPER GREEN — the panel split 3–3 and the tie broke on a rule, not
+#: on taste. Six candidate grounds were rendered on the real week-1 card and judged in a
+#: simulated Instagram profile grid (2026-09-19; the same six seats that graded the first
+#: set). Three seats wanted a richer green: it is the most visible and it stays in the
+#: brand's own hue family. Three — the designer, the honesty seat and the regainer reader —
+#: rejected every green ground for the same reason, and it is the one that decides:
+#:
+#:     In this palette GREEN MEANS EARNED and AMBER MEANS AN HONEST MISS. A permanent green
+#:     ground would say "good week" identically on a week of B's and on this one, which
+#:     graded C, B-, B-, B-, C-, C-, C- and whose own headline is "biggest miss: recovery —
+#:     24/100 at its worst". The grade chips already carry the verdict, honestly. The ground
+#:     carries the card TYPE, and a ground that can be read as a verdict is editorialising.
+#:
+#: Blue carries no meaning anywhere else in this vocabulary, so it can say "different
+#: container" without saying "good" or "bad". The contrast arithmetic agreed with the rule
+#: rather than against it: against the deepest green candidate the faintest text tone fell
+#: to 3.20:1, while on this navy it holds 3.62:1 (the daily ground is 3.90:1) — so the
+#: honest choice was also the legible one. 2.24x the daily ground's luminance is a large
+#: enough lift to read as deliberate at a 110px grid thumbnail rather than as a washed-out
+#: render, which was the one real objection to navy.
+#:
+#: The ground is FIXED. `tests/test_recap_weekly_ground_3741.py` holds it result-neutral.
+WEEKLY_GROUND = (11, 20, 44)
+
+
+def _canvas(ground=None):
     """A portrait canvas whose draw RECORDS every string, so `recap_qa` can audit the frame.
 
     The records ride on `img.info["recap_strings"]` — the image carries its own evidence
     to the gate, and a layout cannot opt out by forgetting to return something extra.
+
+    `ground` is passed straight to the engine: background only, never type or accent.
     """
     from web import recap_qa
 
-    img, draw = ce.base_canvas(size=PORTRAIT, margin=M)
+    img, draw = ce.base_canvas(size=PORTRAIT, margin=M, ground=ground)
     rec = recap_qa.RecordingDraw(draw)
     img.info["recap_strings"] = rec.records
     return img, rec
@@ -181,7 +212,7 @@ def _fact_rows_above_bar(draw, rows: list[tuple], *, y_min: int) -> None:
         y += 44
 
 
-def _bottom(draw, facts, *, frac: float | None = None) -> None:
+def _bottom(draw, facts, *, frac: float | None = None, ground=None) -> None:
     """The anchored bottom of every daily card: the goal bar at BAR_Y, the NEXT line, the footer.
 
     The panel's first finding was the same on every card: content stops at ~y 1170 on a
@@ -190,7 +221,7 @@ def _bottom(draw, facts, *, frac: float | None = None) -> None:
     """
     f = facts.pct_to_goal if frac is None else frac
     if f is not None and facts.baseline_weight_lb is not None and facts.goal_weight_lb is not None:
-        _goal_bar_at(draw, f, facts.baseline_weight_lb, facts.goal_weight_lb, y=BAR_Y, facts=facts)
+        _goal_bar_at(draw, f, facts.baseline_weight_lb, facts.goal_weight_lb, y=BAR_Y, facts=facts, ground=ground)
     nxt = next_line(facts)
     if nxt:
         draw.text((M, NEXT_Y), "NEXT", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
@@ -206,8 +237,8 @@ def _goal_bar(draw, facts, *, y: int) -> int:
     return _goal_bar_at(draw, frac, facts.baseline_weight_lb, facts.goal_weight_lb, y=y, facts=facts)
 
 
-def _goal_bar_at(draw, frac: float, baseline: float, goal: float, *, y: int, facts=None) -> int:
-    ch.draw_progress(draw, frac, x=M, y=y, w=W_CONTENT, h=16)
+def _goal_bar_at(draw, frac: float, baseline: float, goal: float, *, y: int, facts=None, ground=None) -> int:
+    ch.draw_progress(draw, frac, x=M, y=y, w=W_CONTENT, h=16, track=ch.track_for(ground))
     y += 30
     left = f"{baseline:.0f} lb  day one"
     right = f"goal  {goal:.0f} lb"
@@ -612,9 +643,22 @@ def session(facts, *, date_label: str):
 
 # ── D. RECKONING — the weekly close ───────────────────────────────────────────
 def reckoning(
-    facts, *, week_n: int, date_label: str, weight_series=None, grade_series=None, totals: dict[str, Any] | None = None, weekdays=None
+    facts,
+    *,
+    week_n: int,
+    date_label: str,
+    weight_series=None,
+    grade_series=None,
+    totals: dict[str, Any] | None = None,
+    weekdays=None,
+    ground=None,
 ):
-    img, draw = _canvas()
+    """The weekly close. Drawn on `WEEKLY_GROUND`, not the daily ground — see #3741.
+
+    `ground` overrides it for candidate renders and tests; production passes nothing.
+    """
+    gnd = WEEKLY_GROUND if ground is None else ground
+    img, draw = _canvas(ground=gnd)
     df = ce.font(ce.FONT_DISPLAY, 60)
     wk = f"WEEK {week_n}"
     draw.text((M, 84), wk, fill=ce.TEXT, font=df)
@@ -676,7 +720,9 @@ def reckoning(
         y = _fact_row(draw, "biggest miss", str(totals["misses"]), y=y, colour=ce.AMBER, size=25, floor=CONTENT_FLOOR)
     _coach_line(draw, facts, y=y + 6, floor=CONTENT_FLOOR)
 
-    _bottom(draw, facts)
+    # The weekly's ground travels with it: the goal-bar track is derived from the card's
+    # own ground, never the daily near-black, which would lie across the navy as a strip.
+    _bottom(draw, facts, ground=gnd)
     return img
 
 

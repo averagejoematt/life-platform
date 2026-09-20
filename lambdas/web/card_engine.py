@@ -185,19 +185,29 @@ def font(name, size):
 # ── Primitives ───────────────────────────────────────────────────────────────
 
 
-def base_canvas(size=None, margin=None):
+def base_canvas(size=None, margin=None, ground=None):
     """A fresh brand card: background + top accent line + bottom bar. Returns (img, draw).
 
     Defaults to 1200x630 — the unfurl-preview format every existing card uses, unchanged
     down to the pixel. `size` lets the portrait recap card (1080x1350, #3744) reuse the
     same brand chrome instead of a second engine that would drift from this one.
+
+    `ground` swaps ONLY the background (and the bottom bar derived from it), leaving the
+    type, the accents and the mark identical. It exists so one card in a family can be
+    told apart at thumbnail — the weekly reckoning against six dailies in a profile grid
+    (#3741) — without becoming a second brand. `None` is the daily contract, byte-identical
+    to before. Anything that needs different TEXT colours is a re-skin, not a ground, and
+    does not belong here.
     """
     cw, ch = size or (W, H)
     m = margin if margin is not None else MARGIN
-    img = Image.new("RGB", (cw, ch), BG)
+    bg = tuple(ground) if ground else BG
+    img = Image.new("RGB", (cw, ch), bg)
     draw = ImageDraw.Draw(img)
     draw.rectangle([0, 0, cw, 3], fill=GREEN)  # top accent
-    draw.rectangle([0, ch - 40, cw, ch], fill=(6, 10, 8))  # bottom bar
+    # The bottom bar is the ground, a shade deeper — derived, so a new ground can never
+    # leave the historic (6, 10, 8) bar stranded on top of it.
+    draw.rectangle([0, ch - 40, cw, ch], fill=tuple(max(0, c - 2) for c in bg))
     # #1640: the AJM dial signs every card in the top-right corner. It lives in
     # base_canvas — the one shared brand-chrome primitive — so all card families
     # (daily pages, character, chronicle, moments) carry an identical mark. The
