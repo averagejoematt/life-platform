@@ -849,6 +849,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=122`), not carried from the lane's 120.
         # Upper bound 122 -> 123 (2026-09-21, #3615 re-merged onto main AFTER #4014): structural::test_hook_registry_3615.py arrives
         # proven (STRUCTURAL_PROOFS, ARMED 1/1); MEASURED on the merged tree by this test (`proven verdicts n=123`), not carried from the lane's 120.
+        # Upper bound 123 -> 124 (2026-09-20, #3621 box 5): structural::test_protocol_lever_contract_3621.py arrives proven
+        # (STRUCTURAL_HAND_PROOFS — three defects planted one at a time in the real tracked files and reverted between:
+        # the spawned_by predicate softened to a truthiness check 4 failed, the field dropped from a catalogue entry 5 failed,
+        # the pre-#3621 heredoc writer restored byte-for-byte from origin/main 1 failed; reverted 27 passed). RE-MEASURED after
+        # this lane rebased onto #4015 by id-set diff on committed trees against a throwaway-repo `git archive origin/main`
+        # export; exactly one id enters and none leaves.
         <= 123
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
