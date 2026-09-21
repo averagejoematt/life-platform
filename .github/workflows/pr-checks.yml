@@ -65,7 +65,13 @@ jobs:
     # not a round number. scripts/check_job_timeout_headroom.py enumerates every job with
     # timeout-minutes across .github/workflows/*.yml and reds when any sits below this same
     # bound — re-run it before trusting this number again; do not bump by hand.
-    timeout-minutes: 18
+    # 18 -> 22 (2026-09-21, session AP, #3678 recurrence): the same script read RED —
+    # p95 of the trailing 28 runs' genuine completions = 17.59min (n=13; 15 were timeout
+    # casualties, censored, so 17.59 is a FLOOR) x 1.2 = 21.11min required. A SOLO rerun
+    # of PR #4007's job completed every step green in 19m55s and was still rendered
+    # `cancelled`. The lane grew (11,177 premerge tests; the pre-merge step alone is
+    # ~15.5min on the runner) — the ceiling followed the measurement, not the other way.
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

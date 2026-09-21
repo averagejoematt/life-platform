@@ -61,12 +61,12 @@
         "context": "Collect + deploy-critical + format",
         "workflow": "pr-checks.yml",
         "job": "fast-lane",
-        "typical_seconds": 1026,
+        "typical_seconds": 1055,
         "why": "ADR-139's fast lane: pytest --collect-only (the #1297 class), the premerge marker selection (ADR-117/#2258), black/ruff/mypy over the six enforced dirs, and the bundle-boot gate. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class including docs-only. `typical_seconds` is WRITTEN by deploy/write_lane_posture.py (#3608 box 4), never typed: the hand-stored 90 here was a 1m26s reading from PR #2094 that went 11x stale as the lane grew.",
-        "typical_measured_on": "2026-09-19",
+        "typical_measured_on": "2026-09-21",
         "typical_measured_by": "scripts/check_job_timeout_headroom.py sampler (trailing window, genuine completions)",
         "typical_statistic": "p95",
-        "typical_n": 20
+        "typical_n": 13
       },
       {
         "context": "gitleaks (PR commit range only, not full history)",
