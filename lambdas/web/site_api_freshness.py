@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import PACIFIC as PT, anchor_day_key, parse_iso_utc  # #1964/#3257: THE one Pacific frame, parser + day-key anchor
 from experiment.phase_filter import singleton_visible, with_phase_filter
+from ingestion.source_registry import availability_facet, caveated_source_ids  # #3615/#3516: one absence story
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
 from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
@@ -99,6 +100,11 @@ def _carried_from_cycle(date_str: str, *, _g) -> int | None:
         else:
             break
     return cycle
+
+
+#: #3615: the sources whose absence needs a stated reason — DERIVED from the registry,
+#: never a list here (a source becoming paused must not silently lose its caveat).
+_CAVEATED_SOURCE_IDS = caveated_source_ids()
 
 
 def source_freshness(*, _g) -> dict:
@@ -282,6 +288,14 @@ def source_freshness(*, _g) -> dict:
                         row["days_dark_floor"] = int(d["age_floor_days"])
                     dark_rows.append(row)
                 entry["dark_datatypes"] = dark_rows
+        # #3615 box 3: a source the registry expects to lag ("~24h behind by design",
+        # a 336h delivery cadence) carries the registry's OWN reason for the gap, so a
+        # designed cadence is never rendered as a silence that needs explaining.
+        if sid in _CAVEATED_SOURCE_IDS:
+            _facet = availability_facet(sid)
+            entry["absence_status"] = _facet["status"]
+            entry["absence_cause"] = _facet["reason"]
+            entry["absence_caveat"] = _facet["caveat"]
         sources.append(entry)
         summary["total"] += 1
         if status == "fresh":
@@ -290,16 +304,35 @@ def source_freshness(*, _g) -> dict:
             summary["stale"] += 1
 
     for sid, meta in _FRESHNESS_PAUSED.items():
+        # #3615 box 3: a paused row used to carry `last_update: None` and no duration at
+        # all, so this board said "paused" while /api/status said "stopped 97d ago. Check
+        # auth/webhook" about the same source on the same night. One absence, two stories.
+        # The DURATION is the source's own newest record (the same helper every other row
+        # on this board uses) and the CAUSE is the registry's own facet — neither is
+        # composed here, so a pause can never be narrated as a broken pipe again.
+        facet = availability_facet(sid)
+        paused_last_update = None
+        days_dark = None
+        try:
+            paused_last_update = _latest_date_str(sid, _g=_g)
+            if paused_last_update:
+                days_dark = (pt_now.date() - datetime.strptime(paused_last_update[:10], "%Y-%m-%d").date()).days
+        except Exception as e:  # never let one paused source break the feed
+            logger.warning("source_freshness: paused source %s duration failed: %s", sid, e)
         sources.append(
             {
                 "id": sid,
                 "label": meta["label"],
                 "desc": meta["desc"],
                 "category": meta["category"],
-                "last_update": None,
+                "last_update": paused_last_update,
+                "days_dark": days_dark,
                 "age_hours": None,
                 "status": "paused",
                 "is_behavioral": False,
+                "absence_status": facet["status"],
+                "absence_cause": facet["reason"],
+                "absence_caveat": facet["caveat"],
             }
         )
         summary["paused"] += 1

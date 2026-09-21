@@ -847,7 +847,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=121`), not carried from the lane's 120.
         # Upper bound 121 -> 122 (2026-09-21, #3971 re-merged onto main AFTER #4005): guard::mcp/hevy_prescription_gate.py arrives
         # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=122`), not carried from the lane's 120.
-        <= 122
+        # Upper bound 122 -> 123 (2026-09-21, #3615 re-merged onto main AFTER #4014): structural::test_hook_registry_3615.py arrives
+        # proven (STRUCTURAL_PROOFS, ARMED 1/1); MEASURED on the merged tree by this test (`proven verdicts n=123`), not carried from the lane's 120.
+        <= 123
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

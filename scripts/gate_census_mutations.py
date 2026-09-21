@@ -455,7 +455,30 @@ _DRIFTED_PRIOR_CUT_NOTE_PY = (
     'NOTE = "intake is NOT comparable to the prior cut — MacroFactor begins 2025-11-24 (ADR-104)"\n'
 )
 
+# #3615: a reader hook wired into the site with NO row in hook_registry.HOOK_REGISTRY.
+# This is the defect the derivation guard exists for — before #3615 the platform probed
+# exactly one hook nightly, and a new door simply joined the set nobody looks at.
+_UNCLAIMED_READER_HOOK_JS = (
+    "// census probe — a reader POST door with no hooks-registry row.\n"
+    "export async function probe(payload) {\n"
+    '  const r = await fetch("/api/_census_probe_3615", { method: "POST" });\n'
+    "  return r.ok;\n"
+    "}\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_hook_registry_3615.py": MutationSpec(
+        gate_id="structural::test_hook_registry_3615.py",
+        target="tests/test_hook_registry_3615.py",
+        detects=(
+            "a reader POST hook added to site/ with no HOOK_REGISTRY row — the #3615 class. The hook "
+            "would work in the browser and be probed by nothing: before this registry, "
+            "check_predict_week_freshness was the platform's ONLY per-hook probe, so a door that "
+            "stopped answering was found by a reader, not by the nightly"
+        ),
+        plants=(("site/assets/js/_census_probe_3615.js", _UNCLAIMED_READER_HOOK_JS),),
+        track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
+    ),
     "structural::test_prior_cut_disclosure_3754.py": MutationSpec(
         gate_id="structural::test_prior_cut_disclosure_3754.py",
         target="tests/test_prior_cut_disclosure_3754.py",
@@ -833,6 +856,23 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_hook_registry_3615.py": _proof(
+        "structural::test_hook_registry_3615.py",
+        "M1 (harness, ARMED 1/1) baseline: 28 passed in 0.40s | mutated: 1 failed, 27 passed in 0.33s :: "
+        "test_every_site_post_endpoint_is_claimed_by_a_hook_row | reverted: 28 passed in 0.29s",
+        "site/ on disk (rglob, .js only), so an UNTRACKED reader hook is in scope. The sweep "
+        'reads three POST idioms — a `fetch(<literal>, { … method: "POST" … })`, a '
+        '`postJSON(<literal>, …)` through the shared wrapper, and a `data-endpoint="/api/…"` '
+        "attribute (the vote/follow controls build their endpoints from a JS template, so the "
+        "literal never appears at the call site). A `${…}` template hole normalises to `*` and "
+        "matches fnmatch in both directions, which is how `${API}/predict_week` is claimed by a "
+        "concrete registry token. STILL INVISIBLE, stated rather than papered over: a POST "
+        "target assembled at runtime from a variable that is not a template literal, a hook "
+        "reached from inline `<script>` in an HTML page rather than a module under site/, and — "
+        "by construction — whether the door BEHIND a registered endpoint actually works. The "
+        "nightly matrix probes the route, not the handler, and says so in the cell label.",
+        proved_on="2026-09-21",
+    ),
     "structural::test_prior_cut_disclosure_3754.py": _proof(
         "structural::test_prior_cut_disclosure_3754.py",
         "baseline: 3 passed in 0.17s | mutated: 1 failed, 2 passed in 0.18s :: "
