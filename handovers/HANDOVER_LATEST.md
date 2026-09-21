@@ -1,124 +1,131 @@
-# Handover — Session AO: the red-teamed plan, the treadmill fix, and the trailer that reached main (2026-09-20 10:14 → 2026-09-21 ~19:45 PT)
+# Handover — Session AP: the ceiling that killed green jobs, the migrate bug found by running it, and the nine-hour permission prompt (2026-09-20 19:41 → 2026-09-21 ~08:45 PT)
 
-**Fable, autonomous, standing merge + deploy authority (fleet, MCP, site, CDK — tonight only).** The brief set
-63 → ≤45. The honest number at wrap is **57 open in all / 54 outside the Roadmap milestone** — the target was not
-met, and could not have been: most of what shipped closes on a next occurrence (a nightly, a monthly close, a
-reset) or on the owner's morning rulings, and the night's flagship deliverable is, by design, an owner-gated
-document. Gross: **7 closed on live proof + 2 auto-closed (#3980 #3993), 2 filed (#3984 #4008).** The owner sheet
-was applied at boot one item at a time (six rulings; two changed the plan on disk — #3753 became a red-team, not a
-flip, and #3918 box 4 became a $0 value read, not a paid backfill).
+**Fable, autonomous, standing merge + deploy authority (fleet, MCP, site-api, CDK).** The brief set 57 → ≤48 with
+a 06:00 PT wrap. The honest number at wrap is **54 open in all / 51 outside the Roadmap milestone** — the target
+was not met, for the same structural reason as AO: most of what merged tonight closes on a next occurrence (a
+Sunday weekly, a nightly, a reset, an owner commit). Gross: **4 closed on live proof (#3918 #3982 #3700 #4011),
+1 filed (#4011, closed the same session), 0 auto-closed.** The wrap ran ~2.5 h past the deadline because the
+session sat 9 h on a permission prompt (below). **The owner has not ruled on #3753 — v0.2 stays `ACTIVE = False`.**
 
 ---
 
-## The flagship: TRAINING_PROGRAM v0.2 (#3753 / #3755 / #3754)
+## The nine hours (05:23Z → 14:30Z), decoded — owner-confirmed
 
-The owner did not approve the redlines draft; he asked for "all the coach personas, a red team with the
-literature, my historical data from last time, an updated full plan at 3 lb/wk". Five personas — a transformation
-coach, an obesity-medicine physician, a performance dietitian, an S&C coach, and a person who lost 100 lb fast and
-finally held it — ran independently and blind on one evidence packet compiled from the platform's own record.
-Where they converged, independently: **3 lb/wk is defensible now at BMI 46.8 and must taper on a schedule; the
-measured 1,533 kcal / 146 g protein is the biggest problem in the record — too LOW; loads must move; "2–3 lifting
-sessions" was wrong for him; the deficit monitor's SUSTAINABLE at day 14 is not clearance; walking collapse is the
-relapse prodrome; the landing is the plan.** Owner-private: `s3://…/config/coaching/TRAINING_PROGRAM.md` (v0.2;
-v0.1 preserved beside it) and `TRAINING_PROGRAM_v0.2_redteam.md` (the packet, the five positions with citations
-and dissent, the split table, the reusable prompt). Machine twin: `owner_redlines.py` **v2.0-proposed** (#3994) —
-a scheduled rate, an energy floor, protein 200/180, 5–6 lifting days on a load wave, medical cover, nine named
-tripwires the engine does not yet evaluate (it says so in every block) — `ACTIVE = False` until he approves.
+The checkpoint-1 deploy was issued as ONE compound line — `{ echo …; bash deploy/deploy_fleet.sh; bash
+deploy/deploy_lambda.sh life-platform-mcp mcp_server.py; bash deploy/deploy_site_api.sh; } > log 2>&1` in the
+background — and it matches no `permissions.allow` rule: `.claude/settings.local.json` allows the bare string
+`bash deploy/deploy_fleet.sh` only (what `/fewer-permission-prompts` had seen), `deploy_lambda.sh` and
+`deploy_site_api.sh` have no rule at all. The harness waited on the prompt; the four Wave 2 lanes (their own
+allowlisted commands) finished at 05:53–06:21Z and their CI concluded by 06:18Z; the Mac never slept (Caffeinated).
+The command started at 14:30:55Z, the minute the owner approved it. **The brief's autonomy grant does not reach
+the permission layer.** Reflex (memory + the CLAUDE.md block): invoke deploy scripts BARE, exactly as the allow
+rule spells them — the final fleet deploy tonight was a bare `bash deploy/deploy_fleet.sh` and prompted nothing.
+Proposed to the owner (ask-first, permissions — diff in the chat): prefix rules `Bash(bash deploy/deploy_fleet.sh*)`,
+`Bash(bash deploy/deploy_lambda.sh *)`, `Bash(bash deploy/deploy_site_api.sh*)`, `Bash(bash deploy/reject_deployment.sh *)`.
 
-## What shipped (21 PRs merged tonight, every one `Refs`, no trailers except the one below)
+## What shipped — 15 PRs merged, every one `Refs`, zero trailers (each PR's commits grepped before arming)
 
-**Driver PRs:** #3987 (#3984, the merge treadmill) · #3988 + #3999 (#3625, `built_at` from the commit; dirtiness
-scoped to the staged roots) · #3991 (#3715) · #3994 (#3753 redlines v2) · #4007 (#3005 fix-forward, **armed**).
-**Lane PRs:** #3985 (#3761) · #3986 (#3770) · #3989 (#3918) · #3990 (#3755) · #3992 (#3915) · #3995 (#3671) ·
-#3996 (#3601) · #3997 (#3931) · #3998 (#3754) · #4000 (#3900) · #4001 (#3982) · #4002 (#3972) · #4003 (#3621 boxes
-1+3) · #4004 (#3599) · #4006 (#3620) · #4005 (#3621 box 4, **armed**). AN's #3983 merged at Step 0.
+**Driver PRs:** #4010 (#3918 `--only-note` + `--allow-calls`) · #4012 (#4011 the ceiling re-derive 18 → 22) ·
+#4016 (#3918 the migrate keying bug) · #4021 (main's two reds — the hevy gate off `fromisoformat`,
+`docs/engines/HYPOTHESIS.md` re-verified with 12 AST-derived spans). **AO's armed pair:** #4007 (#3005
+fix-forward, hooks installed in the main checkout at 04:0xZ) · #4005 (#3621 box 4). **Lane PRs:** Wave 1 —
+#4009 (#3700) · #4013 (#3712) · #4014 (#3971) · #4015 (#3615 boxes 1–3); Wave 2 — #4017 (#3552) · #4018 (#3607) ·
+#4019 (#3599 boxes 1–2) · #4020 (#3621 boxes 2+5, a `site/**` change: `protocols.json` 1.2.0 live with
+`spawned_by`).
 
-**Closed on live proof (7):** #3625 (0 `S3Key` lines after the deploy) · #3984 (5 of 5 post-fix merges carried zero
-regenerables) · #3715 · #3770 · #3931 · #3772 · #3938.
+**Closed on live proof (4):** #3918 (one Haiku call re-extracted the 06-23 note; `--migrate --apply`;
+`occurrence_mismatches 1 → 0`) · #3982 (`[ BORN ] citation-network-check.yml` on the first cron-freshness run
+after #4005, nothing filed) · #3700 (`draft_custom` → `cardio_cues: 1`, the stored block reads
+`Last: 2.99 mi in 1:00:00 (3.0 mph) — 20 Sep`) · #4011 (seven required jobs green at 14–21 min on the 22-min
+ceiling).
 
-## Deploys — every stack, and which tip each function runs
+## Deploys — every function on ONE tip, read from `build_info.json`
 
-- **Checkpoint 1 (22:56–23:03Z):** fleet 106 updated / 0 failed + `life-platform-mcp` + `life-platform-site-api`
-  from `7c78aaec1` (postflight ancestry OK ×3). CDK `LifePlatformCompute` twice — `d65da1f1f` at 22:05Z (the
-  #3625 measurement that failed on a dirty checkout, 32 `S3Key` lines) and `5c51af0ec` at 22:30Z (**0 lines**).
-- `inter-coach-dialogue` from `17f41aef2` (00:38Z, #4000) + `backfill_coach_ensemble_phase_stamps.py --apply`
-  (2 rows written, 77 cross-phase untouched).
-- **Checkpoint 2 (01:39–01:49Z):** fleet 106/0 + MCP + site-api from `de634f585`; CDK `LifePlatformOperational`
-  (01:41Z) and `LifePlatformServe` (01:49Z, `-- --require-approval never` — the new `ip-hash-salt` grants; the
-  wrapper's first attempt exited 1 with no TTY). CDK-bundled `site-api-ai` reads `de634f58 · commit · dirty=false`.
-- **Post-#4002 (02:02Z):** `life-platform-mcp` + `hevy-backfill` from `732e46659`. **So the fleet is split by two
-  functions:** 104 on `de634f58`, MCP + hevy-backfill on `732e4665`, inter-coach-dialogue on `17f41aef2` — read
-  `build_info.json` per function; every one says `built_at_source: commit`.
-- **Attended:** Hevy template `39c60569…` created (`hevy_recreate_template.py --apply`, index 820 → 821, reads
-  `calves`); `TRAINING_CONTEXT.md`, `PROGRESS_PHOTO_PROTOCOL.md`, `TRAINING_PROGRAM.md` (+ the v0.1 copy) and the
-  red-team record uploaded to the owner-private home; the #3772 draft archived (`archived_local_only`).
-- **Site:** no `site/**` merge tonight.
+- **Checkpoint 1 (14:30–14:44Z, after the prompt):** fleet 106/0 from `3f9f7388`, then MCP + site-api from
+  `6c4b24f9` — SPLIT, because I `git pull`ed mid-run; fleet re-run 106/0 from `6c4b24f9` to unify.
+- **Checkpoint 2 (14:58–15:05Z):** fleet 106/0 + MCP + site-api from `877e87a9` (postflight OK ×3).
+- **Final (15:07–15:13Z):** bare `bash deploy/deploy_fleet.sh` from **`b047216a`** (#4021's tip) — 106 updated /
+  0 failed, MCP + warmer + site-api + site-api-ai included. Read back from the deployed zips: `life-platform-mcp`,
+  `life-platform-site-api`, `episode-detect`, `hevy-routine-cron`, `life-platform-qa-smoke` all `b047216a ·
+  built_at_source commit · dirty=false`. **CDK: no stack deployed tonight** (no `cdk/` change merged).
+- **Site:** #4020's merge auto-deployed `site/config/protocols.json` (run 35615359410 — "Deploy public site" and
+  the smoke both `success`; the visual + AI-vision job was still in progress at 15:1xZ — the next session reads
+  its verdict; a revert would show as the workflow's rollback job).
+- **Verified by content after the site-api deploy:** `/api/calibration` `interval_forecasts.n` **80 → 80**,
+  strata unchanged (#4013's split moved no historical row); `/api/status` garmin comment now registry-derived
+  (`PAUSED in the source registry — … Last record: 98d ago`, was "stopped 97d ago. Check auth/webhook") (#4015);
+  `/api/hypotheses` `min_days_per_arm: 5` (#4017); `manage_hevy_routine dry_run` returns
+  `prescription_audit.verdict = refuse`, `error_code = SUBTRACT_ONLY_VIOLATION` on the #3927 specimen (#3971).
 
-## Leases — 19 rejected by name, zero blanket
-35525539152→d7bbecdd5 · 35528208686→b0487726b · 35528257051→ae0aa0d97 · 35532824199→1081b3fb1 · 35537546424→40fbaa446 ·
-35538092643→9ff9f71c4 · 35540172268→39360c045 · 35540205924→d65da1f1f · 35541837756→255b78fa2 · 35541883498→5c51af0ec ·
-35543133440→7c78aaec1 · 35543288831→9257341db · 35547330298→e134e00f7 · 35548265714→9616570c3 · 35548312052→17f41aef2 ·
-35549643212→2ac9e29d1 · 35549686600→bd616dbaf · 35551325003→25fcbfaa6 · 35552303018→732e4665. The two armed PRs mint
-one each when they merge — the next session rejects them by name.
+## Leases — 20 rejected by name, zero blanket
+
+By hand: 35554444488→`4b498399e` (AO's docs push) · 35558266000→`e18d5e3ba`. By the session steward (a loop that
+rejects only runs whose head is a main commit descended from the session base, naming sha + subject):
+35559147640→`8fa232f58` · 35559198041→`c2b75e5b8` · 35559446055→`d1afb022e` · 35559461424→`d9fc6a925` ·
+35559501162→`aa566c55f` · 35560741739→`5d22d00a6` · 35560801596→`863ccf4c1` · 35561354831→`045f3b120` ·
+35561415027→`f0bdd82ce` · 35562703155→`00a3cab4c` · 35562746589→`341860e0a` · 35564327168→`856a51c6a` ·
+35564375803→`3f9f73886` · 35565566258→`325256970` · 35565622175→`1c0b0f956` · 35612741429→`ab1c4bb5d` ·
+35612840326→`d32e073e9` · 35612751428→`6c4b24f91`. The runs on `b667ed342`, `877e87a95` and `b047216a1` were
+still in flight at wrap — the steward was still running; the next session rejects any it did not catch, by name.
 
 ## Found by measuring, not by reading
 
-- **#3625 box 3 needed two PRs.** After #3988 the diff still read 32 `S3Key` lines: the main checkout carried the
-  owner's modified `.claude/settings.local.json`, and `git status --porcelain` over the whole tree called that
-  dirty → `built_at_source: clock`. #3999 scopes dirtiness to `lambdas mcp config deploy/build_bundle.py`. Then 0.
-- **A `!` record in the counter file was ignored by `--check`** — printed, then dropped from the verdict; #3987's
-  must-fail control found it. And `test_model_gate_pending_reconcile_3646` popped the runner's GITHUB_* env
-  without restoring it, which is why the #3384 PR-exempt skip never fired on lane PRs.
-- **The pr-checks full-suite check is NOT a required check** (only `Collect + deploy-critical + format` and
-  gitleaks are) — auto-merge fired on PRs whose full suite was red on the treadmill.
-- **The required job runs at its own wall-clock ceiling** (~14–17 min vs `timeout-minutes: 18`): CANCELLED with
-  every step green on #3996 ×3, #4001 ×2, #4002 ×2, #4005 ×3, #4004/#3998 ×1 under concurrent lane load (#3678).
-- **A lane's commit trailers reached main through a green PR.** The repo squashes with COMMIT_MESSAGES; #4000's
-  commits carried the harness lines; the body check was clean; a depth-1 PR checkout cannot see branch commits.
-  **Main's full suite has been red from `9257341db` (22:59Z).** #4007 records the sha (rewriting is forbidden),
-  the commit-msg hook refuses the forms, pr-checks scans every PR commit's message (mutation-controlled).
-- **My own #3984 hook re-created the counter conflict it was built to end:** "restore to HEAD" during a
-  conflict-resolution commit reverted the counter the lane had just taken from main (#4005/#4006 went DIRTY after
-  every reconcile). The fix — restore from `MERGE_HEAD` when a merge is in progress — rides on #4007 and is
-  installed locally already.
-- **The 532 un-extracted notes were 19** (the census on #3989's branch), all 2021–22 programme templates; the paid
-  backfill is not worth running. The 2026-06-23 collision needs exactly ONE re-extraction to become two notes.
-- **The nutrition door publishes no calorie target tonight** — #3931's impossibility check refuses at 52–54% of a
-  3,223 kcal TDEE against the logged 1,533; the owner's §7.6 ruling implemented literally, reader-facing.
-- **The cycle-16 prereg artifact is not gone** (PR #3884 said it was) and cycle 17's seal asserts 326.2 lb while
-  the site has served 327.34 since 09-06 (#4004's read-only control). **411 archived rows stamp the cycle a reset
-  OPENED, not closed** — two conventions (#4008).
-- **The training-notes Haiku monthly cap (300) is reached** — 23 of 25 recent notes are `degraded: cap_exceeded`;
-  the semantic pass has been dark most of the last 14 days (named on #3918, not this session's to fix).
-- The routine-level Hevy note DOES render (owner screenshot); only the GET omits it. Memory corrected.
+- **The required job's ceiling, not lane load.** #4007's `Collect + deploy-critical + format` rerun SOLO: every
+  step green, `Complete job` at 19m55s, rendered `cancelled`. `scripts/check_job_timeout_headroom.py` already read
+  RED (p95 17.59 × 1.2 = 21.11 vs 18). AO's ×10 cancellations were this, and a rerun cannot fix it. #4012
+  re-derived 22 from the script's number, re-measured the posture (1055 s, n=13) and re-froze the ratchet with
+  the date; then seven required jobs passed at 14–21 min. The lane has no growth budget (epic #3493 line).
+- **`--migrate` was keyed by occurrence alone.** Another block's occurrence 0 (Rowing, Elliptical) shadowed the
+  Treadmill's, so the archived prior read "no stored extraction carries this note text" on 09-10. Found by
+  running the owner-approved migration, fixed with a mutation-controlled test (#4016).
+- **Four PRs moved the gate-census ratchets in one night** (#4005 #4014 #4015 #4020; #4019 too). Each re-merge
+  was measured on the merged tree, never incremented: 669 → 670 → 672 → 673 → 674 → 675 → 676 / proven 119 → 125.
+  A `git checkout --theirs` on `tests/conftest.py` during #4020's re-merge DROPPED the lane's own
+  `_PREMERGE_EXTRA_FILES` entries — rebuilt as the union; check for that whenever conftest conflicts.
+- **The commit-msg hook (#4007) requires a Conventional Commit subject on MERGE commits too** — `chore(merge):
+  origin/main into <branch> — …` is the form that passes.
+- **The ISO-parse registry is shrink-only (65)**: a new `fromisoformat` site cannot be registered, only migrated
+  (`common.pacific_time.parse_day_key` for DATE# day keys).
+- **`gh pr merge --auto` on an already-green PR merges instantly** — #4018/#4019 merged at 14:31Z the moment I
+  re-armed them after the prompt, not when their checks finished (06:1xZ).
+- **Lane findings on live surfaces:** `/api/status` narrated a PAUSED source as a broken pipe on a third surface
+  (#4015 fixed both producers); `/api/protocols` `count=0` is the phase filter over nine archived cycle-5 rows,
+  not an empty table (#4020); the one served hypothesis carried an unlabelled `min_effect: 0.05` (#4017); the
+  #2119 scoped-writer guard sees 44 of 186 `put_item` sites (#4019, recorded as `xfail(strict=True)`).
 
 ## Residual / next picks (every line cites)
 
-- **Armed PRs:** #4005 (#3621 box 4 — the citation-network cron; its required job keeps hitting the 18-min ceiling,
-  rerun once the full-suite job frees the workflow) · #4007 (#3005 fix-forward — main's full-suite red clears when it
-  lands; whichever of the two merges second needs one more ratchet re-merge: total 671 / proven 120 on the merged tree).
-  After #4007 merges: `bash scripts/install_hooks.sh` in every checkout.
-- **Owner, morning:** #3753 approve/redline v0.2 (then a one-line `ACTIVE = True` PR) · #3918 "run the one" (the
-  06-23 re-extraction) · #3761 box 1 (the 09-06 photo set) · #3599 amendment publish (attended) · #3945's register
-  (0 posted by hand) · book DXA / labs / ECG (v0.2 §10) · the pharmacology conversation at month 3.
-- **Nightly / next-occurrence:** #3900 (18:31Z — expect only the two pre-genesis rows) · #3915 box 4 · #3982 (the
-  first newborn watched cron is #4005's) · #3563 · #3830 · #3712 · #3620 boxes 3–4 · #3601 (October close) · #3671
-  (next reset) · #3621 boxes 2, 5 · #3972 (deployed; closes on a clean pre-flight).
-- **Not started (design, not bug-fix):** #3436 (a design section) · #3754 boxes 3–4 · #3599 boxes 1–2 · #3615 · #3436.
-- **Alarm board:** `qa-smoke-warnings` re-cited on its live cause (`data:orphan_routine_drafts`, cured by the #3772
-  archive; EXPIRES 2026-09-22) — not-work — the 09-21 nightly clears it or files a new defect.
-- **Worktrees:** every merged lane released; `issue-3621-citation-network-cron` and `issue-3005-trailer-fixforward`
-  stay until their PRs merge; `issue-3982-newborn-cron-deadline`, `issue-3972-pain-lexicon-history`,
-  `issue-3620-iphash-salt-prefix-deny` are merged and unreleased — not-work — `lane_worktree.py release` at the next boot.
+- **Owner, morning:** #3753 approve/redline v0.2 (then a one-line `ACTIVE = True` PR + MCP deploy — the build
+  beat) · #3761 box 1 (the 2026-09-06 photo set — no keys tonight) · #3599's amendment publish (attended) ·
+  #3945's register (0 posted by hand) · the permissions diff above (not-work — his settings, ask-first).
+- **Next occurrence:** #3712 (Sun 17:00Z `episode-detect`: `committed_target.available`; the week after: the first
+  `CALIB#…#prescription-week-…` grade) · #3615 (18:30Z nightly: `hooks:liveness_matrix` + the `weeks:*` legs,
+  `qa_hook_matrix` row; boxes 4–5 residual) · #3971 box 4 (the first chat-COMMITTED routine's stored IR
+  `load_floors.status == applied` — not done tonight on purpose, a test commit is litter in his Hevy) · #3621
+  boxes 2b/5 (next attended reset; next `seed_protocols_to_dynamodb.sh --apply`) · #3607 (next `/review` header
+  carrying `sha256 af9f9589…`) · #3552 (next freeze — `min_effect_provenance`) · #3599 (next reset's Step [0]
+  census print; the ten waived writers expire 2026-12-31) · #3563 · #3830 · #3900 + #3915 (the 18:31Z nightly) ·
+  #3601 (October close) · #3671 (next reset) · #3972 (a clean pre-flight).
+- **Not started (design, not tonight):** #3436 · #3754 boxes 3–4 · #3620 boxes 3–4 · #3760 (the private
+  photo viewer) · #3759 (promoted to Now tonight by stored rank; fable; waits on #3760).
+- **Alarm board:** `qa-smoke-warnings` citation EXPIRES 2026-09-22 — not-work — the 09-21 18:30Z nightly clears
+  it or the next session files the defect it names.
+- **Site auto-deploy verdict for #4020** (run 35615359410, visual + AI-vision QA in flight at wrap) — not-work —
+  read `gh run view 35615359410` at boot; a rollback would need the `site/**` re-publish per
+  `docs/SITE_UPLEVEL_PLAYBOOK.md`.
+- **Worktrees:** every merged lane released (`lane_worktree.py release` ×12); `issue-4014-main-red-fixforward`
+  is merged and unreleased — not-work — release at the next boot. 51 older locked worktrees pre-date this session.
+- **Lease steward** (a scratchpad loop) was still running at wrap — not-work — it dies with the terminal; the
+  three in-flight main runs above may park after that and want rejection by name.
 
-**Build beat:** none — the red-teamed plan is owner-gated (v0.2 awaits his approval; #3753 stays open, `ACTIVE = False`), and a drain plus two structural fixes is not a beat.
-**Docs:** `docs/CONVENTIONS.md` §1 (the content-addressed CDK asset sentence, #3988/#3999) and §4 + the reconciliation paragraph (the bot-owned invariant, #3987); `docs/coaching/README.md` + `PROGRESS_PHOTO_PROTOCOL.md` (#3985/#3990); `docs/SCHEMA.md` + ADR-094 (#3989); ADR-088 amendment (#3995); ADR-152 amendment (#3997); `docs/engines/HYPOTHESIS.md` re-verified (#4003); `docs/PROPORTIONALITY.md`'s phase-machinery row priced (#3996).
-**Decisions:** ADR-094 (#3989, the occurrence key) · ADR-088 amendment (#3995) · ADR-152 amendment (#3997, the worked-set TDEE term) — no new standalone ADR.
-**Main:** red — main's full suite has been red from `9257341db` (22:59Z) on `test_reachable_history_carries_no_trailer_since_ban`: PR #4000's squash carried a lane's attribution trailers (COMMIT_MESSAGES); **fix-forward #4007 is armed** (allowlist with the dated reason, hook refusal, PR-commit scan). Unit Tests on the tip are green apart from that one test; every deploy lease is rejected by name.
-**Incidents:** none — the #4000 trailer red and the #4005/#4006 counter treadmill were both fix-forwarded inside the session (#4007) with a hook, a CI scan and tests; neither reached a reader surface.
-**Stash/hooks:** clean — no stash; the installed pre-commit/commit-msg hooks are #4007's (ahead of main by design until it merges); `docs/alarm_citations.json` is the wrap commit's only dirty file.
-**Closures:** #3625, #3984, #3715, #3770, #3931, #3772, #3938 commented (Outcome / Live proof / Residual each) · DoD: scanned=3 window=closed>=2026-09-21 hits=0 findings=0 dispositioned=0 mode=warn blocking=none (the three residual lines re-homed into the `not-work —` grammar before the sweep).
-**Backlog:** 62 → 57 open (54 non-Roadmap); Now 20; 2 filed (#3984 closed the same night, #4008 on epic #3495 — its `## Stories` updated); hygiene: 1 violation (#4008 ↔ #3495 story list) fixed, 2 advisories (now_lane_coverage — a sonnet session finds no startable Now story; the #3540 grounding specimen, grandfathered).
-**Alarms:** ✅ every lit alarm cites an OPEN issue or a dated self-clearing state — `qa-smoke-warnings` re-cited 02:1xZ on `data:orphan_routine_drafts` with `cause` + `cause_observed`, EXPIRES 2026-09-22 (check_alarm_citations green).
-**CI warnings:** latest completed main run red on the #4000 trailer test (see Main); cron-freshness advisory: no open finding (#3980 self-closed 17:20Z).
-**Ledger:** omitted — the only new standing machinery is the monthly citation-network cron (#4005, priced FREE on #3621 and still armed at wrap; its row lands with its first run) and the #3915 inverse-census wire-up (a line in an existing nightly, no new rent); `docs/PROPORTIONALITY.md` was regenerated by the reconcile bot after each merge (gate census 665 → 669 on main tonight).
+**Build beat:** none — the red-teamed plan is still owner-gated (#3753 unruled, `ACTIVE = False`); a merge drain plus two CI structural fixes is not a beat.
+**Docs:** `docs/engines/HYPOTHESIS.md` re-verified against #4017 with 12 AST-derived spans (#4021) · `docs/SCHEMA.md` protocols row (#4020) · `docs/reviews/anchors/ANCHORS.json` + sha sibling (#4018) · `docs/INCIDENT_LOG.md` +1 row (Patterns regenerated) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` +17 rows (13 inherited from AM–AO, snapshot regenerated, the 18-test CI check green) · the doc-sync literals by `sync_doc_metadata.py --apply` in this commit.
+**Decisions:** none needed — the ceiling re-derivation follows #3678's existing rule (measured p95 × 1.2), and every other change is an implementation of an existing ADR.
+**Main:** red — main's full suite was red 04:56Z → 15:00Z on two NON-required gates (`test_iso_parse_site_registry_3609` on #4014's `mcp/hevy_prescription_gate.py`; the Docs CI drift gate on `docs/engines/HYPOTHESIS.md` after #4017); fix-forward #4021 merged 15:00:50Z at `b047216a1`, whose CI/CD run 35616034654 was still in progress at the wrap commit — `check_main_green.py` therefore reads the prior red; the next session confirms green on that run. Every deploy tonight was direct from the main checkout and content-verified; no lease was used.
+**Incidents:** 1 row added — main's full suite red ~10h on the two non-required gates, aggravated by the 9-hour permission-prompt wait (P3, no reader impact; Patterns block regenerated).
+**Stash/hooks:** clean — no stash; the installed pre-commit/commit-msg hooks are #4007's (`session_postflight` hook freshness 🟢).
+**Closures:** #3918, #3982, #3700, #4011 commented (Outcome / Live proof / Residual each) · DoD: scanned=7 window=closed>=2026-09-21 hits=0 findings=0 dispositioned=0 mode=warn blocking=none (one `unhomed-residual` hit on #3700 fixed by editing the closing comment before the sweep re-ran).
+**Backlog:** Now 3 live stories after promoting #3759 by stored rank (milestone + score line both edited); 57 → 54 open (51 non-Roadmap); 1 filed (#4011, closed same session); hygiene: 0 violations, 2 advisories (`now_lane_coverage`, the #3540 grounding specimen — both grandfathered); Later sweep — no stale Later issues.
+**Alarms:** ✅ every lit alarm cites an OPEN issue or a dated self-clearing state (`check_alarm_citations.py` green at 14:4xZ; `qa-smoke-warnings` citation expires 2026-09-22).
+**CI warnings:** none triaged — the latest completed main run was red (see Main), so `check_ci_warnings.py` had no green run to read; the next session triages the annotations on `b047216a1`'s run.
+**Ledger:** omitted — the only standing machinery that shipped rides existing rent: the #4015 census legs are two steps inside the existing qa-smoke nightly (21 key-bounded reads), the #4019 scoped-writer guard is a premerge test, the #4018 anchor seal is a BUILDER with no schedule; the #4005 citation cron's row lands with its first run (October), as AO recorded. `docs/PROPORTIONALITY.md` was regenerated by the reconcile bot after every merge (gate census 669 → 676).

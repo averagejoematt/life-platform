@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 461** — feedback 24 · reference 268 · security 1 · project 165 · user 1 · index 2
+**Files in the memory index snapshot: 478** — feedback 25 · reference 280 · security 1 · project 169 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 293** — homed-here 81 · already-homed 184 · superseded 7 · narrative 17 · off-repo 4
+**Rule-class files (feedback + reference + security): 306** — homed-here 81 · already-homed 192 · superseded 7 · narrative 21 · off-repo 5
 
-**Program/session files (project): 165** — already-homed 14 · superseded 1 · narrative 147 · off-repo 2 · index 1
+**Program/session files (project): 169** — already-homed 14 · superseded 1 · narrative 151 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -81,6 +81,7 @@ feedback_ideation_include_offsite_channels.md
 feedback_pacific_time_in_messages.md
 feedback_partial_acceptance_is_not_a_close.md
 feedback_prod_deploy_authorization.md
+feedback_read_the_clock_not_the_last_log_line.md
 feedback_reader_credibility_first.md
 feedback_rest_and_params_multifactor.md
 feedback_review_ritual_model_identity.md
@@ -216,6 +217,9 @@ project_session_ah_2026_09_16.md
 project_session_ai_2026_09_17.md
 project_session_aj_2026_09_18.md
 project_session_al_2026_09_19.md
+project_session_an_2026_09_20.md
+project_session_ao_2026_09_20.md
+project_session_ap_2026_09_21.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -234,6 +238,7 @@ project_session_w_2026_09_06.md
 project_session_x_2026_09_07.md
 project_session_y_2026_09_08.md
 project_session_z_2026_09_08.md
+project_sessions_am_an_2026_09_19.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -259,8 +264,10 @@ project_wiki_program_2026_07_10.md
 project_wrong_day_and_wrong_gauge_2026_08_18.md
 reference_a_band_is_not_a_contiguous_window.md
 reference_a_behavioral_threshold_cannot_see_a_same_day_miss.md
+reference_a_blanket_lease_reject_catches_another_lanes_deploy.md
 reference_a_byte_diff_is_not_a_visible_change.md
 reference_a_cancelled_ci_rollup_hides_real_failures.md
+reference_a_cdk_deploy_re_bundles_its_stacks_from_the_checkout_tip.md
 reference_a_ceiling_sized_while_the_feature_was_dark.md
 reference_a_check_after_truncation_launders_the_defect.md
 reference_a_check_that_measures_nothing_returns_clean.md
@@ -268,18 +275,24 @@ reference_a_ci_gate_that_cannot_fail.md
 reference_a_ci_warning_that_no_action_can_clear.md
 reference_a_citation_string_is_not_an_owner.md
 reference_a_client_cap_below_the_callee_p50.md
+reference_a_colour_can_carry_a_claim.md
 reference_a_comparison_gate_is_blind_when_both_sides_agree.md
+reference_a_contact_sheet_review_misses_the_edge.md
 reference_a_correct_rule_with_a_narrow_denominator.md
 reference_a_dependency_missing_makes_a_gate_dark.md
 reference_a_derived_artifact_needs_its_lane.md
+reference_a_dry_run_that_only_gates_the_last_step.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_gate_that_cannot_be_satisfied_trains_readers_to_skip_it.md
 reference_a_generated_artifact_with_a_committed_twin.md
+reference_a_lane_fixes_keyword_closes_the_issue_on_merge.md
 reference_a_lease_steward_that_pauses_is_not_a_steward.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
+reference_a_new_config_file_needs_an_ownership_ruling_before_merge.md
 reference_a_page_level_overflow_measure_is_blind.md
 reference_a_page_of_logs_is_not_the_latest.md
+reference_a_parent_turn_can_stall_while_its_children_finish.md
 reference_a_pct_suffix_is_not_one_semantic.md
 reference_a_piped_exit_code_is_not_a_test_result.md
 reference_a_pr_green_is_not_a_main_green_when_a_gate_keys_on_the_ci_event.md
@@ -289,6 +302,7 @@ reference_a_proof_ledger_needs_its_own_freshness_guard.md
 reference_a_registry_shaped_name_in_a_test_mints_phantom_gates.md
 reference_a_repo_side_fix_to_an_s3_read_config.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
+reference_a_squash_merge_carries_every_lane_commit_message.md
 reference_a_success_line_is_not_a_stored_row.md
 reference_a_sweep_one_import_away.md
 reference_a_sweep_that_restores_a_directory.md
@@ -411,6 +425,7 @@ reference_grounder_evidence_excludes_current_turn.md
 reference_guard_the_set_not_the_instance.md
 reference_harness_must_track_its_call_site.md
 reference_hazard_gate_before_model.md
+reference_hevy_routine_notes_never_land.md
 reference_iam_parity_codified_broken_state.md
 reference_import_time_frozen_globals_test_trap.md
 reference_in_the_bundle_is_not_on_the_path.md
@@ -508,10 +523,12 @@ reference_task_notification_exit_codes_lie.md
 reference_test_importing_aws_cdk_reds_ci.md
 reference_test_layer_dep_import_collection_red.md
 reference_the_acceptance_box_can_be_vacuous_on_its_own_incident.md
+reference_the_cdk_asset_is_the_directory_not_the_zip.md
 reference_the_census_enumerates_tracked_files.md
 reference_the_closure_sweep_reads_your_own_verdict_prose.md
 reference_the_doc_literal_merge_treadmill.md
 reference_the_first_denial_masks_the_second.md
+reference_the_required_ci_job_runs_at_its_own_wallclock_ceiling.md
 reference_the_rubric_can_be_the_finding_generator.md
 reference_the_squash_message_is_a_fourth_text.md
 reference_the_tip_does_not_carry_a_superset_of_its_ancestors_deploys.md
@@ -1010,6 +1027,23 @@ carries an operating rule.
 | `reference_an_md5_on_the_source_is_not_proof_the_mutation_ran.md` | reference | `scripts/gate_census_mutations.py` (module docstring: CPython validates a cached `.pyc` on mtime+size, so a byte-length-preserving edit runs the ORIGINAL module — purge `__pycache__` and run `-B` before reading a verdict) | already-homed |
 | `reference_the_closure_sweep_reads_your_own_verdict_prose.md` | reference | `scripts/closure_contract.py` (`unhomed_residuals` / `RESIDUAL_CUE_RE`: a residual is named lexically and disposed structurally — `#N` or `not-work —` on the same block; the docstring says why a closing comment about another issue's lifecycle trips it) | already-homed |
 | `reference_the_tip_does_not_carry_a_superset_of_its_ancestors_deploys.md` | reference | incident narrative (AK's five rejection comments written on a false premise); the rule — CI's Plan diffs `${GITHUB_SHA}~1 HEAD`, so a docs-only tip skips Deploy and an ancestor's fix ships from nobody; verify by shipped content — is stated in `docs/CONVENTIONS.md` §4d and the `/land` skill, so this file keeps the measurement | narrative |
+| `feedback_read_the_clock_not_the_last_log_line.md` | feedback | `.claude/skills/wrap/SKILL.md` (the `date -u` heartbeat reflex; owner 2026-09-07) | already-homed |
+| `project_session_an_2026_09_20.md` | project | — narrative: Session AN's record (the overnight drain, the split fleet) | narrative |
+| `project_session_ao_2026_09_20.md` | project | — narrative: Session AO's record (the red-teamed plan, the treadmill fix, the trailer that reached main) | narrative |
+| `project_session_ap_2026_09_21.md` | project | — narrative: Session AP's record (the ceiling, the migrate bug, the 9-hour stall) | narrative |
+| `project_sessions_am_an_2026_09_19.md` | project | — narrative: Sessions AM+AN's posting-pack record | narrative |
+| `reference_a_blanket_lease_reject_catches_another_lanes_deploy.md` | reference | `docs/CONVENTIONS.md` §4d (leases are actioned BY NAME, never `--status waiting` wholesale) | already-homed |
+| `reference_a_cdk_deploy_re_bundles_its_stacks_from_the_checkout_tip.md` | reference | — narrative: the split-fleet read (build_info per function) is a handover duty stated in every deploy checkpoint line, not a repo rule yet | narrative |
+| `reference_a_colour_can_carry_a_claim.md` | reference | `docs/DESIGN_SYSTEM_V5.md` (the earned-glow rule; a container's ground is result-neutral) | already-homed |
+| `reference_a_contact_sheet_review_misses_the_edge.md` | reference | — narrative: one review-method slip on the posting pack; no repo gate encodes it | narrative |
+| `reference_a_dry_run_that_only_gates_the_last_step.md` | reference | — narrative: a one-off script defect fixed by #3942; the class has no standing guard | narrative |
+| `reference_a_lane_fixes_keyword_closes_the_issue_on_merge.md` | reference | `.claude/agents/worktree-implementer.md` (`Refs` only, never a closing keyword) + `scripts/closure_sweep.py` | already-homed |
+| `reference_a_new_config_file_needs_an_ownership_ruling_before_merge.md` | reference | `deploy/config_ownership_audit.py` (the ruling guard)  | already-homed |
+| `reference_a_parent_turn_can_stall_while_its_children_finish.md` | reference | — off-repo: the cause was a harness permission prompt on a compound deploy command; the fix is the owner's `permissions.allow` (prefix rules for the three deploy scripts, proposed 2026-09-21 with the diff) plus the session reflex of invoking deploy scripts bare | off-repo |
+| `reference_a_squash_merge_carries_every_lane_commit_message.md` | reference | `scripts/install_hooks.sh` (the commit-msg refusal) + `.github/workflows/pr-checks.yml` (the PR-commit scan, #4007) | already-homed |
+| `reference_hevy_routine_notes_never_land.md` | reference | — narrative: a vendor GET quirk (the routine note renders in-app, the API omits it); nothing in the repo depends on the GET | narrative |
+| `reference_the_cdk_asset_is_the_directory_not_the_zip.md` | reference | `docs/CONVENTIONS.md` §1 (the content-addressed CDK asset sentence, #3988/#3999) | already-homed |
+| `reference_the_required_ci_job_runs_at_its_own_wallclock_ceiling.md` | reference | `scripts/check_job_timeout_headroom.py` + `.github/workflows/pr-checks.yml` (the derivation comment on `timeout-minutes`, #4011) | already-homed |
 
 ---
 
