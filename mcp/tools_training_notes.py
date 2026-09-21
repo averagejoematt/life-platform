@@ -12,6 +12,7 @@ from datetime import timedelta
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from training.training_notes import DEGRADE_UNRECORDED, dedupe_head_rows, head_sk_base
+from training.training_notes_keys import PREFLIGHT_LOOKBACK_DAYS  # #3972: the one number, not a restated 180
 
 from mcp.config import table
 from mcp.core import LAYER_DARK, decimal_to_float, derived_layer_status
@@ -57,7 +58,7 @@ def tool_get_exercise_notes(args):
     """Per-exercise note timeline (the arc) + signals + pain flags from the derived layer."""
     args = args or {}
     exercise = args.get("exercise") or args.get("template_id") or ""
-    lookback_days = int(args.get("lookback_days") or 180)
+    lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)
     if not exercise:
         return {"error": "Provide 'exercise' (name) or 'template_id'."}
 
