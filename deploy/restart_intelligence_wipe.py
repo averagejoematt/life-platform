@@ -515,6 +515,82 @@ def assert_registry_coverage(live_scoped_pks: dict | None = None):
         )
 
 
+def build_work() -> list:
+    """The unified partition work list: SOURCE entries + full-pk COACH entries + the
+    non-SOURCE scoped pks (ENSEMBLE/NARRATIVE/coach_thread). Each 5-tuple is
+    ``(pk, label, mode, extra_attrs, sk_prefix)``; ``sk_prefix=""`` scans the whole pk.
+
+    #3621 box 2: extracted from `main()` unchanged so the double-reset harness drives the
+    SAME list the live reset does. A harness that builds its own partition list proves
+    idempotency for a wipe nobody runs.
+    """
+    work = [(f"{USER_PK_PREFIX}{src}", src, mode, extra, "") for src, mode, extra in PARTITIONS]
+    work += [(pk_full, label, mode, extra, "") for pk_full, label, mode, extra in COACH_PARTITIONS]
+    work += [(pk_full, label, mode, extra, skp) for pk_full, label, mode, extra, skp in FULL_PK_PARTITIONS]
+    return work
+
+
+def new_counts() -> defaultdict:
+    return defaultdict(lambda: {"total": 0, "to_tombstone": 0, "skipped_already": 0, "skipped_mode": 0, "applied": 0, "errors": 0})
+
+
+def run_wipe(table, *, cycle: int, now_iso: str, apply: bool, work: list | None = None):
+    """Walk every partition and tombstone what is in scope. Returns
+    ``(counts, samples, errors)``. READ-ONLY unless ``apply``.
+
+    #3621 box 2: the body of `main()`'s loop, lifted verbatim behind a `table` parameter
+    so `tests/test_restart_double_reset_3621.py` can run the REAL wipe twice against a
+    fixture table seeded with real wire-shape rows. The idempotency claim (#1202,
+    ADR-077 — "a prior archive's generation identity survives every later reset") had no
+    executable proof before this: `is_already_tombstoned` was unit-tested on one dict,
+    and the thing actually at risk is the SECOND FULL PASS.
+    """
+    counts = new_counts()
+    samples = defaultdict(list)
+    errors: list[str] = []
+    for pk, source, mode, extra, sk_prefix in work if work is not None else build_work():
+        c = counts[source]
+        if sk_prefix:
+            kwargs = {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skp)",
+                "ExpressionAttributeValues": {":pk": pk, ":skp": sk_prefix},
+            }
+        else:
+            kwargs = {"KeyConditionExpression": "pk = :pk", "ExpressionAttributeValues": {":pk": pk}}
+        while True:
+            resp = table.query(**kwargs)
+            for item in resp.get("Items", []):
+                c["total"] += 1
+                if not should_tombstone(item, mode, pk=pk):
+                    c["skipped_mode"] += 1
+                    continue
+                if is_already_tombstoned(item):
+                    c["skipped_already"] += 1
+                    continue
+                c["to_tombstone"] += 1
+                if len(samples[source]) < 3:
+                    samples[source].append(item.get("sk", ""))
+                if apply:
+                    update_expr, names, values = build_update(
+                        extra, now_iso, cycle, preserve_phase=source in PRESERVE_PHASE_LABELS, item=item
+                    )
+                    try:
+                        table.update_item(
+                            Key={"pk": item["pk"], "sk": item["sk"]},
+                            UpdateExpression=update_expr,
+                            ExpressionAttributeNames=names,
+                            ExpressionAttributeValues=values,
+                        )
+                        c["applied"] += 1
+                    except ClientError as e:
+                        c["errors"] += 1
+                        errors.append(f"{item['pk']} / {item['sk']} :: {e}")
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return counts, samples, errors
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run).")
@@ -542,66 +618,7 @@ def main():
     table = ddb.Table(TABLE_NAME)
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    counts = defaultdict(
-        lambda: {
-            "total": 0,
-            "to_tombstone": 0,
-            "skipped_already": 0,
-            "skipped_mode": 0,
-            "applied": 0,
-            "errors": 0,
-        }
-    )
-    samples = defaultdict(list)
-    errors = []
-
-    # Build unified work list: SOURCE entries + full-pk COACH entries + the
-    # non-SOURCE scoped pks (ENSEMBLE/NARRATIVE/coach_thread). 5-tuple carries an
-    # optional sk_prefix that scopes a bare-pk scan (e.g. coach_thread under USER#matthew).
-    work = [(f"{USER_PK_PREFIX}{src}", src, mode, extra, "") for src, mode, extra in PARTITIONS]
-    work += [(pk_full, label, mode, extra, "") for pk_full, label, mode, extra in COACH_PARTITIONS]
-    work += [(pk_full, label, mode, extra, skp) for pk_full, label, mode, extra, skp in FULL_PK_PARTITIONS]
-
-    for pk, source, mode, extra, sk_prefix in work:
-        c = counts[source]
-        if sk_prefix:
-            kwargs = {
-                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skp)",
-                "ExpressionAttributeValues": {":pk": pk, ":skp": sk_prefix},
-            }
-        else:
-            kwargs = {"KeyConditionExpression": "pk = :pk", "ExpressionAttributeValues": {":pk": pk}}
-        while True:
-            resp = table.query(**kwargs)
-            for item in resp.get("Items", []):
-                c["total"] += 1
-                if not should_tombstone(item, mode, pk=pk):
-                    c["skipped_mode"] += 1
-                    continue
-                if is_already_tombstoned(item):
-                    c["skipped_already"] += 1
-                    continue
-                c["to_tombstone"] += 1
-                if len(samples[source]) < 3:
-                    samples[source].append(item.get("sk", ""))
-                if args.apply:
-                    update_expr, names, values = build_update(
-                        extra, now_iso, cycle, preserve_phase=source in PRESERVE_PHASE_LABELS, item=item
-                    )
-                    try:
-                        table.update_item(
-                            Key={"pk": item["pk"], "sk": item["sk"]},
-                            UpdateExpression=update_expr,
-                            ExpressionAttributeNames=names,
-                            ExpressionAttributeValues=values,
-                        )
-                        c["applied"] += 1
-                    except ClientError as e:
-                        c["errors"] += 1
-                        errors.append(f"{item['pk']} / {item['sk']} :: {e}")
-            if "LastEvaluatedKey" not in resp:
-                break
-            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    counts, samples, errors = run_wipe(table, cycle=cycle, now_iso=now_iso, apply=args.apply)
 
     # Report
     report_path = REPO_ROOT / "docs" / "restart" / "_intelligence_wipe_report.txt"

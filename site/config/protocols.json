@@ -1,7 +1,7 @@
 {
-  "_version": "1.1.0",
-  "_updated": "2026-03-29",
-  "_description": "Source of truth for all health protocols. Read by site-api (/api/protocols) and MCP tools. Seeded to DynamoDB via deploy/seed_protocols_to_dynamodb.sh.",
+  "_version": "1.2.0",
+  "_updated": "2026-09-20",
+  "_description": "Source of truth for all health protocols. Read by site-api (/api/protocols) and MCP tools. Seeded to DynamoDB via deploy/seed_protocols_to_dynamodb.sh. Every entry carries `spawned_by` (#3621): a HYPOTHESIS# id, or the exact label 'pre-platform / literature' meaning no platform hypothesis spawned it. Enforced at the write by lambdas/experiment/protocol_levers.py.",
   "protocols": [
     {
       "id": "sleep",
@@ -25,6 +25,7 @@
       "signal_status": "positive",
       "signal_note": "7.7h avg, HRV stable",
       "origin": "Published literature (Walker, 2017; Huberman, 2021)",
+      "spawned_by": "pre-platform / literature",
       "mechanism": "Optimizes slow-wave sleep for HGH release, memory consolidation, and metabolic recovery",
       "tier": "foundation"
     },
@@ -50,6 +51,7 @@
       "signal_status": "positive",
       "signal_note": "RHR trending down",
       "origin": "Published literature (Seiler 80/20 polarized model)",
+      "spawned_by": "pre-platform / literature",
       "mechanism": "Builds mitochondrial density and fat oxidation capacity below VT1",
       "tier": "foundation"
     },
@@ -75,6 +77,7 @@
       "signal_status": "pending",
       "signal_note": "DEXA #2 scheduled",
       "origin": "Published literature (Schoenfeld, 2010; Attia centenarian framework)",
+      "spawned_by": "pre-platform / literature",
       "mechanism": "Sustained moderate deficit (~500 kcal) preserves lean mass during weight loss",
       "tier": "foundation"
     },
@@ -100,6 +103,7 @@
       "signal_status": "positive",
       "signal_note": "Fasting glucose stable",
       "origin": "N=1 experiment (Week 3 \u2014 proved out)",
+      "spawned_by": "pre-platform / literature",
       "mechanism": "16:8 window aligns eating with circadian rhythm and extends overnight fat oxidation",
       "tier": "intervention"
     },
@@ -125,6 +129,7 @@
       "signal_status": "positive",
       "signal_note": "Time-in-range on target",
       "origin": "Personal conviction \u2014 glucose anxiety \u2192 data as resolution",
+      "spawned_by": "pre-platform / literature",
       "mechanism": "Continuous glucose data reveals individual meal responses invisible to standard blood panels",
       "tier": "measurement"
     },
@@ -150,6 +155,7 @@
       "signal_status": "pending",
       "signal_note": "Tracking 30-day window",
       "origin": "Published literature (Huberman, 2021; Satchin Panda circadian research)",
+      "spawned_by": "pre-platform / literature",
       "mechanism": "Morning photon exposure sets the suprachiasmatic nucleus clock, improving melatonin timing by 1-2 hours",
       "tier": "supporting"
     }

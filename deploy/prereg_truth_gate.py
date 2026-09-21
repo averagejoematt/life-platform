@@ -39,6 +39,29 @@ THE THREE CLAUSES (issue #3599, acceptance box 3)
                          literals, and a reader cannot tell a demanding bar from a
                          decorative one.
 
+THE SECOND CENSUS (#3621 box 2) — THE ONE CLAUSE HERE THAT IS NOT ABOUT BYTES
+─────────────────────────────────────────────────────────────────────────────
+  CENSUS_FAMILY_APPEARED a pk family present in a census taken AFTER the wipe and absent
+                         from the one taken before it. DA-7's window is the specimen: the
+                         reset-time tagger ran at 16:37Z and six `INSIGHT#` rows were
+                         written at 17:09Z — after every instrument that could have seen
+                         them, and before the seal that would make the cycle's record
+                         permanent. Nothing looked twice, so nothing could tell.
+
+  The other four clauses grade an artifact's BYTES. This one grades the TABLE, because
+  the untruth it catches is not in the artifact at all: it is a seal asserting "this is
+  what cycle N was" over rows that arrived after the reset stopped looking. The predicate
+  is still pure — `audit_census_delta(before, after)` takes two family maps, does no I/O
+  and has no clock. `run_second_census_gate()` is the ONE credentialed wrapper, and it
+  delegates the enumeration to `experiment.pk_census.family_census` rather than writing a
+  second scanner (one derivation, two verdicts — see that module's own note).
+
+  THE INVERSE IS DELIBERATELY NOT HERE. A family present before and ABSENT after would
+  mean rows were DELETED, and the wipe never deletes — it tombstones (Interpretation B,
+  the module docstring of restart_intelligence_wipe). Row-level survival is
+  `deploy/restart_verify.py`'s census, which reads counts this one never does. Two
+  implementations of one rule is how a comparison gate goes blind.
+
 THE ISSUE'S FOURTH REFUSAL REASON LIVES NEXT DOOR, DELIBERATELY
 ───────────────────────────────────────────────────────────────
 #3599 also names "a seed whose season ids ⊄ the artifact". That clause exists and is
@@ -124,6 +147,7 @@ COACH_NOT_OPERATIONAL = "COACH_NOT_OPERATIONAL"
 COACH_NAME_MISMATCH = "COACH_NAME_MISMATCH"
 BASELINE_MISMATCH = "BASELINE_MISMATCH"
 MIN_EFFECT_UNDERIVED = "MIN_EFFECT_UNDERIVED"
+CENSUS_FAMILY_APPEARED = "CENSUS_FAMILY_APPEARED"
 
 #: Every finding kind this module can emit. Guard-the-set: `audit_prereg_truth` asserts
 #: its own output is drawn from this tuple, so a new kind cannot be added without the
@@ -131,6 +155,14 @@ MIN_EFFECT_UNDERIVED = "MIN_EFFECT_UNDERIVED"
 #: those spellings are registry names the gate census expands entry by entry, and four
 #: finding labels are not four gates.
 FINDING_KINDS = (COACH_NOT_OPERATIONAL, COACH_NAME_MISMATCH, BASELINE_MISMATCH, MIN_EFFECT_UNDERIVED)
+
+#: #3621 box 2's clause, declared SEPARATELY and on purpose. `FINDING_KINDS` above is the
+#: set an ARTIFACT can reach, and `tests/test_prereg_truth_gate_3599.py` asserts the live
+#: cycle-17 seal reaches every one of them — a guard-the-set control that a kind no
+#: artifact can ever produce would silently break. The census clause grades the TABLE, so
+#: it gets its own set and `audit_census_delta` asserts its own output against it.
+CENSUS_FINDING_KINDS = (CENSUS_FAMILY_APPEARED,)
+ALL_FINDING_KINDS = FINDING_KINDS + CENSUS_FINDING_KINDS
 
 #: The derivation a pre-registered `min_effect` must travel with. `window` is accepted
 #: under either spelling because `prereg_effect.derive_min_effect` emits `window_days`
@@ -436,6 +468,90 @@ def render_report(findings: list[Finding], artifact: dict) -> str:
     for f in findings:
         lines.append(f"  {'BLOCK' if f.blocking else 'note '}  {f}")
     return "\n".join(lines)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# the second-census clause (#3621 box 2) — pure predicate, one credentialed wrapper
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def audit_census_delta(before: dict, after: dict) -> list[Finding]:
+    """Every pk family present in `after` and absent from `before`. PURE: no I/O, no
+    clock, no credentials — two family maps in (`{family: (rep_pk, rep_sk)}`, the shape
+    `experiment.pk_census.family_census` returns), findings out.
+
+    An EMPTY census on either side RAISES rather than returning []. "No new families"
+    over an empty enumeration is a check that cannot fail reporting success — which is
+    the exact failure mode this clause exists to close, so it is refused here too rather
+    than only inside the scanner.
+    """
+    if not before:
+        raise ValueError(
+            "second-census clause: the FIRST census is empty. A delta against an empty "
+            "before-set reports every live family as new; against an empty after-set it "
+            "reports nothing at all. Neither is a verdict — refusing to grade it."
+        )
+    if not after:
+        raise ValueError(
+            "second-census clause: the SECOND census is empty. The scan after the wipe "
+            "enumerated ZERO pk families, which certifies nothing (the vacuous-scan trap) "
+            "— refusing to read it as 'no family appeared'."
+        )
+    findings: list[Finding] = []
+    for family in sorted(set(after) - set(before)):  # the direction IS the clause
+        rep_pk, rep_sk = after[family]
+        findings.append(
+            Finding(
+                CENSUS_FAMILY_APPEARED,
+                f"census.{family}",
+                f"pk family {family!r} exists in the census taken AFTER the wipe and did not exist in the "
+                f"one taken before it (representative row pk={rep_pk!r} sk={rep_sk!r}). A writer wrote into "
+                "the cycle after every instrument that archives it had already looked — DA-7's window, in "
+                "which the tagger ran at 16:37Z and six INSIGHT# rows landed at 17:09Z. Sealing here would "
+                "make a permanent public claim about a cycle whose record is still moving: stop the writer "
+                "(or the schedule), re-run the wipe, and take the census again.",
+            )
+        )
+    unknown = [f.kind for f in findings if f.kind not in CENSUS_FINDING_KINDS]
+    if unknown:  # pragma: no cover - structurally impossible, asserted anyway
+        raise AssertionError(f"census finding kinds outside CENSUS_FINDING_KINDS: {sorted(set(unknown))}")
+    return findings
+
+
+def render_census_delta(findings: list[Finding], before: dict, after: dict) -> str:
+    return "\n".join(
+        [
+            "second-census clause (#3621) — pk families before/after the wipe",
+            f"  families before : {len(before)}",
+            f"  families after  : {len(after)}",
+            f"  appeared        : {len(findings)}",
+            *[f"  BLOCK  {f}" for f in findings],
+        ]
+    )
+
+
+def run_second_census_gate(before: dict, *, table=None, printer=print) -> list[Finding]:
+    """THE CREDENTIALED WRAPPER. Takes the SECOND census and grades it against `before`.
+
+    The only I/O in this module. It delegates the enumeration to
+    `experiment.pk_census.family_census` — the same function that produced `before` — so
+    the two sides of the comparison can never be two different derivations (the #3792
+    lesson). Returns the blocking findings; an empty list means the reset may proceed to
+    the seal. NEVER writes, and never swallows: a census that cannot be taken raises,
+    because "the scan failed" must not read as "nothing appeared".
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _lam = str(_Path(__file__).resolve().parent.parent / "lambdas")
+    if _lam not in _sys.path:
+        _sys.path.insert(0, _lam)
+    from experiment.pk_census import family_census
+
+    after = family_census(table)
+    findings = blocking(audit_census_delta(before, after))
+    printer(render_census_delta(findings, before, after))
+    return findings
 
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI

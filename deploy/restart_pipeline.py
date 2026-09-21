@@ -222,10 +222,12 @@ from experiment.pk_census import (  # noqa: E402,F401
     CensusPreflightError,
     census_families,
     census_snapshot,
+    family_census,
     pk_family as _pk_family,
     run_census_preflight,
     scan_pk_sk_pages,
 )
+from prereg_truth_gate import run_second_census_gate  # noqa: E402 — #3621 box 2, the pre-seal second census
 
 
 def read_cycle_from_ssm() -> int | None:
@@ -847,13 +849,22 @@ def main():
     # fetched or written: classify() a representative of every live pk family and
     # ABORT the reset on any unclassified family, so a NEW experiment-scoped
     # top-level family (the next COACH#-like tier) can no longer silently survive.
+    first_census: dict | None = None  # #3621 box 2: the BEFORE half of the second census
     if args.skip_census_preflight:
         print("\n[0] Census preflight SKIPPED (--skip-census-preflight)")
+        print("    NOTE: the #3621 second census after the wipe is skipped too — it has nothing to compare against.")
     else:
         print("\n[0] Census preflight — every live pk family must classify() (ADR-077 totality guard, #1234)")
         try:
             fam_count = run_census_preflight()
             print(f"    OK — {fam_count} distinct pk families all resolve via phase_taxonomy.classify()")
+            # #3621 box 2: the BEFORE half of the second census, taken here and NOT
+            # threaded out of the preflight's own scan — deliberately. A baseline built
+            # from a table the totality gate is about to reject would be a baseline
+            # nobody can interpret, so the order is preflight-then-baseline and the cost
+            # is one extra pk+sk Scan (~$0.001, measured; see pk_census's COST note).
+            first_census = family_census()
+            print(f"    second-census baseline captured: {len(first_census)} families (#3621)")
             # #3514 (DA-10): the same scan also REFRESHES the committed census artifact, so
             # CI can grade docs/SCHEMA.md against a measured family list. Written here
             # because this is the one moment the pipeline provably holds credentials AND
@@ -1075,6 +1086,21 @@ def main():
             # is cycle N+1.
             if name == "restart_intelligence_wipe" and close_cycle:
                 print(f"    [close-cycle] {bump_cycle_ssm(new_cycle, args.apply)}")
+            # #3621 box 2 / #3599: the SECOND census. The wipe has archived the closing
+            # cycle; anything that wrote a NEW pk family between Step [0]'s census and
+            # now wrote into a cycle every archiving instrument had already finished
+            # looking at (DA-7's window). HARD-FAILS before the seal, never fail-soft:
+            # Step [0] proved credentials exist, so a scan that cannot be taken here is
+            # a failure, not an absence of findings.
+            if name == "restart_intelligence_wipe" and args.apply and first_census is not None:
+                print("\n[6c] Second census — no pk family may have APPEARED since Step [0] (#3621)")
+                _new = run_second_census_gate(first_census, printer=lambda s: print("    " + s.replace("\n", "\n    ")))
+                if _new and not args.continue_on_error:
+                    print("\n✗ SECOND CENSUS FAILED — a writer wrote into the cycle after the archive closed.")
+                    print("   ABORTING before the seal (pass --continue-on-error to override).")
+                    sys.exit(6)
+                if _new:
+                    print("   --continue-on-error: proceeding despite the appeared family/families.")
 
     # Step 11b (opt-in --sync-site, #1092): the full-site sync. Runs BEFORE the
     # verify gates so they check the freshly-synced surface. Apply-only — the

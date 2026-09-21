@@ -856,7 +856,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # the MERGE RESOLUTION tree (origin/main 3f9f73886 + this lane) -> 675 rows {proven 124,
         # unproven 540, not-applicable 6, attempted-unproven 5}; a disposable `git archive origin/main` export -> 674
         # {123, 540, 6, 5}. Exactly {structural::test_scoped_writer_provenance_guard_3599.py} enters, {} leaves — unproven does NOT move.
-        <= 124
+        # Upper bound 124 -> 125 (2026-09-21, #3621 boxes 2+5 re-merged onto main AFTER #4019): structural::test_protocol_lever_contract_3621.py
+        # arrives proven (STRUCTURAL_HAND_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=125`), not carried from the lane's 124.
+        <= 125
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

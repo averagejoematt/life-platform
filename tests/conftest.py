@@ -718,6 +718,19 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # for a gate whose whole job is to stop an unpriced number shipping into a public
         # zero-state payload.
         "test_gate_threshold_provenance_3621.py",
+        # #3621 box 5: an rglob sweep of lambdas/ + deploy/ + mcp/ for every module that
+        # mentions `PROTOCOL#` AND calls `put_item`, asserting the set is exactly the two
+        # sanctioned files (the chokepoint and its one seeder). Pure repo shape, and it
+        # must red BEFORE the merge for the usual reason: a SECOND protocol writer is
+        # introduced by a PR's own diff, and once merged it is a door the `spawned_by`
+        # refusal does not cover — which is the vacuity this box exists to end.
+        "test_protocol_lever_contract_3621.py",
+        # #3621 box 2: reads the committed live census artifact
+        # (deploy/generated/pk_family_census.json) to assert the family names its
+        # second-census clause is proved over are ones the live table actually produces.
+        # A PR that lands a regenerated artifact must red on the PR that lands it —
+        # tests/test_restart_verify_gates_3477.py derives this membership and requires it.
+        "test_restart_second_census_3621.py",
         # #3607: the sealed review anchors. Its verdict depends only on the tree —
         # docs/reviews/anchors/ANCHORS.json, its sha sibling, and the spine that loads
         # them — and the two failures it catches are both introduced by the diff that
