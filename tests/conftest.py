@@ -682,6 +682,18 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # that introduces it, not sit invisible post-merge the way the six sites this
         # PR fixed did.
         "test_ip_hash_salt_sweep_3620.py",
+        # #3615 box 1: an rglob sweep of site/**/*.js for every reader POST door, each of
+        # which must be claimed by a HOOK_REGISTRY row. Pure repo shape, and the failure
+        # is a PR's own diff — a hook added to the site without a registry row is exactly
+        # the thing that must red before it merges, because after the merge it simply
+        # joins the set of hooks nothing probes (which was all of them but one).
+        "test_hook_registry_3615.py",
+        # #3615 boxes 2+3: a glob sweep of lambdas/{web,emails,compute,content,coach} for
+        # modules that restate a week fact, each of which must be a registered surface or
+        # carry a reason. Same shape, same reason: a NEW narrating surface must be
+        # classified in the PR that adds it, not discovered by a human reading two pages
+        # side by side (which is how all five 2026-09-05 contradictions were found).
+        "test_week_agreement_3615.py",
         # #3621 box 3: an AST sweep of lambdas/experiment/experiment_gates.py asserting
         # every module-level arming threshold carries a {value, kind, source} facet. Its
         # verdict depends only on that file's text, and the failure it catches is a bare

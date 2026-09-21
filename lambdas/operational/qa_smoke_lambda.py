@@ -62,11 +62,13 @@ from operational import (
     chronicle_status_row_qa,  # noqa: E402  (#3563 dead-man)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
+    hook_liveness_qa,  # noqa: E402  (#3615 box 1: the hook × artifact liveness matrix)
     nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
     qa_check_edge_429,  # noqa: E402
     qa_check_oauth_door,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
+    week_agreement_qa,  # noqa: E402  (#3615 boxes 2+3: same-week fact + absence agreement)
     weight_truth_qa,  # noqa: E402
 )
 
@@ -131,6 +133,23 @@ def pt_now():
 
 def yesterday_str():
     return (pt_now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+# ── #3615: ONE read budget for both census legs, per invocation ──────────────
+# The hook matrix and the week-agreement gate fetch several of the SAME urls
+# (`/api/journey`, `/journal/posts.json`). A budget shared across both means each url
+# costs one read per night and the two legs cannot collectively overrun the sweep's
+# 240s Lambda ceiling — see census_probe.py for why a spent budget reports `deferred`
+# (a warn) rather than passing.
+_CENSUS_BUDGET: dict = {"budget": None}
+
+
+def census_budget(reset: bool = False):
+    from operational.census_probe import ProbeBudget
+
+    if reset or _CENSUS_BUDGET["budget"] is None:
+        _CENSUS_BUDGET["budget"] = ProbeBudget()
+    return _CENSUS_BUDGET["budget"]
 
 
 # ---------------------------------------------------------------------------
@@ -1129,6 +1148,23 @@ def check_steps():
         # #3860: an unclassified pk family blocks the NEXT reset — report it the day it appears, not at reset time
         ("pk_family_census", check_pk_family_census),
         ("orphan_routine_drafts", check_orphan_routine_drafts),  # #3772: drafts the soft-timeout left behind
+        # #3615 box 1: every reader hook × its downstream artifacts, walked nightly and
+        # stamped with the cycle day — a MISSING cell is a red, an honestly-absent one is
+        # a DECLARED, dated contract. Before this, check_predict_week_freshness above was
+        # the platform's only per-hook probe.
+        (
+            "hook_liveness_matrix",
+            lambda: hook_liveness_qa.check_hook_liveness(
+                table, s3, S3_BUCKET, Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()
+            ),
+        ),
+        # #3615 boxes 2+3: no page may contradict another page's account of the same week,
+        # every surface narrating a paused/lagging source tells ONE absence story, and a
+        # rendered rate carries its n and provisional flag (ADR-105).
+        (
+            "week_narration_agreement",
+            lambda: week_agreement_qa.checks(Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()),
+        ),
         ("recall_freshness", lambda: recall_freshness_qa.checks(table, f"{USER_PREFIX}chronicle", Check, CONTENT_TRUTH)),  # #1384
         # #2367: sk is identity, `date` is display — mismatch legal only with the carry-forward marker
         ("chronicle_sk_invariant", lambda: check_chronicle_sk_date_invariant(table, Check, CONTENT_TRUTH)),
@@ -1150,6 +1186,7 @@ def lambda_handler(event, context):
         run_time = pt_now()
         run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
         print(f"[QA] Smoke test starting — {run_time_str}")
+        census_budget(reset=True)  # #3615: a fresh read budget per invocation, shared by both census legs
 
         # #2307: fault-isolated accumulation. A raise inside any one step is
         # reported as a red `sweep:<label>` check; it can no longer cancel the

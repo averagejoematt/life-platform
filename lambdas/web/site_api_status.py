@@ -26,7 +26,7 @@ from typing import Any
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
-from ingestion.source_registry import due_months  # #3669: the cadence is DERIVED, never restated here
+from ingestion.source_registry import AVAILABILITY_PAUSED, availability_facet, due_months  # #3669 cadence, #3615 absence facets
 
 from web.site_api_common import (
     DDB_REGION,
@@ -52,6 +52,39 @@ from web.site_api_common import (
 _DUE_MONTHS_UNREGISTERED = {"dexa": 12, "food_delivery": 3, "bp_readings": 3, "measurements": 2}
 DUE_MONTHS = {**_DUE_MONTHS_UNREGISTERED, **due_months()}
 DUE_MONTHS_DEFAULT = 6
+
+
+# ── #3615 box 3 / #3516: ONE absence story, derived from the registry's facets ──
+#
+# Measured live on 2026-09-21, this panel rendered garmin as
+#   "Pipeline may need attention — was flowing regularly but stopped 97d ago. Check auth/webhook."
+# while /api/source_freshness rendered the SAME source as `status: paused` with the
+# ADR-074 reason. Garmin is paused by decree and cannot report at all: there is no auth
+# to check and no webhook to fix, and a reader who acts on that comment is chasing a
+# fault that does not exist. #3516 already ruled on this for the coach inventory —
+# `availability_facet()` is that ruling as a facet — and this is the same ruling applied
+# to the health panel, so the DURATION (the panel's own relative last-sync) and the
+# CAUSE (the registry's `method`/ADR text) are the same two things every narrating
+# surface renders. Nothing is composed here beyond the sentence frame.
+# SCOPE, stated because the narrower case was chosen deliberately: this rewrites the
+# comment for a PAUSED source only. The registry also marks some sources LAGGING (a
+# `stale_hours` override past the platform default), and this panel's activity-dependent
+# heuristic will still say "Check auth/webhook" about a gap the registry expects — live
+# on notion, 11d dark inside a 336h expectation. That case is a genuine disagreement
+# between two honest rules (the panel's "an API poller writes daily" and the registry's
+# per-source cadence) and resolving it is a product call, not a lane's: #3615's nightly
+# gate reports it every night as a WARN naming the source, and it is the named residual.
+# A pause is not that case: a paused source CANNOT report, at any duration, so there is
+# no auth to check and no webhook to fix.
+def _absence_comment(facet: dict, rel: str) -> str:
+    """The comment a PAUSED source gets, built from ITS OWN registry facet."""
+    low = str(rel or "").strip().lower()
+    if low and low not in ("never", "not imported"):
+        duration = f"Last record: {rel}."
+    else:
+        duration = "No record has ever arrived on this feed."
+    return f"PAUSED in the source registry — {facet.get('reason') or 'intentionally off'}. {duration} A pause is a hole in the record, not a broken pipe."
+
 
 # ── Module-owned cache state for /api/status ─────────────────────────────────
 # Originally globals in site_api_lambda.py, then on site_api_intelligence.py;
@@ -759,6 +792,13 @@ def status(*, _g) -> dict:
                     comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
             elif activity_dep and not last:
                 comment = "No record has ever arrived on this feed"
+
+        # #3615/#3516: before any alarm override, a source the REGISTRY calls paused or
+        # lagging tells its absence story from the registry's own facets. Applied when the
+        # panel is already narrating an absence (non-green), and always for a paused
+        # source — a pause is a standing fact about the pipe, not a transient state.
+        if availability_facet(sid)["status"] == AVAILABILITY_PAUSED:
+            comment = _absence_comment(availability_facet(sid), rel)
 
         # CloudWatch alarm override — if Lambda is actively erroring, escalate status
         if sid in alarming_sources and status != "blue":
