@@ -603,3 +603,28 @@ def test_bounded_cap_is_the_live_count_plus_exactly_n():
     assert bf.bounded_cap(t, 1) == 301
     assert bf.bounded_cap(t, 0) == 300
     assert bf.bounded_cap(FakeTable(), 1) == 1
+
+
+def test_migrate_plan_is_keyed_by_template_so_another_blocks_occurrence_0_cannot_shadow_the_collision():
+    """Found live (2026-09-10, session AP): the Rowing and Elliptical blocks of the same
+    workout are ALSO occurrence 0 of their own templates. A plan keyed by occurrence alone
+    let the last noted block overwrite the Treadmill's occurrence-0 note, so the real
+    archived prior was reported "no stored extraction carries this note text" and the
+    migration refused a collision it could resolve."""
+    bf = _backfill_module()
+    w = workout()
+    # Give the other template's block (index 1, occurrence 0 of ITS template) a note of its own.
+    w["exercises"][1] = dict(w["exercises"][1], notes="Shadow note on the cable row")
+    t = FakeTable([w])
+    legacy = _seed_legacy(t, w, note=NOTE_B, now_iso="2026-09-11T03:00:00Z")
+    prior = dict(legacy, note_raw=NOTE_A, note_hash=tn.note_hash(NOTE_A), record_kind=tn.RECORD_KIND_PRIOR)
+    prior["sk"] = tn.prior_extraction_sk(legacy["sk"], prior)
+    prior["superseded_head_sk"] = legacy["sk"]
+    t.put_item(Item=prior)
+
+    plans = bf.migrate_collisions(t, dates=(w["date"],), apply=False)
+    (p,) = [p for p in plans if p["template_id"] == TEMPLATE]
+    assert p["unavailable"] == [], f"the other block's note shadowed occurrence 0: {p['unavailable']}"
+    assert p["distinct_notes"] == 2 and sorted(p["end_state"]) == [tn.head_sk(w["date"], wid_of(w), 0), tn.head_sk(w["date"], wid_of(w), 1)]
+    by_sk = {str(it["sk"]): str(it["note_raw"]) for it in p["puts"]}
+    assert by_sk.get(tn.head_sk(w["date"], wid_of(w), 0)) == NOTE_A, f"occurrence 0 must be promoted from ITS archived prior: {by_sk}"

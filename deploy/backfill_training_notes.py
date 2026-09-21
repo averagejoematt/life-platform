@@ -349,11 +349,16 @@ def migrate_collisions(table, dates=COLLISION_DATES, apply=False):
         for w in _noted_workouts(table, date, until=date):
             wid = tn.workout_id_of_raw_row(w)
             exs = w.get("exercises") or []
-            notes_by_occ = {occ: note for _ex, _tid, _nm, occ, note in _noted_sessions(w)}
+            # Keyed by (template, occurrence), never by occurrence alone: every template's first
+            # block is occurrence 0, so an occurrence-only map lets the LAST noted block in the
+            # workout shadow the collision template's note and the plan reports the real archived
+            # prior as "no stored extraction carries this note text" (found live on 2026-09-10,
+            # session AP — the Rowing/Elliptical blocks of the same workout are also occurrence 0).
+            notes_by_occ = {(t_id, occ): note for _ex, t_id, _nm, occ, note in _noted_sessions(w)}
             for tid, occs in tn.noted_occurrences_by_template(exs).items():
                 if len(occs) < 2:
                     continue  # not a collision — untouched
-                plans.append(plan_group_migration(table, date, wid, tid, occs, notes_by_occ))
+                plans.append(plan_group_migration(table, date, wid, tid, occs, {o: notes_by_occ[(tid, o)] for o in occs}))
 
     print(f"MIGRATE{'' if apply else ' (dry-run — nothing written)'}: {len(plans)} colliding (workout, template) group(s)\n")
     for p in plans:
