@@ -455,7 +455,36 @@ _DRIFTED_PRIOR_CUT_NOTE_PY = (
     'NOTE = "intake is NOT comparable to the prior cut — MacroFactor begins 2025-11-24 (ADR-104)"\n'
 )
 
+# #3599 box 2: a NEW writer landing a row on an EXPERIMENT_SCOPED
+# `USER#matthew#SOURCE#*` partition with no write-time provenance — the #3513 defect
+# (insight_writer, measured live at 109 unstamped rows) reconstructed as a fresh module.
+# Deliberately NOT git-added: the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so
+# an untracked module is exactly the shape a half-landed writer has.
+_UNSTAMPED_SCOPED_WRITER_PY = (
+    '"""probe — a synthetic writer landing an unstamped row on a scoped SOURCE partition."""\n\n\n'
+    "def probe(table, insight_id, text):\n"
+    "    table.put_item(\n"
+    "        Item={\n"
+    '            "pk": "USER#matthew#SOURCE#insights",\n'
+    '            "sk": f"INSIGHT#{insight_id}",\n'
+    '            "text": text,\n'
+    "        }\n"
+    "    )\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_scoped_writer_provenance_guard_3599.py": MutationSpec(
+        gate_id="structural::test_scoped_writer_provenance_guard_3599.py",
+        target="tests/test_scoped_writer_provenance_guard_3599.py",
+        detects=(
+            "a NEW put_item writer landing a row on an EXPERIMENT_SCOPED `USER#matthew#SOURCE#*` "
+            "partition with no write-time stamp (experiment_stamp_for/experiment_stamp/tag_record) "
+            "and no dated line in tests/scoped_writer_residue_3599.py — the #3513/#3877 class, which "
+            "the #2119 guard cannot see because its scan set is COACH#/ENSEMBLE# only"
+        ),
+        plants=(("lambdas/emails/_census_probe_3599.py", _UNSTAMPED_SCOPED_WRITER_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
+    ),
     "structural::test_prior_cut_disclosure_3754.py": MutationSpec(
         gate_id="structural::test_prior_cut_disclosure_3754.py",
         target="tests/test_prior_cut_disclosure_3754.py",
@@ -833,6 +862,26 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_scoped_writer_provenance_guard_3599.py": _proof(
+        "structural::test_scoped_writer_provenance_guard_3599.py",
+        "ARMED 1/1 — baseline: 13 passed, 1 xfailed in 12.04s | mutated: 1 failed, 12 passed, 1 xfailed in 11.80s :: "
+        "test_every_scoped_source_writer_stamps_or_carries_a_dated_waiver | reverted: 13 passed, 1 xfailed in 11.72s",
+        "lambdas/ mcp/ deploy/ scripts/ on disk (rglob, .py only, deploy/archive excluded), so an "
+        "UNTRACKED module is in scope. It sees a writer only through a LITERAL `#SOURCE#<name>` "
+        "fragment — in the function's own body, or one hop away in a module-scoped string binding "
+        "(the `insight_writer._PK` shape). Measured with the guard's own helpers on 2026-09-20: 186 "
+        "put_item functions across those four trees, 44 naming a resolvable SOURCE family, 142 blind "
+        "— 38 of those blind ones stamp anyway and 104 do not. So a REGRESSION on a runtime-assembled "
+        "pk is invisible here, which is stated rather than papered over: "
+        "test_a_runtime_assembled_pk_is_unobserved_by_this_guard is an xfail(strict=True), so the day "
+        "someone closes that gap the XPASS reds and this scope line has to be rewritten. The class "
+        "ruling comes from the committed live census (deploy/generated/pk_family_census.json), not "
+        "from a synthetic sk — classify() is sk-dependent and a made-up sk mis-rules real partitions "
+        "(COACH#outbound_events reads EXPERIMENT_SCOPED against a DATE# sk and SYSTEM_STATE against "
+        "its real EVENT# rows). It judges SOURCE SHAPE, never live rows: whether an unstamped row "
+        "actually exists is the qa-smoke inverse leg's question, not this gate's.",
+        proved_on="2026-09-20",
+    ),
     "structural::test_prior_cut_disclosure_3754.py": _proof(
         "structural::test_prior_cut_disclosure_3754.py",
         "baseline: 3 passed in 0.17s | mutated: 1 failed, 2 passed in 0.18s :: "
