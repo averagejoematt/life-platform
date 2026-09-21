@@ -1,3 +1,13 @@
+# gate-entrypoint: this file computes the commit refusal and `tools_hevy_routine.
+# _action_commit` blocks on it — `mcp_error(refusal_message(gate), error_code=
+# SUBTRACT_ONLY_VIOLATION)`, and the routine never reaches Hevy. Nothing here raises or
+# exits, so the census's structural classifier cannot see that enforcement; this is the
+# `declared-entrypoint` case (scripts/gate_census_enforcement.py). #3220 Q1 YES — a
+# blocking consumer obeys this file's verdict. Q2 NO COVERING ROW — the only other row
+# that could report this verdict would be a structural:: test, and
+# tests/test_subtract_only_commit_gate_behavior.py is a behaviour test, not a
+# tree-sweeping one, so it is not in that family. Proof record:
+# scripts/gate_census_proofs.py::GUARD_PROOFS["guard::mcp/hevy_prescription_gate.py"].
 """hevy_prescription_gate.py — subtract-only as a GATE on the chat path (#3971).
 
 WHY THIS EXISTS
