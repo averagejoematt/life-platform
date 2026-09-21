@@ -187,6 +187,9 @@ def tool_get_decisions(args):
             },
             "decisions": [
                 {
+                    # #3754 box 4: the sk travels with the row — update_decision_outcome's own error
+                    # says "get it from get_decisions", and nutrition_critics dedups on it.
+                    "sk": i.get("sk"),
                     "date": i.get("date"),
                     "decision": i.get("decision"),
                     "source": i.get("source"),

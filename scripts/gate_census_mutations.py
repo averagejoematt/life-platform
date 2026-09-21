@@ -497,7 +497,25 @@ _DARK_FEED_ADVERTISED_HTML = (
     "</head><body><p>census probe</p></body></html>\n"
 )
 
+# #3754 boxes 3+4: a site-api module importing the nutrition critics — the block carries a
+# refeed / diet-break decision with a ready `log_decision` payload and is OWNER-ONLY; the
+# gate's whole job is that no lambdas/web, emails, content or coach narrative module ever
+# reaches it. Planted under lambdas/web/ as a NEW file (the gate os.walks lambdas/ + mcp/ on
+# disk, so untracked is in scope), as a parenthesised multi-line import so the RED also
+# proves the sweep is AST-based rather than a single-line regex.
+_WEB_IMPORTS_NUTRITION_CRITICS_PY = "from health import (  # census probe\n    deficit_disclosures,\n    nutrition_critics,\n)\n"
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_nutrition_critics_3754.py": MutationSpec(
+        gate_id="structural::test_nutrition_critics_3754.py",
+        target="tests/test_nutrition_critics_3754.py",
+        detects=(
+            "a module under lambdas/web/ (site-api) importing health.nutrition_critics — the owner-only "
+            "refeed / diet-break decision block reaching a reader-facing surface (#3754 boxes 3+4)"
+        ),
+        plants=(("lambdas/web/_census_probe_3754.py", _WEB_IMPORTS_NUTRITION_CRITICS_PY),),
+        track=False,  # the gate os.walks lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
     "structural::test_scoped_writer_provenance_guard_3599.py": MutationSpec(
         gate_id="structural::test_scoped_writer_provenance_guard_3599.py",
         target="tests/test_scoped_writer_provenance_guard_3599.py",
@@ -911,6 +929,21 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_nutrition_critics_3754.py": _proof(
+        "structural::test_nutrition_critics_3754.py",
+        "ARMED 1/1 — baseline: 62 passed in 1.71s | mutated: 1 failed, 61 passed in 1.70s :: "
+        "test_only_the_mcp_resolver_imports_nutrition_critics | reverted: 62 passed in 1.65s. The plant is a "
+        "parenthesised multi-line `from health import (..., nutrition_critics)` in a NEW lambdas/web/ module, so the "
+        "RED also proves the sweep parses imports (ast) rather than matching one regex line.",
+        "lambdas/**/*.py + mcp/**/*.py on disk (os.walk, __pycache__ excluded; the critic module itself excluded), "
+        "each parsed with `ast` for `from health import nutrition_critics` / `from health.nutrition_critics import` / "
+        "`import health.nutrition_critics`. The allowed set is the ONE MCP resolver (mcp/nutrition_critics_inputs.py); "
+        "any other importer — lambdas/web (site-api), emails, content, coach narrative — reds. Outside the set in both "
+        "directions: an importer that reaches the module through importlib or a string, and a surface that receives the "
+        "block as DATA from an MCP tool's output rather than by import (the MCP layer is owner-only by construction, so "
+        "that path stays behind the same door). Also invisible: a file under a directory other than lambdas/ or mcp/.",
+        proved_on="2026-09-21",
+    ),
     "structural::test_scoped_writer_provenance_guard_3599.py": _proof(
         "structural::test_scoped_writer_provenance_guard_3599.py",
         "ARMED 1/1 — baseline: 13 passed, 1 xfailed in 12.04s | mutated: 1 failed, 12 passed, 1 xfailed in 11.80s :: "
