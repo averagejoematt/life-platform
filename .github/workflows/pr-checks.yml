@@ -129,8 +129,9 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr view "${{ github.event.pull_request.number }}" --json commits \
+          gh pr view "$PR_NUMBER" --json commits \
             -q '[.commits[].messageBody] | join("\n---\n")' > /tmp/pr_commits_3005.txt || echo "" > /tmp/pr_commits_3005.txt
           echo "PR_COMMITS_FILE_UNDER_TEST=/tmp/pr_commits_3005.txt" >> "$GITHUB_ENV"
           echo "collected $(grep -c '^---$' /tmp/pr_commits_3005.txt || true) separator(s)"
@@ -301,8 +302,9 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr view "${{ github.event.pull_request.number }}" --json commits \
+          gh pr view "$PR_NUMBER" --json commits \
             -q '[.commits[].messageBody] | join("\n---\n")' > /tmp/pr_commits_3005.txt || echo "" > /tmp/pr_commits_3005.txt
           echo "PR_COMMITS_FILE_UNDER_TEST=/tmp/pr_commits_3005.txt" >> "$GITHUB_ENV"
           echo "collected $(grep -c '^---$' /tmp/pr_commits_3005.txt || true) separator(s)"
