@@ -591,7 +591,7 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
 # deploy/write_lane_posture.py (box 4) names pr-checks.yml by path, and the
 # equality assertion redded by name until it was registered. That is the
 # derivation guard working on its author, one commit after it landed.
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 24}
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 25}
 
 
 def main() -> None:
