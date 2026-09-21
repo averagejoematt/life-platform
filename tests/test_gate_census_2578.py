@@ -855,7 +855,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # the pre-#3621 heredoc writer restored byte-for-byte from origin/main 1 failed; reverted 27 passed). RE-MEASURED after
         # this lane rebased onto #4015 by id-set diff on committed trees against a throwaway-repo `git archive origin/main`
         # export; exactly one id enters and none leaves.
-        <= 123
+        <= 124
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
