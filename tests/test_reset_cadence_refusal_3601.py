@@ -187,16 +187,35 @@ def test_the_cadence_read_cannot_report_a_VACUOUS_zero():
     sys.path.insert(0, str(ROOT / "scripts"))
     import monthly_close
 
-    src = (ROOT / "scripts" / "monthly_close.py").read_text(encoding="utf-8")
-    body = src[src.index("def reset_cadence") : src.index("def main(argv")]
-    assert "parsed EMPTY" in body, "an empty CYCLE_GENESES would be reported as a clean zero"
+    # BEHAVIOURAL, not a source-substring read: #3601's price work moved the parse into
+    # `_cycle_geneses()`, and a grep anchored to `reset_cadence`'s body went green-to-red
+    # on a pure refactor while the property it cares about never changed. Drive the real
+    # function against a real empty registry instead.
+    def _empty_registry():
+        raise RuntimeError("CYCLE_GENESES parsed EMPTY — a vacuous zero is not a cadence")
+
+    orig = monthly_close._cycle_geneses
+    try:
+        monthly_close._cycle_geneses = _empty_registry
+        out = monthly_close.reset_cadence(datetime.date(2026, 9, 1), datetime.date(2026, 9, 30))
+    finally:
+        monthly_close._cycle_geneses = orig
+    assert "parsed EMPTY" in out.get("error", ""), "an empty CYCLE_GENESES would be reported as a clean zero"
+    assert "in_month" not in out, "an unreadable registry must not also return a count"
     assert monthly_close.reset_cadence.__doc__ and "PARTIAL" in monthly_close.reset_cadence.__doc__
 
 
 def test_the_UNSHIPPED_half_of_box_2_says_so_in_the_output():
-    """`$ per reset` and the DEMOTE-candidate list are box 2 and are NOT delivered. The
-    output names them rather than letting a shorter report read as a complete one — the
-    same rule the rest of this repo applies to a degraded check."""
+    """The residual narrows, and the printout must narrow with it.
+
+    `$ per reset` SHIPPED 2026-09-20 (`deploy/restart_cost_model.py`, asserted in
+    `tests/test_reset_price_3601.py`), so the close no longer lists it as missing — a
+    "not delivered" line for something that IS delivered is the same lie in the other
+    direction. The DEMOTE-candidate list is still outstanding and is still named, rather
+    than letting a shorter report read as a complete one."""
     src = (ROOT / "scripts" / "monthly_close.py").read_text(encoding="utf-8")
     assert "NOT PRINTED, and not invented" in src
     assert "DEMOTE-candidate list" in src
+    tail = src[src.index("NOT PRINTED, and not invented") :]
+    tail = tail[: tail.index('"""') if '"""' in tail[:400] else 400]
+    assert "$ per reset" not in tail, "$/reset has shipped; it must no longer be listed as not-printed"
