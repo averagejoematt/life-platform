@@ -682,6 +682,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # that introduces it, not sit invisible post-merge the way the six sites this
         # PR fixed did.
         "test_ip_hash_salt_sweep_3620.py",
+        # #3621 box 3: an AST sweep of lambdas/experiment/experiment_gates.py asserting
+        # every module-level arming threshold carries a {value, kind, source} facet. Its
+        # verdict depends only on that file's text, and the failure it catches is a bare
+        # new literal added in the very PR that should red on it — post-merge is too late
+        # for a gate whose whole job is to stop an unpriced number shipping into a public
+        # zero-state payload.
+        "test_gate_threshold_provenance_3621.py",
     }
 )
 

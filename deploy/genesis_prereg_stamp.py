@@ -281,6 +281,12 @@ def main():
             f"against this artifact. It was stamped at {stamp['stamped_at']}; a FRESH seal carrying these would be "
             "REFUSED. The repair for a published seal is a public amendment record, never an edit:\n  - "
             + "\n  - ".join(str(f) for f in standing)
+            + (
+                "\n\nThat record now has a shape and a builder (#3599) — read-only, prints what it would publish:\n"
+                f"  python3 deploy/prereg_amendment.py --genesis {stamp['genesis']}\n"
+                "It appends to generated/experiments/prereg/genesis-<genesis>.amendments.json, which the site serves\n"
+                "beside the seal (site_api_common.prereg_seal_meta). The sealed bytes are never touched."
+            )
         )
 
     if not args.apply:

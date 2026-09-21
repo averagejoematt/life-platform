@@ -154,15 +154,24 @@ def live_scoped_pks(prefix: str, table=None) -> dict:
     return out
 
 
+# #3621: `tombstoned_reason` joined this projection rather than getting a scan of its own.
+# A Scan is billed on the bytes SCANNED, not the bytes projected (see COST above), so the
+# extra attribute is free — while a second full-table pass for the tombstone-provenance
+# census would have doubled the RCU of every caller that wants both.
 PROVENANCE_PROJECTION = {
-    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb",
-    "ExpressionAttributeNames": {"#phase": "phase", "#cycle": "cycle", "#tomb": "tombstone"},
+    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb, #treason",
+    "ExpressionAttributeNames": {
+        "#phase": "phase",
+        "#cycle": "cycle",
+        "#tomb": "tombstone",
+        "#treason": "tombstoned_reason",
+    },
 }
 
 
 def scan_provenance_pages(table):
     """Yield each page of a FULL-table scan projected to the key plus the provenance
-    attributes (`phase`, `cycle`, `tombstone`). The row-side companion to
+    attributes (`phase`, `cycle`, `tombstone`, `tombstoned_reason`). The row-side companion to
     `scan_pk_sk_pages`: same RCU (a Scan is billed on the bytes SCANNED, not projected —
     see COST above), three more attributes in the payload, and it answers a question the
     pk-only scan cannot: does THIS row carry the stamp its class requires?"""

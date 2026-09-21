@@ -80,6 +80,15 @@ Checks (each pass/fail):
      INSIGHT# rows across four cycles that PHASE_FILTER_EXPRESSION served as CURRENT on
      Day 1, and no writer enumeration could see it because its pk is a runtime value.
 
+ 22. Tombstone-provenance census (#3621 box 1): every non-null `tombstoned_reason`
+     names a genesis that RESOLVES — to a cycle in CYCLE_GENESES or to the
+     ABANDONED_GENESES alias map beside it (a genesis a reset actually ran on before
+     the anchor moved; the wipe's if_not_exists writes mean an in-place registry
+     correction can never reach rows an earlier run already stamped, #1202). The
+     resolution is then compared against the row's own `cycle` stamp and every
+     agreement/disagreement class is printed by name. Red on the 328 rows the
+     2026-09-04 re-anchor left unreadable.
+
  19. Cross-surface VITALS honesty (#2113): no coach card on
      /api/coaching-dashboard cites a recovery score, HRV, resting HR or sleep
      duration the cockpit disagrees with. The sibling of the weight check —
@@ -96,6 +105,7 @@ Usage:
 """
 
 import json
+import re
 import subprocess
 import sys
 import urllib.request
@@ -174,6 +184,107 @@ def pre_genesis_unstamped(pages, genesis: str) -> tuple[list, int]:
             if d and d < genesis and it.get("phase") != "pilot":
                 bad.append(f"{pk}/{sk}[phase={it.get('phase')}]")
     return bad, scanned
+
+
+_REASON_GENESIS_RE = re.compile(r"_(\d{4}-\d{2}-\d{2})$")
+
+# The census's classes, in the order the detail line prints them.
+TOMB_UNRESOLVED = "unresolved_genesis"
+TOMB_MATCHED = "stamp_is_closing_cycle"
+TOMB_EARLIER = "stamp_is_an_earlier_cycle"
+TOMB_LATER = "stamp_is_a_later_cycle"
+TOMB_NO_STAMP = "no_cycle_stamp"
+TOMB_CYCLE_ONE = "genesis_of_cycle_1"
+TOMB_UNDATED = "reason_names_no_genesis"
+
+
+def genesis_in_reason(reason) -> str | None:
+    """The genesis date a tombstone reason names, or None when it names none.
+
+    DELIBERATELY WIDER than phase_taxonomy.closing_genesis_of, which matches
+    `experiment_restart_<date>` only — correctly, because the pre-registered-bet ledger it
+    feeds must not read a reconcile row as a reset, and it falls back to `tombstoned_at`
+    when the reason is unreadable. The census asks the other question ("does every dated
+    reason in the table resolve?"), so it takes ANY reason whose trailing token is an ISO
+    date — `countdown_gap_reconcile_2026-09-05` is one, and 438 live rows carry that family
+    — and never falls back to a write timestamp, which is not a genesis. A reason with no
+    trailing date (`legacy_daily_aggregate_superseded_by_per_workout`) names no genesis and
+    is counted out of scope rather than guessed at (ADR-104).
+    """
+    m = _REASON_GENESIS_RE.search(str(reason or ""))
+    return m.group(1) if m else None
+
+
+def tombstone_provenance_census(pages, cycle_geneses: dict, abandoned_geneses: dict | None = None):
+    """#3621 box 1 — the pure predicate behind check 22: every non-null `tombstoned_reason`
+    in the table resolves, and its resolution is compared against the row's OWN cycle stamp.
+
+    Returns (counts, examples, scanned). `counts` is keyed by the TOMB_* classes above.
+
+    THE BLOCKING CLAUSE is `unresolved_genesis == 0`: a reason naming a genesis that is in
+    NEITHER registry (CYCLE_GENESES nor ABANDONED_GENESES) means the archive carries a
+    provenance nothing in the repo can read back. That is red today on the 328 rows the
+    2026-09-04 re-anchor left behind and green once the alias map ships — the free positive
+    control this check was built around.
+
+    THE STAMP COMPARISON IS REPORTED, NOT BLOCKING, and that is a deliberate call. Three
+    disagreement shapes exist in live data and only one of them is a defect:
+
+      * `stamp_is_closing_cycle` — the wipe stamped `cycle = closing run` on a row that had
+        no cycle attribute. The intended shape.
+      * `stamp_is_an_earlier_cycle` — the row already carried the cycle it was WRITTEN in,
+        so the wipe's `if_not_exists` left it alone (#1202, by design: the archive stays
+        navigable by the generation a record was born in). Not a defect; ~8,400 live rows.
+      * `stamp_is_a_later_cycle` — the stamp is the cycle the reset OPENED, not the one it
+        closed, so two conventions coexist in the archive. That IS a finding, but it is a
+        DIFFERENT finding from this box, its repair is an attended DynamoDB write, and a
+        check that can only be made green by one is a check nobody can act on. It is
+        counted and printed by name on every run so it cannot go quiet.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+    from experiment import phase_taxonomy as taxonomy  # noqa: E402
+
+    counts: dict[str, int] = {}
+    examples: dict[str, list] = {}
+    scanned = 0
+
+    def record(klass: str, key: str):
+        counts[klass] = counts.get(klass, 0) + 1
+        if len(examples.setdefault(klass, [])) < 4:
+            examples[klass].append(key)
+
+    for page in pages:
+        for it in page:
+            scanned += 1
+            reason = it.get("tombstoned_reason")
+            if reason in (None, ""):
+                continue
+            key = f"{it.get('pk', '')}/{it.get('sk', '')}[{reason}|cycle={it.get('cycle')}]"
+            genesis = genesis_in_reason(reason)
+            if genesis is None:
+                record(TOMB_UNDATED, key)
+                continue
+            opening = taxonomy.opening_cycle_for_genesis(genesis, cycle_geneses, abandoned_geneses)
+            if opening is None:
+                record(TOMB_UNRESOLVED, key)
+                continue
+            if opening <= 1:
+                record(TOMB_CYCLE_ONE, key)
+                continue
+            closing = opening - 1
+            stamp = it.get("cycle")
+            try:
+                stamp_int = int(stamp)
+            except (TypeError, ValueError):
+                record(TOMB_NO_STAMP, key)
+                continue
+            if stamp_int == closing:
+                record(TOMB_MATCHED, key)
+            elif stamp_int < closing:
+                record(TOMB_EARLIER, key)
+            else:
+                record(TOMB_LATER, key)
+    return counts, examples, scanned
 
 
 def check(name: str, ok: bool, detail: str = ""):
@@ -420,6 +531,33 @@ def main():
         check("No pre-genesis EXPERIMENT_SCOPED row without phase=pilot (#3513)", not bad and scanned > 0, detail)
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("No pre-genesis EXPERIMENT_SCOPED row without phase=pilot (#3513)", False, f"check could not run: {e}")
+
+    # 22. #3621 box 1 — tombstone-provenance census. Check 21 asks whether a pre-genesis
+    # row is stamped; this asks whether the ARCHIVE's own provenance can be read back:
+    # every non-null `tombstoned_reason` names a genesis, and that genesis must resolve to
+    # a cycle in CYCLE_GENESES or the ABANDONED_GENESES alias beside it. Red on 328 rows
+    # before #3621's alias (the 2026-09-04 Friday re-anchor), green after — and the stamp
+    # comparison prints beside it (see `tombstone_provenance_census` for why one of its
+    # three disagreement classes is a finding and two are the intended shape).
+    # A second projected full scan, same RCU class as check 21 — this is an attended script.
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+        from experiment.pk_census import scan_provenance_pages  # noqa: E402
+        from web.site_api_data import ABANDONED_GENESES, CYCLE_GENESES  # noqa: E402
+
+        counts, examples, scanned = tombstone_provenance_census(scan_provenance_pages(t), CYCLE_GENESES, ABANDONED_GENESES)
+        unresolved = counts.get(TOMB_UNRESOLVED, 0)
+        breakdown = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))
+        detail = f"{breakdown} over {scanned} scanned" + (
+            f"; e.g. {', '.join(examples.get(TOMB_UNRESOLVED, [])[:3])}; repair: add the genesis to "
+            "ABANDONED_GENESES in lambdas/web/site_api_data.py (NEVER re-put the reason strings — that "
+            "destroys the record that the genesis was written)"
+            if unresolved
+            else ""
+        )
+        check("Every dated tombstoned_reason resolves to a known cycle (#3621)", unresolved == 0 and scanned > 0, detail)
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("Every dated tombstoned_reason resolves to a known cycle (#3621)", False, f"check could not run: {e}")
 
     # 15. #1979 — pre-registration completion gate. "Pre-registered" is the
     # platform's central credibility claim; nothing previously asserted a cycle's
