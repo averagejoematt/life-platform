@@ -1980,3 +1980,52 @@ REGISTRY_PROOFS.update(
         }
     }
 )
+
+
+# ── #3621 box 4: the citation NETWORK re-resolution arm ────────────────────────────────
+#
+# scripts/verify_citations.py's own eutils/Crossref calls sit behind one seam
+# (`_fetch_json`), so the mutation is transport-level per this family's stated bar (the
+# planted condition is on the REAL call shapes both arms make, not a synthetic detector).
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/verify_citations.py": {
+            "gate_name": "scripts/verify_citations.py",
+            "command": "python3 -m pytest tests/test_verify_citations_3621.py -q   # 21 cases, fully offline",
+            "mutation": (
+                "`_fetch_json` monkeypatched to return each of the three eutils/Crossref shapes the guard "
+                "exists to catch, one at a time: a PMID/DOI that no longer resolves (empty eutils `title`, "
+                "a Crossref HTTPError 404); a retraction (eutils `status: retracted`; a Crossref `update-to` "
+                "record of type `retraction`); and a live title that no longer matches the stored one (PMID "
+                "reassignment / a corrected DOI title). Each has a matching-title PASS control on the same "
+                "code path, so a detector that always reports drift (or never does) fails either the mutation "
+                "or the control, never both silently."
+            ),
+            "observed": (
+                "2026-09-20. RED (one failure line each, `check_pubmed`/`check_doi`): the 404 shape -> "
+                "'did not resolve (404/withdrawn)' / 'did not resolve (HTTP 404)'; the retraction shape -> "
+                "'is RETRACTED' / 'carries a RETRACTION notice'; the title-mismatch shape -> 'is now ... "
+                "stored ...' on both arms. GREEN on the matching-title control for both arms "
+                "(test_check_pubmed_passes_when_the_live_title_matches_stored, "
+                "test_check_doi_passes_when_the_live_title_matches_stored). Also watched: `check_pubmed([])` "
+                "makes zero network calls (a monkeypatched `_fetch_json` that raises proves it is never "
+                "invoked), and `main()` exits 1 on drift / 0 clean. Live run against the real registries at "
+                "the same commit (no plant): 47 PubMed + 3 DOI citations, zero drift — `verify()`'s own "
+                "clean-count print distinguishes 'zero found' from 'zero checked'. 21 passed."
+            ),
+            "scope": (
+                "The mutation is the seam (`_fetch_json`'s return shape), not a live NCBI/Crossref outage or "
+                "rate-limit response — a genuinely malformed or non-JSON body from either API raises inside "
+                "`_fetch_json` itself; `check_pubmed`'s broad except reports an eutils lookup failure for the "
+                "whole batch and `check_doi`'s per-DOI except (URLError/ValueError) reports it per citation, "
+                "but that catch path is NOT separately watched red/green the way #3112 requires of family 6 — "
+                "this is family 2 (guard-script), held to the single-defect bar, not the two-half one. The "
+                "scheduled CI wiring (`ci::.github/workflows/citation-network-check.yml::verify::1`) is "
+                "ATTEMPTED_UNPROVEN: a genuine live drift needs a real retraction/reassignment on NCBI/"
+                "Crossref to reproduce end to end, which this lane cannot plant without mutating third-party "
+                "public records."
+            ),
+            "proved_on": "2026-09-20",
+        }
+    }
+)
