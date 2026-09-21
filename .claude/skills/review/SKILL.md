@@ -107,18 +107,22 @@ queue before filing or shipping.
      sampled. **A lens with ANY UNOBSERVED clause cannot be graded A** — that rule is what stops
      silence from reading as a pass, and it is what catches a clause graded against an empty
      payload or against a cycle day that never happened.
-   - **An extension proposed during a run does not bind that run.** Write it to that lens's
-     `proposed_extensions[]` with your run id, report TWO grades for the lens (frozen, and
-     frozen+proposed) and name which clause moved the row. Promotion into the anchor happens at
-     the next freeze, by PR — a reviewable dated diff that changes the artifact's hash. The
-     ratchet is tightening-only: `python3 scripts/review_anchor_seal.py --diff origin/main` reds
-     on any clause weakened, removed or with its evidence requirement relaxed, and a deliberate
-     loosening needs an owner-signed dated line in the file, which then prints in this header.
+   - **An extension proposed during a run does not bind that run.** The frozen clauses are fixed
+     for the run: they **may not be extended, narrowed or reworded while it is in flight**. Write
+     the extension to that lens's `proposed_extensions[]` with your run id, report TWO grades for
+     the lens (frozen, and frozen+proposed) and name which clause moved the row. Promotion into
+     the anchor happens at the next freeze — a reviewable dated diff that changes the artifact's
+     hash. The ratchet is tightening-only: `python3 scripts/review_anchor_seal.py --diff
+     origin/main` reds on any clause weakened, removed or with its evidence requirement relaxed,
+     and a deliberate loosening needs an owner-signed dated line in the file, which then prints
+     in this header.
 
    This reverses what this file used to sanction — "anchors may be *extended*" — and the reversal
    is the finding: on the 2026-09-05 baseline every one of the panel's anchors was extended by the
    run that graded against it, so a dropped grade cannot be separated from a raised bar, and the
-   trend line (the only reason to grade) stops meaning anything.
+   trend line (the only reason to grade) stops meaning anything. Extend an anchor **between** runs,
+   by PR, where the change is a reviewable dated diff. A later run that grades against a different
+   artifact hash gets a different header and must say so in its `method`.
 6. Write the **shared context block** every lens brief will carry verbatim: the platform
    one-paragraph + experiment day N of cycle N; the budget tier and what it pauses; the
    **intentional-emptiness manifest** (post-reset, which surfaces are empty *by design* per
