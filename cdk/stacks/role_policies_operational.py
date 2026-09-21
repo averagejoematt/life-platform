@@ -1082,6 +1082,17 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
         iam.PolicyStatement(
+            sid="IpHashSalt",  # #3620 (security ROW4): the confirmed-subscriber record's ip_hash and the
+            # subscribe rate limiter's dedup key both routed through unsalted sha256(ip). The
+            # subscriber-record field is optional (common.client_ip.salted_ip_hash fail-closed
+            # omits it, never writes an unsalted digest); the rate limiter fails OPEN on a
+            # missing salt, matching its own pre-existing "accept over lock out" posture.
+            # Without this grant both paths take their documented degraded branch, never an
+            # unsalted write.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ip-hash-salt")],
+        ),
+        iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query"],
             resources=[TABLE_ARN],

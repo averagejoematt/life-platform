@@ -19,11 +19,16 @@ first two are kept apart on purpose (#3213 box 3):
 
   ok           the newest scheduled run is inside cadence + grace
   stale        it fired before, and the newest fire is older than cadence + grace
-  never-fired  the API reports ZERO scheduled runs for this workflow, ever — a
-               workflow whose cron has never once been delivered (a bad cron
-               expression, a disabled workflow, a file that was renamed). This is not
-               "late"; nothing will ever auto-close it, and it reads identically to a
-               healthy workflow on every other instrument in the repo.
+  born         (#3982) ZERO scheduled runs yet, but the workflow's own BIRTH instant —
+               plus one cadence + grace — has not passed yet. A cron registered an hour
+               ago cannot have missed a deadline that has not arrived; see NEWBORN
+               CRONS below. Not a finding.
+  never-fired  the API reports ZERO scheduled runs for this workflow AND either its
+               birth deadline has passed, or its birth cannot be established at all
+               (no `A` commit for the workflow file reachable on main — "birth
+               unknown", reported rather than assumed recent). This is not "late";
+               nothing will ever auto-close it, and it reads identically to a healthy
+               workflow on every other instrument in the repo.
 
 Plus two states about the instrument rather than the subject, because a watcher that
 cannot say "I could not look" is a watcher that reports health when it is blind:
@@ -77,6 +82,36 @@ a detected stop becomes one deduped tracked issue that auto-closes on the next c
 run, reusing the filer rather than growing a second issue-filing path — and the slug
 keeps it from ever colliding with the watched workflow's own auto-filed issue.
 
+NEWBORN CRONS (#3982)
+----------------------
+Before this fix, a workflow's deadline for `never-fired` was computed the same way
+regardless of history: cadence + grace measured against "now", with zero scheduled
+runs read as an instant finding. That is correct for a workflow that has existed for
+months and never once fired, and wrong for a workflow that was registered ten minutes
+ago — its first cron literally cannot have happened yet.
+
+The concrete before/after is #3980: PR #3976 registered `pii-endpoint-sweep.yml`
+(cadence 24h, grace 14h) as `watched`. The very next push-triggered `cron-freshness`
+run — three hours before the sweep's own first 14:10Z cron could exist — read its zero
+scheduled runs as `never-fired` and auto-filed #3980. #3980's own recovery comment
+records that it self-closed at 17:20Z the same day on the workflow's first green
+scheduled run: correct eventually, but a false red for the ~14h of its own declared
+grace window that the deadline should have covered from birth, not from registration.
+
+The fix: a watched workflow with zero scheduled runs is judged from its BIRTH instant
+— the oldest commit on `main` that added its `.github/workflows/<file>` (`git log
+--diff-filter=A`, via `first_commit_time()`; a declared `registered_at` in the
+registry row overrides it when present) — plus one cadence + grace, not from "now".
+Inside that window the row renders `born` (not a finding); the deadline passing with
+still-zero runs, or the birth being UNDISCOVERABLE at all (no `A` commit reachable —
+e.g. a squash/rewrite, or a checkout too shallow to see it), both fall through to
+`never-fired` exactly as before — an unknown birth is reported, never assumed recent.
+`git log` needs real history to find that commit, which is why
+`.github/workflows/cron-freshness.yml`'s checkout step is `fetch-depth: 0` — the
+default shallow `fetch-depth: 1` checkout carries only the tip commit, so `git log
+--diff-filter=A` would find nothing for any workflow file older than the last push and
+every zero-run row would read as birth-unknown forever.
+
 EXIT STATUS
 -----------
   0  every watched workflow is inside its window (or --allow-unverified absorbed a
@@ -117,6 +152,7 @@ from typing import Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from scheduled_workflow_registry import (  # noqa: E402
+    REPO_ROOT,
     SCHEDULED_WORKFLOW_FLOOR,
     discover_scheduled_workflows,
     orphaned_policy_rows,
@@ -127,11 +163,14 @@ from scheduled_workflow_registry import (  # noqa: E402
 # consumer share one spelling (check_main_green.py's shape).
 OK = "ok"
 STALE = "stale"
+BORN = "born"  # #3982 — zero runs yet, but inside the birth deadline. Not a finding.
 NEVER_FIRED = "never-fired"
 UNVERIFIED = "unverified"
 UNRULED = "unruled"
 ORPHANED = "orphaned"
 
+# BORN is deliberately absent: a newborn cron still inside its first cadence + grace
+# window is not a finding, the entire point of #3982.
 REPORTABLE = (STALE, NEVER_FIRED, UNRULED, ORPHANED)
 
 # ── #3541: the live grace derivation ─────────────────────────────────────────
@@ -187,6 +226,34 @@ def _parse_iso(ts: str | None) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def classify_newborn(birth_iso: str | None, deadline_hours: float, now: datetime) -> tuple[str, float | None]:
+    """(verdict, age_hours) for a watched workflow with ZERO scheduled runs (#3982).
+
+    Distinct from `classify()` on purpose: that function has no birth concept at all —
+    a `None` newest-run reads as an instant `never-fired` there, correct for a workflow
+    that has existed for months and simply never fired, but wrong for one registered
+    minutes ago. This function is the newborn path `evaluate()` reaches for instead,
+    the moment there is zero scheduled-run history.
+
+    `birth_iso` is the workflow's own birth instant (its first `A` commit on main, or a
+    declared `registered_at` override) — or `None` when that birth is UNDISCOVERABLE
+    (no such commit reachable at all). An undiscoverable birth is always a finding: it
+    is never treated as "recent" by default, because that would silently reopen the
+    exact false-green risk this repo's dead-men exist to close. Otherwise the verdict
+    is `born` while `now` is still inside one cadence + grace of the birth instant, and
+    falls through to `never-fired` — identically to the pre-#3982 behaviour — once that
+    deadline has passed with still no scheduled run.
+    """
+    if birth_iso is None:
+        return NEVER_FIRED, None
+    born = _parse_iso(birth_iso)
+    if born is None:
+        # An unparseable birth timestamp carries no more information than none at all.
+        return NEVER_FIRED, None
+    age = (now - born).total_seconds() / 3600.0
+    return (BORN if age <= deadline_hours else NEVER_FIRED), age
+
+
 def derive_live_grace_hours(
     timestamps_oldest_first: list[str], *, margin: float = GRACE_MARGIN, min_samples: int = NEWBORN_MIN_SAMPLES
 ) -> tuple[float | None, str]:
@@ -222,21 +289,45 @@ def effective_grace_hours(declared_grace_hours: float, live_grace_hours: float |
     return max(float(declared_grace_hours), float(live_grace_hours))
 
 
-def evaluate(rows: dict[str, dict[str, Any]], newest_by_file: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
-    """One finding per WATCHED row. Pure: `newest_by_file` is injected, never fetched.
+def evaluate(
+    rows: dict[str, dict[str, Any]],
+    newest_by_file: dict[str, Any],
+    now: datetime,
+    birth_by_file: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """One finding per WATCHED row. Pure: `newest_by_file` and `birth_by_file` are both
+    injected, never fetched.
 
-    A file mapped to the sentinel `False` means "the lookup itself failed" (as opposed
-    to None, which means "the API answered, and the answer was zero runs"). Collapsing
-    those two would let a rate-limited run report `never-fired` on a healthy workflow —
-    the reverse of this instrument's whole purpose.
+    A file mapped to the sentinel `False` in `newest_by_file` means "the lookup itself
+    failed" (as opposed to None, which means "the API answered, and the answer was zero
+    runs"). Collapsing those two would let a rate-limited run report `never-fired` on a
+    healthy workflow — the reverse of this instrument's whole purpose.
+
+    `birth_by_file` (#3982, optional — every pre-existing caller keeps working
+    unchanged) is only consulted for a zero-run row: `{file: iso_birth_string}`. A file
+    absent from the map, or mapped to anything that is not a string, is an
+    UNDISCOVERABLE birth — `classify_newborn` turns that into an immediate finding
+    rather than a fresh one, so a caller that forgets to pass birth data gets the
+    pre-#3982 behaviour (instant `never-fired`) rather than a silently lenient one.
     """
     findings: list[dict[str, Any]] = []
     for name, row in sorted(rows.items()):
         if not row.get("watched"):
             continue
         lookup = newest_by_file.get(name, False)
+        newborn_note: str | None = None
         if lookup is False:
             verdict, age = UNVERIFIED, None
+        elif lookup is None:
+            birth_raw = (birth_by_file or {}).get(name)
+            birth_iso = birth_raw if isinstance(birth_raw, str) else None
+            verdict, age = classify_newborn(birth_iso, float(row["deadline_hours"]), now)
+            if birth_iso is None:
+                newborn_note = "birth unknown — no `A` commit found for this workflow file on main; reported, not assumed recent (#3982)"
+            elif verdict == BORN:
+                newborn_note = f"newborn: zero scheduled runs yet; born {birth_iso}, still inside its first cadence + grace window (#3982)"
+            else:
+                newborn_note = f"newborn: zero scheduled runs yet; born {birth_iso}, first cadence + grace window has elapsed (#3982)"
         else:
             verdict, age = classify(lookup, float(row["deadline_hours"]), now)
         findings.append(
@@ -250,6 +341,7 @@ def evaluate(rows: dict[str, dict[str, Any]], newest_by_file: dict[str, Any], no
                 "newest_scheduled_run": lookup if lookup is not False else None,
                 "age_hours": None if age is None else round(age, 2),
                 "verdict": verdict,
+                "newborn_note": newborn_note,
             }
         )
     return findings
@@ -296,10 +388,14 @@ def render(
     add("")
 
     for f in findings:
-        mark = {OK: "  ok  ", STALE: " STALE", NEVER_FIRED: " NEVER", UNVERIFIED: " ????? "}.get(f["verdict"], " ???? ")
+        mark = {OK: "  ok  ", STALE: " STALE", BORN: " BORN ", NEVER_FIRED: " NEVER", UNVERIFIED: " ????? "}.get(f["verdict"], " ???? ")
         age = "n/a" if f["age_hours"] is None else f"{f['age_hours']}h"
+        # #3982: a zero-run row (BORN, or a NEVER_FIRED reached via the newborn path) has
+        # no "newest sched run" at all — the age is since BIRTH, and saying otherwise
+        # would misreport what is actually being measured.
+        age_label = "since birth" if f["verdict"] == BORN or f.get("newborn_note") else "newest sched run"
         add(
-            f"  [{mark}] {f['file']:<34} newest sched run {age} ago "
+            f"  [{mark}] {f['file']:<34} {age_label} {age} ago "
             f"(deadline {f['deadline_hours']}h = cadence {f['cadence_hours']}h + grace {f['grace_hours']}h)"
         )
         _note = (grace_notes or {}).get(f["file"])
@@ -310,6 +406,11 @@ def render(
             add("           GitHub has not delivered this cron inside its window. This is an")
             add("           ABSENCE, not a failure: the #1447 advisory filer is armed on a run's")
             add("           result and has nothing to be armed on.")
+        if f.get("newborn_note"):
+            add(f"           {f['newborn_note']}")
+        if f["verdict"] == BORN:
+            add(f"           cron {f['crons']} — no scheduled run yet, and none expected until birth + deadline.")
+            add("           Not a finding: the deadline above has not passed.")
         if f["verdict"] == NEVER_FIRED:
             add(f"           cron {f['crons']} — the API reports ZERO `event: schedule` runs, ever.")
             add("           Check the cron expression, and whether the workflow is disabled.")
@@ -400,6 +501,40 @@ def scheduled_run_history(workflow_file: str, per_page: int = GRACE_HISTORY_SAMP
     return parsed if isinstance(parsed, list) else False
 
 
+def first_commit_time(workflow_file: str, repo_root: str | None = None) -> Any:
+    """The ISO commit time of the OLDEST commit reachable from `HEAD` that added
+    `.github/workflows/{workflow_file}` — this cron's BIRTH instant (#3982).
+
+    `git log` (no `--reverse`) lists newest-first, and a file can carry more than one
+    `A` (added) event across its life if it was ever deleted and re-added, so this
+    takes the LAST line printed (the earliest) rather than the first.
+
+    Returns None when the file has zero `A` events reachable from HEAD at all — a
+    genuinely UNDISCOVERABLE birth (a history rewrite, or a checkout too shallow to see
+    it — see the module docstring's NEWBORN CRONS section) — never guessed. Returns the
+    sentinel False when the `git` invocation itself failed (not a git checkout, `git`
+    missing), sentinel-compatible with `newest_scheduled_run`/`scheduled_run_history`
+    above.
+
+    `repo_root` defaults to this repo's real root; tests inject a synthetic git repo
+    here rather than monkeypatching module state.
+    """
+    path = os.path.join(".github", "workflows", workflow_file)
+    try:
+        out = subprocess.run(
+            ["git", "log", "--diff-filter=A", "--format=%cI", "--", path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+            cwd=repo_root or REPO_ROOT,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return False
+    lines = [ln for ln in out.splitlines() if ln.strip()]
+    return lines[-1] if lines else None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--json", action="store_true", help="machine-readable findings on stdout")
@@ -450,7 +585,18 @@ def main(argv: list[str] | None = None) -> int:
             rows[name]["grace_hours"] = round(effective, 2)
             rows[name]["deadline_hours"] = round(rows[name]["cadence_hours"] + effective, 2)
 
-    findings = evaluate(rows, newest, now)
+    # #3982: a zero-run watched workflow is judged from its BIRTH instant, not from
+    # "now" — only zero-run rows need one looked up at all. The registry's declared
+    # `registered_at` (when present) overrides the derived first-commit-on-main lookup;
+    # everything else falls through to `first_commit_time()`.
+    birth: dict[str, Any] = {}
+    for name in watched_names:
+        if newest.get(name) is not None:
+            continue
+        override = rows[name].get("registered_at")
+        birth[name] = override if isinstance(override, str) else first_commit_time(name)
+
+    findings = evaluate(rows, newest, now, birth)
     code, report = render(findings, unruled, orphaned, len(rows), grace_notes)
 
     if args.json:
@@ -463,6 +609,7 @@ def main(argv: list[str] | None = None) -> int:
                     "unruled": unruled,
                     "orphaned": orphaned,
                     "grace_notes": grace_notes,
+                    "birth": birth,
                 },
                 indent=2,
             )

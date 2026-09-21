@@ -69,8 +69,12 @@ the state is observable. "Reported green while guarding nothing" is the failure 
 #1221 itself was.
 """
 
+import hashlib
 import logging
+import os
 import uuid
+
+from common.secret_cache import get_secret as _get_secret
 
 _LOG = logging.getLogger(__name__)
 
@@ -245,3 +249,74 @@ def extract_idempotency_identity(event: dict) -> str:
         nonce[:8],
     )
     return f"{_UNTRUSTED_IDENTITY_PREFIX}:{nonce}"
+
+
+# ── #3620 box 5 / security ROW4: THE shared salted ip_hash helper ────────────
+# `web/site_api_social_engage.py` found and fixed 6 doors that kept
+# `sha256(client_ip)[:16]` as a rate-limit / dedup key and, in three of them,
+# PERSISTED that digest (submit_finding / board_question write it into the
+# stored record, predict writes it into a DDB sort key). Unsalted, that digest
+# is a 2**32 keyspace over IPv4 — exhaustible in minutes, so it was never a
+# pseudonym.
+#
+# That fix scoped its own AST sweep (tests/test_ip_hash_salt_3620.py) to the ONE
+# module it touched — the issue carries a `review:*` label, which names the
+# CLASS, not the specimen. `grep -rn "sha256(.*ip" lambdas/ mcp/` (#3620's own
+# instruction) found SIX more unsalted call sites across FOUR more modules —
+# `site_api_social_ladder.py`, `site_api_social_challenges.py`,
+# `site_api_social_experiments.py`, `site_api_ai_lambda.py` (x3, one of which
+# PERSISTS into a board follow-up session record) and `email_subscriber_lambda.py`
+# (persisted into the confirmed-subscriber row until unsubscribe redacts it).
+# Every one of those routes through THIS function now — see
+# `tests/test_ip_hash_salt_sweep_3620.py` for the repo-wide sweep that replaces
+# the module-scoped one.
+#
+# `web/site_api_social_engage.py` keeps its own private, independently-tested
+# implementation rather than being rewired to call this one: it reads the
+# identical secret (`life-platform/ip-hash-salt`) through the identical
+# `secret_cache` and produces the identical digest form
+# (`sha256(f"{salt}:{ip}")[:16]`) — the two are functionally ONE helper wearing
+# two names, and re-pointing 6 already-shipped, already-deployed doors at a new
+# import for a cosmetic dedup was judged not worth re-risking them. Both are
+# covered by name in `tests/test_ip_hash_salt_sweep_3620.py`.
+_IP_HASH_SALT_SECRET_NAME = os.environ.get("IP_HASH_SALT_SECRET_NAME", "life-platform/ip-hash-salt")
+
+_salt_client_cache: list = []
+
+
+def _salt_secrets_client():
+    """A cached Secrets Manager client, or None if one cannot be built.
+
+    Mirrors `site_api_social_engage._secrets_client()`: failure to build a
+    client is NOT the fail-closed decision here; only a failed READ is.
+    """
+    if _salt_client_cache:
+        return _salt_client_cache[0] or None
+    try:
+        import boto3
+
+        client = boto3.client("secretsmanager", region_name="us-west-2")
+    except Exception:
+        client = None
+    _salt_client_cache.append(client)
+    return client
+
+
+def salted_ip_hash(source_ip: str, logger: "logging.Logger | None" = None) -> "str | None":
+    """`sha256(salt + ip)[:16]`, or None when the salt is unavailable (fail-closed).
+
+    Callers MUST branch on None and refuse to persist or emit an unsalted digest
+    — there is no unsalted fallback by construction. `logger` defaults to this
+    module's logger; callers that want the failure attributed to their own
+    module name may pass their own.
+    """
+    log = logger or _LOG
+    try:
+        salt = _get_secret(_IP_HASH_SALT_SECRET_NAME, _salt_secrets_client())
+    except Exception as e:
+        log.error(f"[ip_hash] salt unavailable ({type(e).__name__}: {e}) — refusing the write (fail-closed)")
+        return None
+    if not salt:
+        log.error("[ip_hash] salt resolved EMPTY — refusing the write (fail-closed)")
+        return None
+    return hashlib.sha256(f"{salt}:{source_ip}".encode()).hexdigest()[:16]

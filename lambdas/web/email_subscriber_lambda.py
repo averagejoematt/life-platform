@@ -83,7 +83,6 @@ is still honored: sends route through common.send_guard.guarded_send_email and
 the subscriber-record writes are suppressed.
 """
 
-import hashlib
 import hmac as _hmac
 import json
 import logging
@@ -101,7 +100,7 @@ import boto3
 # CloudFront header / env var can't break subscriptions. Always importable: every
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
-from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.client_ip import extract_client_ip, salted_ip_hash  # #1221 / #3620 (security ROW4)
 from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.pacific_time import PACIFIC  # #2414 — the site's day boundary is Pacific (legacy-link sunset check)
 from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
@@ -186,9 +185,21 @@ def _email_hash(email: str) -> str:
     return subscriber_email_hash(email)
 
 
-def _ip_hash(ip: str) -> str:
-    """SHA256 of IP — non-reversible, for abuse detection only."""
-    return hashlib.sha256((ip or "").encode()).hexdigest()[:16]
+def _ip_hash(ip: str) -> "str | None":
+    """Salted SHA256 of IP, or None when the salt is unavailable (#3620 security ROW4).
+
+    Was `sha256(ip)[:16]` with no salt — a 2**32 keyspace over IPv4, exhaustible in
+    minutes, sitting in a DDB record that PERSISTS until unsubscribe redacts it (the
+    docstring's own "non-identifying" claim was false). The caller (`_handle_subscribe`)
+    treats this as an OPTIONAL abuse-detection field, not a door to fail closed on: a
+    missing salt omits `ip_hash` from the record rather than refusing the subscription
+    — the field is write-only (nothing reads or enforces on it; see
+    `lambdas/content/subscriber_retention.py`), so blocking growth's core funnel over it
+    would trade a real feature for a diagnostic one no code consumes.
+    """
+    if not ip:
+        return None
+    return salted_ip_hash(ip, logger)
 
 
 def _get_record(email_hash: str) -> dict | None:
@@ -245,7 +256,13 @@ def _check_subscribe_rate_limit(source_ip: str) -> tuple[bool, int]:
     if not source_ip or source_ip == "unknown":
         return True, 0
 
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): fail OPEN here, matching this function's own stated
+    # posture ("we'd rather accept a request than lock out a legitimate user") —
+    # a missing salt skips the rate-limit bucket rather than either writing an
+    # unsalted digest or blocking every subscribe attempt on a diagnostic secret.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return True, 0
     now_epoch = int(datetime.now(timezone.utc).timestamp())
     bucket = now_epoch // _RATE_LIMIT_WINDOW_SEC
     sk = f"IP#{ip_hash}#BUCKET#{bucket}"
@@ -407,10 +424,16 @@ def handle_subscribe(
         "created_at": now_iso,
         "confirm_token": token,
         "token_expires": token_exp,
-        "ip_hash": _ip_hash(source_ip),
         "updated_at": now_iso,
         **attribution,
     }
+    # #3620 (security ROW4): `ip_hash` is fail-closed on the SALT, not on the
+    # subscribe flow — a missing/unavailable salt omits the field (no unsalted
+    # digest ever gets written) rather than refusing the subscription. See
+    # `_ip_hash`'s docstring for why this field is safe to drop rather than block on.
+    _iph = _ip_hash(source_ip)
+    if _iph is not None:
+        item["ip_hash"] = _iph
     if existing:
         # Preserve original created_at and confirmed_at if resubscribing
         item["created_at"] = existing.get("created_at", now_iso)

@@ -192,7 +192,7 @@ def _handle_experiment_vote(event: dict, *, _g) -> dict:
     _valid_library_ids = _g["_valid_library_ids"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -220,7 +220,11 @@ def _handle_experiment_vote(event: dict, *, _g) -> dict:
     if library_id not in valid_ids:
         return _error(400, "Unknown experiment")
 
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): TTL'd (24h) but still the reversible-in-minutes
+    # exposure the issue names for that window.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     rate_pk = "VOTES#rate_limit"
     rate_sk = f"IP#{ip_hash}#LIB#{library_id}"
     now_epoch = int(datetime.now(timezone.utc).timestamp())
@@ -281,6 +285,7 @@ def _handle_experiment_follow(event: dict, *, _g) -> dict:
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -315,7 +320,10 @@ def _handle_experiment_follow(event: dict, *, _g) -> dict:
         return _error(400, "Unknown experiment")
 
     email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): only the IP side is the reversible-in-minutes exposure.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     now_epoch = int(datetime.now(timezone.utc).timestamp())
 
     # Rate limit: FOLLOW_RATE_LIMIT follows per IP per hour
@@ -536,13 +544,16 @@ def _handle_experiment_suggest(event: dict, *, _g) -> dict:
     extract_client_ip = _g["extract_client_ip"]
     extract_idempotency_identity = _g["extract_idempotency_identity"]
     hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
     timezone = _g["timezone"]
     # Rate limit: 3 per IP per hour (#358). Applied unconditionally (#2237).
     ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    ip_hash = salted_ip_hash(ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     allowed, _rem, _retry = _rate_check("experiment_suggest", ip_hash, limit=3, window_seconds=3600)
     if not allowed:
         return _rate_limited("experiment_suggest", "Too many suggestions. Please try again later.", retry_after=3600)

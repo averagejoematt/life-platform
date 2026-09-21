@@ -96,6 +96,13 @@ SCHEDULED_WORKFLOW_FLOOR = 8
 #   basis        — str. Where grace_hours came from. A number with no basis is the
 #                  thing ADR-105 exists to forbid.
 #   reason       — str. Why watched, or why deliberately not. Never blank.
+#   registered_at — str | None, OPTIONAL (#3982). An explicit ISO timestamp overriding
+#                  the derived birth instant used for a NEWBORN cron (zero scheduled
+#                  runs yet). When absent (every row today), the birth instant is
+#                  derived instead from the workflow file's first commit on main
+#                  (`check_cron_freshness.first_commit_time`) — a declared override
+#                  exists only for the case a workflow was renamed/moved and its true
+#                  birth predates the current filename's own history.
 # ─────────────────────────────────────────────────────────────────────────────
 WATCH_POLICY: dict[str, dict[str, Any]] = {
     # ── watched ──────────────────────────────────────────────────────────────
@@ -434,6 +441,7 @@ def discover_scheduled_workflows(workflow_dir: str | None = None) -> dict[str, d
             "grace_hours": grace,
             "basis": (policy or {}).get("basis"),
             "reason": (policy or {}).get("reason"),
+            "registered_at": (policy or {}).get("registered_at"),
             "deadline_hours": (cadence + float(grace)) if (watched and grace is not None) else None,
         }
     return found

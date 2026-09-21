@@ -206,12 +206,16 @@ def _handle_replicate_certify(event: dict, *, _g) -> dict:
     _error = _g["_error"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     logger = _g["logger"]
     table = _g["table"]
     timezone = _g["timezone"]
     source_ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): this dedup row is PERMANENT (no ttl, by design — see
+    # the docstring above), so an unsalted digest here would never age out.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     now_epoch = int(datetime.now(timezone.utc).timestamp())
     try:
         table.put_item(
@@ -269,7 +273,7 @@ def _handle_cohort_submit(event: dict, *, _g) -> dict:
     _rate_limited = _g["_rate_limited"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -306,7 +310,11 @@ def _handle_cohort_submit(event: dict, *, _g) -> dict:
     week = str(cfg["week"])
 
     ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): this row is keyed on ip_hash and stays until the next
+    # submission overwrites it — never TTL-expired sooner than that.
+    ip_hash = salted_ip_hash(ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
 
     # Rate limit: 1 submission per IP per week — DDB-backed (the SAME limiter the
     # challenge check-in uses), survives warm-container distribution. Applied
