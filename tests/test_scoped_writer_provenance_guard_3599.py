@@ -322,7 +322,13 @@ def findings(writers: list, residue: dict, today: str) -> list:
 
 
 def _today() -> str:
-    return date.today().isoformat()
+    """The platform's day, not the runner's. Every date in this gate — `seeded`, `expires`
+    — is a calendar day in Matthew's frame, so the clock that grades them is the same one
+    the rest of the platform reads (#3222: a UTC 'today' is a different day for seven
+    hours every evening, which would expire a waiver early in CI and not locally)."""
+    from common.pacific_time import pacific_today
+
+    return pacific_today()
 
 
 # ── the real tree ────────────────────────────────────────────────────────────
@@ -518,7 +524,7 @@ def test_the_guards_reach_is_measured_and_still_partial():
 def test_the_seed_date_is_not_in_the_future():
     """A ledger sealed in the future would waive writers nobody has looked at, and would
     make every `seeded` date meaningless as provenance."""
-    assert date.fromisoformat(SEED_DATE) <= date.today()
+    assert date.fromisoformat(SEED_DATE) <= date.fromisoformat(_today())
     assert all(
         entry["seeded"] == SEED_DATE for entry in SCOPED_WRITER_RESIDUE.values()
     ), "a line dated off the seal must carry its own reason"
