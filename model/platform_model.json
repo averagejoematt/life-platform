@@ -3604,6 +3604,20 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/operational/hook_liveness_qa.py",
+      "partition": "qa_hook_matrix",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/operational/hook_liveness_qa.py",
+      "partition": "qa_hook_matrix",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": "pipeline-health-check",
       "module": "lambdas/operational/pipeline_health_check_lambda.py",
@@ -7210,7 +7224,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 695,
+      "edges": 697,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7224,9 +7238,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 338,
-        "sites_resolved": 861,
-        "sites_total": 1199
+        "sites_dynamic": 341,
+        "sites_resolved": 863,
+        "sites_total": 1204
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7239,6 +7253,7 @@
       "intelligence_quality",
       "journal",
       "platform_memory",
+      "qa_hook_matrix",
       "zone2_efficiency"
     ],
     "scope_cuts": [

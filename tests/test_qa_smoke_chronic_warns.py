@@ -115,6 +115,18 @@ SANCTIONED_CHRONIC_SITES = {
     #     a `low` whose own note ends "No flag warranted on reconsideration" — the
     #     judge retracted it, the pipeline counted it, qa-smoke-warnings lit (#3258).
     ("qa_check_reader_truth.py", "check_reader_truth"),
+    # #3615, class (b) — the absence-agreement gate's ADVISORY branch, pinned to the
+    # residual #3615 names. The FAIL branch (a source the registry calls PAUSED narrated as
+    # a broken pipe — "Check auth/webhook" about garmin, which ADR-074 paused and which
+    # cannot report at all) is untouched and stays alarmed. What is chronic is the other
+    # case: a LAGGING source narrated as a possible auth failure INSIDE the gap the registry
+    # itself expects (live: notion, 11d dark against a 336h expectation). Two honest rules
+    # collide there — /api/status's "an API poller writes daily, so a 2-day gap is expired
+    # auth" and source_registry's per-source cadence — and choosing between them is an owner
+    # product call, not something a nightly should red on. It would otherwise recur every
+    # single night with zero marginal information, which is exactly the ADR-105 condition
+    # this flag exists for. Un-chronic the branch when the ruling lands.
+    ("week_agreement_qa.py", "check_absence_agreement"),
 }
 
 
