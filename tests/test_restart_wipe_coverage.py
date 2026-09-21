@@ -13,8 +13,11 @@ so the gap is caught at PR time.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -25,7 +28,12 @@ sys.modules["restart_intelligence_wipe"] = wipe
 _spec.loader.exec_module(wipe)
 
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
-from experiment import phase_taxonomy as taxonomy  # noqa: E402
+from experiment import (
+    phase_taxonomy as taxonomy,  # noqa: E402
+    pk_census,  # noqa: E402
+)
+
+CENSUS_ARTIFACT = REPO_ROOT / "deploy" / "generated" / "pk_family_census.json"
 
 
 def test_registry_coverage_assertion_passes():
@@ -176,3 +184,85 @@ def test_the_commitments_rollup_is_covered():
     covered = {pk for pk, *_ in wipe.COACH_PARTITIONS}
     assert "COACH#commitments" in covered
     assert taxonomy.classify("COACH#commitments", "TALLY#current") == taxonomy.EXPERIMENT_SCOPED
+
+
+# ── #3599 box 1: the coverage assertion graded against the REAL census, in CI ──
+#
+# #3514's census leg is live-only: `main()` scans DynamoDB and passes the result in, so
+# the claim "today's real partition set is covered" could only ever be made by an operator
+# with credentials, at reset time, and its CI control was a HAND-BUILT one-key dict
+# ({"COACH#brand_new": ...}). That control proves the assertion can fire; it says nothing
+# about the live set.
+#
+# `deploy/generated/pk_family_census.json` now carries a `coverage_partitions` block —
+# every live pk under `pk_census.COVERAGE_PREFIXES` with the class the taxonomy gives it,
+# taken from the same scan the artifact already paid for. So the tests below run the SAME
+# assertion the reset runs, against MEASURED rows (real pks, real representative sks),
+# offline, on every PR. The fixture is the wire.
+
+
+def _committed_scoped_partitions() -> dict:
+    """The live EXPERIMENT_SCOPED partition set from the committed census, through
+    pk_census's own reader (never re-derived here — see that function's docstring)."""
+    snapshot = json.loads(CENSUS_ARTIFACT.read_text(encoding="utf-8"))
+    scoped = pk_census.scoped_partitions_from_snapshot(snapshot)
+    # Population floor: a truncated or filtered-to-nothing census must not read as "all
+    # covered". Ten coach-tier partitions were live on 2026-09-21; the floor is the eight
+    # operational coaches, which cannot drop without a roster change reviewing this line.
+    assert len(scoped) >= 8, f"only {len(scoped)} scoped partitions in the committed census — a truncated scan, not the live table"
+    return scoped
+
+
+def test_the_committed_census_carries_the_coverage_granularity():
+    """The artifact must enumerate FULL pks, not only the folded `COACH` family — the
+    granularity gap #3514 found (`COACH#nudge_ledger` survived three cycles inside a
+    family that classified fine). Absence here is a regenerate, not a skip."""
+    snapshot = json.loads(CENSUS_ARTIFACT.read_text(encoding="utf-8"))
+    block = snapshot.get("coverage_partitions")
+    assert block, "the committed census has no coverage_partitions block — run python3 deploy/write_pk_family_census.py"
+    assert set(block) == set(pk_census.COVERAGE_PREFIXES), f"census prefixes {sorted(block)} != {sorted(pk_census.COVERAGE_PREFIXES)}"
+    assert len(block["COACH#"]) >= 10, f"only {len(block['COACH#'])} live COACH#* partitions recorded"
+
+
+def test_todays_real_census_passes_the_coverage_assertion():
+    """Box 1's second half: the live partition set — including the two delivery ledgers
+    #3514 reclassified — is fully covered by the wipe TODAY. Verified live read-only on
+    2026-09-21 (16 scoped partitions across the four prefixes, PASS) and pinned here so a
+    new uncovered partition reds at PR time rather than at the next reset."""
+    wipe.assert_registry_coverage(_committed_scoped_partitions())
+
+
+def test_a_phantom_census_family_with_no_partitions_entry_reds():
+    """Box 1's first half, on the real census rather than a one-key stand-in: plant
+    `COACH#phantom_ledger` — the issue's own fixture name, shaped like the two ledgers
+    that actually escaped (a `DAY#<date>` sk, not a coach brief) — into the measured set
+    and the SAME assertion must SystemExit naming it. Without this the test above is just
+    a green light with no proof it can go red."""
+    census = dict(_committed_scoped_partitions())
+    census["COACH#phantom_ledger"] = "DAY#2026-09-21"
+    with pytest.raises(SystemExit) as exc:
+        wipe.assert_registry_coverage(census)
+    assert "COACH#phantom_ledger" in str(exc.value)
+
+
+def test_the_reclassified_ledgers_are_live_and_system_state_in_the_measured_census():
+    """Why the real census passes is a RULING, not an absence: both ledgers are live rows
+    on the table right now, and they stay out of the required set because the taxonomy
+    classifies them SYSTEM_STATE (#3514). Graded against the measured class in the
+    artifact AND re-derived through classify() on the artifact's own representative row,
+    so reverting the rule reds here rather than quietly re-arming the 2026-06 gap."""
+    snapshot = json.loads(CENSUS_ARTIFACT.read_text(encoding="utf-8"))
+    coach = snapshot["coverage_partitions"]["COACH#"]
+    for pk in ("COACH#nudge_ledger", "COACH#outbound_ledger"):
+        assert pk in coach, f"{pk} is not in the measured census — this test's premise is stale, re-measure"
+        assert coach[pk]["class"] == taxonomy.SYSTEM_STATE, f"{pk} is {coach[pk]['class']} in the census"
+        assert taxonomy.classify(pk, coach[pk]["rep_sk"]) == taxonomy.SYSTEM_STATE
+    assert pk_census.scoped_partitions_from_snapshot(snapshot).keys().isdisjoint({"COACH#nudge_ledger", "COACH#outbound_ledger"})
+
+
+def test_a_census_with_no_coverage_block_is_refused_not_treated_as_empty():
+    """The vacuous-scan trap in JSON form: a snapshot missing the block must RAISE, never
+    return {} — an empty coverage set would make the assertion above pass by having
+    nothing to check."""
+    with pytest.raises(pk_census.CensusPreflightError):
+        pk_census.scoped_partitions_from_snapshot({"families": {}})

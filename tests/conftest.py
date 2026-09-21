@@ -341,6 +341,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # that adds a live SOURCE# partition (or refreshes the census) must red BEFORE the
         # merge, not after the partition is already invisible to every freshness check.
         "test_source_registry_coverage_3669.py",
+        # #3599 box 1: the same artifact, read for its `coverage_partitions` block — the
+        # measured live partition set the wipe's own coverage assertion is now graded
+        # against offline. Joined the lane by the derivation above rather than by hand:
+        # a PR that refreshes the census must red on itself if the refreshed set is no
+        # longer covered, not on whoever merges next.
+        "test_restart_wipe_coverage.py",
         "test_restart_verify_gates_3477.py",
         "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
@@ -541,6 +547,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_board_lead_single_character.py",
         "test_cast_roster_consistency.py",
         "test_coach_ensemble_writer_phase_stamp_guard_2119.py",
+        # #3599 box 2: the SOURCE-tier sibling of the guard above — an AST sweep of
+        # lambdas/ mcp/ deploy/ scripts/ for every put_item writer landing a row on an
+        # EXPERIMENT_SCOPED `USER#matthew#SOURCE#*` partition with no write-time stamp.
+        # Pre-merge for the same reason as its #2119 sibling: the defect arrives in the
+        # diff of the PR that adds the writer, and post-merge is after the unstamped rows
+        # exist (#3513 measured 109 of them live before anyone noticed).
+        "test_scoped_writer_provenance_guard_3599.py",
         "test_coach_roster_set_guard_2334.py",
         "test_ddb_key_contracts.py",
         "test_ddb_patterns.py",
