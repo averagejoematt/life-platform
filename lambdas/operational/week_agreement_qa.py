@@ -454,10 +454,20 @@ def check_absence_agreement(Check, tier, pt_now, *, site_base_url: str, budget: 
     if advisories:
         head = "; ".join(advisories[:3])
         more = f" (+{len(advisories) - 3} more)" if len(advisories) > 3 else ""
+        # chronic=True, class (b) — a known-recurring warn PINNED TO A FILED ISSUE (#3615's
+        # named residual). It recurs every night for as long as a lagging source sits inside
+        # its declared cadence while the health panel's activity heuristic calls that a
+        # possible auth failure (live: notion, 11d dark inside a 336h expectation). Alarming
+        # qa-smoke-warnings nightly over an already-filed product question carries zero
+        # marginal information (ADR-105) — the finding stays fully visible in the email, the
+        # logs and ChronicWarnCount. UN-CHRONIC THIS BRANCH the moment the owner rules on
+        # which rule wins; the FAIL side (a PAUSED source narrated as a broken pipe) is
+        # untouched and stays alarmed.
         return [
             check.warn(
                 f"{len(advisories)} lagging-source narration(s) fight the registry's own cadence facet — the panel "
-                f"heuristic vs the registry cadence is an open product call (#3615 residual): {head}{more}"
+                f"heuristic vs the registry cadence is an open product call (#3615 residual): {head}{more}",
+                chronic=True,
             ).with_details(details)
         ]
     return [
