@@ -196,39 +196,6 @@ VALID_SPEC_DIRECTIONS = frozenset({"higher", "lower"})
 MIN_DAYS_PER_ARM = experiment_gates.HYPOTHESIS_MIN_DAYS_PER_ARM  # each arm needs 5+ days (also stats_core's bootstrap floor)
 MAX_LAG_DAYS = 3
 
-# ── #3552: a bar this engine did not derive says so, on the artifact, in words ──
-# The seeder's two genesis hypotheses have derived `min_effect`s since #3648. The other
-# two writers — the standing diary hypothesis below and this weekly generator — did not,
-# so the ONE hypothesis live on /api/hypotheses served `min_effect: 0.05` with no
-# derivation, no arm floor and a criterion naming no n. `store_hypothesis` is the
-# chokepoint every one of them goes through; the facet is attached there.
-MODEL_PROPOSED_EFFECT_CITATION = (
-    "Proposed by this weekly generator's model (Bedrock, structured tier) alongside the hypothesis "
-    "text and its confirmation criterion, then frozen unchanged at pre-registration: the model chose "
-    "this bar and no derivation from Matthew's own variance stands behind it. It is deliberately NOT "
-    "re-priced here — the criterion sentence states the same number, and replacing one of the two "
-    "would put a contradiction on the public artifact."
-)
-
-
-def outcome_metric_series(spec, daily_rows):
-    """The outcome metric's own trailing readings, oldest-first — the noise SCALE a
-    declared bar is reported against (#3552). None when the metric was never measured in
-    the window, which is an honest silence, not a zero."""
-    metric = (spec or {}).get("outcome_metric")
-    if not metric or not daily_rows:
-        return None
-    values = []
-    for row in sorted(daily_rows, key=lambda r: r.get("date") or ""):
-        raw = row.get(metric)
-        if raw is None:
-            continue
-        try:
-            values.append(float(raw))
-        except (TypeError, ValueError):
-            continue
-    return values or None
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -311,25 +278,17 @@ def load_existing_hypotheses(status_filter=None):
         return []
 
 
-def store_hypothesis(hypothesis: dict, daily_rows=None, *, effect_kind=None, effect_citation=None):
-    """Write a new hypothesis to DynamoDB.
-
-    #3552: every spec leaves here with its `min_effect` LABELLED — the same
-    `{value, kind, source}` facet `experiment_gates.gate_provenance()` serves for an
-    arming threshold — with the checker's per-arm n floor in the spec and named in the
-    criterion. Idempotent and additive: a spec that already carries a derivation (the
-    genesis seeder's) passes through with that derivation expressed as the facet, and
-    nothing else is touched. `daily_rows` is optional; when given, a declared bar is
-    reported against the outcome metric's own measured noise scale.
-    """
-    hypothesis = prereg_effect.stamp_spec_provenance(
-        hypothesis,
-        min_days_per_arm=MIN_DAYS_PER_ARM,
-        fallback_kind=effect_kind or experiment_gates.MODEL_PROPOSED,
-        fallback_citation=effect_citation or MODEL_PROPOSED_EFFECT_CITATION,
-        outcome_series=outcome_metric_series(hypothesis.get("test_spec"), daily_rows),
-        window_days=len(daily_rows) if daily_rows else None,
-    )
+def store_hypothesis(hypothesis: dict, daily_rows=None, *, kind=None, citation=None):
+    """Write a new hypothesis to DynamoDB."""
+    # #3552 — THE chokepoint. Every hypothesis this engine writes leaves here with its
+    # `min_effect` labelled by the shared `{value, kind, source}` facet and the checker's
+    # per-arm n floor stated in both the spec and the criterion. Additive and idempotent:
+    # a spec that already carries a derivation (the genesis seeder's) passes through with
+    # that derivation expressed as the facet and nothing else touched. `daily_rows`, when
+    # given, prices a DECLARED bar against the outcome metric's own measured noise scale.
+    # (The prose is a comment, not a docstring, because this module sits on its #1665
+    # size ceiling and that ratchet counts logical lines, not comments — #3537.)
+    hypothesis = prereg_effect.stamp_spec_provenance(hypothesis, MIN_DAYS_PER_ARM, daily_rows, kind=kind, citation=citation)
     now = datetime.now(timezone.utc)
     sk = f"HYPOTHESIS#{now.isoformat()}"
 
@@ -1456,18 +1415,6 @@ def run_time_affluence_weekly(force=False):
 DIARY_INTERVENTION_HYPOTHESIS_ID = "hyp_diary_days_habit_adherence"
 
 
-# #3552: the diary bar is a DESIGN choice, and the artifact now says so. habit_pct is a
-# 0-1 completion ratio, so 0.05 is five percentage points — the same number the criterion
-# sentence states. It is an adopted convention, not a derivation, and the facet labels it
-# as one (the #3621 rule: label the number, never silently upgrade it).
-DIARY_EFFECT_CITATION = (
-    "#1843's design choice, made when this structural hypothesis was written: habit_pct is a 0-1 "
-    "completion ratio, so 0.05 is five percentage points of same-day habit adherence — the smallest "
-    "difference at which the video diary would be worth treating as a deliberate nudge rather than a "
-    "neutral instrument. A product convention, not a bar derived from Matthew's own habit_pct variance."
-)
-
-
 def seed_diary_intervention_hypothesis(all_hypotheses, daily_rows=None):
     """#1843 AC3: register ONE hypothesis testing whether the video diary is itself
     an intervention (measurement reactivity / the Hawthorne effect he explicitly
@@ -1544,12 +1491,8 @@ def seed_diary_intervention_hypothesis(all_hypotheses, daily_rows=None):
             logger.error(f"[#1843] diary-intervention hypothesis failed validation: {issues}")
             return {"registered": False, "reason": f"validation_failed: {issues}"}
 
-        store_hypothesis(
-            hyp,
-            daily_rows,
-            effect_kind=experiment_gates.POPULATION_CONSTANT,
-            effect_citation=DIARY_EFFECT_CITATION,
-        )
+        # #3552: a DESIGN-declared bar, labelled as one (never dressed as a derivation).
+        store_hypothesis(hyp, daily_rows, kind=experiment_gates.POPULATION_CONSTANT, citation=prereg_effect.DIARY_DESIGN_CITATION)
         logger.info(f"[#1843] Registered pre-registered hypothesis: {DIARY_INTERVENTION_HYPOTHESIS_ID}")
         return {"registered": True, "hypothesis_id": DIARY_INTERVENTION_HYPOTHESIS_ID}
     except Exception as e:

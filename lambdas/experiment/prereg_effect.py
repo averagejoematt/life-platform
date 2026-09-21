@@ -203,16 +203,49 @@ def arm_floor_clause(min_days_per_arm: int) -> str:
     )
 
 
-def stamp_spec_provenance(
-    hyp: dict,
-    *,
-    min_days_per_arm: int,
-    fallback_kind: str,
-    fallback_citation: str,
-    outcome_series=None,
-    window_days=None,
-    unit: str = "",
-) -> dict:
+# ── The citations a NON-derived bar ships with (#3552) ───────────────────────
+# Moved here from `hypothesis_engine_lambda` rather than added to it: the engine sits on
+# its #1665 size ceiling, and "put the new code in a cohesive helper module beside it" is
+# what that ratchet asks for. This is that module — the pre-registered effect bar and
+# everything a reader needs to price it.
+MODEL_PROPOSED_CITATION = (
+    "Proposed by the weekly hypothesis generator's model (Bedrock, structured tier) alongside the "
+    "hypothesis text and its confirmation criterion, then frozen unchanged at pre-registration: the "
+    "model chose this bar and no derivation from Matthew's own variance stands behind it. It is "
+    "deliberately NOT re-priced afterwards — the criterion sentence states the same number, and "
+    "replacing one of the two would put a contradiction on the public artifact."
+)
+
+# #1843's diary-intervention bar. habit_pct is a 0-1 completion ratio, so 0.05 is five
+# percentage points — the same number that hypothesis' criterion sentence states.
+DIARY_DESIGN_CITATION = (
+    "#1843's design choice, made when this structural hypothesis was written: habit_pct is a 0-1 "
+    "completion ratio, so 0.05 is five percentage points of same-day habit adherence — the smallest "
+    "difference at which the video diary would be worth treating as a deliberate nudge rather than a "
+    "neutral instrument. A product convention, not a bar derived from Matthew's own habit_pct variance."
+)
+
+
+def outcome_series(spec, daily_rows):
+    """The outcome metric's own trailing readings, oldest-first, from `build_data_narrative`
+    rows. None when the metric was never measured in the window — an honest absence, never
+    a zero-filled series that would understate the noise."""
+    metric = (spec or {}).get("outcome_metric")
+    if not metric or not daily_rows:
+        return None
+    values = []
+    for row in sorted(daily_rows, key=lambda r: r.get("date") or ""):
+        raw = row.get(metric)
+        if raw is None:
+            continue
+        try:
+            values.append(float(raw))
+        except (TypeError, ValueError):
+            continue
+    return values or None
+
+
+def stamp_spec_provenance(hyp: dict, min_days_per_arm: int, daily_rows=None, *, kind: str = "", citation: str = "", unit: str = "") -> dict:
     """Every stored hypothesis leaves here with its bar LABELLED and its n floor stated.
 
     #3552 fixed the two genesis hypotheses at the seeder. It did not reach the other two
@@ -243,11 +276,11 @@ def stamp_spec_provenance(
         else:
             spec["min_effect_provenance"] = declared_effect_provenance(
                 spec["min_effect"],
-                kind=fallback_kind,
-                citation=fallback_citation,
-                values=outcome_series,
+                kind=kind or experiment_gates.MODEL_PROPOSED,
+                citation=citation or MODEL_PROPOSED_CITATION,
+                values=outcome_series(spec, daily_rows),
                 metric=str(spec.get("outcome_metric") or ""),
-                window_days=window_days,
+                window_days=len(daily_rows) if daily_rows else None,
                 unit=unit,
             )
 

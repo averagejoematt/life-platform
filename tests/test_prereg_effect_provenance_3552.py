@@ -164,10 +164,10 @@ def _hyp(**over):
     return hyp
 
 
-def _stamp(hyp, **over):
-    kwargs = dict(min_days_per_arm=5, fallback_kind=gates.MODEL_PROPOSED, fallback_citation="the model proposed this bar")
+def _stamp(hyp, daily_rows=None, **over):
+    kwargs = dict(kind=gates.MODEL_PROPOSED, citation="the model proposed this bar")
     kwargs.update(over)
-    return prereg_effect.stamp_spec_provenance(hyp, **kwargs)
+    return prereg_effect.stamp_spec_provenance(hyp, 5, daily_rows, **kwargs)
 
 
 def test_an_unlabelled_bar_leaves_the_stamp_labelled_with_the_arm_floor():
@@ -182,7 +182,7 @@ def test_an_unlabelled_bar_leaves_the_stamp_labelled_with_the_arm_floor():
 def test_the_bar_itself_is_never_changed():
     """Re-pricing a pre-registered number would contradict the criterion sentence that
     states it — the artifact would carry two different bars for the same test."""
-    out = _stamp(_hyp(), outcome_series=_SERIES, window_days=30)
+    out = _stamp(_hyp(), [{"date": f"2026-08-{i + 1:02d}", "habit_pct": v} for i, v in enumerate(_SERIES)])
     assert out["test_spec"]["min_effect"] == 0.05
 
 
@@ -343,3 +343,24 @@ def test_the_public_projection_serves_the_arm_floor():
                     assert len(keys) >= 10, f"projection parse looks wrong: {sorted(keys)}"
                     return
     raise AssertionError("the /api/hypotheses projection dict was not found")
+
+
+def test_an_unnamed_writer_gets_the_model_proposed_citation_by_default():
+    """The weekly generator's path: no caller-supplied label, so the facet says plainly
+    that a model chose the bar rather than leaving the reader to assume a derivation."""
+    facet = prereg_effect.stamp_spec_provenance(_hyp(), 5)["test_spec"]["min_effect_provenance"]
+    assert facet["kind"] == gates.MODEL_PROPOSED
+    assert facet["source"] == prereg_effect.MODEL_PROPOSED_CITATION
+    assert "no derivation" in facet["source"]
+
+
+def test_outcome_series_reads_the_metric_in_date_order_and_keeps_gaps_honest():
+    rows = [
+        {"date": "2026-08-03", "habit_pct": 0.9},
+        {"date": "2026-08-01", "habit_pct": 0.5},
+        {"date": "2026-08-02"},  # the metric was not measured that day — skipped, never 0
+        {"date": "2026-08-04", "habit_pct": "not a number"},
+    ]
+    assert prereg_effect.outcome_series({"outcome_metric": "habit_pct"}, rows) == [0.5, 0.9]
+    assert prereg_effect.outcome_series({"outcome_metric": "habit_pct"}, []) is None
+    assert prereg_effect.outcome_series({"outcome_metric": "weight_lbs"}, rows) is None
