@@ -510,6 +510,35 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
     }
 
 
+def family_census(table=None) -> dict:
+    """THE CENSUS ITSELF — ``{family: (rep_pk, rep_sk)}`` over one pk+sk scan, with the
+    vacuous-scan refusal applied. READ-ONLY.
+
+    #3621 box 2 split this out of `unresolved_families` so the reset can take the SAME
+    census TWICE and compare the two family sets (DA-7's window: the tagger ran at 16:37Z
+    and six INSIGHT# rows were written at 17:09Z — after every instrument that could have
+    seen them). "Does classify() resolve this family?" and "did a family APPEAR during the
+    reset?" are two verdicts over one derivation, exactly like the reset gate and the
+    nightly WARN below; a second, separately-written enumeration is how a comparison gate
+    goes blind.
+
+    Raises CensusPreflightError on an empty scan: a census with nothing in it certifies
+    nothing, and "no new families" over an empty second census is a pass that cannot fail.
+    """
+    if table is None:
+        import boto3
+
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    reps = census_families(scan_pk_sk_pages(table))
+    if not reps:
+        raise CensusPreflightError(
+            "pk-family census: the pk+sk scan returned ZERO pk families. "
+            "Refusing to certify taxonomy totality on an empty census (the vacuous-scan trap) — "
+            "the scan must actually classify live families, not silently pass an empty set."
+        )
+    return reps
+
+
 def unresolved_families(table=None) -> tuple[list[tuple[str, str, str, str]], int]:
     """The census as DATA rather than as an exception: return
     ``(unresolved, family_count)`` where each unresolved entry is
@@ -525,17 +554,7 @@ def unresolved_families(table=None) -> tuple[list[tuple[str, str, str, str]], in
     nightly check that reports "all clear" on a broken scan is worse than no check.
     READ-ONLY (never writes).
     """
-    if table is None:
-        import boto3
-
-        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
-    reps = census_families(scan_pk_sk_pages(table))
-    if not reps:
-        raise CensusPreflightError(
-            "pk-family census: the pk+sk scan returned ZERO pk families. "
-            "Refusing to certify taxonomy totality on an empty census (the vacuous-scan trap) — "
-            "the scan must actually classify live families, not silently pass an empty set."
-        )
+    reps = family_census(table)
     unresolved: list[tuple[str, str, str, str]] = []
     for fam, (pk, sk) in sorted(reps.items()):
         try:

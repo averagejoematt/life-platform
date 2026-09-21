@@ -701,6 +701,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # for a gate whose whole job is to stop an unpriced number shipping into a public
         # zero-state payload.
         "test_gate_threshold_provenance_3621.py",
+        # #3621 box 5: an rglob sweep of lambdas/ + deploy/ + mcp/ for every module that
+        # mentions `PROTOCOL#` AND calls `put_item`, asserting the set is exactly the two
+        # sanctioned files (the chokepoint and its one seeder). Pure repo shape, and it
+        # must red BEFORE the merge for the usual reason: a SECOND protocol writer is
+        # introduced by a PR's own diff, and once merged it is a door the `spawned_by`
+        # refusal does not cover — which is the vacuity this box exists to end.
+        "test_protocol_lever_contract_3621.py",
     }
 )
 
