@@ -440,6 +440,63 @@ def _parallel_fetch(jobs, *, failures=None):
     return out
 
 
+# ── the interval-forecast strata (#3712) ──────────────────────────────────────
+# The CALIB# ledger holds `forecast_resolution` rows from MORE THAN ONE MODEL, and
+# `pairs_from_forecast_resolution_rows` filters on record_type alone — so every
+# interval forecast any producer ever grades pools into one published coverage
+# number by default. From #3712 that is no longer hypothetical: the weekly training
+# prescription (`prescription-cardio-loo@1`, a 7-day rate forecast graded by
+# episode-detect) writes the same row shape the daily EWMA engine does, and its
+# first grade would have landed inside `interval_forecasts` with nothing naming it.
+#
+# That is #3550's finding recommitted one model later: strata with different base
+# rates pooled against one climatology credit "knowing which stratum a call came
+# from" to the forecasters. So the rows are split by their OWN `model` field before
+# they are scored, each model gets its own named stratum, and a model this map has
+# never heard of lands in `other_forecasts` — VISIBLE, with its own n — rather than
+# being folded into a headline that would then be describing two things.
+_FORECAST_MODEL_STRATA = {
+    "ewma-v1": "interval_forecasts",  # compute/forecast_engine_lambda — the daily metric forecasts
+    "prescription-cardio-loo@1": "weekly_prescriptions",  # training/prescription_forecast (#3712)
+}
+_DEFAULT_FORECAST_STRATUM = "interval_forecasts"
+_UNKNOWN_FORECAST_STRATUM = "other_forecasts"
+
+
+def split_forecast_rows_by_model(rows):
+    """`forecast_resolution` CALIB# rows → {stratum name: rows}, split by producing model.
+
+    Pure and unit-tested. Rows that are not forecast resolutions are dropped (the
+    pair extractor would skip them anyway); a row with no `model` at all predates
+    the field and keeps the default stratum, which is where it has always been
+    counted. Only non-empty strata are returned, so a payload gains a stratum key
+    the first time that model actually grades something and never before.
+    """
+    out: dict = {}
+    for r in rows or []:
+        if (r or {}).get("record_type") != "forecast_resolution":
+            continue
+        model = str(r.get("model") or "").strip()
+        if not model:
+            name = _DEFAULT_FORECAST_STRATUM
+        else:
+            name = _FORECAST_MODEL_STRATA.get(model, _UNKNOWN_FORECAST_STRATUM)
+        out.setdefault(name, []).append(r)
+    return out
+
+
+def _forecast_strata_pairs(rows):
+    """{stratum name: (confidence, outcome) pairs} — ordered, scored by the ONE extractor.
+
+    `interval_forecasts` is always present (it is an existing payload key, and a
+    stratum that vanishes at n=0 is a shape change dressed as a fix); the others
+    appear only once that model has a graded row.
+    """
+    split = split_forecast_rows_by_model(rows)
+    ordered = [_DEFAULT_FORECAST_STRATUM] + [n for n in ("weekly_prescriptions", _UNKNOWN_FORECAST_STRATUM) if n in split]
+    return {n: calibration_core.pairs_from_forecast_resolution_rows(split.get(n, [])) for n in ordered}
+
+
 def _prefetch_calibration_partitions(cids, *, _g):
     """All requested coaches' PREDICTION# partitions, concurrently → {cid: records}."""
     _fetch_prediction_partition = _g["_fetch_prediction_partition"]
@@ -561,8 +618,15 @@ def handle_calibration(event, *, _g):
         # ledger but carry `covered` (did the 80% interval hold?), not an `outcome`
         # word — a genuinely graded binary the scoreboard was silently dropping, so
         # /api/calibration read platform n=0 while /api/forecast graded the same rows.
-        forecast_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows_season)
-        forecast_career_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows)
+        #
+        # #3712: split by PRODUCING MODEL first (see _FORECAST_MODEL_STRATA). The
+        # `interval_forecasts` block keeps meaning exactly what it has always meant —
+        # the daily engine's forecasts — instead of quietly becoming a blend the
+        # moment a second model starts grading.
+        forecast_strata = _forecast_strata_pairs(hyp_rows_season)
+        forecast_career_strata = _forecast_strata_pairs(hyp_rows)
+        forecast_pairs = forecast_strata.get(_DEFAULT_FORECAST_STRATUM, [])
+        forecast_career_pairs = forecast_career_strata.get(_DEFAULT_FORECAST_STRATUM, [])
         interval_forecasts = calibration_core.score_pairs(forecast_pairs)
         interval_forecasts_lifetime = calibration_core.score_pairs(forecast_career_pairs)
 
@@ -576,9 +640,13 @@ def handle_calibration(event, *, _g):
         # from" to the forecasters. Stratified, pooled skill > 0 is impossible
         # unless a stratum earned it, the over-confidence trip is driven by the
         # worst stratum's gap, and each stratum's numbers ride on the card.
-        platform = calibration_core.score_strata({"coaches": platform_pairs, "hypotheses": hyp_pairs, "interval_forecasts": forecast_pairs})
+        #
+        # #3712: the forecast strata are now plural and data-derived, so a second
+        # interval-forecasting model is scored against its OWN base rate from its
+        # first graded week rather than after someone notices the blend.
+        platform = calibration_core.score_strata({"coaches": platform_pairs, "hypotheses": hyp_pairs, **forecast_strata})
         platform_lifetime = calibration_core.score_strata(
-            {"coaches": platform_career_pairs, "hypotheses": hyp_career_pairs, "interval_forecasts": forecast_career_pairs}
+            {"coaches": platform_career_pairs, "hypotheses": hyp_career_pairs, **forecast_career_strata}
         )
         platform["lifetime"] = platform_lifetime
 
@@ -617,7 +685,9 @@ def handle_calibration(event, *, _g):
                     "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
                     "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
                     "Calibrated. The platform-wide card scores skill against a STRATIFIED base rate — coach "
-                    "calls, hypothesis bets and interval forecasts each against their own climatology — so "
+                    "calls, hypothesis bets and each forecasting MODEL's interval forecasts separately, every "
+                    "one against its own climatology (the daily metric engine and the weekly training "
+                    "prescription are different models and are never counted as one number) — so "
                     "pooling strata with different base rates cannot manufacture a skill no stratum has; its "
                     "over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own "
                     "n, Brier and skill are served beside it. Voided bets: a reset voids — never grades — every still-open pre-registered "

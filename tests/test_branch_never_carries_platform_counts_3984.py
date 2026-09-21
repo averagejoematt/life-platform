@@ -200,8 +200,13 @@ def _scratch_repo(tmp_path: Path, branch: str, hook_body: str) -> Path:
     subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, capture_output=True)
     for k, v in (("user.email", "t@example.com"), ("user.name", "t"), ("commit.gpgsign", "false")):
         subprocess.run(g + ["config", k, v], check=True, capture_output=True)
-    (repo / "deploy").mkdir()
+    (repo / "deploy" / "lib").mkdir(parents=True)
     (repo / "deploy" / "sync_doc_metadata.py").write_text(_STUB_SYNC, encoding="utf-8")
+    # a stub of the pinned-formatter lib so a staged .py (the counter, in the merge test) passes
+    # the hook's format gate without a real black/ruff — the gate under test here is doc-sync.
+    (repo / "deploy" / "lib" / "pinned_formatters.sh").write_text(
+        "resolve_pinned_formatter() { echo true; }\npinned_formatter_version() { echo stub; }\n", encoding="utf-8"
+    )
     (repo / "docs").mkdir()
     (repo / "docs" / "COUNTS.md").write_text("Lambdas: 105\n", encoding="utf-8")
     (repo / "lambdas" / "web").mkdir(parents=True)
@@ -256,11 +261,51 @@ def test_hook_on_main_stages_the_counter(tmp_path):
     assert _worktree_diff(repo) == ""
 
 
+def test_hook_in_a_merge_commit_keeps_the_counter_the_merge_brought_in(tmp_path):
+    """A lane resolving a counter conflict with main: the resolution commit runs the pre-commit
+    hook with MERGE_HEAD present (a clean `git merge` runs no pre-commit hook; a conflict
+    resolution is a `git commit`). Restoring to HEAD — the branch's old tip — reverted the
+    counter the lane had just taken from main and re-created the conflict on the next
+    reconcile (#4005/#4006, 2026-09-21). The bot-owned file follows the side merged IN."""
+    repo = _scratch_repo(tmp_path, "feature", _hook_body())
+    g = ["git", "-C", str(repo)]
+    nohook = ["git", "-C", str(repo), "-c", "core.hooksPath=/dev/null"]
+    counter = repo / "lambdas" / "web" / "platform_counts.py"
+    # main moves: the reconcile bot regenerates the counter (no hooks on the bot's checkout)
+    subprocess.run(g + ["checkout", "-q", "main"], check=True, capture_output=True)
+    counter.write_text('DISCOVERED_COUNTS = {"lambdas": 107}\n', encoding="utf-8")
+    rc = subprocess.run(nohook + ["commit", "-q", "-am", "chore(reconcile): regenerate"], capture_output=True, text=True)
+    assert rc.returncode == 0, f"{rc.stdout}\n{rc.stderr}"
+    # the lane carries a different (stale) counter — the state every pre-#3984 lane was in
+    subprocess.run(g + ["checkout", "-q", "feature"], check=True, capture_output=True)
+    counter.write_text('DISCOVERED_COUNTS = {"lambdas": 99}\n', encoding="utf-8")
+    rc = subprocess.run(nohook + ["commit", "-q", "-am", "chore: a stale counter on the lane"], capture_output=True, text=True)
+    assert rc.returncode == 0, f"{rc.stdout}\n{rc.stderr}"
+    env = dict(os.environ)
+    env.pop("GITHUB_REF", None)
+    env.pop("GITHUB_EVENT_NAME", None)
+    m = subprocess.run(g + ["merge", "--no-ff", "main"], capture_output=True, text=True, env=env)
+    assert m.returncode != 0 and "CONFLICT" in m.stdout + m.stderr, "the fixture must conflict on the counter"
+    subprocess.run(g + ["checkout", "main", "--", "lambdas/web/platform_counts.py"], check=True, capture_output=True)
+    subprocess.run(g + ["add", "lambdas/web/platform_counts.py"], check=True, capture_output=True)
+    c = subprocess.run(g + ["commit", "-q", "-m", "chore: merge main"], capture_output=True, text=True, env=env)
+    assert c.returncode == 0, f"{c.stdout}\n{c.stderr}"
+    assert "restored to MERGE_HEAD" in c.stdout + c.stderr, c.stdout + c.stderr
+    assert '"lambdas": 107' in counter.read_text(encoding="utf-8"), "the resolution commit lost main's counter"
+    assert (
+        '"lambdas": 107'
+        in subprocess.run(g + ["show", "HEAD:lambdas/web/platform_counts.py"], capture_output=True, text=True, check=True).stdout
+    )
+    assert _worktree_diff(repo) == ""
+
+
 def test_mutation_dropping_the_restore_line_lets_the_counter_leak_off_main(tmp_path):
     """The control for the off-main arm: with the `checkout HEAD --` restore removed, the counter
     stays dirty in the worktree after the commit — the exact state the treadmill starts from."""
     body = _hook_body()
-    mutated, n = re.subn(r"^\s*git -C \"\$PROJ_ROOT\" checkout HEAD -- lambdas/web/platform_counts\.py.*\n", "", body, count=1, flags=re.M)
+    mutated, n = re.subn(
+        r"^\s*git -C \"\$PROJ_ROOT\" checkout \"\$RESTORE_FROM\" -- lambdas/web/platform_counts\.py.*\n", "", body, count=1, flags=re.M
+    )
     assert n == 1, "the restore line is gone from the hook — the off-main arm is not what this test thinks it is"
     repo = _scratch_repo(tmp_path, "feature", mutated)
     r = _commit_a_note(repo)

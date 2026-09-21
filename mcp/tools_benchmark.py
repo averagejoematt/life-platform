@@ -459,6 +459,9 @@ def _benchmark_prescription(args: dict) -> dict:
         "n_weighins_28d": n_wi,
         "current_typical": None,
         "proven_target": None,
+        # #3712 box 3 — the standing bet's volume target, which OVERRIDES the proven
+        # number when it was derived from last week's grade.
+        "committed_target": _committed_target(end_date),
         "now": now,
         "gap": {},
         # ADR-104 — stated on every output, not inferred from its absence.
@@ -489,7 +492,7 @@ def _benchmark_prescription(args: dict) -> dict:
         out["signal"] = (
             f"No comparable period from a losing phase within reach of {round(weight, 1)} lb. "
             "Nothing to prescribe from — say so rather than substituting the current band."
-        )
+        ) + _committed_target_line(out["committed_target"])
         return out
 
     ev = proven.get("evidence") or {}
@@ -560,7 +563,80 @@ def _benchmark_prescription(args: dict) -> dict:
             f"{ev.get('volume_floor_days')}. Citable as description ({proven.get('walk_mi_wk')} mi/wk), "
             "not as a target."
         )
+    out["signal"] += _committed_target_line(out["committed_target"])
     return out
+
+
+def _committed_target(end_date: str) -> dict:
+    """The volume the STANDING weekly bet is under, and the arithmetic that set it (#3712 box 3).
+
+    WHY THIS IS ON THE PRESCRIPTION VIEW AND NOT ONLY ON view='forecast'. #3712's
+    third box is "a missed forecast feeds the next prescription". Producer-side that
+    is true — episode-detect prescribes `derive_adjustment`'s number — but the view
+    the night-before authoring path actually reads (#3710) served `proven_target`
+    alone, so the adjusted number was reachable only from a different view nobody in
+    that path called. A derivation the planning surface cannot see is a derivation
+    that gets re-authored freehand, which is the failure mode this issue exists to
+    end.
+
+    Fail-soft and read-only: an unreadable partition is reported as unreadable, never
+    as "no committed target" — an absent bet and an unreadable one are different
+    facts and only one of them licenses picking a number yourself (#3920's posture).
+    """
+    try:
+        rows = _read_prescription_forecasts(end_date)
+    except Exception as e:  # noqa: BLE001
+        return {
+            "available": False,
+            "reason": f"the weekly forecast partition could not be read ({type(e).__name__}) — this is not a finding",
+        }
+    standing = [r for r in rows or [] if not r.get("resolved_at")]
+    if not standing:
+        return {
+            "available": False,
+            "reason": "no standing weekly forecast — episode-detect issues one every Sunday, so this is empty until its next run",
+        }
+    row = standing[-1]
+    adj = row.get("adjustment_from_last_week") or {}
+    src = row.get("target_source")
+    return {
+        "available": True,
+        "target_week_start": row.get("target_week_start"),
+        "target_week_end": row.get("target_week_end"),
+        "cardio_hr_wk": row.get("prescribed_cardio_hr_wk"),
+        "target_source": src,
+        # None, not False, when the row predates the provenance stamp: unknown
+        # provenance is not evidence the number was re-read from the band (ADR-104).
+        "derived_from_last_grade": (src == "derived_from_last_grade") if src else None,
+        "basis": adj.get("basis"),
+        "derivation": adj.get("derivation"),
+        "proven_cardio_hr_wk": row.get("proven_cardio_hr_wk"),
+        "forecast_issued": bool(row.get("issued")),
+        "expected_lb_wk": row.get("point_lb_wk"),
+        "interval_lb_wk": ([row.get("lo_lb_wk"), row.get("hi_lb_wk")] if row.get("issued") else None),
+        "confidence": row.get("confidence"),
+        "n_weeks": row.get("n_weeks"),
+        "declined_reason": row.get("declined_reason"),
+        "_role": (
+            "THE volume target for the coming week. It SUPERSEDES proven_target.cardio_hr_wk whenever "
+            "target_source is 'derived_from_last_grade' — quote the derivation, never re-author the number."
+        ),
+    }
+
+
+def _committed_target_line(ct: dict) -> str:
+    """One sentence naming the committed volume, or nothing. Never invents a number."""
+    if not (ct or {}).get("available"):
+        return ""
+    hrs = ct.get("cardio_hr_wk")
+    if hrs is None:
+        return f" The standing weekly forecast for the week ending {ct.get('target_week_end')} was DECLINED: {ct.get('declined_reason')}."
+    if ct.get("derived_from_last_grade"):
+        return (
+            f" The week ending {ct.get('target_week_end')} is already committed to {hrs} cardio hr/wk, "
+            f"DERIVED from last week's grade ({ct.get('basis')}) — use that number, not a fresh one."
+        )
+    return f" The week ending {ct.get('target_week_end')} is already committed to {hrs} cardio hr/wk (source: {ct.get('target_source')})."
 
 
 def _campaign_day_n(curve: list, day_n: int):
@@ -836,8 +912,10 @@ GET_BENCHMARK_DESCRIPTION = (
     "the weight distance to that period and its evidence tier stated. Returns two tables that are "
     "not interchangeable: proven_target (from losing phases; the target) and current_typical (all "
     "history at his current weight; the BASELINE, never a target — at his current weight that is "
-    "the period he is trying to escape). Training/activity only: intake is not comparable, no "
-    "nutrition data exists before 2025-11-24. "
+    "the period he is trying to escape). It also returns committed_target (#3712): the volume the "
+    "week's standing forecast is already under, which OVERRIDES proven_target.cardio_hr_wk whenever "
+    "target_source is 'derived_from_last_grade' — quote its derivation, never re-author the number. "
+    "Training/activity only: intake is not comparable, no nutrition data exists before 2025-11-24. "
     "'campaign' = is THIS transformation tracking the one that worked, and which lever "
     "explains the gap — day-N cumulative loss vs the proven curve at the same day, plus the "
     "levers RANKED by how far each sits below its comparable losing-phase value. Windows "

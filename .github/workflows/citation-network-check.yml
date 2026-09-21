@@ -1,0 +1,78 @@
+name: Citation network re-resolution
+
+# #3621 box 4 — the citation network arm, wired to a schedule.
+#
+# tests/test_citation_resolution_1892.py's OFFLINE half (every url-bearing source
+# carries a resolved_title, no duplicate PMID, no withdrawn citation keeps its URL,
+# …) gates every commit. Its NETWORK half — does the cited paper still say what we
+# stored? — lived only in that file's `integration`-marked test and in
+# scripts/verify_citations.py, and neither ran in ANY workflow: a retraction or a
+# PMID reassignment across the ~40 config/supplement_registry.json PubMed citations
+# (plus config/experiment_library.json's evidence_for/evidence_against PMIDs and its
+# 3 top-level DOI citations) was invisible until a human happened to run the
+# integration test by hand. This workflow is that dead man: it runs
+# scripts/verify_citations.py's `main()` directly (the SAME enumeration + the SAME
+# NCBI eutils / Crossref calls the integration test rehearses), fails on a 404, a
+# retraction, or a stored title that no longer matches the live one, and is
+# registered `watched: True` in scripts/scheduled_workflow_registry.py so
+# scripts/check_cron_freshness.py — the platform's silence-is-not-a-pass dead-man —
+# reports if this cron itself ever stops firing.
+#
+# Cadence: monthly (5th, 16:47 UTC — offset from eval-harvest's 3rd/16:23 slot).
+# #3621's own pricing note: demote further to quarterly once 12 consecutive monthly
+# runs land with zero drifts. Free: stdlib `urllib.request` only (no pip install
+# step, no AWS role, no Bedrock) against two public, unauthenticated read APIs
+# (NCBI eutils, Crossref) — $0 on a public repo.
+#
+# No `pull_request` trigger: this re-checks LIVE citation state against NCBI/
+# Crossref, which has nothing to do with a PR's repo bytes and would be redundant
+# with every commit re-running an unrelated network fetch (the offline half already
+# gates the PR).
+
+on:
+  schedule:
+    - cron: "47 16 5 * *"
+  workflow_dispatch: {} # manual re-check / testing
+
+permissions:
+  contents: read
+
+concurrency:
+  group: citation-network-check
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Re-resolve every citation against its live source
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Unpiped, same reasoning as operating-calendar.yml: a pipe hands the step the
+      # TAIL's exit status and the gate could not fail (CONVENTIONS.md §4, the #3103
+      # class). scripts/verify_citations.py's own exit code is captured, echoed to the
+      # step summary, and re-raised verbatim.
+      - name: Network re-resolution (PubMed eutils + Crossref)
+        run: |
+          set +e
+          OUT="$(mktemp)"
+          python3 scripts/verify_citations.py > "$OUT" 2>&1
+          rc=$?
+          set -e
+          cat "$OUT"
+          {
+            echo "## Citation network re-resolution (#3621 box 4)"
+            echo ""
+            echo "Run (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo '```'
+            cat "$OUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "${rc}" in
+            0) echo "::notice::Every citation still resolves to its stored title." ;;
+            1) echo "::error::Citation drift found — a 404, a retraction, or a title that no longer matches what is stored. See the step summary." ;;
+            *) echo "::error::scripts/verify_citations.py exited ${rc} unexpectedly — read the output above." ;;
+          esac
+          exit "${rc}"

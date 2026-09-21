@@ -100,6 +100,75 @@ def tool_get_coach_thread(args):
     return out
 
 
+# The weekly prescription's own verdict vocabulary → the ledger's shared statuses
+# (#3712 box 5). `covered` is the graded binary: the actual weekly rate landed inside
+# the stated 80% interval or it did not. A week that could not be MEASURED is
+# `inconclusive`, never a refutation, and a forecast that was DECLINED for want of
+# history is `declined` — it is a result, but it is not a bet, so it must never enter
+# a hit-rate denominator as either a hit or a miss.
+_PRESCRIPTION_CLAIMANT = "prescription"
+
+
+def _prescription_status(row: dict) -> str:
+    if not row.get("issued"):
+        return "declined"
+    if not row.get("resolved_at"):
+        return "pending"
+    if row.get("grade_status") != "graded":
+        return "inconclusive"
+    return "confirmed" if row.get("covered") else "refuted"
+
+
+def _prescription_claims() -> list:
+    """The weekly prescription bets, in the prediction ledger's own row shape (#3712).
+
+    Reads through `tools_benchmark._read_prescription_forecasts` rather than re-deriving
+    the key range here: the PRESCRIPTION# sk prefix is load-bearing (it is what keeps the
+    daily forecast engine's resolver off these rows) and a second spelling of it is a
+    second thing to keep in sync.
+    """
+    from mcp.tools_benchmark import _read_prescription_forecasts
+
+    today = pacific_now().strftime("%Y-%m-%d")
+    out = []
+    for row in _read_prescription_forecasts(today) or []:
+        status = _prescription_status(row)
+        issued = bool(row.get("issued"))
+        interval = [row.get("lo_lb_wk"), row.get("hi_lb_wk")] if issued else None
+        out.append(
+            {
+                "coach_id": None,  # never a coach's call — no coach hit-rate may absorb it
+                "coach_name": "The weekly training prescription",
+                "claimant": _PRESCRIPTION_CLAIMANT,
+                "source": "prescription_forecast",
+                "source_sk": row.get("sk"),
+                "prediction_id": f"prescription-week-{row.get('target_week_end')}",
+                "date": row.get("issued_date"),
+                "claim": row.get("statement"),
+                # The interval IS the confidence here — a nominal 80% coverage, not a
+                # word — and n rides with it (ADR-105 rule 1: no number without both).
+                "confidence": row.get("confidence"),
+                "interval_lb_wk": interval,
+                "point_lb_wk": row.get("point_lb_wk"),
+                "n_weeks": row.get("n_weeks"),
+                "status": status,
+                "subdomain": "training",
+                "metric": "weekly_rate_lb_wk",
+                "eval_type": "interval_coverage",
+                "window_days": 7,
+                "grade_by": row.get("target_week_end"),
+                "outcome": ("covered" if status == "confirmed" else "missed" if status == "refuted" else None),
+                "outcome_date": row.get("resolved_at"),
+                "outcome_notes": (row.get("declined_reason") if status == "declined" else row.get("retired_reason")),
+                "actual_lb_wk": row.get("actual_lb_wk"),
+                "prescribed_cardio_hr_wk": row.get("prescribed_cardio_hr_wk"),
+                "delivered_cardio_hr_wk": row.get("delivered_cardio_hr_wk"),
+                "adherence": row.get("adherence"),
+            }
+        )
+    return out
+
+
 def tool_get_predictions(args):
     """Cross-coach prediction ledger — all predictions with statuses.
 
@@ -211,6 +280,23 @@ def tool_get_predictions(args):
         except Exception as ex:  # noqa: BLE001
             unreadable["diary_claims"] = f"{type(ex).__name__}: {ex}"
 
+    # #3712 box 5: the week's TRAINING PRESCRIPTION is a claim with skin in the game —
+    # "at X cardio hr/wk this plan expects Y lb/wk" — graded seven days later against
+    # the measured rate. It belongs in the one ledger for the same reason #1841's diary
+    # claims do: a bet that is only visible from its own bespoke view is a bet nobody
+    # audits beside the others. Same treatment as those: coach_id is None so a coach
+    # filter excludes them and no coach hit-rate can absorb them, and this is the
+    # PRIVATE surface — site_api_coach reads COACH# partitions only, so a prescription
+    # bet never reaches the public /api/predictions.
+    if not coach_filter:
+        try:
+            for rec in _prescription_claims():
+                if status_filter and rec.get("status") != status_filter:
+                    continue
+                all_predictions.append(rec)
+        except Exception as ex:  # noqa: BLE001
+            unreadable["prescription_forecast"] = f"{type(ex).__name__}: {ex}"
+
     # Sort by date descending
     all_predictions.sort(key=lambda p: p.get("date") or "", reverse=True)
 
@@ -231,7 +317,8 @@ def tool_get_predictions(args):
         **layer_fields(status, reason, producer=DERIVED_LAYERS["PREDICTION#"]["producer"], unreadable=unreadable),
         "store": (
             "COACH#/PREDICTION# (canonical, evaluator-graded — same store the public site reads), "
-            "plus the subject's own on-tape diary claims (#1841, claimant='matthew', PRIVATE — not on the public site)"
+            "plus the subject's own on-tape diary claims (#1841, claimant='matthew', PRIVATE — not on the public site) "
+            "and the weekly training prescription's graded forecasts (#3712, claimant='prescription', PRIVATE)"
         ),
         "predictions": all_predictions[:limit],
     }

@@ -552,3 +552,79 @@ def test_the_backfill_docstring_carries_the_measured_population():
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. --only-note: ONE exercise-session, bounded spend ("run the one", 2026-09-20 ruling)
+# ══════════════════════════════════════════════════════════════════════════════
+def test_only_note_narrows_to_one_block_and_keeps_its_occurrence():
+    """The fixture logs the Treadmill twice. Naming occurrence 1 must leave exactly one
+    NOTED block, at occurrence 1 — the other blocks keep their positions with blank
+    notes, so the head key the writer mints is unchanged."""
+    bf = _backfill_module()
+    w = workout()
+    narrowed = bf.only_note_workouts([w], (w["date"], TEMPLATE, 1))
+    assert len(narrowed) == 1
+    exs = narrowed[0]["exercises"]
+    assert len(exs) == len(w["exercises"]), "a block was dropped — the occurrence index would shift"
+    noted = [(tn.normalize_exercise_key(e)[0], o) for e, o in zip(exs, tn.occurrence_indices(exs)) if (e.get("notes") or "").strip()]
+    assert noted == [(TEMPLATE, 1)], noted
+    items = tn.build_workout_note_items(w["date"], w["workout_uid"], exs)
+    assert [it["sk"] for it in items] == [tn.head_sk(w["date"], wid_of(w), 1)]
+    assert items[0]["note_raw"] == NOTE_B
+    # The source row is untouched (the narrowing is a copy).
+    assert (w["exercises"][0].get("notes") or "").strip(), "the caller's workout row was mutated"
+
+
+def test_only_note_finds_nothing_for_a_target_that_is_not_noted():
+    """NEGATIVE CONTROL: a wrong date, template or occurrence yields [] — the driver
+    refuses to run rather than backfilling an empty selection or the wrong session."""
+    bf = _backfill_module()
+    w = workout()
+    assert bf.only_note_workouts([w], ("1999-01-01", TEMPLATE, 0)) == []
+    assert bf.only_note_workouts([w], (w["date"], "00000000", 0)) == []
+    assert bf.only_note_workouts([w], (w["date"], TEMPLATE, 7)) == []
+
+
+def test_only_note_spec_parses_and_refuses_junk():
+    bf = _backfill_module()
+    assert bf.parse_only_note("2026-06-23/243710de/0") == ("2026-06-23", "243710DE", 0)
+    for junk in ("2026-06-23", "243710DE/0", "2026-06-23/243710DE", "yesterday/243710DE/0", ""):
+        with pytest.raises(ValueError):
+            bf.parse_only_note(junk)
+
+
+def test_bounded_cap_is_the_live_count_plus_exactly_n():
+    """The September cap is reached; the run's cap is live+N, never a blanket lift."""
+    bf = _backfill_module()
+    from training import training_notes_llm as tl
+
+    t = FakeTable([{"pk": tl._USAGE_PK, "sk": f"MONTH#{tl._month()}", "calls": 300}])
+    assert bf.bounded_cap(t, 1) == 301
+    assert bf.bounded_cap(t, 0) == 300
+    assert bf.bounded_cap(FakeTable(), 1) == 1
+
+
+def test_migrate_plan_is_keyed_by_template_so_another_blocks_occurrence_0_cannot_shadow_the_collision():
+    """Found live (2026-09-10, session AP): the Rowing and Elliptical blocks of the same
+    workout are ALSO occurrence 0 of their own templates. A plan keyed by occurrence alone
+    let the last noted block overwrite the Treadmill's occurrence-0 note, so the real
+    archived prior was reported "no stored extraction carries this note text" and the
+    migration refused a collision it could resolve."""
+    bf = _backfill_module()
+    w = workout()
+    # Give the other template's block (index 1, occurrence 0 of ITS template) a note of its own.
+    w["exercises"][1] = dict(w["exercises"][1], notes="Shadow note on the cable row")
+    t = FakeTable([w])
+    legacy = _seed_legacy(t, w, note=NOTE_B, now_iso="2026-09-11T03:00:00Z")
+    prior = dict(legacy, note_raw=NOTE_A, note_hash=tn.note_hash(NOTE_A), record_kind=tn.RECORD_KIND_PRIOR)
+    prior["sk"] = tn.prior_extraction_sk(legacy["sk"], prior)
+    prior["superseded_head_sk"] = legacy["sk"]
+    t.put_item(Item=prior)
+
+    plans = bf.migrate_collisions(t, dates=(w["date"],), apply=False)
+    (p,) = [p for p in plans if p["template_id"] == TEMPLATE]
+    assert p["unavailable"] == [], f"the other block's note shadowed occurrence 0: {p['unavailable']}"
+    assert p["distinct_notes"] == 2 and sorted(p["end_state"]) == [tn.head_sk(w["date"], wid_of(w), 0), tn.head_sk(w["date"], wid_of(w), 1)]
+    by_sk = {str(it["sk"]): str(it["note_raw"]) for it in p["puts"]}
+    assert by_sk.get(tn.head_sk(w["date"], wid_of(w), 0)) == NOTE_A, f"occurrence 0 must be promoted from ITS archived prior: {by_sk}"

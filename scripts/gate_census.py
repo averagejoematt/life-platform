@@ -538,6 +538,16 @@ ATTEMPTED_UNPROVEN: dict[str, str] = {
         "assert it reports a violation rather than a silent pass. Needs a scratch site "
         "deployment (or a staged fixture endpoint) to prove the CLI wiring itself — future work."
     ),
+    "ci::citation-network-check.yml::verify::1": (
+        "NOT PROVED at the CI-wiring level, same shape as the pii-endpoint-sweep entry above: "
+        "the step's failing arm needs a genuine 404, retraction or title reassignment on live "
+        "NCBI/Crossref data, and this lane cannot plant one of those on a third-party public "
+        "record. What IS mutation-proven, at the unit level, is the function this step invokes "
+        "end to end (scripts/verify_citations.py's own main()) — see guard::scripts/"
+        "verify_citations.py for the RED/GREEN pairs on each failure mode "
+        "(404/retraction/mismatch) plus the matching-title pass control, in "
+        "tests/test_verify_citations_3621.py."
+    ),
 }
 
 

@@ -842,20 +842,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # disposable `git archive origin/main` export -> 668 {118, 540, 6, 4}. Exactly
         # {structural::test_ip_hash_salt_sweep_3620.py} enters, {} leaves — so unproven does NOT
         # move and BASELINE_UNPROVEN_GATES is untouched.
-        # 119 -> 120 (2026-09-21, #3615): the 120th proof is
-        # `structural::test_hook_registry_3615.py` — the reader-hook derivation guard (an rglob of
-        # site/**/*.js for every POST target, each of which must be claimed by a row in
-        # lambdas/operational/hook_registry.py). Mutation-backed via the same re-runnable harness
-        # (`gate_census_mutations.py --run --gate test_hook_registry_3615.py`: ARMED 1/1 — an
-        # untracked site/assets/js/_census_probe_3615.js planting a reader POST door with no
-        # registry row; baseline 28 passed in 0.40s, mutated 1 failed
-        # (test_every_site_post_endpoint_is_claimed_by_a_hook_row) + 27 passed in 0.33s, reverted
-        # 28 passed in 0.29s). Measured by id-set diff on COMMITTED trees, never by arithmetic:
-        # this lane at a67b1fb8b -> 670 rows {proven 120, unproven 540, not-applicable 6,
-        # attempted-unproven 4}; a disposable `git archive origin/main` export at 4b498399e ->
-        # 669 {119, 540, 6, 4}. Exactly {structural::test_hook_registry_3615.py} enters, {}
-        # leaves — so unproven does NOT move and BASELINE_UNPROVEN_GATES is untouched.
-        <= 120
+        # Upper bound 119 -> 120 (2026-09-21, #3005 fix-forward merged after #4006): the install_hooks.sh ALLOWLIST entrant, proven.
+        # Upper bound 120 -> 121 (2026-09-21, #3621 box 4 re-merged onto main AFTER #4007): guard::scripts/verify_citations.py arrives
+        # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=121`), not carried from the lane's 120.
+        # Upper bound 121 -> 122 (2026-09-21, #3971 re-merged onto main AFTER #4005): guard::mcp/hevy_prescription_gate.py arrives
+        # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=122`), not carried from the lane's 120.
+        # Upper bound 122 -> 123 (2026-09-21, #3615 re-merged onto main AFTER #4014): structural::test_hook_registry_3615.py arrives
+        # proven (STRUCTURAL_PROOFS, ARMED 1/1); MEASURED on the merged tree by this test (`proven verdicts n=123`), not carried from the lane's 120.
+        <= 123
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
