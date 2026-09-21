@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
+import v4_chrome  # noqa: E402 — the ONE source for chrome, incl. the #3615 syndication gate
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 from v4_proof import (  # noqa: E402  — #730/#803 static proof + #1395 data-driven OG + #1972 cadence
     chronicle_list_html,
@@ -131,9 +132,7 @@ SHELL = """<!DOCTYPE html>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <!-- PWA island (#1020): /story/ is OUTSIDE the cockpit-PWA island (home + /cockpit/ + /coaching/) —
        long-form reading has no daily-return offline case, so these shells do NOT register sw.js. -->
-  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
-  <link rel="alternate" type="application/rss+xml" title="The Measured Life — read aloud (podcast)" href="/podcast/feed.xml">
-  <link rel="alternate" type="application/rss+xml" title="The Measured Life — The Panel (podcast)" href="/panelcast/feed.xml">
+{feeds}
     <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/v4/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>
@@ -199,6 +198,14 @@ SHELL = """<!DOCTYPE html>
 # #578 — inline the shared loop-ribbon once (constant for this door) before the
 # per-page .format() calls, so the spine can't drift from the other builders.
 SHELL = SHELL.replace("{ribbon}", loop_ribbon("story"))
+
+# #3615 box 5 — the <link rel=alternate> feed block comes from v4_chrome, which withholds
+# every feed the hook registry declares dark. Inlined here for the same reason as the
+# ribbon: it is constant for this door, so it must not become a per-call argument the next
+# write() site can forget to pass. The 11 shells under /story/ were advertising
+# /podcast/feed.xml — a 200 with a full <channel> and ZERO <item> elements — to every
+# podcast client that unfurled them.
+SHELL = SHELL.replace("{feeds}", v4_chrome.syndication_links())
 
 
 def _section_proof(key: str, chronicle_proof: str) -> str:

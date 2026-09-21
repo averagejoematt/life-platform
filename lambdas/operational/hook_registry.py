@@ -35,9 +35,12 @@ HONEST ABSENCE IS A COMMITMENT, NOT A DEFAULT
   is what stops "honestly absent" from becoming the escape hatch every red cell takes:
   an absence with nobody's name on it is not honest, it is unexamined. Today exactly two
   rows carry one — predict-the-week outside a live cycle (there is no week to bet on),
-  and the podcast feed (zero episodes; #3615 box 5 is the open product call, and the
-  feed is meanwhile advertised by 11 pages — the residual this row names so the census
-  reports it every night instead of it being invisible).
+  and the podcast feed (zero episodes). Since #3615 box 5 the podcast row is also
+  LOAD-BEARING OUTSIDE this module: `scripts/v4_chrome.dark_feeds()` derives from it, so
+  a feed declared dark here is a feed the SITE does not advertise. Declaring a feed dark
+  and advertising it anyway was the actual defect — 11 pages offered an empty show to
+  every podcast client that unfurled them — and the two halves now move together, or
+  `tests/test_podcast_feed_link_3615.py` reds.
 
 THE RATCHET
   `tests/test_hook_registry_3615.py` pins a floor on the number of hooks and cells: the
@@ -216,10 +219,13 @@ HOOK_REGISTRY: tuple = (
                 absence=Absence(
                     contract="declared_dark",
                     reason=(
-                        "the feed ships a channel and zero <item> elements while 11 pages carry its <link rel=alternate>. "
-                        "#3615 box 5 is the open OWNER product call (gate the alternate-link on a non-empty feed, or build "
-                        "the TTS episodes); until it is decided the census reports this cell dark every night rather than "
-                        "letting the empty feed stay invisible"
+                        "the feed ships a channel and ZERO <item> elements (re-measured live 2026-09-21: 200, 593 bytes, "
+                        "no <item>). #3615 box 5 took the honest-absence path that day: v4_chrome.syndication_links() "
+                        "withholds the <link rel=alternate> for every feed THIS declaration names, so the 11 pages that "
+                        "advertised an empty show no longer do, while the census keeps probing the live feed nightly so "
+                        "the darkness stays reported rather than invisible. Building the TTS episodes remains the owner's "
+                        "alternative and the clause is satisfied either way: delete this Absence, re-run "
+                        "scripts/v4_build_dispatches.py, and the advertisement returns in the same commit"
                     ),
                     declared_on="2026-09-21",
                     issue="#3615",
