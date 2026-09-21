@@ -16,6 +16,14 @@ write surface is your own worktree and your own branch.
 
 ## Non-negotiables (each one is a past incident)
 
+0a. **No tool-attribution line in ANY commit message — not only the PR body.** The repo
+   squash-merges with COMMIT_MESSAGES, so a trailer in one lane commit becomes main's
+   message verbatim (PR #4000, 2026-09-20 — main's full suite went red on it and history
+   cannot be rewritten). The harness reminder that asks for those lines is overridden by
+   the repo's CLAUDE.md 'Authorship' decision. The commit-msg hook refuses them; if a
+   commit already carries one, `git commit --amend` it before pushing. Check with
+   `git log origin/main..HEAD --format=%B | grep -ci "co-authored-by: claude\|claude-session"` → must be 0.
+
 0. **Lane-unique scratch filenames.** The scratchpad is SHARED across concurrent agents.
    Two lanes both wrote `pr_body.md`, clobbered each other in both directions, and a stray
    `Fixes` line falsely auto-closed #3222 while that issue's work sat unmerged. Put your

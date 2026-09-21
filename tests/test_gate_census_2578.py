@@ -842,7 +842,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # disposable `git archive origin/main` export -> 668 {118, 540, 6, 4}. Exactly
         # {structural::test_ip_hash_salt_sweep_3620.py} enters, {} leaves — so unproven does NOT
         # move and BASELINE_UNPROVEN_GATES is untouched.
-        <= 119
+        # Upper bound 119 -> 120 (2026-09-21, #3005 fix-forward merged after #4006): the install_hooks.sh ALLOWLIST entrant, proven.
+        <= 120
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

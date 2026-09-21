@@ -65,7 +65,13 @@ jobs:
     # not a round number. scripts/check_job_timeout_headroom.py enumerates every job with
     # timeout-minutes across .github/workflows/*.yml and reds when any sits below this same
     # bound — re-run it before trusting this number again; do not bump by hand.
-    timeout-minutes: 18
+    # 18 -> 22 (2026-09-21, session AP, #3678 recurrence): the same script read RED —
+    # p95 of the trailing 28 runs' genuine completions = 17.59min (n=13; 15 were timeout
+    # casualties, censored, so 17.59 is a FLOOR) x 1.2 = 21.11min required. A SOLO rerun
+    # of PR #4007's job completed every step green in 19m55s and was still rendered
+    # `cancelled`. The lane grew (11,177 premerge tests; the pre-merge step alone is
+    # ~15.5min on the runner) — the ceiling followed the measurement, not the other way.
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -122,6 +128,20 @@ jobs:
       # after a merge and red-mained main four times on 2026-08-08. They cost 1.98s
       # locally for all 66 tests. No workflow edit was needed to add them: one marker,
       # one selection, which is exactly the property #2258 bought.
+      # #3005: a PR checkout is the merge commit at depth 1, so `git log` cannot see the
+      # branch's own commits — the attribution test reads them from this file instead.
+      # The repo squashes with COMMIT_MESSAGES, so a trailer in any commit lands on main.
+      - name: Collect the PR's commit messages for the attribution test (#3005)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json commits \
+            -q '[.commits[].messageBody] | join("\n---\n")' > /tmp/pr_commits_3005.txt || echo "" > /tmp/pr_commits_3005.txt
+          echo "PR_COMMITS_FILE_UNDER_TEST=/tmp/pr_commits_3005.txt" >> "$GITHUB_ENV"
+          echo "collected $(grep -c '^---$' /tmp/pr_commits_3005.txt || true) separator(s)"
+
       - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)
         if: always()
         # `set -o pipefail` is LOAD-BEARING (#2746 class, caught by
@@ -281,6 +301,20 @@ jobs:
       # their assertions mean anything. The credential-restore defect #3917 fixed (xdist
       # workers inheriting the controller's fakes) was never what kept this file out — it is
       # out because a PR lane has nothing real to point it at.
+      # #3005: a PR checkout is the merge commit at depth 1, so `git log` cannot see the
+      # branch's own commits — the attribution test reads them from this file instead.
+      # The repo squashes with COMMIT_MESSAGES, so a trailer in any commit lands on main.
+      - name: Collect the PR's commit messages for the attribution test (#3005)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json commits \
+            -q '[.commits[].messageBody] | join("\n---\n")' > /tmp/pr_commits_3005.txt || echo "" > /tmp/pr_commits_3005.txt
+          echo "PR_COMMITS_FILE_UNDER_TEST=/tmp/pr_commits_3005.txt" >> "$GITHUB_ENV"
+          echo "collected $(grep -c '^---$' /tmp/pr_commits_3005.txt || true) separator(s)"
+
       - name: Full unit suite — parallel pass (same selection as the post-merge coverage gate)
         if: always()
         run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25 -n auto --dist loadfile -m "not serial"
