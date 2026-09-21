@@ -112,9 +112,18 @@ if [[ -f "$PROJ_ROOT/deploy/sync_doc_metadata.py" ]]; then
   if [[ "$HOOK_BRANCH" == "main" ]]; then
     SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/platform_counts.py || true)
   else
-    git -C "$PROJ_ROOT" checkout HEAD -- lambdas/web/platform_counts.py 2>/dev/null || true
+    # In a MERGE commit (MERGE_HEAD exists — a lane merging origin/main into itself), HEAD is
+    # the branch's OLD tip: restoring to HEAD here silently threw away the counter the merge
+    # had just brought in from main, and the next reconcile on main conflicted with the branch
+    # again (#4005/#4006, 2026-09-21). The bot-owned file follows the side being merged IN.
+    if [[ -f "$(git -C "$PROJ_ROOT" rev-parse --git-path MERGE_HEAD)" ]]; then
+      RESTORE_FROM="MERGE_HEAD"
+    else
+      RESTORE_FROM="HEAD"
+    fi
+    git -C "$PROJ_ROOT" checkout "$RESTORE_FROM" -- lambdas/web/platform_counts.py 2>/dev/null || true
     SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md || true)
-    echo "[pre-commit] off main ($HOOK_BRANCH): lambdas/web/platform_counts.py restored to HEAD, not staged (#3984)"
+    echo "[pre-commit] off main ($HOOK_BRANCH): lambdas/web/platform_counts.py restored to $RESTORE_FROM, not staged (#3984)"
   fi
   if [[ -n "$SYNCED_CHANGED" ]]; then
     git -C "$PROJ_ROOT" add $SYNCED_CHANGED
