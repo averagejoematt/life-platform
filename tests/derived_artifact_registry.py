@@ -389,6 +389,21 @@ ARTIFACTS: dict[str, dict] = {
         step="manual, per review filing run",
         reason="Writes a dated docs/reviews/*_MANIFEST_*.json as the record of one filing run. Dated record, not re-derivable.",
     ),
+    "scripts/review_anchor_seal.py": _builder(
+        "scripts/review_anchor_seal.py",
+        step="`python3 scripts/review_anchor_seal.py --seal`, run deliberately in the SAME PR that edits docs/reviews/anchors/ANCHORS.json (#3607)",
+        reason=(
+            "Writes docs/reviews/anchors/ANCHORS.sha256.json, the content-addressed sibling of the review's "
+            "sealed grading anchors. BUILDER rather than DERIVED, and the distinction is the whole point of a "
+            "seal: the artifact it stamps is hand-authored prose frozen by PR, not repo state a job re-derives, "
+            "and a bot that re-stamped the sibling whenever it disagreed would erase exactly the property the "
+            "sibling exists to prove. So the drift contract here is a REFUSAL, not a regeneration — "
+            "tests/test_anchor_freeze_3607.py runs in the pre-merge lane (tests/conftest.py::_PREMERGE_EXTRA_FILES) "
+            "and reds on any mismatch, and scripts/review_anchor_seal.py::load_anchors raises rather than "
+            "returning an unsealed bar. Deliberately NOT in ci-cd.yml's run_generators(): self-healing is the "
+            "one behaviour this artifact must not have."
+        ),
+    ),
     "deploy/restart_pipeline.py": _builder(
         "deploy/restart_pipeline.py",
         step="deploy/restart_pipeline.py --apply (an experiment reset)",
