@@ -817,9 +817,10 @@ def test_subscribe_rate_limit_via_preseeded_counter(wp):
     """The 60/5min/IP budget, proven WITHOUT issuing 60 requests: pre-seed the
     real atomic counter at the limit and show the next request trips 429 through
     the real read-modify path."""
-    import hashlib
+    from common.client_ip import salted_ip_hash
 
-    ip_hash = hashlib.sha256(IP_C.encode()).hexdigest()[:16]
+    # #3620: the limiter salts this key now — seed under the SAME digest.
+    ip_hash = salted_ip_hash(IP_C)
     bucket = _FROZEN_EPOCH // 300
     wp.table.seed({"pk": "SUBSCRIBE#rate_limit", "sk": f"IP#{ip_hash}#BUCKET#{bucket}", "req_count": 60})
 

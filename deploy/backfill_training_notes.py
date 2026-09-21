@@ -30,6 +30,8 @@ Usage:
   python3 deploy/backfill_training_notes.py --since 2026-06-01 --apply
   python3 deploy/backfill_training_notes.py --report-overwrites    # READ-ONLY; writes nothing
   python3 deploy/backfill_training_notes.py --value-census         # READ-ONLY, $0; what is IN the un-extracted notes
+  python3 deploy/backfill_training_notes.py --pain-burst-census --since 2026-09-19T21:00Z --until 2026-09-19T21:10Z
+                                                                     # READ-ONLY (#3972); lists #pain thread rows + lexicon explanation
   python3 deploy/backfill_training_notes.py --migrate              # dry-run re-key of the collisions
   python3 deploy/backfill_training_notes.py --migrate --apply      # write the re-key (no model calls)
 """
@@ -464,9 +466,71 @@ def print_value_census(c):
     )
 
 
+def _extract_note_from_thread_text(text):
+    """The verbatim (<=160-char) note `elevate_pain` embedded in its own thread text —
+    the SAME truncation the write applied, never re-truncated here."""
+    m = re.search(r'note on .*?: "(.*)"\. Surface', text or "", re.S)
+    return m.group(1) if m else ""
+
+
+def _pain_hit_pre_3972(note_text):
+    """Re-derive the ORIGINAL (pre-#3972) lexicon verdict — no grip-work strip — so the
+    census can show exactly why a row over-fired, against what `tn.pain_lexicon_hit`
+    (post-fix) says today."""
+    t = (note_text or "").lower()
+    if any(w in t for w in tn._PAIN_WORDS):
+        return True
+    return any(r in t for r in tn._JOINT_REGIONS) and any(s in t for s in tn._JOINT_SENSATION)
+
+
+def pain_burst_census(table, since, until):
+    """READ-ONLY (#3972): every `#pain` coach_thread row written in [since, until) — the
+    2026-09-19T21:08-09Z burst that mis-fired 14 rows off 2022 Hevy notes. No write, no
+    delete: a Query plus a re-run of the pure lexicon function against each row's own
+    stored note text, so a human can post keep/dismiss counts on the issue."""
+    rows = _query_all(
+        table,
+        KeyConditionExpression=Key("pk").eq("USER#matthew")
+        & Key("sk").between(f"SOURCE#coach_thread#training_coach#{since}", f"SOURCE#coach_thread#training_coach#{until}~"),
+    )
+    rows = [r for r in rows if str(r.get("sk", "")).endswith("#pain")]
+    out = []
+    for r in sorted(rows, key=lambda row: row.get("sk", "")):
+        note = _extract_note_from_thread_text(r.get("text", ""))
+        post_fix_hit = tn.pain_lexicon_hit(note)
+        out.append(
+            {
+                "sk": r.get("sk"),
+                "created_at": r.get("created_at"),
+                "note_date": r.get("date"),
+                "exercise": r.get("exercise"),
+                "note_text": note,
+                "pain_lexicon_hit_pre_3972": _pain_hit_pre_3972(note),
+                "pain_lexicon_hit_post_3972": post_fix_hit,
+                "disposition": "keep (genuine pain)" if post_fix_hit else "dismiss (lexicon false positive — #3972 grip-work control)",
+            }
+        )
+    return out
+
+
+def print_pain_burst_census(rows):
+    print(f"PAIN-BURST CENSUS — {len(rows)} `#pain` coach_thread row(s) (READ-ONLY: no write, no delete)\n")
+    keep = [r for r in rows if r["pain_lexicon_hit_post_3972"]]
+    dismiss = [r for r in rows if not r["pain_lexicon_hit_post_3972"]]
+    for r in rows:
+        print(f"  {r['sk']}")
+        print(f"      note date: {r['note_date']}   exercise: {r['exercise']}   created_at: {r['created_at']}")
+        print(f'      note: "{r["note_text"]}"')
+        print(f"      lexicon hit pre-#3972: {r['pain_lexicon_hit_pre_3972']}   post-#3972: {r['pain_lexicon_hit_post_3972']}")
+        print(f"      disposition: {r['disposition']}\n")
+    print(f"KEEP (genuine pain, post-fix): {len(keep)}")
+    print(f"DISMISS (lexicon false positive, post-fix): {len(dismiss)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--since", default="2000-01-01")
+    ap.add_argument("--until", default="9999", help="upper bound for --pain-burst-census (exclusive-ish, sk-prefix compare)")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument(
         "--report-overwrites",
@@ -479,6 +543,11 @@ def main():
         help="READ-ONLY, $0: count and characterise the un-extracted noted exercise-sessions",
     )
     ap.add_argument(
+        "--pain-burst-census",
+        action="store_true",
+        help="READ-ONLY (#3972): list #pain coach_thread rows in [--since, --until) with source note + lexicon-hit explanation",
+    )
+    ap.add_argument(
         "--migrate",
         action="store_true",
         help="re-key the pre-#3918 collision workouts onto DATE#...#WORKOUT#<id>#<occurrence> (dry-run unless --apply)",
@@ -488,7 +557,9 @@ def main():
         ap.error("--report-overwrites is read-only; it cannot be combined with --apply")
     if args.value_census and args.apply:
         ap.error("--value-census is read-only; it cannot be combined with --apply")
-    if args.migrate and (args.report_overwrites or args.value_census):
+    if args.pain_burst_census and args.apply:
+        ap.error("--pain-burst-census is read-only; it cannot be combined with --apply")
+    if args.migrate and (args.report_overwrites or args.value_census or args.pain_burst_census):
         ap.error("--migrate is its own mode; run it on its own")
 
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
@@ -498,6 +569,9 @@ def main():
         return
     if args.value_census:
         print_value_census(value_census(table, args.since))
+        return
+    if args.pain_burst_census:
+        print_pain_burst_census(pain_burst_census(table, args.since, args.until))
         return
     if args.migrate:
         migrate_collisions(table, apply=args.apply)

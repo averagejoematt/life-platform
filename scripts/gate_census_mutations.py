@@ -250,6 +250,17 @@ _SPLIT_ID_PY = (
 
 _DEAD_SYMBOL_PY = '"""probe."""\n\n\n' "def probe(client):\n" "    return client.write_action()\n"
 
+# tests/test_ip_hash_salt_sweep_3620.py — the exact defect it exists to catch: a NEW
+# unsalted `sha256(ip)` call site, untriaged by the file's own allowlist. Assembled via
+# `_lit` so this module (scanned by other structural sweeps as ordinary tracked source)
+# never carries the literal call form outside the string it is building.
+_UNSALTED_IP_HASH_PY = (
+    '"""probe."""\n\n'
+    "import hashlib\n\n\n"
+    "def probe(source_ip):\n"
+    "    return hashlib." + _lit("sha256(source_ip.encode())") + ".hexdigest()[:16]\n"
+)
+
 _DEAD_ID_DOCSTRING_PY = '"""probe.\n\nSecret: life-platform/probe-2999-nope (Secrets Manager)\n"""\n'
 
 _ORPHAN_PAGE_HTML = "<!doctype html>\n<html><head><title>probe</title></head><body><p>probe</p></body></html>\n"
@@ -593,6 +604,13 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/common/_census_probe_2999.py", _MASKED_ID_PY),),
         track=False,
     ),
+    "structural::test_ip_hash_salt_sweep_3620.py": MutationSpec(
+        gate_id="structural::test_ip_hash_salt_sweep_3620.py",
+        target="tests/test_ip_hash_salt_sweep_3620.py",
+        detects="a new unsalted sha256(ip) call site under lambdas/ or mcp/, untriaged by the file's own allowlist (#3620)",
+        plants=(("lambdas/common/_census_probe_2999.py", _UNSALTED_IP_HASH_PY),),
+        track=False,
+    ),
     "structural::test_no_hardcoded_feature_tier.py": MutationSpec(
         gate_id="structural::test_no_hardcoded_feature_tier.py",
         target="tests/test_no_hardcoded_feature_tier.py",
@@ -826,6 +844,24 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "substring, so a paraphrase (a different em-dash, a reworded clause, a dropped date) is "
         "invisible to it by design — that class reads as a NEW claim, not a restated one, and is "
         "a content-review item, not a structural one.",
+        proved_on="2026-09-20",
+    ),
+    "structural::test_ip_hash_salt_sweep_3620.py": _proof(
+        "structural::test_ip_hash_salt_sweep_3620.py",
+        "baseline: 4 passed in 0.30s | mutated: 1 failed, 3 passed in 0.31s :: "
+        "test_every_sha256_ip_call_site_is_triaged | reverted: 4 passed in 0.28s",
+        "lambdas/ + mcp/ on disk (os.walk, .py only) for any `.sha256(...)` call whose "
+        "argument contains an `ip` token, checked against an explicit allowlist naming WHY "
+        "each existing hit is safe. An UNTRACKED module is in scope (os.walk, not git "
+        "ls-files). The regex's own positive/negative controls "
+        "(test_regex_control_catches_a_planted_unsalted_call, run every collection) prove the "
+        "detector fires on the exact planted shape and does not fire on an unrelated "
+        ".strip()/email hash; this harness run proves the THIRD leg end-to-end against the "
+        "real tracked tree — a genuinely new module the in-file controls never touch. STILL "
+        "INVISIBLE, stated rather than papered over: `from hashlib import sha256; sha256(ip)` "
+        "— no leading `.` before the call, so the dotted-call requirement (added to exclude "
+        "prose like a docstring's `` `sha256(salt + ip)` `` mentioning the function without "
+        "calling it) also excludes this real, if unidiomatic, call form.",
         proved_on="2026-09-20",
     ),
     "structural::test_gsi_set_premerge_3609.py": _proof(

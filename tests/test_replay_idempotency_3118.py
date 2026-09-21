@@ -219,10 +219,11 @@ def test_the_replay_survives_the_whole_function_url_envelope(board, monkeypatch)
     monkeypatch.setattr(ai, "_rate_limit_identity", lambda _e: "203.0.113.9")
     monkeypatch.setattr(ai, "_ddb_rate_check", lambda *a, **k: (True, 4, 0))
     monkeypatch.setattr(ai, "table", table)
-    # The follow-up path derives its own ip_hash from the same identity the mint used.
-    import hashlib
+    # The follow-up path derives its own ip_hash from the same identity the mint used
+    # (salted — #3620 — so seed the session under the SAME digest it will compute).
+    from common.client_ip import salted_ip_hash
 
-    table.store[(f"BOARDSESS#{TOKEN}", "SESSION")]["ip_hash"] = hashlib.sha256(b"203.0.113.9").hexdigest()[:16]
+    table.store[(f"BOARDSESS#{TOKEN}", "SESSION")]["ip_hash"] = salted_ip_hash("203.0.113.9")
 
     def _post():
         return ai.lambda_handler(

@@ -290,6 +290,16 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
+        iam.PolicyStatement(
+            sid="IpHashSalt",  # #3620 (security ROW4): the repo-wide grep sweep found /api/ask,
+            # /api/explain and /api/board_ask (+ its follow-up path) each keying their rate
+            # limiter — and board_ask's session store — on the SAME unsalted digest the
+            # site_api() role's IpHashSalt statement already fixed on the OTHER role. Fail-
+            # closed by construction (common.client_ip.salted_ip_hash): without this grant
+            # all three doors answer 503 rather than write/compare an unsalted digest.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ip-hash-salt")],
+        ),
         # #968 -> #3414: the coach-voiced board answers run the ADR-108 quality
         # gate (the same coach-quality-gate lambda the daily brief enforces).
         # #3413 removed the #968 SYNCHRONOUS reader-path invoke; the grant now

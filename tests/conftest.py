@@ -675,6 +675,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible at runtime — the generator would plan a PPL week while another caller
         # graded a session against the old grid, with nothing red anywhere.
         "test_program_structure_3755.py",
+        # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
+        # whose argument mentions an IP, triaged against an explicit allowlist. Pure
+        # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own
+        # diff, and the whole point of this file is that it must red BEFORE the merge
+        # that introduces it, not sit invisible post-merge the way the six sites this
+        # PR fixed did.
+        "test_ip_hash_salt_sweep_3620.py",
         # #3621 box 3: an AST sweep of lambdas/experiment/experiment_gates.py asserting
         # every module-level arming threshold carries a {value, kind, source} facet. Its
         # verdict depends only on that file's text, and the failure it catches is a bare
@@ -829,6 +836,12 @@ def _write_day_is_genesis_day(monkeypatch):
 # So the suite pins a fixed salt. The fail-closed arm is NOT left unasserted:
 # tests/test_ip_hash_salt_3620.py overrides this by patching `_get_secret` again
 # inside the test, and asserts the None return AND a real handler's 503.
+#
+# `common.client_ip.salted_ip_hash` — the shared helper every OTHER ip_hash call
+# site routes through (tests/test_ip_hash_salt_sweep_3620.py) — reads the SAME
+# secret through its own `_get_secret` reference, patched here too so none of
+# those doors' pre-existing tests start hitting a real (absent, in CI)
+# Secrets Manager either.
 @pytest.fixture(autouse=True)
 def _ip_hash_salt_3620(monkeypatch):
     try:
@@ -837,4 +850,10 @@ def _ip_hash_salt_3620(monkeypatch):
         yield
         return
     monkeypatch.setattr(_engage, "_get_secret", lambda secret_id, client: "conftest-ip-hash-salt")
+    try:
+        from common import client_ip as _client_ip
+
+        monkeypatch.setattr(_client_ip, "_get_secret", lambda secret_id, client: "conftest-ip-hash-salt")
+    except Exception:
+        pass
     yield
