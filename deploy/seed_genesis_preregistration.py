@@ -714,6 +714,10 @@ def build_hypotheses(goals, series_reader=None):
                 "direction": "lower",
                 "min_effect": h1_effect["min_effect"],
                 "min_effect_derivation": h1_effect["derived_from"],
+                # The same `{value, kind, source}` facet `experiment_gates.gate_provenance()`
+                # serves for every arming threshold, with `source` the derivation block above
+                # — ONE provenance vocabulary on the artifact, not one spelling per surface.
+                "min_effect_provenance": prereg_effect.effect_provenance(h1_effect),
                 "min_days_per_arm": arm_floor,
                 "lag_days": 1,
             },
@@ -743,6 +747,10 @@ def build_hypotheses(goals, series_reader=None):
                 "direction": "higher",
                 "min_effect": h2_effect["min_effect"],
                 "min_effect_derivation": h2_effect["derived_from"],
+                # The same `{value, kind, source}` facet `experiment_gates.gate_provenance()`
+                # serves for every arming threshold, with `source` the derivation block above
+                # — ONE provenance vocabulary on the artifact, not one spelling per surface.
+                "min_effect_provenance": prereg_effect.effect_provenance(h2_effect),
                 "min_days_per_arm": arm_floor,
                 "lag_days": 1,
             },

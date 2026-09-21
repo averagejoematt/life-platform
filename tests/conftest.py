@@ -324,6 +324,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_channel_divergence_prereg_1844.py",
         "test_genesis_preregistration.py",
         "test_plan_literal_reconciliation.py",
+        # #3552: reads the frozen `deploy/generated/genesis_preregistration.json` as the
+        # WIRE SHAPE its additive-projection assertions compare against. Named here in the
+        # same PR that adds the test, exactly as the block above instructs.
+        "test_prereg_effect_provenance_3552.py",
         "test_prereg_hash_stamp.py",
         "test_qa_smoke_phase_stamp_coverage_1970.py",
         # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this

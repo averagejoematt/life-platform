@@ -369,7 +369,14 @@ BASELINE = {
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the
     # seam caller. A considered raise, not a reflexive one; the NEXT growth extracts.
-    "lambdas/compute/hypothesis_engine_lambda.py": 1292,
+    # 2026-09-20 (#3552): 1292 -> 1293, and that next growth DID extract. Making
+    # store_hypothesis label the `min_effect` it writes (the #3552 provenance facet + the
+    # arm floor) needs exactly ONE logical line here — the chokepoint call. Everything
+    # else it needs (the two citation strings, the outcome-series reader, the whole stamp
+    # implementation) went into the cohesive sibling lambdas/experiment/prereg_effect.py,
+    # and the explanatory prose is a comment rather than a docstring so it costs nothing
+    # against this ceiling (#3537's measurement choice, used as intended).
+    "lambdas/compute/hypothesis_engine_lambda.py": 1293,
     "lambdas/ai/ai_context.py": 1076,
     # lambdas/content/output_writers.py LEFT this registry at #3728: extracting the whole
     # /api/labs labs block (139 lines) to content/labs_scope.py took it 1116 -> 990, under

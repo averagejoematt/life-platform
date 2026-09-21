@@ -43,6 +43,8 @@ from __future__ import annotations
 import math
 import statistics
 
+from experiment import experiment_gates  # the ONE provenance vocabulary (#3621/#4003)
+
 # Cohen's medium effect, expressed against the subject's own per-observation SD.
 EFFECT_SD_FRACTION = 0.5
 # Fewer usable successive differences than this and the SD is not a measurement.
@@ -119,3 +121,170 @@ def criteria_sentence(
         f"SD {derived_from['sd']}{unit_str} over n={derived_from['n']} successive readings "
         f"in the trailing {derived_from['window_days']} days."
     )
+
+
+# ── The provenance FACET (#3552, reusing the #3621/#4003 vocabulary) ──────────
+#
+# `experiment_gates.gate_provenance()` returns `{value, kind, source}` for every arming
+# threshold the platform serves, and its own docstring names THIS module's `derived_from`
+# block as the shape a `personal_derivation`'s `source` must arrive in ("reusing the
+# shape #3552 shipped rather than minting a second one for the same idea"). A
+# pre-registered `min_effect` is the same kind of object — a number a reader is asked to
+# trust — so it ships in that facet, not in a third spelling of it.
+#
+# The facet LABELS a number; it never upgrades one. A bar that was declared by design, or
+# proposed by a model, stays exactly the number it was — the facet is what lets a reader
+# tell it apart from a derived one, which is the whole defect this issue was filed about
+# (0.1 lb read as a pre-registered threshold and was ~3% of the day-to-day noise).
+# The phrase the per-arm floor is stated in. Checked before appending so a criterion that
+# already names the floor (the seeder's sentence does) is never restated.
+ARM_FLOOR_PHRASE = "days in each arm"
+
+
+def effect_provenance(derived: dict) -> dict:
+    """The `{value, kind, source}` facet for a DERIVED bar.
+
+    `source` is the `derived_from` block verbatim — the shape
+    `experiment_gates.gate_provenance()` documents for `personal_derivation`. Copied on
+    the way out so a payload consumer cannot mutate the artifact's own block.
+    """
+    return {
+        "value": derived["min_effect"],
+        "kind": experiment_gates.PERSONAL_DERIVATION,
+        "source": dict(derived["derived_from"]),
+    }
+
+
+def noise_scale_note(min_effect, values, *, metric: str, window_days: int, unit: str = "") -> str:
+    """The "measured against the subject's own series" clause — the scale a DECLARED bar sits on.
+
+    This does not derive anything: the bar stays the number that was declared. It states
+    what that number is worth against the subject's own per-observation noise, which is
+    the one fact the literal thresholds never carried. Returns "" when the series cannot
+    support a variance estimate — an honest silence, never a guessed ratio (ADR-104).
+    """
+    est = sigma_from_successive_differences(values)
+    if est is None:
+        return ""
+    sigma, n_pairs = est
+    if sigma <= 0:
+        return ""
+    unit_str = f" {unit}".rstrip()
+    ratio = round(float(min_effect) / sigma, 2)
+    return (
+        f" Measured against the subject's own series for SCALE (this is not a derivation of the bar): "
+        f"SD {round(sigma, 3)}{unit_str} over n={n_pairs} successive {metric} readings in the trailing "
+        f"{window_days} days, so the declared bar is {ratio}x that per-observation noise scale."
+    )
+
+
+def declared_effect_provenance(
+    min_effect, *, kind: str, citation: str, values=None, metric: str = "", window_days=None, unit: str = ""
+) -> dict:
+    """The facet for a bar that was NOT derived — declared by design, or model-proposed.
+
+    `kind` is `experiment_gates.POPULATION_CONSTANT` (an adopted design convention) or
+    `experiment_gates.MODEL_PROPOSED` (the number arrived with an LLM-generated
+    hypothesis). Either way `source` is a citation STRING, matching what
+    `gate_provenance()` carries for a non-derived threshold — with the measured noise
+    scale appended when the outcome metric's own series can supply one.
+    """
+    source = citation
+    if values and window_days:
+        source += noise_scale_note(min_effect, values, metric=metric, window_days=window_days, unit=unit)
+    return {"value": min_effect, "kind": kind, "source": source}
+
+
+def arm_floor_clause(min_days_per_arm: int) -> str:
+    """The sentence that puts the checker's per-arm n floor on the public artifact."""
+    return (
+        f" No verdict is possible below {min_days_per_arm} {ARM_FLOOR_PHRASE} — the deterministic check "
+        "stamps both arm counts, and they are read alongside any verdict, never the verdict alone."
+    )
+
+
+# ── The citations a NON-derived bar ships with (#3552) ───────────────────────
+# Moved here from `hypothesis_engine_lambda` rather than added to it: the engine sits on
+# its #1665 size ceiling, and "put the new code in a cohesive helper module beside it" is
+# what that ratchet asks for. This is that module — the pre-registered effect bar and
+# everything a reader needs to price it.
+MODEL_PROPOSED_CITATION = (
+    "Proposed by the weekly hypothesis generator's model (Bedrock, structured tier) alongside the "
+    "hypothesis text and its confirmation criterion, then frozen unchanged at pre-registration: the "
+    "model chose this bar and no derivation from Matthew's own variance stands behind it. It is "
+    "deliberately NOT re-priced afterwards — the criterion sentence states the same number, and "
+    "replacing one of the two would put a contradiction on the public artifact."
+)
+
+# #1843's diary-intervention bar. habit_pct is a 0-1 completion ratio, so 0.05 is five
+# percentage points — the same number that hypothesis' criterion sentence states.
+DIARY_DESIGN_CITATION = (
+    "#1843's design choice, made when this structural hypothesis was written: habit_pct is a 0-1 "
+    "completion ratio, so 0.05 is five percentage points of same-day habit adherence — the smallest "
+    "difference at which the video diary would be worth treating as a deliberate nudge rather than a "
+    "neutral instrument. A product convention, not a bar derived from Matthew's own habit_pct variance."
+)
+
+
+def outcome_series(spec, daily_rows):
+    """The outcome metric's own trailing readings, oldest-first, from `build_data_narrative`
+    rows. None when the metric was never measured in the window — an honest absence, never
+    a zero-filled series that would understate the noise."""
+    metric = (spec or {}).get("outcome_metric")
+    if not metric or not daily_rows:
+        return None
+    values = []
+    for row in sorted(daily_rows, key=lambda r: r.get("date") or ""):
+        raw = row.get(metric)
+        if raw is None:
+            continue
+        try:
+            values.append(float(raw))
+        except (TypeError, ValueError):
+            continue
+    return values or None
+
+
+def stamp_spec_provenance(hyp: dict, min_days_per_arm: int, daily_rows=None, *, kind: str = "", citation: str = "", unit: str = "") -> dict:
+    """Every stored hypothesis leaves here with its bar LABELLED and its n floor stated.
+
+    #3552 fixed the two genesis hypotheses at the seeder. It did not reach the other two
+    writers — the standing diary-intervention hypothesis (#1843) and the weekly LLM
+    generator — so the ONE hypothesis live on `/api/hypotheses` still served
+    `min_effect: 0.05` with no derivation, no arm floor, and a `confirmation_criteria`
+    that named no n. This is the chokepoint that closes the set.
+
+    Additive and idempotent: an existing facet, an existing `min_days_per_arm` and a
+    criterion that already names the floor are all left exactly as they are, so the
+    seeder's derived specs pass through untouched. Returns a new dict; never mutates the
+    caller's.
+    """
+    spec = hyp.get("test_spec")
+    if not isinstance(spec, dict):
+        return hyp
+    spec = dict(spec)
+    out = dict(hyp)
+    out["test_spec"] = spec
+
+    spec.setdefault("min_days_per_arm", min_days_per_arm)
+
+    if "min_effect" in spec and "min_effect_provenance" not in spec:
+        derivation = spec.get("min_effect_derivation")
+        if isinstance(derivation, dict):
+            # The seeder's already-derived block, expressed in the shared facet shape.
+            spec["min_effect_provenance"] = effect_provenance({"min_effect": spec["min_effect"], "derived_from": derivation})
+        else:
+            spec["min_effect_provenance"] = declared_effect_provenance(
+                spec["min_effect"],
+                kind=kind or experiment_gates.MODEL_PROPOSED,
+                citation=citation or MODEL_PROPOSED_CITATION,
+                values=outcome_series(spec, daily_rows),
+                metric=str(spec.get("outcome_metric") or ""),
+                window_days=len(daily_rows) if daily_rows else None,
+                unit=unit,
+            )
+
+    criteria = out.get("confirmation_criteria")
+    if isinstance(criteria, str) and criteria.strip() and ARM_FLOOR_PHRASE not in criteria:
+        out["confirmation_criteria"] = criteria.rstrip() + arm_floor_clause(min_days_per_arm)
+    return out

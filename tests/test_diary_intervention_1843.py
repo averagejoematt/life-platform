@@ -260,7 +260,7 @@ def test_build_data_narrative_diary_day_absent_pre_1843():
 
 def test_seed_registers_when_absent(monkeypatch):
     stored = {}
-    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp: stored.update(hyp))
+    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp, *_a, **_kw: stored.update(hyp))
 
     result = eng.seed_diary_intervention_hypothesis([])
 
@@ -276,7 +276,7 @@ def test_seed_registers_when_absent(monkeypatch):
 
 def test_seed_is_idempotent(monkeypatch):
     calls = []
-    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp: calls.append(hyp))
+    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp, *_a, **_kw: calls.append(hyp))
     existing = [{"hypothesis_id": eng.DIARY_INTERVENTION_HYPOTHESIS_ID, "status": "confirmed"}]
 
     result = eng.seed_diary_intervention_hypothesis(existing)
@@ -290,7 +290,7 @@ def test_seed_hypothesis_passes_validate_hypothesis(monkeypatch):
     gate a generated hypothesis has to pass (required fields, numeric threshold in
     confirmation_criteria, a valid pre-registered test_spec)."""
     stored = {}
-    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp: stored.update(hyp))
+    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp, *_a, **_kw: stored.update(hyp))
     eng.seed_diary_intervention_hypothesis([])
 
     is_valid, issues = eng.validate_hypothesis(stored, existing_texts=None)
@@ -319,7 +319,7 @@ def test_seed_hypothesis_evaluates_deterministically_end_to_end(monkeypatch):
     from datetime import date, timedelta
 
     stored = {}
-    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp: stored.update(hyp))
+    monkeypatch.setattr(eng, "store_hypothesis", lambda hyp, *_a, **_kw: stored.update(hyp))
     eng.seed_diary_intervention_hypothesis([])
     spec = stored["test_spec"]
 

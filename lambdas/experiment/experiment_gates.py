@@ -78,6 +78,13 @@ FELT_CALIBRATION_CI_MIN_WEEKS = 8
 POPULATION_CONSTANT = "population_constant"
 PERSONAL_DERIVATION = "personal_derivation"
 MEASUREMENT = "measurement"
+# #3552: a bar that arrived with an LLM-generated hypothesis. No gate in THIS registry is
+# ever model-proposed (every threshold here is authored), but a pre-registered
+# `test_spec.min_effect` on the weekly-generator path is — and labelling it is the only
+# honest option, because re-pricing it would contradict the criterion sentence the same
+# model wrote. Lives here so there is ONE provenance vocabulary rather than one per
+# surface; `THRESHOLD_KINDS` below stays the set this registry's own facets may use.
+MODEL_PROPOSED = "model_proposed"
 THRESHOLD_KINDS = (POPULATION_CONSTANT, PERSONAL_DERIVATION)
 
 # Keyed by the module-level NAME, so the completeness sweep can compare this registry

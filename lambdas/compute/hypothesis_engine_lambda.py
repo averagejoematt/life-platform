@@ -77,7 +77,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
-from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
+from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -278,8 +278,17 @@ def load_existing_hypotheses(status_filter=None):
         return []
 
 
-def store_hypothesis(hypothesis: dict):
+def store_hypothesis(hypothesis: dict, daily_rows=None, *, kind=None, citation=None):
     """Write a new hypothesis to DynamoDB."""
+    # #3552 — THE chokepoint. Every hypothesis this engine writes leaves here with its
+    # `min_effect` labelled by the shared `{value, kind, source}` facet and the checker's
+    # per-arm n floor stated in both the spec and the criterion. Additive and idempotent:
+    # a spec that already carries a derivation (the genesis seeder's) passes through with
+    # that derivation expressed as the facet and nothing else touched. `daily_rows`, when
+    # given, prices a DECLARED bar against the outcome metric's own measured noise scale.
+    # (The prose is a comment, not a docstring, because this module sits on its #1665
+    # size ceiling and that ratchet counts logical lines, not comments — #3537.)
+    hypothesis = prereg_effect.stamp_spec_provenance(hypothesis, MIN_DAYS_PER_ARM, daily_rows, kind=kind, citation=citation)
     now = datetime.now(timezone.utc)
     sk = f"HYPOTHESIS#{now.isoformat()}"
 
@@ -1406,7 +1415,7 @@ def run_time_affluence_weekly(force=False):
 DIARY_INTERVENTION_HYPOTHESIS_ID = "hyp_diary_days_habit_adherence"
 
 
-def seed_diary_intervention_hypothesis(all_hypotheses):
+def seed_diary_intervention_hypothesis(all_hypotheses, daily_rows=None):
     """#1843 AC3: register ONE hypothesis testing whether the video diary is itself
     an intervention (measurement reactivity / the Hawthorne effect he explicitly
     hopes for) rather than a neutral instrument — diary-recorded days vs
@@ -1482,7 +1491,8 @@ def seed_diary_intervention_hypothesis(all_hypotheses):
             logger.error(f"[#1843] diary-intervention hypothesis failed validation: {issues}")
             return {"registered": False, "reason": f"validation_failed: {issues}"}
 
-        store_hypothesis(hyp)
+        # #3552: a DESIGN-declared bar, labelled as one (never dressed as a derivation).
+        store_hypothesis(hyp, daily_rows, kind=experiment_gates.POPULATION_CONSTANT, citation=prereg_effect.DIARY_DESIGN_CITATION)
         logger.info(f"[#1843] Registered pre-registered hypothesis: {DIARY_INTERVENTION_HYPOTHESIS_ID}")
         return {"registered": True, "hypothesis_id": DIARY_INTERVENTION_HYPOTHESIS_ID}
     except Exception as e:
@@ -1550,7 +1560,7 @@ def lambda_handler(event, context):
         # the check step (so it is never evaluated the same run it's created — same
         # convention as generated hypotheses) and before generation (so it counts
         # against the pending cap like any other hypothesis).
-        diary_hypothesis_result = seed_diary_intervention_hypothesis(all_hypotheses)
+        diary_hypothesis_result = seed_diary_intervention_hypothesis(all_hypotheses, daily_rows)
         if diary_hypothesis_result.get("registered"):
             pending_count += 1  # newly-seeded hypothesis starts "pending" — counts against the cap below
 
@@ -1593,7 +1603,10 @@ def lambda_handler(event, context):
                         window = 21
                     hyp["monitoring_window_days"] = window
 
-                    store_hypothesis(hyp)
+                    # #3552: the generated bar rides with its MODEL_PROPOSED facet and the
+                    # arm floor — stamped in store_hypothesis, after validation, because it
+                    # only adds registry-grounded text to an already-valid criterion.
+                    store_hypothesis(hyp, daily_rows)
                     new_hypotheses_stored += 1
 
                 logger.info(f"Stored {new_hypotheses_stored} new hypotheses, rejected {validation_rejected}")
