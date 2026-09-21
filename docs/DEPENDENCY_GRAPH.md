@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-695 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+697 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -204,6 +204,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `private_intake` | — | intake_response.py |
 | `progress_photos` | progress_capture.py | progress_capture.py |
 | `protocols` | — | site_api_protocols.py |
+| `qa_hook_matrix` | hook_liveness_qa.py | — |
 | `qa_predict_dark` | qa_smoke_lambda.py | qa_smoke_lambda.py |
 | `recall_embeddings` | — | — |
 | `recap_cards` | recap_card_lambda.py | recap_card_lambda.py |
@@ -493,12 +494,12 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1199 total · 861 resolved · 338 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1204 total · 863 resolved · 341 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
 - Alarms: 131 literal-named declarations across three idioms, 4 composite; routing digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 90 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
-- Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
+- Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `qa_hook_matrix`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
 ## 7. Cost-bearing surface (#3374 R1)
