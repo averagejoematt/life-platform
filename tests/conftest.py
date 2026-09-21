@@ -708,6 +708,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # introduced by a PR's own diff, and once merged it is a door the `spawned_by`
         # refusal does not cover — which is the vacuity this box exists to end.
         "test_protocol_lever_contract_3621.py",
+        # #3621 box 2: reads the committed live census artifact
+        # (deploy/generated/pk_family_census.json) to assert the family names its
+        # second-census clause is proved over are ones the live table actually produces.
+        # A PR that lands a regenerated artifact must red on the PR that lands it —
+        # tests/test_restart_verify_gates_3477.py derives this membership and requires it.
+        "test_restart_second_census_3621.py",
     }
 )
 

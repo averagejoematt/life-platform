@@ -103,10 +103,6 @@ def spawned_by_problem(value: Any) -> str | None:
     )
 
 
-def is_valid_spawned_by(value: Any) -> bool:
-    return spawned_by_problem(value) is None
-
-
 def require_spawned_by(protocol: dict, *, where: str = "protocol") -> str:
     """THE REFUSAL. Returns the validated `spawned_by`, or raises ProtocolLeverRefused."""
     problem = spawned_by_problem((protocol or {}).get("spawned_by"))
@@ -142,8 +138,13 @@ def build_protocol_item(protocol: dict, *, pk: str) -> dict:
 
 
 def audit_catalog(protocols: Iterable[dict]) -> list[str]:
-    """The SAME predicate over `site/config/protocols.json`'s entries. Returns one line
-    per offender; an empty list means the catalogue is clean.
+    """THE BATCH VERDICT — the same predicate over a whole catalogue. Returns one line per
+    offender; an empty list means every lever is linked.
+
+    Called by `deploy/seed_protocols.py::build_items` before a single item is built (so a
+    seed reports EVERY offender at once instead of stopping at the first), and by the
+    contract test over `site/config/protocols.json` — the file `/api/protocols` falls back
+    to when the DDB query fails. One predicate, both doors.
 
     Vacuity is a finding here, not a pass: an empty catalogue returns a finding rather
     than `[]`, because "no lever is unlinked" over zero levers is exactly the vacuous

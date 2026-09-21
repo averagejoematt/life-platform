@@ -44,7 +44,6 @@ from experiment.protocol_levers import (  # noqa: E402
     ProtocolLeverRefused,
     audit_catalog,
     build_protocol_item,
-    is_valid_spawned_by,
     spawned_by_problem,
 )
 
@@ -86,9 +85,9 @@ def test_a_hypothesis_id_is_accepted_and_keys_the_row():
 
 
 def test_the_literature_label_is_accepted_at_its_exact_spelling_only():
-    assert is_valid_spawned_by(PRE_PLATFORM)
+    assert spawned_by_problem(PRE_PLATFORM) is None
     for near_miss in ("Pre-Platform / Literature", "pre-platform/literature", "pre-platform", "pre-platform / lit"):
-        assert not is_valid_spawned_by(near_miss), f"{near_miss!r} must not pass — spelling is the contract"
+        assert spawned_by_problem(near_miss) is not None, f"{near_miss!r} must not pass — spelling is the contract"
         assert "EXACT" in (spawned_by_problem(near_miss) or "") or "not a HYPOTHESIS#" in (spawned_by_problem(near_miss) or "")
 
 
@@ -202,7 +201,7 @@ def test_mutation_control_a_truthiness_check_admits_a_prose_citation():
     the shape test in `spawned_by_problem` is load-bearing."""
     softened = bool("Published literature (Walker, 2017; Huberman, 2021)")
     assert softened is True, "the softened predicate must be shown to accept it"
-    assert not is_valid_spawned_by("Published literature (Walker, 2017; Huberman, 2021)")
+    assert spawned_by_problem("Published literature (Walker, 2017; Huberman, 2021)") is not None
 
 
 def test_mutation_control_defaulting_instead_of_refusing_makes_every_lever_claim_provenance():

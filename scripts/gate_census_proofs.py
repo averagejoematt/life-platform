@@ -1196,7 +1196,10 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
             "which is the behaviour under test), and the in-test control for the catalogue leg. "
             "M3 RED (1 failed, 26 passed) — test_the_shell_entrypoint_delegates_rather_than_carrying_its_own_writer, "
             "and only that one, which is the right blast radius for a clause about the shell entrypoint. "
-            "RESTORED after each: 27 passed, exit 0, `git status --porcelain` empty."
+            "RESTORED after each: 27 passed, exit 0. "
+            "RE-RUN in full after `is_valid_spawned_by` was deleted (#3538's every-bundle dead-def gate) and "
+            "`audit_catalog` was wired into the seeder's `build_items` as the batch verdict: identical counts, "
+            "4 / 5 / 1, baseline and restore 27 passed — so the record dates the code that ships, not an earlier revision."
         ),
         "scope": (
             "Covers the write path and the catalogue: no PROTOCOL# item can be built without an admissible "

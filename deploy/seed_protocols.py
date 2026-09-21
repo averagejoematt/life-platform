@@ -30,7 +30,7 @@ for _p in (str(REPO_ROOT), str(REPO_ROOT / "lambdas")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from experiment.protocol_levers import PROTOCOLS_SOURCE, ProtocolLeverRefused, build_protocol_item  # noqa: E402
+from experiment.protocol_levers import PROTOCOLS_SOURCE, ProtocolLeverRefused, audit_catalog, build_protocol_item  # noqa: E402
 
 TABLE_NAME = "life-platform"
 REGION = "us-west-2"
@@ -48,9 +48,15 @@ def load_catalog(path: Path | None = None) -> list[dict]:
 
 
 def build_items(protocols: list[dict], pk: str = PK) -> list[dict]:
-    """Every lever as a validated DDB item, or SystemExit naming every refusal at once."""
+    """Every lever as a validated DDB item, or SystemExit naming every refusal at once.
+
+    The batch verdict comes FIRST (`audit_catalog`) so an operator sees every unlinked
+    lever in one message rather than fixing them one re-run at a time; `build_protocol_item`
+    then refuses again per item, which is the chokepoint proper and also catches the
+    shapes a catalogue audit has no opinion on (a missing `id`)."""
+    problems = audit_catalog(protocols)
     items: list[dict] = []
-    refusals: list[str] = []
+    refusals: list[str] = list(problems)
     for p in protocols:
         try:
             items.append(build_protocol_item(p, pk=pk))
