@@ -32,6 +32,41 @@ the experiment, so — like the calibration scoreboard — it must survive a res
 phase_taxonomy classifies the "VOICEFIDELITY#" pk prefix as CROSS_PHASE, even
 though the COACH#.../OUTPUT# records it samples FROM are experiment-scoped.
 
+THE SAMPLER READS ACROSS CYCLES ON PURPOSE (#3615 box 4)
+  Until 2026-09-21 the sample query was wrapped in `with_phase_filter()` with the
+  default `include_pilot=False`, which is the filter for EXPERIMENT-SCOPED reads —
+  and `COACH#{id}/OUTPUT#` IS experiment-scoped, so the wrapper did exactly what it
+  says. The defect was that it made the INSTRUMENT experiment-scoped too, which
+  contradicts three things this module and its endpoint already declare:
+
+    * this docstring (CROSS_PHASE, "must survive a reset");
+    * the class of the rows it writes (`VOICEFIDELITY#`, CROSS_PHASE — the tally is
+      never wiped, so a cycle-bounded sampler feeds a lifetime ledger);
+    * the PUBLISHED method on /api/voice_fidelity, verbatim: "The tally accumulates
+      across every cycle and is never reset at a restart — a cross-phase measurement
+      of whether the coaches sound distinct, not a claim about the live cycle."
+
+  So the honest reading is the reverse of the tempting one: the cross-phase sample is
+  what the stated method promises, and the phase filter was the thing producing a
+  number the disclosure does not describe. (The rejected lever recorded on #3615 on
+  2026-09-16 was "drop the filter to make the surface light up sooner" — a verdict
+  about the CURRENT CYCLE'S coaching computed across a reset boundary. That is not
+  what this instrument claims: it never says anything about a cycle. What it grades is
+  whether eight personas write distinguishably, which is a property of the ENGINE and
+  is measured better, not worse, by spanning twelve cycles of prose.)
+
+  Two consequences are load-bearing:
+    1. DynamoDB applies `Limit` BEFORE a `FilterExpression`. With the filter on, a
+       coach whose newest `lookback` rows were all archived by a reset returned ZERO
+       samples — post-filter starvation, silent, and indistinguishable from "this
+       coach has never written anything". Reading unfiltered makes `Limit` mean what
+       it looks like it means, and `SAMPLE_LOOKBACK` is sized so the near-empty-
+       passage skip cannot starve the sample either.
+    2. Every judgment row now records the phase of the row it was drawn from
+       (`sample_phase`), and the scoreboard carries `phases_sampled` — so an
+       archive-sourced judgment is labelled forever rather than being silently folded
+       into the current cycle's prose.
+
 Runs 1st of the month, 15:00 UTC (8:00 AM PT) — fixed UTC, no DST drift.
 """
 
@@ -44,7 +79,7 @@ import boto3
 from ai import voice_fidelity_core as vfc
 from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
-from experiment.phase_filter import with_phase_filter  # ADR-058 (harmless no-op here: these records never set `phase`)
+from experiment.phase_filter import with_phase_filter  # ADR-058 — called with include_pilot=True here (see the docstring, #3615)
 
 from coach import persona_registry
 
@@ -58,6 +93,16 @@ MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 SCOREBOARD_PK = "VOICEFIDELITY#scoreboard"
 SAMPLES_PER_COACH = 2
+# How many of a coach's newest OUTPUT# rows the sampler reads to find SAMPLES_PER_COACH
+# judgeable passages (#3615 box 4). Sized against the failure it exists to prevent: with
+# the phase filter gone `Limit` is the only bound, so this has to cover a run of rows that
+# are all too short to judge (MIN_PASSAGE_CHARS) AND a coach whose recent writing sits
+# behind a reset's worth of archived rows. 40 rows x <=1.5 KB is one key-bounded query
+# well inside DynamoDB's 1 MB page, so the wider read costs one RCU-class page, not a
+# second round trip. The ratio that matters: SAMPLE_LOOKBACK // SAMPLES_PER_COACH = 20
+# unjudgeable rows tolerated per required sample.
+SAMPLE_LOOKBACK = 40
+UNKNOWN_PHASE = "unstamped"  # a row written before / outside the phase tagger carries no `phase`
 PANEL_TEMPERATURES = (0.1, 0.4, 0.7)  # panel diversity — not 3 copies of one guess
 MIN_PASSAGE_CHARS = 200  # skip near-empty outputs — nothing there to judge
 PASSAGE_TRUNCATE_CHARS = 1400  # bounds prompt cost; ~2-3 paragraphs is plenty of voice signal
@@ -70,12 +115,21 @@ def _run_month(dt=None):
     return (dt or datetime.now(timezone.utc)).strftime("%Y-%m")
 
 
-def _sample_recent_outputs(coach_id, n=SAMPLES_PER_COACH, lookback=8):
+def _sample_recent_outputs(coach_id, n=SAMPLES_PER_COACH, lookback=SAMPLE_LOOKBACK):
     """Most recent OUTPUT# records for a coach with enough text to judge.
 
     Reads a few more than `n` (lookback) so short/empty outputs can be skipped
     without an extra round trip. Returns at most `n` dicts:
-      {"coach_id", "sample_date", "passage"} (passage truncated for prompt cost).
+      {"coach_id", "sample_date", "sample_phase", "passage"} (passage truncated
+      for prompt cost).
+
+    `include_pilot=True` is deliberate and is the whole of #3615 box 4 — see this
+    module's docstring. It is the sanctioned bypass named in `phase_filter`'s own
+    contract ("callers can pass include_pilot=True ... for the rare backward-looking
+    case"), and it is what makes `Limit` a bound on ROWS READ rather than on rows read
+    BEFORE a filter that can discard all of them. The call is left wrapped rather than
+    deleted so the decision is stated at the call site instead of being the absence of
+    something.
     """
     try:
         resp = table.query(
@@ -84,7 +138,8 @@ def _sample_recent_outputs(coach_id, n=SAMPLES_PER_COACH, lookback=8):
                     "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"),
                     "ScanIndexForward": False,
                     "Limit": lookback,
-                }
+                },
+                include_pilot=True,
             )
         )
         items = resp.get("Items", [])
@@ -101,6 +156,7 @@ def _sample_recent_outputs(coach_id, n=SAMPLES_PER_COACH, lookback=8):
             {
                 "coach_id": coach_id,
                 "sample_date": str(item.get("sk", "")).replace("OUTPUT#", "").split("#")[0] or "unknown",
+                "sample_phase": str(item.get("phase") or UNKNOWN_PHASE),
                 "passage": content[:PASSAGE_TRUNCATE_CHARS],
             }
         )
@@ -203,7 +259,14 @@ def _load_cumulative_judgments(coach_ids):
     cumulative (like the calibration ledger), not a single month's tiny sample.
     Strongly consistent so a run's own just-written judgments are counted in the
     same invocation (cf. #468's strongly-consistent sentinel read — the same
-    read-your-writes gap, one commit ago in this repo)."""
+    read-your-writes gap, one commit ago in this repo).
+
+    `include_pilot=True` for the same reason as the sampler (#3615 box 4), and here
+    it is belt-and-braces: `VOICEFIDELITY#` is CROSS_PHASE, so nothing stamps these
+    rows today and the filter is currently a no-op — but `Limit` is applied before a
+    FilterExpression, so the day anything DID stamp one, this lifetime tally would
+    quietly truncate instead of erroring. An instrument whose n can silently fall is
+    worse than one that cannot read."""
     judgments = []
     for coach_id in coach_ids:
         try:
@@ -213,11 +276,18 @@ def _load_cumulative_judgments(coach_ids):
                         "KeyConditionExpression": Key("pk").eq(f"VOICEFIDELITY#{coach_id}") & Key("sk").begins_with("JUDGMENT#"),
                         "ConsistentRead": True,
                         "Limit": 500,
-                    }
+                    },
+                    include_pilot=True,
                 )
             )
             for item in resp.get("Items", []):
-                judgments.append({"actual_coach_id": item.get("actual_coach_id"), "predicted_coach_id": item.get("predicted_coach_id")})
+                judgments.append(
+                    {
+                        "actual_coach_id": item.get("actual_coach_id"),
+                        "predicted_coach_id": item.get("predicted_coach_id"),
+                        "sample_phase": item.get("sample_phase") or UNKNOWN_PHASE,
+                    }
+                )
         except Exception as e:
             logger.warning("judgment fetch failed for %s: %s", coach_id, e)
     return judgments
@@ -268,6 +338,11 @@ def lambda_handler(event, context=None):
                 "actual_coach_id": coach_id,
                 "predicted_coach_id": predicted,
                 "sample_date": sample["sample_date"],
+                # #3615 box 4: the phase of the ROW this passage came from, not of this
+                # judgment (VOICEFIDELITY# is CROSS_PHASE and carries no phase stamp of
+                # its own). Written so an archive-sourced judgment stays identifiable
+                # forever rather than being folded into the current cycle's prose.
+                "sample_phase": sample.get("sample_phase", UNKNOWN_PHASE),
                 "panel_size": len(votes),
                 "agreement": agreement,
                 "mean_confidence": mean_confidence,
@@ -284,6 +359,11 @@ def lambda_handler(event, context=None):
     scoreboard["run_month"] = run_month
     scoreboard["updated_at"] = now.isoformat()
     scoreboard["new_samples_this_run"] = new_samples
+    # #3615 box 4: state the span the tally was drawn from, in the row itself. The
+    # endpoint's published method already says the tally "accumulates across every
+    # cycle"; this is the machine-readable version of that sentence, so a reader (or a
+    # later reviewer) can see WHICH phases produced the n rather than taking it on faith.
+    scoreboard["phases_sampled"] = sorted({str(j.get("sample_phase") or UNKNOWN_PHASE) for j in all_judgments})
 
     try:
         table.put_item(Item=floats_to_decimal({"pk": SCOREBOARD_PK, "sk": "latest", **scoreboard}))
