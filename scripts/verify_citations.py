@@ -131,6 +131,13 @@ def _fetch_json(url: str, timeout: float = 30.0):
         return json.load(fh)
 
 
+def split_unverified(lines: list[str]) -> tuple[list[str], list[str]]:
+    """(drift, unverified) — an UNVERIFIED line is a registry that could not be observed
+    (429 / 5xx / network); it is reported, never counted as drift and never silently dropped."""
+    unverified = [l for l in lines if l.startswith("UNVERIFIED ")]
+    return [l for l in lines if not l.startswith("UNVERIFIED ")], unverified
+
+
 def check_pubmed(pairs: list[tuple[str, str, str]]) -> list[str]:
     """pairs: [(loc, pmid, stored_title)]. Returns one failure string per drifted
     citation: not-found, retracted, or a live title that no longer matches stored."""
@@ -169,10 +176,15 @@ def check_doi(triples: list[tuple[str, str, str]]) -> list[str]:
         try:
             payload = _fetch_json(url)
         except urllib.error.HTTPError as exc:
-            failures.append(f"{loc}: DOI {doi} did not resolve (HTTP {exc.code})")
+            if exc.code == 429 or exc.code >= 500:
+                # the registry could not be OBSERVED (rate limit / outage) — that is YELLOW, not
+                # drift: a 429 from Crossref reds nothing, but it is never a silent pass either.
+                failures.append(f"UNVERIFIED {loc}: DOI {doi} could not be observed (HTTP {exc.code}); retry later")
+            else:
+                failures.append(f"{loc}: DOI {doi} did not resolve (HTTP {exc.code})")
             continue
         except (urllib.error.URLError, ValueError) as exc:
-            failures.append(f"{loc}: DOI {doi} lookup failed ({exc})")
+            failures.append(f"UNVERIFIED {loc}: DOI {doi} could not be observed ({exc})")
             continue
         msg = payload.get("message") or {}
         titles = msg.get("title") or []
@@ -198,13 +210,23 @@ def verify() -> tuple[list[str], dict[str, int]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    failures, counts = verify()
+    lines, counts = verify()
+    drift, unverified = split_unverified(lines)
     print(f"Checked {counts['pubmed']} PubMed citation(s) + {counts['doi']} DOI citation(s) against their live source.")
-    if failures:
-        print(f"CITATION DRIFT ({len(failures)}):")
-        for f in failures:
+    if unverified:
+        # YELLOW: the registry could not be observed for these — said out loud, exit 0 only if
+        # nothing that WAS observed drifted. The cron-freshness dead-man still sees the run.
+        print(f"UNVERIFIED ({len(unverified)}) — could not observe, not drift:")
+        for u in unverified:
+            print(f"  {u}")
+    if drift:
+        print(f"CITATION DRIFT ({len(drift)}):")
+        for f in drift:
             print(f"  {f}")
         return 1
+    if unverified:
+        print(f"{len(lines) - len(unverified)} observed citation(s) still resolve to their stored title; {len(unverified)} unverified.")
+        return 0
     print("All citations still resolve to their stored title.")
     return 0
 

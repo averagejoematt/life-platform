@@ -272,3 +272,24 @@ def test_the_registry_agrees_the_workflow_is_watched_and_not_orphaned():
     assert rows["citation-network-check.yml"]["watched"] is True
     assert "citation-network-check.yml" not in reg.unruled_workflows()
     assert "citation-network-check.yml" not in reg.orphaned_policy_rows()
+
+
+def test_a_rate_limit_is_unverified_not_drift(monkeypatch):
+    """A 429 (or a 5xx / network error) means the registry could not be OBSERVED — reported
+    as UNVERIFIED, never as drift, and never silently dropped (main() prints it, exits 0)."""
+    import urllib.error
+
+    def limited(url, timeout=30.0):
+        raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+
+    monkeypatch.setattr(vc, "_fetch_json", limited)
+    lines = vc.check_doi([("experiments/x.source_url", "10.1/abc", "A Title")])
+    drift, unverified = vc.split_unverified(lines)
+    assert not drift and len(unverified) == 1 and "HTTP 429" in unverified[0]
+
+    def gone(url, timeout=30.0):
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(vc, "_fetch_json", gone)
+    drift, unverified = vc.split_unverified(vc.check_doi([("experiments/x.source_url", "10.1/abc", "A Title")]))
+    assert len(drift) == 1 and not unverified  # a 404 IS drift (the must-fail control)
