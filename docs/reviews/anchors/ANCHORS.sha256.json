@@ -1,0 +1,29 @@
+{
+  "artifact": "ANCHORS.json",
+  "artifact_path": "docs/reviews/anchors/ANCHORS.json",
+  "algorithm": "sha256",
+  "sha256": "af9f958947dc30c8023d47553fc378e505dc01b56006afb154f183e71be96f57",
+  "sealed_at": "2026-09-21T04:51:14.637047+00:00",
+  "frozen_at": "2026-09-20",
+  "lenses": [
+    "a11y",
+    "aiq",
+    "cost",
+    "cpo",
+    "cto",
+    "data-architect",
+    "dataviz",
+    "designer",
+    "devex",
+    "growth",
+    "integrations",
+    "narrative",
+    "observability",
+    "principal",
+    "qs",
+    "reader",
+    "security"
+  ],
+  "verify": "shasum -a 256 docs/reviews/anchors/ANCHORS.json",
+  "seal_note": "The hash covers the artifact's exact bytes. Edit ANCHORS.json and this file no longer verifies; `python3 scripts/review_anchor_seal.py --verify` fails closed and the review refuses to grade against an unsealed bar (#3607, the #3483 shape)."
+}
