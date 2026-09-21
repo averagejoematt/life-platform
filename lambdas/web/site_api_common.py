@@ -1010,6 +1010,17 @@ def _prereg_stamp_key(genesis: str) -> str:
     return f"generated/experiments/prereg/genesis-{genesis}.sha256.json"
 
 
+def _prereg_amendment_key(genesis: str) -> str:
+    """S3 key of the genesis pre-registration's AMENDMENT ledger (#3599).
+
+    Same duplication rule and the same kind of parity pin as `_prereg_stamp_key`:
+    deploy/prereg_amendment.py owns the writer's literal, this owns the reader's, and
+    tests/test_prereg_amendment_3599.py asserts the two are equal. A correction
+    published where no surface reads it is not the VISIBLE amendment record #3599
+    asked for — it is a second artifact nobody links."""
+    return f"generated/experiments/prereg/genesis-{genesis}.amendments.json"
+
+
 # #1980: cache the seal lookup per warm container (same pattern as _supp_metadata_cache),
 # but a MISSING stamp is a legitimate, cacheable answer (a freshly re-anchored cycle
 # whose --with-preregistration hasn't landed yet) — so a separate "attempted" flag
@@ -1030,6 +1041,12 @@ def prereg_seal_meta() -> dict | None:
 
     Returns None (honest-empty) when no stamp exists yet for this genesis; callers
     render nothing rather than a broken/guessed link.
+
+    #3599: a sealed pre-registration is never edited, so when one turns out to
+    disagree with the platform's own facts the repair is an AMENDMENT published
+    beside it. The ledger travels WITH the seal here rather than on a surface of its
+    own — a correction a reader has to go looking for is not a correction — and is
+    honest-empty (absent key) when nothing has been amended, which is the normal case.
     """
     global _prereg_seal_cache, _prereg_seal_attempted
     if _prereg_seal_attempted:
@@ -1047,4 +1064,46 @@ def prereg_seal_meta() -> dict | None:
         "verify": stamp.get("verify"),
         "stamped_at": stamp.get("stamped_at"),
     }
+    amendments = prereg_amendments(EXPERIMENT_START)
+    if amendments:
+        _prereg_seal_cache["amendments"] = amendments
+        # Derived from the stamp's own published URL rather than a second origin
+        # literal — one place to be wrong about where the artifact lives, not two.
+        artifact_url = str(stamp.get("public_artifact_url") or "")
+        _prereg_seal_cache["amendments_url"] = (
+            artifact_url[: -len(".json")] + ".amendments.json" if artifact_url.endswith(".json") else None
+        )
     return _prereg_seal_cache
+
+
+def prereg_amendments(genesis: str) -> list:
+    """The published corrections to `genesis`'s seal, newest last (#3599).
+
+    One summary line per amendment — kind, where, and what is true instead — never
+    the sealed bytes and never a repaired copy of them. Fail-soft and honest-empty:
+    a missing or unreadable ledger is [], because a seal with no amendments is the
+    normal state and must not degrade the seal block that #1980 requires on every
+    response, including the 5xx path.
+    """
+    ledger = _load_s3_json(_prereg_amendment_key(genesis), "prereg_amendments")
+    out = []
+    for record in (ledger or {}).get("amendments") or []:
+        if not isinstance(record, dict):
+            continue
+        out.append(
+            {
+                "amendment_id": record.get("amendment_id"),
+                "authored_at": record.get("authored_at"),
+                "reason": record.get("reason"),
+                "corrections": [
+                    {
+                        "kind": c.get("kind"),
+                        "where": c.get("where"),
+                        "correct_value": c.get("correct_value") or c.get("correction_unknown_reason"),
+                    }
+                    for c in (record.get("corrections") or [])
+                    if isinstance(c, dict)
+                ],
+            }
+        )
+    return out
