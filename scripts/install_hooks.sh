@@ -163,6 +163,17 @@ fi
 . "$CSP_LIB"
 
 # Subject = first line that is neither blank nor a comment.
+# #3005 (owner decision, CLAUDE.md 'Authorship'): no tool-attribution trailer in any commit.
+# The repo squash-merges with COMMIT_MESSAGES, so a lane's trailer becomes main's message
+# (PR #4000, 2026-09-20). Refused here, before the subject check, on the WHOLE message.
+if grep -vE '^[[:space:]]*#' "$MSG_FILE" | grep -qiE '^(Claude-Session:|Co-Authored-By:[[:space:]]*Claude)|Generated with \[Claude Code\]'; then
+  {
+    echo "[commit-msg] ❌ the message carries a Claude tool-attribution form (Claude-Session / Co-Authored-By: Claude / Generated with [Claude Code])."
+    echo "  Commits carry the work, not the tooling — owner decision 2026-08-12 (CLAUDE.md 'Authorship')."
+    echo "  Remove the trailer lines and commit again."
+  } >&2
+  exit 1
+fi
 SUBJECT="$(grep -vE '^[[:space:]]*#' "$MSG_FILE" | grep -vE '^[[:space:]]*$' | head -n1)"
 
 # Skip subjects git itself generates.
