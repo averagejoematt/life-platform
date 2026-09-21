@@ -96,6 +96,83 @@ def head_chrome(indent: str = "  ") -> str:
     return "\n".join(indent + tag for tag in HEAD_CHROME_TAGS)
 
 
+# ── Syndication chrome (#3615 box 5) ──────────────────────────────────────────
+#
+# WHAT WAS SHIPPING. Eleven pages under /story/ carried
+#   <link rel="alternate" type="application/rss+xml" … href="/podcast/feed.xml">
+# and the feed at that URL was 200 / 593 bytes: a complete <channel> with an
+# <itunes:author>, an artwork link, and ZERO <item> elements (re-measured live
+# 2026-09-21). Every podcast client treats `rel=alternate` as a real subscription
+# offer, so the platform was advertising a show with no episodes — an unfurl that
+# promises content nothing produces. That is the #3495 class (a claim a reader would
+# believe that the platform's own data does not support), not a cosmetic nit.
+#
+# THE GATE, AND WHERE ITS TRUTH COMES FROM. A build script cannot see the live feed
+# (it is generated into `generated/podcast/` in S3 and never committed), and a
+# build-time HTTP fetch would make generated HTML depend on the network — the
+# regenerate-to-a-zero-diff property the whole v4 build rests on would be gone. So the
+# gate reads the ONE committed statement the platform already makes about that feed:
+# the `Absence(contract="declared_dark")` on the `podcast/feed_items` cell of
+# `lambdas/operational/hook_registry.py`. One declaration, two consumers:
+#
+#   * the nightly census PROBES the live feed and reports that cell honestly-absent
+#     against the declaration (#3615 box 1, shipped in PR #4015);
+#   * this module WITHDRAWS the advertisement for exactly the feeds it names.
+#
+# "Honestly absent" then becomes a whole statement instead of half of one: the feed is
+# empty, the platform says so in a dated and owned declaration, and no page offers it.
+# When the TTS episodes get built (the other half of box 5's owner choice — the grade
+# is identical either way), deleting that Absence and re-running the story builder
+# brings the link back, and `tests/test_podcast_feed_link_3615.py` REDS until both
+# halves move in the same direction.
+FEED_LINKS = (
+    ("/rss.xml", "averagejoematt"),
+    ("/podcast/feed.xml", "The Measured Life — read aloud (podcast)"),
+    ("/panelcast/feed.xml", "The Measured Life — The Panel (podcast)"),
+)
+
+
+def dark_feeds() -> frozenset:
+    """Feed paths the hook registry DECLARES dark — advertising one is a false offer.
+
+    Derived from `hook_registry` rather than re-listed here: a second hand-maintained
+    copy of "which feeds are empty" is the drift this gate exists to end. A feed with no
+    registry row (today `/rss.xml`) is not gated — it is a surface the census has never
+    ruled on, and silence is not a declaration in either direction.
+
+    Raises rather than guessing when the registry cannot be read: a build that fell back
+    to "advertise everything" would quietly republish the false offer, and an unreadable
+    committed module is a real breakage, not a degraded environment.
+    """
+    lambdas_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
+    if lambdas_dir not in sys.path:
+        sys.path.insert(0, lambdas_dir)
+    try:
+        from operational import hook_registry
+    except Exception as exc:  # noqa: BLE001 — any import failure here is the same verdict
+        raise RuntimeError(f"v4_chrome cannot read lambdas/operational/hook_registry.py, so it cannot tell which feeds are dark: {exc}")
+    dark = set()
+    for _hook, artifact in hook_registry.cells():
+        absence = getattr(artifact, "absence", None)
+        if absence is not None and absence.contract == "declared_dark" and str(artifact.locator).startswith("/"):
+            dark.add(artifact.locator)
+    return frozenset(dark)
+
+
+def syndication_links(indent: str = "  ") -> str:
+    """The page's `<link rel=alternate>` feed block, minus every declared-dark feed.
+
+    One tag per line, joined with newlines and no trailing newline — the same contract
+    as `head_chrome()`.
+    """
+    dark = dark_feeds()
+    return "\n".join(
+        f'{indent}<link rel="alternate" type="application/rss+xml" title="{title}" href="{href}">'
+        for href, title in FEED_LINKS
+        if href not in dark
+    )
+
+
 def _door_icon(key: str) -> str:
     # Inline <use> of the shared sprite — server-rendered (no JS), inherits .ico-door colour.
     return (

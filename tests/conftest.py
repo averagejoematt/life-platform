@@ -261,6 +261,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # hand-types a drifted paraphrase (rather than importing the shared constant)
         # must red on the PR that adds it, not sit invisible post-merge.
         "test_prior_cut_disclosure_3754.py",
+        # #3615 box 5: sweeps every committed site/**/*.html for a `rel=alternate` link to a
+        # feed the hook registry declares DARK. A repo-shape ratchet in the strict sense —
+        # its verdict is a function of the tree alone — and pre-merge because the failure it
+        # catches is a reader-facing false offer (11 pages advertised a podcast feed with
+        # zero episodes) on a `site/**` PR, which AUTO-DEPLOYS on merge (#750). Post-merge
+        # this gate would only ever red on something already published.
+        "test_podcast_feed_link_3615.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the

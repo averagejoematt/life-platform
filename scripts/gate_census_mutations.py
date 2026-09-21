@@ -483,6 +483,20 @@ _UNCLAIMED_READER_HOOK_JS = (
     "}\n"
 )
 
+# #3615 box 5: a page under site/ advertising a feed the hook registry DECLARES dark —
+# i.e. offering a reader a podcast subscription to a show with zero episodes. This is the
+# exact 11-page defect the gate was written for, planted as a NEW page so it also proves
+# the sweep reaches a section nobody edited. The href is hardcoded because a MutationSpec
+# plant is static content; if the podcast feed ever gains episodes and its Absence is
+# deleted, this spec stops reding — which is itself the signal to re-run and re-record it
+# against whatever the registry declares dark then.
+_DARK_FEED_ADVERTISED_HTML = (
+    "<!DOCTYPE html>\n"
+    '<html lang="en"><head><meta charset="UTF-8"><title>census probe</title>\n'
+    '<link rel="alternate" type="application/rss+xml" title="census probe" href="/podcast/feed.xml">\n'
+    "</head><body><p>census probe</p></body></html>\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_scoped_writer_provenance_guard_3599.py": MutationSpec(
         gate_id="structural::test_scoped_writer_provenance_guard_3599.py",
@@ -507,6 +521,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("site/assets/js/_census_probe_3615.js", _UNCLAIMED_READER_HOOK_JS),),
         track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
+    ),
+    "structural::test_podcast_feed_link_3615.py": MutationSpec(
+        gate_id="structural::test_podcast_feed_link_3615.py",
+        target="tests/test_podcast_feed_link_3615.py",
+        detects=(
+            "a page under site/ carrying `<link rel=alternate>` to a feed the hook registry declares "
+            "DARK — the #3615 box 5 defect verbatim: 11 story pages advertised /podcast/feed.xml, a 200 "
+            "with a full <channel> and ZERO <item> elements, so every podcast client that unfurled them "
+            "offered a reader a subscription to a show that has never published an episode"
+        ),
+        plants=(("site/_census_probe_3615_box5/index.html", _DARK_FEED_ADVERTISED_HTML),),
+        track=False,  # the gate rglobs site/ on disk, so an untracked page is in scope
     ),
     "structural::test_prior_cut_disclosure_3754.py": MutationSpec(
         gate_id="structural::test_prior_cut_disclosure_3754.py",
@@ -920,6 +946,24 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "reached from inline `<script>` in an HTML page rather than a module under site/, and — "
         "by construction — whether the door BEHIND a registered endpoint actually works. The "
         "nightly matrix probes the route, not the handler, and says so in the cell label.",
+        proved_on="2026-09-21",
+    ),
+    "structural::test_podcast_feed_link_3615.py": _proof(
+        "structural::test_podcast_feed_link_3615.py",
+        "ARMED 1/1 — baseline: 8 passed in 0.19s | mutated: 1 failed, 7 passed in 0.19s :: "
+        "test_no_committed_page_advertises_a_declared_dark_feed | reverted: 8 passed in 0.18s. The plant is a "
+        "page in a site/ directory that did not previously exist, so the RED also proves the sweep is an "
+        "rglob over the tree rather than a walk of a hand-kept page list.",
+        "site/**/*.html on disk (rglob, site/legacy excluded), so an UNTRACKED page is in scope, plus "
+        "scripts/v4_build_dispatches.py read as text for the re-hardcoded-literal check. The dark set is "
+        "DERIVED from lambdas/operational/hook_registry.py (`Absence(contract='declared_dark')` on a cell "
+        "whose locator is a site path), never hand-listed here — test_the_registry_still_declares_at_least_"
+        "one_feed_dark fails loudly rather than passing vacuously if that set empties. It judges the "
+        "COMMITTED HTML and the committed declaration: whether the live feed at that URL actually has zero "
+        "<item> elements tonight is the nightly census's probe (hooks:liveness_matrix), not this gate's, and "
+        "a feed with no registry row at all (today /rss.xml) is outside the set in both directions — silence "
+        "is not a declaration. Also invisible here: a feed advertised from JS at runtime rather than from a "
+        "committed <link>, and any page under site/legacy (frozen by #1237).",
         proved_on="2026-09-21",
     ),
     "structural::test_prior_cut_disclosure_3754.py": _proof(
