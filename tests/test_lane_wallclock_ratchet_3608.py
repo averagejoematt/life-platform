@@ -43,10 +43,16 @@ POSTURE = os.path.join(REPO_ROOT, "deploy", "github_posture.json")
 PR_CHECKS_YML_PATH = os.path.join(REPO_ROOT, ".github", "workflows", "pr-checks.yml")
 WRITER = os.path.join(REPO_ROOT, "deploy", "write_lane_posture.py")
 
-# THE RATCHET. Last measured value per required check, 2026-09-19, by
+# THE RATCHET. Last measured value per required check, 2026-09-21, by
 # `python3 deploy/write_lane_posture.py --measure` (p95 of genuine completions
 # over the trailing 30 runs). Raise ONLY with a new measurement and a new date —
 # never to make a red go away.
+#
+# 2026-09-21 (#4011, the #3678 recurrence): re-frozen 1037s -> 1055s (n=13 genuine of
+# 28; 15 were timeout casualties, censored). The growth is ACCEPTED and named: the
+# premerge lane reached 11,177 tests and the pre-merge step alone runs ~15.5min on the
+# GitHub runner; the 18-min ceiling was re-derived to 22 in the same PR. The lane has
+# no growth budget of its own (only this ceiling ratchet) — epic #3493 carries that.
 #
 # The fast lane was sampled twice within the hour and returned 1037s (n=21) then
 # 1026s (n=20) as one run rolled out of the trailing window. The ceiling is
@@ -54,8 +60,8 @@ WRITER = os.path.join(REPO_ROOT, "deploy", "write_lane_posture.py")
 # next sample for no reason but window jitter, and a gate that reds on noise is
 # a gate people learn to widen. The posture file carries whichever reading the
 # writer last took; this is the bar it may not cross.
-LAST_MEASURED_SECONDS_2026_09_19 = {
-    "Collect + deploy-critical + format": 1037,
+LAST_MEASURED_SECONDS_2026_09_21 = {
+    "Collect + deploy-critical + format": 1055,
     "gitleaks (PR commit range only, not full history)": 12,
 }
 
@@ -88,14 +94,14 @@ def test_every_required_check_carries_a_measured_duration_with_provenance():
 def test_the_ratchet_reds_above_the_last_measured_value():
     for check in _checks():
         ctx = check["context"]
-        ceiling = LAST_MEASURED_SECONDS_2026_09_19.get(ctx)
+        ceiling = LAST_MEASURED_SECONDS_2026_09_21.get(ctx)
         assert ceiling is not None, (
             f"{ctx} is a required check with no frozen measurement in this test. Measure it "
             "(`python3 deploy/write_lane_posture.py --measure --context ...`) and add the row."
         )
         assert check["typical_seconds"] <= ceiling, (
             f"{ctx}: typical_seconds {check['typical_seconds']}s exceeds the last measured {ceiling}s "
-            f"(frozen 2026-09-19). The lane got slower. Decide whether that is acceptable, then re-freeze "
+            f"(frozen 2026-09-21). The lane got slower. Decide whether that is acceptable, then re-freeze "
             "this row WITH the new measurement date — do not widen it to clear a red."
         )
 
@@ -104,7 +110,7 @@ def test_the_frozen_rows_match_the_checks_that_actually_exist():
     """The other direction: a stale row here for a check that was renamed or
     retired would leave a real check unguarded while the file still looks full."""
     live = {c["context"] for c in _checks()}
-    stale = set(LAST_MEASURED_SECONDS_2026_09_19) - live
+    stale = set(LAST_MEASURED_SECONDS_2026_09_21) - live
     assert not stale, f"frozen rows for checks that no longer exist: {sorted(stale)}"
 
 
