@@ -343,6 +343,28 @@ def _extract_status_components(payload: dict) -> dict:
 _ABSENCE_EXTRACTORS = {"freshness_rows": _extract_freshness_rows, "status_components": _extract_status_components}
 
 
+#: Words that turn a mention of a broken pipe into a DENIAL of one. The registry's own
+#: canonical caveat ends "…never a sync failure", and an earlier draft of this matcher
+#: red-flagged the registry's own honest sentence — the gate must read a negated mention
+#: as what it is. The window is short on purpose: "never a sync failure" and "not a
+#: broken pipe" are denials; a sentence that says "check auth" thirty words after the
+#: word "not" is not.
+_NEGATORS = ("not ", "never ", "n't ", "rather than ", "no ")
+_NEGATION_WINDOW = 24
+
+
+def _claims_broken_pipe(low: str) -> Optional[str]:
+    """The first sync-failure phrase ASSERTED (not denied) in `low`, or None."""
+    for phrase in reg.SYNC_FAILURE_PHRASES:
+        start = low.find(phrase)
+        while start != -1:
+            window = low[max(0, start - _NEGATION_WINDOW) : start]
+            if not any(neg in window for neg in _NEGATORS):
+                return phrase
+            start = low.find(phrase, start + 1)
+    return None
+
+
 def _cause_verdict(facet: dict, cause_text: str, duration_days: Optional[float]) -> Optional[tuple]:
     """(severity, message) when the rendered cause fights the registry facet, else None.
 
@@ -365,7 +387,7 @@ def _cause_verdict(facet: dict, cause_text: str, duration_days: Optional[float])
     gate into the thing that hides outages behind a facet.
     """
     low = (cause_text or "").lower()
-    hit = next((p for p in reg.SYNC_FAILURE_PHRASES if p in low), None)
+    hit = _claims_broken_pipe(low)
     status = facet.get("status")
     if status == "paused":
         if hit:

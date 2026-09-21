@@ -276,6 +276,42 @@ def _run_absence(payloads):
     return wq.check_absence_agreement(Check, CONTENT_TRUTH, None, site_base_url="https://site", budget=_budget(payloads))[0]
 
 
+def test_the_two_producer_fixes_in_this_PR_clear_the_gate():
+    """The end-to-end control for the live 2026-09-21 reds, assembled from BOTH shipped fixes.
+
+    `/api/status` gets its paused comment from `_absence_comment(availability_facet(sid), rel)`,
+    and `/api/source_freshness`'s paused row now carries `days_dark` + `last_update` +
+    `absence_cause`/`absence_caveat` from the same facet. Fed to the gate together, the two
+    surfaces tell ONE story and it goes green — which is the whole claim this PR makes about
+    what the deploy will do, tested rather than asserted.
+    """
+    from web.site_api_status import _absence_comment
+
+    facet = availability_facet("garmin")
+    row = {
+        "id": "garmin",
+        "status": "paused",
+        "desc": "Biometrics — paused (vendor anti-automation, ADR-074)",
+        "last_update": "2026-06-15",
+        "days_dark": 97,
+        "absence_status": facet["status"],
+        "absence_cause": facet["reason"],
+        "absence_caveat": facet["caveat"],
+    }
+    check = _run_absence(_absence_payloads(_absence_comment(facet, "97d ago"), freshness_row=row))
+    assert check.passed is True, check.message
+
+
+def test_a_DENIED_broken_pipe_is_not_a_claim_of_one():
+    """The registry's own caveat ends "…never a sync failure". An earlier draft of the
+    phrase matcher red-flagged the registry's own honest sentence — a negated mention is
+    a denial, and the gate has to read it as one."""
+    facet = availability_facet("garmin")
+    assert wq._claims_broken_pipe("paused by ADR-074 — a hole in the record, never a sync failure") is None
+    assert wq._claims_broken_pipe("was flowing regularly but stopped. check auth/webhook.") == "check auth"
+    assert wq._cause_verdict(facet, facet["caveat"], 97.0) is None
+
+
 def test_a_paused_source_narrated_as_a_sync_failure_is_a_FAIL():
     """The live 2026-09-21 copy, verbatim — garmin is paused by ADR-074 and cannot report."""
     check = _run_absence(_absence_payloads("Pipeline may need attention — was flowing regularly but stopped 97d ago. Check auth/webhook."))
