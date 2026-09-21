@@ -421,6 +421,11 @@ def discover_ci_mirror_sites(repo_root: str = REPO_ROOT) -> set[str]:
 
 
 CI_MIRROR_SITES: dict[str, dict[str, str]] = {
+    "scripts/verify_citations.py": {
+        "clause": "C",
+        "claim": ".github/workflows/citation-network-check.yml",
+        "notes": "the citation network re-resolution script names the monthly workflow that schedules it (#3621 box 4)",
+    },
     ".claude/skills/deploy/SKILL.md": {
         "clause": "C",
         "claim": ".github/workflows/site-deploy.yml",
