@@ -92,6 +92,12 @@ KNOWN_SECRETS = [
     # credential families lets either one forge the other. Mint: telegram-coach-worker (the one-time link). Verify:
     # progress-viewer (the link and the session cookie). Must be created in Secrets Manager before the deploy (the
     # viewer answers 503 until it exists — never 200).
+    #
+    # DELIBERATELY NOT YET IN docs/ARCHITECTURE.md's Secrets Manager table: that table is the LIVE inventory, stamped
+    # with a live-verified count and date, and `scripts/check_doc_facts.py` reds when the rows outnumber the stamp. A
+    # secret that has not been created yet is not live, so it joins the table on the `--refresh-secrets` run AFTER the
+    # one-time `aws secretsmanager create-secret` (named in #3760's PR). KNOWN_SECRETS here is the DECLARED set and is
+    # what the IAM lockstep reads, so the grant is checked from the moment it ships.
     "life-platform/progress-photos-signing",
     "life-platform/site-api-origin-secret",  # #815 R22-SEC-03: the x-amj-origin CloudFront gate value. Resolved at CDK deploy time into serve/web env; #1589 added a runtime read by the AI-quality canary so its direct-invoke probes can present the header.
     "life-platform/ip-hash-salt",  # #3620 (security ROW4): the salt for every reader ip_hash in site_api_social_engage.py. Read at runtime by site-api through secret_cache; the doors answer 503 until it exists (fail-closed, never an unsalted fallback).
