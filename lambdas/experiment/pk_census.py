@@ -154,6 +154,37 @@ def live_scoped_pks(prefix: str, table=None) -> dict:
     return out
 
 
+# #3599 box 1: the non-SOURCE pk prefixes `assert_registry_coverage` requires FULL-PK
+# coverage for. The reset passes only "COACH#" live today (#3514 widened it that far);
+# the artifact records all four so a CI test can grade the same assertion offline against
+# the whole set the wipe's `required_pks` names, not just the coach tier.
+COVERAGE_PREFIXES = ("COACH#", "ENSEMBLE#", "NARRATIVE#", "PERSONA#")
+
+
+def scoped_partitions_from_snapshot(snapshot: dict) -> dict:
+    """{pk: rep_sk} for every EXPERIMENT_SCOPED partition in a census snapshot's
+    `coverage_partitions` block — the shape `assert_registry_coverage` consumes.
+
+    The ONE reader of that block, for the same single-home reason `write_pk_family_census`
+    is the one writer of the artifact path (#3860): a test that re-derived the filter
+    beside this function would be free to disagree with it about what "scoped" means.
+    Raises on an absent or classless block rather than returning {} — an empty coverage
+    set reads as "nothing to cover", which is the vacuous-scan trap wearing a JSON hat.
+    """
+    block = (snapshot or {}).get("coverage_partitions")
+    if not block:
+        raise CensusPreflightError(
+            "pk census: this snapshot carries no `coverage_partitions` block. Refusing to certify "
+            "wipe coverage from it — regenerate with deploy/write_pk_family_census.py (#3599)."
+        )
+    out: dict = {}
+    for _prefix, pks in sorted(block.items()):
+        for pk, facet in sorted((pks or {}).items()):
+            if (facet or {}).get("class") == taxonomy.EXPERIMENT_SCOPED:
+                out[pk] = facet.get("rep_sk", "")
+    return out
+
+
 # #3621: `tombstoned_reason` joined this projection rather than getting a scan of its own.
 # A Scan is billed on the bytes SCANNED, not the bytes projected (see COST above), so the
 # extra attribute is free — while a second full-table pass for the tombstone-provenance
@@ -581,10 +612,19 @@ def census_snapshot(table=None) -> dict:
     # family_count alone cannot distinguish a healthy table from a scan truncated after
     # its first page, because both can surface the same handful of families.
     _scanned = [0]
+    _coverage: dict = {p: {} for p in COVERAGE_PREFIXES}
 
     def _counting(pages):
         for page in pages:
             _scanned[0] += len(page)
+            # #3599 box 1: the FULL-pk enumeration under the coverage prefixes, taken from
+            # the same streaming pages as the family reduction below — one scan, no extra
+            # read units (a Scan is billed on the bytes SCANNED; see COST above).
+            for item in page:
+                pk = item.get("pk", "")
+                for prefix in COVERAGE_PREFIXES:
+                    if pk.startswith(prefix):
+                        _coverage[prefix].setdefault(pk, item.get("sk", ""))
             yield page
 
     reps = census_families(_counting(scan_pk_sk_pages(table)))
@@ -602,11 +642,31 @@ def census_snapshot(table=None) -> dict:
             cls = None  # unresolved; run_census_preflight is the instrument that RULES on this
         families[fam] = {"rep_pk": pk, "rep_sk": sk, "class": cls}
     n_families = len(families)
+    coverage_partitions: dict = {}
+    for prefix, pks in _coverage.items():
+        block = {}
+        for pk, sk in sorted(pks.items()):
+            try:
+                cls = taxonomy.classify(pk, sk)
+            except KeyError:
+                cls = None
+            block[pk] = {"rep_sk": sk, "class": cls}
+        coverage_partitions[prefix] = block
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py.",
         "family_count": n_families,
         "families": families,
+        # #3599 box 1: the coverage-granularity enumeration. `families` folds every
+        # COACH#* pk into one "COACH" family — the right granularity for the TOTALITY
+        # question and the wrong one for COVERAGE (see census_pks_with_prefix above), so
+        # the artifact carried nothing CI could grade `assert_registry_coverage` against.
+        # Every live pk under COVERAGE_PREFIXES is recorded here WITH ITS CLASS — not only
+        # the EXPERIMENT_SCOPED ones — so a CI test can prove both halves offline: that
+        # today's real partition set is covered by the wipe, and that the two delivery
+        # ledgers #3514 reclassified are LIVE and SYSTEM_STATE (a silent revert of that
+        # ruling shows up here as a class change, not as an absence nobody can see).
+        "coverage_partitions": coverage_partitions,
         # #3669: the provenance block. `family_count` is repeated inside `_meta` rather
         # than cross-referenced because the two are one expression evaluated once, so they
         # cannot drift; a reader grading the artifact should not have to know which of the

@@ -1,11 +1,113 @@
 {
   "_meta": {
-    "captured_at": "2026-09-19",
+    "captured_at": "2026-09-21",
     "family_count": 98,
     "generated_by": "lambdas/experiment/pk_census.py::census_snapshot via deploy/write_pk_family_census.py \u2014 never hand-edit this artifact",
-    "item_count": 44697,
+    "item_count": 45696,
     "region": "us-west-2",
     "table": "life-platform"
+  },
+  "coverage_partitions": {
+    "COACH#": {
+      "COACH#career_coach": {
+        "class": "cross_phase",
+        "rep_sk": "CHAT#2026-08-25#1120a41b"
+      },
+      "COACH#commitments": {
+        "class": "experiment_scoped",
+        "rep_sk": "TALLY#current"
+      },
+      "COACH#computation": {
+        "class": "experiment_scoped",
+        "rep_sk": "RESULTS#2026-04-07"
+      },
+      "COACH#eli_marsh": {
+        "class": "cross_phase",
+        "rep_sk": "CHAT#2026-08-12#18818e69"
+      },
+      "COACH#explorer_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#glucose_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#labs_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#mind_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#nudge_ledger": {
+        "class": "system_state",
+        "rep_sk": "DAY#2026-07-26"
+      },
+      "COACH#nutrition_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#outbound_events": {
+        "class": "system_state",
+        "rep_sk": "EVENT#recovery_slide#2026-08-12"
+      },
+      "COACH#outbound_ledger": {
+        "class": "system_state",
+        "rep_sk": "DAY#2026-09-01"
+      },
+      "COACH#physical_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#sleep_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      },
+      "COACH#training_coach": {
+        "class": "experiment_scoped",
+        "rep_sk": "BRIEF#2026-04-07"
+      }
+    },
+    "ENSEMBLE#": {
+      "ENSEMBLE#digest": {
+        "class": "experiment_scoped",
+        "rep_sk": "CYCLE#2026-04-08"
+      },
+      "ENSEMBLE#disagreements": {
+        "class": "experiment_scoped",
+        "rep_sk": "ACTIVE#caloric_deficit_sustainability_and_muscle_preservation"
+      },
+      "ENSEMBLE#dispute": {
+        "class": "experiment_scoped",
+        "rep_sk": "THREAD#2026-W27#caloric_intake_adequacy_for_current_activity_and_upcoming_tr"
+      },
+      "ENSEMBLE#docket": {
+        "class": "experiment_scoped",
+        "rep_sk": "OPEN#explorer_coach__nutrition_coach#calories"
+      },
+      "ENSEMBLE#influence_graph": {
+        "class": "system_state",
+        "rep_sk": "CONFIG#v1"
+      }
+    },
+    "NARRATIVE#": {
+      "NARRATIVE#arc": {
+        "class": "experiment_scoped",
+        "rep_sk": "HISTORY#2026-05-18"
+      }
+    },
+    "PERSONA#": {
+      "PERSONA#elena": {
+        "class": "experiment_scoped",
+        "rep_sk": "CALLBACK#2026-06-30#what-happened-tuesday-to-sunday"
+      },
+      "PERSONA#margaret": {
+        "class": "cross_phase",
+        "rep_sk": "NOTE#2026-09-01"
+      }
+    }
   },
   "families": {
     "BOOK": {
@@ -386,7 +488,7 @@
     "SOURCE#recap_cards": {
       "class": "experiment_scoped",
       "rep_pk": "USER#matthew#SOURCE#recap_cards",
-      "rep_sk": "DATE#2026-09-06"
+      "rep_sk": "DATE#2026-09-05"
     },
     "SOURCE#routine_index": {
       "class": "system_state",
@@ -440,8 +542,8 @@
     },
     "SOURCE#training_notes": {
       "class": "raw_timeseries",
-      "rep_pk": "USER#matthew#SOURCE#training_notes#EXERCISE#651F844C",
-      "rep_sk": "DATE#2026-06-22#WORKOUT#1a06d0c8-ba12-49ce-bd18-89dc6cc270ac"
+      "rep_pk": "USER#matthew#SOURCE#training_notes#EXERCISE#2f9e5895-87cd-4c51-baca-3cbd2b910d67",
+      "rep_sk": "DATE#2023-05-27#WORKOUT#6b586197-26a6-42fc-9f9e-ccb323c7c183"
     },
     "SOURCE#training_reference": {
       "class": "cross_phase",
@@ -500,6 +602,6 @@
     }
   },
   "family_count": 98,
-  "generated_at": "2026-09-19T00:51:06.105464+00:00",
+  "generated_at": "2026-09-21T04:48:35.787907+00:00",
   "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py."
 }
