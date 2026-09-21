@@ -1,0 +1,979 @@
+{
+  "_comment": [
+    "docs/reviews/anchors/ANCHORS.json — the review's grading anchors as a SEALED, DERIVED artifact (#3607).",
+    "READ scripts/review_anchor_seal.py's module docstring first: it owns the rules this file obeys.",
+    "SHAPE: one record per graded lens. `anchors` pins three points of the A..F span — A, C and F — the same",
+    "three every prior review artifact recorded; each is a LIST OF CLAUSES because a clause is the unit that",
+    "resolves MET / FAILED / UNOBSERVED, and a lens with ANY UNOBSERVED clause cannot be graded A.",
+    "NO HAND-TYPED NUMBER SURVIVES: every magnitude is a ${placeholder} resolved at grading time from the",
+    "source named in scripts/review_anchor_seal.RESOLVERS. A bare numeral in a clause reds the freeze test.",
+    "TIGHTENING ONLY: the freeze test diffs this file against its previous sha and reds on any clause weakened,",
+    "removed, or with its evidence requirement relaxed. A deliberate loosening needs an owner-signed dated entry",
+    "in `loosenings` below, naming the clause ids it covers — and that entry prints in every review header.",
+    "EXTENSIONS: an extension proposed during a run goes to that lens's proposed_extensions[] with its authoring",
+    "run id. It does NOT bind that run's grade; the run reports two grades per lens (frozen, frozen+proposed) and",
+    "names which clause moved the row. Promotion into `anchors` happens at the next freeze, by PR, and changes",
+    "this file's hash.",
+    "SEAL: docs/reviews/anchors/ANCHORS.sha256.json is the content-addressed sibling (the prereg seal's shape).",
+    "Edit this file and re-stamp it deliberately: python3 scripts/review_anchor_seal.py --seal"
+  ],
+  "version": "1.0.0",
+  "frozen_at": "2026-09-20",
+  "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+  "source": "docs/reviews/FORENSIC_RCA_2026-09-05.md Part 4 (anchor_freeze_proposal) + docs/reviews/fullreview_grades_2026-09-05.json",
+  "loosenings": [],
+  "records": [
+    {
+      "lens": "a11y",
+      "title": "Accessibility specialist",
+      "anchors": {
+        "A": [
+          {
+            "id": "a11y.A.1",
+            "text": "WCAG AA holds on every live page in both themes, verified by an automated token-contrast check rather than by hand-written comments, and the check covers COMPOSITED text (opacity or colour-mix over a surface) and every palette used as text.",
+            "evidence": "the check's own output, with its derived foreground set enumerated so a colour it never tested is visible as untested."
+          },
+          {
+            "id": "a11y.A.2",
+            "text": "Every interactive widget is keyboard-operable with visible focus, and data charts are named to assistive technology.",
+            "evidence": "the keyboard path walked per widget, and the accessible name read back per chart."
+          },
+          {
+            "id": "a11y.A.3",
+            "text": "Reduced motion is honoured, and target sizes meet WCAG 2.2 SC 2.5.8 as the hard floor with SC 2.5.5 as the target, measured site-wide by a gating audit.",
+            "evidence": "the measured hit box per target; a rule passing a doubled hit box is not a floor."
+          },
+          {
+            "id": "a11y.A.4",
+            "text": "The debt ledger the gate compares against is CURRENT: a baselined rule the page no longer exhibits is a disarmed gate, not a guard.",
+            "evidence": "the ledger rows diffed against what the live page exhibits today."
+          },
+          {
+            "id": "a11y.A.5",
+            "text": "The audit covers both viewports the sweep enumerates (${a11y_viewports}), and a ledger whose cleanliness is the emptiness of a page that has no data yet does not satisfy this clause.",
+            "evidence": "the per-viewport verdicts, plus the payload behind any surface graded clean; an empty payload is UNOBSERVED with that reason."
+          }
+        ],
+        "C": [
+          {
+            "id": "a11y.C.1",
+            "text": "Landmarks, headings and skip links are mostly right and most widgets are keyboard-reachable, but multiple AA contrast failures exist in at least one theme, some custom widgets are mouse-only or unnamed, and there is no regression guard so fixes decay.",
+            "evidence": "the failing pair with its measured ratio, and the widget with its missing name."
+          }
+        ],
+        "F": [
+          {
+            "id": "a11y.F.1",
+            "text": "Div-soup interactive UI with no focus styles and no keyboard path, data charts silent to screen readers, contrast failures on body text, no skip links, or animation that ignores the reduced-motion preference.",
+            "evidence": "the rendered DOM and the measured ratio."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "a11y_viewports"
+      ],
+      "proposed_extensions": [],
+      "freeze_note": "The /data/training/ ledger's cleanliness was Day-0 emptiness — one of the six silence passes. A.5 makes an empty payload UNOBSERVED for this clause."
+    },
+    {
+      "lens": "aiq",
+      "title": "AI-quality lead",
+      "anchors": {
+        "A": [
+          {
+            "id": "aiq.A.1",
+            "text": "Every reader-facing AI narrative passes a deterministic grounding gate with the audience-correct fail mode (fail-closed public, keep-best internal).",
+            "evidence": "per surface: the gate's code path and a live response showing the fail mode it actually takes."
+          },
+          {
+            "id": "aiq.A.2",
+            "text": "Every prompt carries the phase and day truth, and a reset leaves zero wiped-cycle narrative reachable on any live endpoint.",
+            "evidence": "the prompt assembly read at source plus a live fetch of every endpoint the reset should have emptied."
+          },
+          {
+            "id": "aiq.A.3",
+            "text": "Live spot-checks find no number, date, or verdict a reader could not trace to real data — sampled as a (cycle_day x hook x artifact) matrix over the days the cycle has actually reached, never as a single sample on one day the cycle may never reach.",
+            "evidence": "the matrix enumerated with a cell per sampled combination; a cell the cycle has not reached is UNOBSERVED with that reason, never a silent pass."
+          },
+          {
+            "id": "aiq.A.4",
+            "text": "A tense claim about a genesis that has not happened, or a cause attributed to a data absence the registry already explains (paused, lag-by-design), counts as untraceable exactly like a fabricated number.",
+            "evidence": "the served sentence beside the registry facet that explains the absence."
+          }
+        ],
+        "C": [
+          {
+            "id": "aiq.C.1",
+            "text": "The grounding harness exists and covers the flagship surfaces, but coverage is convention rather than structure: at least one live surface serves stale, ungated or mischaracterised AI content and no test or gate would catch it, including a judge whose no-verdict path returns severity ok.",
+            "evidence": "the surface's live response plus the gate that does not reach it, or the judge path that returns ok on no verdict."
+          }
+        ],
+        "F": [
+          {
+            "id": "aiq.F.1",
+            "text": "Models receive raw data and ship unchecked numbers or claims to readers.",
+            "evidence": "the prompt and the shipped claim, both quoted."
+          },
+          {
+            "id": "aiq.F.2",
+            "text": "A reset or budget state silently narrates wiped or fabricated history as current with no tombstone semantics at all.",
+            "evidence": "the live narrative beside the phase registry that says the data is gone."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": [],
+      "freeze_note": "The Day-4 spot-check clause was one of the six that passed by silence: it was graded on cycles that never reached Day 4. A.3 replaces the single sample with the (cycle_day x hook x artifact) matrix the RCA's gap analysis asked for, and makes an unreachable cell UNOBSERVED."
+    },
+    {
+      "lens": "cost",
+      "title": "Cost engineer",
+      "anchors": {
+        "A": [
+          {
+            "id": "cost.A.1",
+            "text": "The ADR-063/133 ceiling is enforced at the inference chokepoint with the ADR-125 audience-ordered ladder.",
+            "evidence": "the chokepoint's code path plus a tier transition observed end to end."
+          },
+          {
+            "id": "cost.A.2",
+            "text": "The projection math has no double-count or de-escalation trap, and a published projection states its SCOPE whenever the governor extrapolates a subset of spend.",
+            "evidence": "the projection's inputs beside the served sentence that presents it."
+          },
+          {
+            "id": "cost.A.3",
+            "text": "Every public and operator-facing cost number (ceiling, monthly total, tier label) matches live governor state: the served ceiling is $${ceiling} with surge $${surge_ceiling} on the day of the run.",
+            "evidence": "the served number beside the governor's own value for the same day."
+          },
+          {
+            "id": "cost.A.4",
+            "text": "A ceiling that floats on a traffic threshold counts as enforced only when the threshold sits outside the baseline's own variance.",
+            "evidence": "the threshold beside the measured variance of the series it keys on."
+          },
+          {
+            "id": "cost.A.5",
+            "text": "Per-feature AI cost is visible on a live public receipt.",
+            "evidence": "the receipt fetched live, with the per-feature rows it serves."
+          }
+        ],
+        "C": [
+          {
+            "id": "cost.C.1",
+            "text": "A hard stop exists somewhere but the tier labels, public cost numbers and the actual degradation ladder disagree with each other, or the projection has a known over-count or under-count failure mode, or the operator cannot attribute AI spend per feature.",
+            "evidence": "the two numbers that disagree, each with its source."
+          }
+        ],
+        "F": [
+          {
+            "id": "cost.F.1",
+            "text": "No near-real-time enforcement, reader traffic able to spend unbounded through the public AI endpoints, or public cost claims fabricated rather than derived from metering.",
+            "evidence": "the endpoint's own spend path, or the claim beside the meter."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "ceiling",
+        "surge_ceiling"
+      ],
+      "proposed_extensions": []
+    },
+    {
+      "lens": "cpo",
+      "title": "CPO",
+      "anchors": {
+        "A": [
+          {
+            "id": "cpo.A.1",
+            "text": "Every door's first screen states its role in the loop, and each audience named in docs/PLATFORM_NORTH_STAR.md finds its surface within one click of Home.",
+            "evidence": "the first screen of each door as served, and the click path per audience."
+          },
+          {
+            "id": "cpo.A.2",
+            "text": "Every live engagement hook (predict-the-week, ask-the-board, chronicle and podcast cadence) is demonstrably alive-or-honestly-absent on every day of a cycle the run can sample, including the day this run occupies, Day ${cycle_day}.",
+            "evidence": "per hook per sampled day: the live fetch; a day the cycle has not reached is UNOBSERVED with that reason."
+          },
+          {
+            "id": "cpo.A.3",
+            "text": "The alive-or-honestly-absent test covers every artifact a hook publishes downstream of its own page — the permalink, the manifest, the recap memory, the share kit, the subscriber onboarding email.",
+            "evidence": "each downstream artifact fetched at its own public URL, not inferred from the page."
+          },
+          {
+            "id": "cpo.A.4",
+            "text": "A shared bare URL lands on the page, and the early-cycle state reads as a deliberate season premiere (day counter, pre-registration, prequels, cycle-vs-cycle context).",
+            "evidence": "the bare URL fetched cold, and the premiere elements named on the served page."
+          },
+          {
+            "id": "cpo.A.5",
+            "text": "The loop's protocols-to-data leg carries at least one instrument that can grade whether coaching moved behaviour, and that instrument has graded at least once.",
+            "evidence": "the instrument's own most recent verdict, with its timestamp; never graded is FAILED, not absent."
+          }
+        ],
+        "C": [
+          {
+            "id": "cpo.C.1",
+            "text": "Doors render and the loop is taught, but one or more engagement hooks silently serve stale or dead-cycle content, shared links miss, or the fresh-cycle state depends on the reader's forgiveness to not read as broken.",
+            "evidence": "the stale artifact served at its live URL, with the cycle it belongs to."
+          }
+        ],
+        "F": [
+          {
+            "id": "cpo.F.1",
+            "text": "The early-cycle site reads as broken or dishonest: blank doors, no day counter or pre-registration, hooks dead or fabricating.",
+            "evidence": "the served page, quoted."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "cycle_day"
+      ],
+      "proposed_extensions": [],
+      "freeze_note": "cpo's premiere verdict was never recorded by anyone — one of the six silence passes. A.4 now names the premiere elements so the verdict has a citable object, and A.5 makes an instrument that has never graded FAILED rather than invisible."
+    },
+    {
+      "lens": "cto",
+      "title": "CTO / architect",
+      "anchors": {
+        "A": [
+          {
+            "id": "cto.A.1",
+            "text": "Every resilience or ops claim in docs/ARCHITECTURE.md reproduces against live CDK and AWS state.",
+            "evidence": "per claim: the CDK source line it rests on plus the read-only AWS describe output that reproduces it, quoted."
+          },
+          {
+            "id": "cto.A.2",
+            "text": "Every liveness sensor is capability-verified after deploy — the producer is shown actually emitting, never shown merely to hold the IAM permission to emit.",
+            "evidence": "the metric datapoint or log line the producer wrote after the deploy under grade, with its timestamp."
+          },
+          {
+            "id": "cto.A.3",
+            "text": "No alarm sits in ALARM unexplained past the window its own citation gate enforces, and 'unexplained' includes an alarm explained by a citation whose stated cause is not that alarm's current cause.",
+            "evidence": "the live alarm state beside its row in docs/alarm_citations.json, and the citation gate's own verdict for that row."
+          },
+          {
+            "id": "cto.A.4",
+            "text": "A reader-audience red reaches a human within one detection interval of the probe that raised it, independent of any session or wrap running.",
+            "evidence": "the probe's configured interval and the delivered notification, both timestamped, for a red that actually occurred in the window."
+          },
+          {
+            "id": "cto.A.5",
+            "text": "The ADR-103 ledger rows in docs/PROPORTIONALITY.md match live subsystem state, and nothing needed to reach the clauses above adds standing machinery beyond the solo-operator $${ceiling}/mo envelope (surge $${surge_ceiling}).",
+            "evidence": "the ledger row beside the live state it claims, plus the governor's own ceiling for the day of the run."
+          }
+        ],
+        "C": [
+          {
+            "id": "cto.C.1",
+            "text": "The core pipeline works (ingest to DLQ to digest, S3 and DDB protection, per-lambda roles) but one or more monitoring paths are silently dead.",
+            "evidence": "the dead path named, with the read that shows it produces nothing."
+          },
+          {
+            "id": "cto.C.2",
+            "text": "The canonical architecture doc materially misdescribes live behaviour (crons, stack ownership, quotas), or stale alarms and ledger rows accumulate with no reconcile loop.",
+            "evidence": "the doc line beside the live value it contradicts."
+          }
+        ],
+        "F": [
+          {
+            "id": "cto.F.1",
+            "text": "Async paths without DLQ or alarm coverage, shared over-privileged IAM roles, or S3 and DDB unprotected against operator error.",
+            "evidence": "the resource and the policy or subscription that is absent."
+          },
+          {
+            "id": "cto.F.2",
+            "text": "Documentation wrong enough that an incident responder acting on it would make things worse.",
+            "evidence": "the doc instruction quoted beside what it would actually do."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "ceiling",
+        "surge_ceiling"
+      ],
+      "proposed_extensions": [],
+      "freeze_note": "Extensions written during the 2026-09-05 run (seed cto-S1) are folded in here as clauses A.3, A.4 and the ceiling in A.5 — promoted between runs, by PR, which is the sanctioned path."
+    },
+    {
+      "lens": "data-architect",
+      "title": "Data architect",
+      "anchors": {
+        "A": [
+          {
+            "id": "data-architect.A.1",
+            "text": "Live DynamoDB items, docs/SCHEMA.md and the phase-taxonomy registry are mutually consistent under spot-sampling, and exactly the ADR-097-sanctioned GSI set exists and no other.",
+            "evidence": "the sampled items beside the schema rows, and the live table description."
+          },
+          {
+            "id": "data-architect.A.2",
+            "text": "The reset machinery is provably total against the LIVE pk-family census, not only against the source class: a family the classifier calls experiment-scoped that no wipe list visits is a totality escape.",
+            "evidence": "the live pk-family census beside the wipe list, family by family."
+          },
+          {
+            "id": "data-architect.A.3",
+            "text": "The reset machinery is idempotent: a double reset preserves each record's original cycle provenance, and a row's cycle stamp agrees with the closing cycle derived from the genesis named in its own tombstone reason under an in-place re-anchor.",
+            "evidence": "the stamps before and after a second reset, per sampled row."
+          },
+          {
+            "id": "data-architect.A.4",
+            "text": "Raw S3 layouts match their registry raw_layout facets including the filename scheme.",
+            "evidence": "the live key listing per prefix beside the facet that declares it."
+          }
+        ],
+        "C": [
+          {
+            "id": "data-architect.C.1",
+            "text": "The schema doc is mostly accurate and the GSI set holds, but the reset or provenance machinery drifts from its stated contract in live data (wrong cycle stamps, claimed write-time stamping absent), or new pk families can silently escape the taxonomy's totality guarantee.",
+            "evidence": "the live stamp beside the contract that claims it."
+          }
+        ],
+        "F": [
+          {
+            "id": "data-architect.F.1",
+            "text": "Undocumented GSIs or partitions live, float writes crashing or silently failing persistence (including a crash that loses a record whose side effect already happened), tombstoned records from a prior cycle leaking into current-cycle reads including WRITER-side resurrection, or archive records destroyed with no way to reconstruct provenance.",
+            "evidence": "the live item or the republishing writer, quoted."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": []
+    },
+    {
+      "lens": "dataviz",
+      "title": "Data-viz expert",
+      "anchors": {
+        "A": [
+          {
+            "id": "dataviz.A.1",
+            "text": "Every visual encoding is proportional and honest at any n: lengths and areas are never anchored to arbitrary floors.",
+            "evidence": "the rendered geometry beside the payload it encodes."
+          },
+          {
+            "id": "dataviz.A.2",
+            "text": "Every statistical claim carries a visible-and-reachable n and interval on touch and on keyboard, and low-n charts refuse or degrade with explicit copy.",
+            "evidence": "the readout reached by each input mode, and the copy served at low n."
+          },
+          {
+            "id": "dataviz.A.3",
+            "text": "The live site renders zero contradictory encodings on any surface, graded on a day when the series carry data — a day whose series are empty arrays cannot satisfy this clause.",
+            "evidence": "the payload lengths per series plus the rendered chart; an all-empty payload is UNOBSERVED with that reason."
+          },
+          {
+            "id": "dataviz.A.4",
+            "text": "Contradictory includes the same series rendered with two different y-domains on two doors so the caption verdict flips, and a served probability whose numerator is entirely censored observations shorter than its own horizon.",
+            "evidence": "both doors' payloads and axes, or the probability's own numerator, quoted."
+          },
+          {
+            "id": "dataviz.A.5",
+            "text": "A literal n in a caption always agrees with the n the payload computed.",
+            "evidence": "the caption text beside the payload field it claims to state."
+          }
+        ],
+        "C": [
+          {
+            "id": "dataviz.C.1",
+            "text": "Charts render and mostly caption honestly, but multiple encodings exaggerate (truncated-baseline bar lengths, area fills over min-max axes), some correlations ship without a visible n, or hover and tap readouts are dead on a class of charts.",
+            "evidence": "the chart, its axis domain, and the payload it draws."
+          }
+        ],
+        "F": [
+          {
+            "id": "dataviz.F.1",
+            "text": "Truncated axes or area lies presented as trends, correlations framed causally or shipped with no n at all, fabricated confidence bands, or sparse data drawn as a confident trend line with no caveat.",
+            "evidence": "the served chart and its payload."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": [],
+      "freeze_note": "The live-encoding clause was graded on a day when every series was an empty array — vacuously true. A.3 makes that day UNOBSERVED."
+    },
+    {
+      "lens": "designer",
+      "title": "Product designer",
+      "anchors": {
+        "A": [
+          {
+            "id": "designer.A.1",
+            "text": "Every live surface draws colour, type and spacing from tokens.css.",
+            "evidence": "the sheet and the token each value resolves to, swept across all sheets."
+          },
+          {
+            "id": "designer.A.2",
+            "text": "The ${type_floor_px}px type floor holds when MEASURED — including SVG text under render scale — across the whole page registry the visual sweep walks (${page_count} pages), not a gate subset.",
+            "evidence": "the measured on-screen size per text node per page; a page the sweep could not render is UNOBSERVED with that reason."
+          },
+          {
+            "id": "designer.A.3",
+            "text": "On the mobile viewport the sweep measures at (${mobile_viewport}px) every page opens at the top of the document with its page hero inside the first viewport.",
+            "evidence": "the scroll position and hero intersection measured per page, not asserted."
+          },
+          {
+            "id": "designer.A.4",
+            "text": "Single-ember discipline and the breakpoint set are enforced by a gate that sweeps all sheets, and Day-N-sparse states are visibly designed and honest when graded on a POPULATED site, not only on an empty one.",
+            "evidence": "the gate's swept file set, plus the sparse-state screenshots taken on a day the surfaces carry data; an empty-by-design day is UNOBSERVED for this clause."
+          }
+        ],
+        "C": [
+          {
+            "id": "designer.C.1",
+            "text": "The kit and tokens exist and most pages use them, but flagship charts ship sub-floor text, off-palette raw-hex accents render live, or the token gate covers only a minority of sheets so drift accumulates unpoliced.",
+            "evidence": "the sub-floor node or raw hex, with the page it renders on and the gate's actual scope."
+          }
+        ],
+        "F": [
+          {
+            "id": "designer.F.1",
+            "text": "No token discipline: decorative glow, red-for-down direction encoding, emoji marks, per-page ad-hoc type and colour; empty states blank, broken, or dressed up to hide sparseness.",
+            "evidence": "the rendered surface, screenshotted."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "mobile_viewport",
+        "page_count",
+        "type_floor_px"
+      ],
+      "proposed_extensions": [],
+      "freeze_note": "The page count in this anchor was a hand-typed number that had already gone stale when it graded. A.2 now resolves it from the registry the sweep actually walks. The Day-N-sparse clause had literally never been graded on a populated site — A.4 makes that UNOBSERVED rather than a pass."
+    },
+    {
+      "lens": "devex",
+      "title": "DevEx / SDLC lead",
+      "anchors": {
+        "A": [
+          {
+            "id": "devex.A.1",
+            "text": "Every load-bearing claim in an agent's first-contact set (CLAUDE.md, docs/CONVENTIONS.md, the deploy skill) is either machine-synced or provably current.",
+            "evidence": "per claim: the sync that owns it, or the read that shows it current today."
+          },
+          {
+            "id": "devex.A.2",
+            "text": "All deploy paths verifiably stage through one bundle.",
+            "evidence": "each deploy entrypoint traced to the bundle builder it calls."
+          },
+          {
+            "id": "devex.A.3",
+            "text": "The required pre-merge lane runs green offline within its measured budget of ${lane_budget} seconds, and that budget is read from the posture file rather than described with an adjective.",
+            "evidence": "the lane's own wall-clock emission beside the written typical_seconds and its provenance fields."
+          },
+          {
+            "id": "devex.A.4",
+            "text": "Incident classes are encoded in gates or agents rather than in agent memory, and drift gates cover process, ownership and date facts, not only counts.",
+            "evidence": "the gate that encodes each named incident class."
+          },
+          {
+            "id": "devex.A.5",
+            "text": "Main's own green-reader cannot classify a run carrying a real failing job as 'no signal', and every local check claiming to mirror a CI job DERIVES its step set from the workflow file rather than restating a subset.",
+            "evidence": "the reader's verdict on a run known to carry a failing job, and the mirror's own source of step names."
+          }
+        ],
+        "C": [
+          {
+            "id": "devex.C.1",
+            "text": "The one-bundle rule and the CI gates exist and mostly work, but agent-facing docs carry contradictions an agent must resolve by reading source, the doc-sync gates cover only what they were hand-taught, and a fresh agent's first deploy needs tribal knowledge to avoid a known incident class.",
+            "evidence": "the contradicting doc lines, and the gate's actual taught scope."
+          }
+        ],
+        "F": [
+          {
+            "id": "devex.F.1",
+            "text": "Deploy paths diverge so some functions ship partial bundles, documented commands fail or silently do the wrong thing, CI pins drift from local tooling so local-green is not CI-green, or the handover and memory system has rotted into an unindexed pile.",
+            "evidence": "the command run with its output, or the pin compared across both sides."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "lane_budget"
+      ],
+      "proposed_extensions": []
+    },
+    {
+      "lens": "growth",
+      "title": "Growth PM",
+      "anchors": {
+        "A": [
+          {
+            "id": "growth.A.1",
+            "text": "Every shareable page emits a current, data-driven share card, and the whole share surface agrees — the moments index, the share kits and the permalinks those kits canonicalise.",
+            "evidence": "each artifact fetched at its own public URL, with the cycle it advertises."
+          },
+          {
+            "id": "growth.A.2",
+            "text": "The subscribe flow is double opt-in and canary-tested.",
+            "evidence": "the canary's own most recent run, with its result."
+          },
+          {
+            "id": "growth.A.3",
+            "text": "The funnel is MEASURED: attempts, confirms and list size are visible in the weekly traffic digest — a flow that works but is unmeasured does not satisfy this clause, and the measurement half is graded separately from the working half.",
+            "evidence": "the digest's own served figures for a week that has closed."
+          },
+          {
+            "id": "growth.A.4",
+            "text": "Subscribers get a fixed cadence matching the promise copy on the subscribe page.",
+            "evidence": "the promise copy beside the send log."
+          },
+          {
+            "id": "growth.A.5",
+            "text": "Engagement hooks (predict, board-ask, votes) work on every day of a cycle the run can sample, including its first, and are discoverable from the pages newcomers land on.",
+            "evidence": "per hook per sampled day: the live interaction attempted; an unreached day is UNOBSERVED with that reason."
+          },
+          {
+            "id": "growth.A.6",
+            "text": "Commercial option value (list, feed, gear, podcast) is real and measured, with zero dishonest monetisation.",
+            "evidence": "the option's own measured figure, and its disclosure."
+          }
+        ],
+        "C": [
+          {
+            "id": "growth.C.1",
+            "text": "Capture and email machinery works end to end but the funnel is unmeasured (signups can silently die pending), share surfaces ship a generic, stale or hard-coded placeholder card on a topic page whose API serves null, or engagement hooks exist in code but are not reachable on the first day of a cycle.",
+            "evidence": "the pending record with no terminal state, or the card beside the payload it claims."
+          }
+        ],
+        "F": [
+          {
+            "id": "growth.F.1",
+            "text": "The funnel is broken or dishonest: subscribe silently fails or is single opt-in spam, share cards present wrong or stale numbers as current, engagement endpoints error, or monetisation contradicts the proof-not-promises posture.",
+            "evidence": "the request and its response."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": [],
+      "freeze_note": "growth's fused 'real AND measured' clause is split here (A.3 carries the measurement half on its own) per the RCA's gap analysis — a fused clause lets a working-but-unmeasured funnel borrow the grade of the half that passed."
+    },
+    {
+      "lens": "integrations",
+      "title": "Integrations engineer",
+      "anchors": {
+        "A": [
+          {
+            "id": "integrations.A.1",
+            "text": "Every source's declared cadence and threshold matches its live schedule rule, with a written derivation.",
+            "evidence": "the facet beside the live rule expression, per source."
+          },
+          {
+            "id": "integrations.A.2",
+            "text": "The public board and the operator checker tell the same cross-reset-honest story: a real last update and an explicit dark duration.",
+            "evidence": "both surfaces fetched for the same source at the same moment."
+          },
+          {
+            "id": "integrations.A.3",
+            "text": "A dead OAuth token pages within about one cadence, via alarms that are green because they work rather than because they cannot fire.",
+            "evidence": "the alarm's own must-fail evidence, plus the last time it fired for a real token death."
+          },
+          {
+            "id": "integrations.A.4",
+            "text": "The checker's own sub-instruments (episode dedup, absence markers, sentinel writes) are alive too — a write the role cannot perform, logged as non-fatal every run, is a dead instrument.",
+            "evidence": "the log line per sub-instrument, with the permission it needs."
+          },
+          {
+            "id": "integrations.A.5",
+            "text": "A consumer claiming to derive from the registry actually reads the facet it derives from, never a hand-rolled proxy, and dead sources are disclosed everywhere they surface — with no machinery beyond the one canonical registry.",
+            "evidence": "the consumer's own read traced to the facet, at source."
+          }
+        ],
+        "C": [
+          {
+            "id": "integrations.C.1",
+            "text": "Cadences and thresholds are mostly honest, but at least one public surface omits or misstates staleness (a real lapse rendered as 'no data' with no duration), or a dead source appears live on a reader-facing surface, or token death is only noticed by a daily human glance.",
+            "evidence": "the served staleness string beside the real last update."
+          }
+        ],
+        "F": [
+          {
+            "id": "integrations.F.1",
+            "text": "Registry facets contradict the live rules (thresholds impossible for the cadence), staleness is silently hidden or fabricated on the public board, dead sources are presented as flowing, and there is no alarm path for a dead token.",
+            "evidence": "the facet beside the rule, or the board beside the table."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": []
+    },
+    {
+      "lens": "narrative",
+      "title": "Narrative editor",
+      "anchors": {
+        "A": [
+          {
+            "id": "narrative.A.1",
+            "text": "Every live narrative surface tells one coherent cycle-${cycle} story, and no page contradicts another page's account of the same week.",
+            "evidence": "the cycle read from its own source at run time, plus the surfaces quoted side by side."
+          },
+          {
+            "id": "narrative.A.2",
+            "text": "Reset seams are invisible to a binge reader and restored prequels are internally reconciled.",
+            "evidence": "the reading path across a reset boundary, quoted in order."
+          },
+          {
+            "id": "narrative.A.3",
+            "text": "Each coach is distinguishable blind, evidenced by a voice-fidelity verdict standing on at least ${min_n} scored passages PER COACH and clearing chance by at least ${distinct_margin} points — an overall verdict standing over per-coach cells that read insufficient_data does not satisfy this clause.",
+            "evidence": "the per-coach cells behind the scoreboard, each with its own n; a cell below the floor is UNOBSERVED for that coach."
+          },
+          {
+            "id": "narrative.A.4",
+            "text": "One absence is one story: every surface narrating the same missing data agrees on its duration and cause, states n beside any rate, and never grades a zero-observation set.",
+            "evidence": "the surfaces quoted together, with the registry facet that owns the absence."
+          },
+          {
+            "id": "narrative.A.5",
+            "text": "The story the reset tells at reset time is still the story every scheduled writer tells at the first cron after it — a surface the reset honestly emptied may not be re-populated by any job deriving 'publishable' from something other than the phase registry.",
+            "evidence": "the reset's own output beside the first post-reset cron's output, both timestamped."
+          }
+        ],
+        "C": [
+          {
+            "id": "narrative.C.1",
+            "text": "Page-by-page prose is competent but cross-surface continuity breaks survive a reset: stale prior-cycle narratives render on live doors, restored posts contradict each other on plan facts, or coach attributions add no voice.",
+            "evidence": "the two surfaces that disagree, quoted."
+          }
+        ],
+        "F": [
+          {
+            "id": "narrative.F.1",
+            "text": "Personas are interchangeable or the narrator voice is absent, wiped-cycle narratives dominate live pages as if current, or narrative copy contradicts the platform's own data.",
+            "evidence": "the served copy beside the data it contradicts."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "cycle",
+        "distinct_margin",
+        "min_n"
+      ],
+      "proposed_extensions": [],
+      "freeze_note": "'cycle-6' sat in this anchor while the live cycle had moved ten times; A.1 now resolves the cycle from SSM at grading time and reports UNOBSERVED offline rather than guessing. The clause 'reset seams are invisible to a binge reader' is deliberately left exactly as written (A.2): every available rewording trades 'invisible' for 'legible', and legible is what the filed work already buys. Leave it saying the true thing, mark the lens A-blocked on the cadence ruling, and price it rather than reword it."
+    },
+    {
+      "lens": "observability",
+      "title": "Observability lead",
+      "anchors": {
+        "A": [
+          {
+            "id": "observability.A.1",
+            "text": "Every alarm state is honest: red means a real, actionable condition, and nothing is permanently red or structurally unclearable.",
+            "evidence": "each alarm's live state beside the condition it claims to detect."
+          },
+          {
+            "id": "observability.A.2",
+            "text": "Honesty extends to the acknowledgement layers on top of the alarm (the citation file, the ack ledger): a green citation gate over a citation written for a PREVIOUS episode is a dishonest layer on an honest alarm.",
+            "evidence": "the citation's own text and date beside the alarm's current cause."
+          },
+          {
+            "id": "observability.A.3",
+            "text": "Every watchdog's producer is verified actually emitting, not merely designed to.",
+            "evidence": "the datapoint the producer wrote, with its timestamp."
+          },
+          {
+            "id": "observability.A.4",
+            "text": "The remediation and drift loop demonstrably closes or explicitly hands off every signal it sees, and a hand-off is about the CURRENT state and has a terminal condition — a needs-human line repeating verbatim about a state a later deploy already replaced is not a hand-off.",
+            "evidence": "the same signal across consecutive runs, with what changed between them."
+          },
+          {
+            "id": "observability.A.5",
+            "text": "A composite alarm's suppressor is named in a registry the grader can read, so a suppressed red is a stated decision rather than an invisible one.",
+            "evidence": "the composite's own suppressor field beside its registry row."
+          },
+          {
+            "id": "observability.A.6",
+            "text": "The whole observability estate is priced in docs/PROPORTIONALITY.md and sits inside the $${ceiling}/mo envelope, with the urgent-versus-digest split intact and the operator paged for what matters and only that.",
+            "evidence": "the estate's measured cost rows, and the routing per alarm."
+          }
+        ],
+        "C": [
+          {
+            "id": "observability.C.1",
+            "text": "The alarm inventory is well-designed on paper but one or more watchdog producers are dead (emission failures swallowed as warnings), red alarms sit unactioned for a long window, or the self-healing loop completes triage only intermittently while reporting green.",
+            "evidence": "the producer's absent datapoints, or the run that reported green with triage incomplete."
+          }
+        ],
+        "F": [
+          {
+            "id": "observability.F.1",
+            "text": "Alarms missing or routed to nowhere, DLQ pileup or a dead ingestion source discoverable only by manual audit, a silent budget hard stop, or unbounded log groups — the operator learns about failures from the website being wrong.",
+            "evidence": "the alarm's subscription list, or the queue depth."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "ceiling"
+      ],
+      "proposed_extensions": [],
+      "freeze_note": "This anchor carried the same stale ceiling as cto's. A.6 now resolves it from the governor at grading time and adds the priced-estate clause the RCA's gap analysis asked for; A.5 is the suppressor registry."
+    },
+    {
+      "lens": "principal",
+      "title": "Principal engineer",
+      "anchors": {
+        "A": [
+          {
+            "id": "principal.A.1",
+            "text": "The full offline suite is green with credentials blanked, and the required pre-merge lane completes inside its measured budget of ${lane_budget} seconds.",
+            "evidence": "the suite run under FAKE credentials, plus the lane's own wall-clock against deploy/github_posture.json's written typical_seconds."
+          },
+          {
+            "id": "principal.A.2",
+            "text": "Every stated quality gate (coverage floor, mypy tier set, deploy-critical lane, format gates) matches measured reality within a stated tolerance.",
+            "evidence": "each gate's declared scope beside the scope it actually enforces, measured."
+          },
+          {
+            "id": "principal.A.3",
+            "text": "No unreferenced code ships in the every-bundle shared modules, and exactly one canonical implementation exists per platform invariant (float to Decimal, Pacific date, ISO parse).",
+            "evidence": "the bundle's staged tree plus the import graph, and for each invariant the single module every caller reaches."
+          },
+          {
+            "id": "principal.A.4",
+            "text": "Golden tests are pinned against the known wall-clock defect class, and every source-scanning guard ships with a synthetic must-fail control.",
+            "evidence": "the must-fail control named per guard, watched failing."
+          },
+          {
+            "id": "principal.A.5",
+            "text": "Every landing path onto main — PR merge or direct push — meets at least the pre-merge lane before the commit is on main.",
+            "evidence": "the landing paths enumerated over a recent window, with the lane verdict each one carried."
+          }
+        ],
+        "C": [
+          {
+            "id": "principal.C.1",
+            "text": "The suite is green but the gates are partly decorative: a coverage floor drifted below actual so backsliding is possible, gate comments contradict enforcement status, or dead lines ship in every Lambda bundle.",
+            "evidence": "the gate's configured threshold beside the measured value it permits."
+          },
+          {
+            "id": "principal.C.2",
+            "text": "The gates are sound in construction but the landing path most commits actually use bypasses them, so reds are measured on main rather than prevented.",
+            "evidence": "the red runs on main over a window, split by landing path."
+          }
+        ],
+        "F": [
+          {
+            "id": "principal.F.1",
+            "text": "Red main tolerated or gates disabled to get green, or tests that mirror implementation so a defect cannot fail them.",
+            "evidence": "the disabling commit or the mirrored assertion, quoted."
+          },
+          {
+            "id": "principal.F.2",
+            "text": "No coverage or type gate at all, or wall-clock time bombs in fixtures with no encoded lesson.",
+            "evidence": "the absent gate, or the fixture whose assertion depends on the wall clock."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "lane_budget"
+      ],
+      "proposed_extensions": []
+    },
+    {
+      "lens": "qs",
+      "title": "QS / biohacker authority",
+      "anchors": {
+        "A": [
+          {
+            "id": "qs.A.1",
+            "text": "Every public claim is correlative and carries a real, resolvable citation.",
+            "evidence": "each citation fetched and shown to resolve to the work it names."
+          },
+          {
+            "id": "qs.A.2",
+            "text": "Every protocol lever states the data it targets and the hypothesis that spawned it — graded against a lever set that is non-empty; an endpoint serving an empty lever list cannot satisfy this clause.",
+            "evidence": "the served lever list with its count; an empty list is UNOBSERVED with that reason, never a vacuous pass."
+          },
+          {
+            "id": "qs.A.3",
+            "text": "Every pre-registered bet is either graded or explicitly voided ON THE RECORD, and the record carries ACROSS resets: a bet frozen in one cycle is still resolvable after the next genesis.",
+            "evidence": "the sealed artifact's bet list beside the served ledger, on both sides of a reset boundary."
+          },
+          {
+            "id": "qs.A.4",
+            "text": "The served season ledger is a labelled mirror of the sealed artifact: every row is either in the seal or visibly marked unsealed, and provenance dates on bets are event times (freeze instant, void instant), never lifecycle constants.",
+            "evidence": "the served rows diffed against the sealed artifact's own rows, with each row's stated date."
+          },
+          {
+            "id": "qs.A.5",
+            "text": "An aggregate calibration label never claims a property (skilled, well-calibrated) that no constituent stratum has, and thresholds derive from personal variance or are labelled population constants.",
+            "evidence": "the per-stratum figures behind the aggregate label, and each threshold's stated derivation."
+          }
+        ],
+        "C": [
+          {
+            "id": "qs.C.1",
+            "text": "The methodology pages state the right posture (correlative-only, pre-registration, calibration) but spot-checks find fabricated-looking citations, pre-registered bets that silently vanish at reset, or dead credibility surfaces a skeptic can trip on.",
+            "evidence": "the citation that does not resolve, or the bet present before a reset and absent after it."
+          }
+        ],
+        "F": [
+          {
+            "id": "qs.F.1",
+            "text": "Causal claims stated as fact, invented or search-URL citations presented as studies, calibration numbers that misrepresent the actual record, or magic-number thresholds presented as personalised.",
+            "evidence": "the served claim and the record it misstates."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": [],
+      "freeze_note": "The three extensions in this lens's 2026-09-05 anchor were written mid-run by the run that found their specimens; they are folded in here at the freeze, between runs, which is the sanctioned path. The lever clause was graded against an endpoint serving an empty list — vacuously true at every grading moment a reviewer will ever occupy; A.2 now makes that UNOBSERVED."
+    },
+    {
+      "lens": "reader",
+      "title": "First-time reader (persona, on LIVE pages)",
+      "anchors": {
+        "A": [
+          {
+            "id": "reader.A.1",
+            "text": "A stranger arriving cold gets what, who and why in one screen on every door.",
+            "evidence": "the first screen of each door as served to a cold client, quoted."
+          },
+          {
+            "id": "reader.A.2",
+            "text": "Every platform term is glossed inline where it first appears.",
+            "evidence": "the term and the gloss, in reading order."
+          },
+          {
+            "id": "reader.A.3",
+            "text": "Every visible number is self-consistent and date-scoped, and a prior cycle's writing is reachable only when labelled as the prior cycle's, never as the current cycle's latest.",
+            "evidence": "the number and its scope label, and the prior-cycle article's own served label."
+          },
+          {
+            "id": "reader.A.4",
+            "text": "A Day-${cycle_day} experiment reads as deliberately young rather than empty or broken, and a pre-start countdown reads as a deliberate premiere.",
+            "evidence": "the served state on the day the run occupies, screenshotted."
+          }
+        ],
+        "C": [
+          {
+            "id": "reader.C.1",
+            "text": "The pages render and the premise is findable, but unexplained jargon, contradictory or stale numbers, or broken-looking text force the reader to do reconciliation work before they can trust the site.",
+            "evidence": "the two numbers that disagree, or the unglossed term in place."
+          }
+        ],
+        "F": [
+          {
+            "id": "reader.F.1",
+            "text": "A first-time reader cannot tell what the site is or whether it is alive: blank regions, raw template bindings, dead data, or a story surface that looks abandoned.",
+            "evidence": "the served page, screenshotted."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [
+        "cycle_day"
+      ],
+      "proposed_extensions": []
+    },
+    {
+      "lens": "security",
+      "title": "Security / privacy lead",
+      "anchors": {
+        "A": [
+          {
+            "id": "security.A.1",
+            "text": "Live public JSON exposes zero chronological age, birth year, genome identifier or vice-substance name, verified by fetching and grepping the live surface rather than by reading docs.",
+            "evidence": "the fetch command and its output per endpoint swept."
+          },
+          {
+            "id": "security.A.2",
+            "text": "Sensitive S3 prefixes (raw, config, uploads, dashboard) are not anonymously readable at the ORIGIN, returning HTTP 403 or HTTP 404 to an unsigned request.",
+            "evidence": "the unsigned request against the S3 origin, not against the CDN."
+          },
+          {
+            "id": "security.A.3",
+            "text": "No live secret or third-party PII sits in tracked repo files or recent history, and no reader-supplied identifier (email, ip hash) is written into an anonymously-readable prefix — a prefix public BY DESIGN counts as sensitive the moment a reader-input door writes PII into it.",
+            "evidence": "the history scan output, plus each reader-input door's write path traced to its prefix."
+          },
+          {
+            "id": "security.A.4",
+            "text": "The MCP OAuth consent and PKCE gate and the DDB-backed per-IP rate limits are provably enforced with no spoofable trust boundary.",
+            "evidence": "a request that attempts the bypass, with the response it receives."
+          },
+          {
+            "id": "security.A.5",
+            "text": "Every Lambda has its own least-privilege role, with a wildcard Resource only on actions that cannot be resource-scoped.",
+            "evidence": "the role policy per function, with the reason each wildcard cannot be narrowed."
+          }
+        ],
+        "C": [
+          {
+            "id": "security.C.1",
+            "text": "Privacy absolutes hold on the sampled live endpoints but one enforcement boundary is bypassable (a spoofable client identity so rate limits do not bind), or a known-inversion residual is unmitigated, or an over-broad wildcard or publicly readable sensitive prefix exists with no compensating control.",
+            "evidence": "the bypass reproduced, or the policy statement quoted."
+          }
+        ],
+        "F": [
+          {
+            "id": "security.F.1",
+            "text": "Any live public endpoint returns chronological age, a genome identifier, or a named vice substance; a live credential is committed; the token or authorize path mints a bearer without consent; or raw health data is publicly fetchable.",
+            "evidence": "the live response, quoted."
+          }
+        ]
+      },
+      "frozen_at": "2026-09-20",
+      "frozen_by": "#3607 — the first seal; promoted from docs/reviews/fullreview_grades_2026-09-05.json::lenses.<lens>.rubric_anchors",
+      "supersedes_sha": null,
+      "supersedes_note": "First sealed version. The predecessor was unsealed prose carried run-to-run inside each review's grades JSON (newest: docs/reviews/fullreview_grades_2026-09-05.json), so there is no prior artifact sha to name.",
+      "derived_fields": [],
+      "proposed_extensions": []
+    }
+  ]
+}
