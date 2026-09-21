@@ -111,7 +111,7 @@ def _days_since_last_workout(history_index: dict[str, list], target_date: str) -
     so the number that triggers it has to come from evidence. None (no prior session on
     record) means no discount — the strictest floor — rather than a guessed gap.
     """
-    from datetime import date
+    from common.pacific_time import parse_day_key
 
     latest = ""
     for sessions in (history_index or {}).values():
@@ -121,10 +121,12 @@ def _days_since_last_workout(history_index: dict[str, list], target_date: str) -
                 latest = d
     if not latest or not target_date:
         return None
-    try:
-        return (date.fromisoformat(target_date) - date.fromisoformat(latest)).days
-    except ValueError:
+    # #3609: calendar-day arithmetic on two bare DATE# day keys goes through the ONE day-key
+    # parser (never a hand-rolled fromisoformat — the registry of those is shrink-only).
+    a, b = parse_day_key(target_date), parse_day_key(latest)
+    if a is None or b is None:
         return None
+    return (a - b).days
 
 
 def _load_indexes() -> tuple[dict[str, list], dict[str, float], str | None]:
