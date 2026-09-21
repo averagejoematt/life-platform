@@ -20,7 +20,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
-from experiment.pk_census import census_snapshot  # noqa: E402
+from experiment.pk_census import census_snapshot, scoped_partitions_from_snapshot  # noqa: E402
 
 ARTIFACT = REPO_ROOT / "deploy" / "generated" / "pk_family_census.json"
 
@@ -61,6 +61,12 @@ def main() -> int:
         print("  added:   " + ", ".join(added))
     if removed:
         print("  removed: " + ", ".join(removed))
+    # #3599: the coverage-granularity half of the same scan, read back through the ONE
+    # reader `deploy/restart_intelligence_wipe.assert_registry_coverage`'s CI twin uses —
+    # so an artifact whose coverage block is unreadable says so HERE, at write time, and
+    # not on the PR of whoever next grades the wipe against it.
+    scoped = scoped_partitions_from_snapshot(snap)
+    print(f"coverage partitions: {len(scoped)} EXPERIMENT_SCOPED full pk(s) — {', '.join(sorted(scoped))}")
     unresolved = sorted(f for f, v in snap["families"].items() if v.get("class") is None)
     if unresolved:
         print(f"  UNRESOLVED (phase_taxonomy cannot classify): {', '.join(unresolved)}")

@@ -82,17 +82,47 @@ queue before filing or shipping.
    `issue-filer` contract's, not this file's — read them there and run the reconcile in Phase 0,
    so a duplicate filing is impossible by the time Phase 4 starts.
 5. **Freeze the anchors, and say what you froze (#3603).** Load the previous run's artifact for
-   this lens (the rubric names the filename) and reuse its `rubric_anchors` **verbatim**, citing
-   which artifact each came from. Then run
-   `python3 scripts/review_anchors.py --freeze --lens <lens>` and paste the `anchor_freeze` block
-   into this run's grades JSON **before any grading starts**. The anchors are now fixed for the
-   run: they may not be extended, narrowed or reworded while it is in flight. This reverses what
-   this file used to sanction — "anchors may be *extended*" — and the reversal is the finding:
-   on the 2026-09-05 baseline every one of the panel's anchors was extended by the run that
-   graded against it, so a dropped grade cannot be separated from a raised bar, and the trend
-   line (the only reason to grade) stops meaning anything. Extend an anchor **between** runs, by
-   PR, where the change is a reviewable dated diff. A later run that grades against different
-   anchors gets a different fingerprint and must say so in its `method`.
+   this lens (the rubric names the filename), then load the **sealed anchor artifact** — the
+   anchors are no longer prose a run retypes out of the last artifact (#3607):
+
+   Run `python3 scripts/review_anchor_seal.py --header` and put that block **verbatim at the top
+   of the report and into the grades JSON**, before any grading starts. It carries the
+   `docs/reviews/anchors/ANCHORS.json` `sha256` (the dead-man — a report with no hash graded
+   against a bar nobody can reconstruct), every `${…}` placeholder resolved from its named source
+   on the day of the run, and any owner-signed loosening in force.
+   `python3 scripts/review_anchor_seal.py --lens <lens>` prints that lens's clauses with the
+   placeholders substituted. **If the seal does not verify, the run does not grade** — it fails
+   closed, the same posture as the pre-registration seal. Then run
+   `python3 scripts/review_anchors.py --freeze --lens <lens>` and paste its `anchor_freeze` block
+   in as well (#3603): that one fingerprints the *rubric prose* the run read. Both blocks go in.
+
+   Three rules ride on the artifact, and they are the whole point:
+   - **No magnitude is retyped.** A number inside an anchor is a `${placeholder}` resolved at
+     grading time from the source `scripts/review_anchor_seal.py::RESOLVERS` names. A placeholder
+     that cannot be read (SSM unreachable, a derivation that raised) resolves UNOBSERVED — never
+     a guess, never a stale default. On the 2026-09-05 baseline the spend ceiling in two anchors,
+     the cycle in a third and a page count in a fourth were all hand-typed and all wrong.
+   - **Every clause resolves MET / FAILED / UNOBSERVED.** MET and FAILED each carry a citation
+     (file:line, URL, or query result); UNOBSERVED carries the reason the clause could not be
+     sampled. **A lens with ANY UNOBSERVED clause cannot be graded A** — that rule is what stops
+     silence from reading as a pass, and it is what catches a clause graded against an empty
+     payload or against a cycle day that never happened.
+   - **An extension proposed during a run does not bind that run.** The frozen clauses are fixed
+     for the run: they **may not be extended, narrowed or reworded while it is in flight**. Write
+     the extension to that lens's `proposed_extensions[]` with your run id, report TWO grades for
+     the lens (frozen, and frozen+proposed) and name which clause moved the row. Promotion into
+     the anchor happens at the next freeze — a reviewable dated diff that changes the artifact's
+     hash. The ratchet is tightening-only: `python3 scripts/review_anchor_seal.py --diff
+     origin/main` reds on any clause weakened, removed or with its evidence requirement relaxed,
+     and a deliberate loosening needs an owner-signed dated line in the file, which then prints
+     in this header.
+
+   This reverses what this file used to sanction — "anchors may be *extended*" — and the reversal
+   is the finding: on the 2026-09-05 baseline every one of the panel's anchors was extended by the
+   run that graded against it, so a dropped grade cannot be separated from a raised bar, and the
+   trend line (the only reason to grade) stops meaning anything. Extend an anchor **between** runs,
+   by PR, where the change is a reviewable dated diff. A later run that grades against a different
+   artifact hash gets a different header and must say so in its `method`.
 6. Write the **shared context block** every lens brief will carry verbatim: the platform
    one-paragraph + experiment day N of cycle N; the budget tier and what it pauses; the
    **intentional-emptiness manifest** (post-reset, which surfaces are empty *by design* per
@@ -117,9 +147,13 @@ discipline that took first-pass survival from the historical ~50% to 67/70 on 20
    posture IS the answer — a finding must show the posture is *wrong*, not that it exists);
    re-filing open issues; "hire a team" answers; and the product bar — decorative glow, causal
    claims, vice/age/genome exposure, AI doing arithmetic, hype over honesty;
-5. **structured output**: `{area, grade, rubric_anchors {A,C,F}, findings[{summary, evidence,
-   sev (P1|P2|P3), effort (S|M|L), regression_guard}], path_to_A (≤5 actions),
-   coverage_statement}` — the rubric may extend this shape; caps and extra fields live there;
+5. **structured output**: `{area, grade, grade_with_proposed, anchors_sha256,
+   clause_verdicts[{clause_id, verdict (MET|FAILED|UNOBSERVED), citation, reason}],
+   findings[{summary, evidence, sev (P1|P2|P3), effort (S|M|L), regression_guard}],
+   path_to_A (≤5 actions), coverage_statement}` — `clause_verdicts` covers **every clause** in
+   that lens's sealed record, one verdict each, and `grade` obeys the ceiling
+   `scripts/review_anchor_seal.py::lens_grade_ceiling` computes from them (any UNOBSERVED clause
+   caps the row below A). The rubric may extend this shape; caps and extra fields live there;
 6. **grade calibration** — an A means *A for this platform's stated posture*: solo operator, the
    ADR-103 complexity ledger, the ADR-063/133 cost ceiling. A path-to-A step that adds standing
    complexity, cost or ops burden must name its ADR-103 rent justification. "Hire an SRE team"
@@ -179,13 +213,18 @@ Every lens writes two artifacts, and **the filenames are a contract** — the op
 dead-man probes them by name, so a run whose artifact lands somewhere else reads as a run that
 never happened. The rubric names its exact pair.
 
-- **Grade table**: area · grade · one-line justification · **trend vs the previous run**.
-- **Machine-readable grades** (`{date, run_id, method, headline, anchor_freeze, calibration,
-  lenses{…}}`) — this file IS the comparability mechanism: the next run loads it, reuses its
-  rubric anchors, and diffs grades mechanically. `anchor_freeze` is the Phase-0 block verbatim
-  (what this run graded against, fingerprinted at its own sha — `anchor_drift()` in
+- **Report header**: the `review_anchor_seal --header` block verbatim, first thing — the
+  artifact's `sha256`, the resolved placeholders, the owner-signed loosenings in force.
+- **Grade table**: area · grade · **grade against frozen+proposed** · one-line justification ·
+  **trend vs the previous run**. Where the two grades differ, name the clause that moved the row.
+- **Machine-readable grades** (`{date, run_id, method, headline, anchor_seal, anchor_freeze,
+  calibration, lenses{…}}`) — this file IS the comparability mechanism: the next run loads it and
+  diffs grades mechanically. `anchor_seal` is `{sha256, resolved{…}, unobserved_placeholders[],
+  signed_loosenings[]}` — the sealed bar this run graded against (#3607); `anchor_freeze` is the
+  Phase-0 rubric-prose block verbatim, fingerprinted at its own sha (`anchor_drift()` in
   `scripts/review_anchors.py` is the read-back); `calibration` is the planted-control result
-  from Phase 2. A run missing either is a run whose numbers nobody can check.
+  from Phase 2. Each lens carries its own `clause_verdicts[]`. A run missing any of the three is
+  a run whose numbers nobody can check.
 - **Remediation ledger to A**: per area, ranked — root cause, fix, A/B class, regression guard,
   effort (S/M/L), milestone. Cap ~5 actions per area; a 200-item ledger nobody burns down is a
   failed review.
@@ -231,7 +270,9 @@ current tree or the live surface, not best-practice lore; (2) each recommendatio
 ADR-103 solo-operator rent test; (3) at least one deliberate posture is confirmed as correct and
 named; (4) the grade table is honest enough that a stranger could dispute it with evidence; (5)
 the machinery is stronger at wrap than at start; (6) **the run's planted controls are reported,
-and its anchor-freeze block is in its artifact** — a run that cannot say whether its verifiers
-were awake, or what text it graded against, has produced letters rather than measurements; and
-(7) **the artifact landed under the exact filename the rubric names**, because that filename is the only thing that tells the operating
+and both anchor blocks are in its artifact — the sealed artifact's `sha256` and the anchor-freeze
+fingerprint** — a run that cannot say whether its verifiers were awake, or what bar it graded
+against, has produced letters rather than measurements; (7) **every clause carries a verdict with
+its citation or its reason**, so no row is an A by silence; and (8) **the artifact landed under the
+exact filename the rubric names**, because that filename is the only thing that tells the operating
 calendar the ritual actually ran.

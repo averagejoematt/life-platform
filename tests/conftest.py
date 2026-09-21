@@ -324,6 +324,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_channel_divergence_prereg_1844.py",
         "test_genesis_preregistration.py",
         "test_plan_literal_reconciliation.py",
+        # #3552: reads the frozen `deploy/generated/genesis_preregistration.json` as the
+        # WIRE SHAPE its additive-projection assertions compare against. Named here in the
+        # same PR that adds the test, exactly as the block above instructs.
+        "test_prereg_effect_provenance_3552.py",
         "test_prereg_hash_stamp.py",
         "test_qa_smoke_phase_stamp_coverage_1970.py",
         # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this
@@ -337,6 +341,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # that adds a live SOURCE# partition (or refreshes the census) must red BEFORE the
         # merge, not after the partition is already invisible to every freshness check.
         "test_source_registry_coverage_3669.py",
+        # #3599 box 1: the same artifact, read for its `coverage_partitions` block — the
+        # measured live partition set the wipe's own coverage assertion is now graded
+        # against offline. Joined the lane by the derivation above rather than by hand:
+        # a PR that refreshes the census must red on itself if the refreshed set is no
+        # longer covered, not on whoever merges next.
+        "test_restart_wipe_coverage.py",
         "test_restart_verify_gates_3477.py",
         "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
@@ -537,6 +547,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_board_lead_single_character.py",
         "test_cast_roster_consistency.py",
         "test_coach_ensemble_writer_phase_stamp_guard_2119.py",
+        # #3599 box 2: the SOURCE-tier sibling of the guard above — an AST sweep of
+        # lambdas/ mcp/ deploy/ scripts/ for every put_item writer landing a row on an
+        # EXPERIMENT_SCOPED `USER#matthew#SOURCE#*` partition with no write-time stamp.
+        # Pre-merge for the same reason as its #2119 sibling: the defect arrives in the
+        # diff of the PR that adds the writer, and post-merge is after the unstamped rows
+        # exist (#3513 measured 109 of them live before anyone noticed).
+        "test_scoped_writer_provenance_guard_3599.py",
         "test_coach_roster_set_guard_2334.py",
         "test_ddb_key_contracts.py",
         "test_ddb_patterns.py",
@@ -714,6 +731,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # A PR that lands a regenerated artifact must red on the PR that lands it —
         # tests/test_restart_verify_gates_3477.py derives this membership and requires it.
         "test_restart_second_census_3621.py",
+        # #3607: the sealed review anchors. Its verdict depends only on the tree —
+        # docs/reviews/anchors/ANCHORS.json, its sha sibling, and the spine that loads
+        # them — and the two failures it catches are both introduced by the diff that
+        # would land them: an anchor edited without a re-seal (the sibling stops
+        # verifying) and a clause weakened with no owner-signed line. Both are
+        # reviewable in the PR and pointless after the merge.
+        "test_anchor_freeze_3607.py",
     }
 )
 

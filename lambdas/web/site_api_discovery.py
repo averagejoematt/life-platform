@@ -99,6 +99,13 @@ def hypotheses(*, _g) -> dict:
                 # criterion is also where the derived effect bar (SD, n, window) and the
                 # per-arm n floor are stated in words.
                 "confirmation_criteria": it.get("confirmation_criteria"),
+                # #3552: the per-arm n floor the deterministic checker actually applies.
+                # It is a module constant in hypothesis_engine_lambda, not a per-record
+                # field, so it is equally true of hypotheses pre-registered BEFORE the
+                # spec started carrying it — which is why it is served from the registry
+                # here rather than only from the stored spec. No frozen criterion is
+                # rewritten to say it; the number simply stops being invisible.
+                "min_days_per_arm": ((it.get("test_spec") or {}).get("min_days_per_arm") or experiment_gates.HYPOTHESIS_MIN_DAYS_PER_ARM),
                 "monitoring_window_days": it.get("monitoring_window_days"),
                 "actionable_if_confirmed": it.get("actionable_if_confirmed"),
                 "pre_registered_at": it.get("pre_registered_at") or it.get("created_at"),
