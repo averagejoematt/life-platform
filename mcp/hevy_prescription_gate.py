@@ -1,0 +1,313 @@
+"""hevy_prescription_gate.py — subtract-only as a GATE on the chat path (#3971).
+
+WHY THIS EXISTS
+
+#3927 made the subtract-only rule real on the CRON path: `routine_generator.
+_enforce_load_floors()` raises every working set to the movement's band-matched
+prescription floor and records the pass in `inputs_snapshot["load_floors"]`. The
+chat path — `manage_hevy_routine draft_custom -> dry_run -> commit`, which is the
+surface that authored BOTH #3927 specimens — was left governed only by SKILL.md
+prose plus `recovery_authoring.audit_prescription()`, which the authoring session
+has to REMEMBER to call. A rule that depends on remembering is a discipline, not a
+gate: a routine whose notes say "if set 1 feels good, go up to 85" could still be
+committed, and one of them was.
+
+So this module is the refusal. It is shaped after the #3752 critic veto in
+`coach.critics` (`veto_reason` -> `mcp_error(..., error_code=...)`): a NAMED error
+code, the offending clause quoted, and — for a below-floor set — the floor's
+PROVENANCE, because "you prescribed too little" is unactionable without the date,
+the load and the bodyweight the floor was drawn from.
+
+WHAT IT DOES NOT DO
+
+It does not raise the load. ADR-069's escape hatch exists precisely so the chat
+path can prescribe what the platform did not compute; silently rewriting a
+caller-supplied number would be a different (and worse) surprise than refusing.
+The cron path applies; the chat path refuses. Both derive the floor the same way,
+from `routine_generator.prescription_floor`, so there is ONE definition of a floor.
+
+`floor` and `re_entry` variants are exempt BY DESIGN and say so in the result:
+they prescribe a deliberately reduced session, and a floor asserted over one would
+be the exact inverse of the rule.
+
+I/O: the floor arm needs the Hevy history + Withings bodyweight indexes, so it is
+NOT pure — but every load is fail-soft and the absence is reported BY NAME
+(`indexes_unavailable`, `no_current_bodyweight`) rather than passing for a clean
+audit. The conditional-up arm is pure text and always runs; a DynamoDB hiccup can
+cost the floor check, never the prose check. Both index arguments are injectable
+so the gate tests against the live wire shapes in
+tests/fixtures/subtract_only_3927/ with no AWS.
+
+COST, MEASURED not assumed (2026-09-21, from a laptop over the internet — in-region
+from the MCP Lambda it is faster): the 3,650-day Hevy history Query returned 502
+templates in 2.95s and the Withings bodyweight Query 1,047 weigh-ins in 0.03s. So
+the gate adds roughly one such pair to `dry_run` and one to `commit`. That is the
+same pair `_action_draft` already pays per call, and it is deliberately NOT cached:
+a memoised history index is a stale floor, and a stale floor is the exact defect
+#3927 was filed on.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+logger = logging.getLogger("hevy_prescription_gate")
+
+# The named refusal, in the shape of #3752's CRITIC_VETO.
+SUBTRACT_ONLY_ERROR_CODE = "SUBTRACT_ONLY_VIOLATION"
+
+# Variants that prescribe no load by design (#3927: "a floor stamped on a
+# deliberately-easy variant would be the opposite rule").
+NO_LOAD_VARIANTS = frozenset({"floor", "re_entry"})
+
+SKIP_NOTE = (
+    "subtract-only gate SKIPPED — variant={variant} prescribes a deliberately reduced session and asserts no load "
+    "floor by design (#3927/#3971). Conditional up-branches and below-floor sets are NOT checked on this variant."
+)
+
+# `status` vocabulary is deliberately the SAME as `_enforce_load_floors`'s, because the
+# live readback (#3971 acceptance box 4) reads `inputs_snapshot.load_floors.status` and
+# must not have to know which path authored the routine. "applied" means the floor pass
+# RAN against a resolved bodyweight — on this path enforcement is a refusal rather than a
+# silent raise, which `enforcement` records.
+ENFORCEMENT = "chat_commit_gate_refusal"
+
+
+def _catalog_movements() -> dict[str, Any]:
+    from training.routine_generator import _load_json
+
+    return (_load_json("movement_catalog.json") or {}).get("movements", {})
+
+
+def _template_id_for(movement_key: str | None, movements: dict[str, Any]) -> str | None:
+    """movement_key -> Hevy template id, WITHOUT any network resolve.
+
+    `tmpl:<id>` keys (ADR-069 index-resolved / auto-created movements) already carry
+    the id; curated keys carry a catalog hint. A key with neither yields None, which
+    `prescription_floor` reports as `no_template_id` — an absence, never a guess.
+    """
+    if not movement_key:
+        return None
+    if movement_key.startswith("tmpl:"):
+        return movement_key[len("tmpl:") :]
+    return ((movements or {}).get(movement_key) or {}).get("hevy_template_id_hint")
+
+
+def _days_since_last_workout(history_index: dict[str, list], target_date: str) -> int | None:
+    """Derived from the history itself, never assumed.
+
+    The layoff discount is the ONLY sanctioned path to a floor below an achieved load,
+    so the number that triggers it has to come from evidence. None (no prior session on
+    record) means no discount — the strictest floor — rather than a guessed gap.
+    """
+    from datetime import date
+
+    latest = ""
+    for sessions in (history_index or {}).values():
+        for s in sessions or []:
+            d = str((s or {}).get("date") or "")
+            if d and (not target_date or d < target_date) and d > latest:
+                latest = d
+    if not latest or not target_date:
+        return None
+    try:
+        return (date.fromisoformat(target_date) - date.fromisoformat(latest)).days
+    except ValueError:
+        return None
+
+
+def _load_indexes() -> tuple[dict[str, list], dict[str, float], str | None]:
+    """The two live indexes the floor needs. Fail-soft, and the failure is NAMED."""
+    from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_bodyweight_index, load_history_indexes
+
+    try:
+        history = load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[0]
+        weights = load_bodyweight_index()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("subtract-only gate: index load failed (%s) — the floor arm cannot run", e)
+        return {}, {}, f"{type(e).__name__}: {e}"
+    return history, weights, None
+
+
+def derive_load_floors(
+    ir: Any,
+    *,
+    movements: dict[str, Any] | None = None,
+    history_index: dict[str, list] | None = None,
+    weight_index: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """The `inputs_snapshot["load_floors"]` audit for a chat-authored routine.
+
+    Same shape and same `status` vocabulary as `routine_generator._enforce_load_floors`
+    so one readback serves both paths — including the movements that got NO floor and
+    why, because a silent absence reads as "the rule was satisfied".
+    """
+    from training.band_reference import band_key
+    from training.exercise_history import nearest_bodyweight
+    from training.routine_generator import SUBTRACT_ONLY_RULE, prescription_floor
+
+    target_date = str(getattr(ir, "target_date", "") or "")
+    audit: dict[str, Any] = {
+        "rule": SUBTRACT_ONLY_RULE,
+        "source": "chat_commit_gate",
+        "enforcement": ENFORCEMENT,
+        "target_date": target_date,
+        "current_bodyweight_lb": None,
+        "band": None,
+        "movements": {},
+    }
+    if history_index is None or weight_index is None:
+        loaded_history, loaded_weights, err = _load_indexes()
+        history_index = loaded_history if history_index is None else history_index
+        weight_index = loaded_weights if weight_index is None else weight_index
+        if err:
+            audit["status"] = "indexes_unavailable"
+            audit["reason"] = err
+            return audit
+
+    current_lb = nearest_bodyweight(target_date, weight_index) if target_date else None
+    if not current_lb:
+        audit["status"] = "no_current_bodyweight"
+        audit["reason"] = "no weigh-in within tolerance of the target date — no floor was asserted (#3927)"
+        return audit
+
+    audit["current_bodyweight_lb"] = round(float(current_lb), 1)
+    audit["band"] = band_key(float(current_lb))
+    audit["status"] = "applied"
+    dslw = _days_since_last_workout(history_index, target_date)
+    audit["days_since_last_workout"] = dslw
+    movements = _catalog_movements() if movements is None else movements
+
+    for ex in getattr(ir, "exercises", None) or []:
+        key = getattr(ex, "movement_key", None) or "?"
+        floor = prescription_floor(
+            _template_id_for(key, movements),
+            history_index,
+            weight_index,
+            current_lb,
+            days_since_last_workout=dslw,
+            as_of=target_date,
+        )
+        audit["movements"][key] = {
+            k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")
+        }
+    return audit
+
+
+def prescription_gate(ir: Any, **kw: Any) -> dict[str, Any]:
+    """The verdict for ONE routine IR: clean, refuse, or skipped.
+
+    A routine the generator already floored carries its own `load_floors` audit; that
+    one is REUSED rather than recomputed — the cron path raised the sets, so re-deriving
+    would only invite the two derivations to disagree about the same routine.
+    """
+    from training.routine_generator import SUBTRACT_ONLY_RULE
+
+    from mcp.recovery_authoring import audit_prescription
+
+    variant = str(getattr(ir, "variant", "") or "ideal").lower()
+    out: dict[str, Any] = {"rule": SUBTRACT_ONLY_RULE, "variant": variant, "error_code": SUBTRACT_ONLY_ERROR_CODE}
+    if variant in NO_LOAD_VARIANTS:
+        out.update(
+            {
+                "enforced": False,
+                "verdict": "skipped",
+                "skipped_reason": SKIP_NOTE.format(variant=variant),
+                "load_floors": {"status": "not_applicable", "reason": SKIP_NOTE.format(variant=variant)},
+                "audit": None,
+            }
+        )
+        return out
+
+    stored = ((getattr(ir, "inputs_snapshot", None) or {}).get("load_floors")) or {}
+    if stored.get("status") == "applied":
+        floors = dict(stored)
+        floors.setdefault("source", "routine_generator")
+    else:
+        floors = derive_load_floors(ir, **kw)
+
+    audit = audit_prescription(getattr(ir, "exercises", None) or [], getattr(ir, "notes", "") or "", floors.get("movements"))
+    out.update(
+        {
+            "enforced": True,
+            "verdict": "clean" if audit["ok"] else "refuse",
+            "skipped_reason": None,
+            "load_floors": floors,
+            "audit": audit,
+        }
+    )
+    return out
+
+
+def _fmt(kg: Any) -> str:
+    from training.routine_generator import _fmt_load
+
+    return _fmt_load(float(kg))
+
+
+def _provenance(gate: dict[str, Any], v: dict[str, Any]) -> str:
+    """Where this floor came from — a load, a date, a bodyweight, a band.
+
+    Without it the refusal is "your number is too low", which Matthew cannot act on at
+    11pm. With it he can check the claim against his own log in one glance.
+    """
+    floors = gate.get("load_floors") or {}
+    movement = (floors.get("movements") or {}).get(v.get("where")) or {}
+    basis = v.get("basis") or movement.get("basis") or {}
+    bits: list[str] = []
+    if basis:
+        reps = "/".join(str(r) for r in (basis.get("reps") or []))
+        bits.append(f"floor from {_fmt(basis.get('weight_kg') or 0)}{f' x {reps}' if reps else ''} on {basis.get('date')}")
+        if basis.get("bodyweight_lb") is not None:
+            bits.append(f"at {basis['bodyweight_lb']} lb")
+    if floors.get("band"):
+        bits.append(f"band {floors['band']}")
+    if movement.get("layoff_reason"):
+        bits.append(str(movement["layoff_reason"]))
+    bits.append(f"floors source={floors.get('source', '?')}, status={floors.get('status', '?')}")
+    return "; ".join(bits)
+
+
+def refusal_message(gate: dict[str, Any] | None) -> str | None:
+    """The commit refusal, or None. Names the clause or the set — never just the verdict."""
+    if not gate or gate.get("verdict") != "refuse":
+        return None
+    lines: list[str] = []
+    for v in (gate.get("audit") or {}).get("violations") or []:
+        if v.get("kind") == "conditional_up":
+            lines.append(
+                f"conditional up-branch in {v.get('where')} [{v.get('pattern')}]: \"{v.get('clause')}\" "
+                f"(matched {v.get('match')!r}) — progression is the platform's job, never his to trigger mid-set at 5am"
+            )
+        else:
+            lines.append(
+                f"{v.get('where')} set {v.get('set')} prescribes {_fmt(v.get('prescribed_kg'))} "
+                f"against a floor of {_fmt(v.get('floor_kg'))} — {_provenance(gate, v)}"
+            )
+    return (
+        f"Refusing to commit — subtract-only violation (#3927/#3971), {len(lines)} finding(s): "
+        + " | ".join(lines)
+        + f" || Rule: {gate.get('rule')} || Fix the draft (re-run draft_custom) and commit again — "
+        "the gate is not overridable from chat."
+    )
+
+
+def summary(gate: dict[str, Any] | None) -> str:
+    """One line for the commit/dry_run result: what the gate did, in the result itself."""
+    if not gate:
+        return "subtract-only gate: not run"
+    if gate.get("verdict") == "skipped":
+        return gate.get("skipped_reason") or "subtract-only gate: skipped"
+    floors = gate.get("load_floors") or {}
+    movements = floors.get("movements") or {}
+    with_floor = sum(1 for m in movements.values() if m.get("floor_kg"))
+    reason = f" ({floors['reason']})" if floors.get("reason") else ""
+    audit = gate.get("audit") or {}
+    return (
+        f"subtract-only gate: {'clean' if gate.get('verdict') == 'clean' else 'REFUSED'} — "
+        f"load_floors status={floors.get('status', '?')}{reason}, source={floors.get('source', '?')}, "
+        f"{with_floor}/{len(movements)} movement(s) carry a band-matched floor; "
+        f"conditional-up scan ran on routine notes + every exercise note, "
+        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}"
+    )

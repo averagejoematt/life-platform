@@ -42,6 +42,10 @@ from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 
+# #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
+# module for the same reason — this file sits at the ratchet's ceiling.
+from mcp.hevy_prescription_gate import SUBTRACT_ONLY_ERROR_CODE, prescription_gate, refusal_message, summary as _gate_summary
+
 # #3670: everything the commit result must report honestly lives in its own module
 # (the module-size ratchet's own instruction: extract, don't raise the cap).
 # Re-exported under the historical private names so call sites and tests are unchanged.
@@ -885,6 +889,9 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         "wire_body": body,
         "rationale": ir.rationale,
         "validation": _validate_ir_for_hevy(ir),
+        # #3971 box 1 — dry_run REPORTS what commit will refuse on: the derived load
+        # floors and every find_conditional_up hit, before anything reaches Hevy.
+        "prescription_audit": prescription_gate(ir),
     }
     # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
     # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.
@@ -939,6 +946,16 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     veto = veto_reason(ir)
     if veto:
         return mcp_error("Refusing to commit — critic veto (#3752): " + veto, error_code="CRITIC_VETO")
+    # #3971: subtract-only is a GATE here, not a discipline. A conditional up-branch or a
+    # working set under the movement's band-matched floor refuses BY NAME, with the floor's
+    # provenance; `floor`/`re_entry` are exempt by design and say so. The audit is stamped
+    # into inputs_snapshot so the stored IR records what ran (box 4's readback).
+    gate = prescription_gate(ir)
+    gate_refusal = refusal_message(gate)
+    if gate_refusal:
+        return mcp_error(gate_refusal, error_code=SUBTRACT_ONLY_ERROR_CODE, detail=gate["audit"]["violations"])
+    if gate.get("load_floors"):
+        ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "load_floors": gate["load_floors"]}
     folder_note: str | None = None
     try:
         resolve = _make_resolver()
@@ -994,6 +1011,8 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             "folder": folder_note or _UPDATE_FOLDER_NOTE,
             # #3752 — whether the red team ran on THIS routine, in the result, never only in a log.
             "critics": commit_status(ir),
+            # #3971 — whether the subtract-only gate ran, was clean, or was SKIPPED (floor/re_entry).
+            "prescription_gate": _gate_summary(gate),
             # #3718 — what Hevy actually holds, read back after the write.
             **wc.readback_fields(check, took_update_branch),
         }
