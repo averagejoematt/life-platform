@@ -32,6 +32,7 @@ from __future__ import annotations
 import importlib.util
 import inspect
 import os
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -422,3 +423,175 @@ def test_i_the_two_dark_causes_are_not_downgradable_alike(monkeypatch):
     monkeypatch.setattr(watch, "newest_scheduled_run", lambda _f: False)
     assert watch.main([]) == 2
     assert watch.main(["--allow-unverified"]) == 0
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #3982 — a NEWBORN watched workflow (zero scheduled runs) is judged from its BIRTH
+# instant, not from "now". Before this: PR #3976 registered pii-endpoint-sweep.yml
+# (cadence 24h, grace 14h) as watched; the very next push-triggered run read its zero
+# scheduled runs as an instant `never-fired` — three hours before the sweep's own
+# first cron could exist — and auto-filed #3980. #3980's own recovery comment records
+# it self-closing at 17:20Z the same day on the workflow's first green scheduled run:
+# correct eventually, but a false red for the whole of its own declared grace window.
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _newborn_row(deadline_hours: float = 24.0, cadence_hours: float = 24.0, grace_hours: float = 0.0) -> dict:
+    return {
+        "newborn.yml": {
+            "watched": True,
+            "name": "Newborn",
+            "crons": ["0 0 * * *"],
+            "cadence_hours": cadence_hours,
+            "grace_hours": grace_hours,
+            "deadline_hours": deadline_hours,
+        }
+    }
+
+
+def test_3982_a_cron_born_within_the_last_hour_is_not_a_finding():
+    """The issue's acceptance, box 1: a workflow file committed 1h ago, cadence 24h —
+    inside its first cadence+grace window, zero runs is expected, not a finding."""
+    verdict, age = watch.classify_newborn(_ago(1.0), deadline_hours=24.0, now=NOW)
+    assert verdict == watch.BORN and age == pytest.approx(1.0)
+
+
+def test_3982m_the_same_workflow_30h_after_birth_with_no_run_is_a_finding():
+    """The issue's must-fail control: once the birth deadline has passed with still
+    zero runs, this reports exactly like the pre-#3982 behaviour did for every case."""
+    verdict, age = watch.classify_newborn(_ago(30.0), deadline_hours=24.0, now=NOW)
+    assert verdict == watch.NEVER_FIRED and age == pytest.approx(30.0)
+
+
+def test_3982_the_boundary_is_the_birth_deadline_itself():
+    assert watch.classify_newborn(_ago(24.0), 24.0, NOW)[0] == watch.BORN
+    assert watch.classify_newborn(_ago(24.01), 24.0, NOW)[0] == watch.NEVER_FIRED
+
+
+def test_3982_an_undiscoverable_birth_is_a_finding_never_a_fresh_one():
+    """A zero-run workflow whose file has no `A` commit reachable at all must never be
+    treated as recently born — that would report BORN forever and hide a genuinely
+    stopped (or renamed-away) cron behind an unfalsifiable green."""
+    verdict, age = watch.classify_newborn(None, deadline_hours=24.0, now=NOW)
+    assert verdict == watch.NEVER_FIRED and age is None
+
+
+def test_3982_evaluate_end_to_end_born_vs_the_must_fail_control():
+    """The acceptance's exact pair, at the evaluate() level with an injected birth map —
+    the boundary a real `main()` run would actually exercise."""
+    rows = _newborn_row()
+
+    fresh = watch.evaluate(rows, {"newborn.yml": None}, NOW, {"newborn.yml": _ago(1.0)})
+    assert fresh[0]["verdict"] == watch.BORN
+    code, report = watch.render(fresh, [], [], 11)
+    assert code == 0 and "BORN" in report and "NEVER" not in report
+
+    stale_zero = watch.evaluate(rows, {"newborn.yml": None}, NOW, {"newborn.yml": _ago(30.0)})
+    assert stale_zero[0]["verdict"] == watch.NEVER_FIRED
+    code2, report2 = watch.render(stale_zero, [], [], 11)
+    assert code2 == 1 and "NEVER" in report2
+
+
+def test_3982_a_zero_run_workflow_with_unknown_birth_reports_the_reason_explicitly():
+    """No birth map at all — the shape a caller that forgot to look one up would
+    produce. Must read as an explicit 'birth unknown' finding, never silently green."""
+    rows = _newborn_row()
+    findings = watch.evaluate(rows, {"newborn.yml": None}, NOW)
+    assert findings[0]["verdict"] == watch.NEVER_FIRED
+    assert findings[0]["newborn_note"] and "birth unknown" in findings[0]["newborn_note"]
+    code, report = watch.render(findings, [], [], 11)
+    assert code == 1 and "birth unknown" in report
+
+
+def test_3982_main_prefers_a_declared_registered_at_over_the_git_lookup(monkeypatch, capsys):
+    """`main()`'s birth source is the registry's declared `registered_at` FIRST,
+    `first_commit_time()` only as a fallback — proven by POISONING the git lookup with
+    a value that would flip the verdict if it were ever consulted.
+
+    `main()` reads the REAL wall clock (`datetime.now`), not this module's fixed
+    `NOW` — so the birth instant below is computed off the real clock too.
+    """
+    real_now = datetime.now(timezone.utc)
+    registered_at = (real_now - timedelta(hours=1)).isoformat()
+    rows = {
+        "newborn.yml": {
+            "file": "newborn.yml",
+            "name": "Newborn",
+            "crons": ["0 0 * * *"],
+            "cadence_hours": 24.0,
+            "watched": True,
+            "grace_hours": 0.0,
+            "basis": "test",
+            "reason": "x" * 70,
+            "registered_at": registered_at,
+            "deadline_hours": 24.0,
+        }
+    }
+    monkeypatch.setattr(watch, "SCHEDULED_WORKFLOW_FLOOR", 1)
+    monkeypatch.setattr(watch, "discover_scheduled_workflows", lambda: dict(rows))
+    monkeypatch.setattr(watch, "unruled_workflows", lambda: [])
+    monkeypatch.setattr(watch, "orphaned_policy_rows", lambda: [])
+    monkeypatch.setattr(watch, "newest_scheduled_run", lambda _f: None)
+    monkeypatch.setattr(watch, "scheduled_run_history", lambda _f, per_page=watch.GRACE_HISTORY_SAMPLE: [])
+    # Poison: if `main()` ever fell through to the git lookup despite a declared
+    # `registered_at`, this ancient birth would flip the verdict to NEVER_FIRED.
+    monkeypatch.setattr(watch, "first_commit_time", lambda *_a, **_k: "2000-01-01T00:00:00+00:00")
+
+    assert watch.main([]) == 0
+    out = capsys.readouterr().out
+    assert "BORN" in out and "NEVER" not in out
+
+
+_GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "t",
+    "GIT_AUTHOR_EMAIL": "t@example.com",
+    "GIT_COMMITTER_NAME": "t",
+    "GIT_COMMITTER_EMAIL": "t@example.com",
+}
+
+
+def test_3982_first_commit_time_reads_a_real_git_history(tmp_path):
+    """End-to-end proof of the IO half: a synthetic git repo with one commit adding the
+    workflow file, and `first_commit_time()` must recover THAT commit's own timestamp —
+    not 'now', not the repo's most recent commit."""
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    (tmp_path / ".github" / "workflows" / "synthetic-3982.yml").write_text(
+        "name: Synthetic\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n", encoding="utf-8"
+    )
+    born_at = "2026-09-19T12:00:00+00:00"
+    env = {**_GIT_ENV, "GIT_AUTHOR_DATE": born_at, "GIT_COMMITTER_DATE": born_at}
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, env=env)
+    subprocess.run(["git", "commit", "-q", "-m", "add synthetic workflow"], cwd=tmp_path, check=True, env=env)
+
+    result = watch.first_commit_time("synthetic-3982.yml", repo_root=str(tmp_path))
+    assert result not in (None, False)
+    assert result.startswith("2026-09-19T12:00:00")
+
+
+def test_3982_first_commit_time_reports_none_with_no_add_commit_ever(tmp_path):
+    """The other half: a real git repo where the workflow file was NEVER added — the
+    shallow-checkout / history-rewrite shape. Must return None, never guess a birth."""
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("x", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, env=_GIT_ENV)
+    subprocess.run(["git", "commit", "-q", "-m", "unrelated"], cwd=tmp_path, check=True, env=_GIT_ENV)
+
+    assert watch.first_commit_time("synthetic-3982-never-added.yml", repo_root=str(tmp_path)) is None
+
+
+def test_3982_first_commit_time_reports_false_when_git_itself_fails(tmp_path):
+    """Sentinel-compatible with the other IO lookups: NOT a git checkout at all must be
+    `False` (lookup failed), never collapsed onto `None` (birth genuinely unknown)."""
+    assert watch.first_commit_time("whatever.yml", repo_root=str(tmp_path)) is False
+
+
+def test_3982_the_watcher_checkout_step_has_full_history():
+    """`first_commit_time()` needs real git history. GitHub's default `fetch-depth: 1`
+    checkout carries only the tip commit, which would make every zero-run row read as
+    birth-unknown forever, for any workflow file older than the triggering push."""
+    doc = yaml.safe_load(open(WATCHER_WORKFLOW, encoding="utf-8").read())
+    steps = doc["jobs"]["cadence"]["steps"]
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert checkout.get("with", {}).get("fetch-depth") == 0
