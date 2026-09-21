@@ -34,6 +34,11 @@ Usage:
                                                                      # READ-ONLY (#3972); lists #pain thread rows + lexicon explanation
   python3 deploy/backfill_training_notes.py --migrate              # dry-run re-key of the collisions
   python3 deploy/backfill_training_notes.py --migrate --apply      # write the re-key (no model calls)
+  python3 deploy/backfill_training_notes.py --only-note 2026-06-23/243710DE/0 --apply --allow-calls 1
+                                                                     # ONE exercise-session, at most ONE model call over the cap
+                                                                     # (#3918 "run the one": every other block in the workout is
+                                                                     # blanked so its occurrence index is preserved and nothing
+                                                                     # else is touched; the cap is raised by exactly N for this run)
 """
 
 import argparse
@@ -193,6 +198,60 @@ def report_overwrites(table, since):
         "without a model call (no cached extraction for that note)."
     )
     return buckets
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# --only-note — ONE exercise-session, bounded spend (#3918 "run the one")
+# ══════════════════════════════════════════════════════════════════════════════
+_ONLY_NOTE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})/([0-9A-Fa-f]{8})/(\d+)$")
+
+
+def parse_only_note(spec: str) -> tuple:
+    """`DATE/TEMPLATE_ID/OCCURRENCE` → (date, template_id, occurrence). Anything else is a usage error."""
+    m = _ONLY_NOTE_RE.match((spec or "").strip())
+    if not m:
+        raise ValueError(f"--only-note wants DATE/TEMPLATE_ID/OCCURRENCE (e.g. 2026-06-23/243710DE/0), got {spec!r}")
+    return m.group(1), m.group(2).upper(), int(m.group(3))
+
+
+def only_note_workouts(workouts, target) -> list:
+    """Narrow `workouts` to the ONE exercise-session named by `target`.
+
+    Every other block in the matching workout keeps its position but has its note
+    BLANKED, so `occurrence_indices` still counts the same template appearances and
+    the target's head key is unchanged — while the writer sees exactly one noted block
+    (no record, no model call, no write for anything else). Returns [] when the target
+    does not exist, so the caller can refuse instead of running an empty backfill.
+    """
+    date, tid, occ = target
+    out = []
+    for w in workouts:
+        if w.get("date") != date:
+            continue
+        exs = w.get("exercises") or []
+        kept, narrowed = 0, []
+        for ex, o in zip(exs, tn.occurrence_indices(exs)):
+            t, _name = tn.normalize_exercise_key(ex)
+            if t == tid and o == occ and (ex.get("notes") or "").strip():
+                narrowed.append(ex)
+                kept += 1
+            else:
+                narrowed.append(dict(ex, notes=""))
+        if kept:
+            out.append(dict(w, exercises=narrowed))
+    return out
+
+
+def bounded_cap(table, extra_calls: int) -> int:
+    """The monthly cap for THIS run: the live count plus exactly `extra_calls`.
+
+    The September cap (300) is reached, so a plain `make_llm_fn` degrades the one note
+    the owner approved re-extracting to deterministic-only. Raising the cap by N above
+    the CURRENT count bounds the spend to N calls whatever the cap's state — never a
+    blanket lift."""
+    from training.training_notes_llm import monthly_calls
+
+    return monthly_calls(table) + int(extra_calls)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -552,7 +611,29 @@ def main():
         action="store_true",
         help="re-key the pre-#3918 collision workouts onto DATE#...#WORKOUT#<id>#<occurrence> (dry-run unless --apply)",
     )
+    ap.add_argument(
+        "--only-note",
+        default=None,
+        metavar="DATE/TEMPLATE_ID/OCCURRENCE",
+        help='re-extract ONE exercise-session only (#3918 "run the one"); every other block is blanked, nothing else is touched',
+    )
+    ap.add_argument(
+        "--allow-calls",
+        type=int,
+        default=0,
+        metavar="N",
+        help="with --only-note --apply: raise the monthly Haiku cap by exactly N above the live count for this run (bounded spend)",
+    )
     args = ap.parse_args()
+    if args.allow_calls and not (args.only_note and args.apply):
+        ap.error("--allow-calls is only meaningful with --only-note --apply")
+    if args.only_note and (args.migrate or args.report_overwrites or args.value_census or args.pain_burst_census):
+        ap.error("--only-note is the write path; it cannot be combined with a read-only mode or --migrate")
+    if args.only_note:
+        try:
+            only_note = parse_only_note(args.only_note)
+        except ValueError as e:
+            ap.error(str(e))
     if args.report_overwrites and args.apply:
         ap.error("--report-overwrites is read-only; it cannot be combined with --apply")
     if args.value_census and args.apply:
@@ -577,11 +658,20 @@ def main():
         migrate_collisions(table, apply=args.apply)
         return
 
-    llm_fn = make_llm_fn(table) if args.apply else None  # dry-run: deterministic-only, no model spend
+    if args.only_note:
+        workouts = only_note_workouts(_noted_workouts(table, only_note[0], only_note[0]), only_note)
+        if len(workouts) != 1:
+            raise SystemExit(f"--only-note {args.only_note}: expected exactly ONE noted exercise-session, found {len(workouts)} workout(s)")
+        cap = bounded_cap(table, args.allow_calls) if args.apply else None
+        llm_fn = make_llm_fn(table, monthly_cap=cap) if args.apply else None
+        print(f"ONLY-NOTE {args.only_note}: 1 exercise-session; model cap for this run = {cap} (live count + {args.allow_calls})")
+    else:
+        workouts = _noted_workouts(table, args.since)
+        llm_fn = make_llm_fn(table) if args.apply else None  # dry-run: deterministic-only, no model spend
 
     total_records = total_pain = total_workouts = 0
     total_wrote = total_skipped = total_versioned = 0
-    for w in _noted_workouts(table, args.since):
+    for w in workouts:
         exs = w.get("exercises") or []
         total_workouts += 1
         res = tn.write_workout_notes(table, w["date"], w.get("workout_uid", ""), exs, dry_run=not args.apply, llm_fn=llm_fn)
@@ -595,6 +685,13 @@ def main():
                     tn.elevate_pain(table, it)
                     total_pain += 1
         print(f"  {w['date']} {w.get('workout_uid', '')}: {res['records']} records" + (" [dry-run]" if not args.apply else ""))
+        if args.only_note:
+            for it in res.get("items", []):
+                print(
+                    f"    {it.get('sk')}  degraded={it.get('degraded')} degraded_reason={it.get('degraded_reason')} "
+                    f"extracted_by={it.get('extracted_by')} signals={len(it.get('signals') or [])} "
+                    f"legacy_rekeyed={res.get('legacy_rekeyed')} versioned={res.get('versioned')} wrote={res.get('wrote')}"
+                )
 
     print(
         f"\n{'APPLIED' if args.apply else 'DRY-RUN'}: {total_workouts} noted workouts → {total_records} records, {total_pain} pain elevated"
