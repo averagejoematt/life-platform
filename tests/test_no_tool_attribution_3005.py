@@ -54,6 +54,8 @@ from pathlib import Path
 
 import pytest
 
+REPO = str(Path(__file__).resolve().parents[1])
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Files allowed to contain the banned strings because they STATE the ban.
@@ -69,6 +71,7 @@ ALLOWLIST = {
     "docs/CONVENTIONS.md",
     "remediation/prompt.md",
     "scripts/gate_census_mutations.py",
+    "scripts/install_hooks.sh",  # the commit-msg hook that REFUSES the forms names them to grep for them (#4000 fix-forward)
     "handovers/HANDOVER_LATEST.md",  # a session's own incident narrative, not an instruction
     # #3645: worktree-implementer.md's step 9 now STATES the three banned forms by name
     # (so an agent reading it recognizes what to refuse) instead of instructing one —
@@ -276,24 +279,137 @@ def test_no_tracked_file_instructs_the_trailer():
     )
 
 
+# Post-ban commits that DO carry a form and cannot be removed: rewriting `main` is forbidden
+# (CLAUDE.md 'Authorship' — "the cost is real and the erasure is not"), so the honest record
+# is a dated entry naming how the trailer got in and the guard that now stops the next one.
+# Each entry is verified below: the sha must exist AND must carry a form (an allowlisted
+# clean commit is a rotten entry, and a missing sha is a typo).
+POST_BAN_HISTORY_OFFENDERS = {
+    "9257341db35f7b0b4b3c9e5b5d1d0a4c4b0a1f2e"[:12]: (
+        "2026-09-20 — the squash-merge of PR #4000 (#3900's lane). The repo squashes with "
+        "COMMIT_MESSAGES, so the lane's own commit trailers (the harness reminder's "
+        "Claude-Session / Co-authored-by lines) became main's message. The PR-body check "
+        "passed because the body was clean; nothing checked the commits. Guards added in the "
+        "same fix-forward: the commit-msg hook refuses the forms, and pr-checks scans every PR "
+        "commit's message (PR_COMMITS_FILE_UNDER_TEST)."
+    ),
+}
+
+
+def _history_entries(log: str):
+    for entry in log.split("\x00"):
+        entry = entry.strip()
+        if not entry:
+            continue
+        sha, _, body = entry.partition("\n")
+        yield sha, body
+
+
 def test_reachable_history_carries_no_trailer_since_ban():
     try:
         log = _git("log", f"--since={BAN_DATE}", "--format=%H%n%B%x00")
     except (subprocess.CalledProcessError, FileNotFoundError):
         pytest.skip("not a git checkout")
     offenders = []
-    for entry in log.split("\x00"):
-        entry = entry.strip()
-        if not entry:
-            continue
-        sha, _, body = entry.partition("\n")
+    seen_allowlisted = set()
+    for sha, body in _history_entries(log):
         forms = trailer_forms(body)
-        if forms:
-            offenders.append(f"{sha[:12]} ({', '.join(forms)})")
+        if not forms:
+            continue
+        if sha[:12] in POST_BAN_HISTORY_OFFENDERS:
+            seen_allowlisted.add(sha[:12])
+            continue
+        offenders.append(f"{sha[:12]} ({', '.join(forms)})")
     assert not offenders, (
         f"commits since {BAN_DATE} carry a Claude tool-attribution form: {offenders} — "
-        "banned by the owner decision recorded in CLAUDE.md 'Authorship'"
+        "banned by the owner decision recorded in CLAUDE.md 'Authorship'; a commit that cannot be "
+        "rewritten is recorded in POST_BAN_HISTORY_OFFENDERS with how it got in"
     )
+
+
+def test_every_allowlisted_offender_exists_and_still_carries_a_form():
+    """The allowlist cannot rot: a sha that is not in history is a typo, and a sha whose message
+    is clean is an entry that hides nothing and should be deleted."""
+    try:
+        log = _git("log", f"--since={BAN_DATE}", "--format=%H%n%B%x00")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pytest.skip("not a git checkout")
+    by_prefix = {sha[:12]: body for sha, body in _history_entries(log)}
+    for prefix, reason in POST_BAN_HISTORY_OFFENDERS.items():
+        assert reason.startswith("20"), f"{prefix}: the allowlist reason must start with a date"
+        if prefix not in by_prefix:
+            pytest.skip(f"{prefix} is not reachable from this checkout (shallow clone or a branch that predates it)")
+        assert trailer_forms(by_prefix[prefix]), f"{prefix} is allowlisted but carries no form — delete the entry"
+
+
+def pr_commit_messages_under_test() -> "list[str] | None":
+    """Every commit message of the PR under test, or None when there is no PR to see.
+
+    `PR_COMMITS_FILE_UNDER_TEST` names a file whose entries are separated by a line of
+    exactly `---`; pr-checks writes it from `gh pr view --json commits` before the lanes run
+    (a PR checkout is the MERGE commit at depth 1 — `git log` cannot see the branch's own
+    commits, which is how #4000's trailers reached main through a green PR)."""
+    path = os.environ.get("PR_COMMITS_FILE_UNDER_TEST")
+    if not path or not os.path.exists(path):
+        return None
+    text = Path(path).read_text(encoding="utf-8")
+    return [m.strip() for m in text.split("\n---\n") if m.strip()]
+
+
+def test_pr_commits_under_test_carry_no_attribution():
+    messages = pr_commit_messages_under_test()
+    if messages is None:
+        pytest.skip("no PR commit messages to see (not a pull_request run, or the file was not written)")
+    offenders = [f"commit {i + 1} ({', '.join(trailer_forms(m))})" for i, m in enumerate(messages) if trailer_forms(m)]
+    assert not offenders, (
+        f"PR commit message(s) carry a Claude tool-attribution form: {offenders} — the repo squashes "
+        "with COMMIT_MESSAGES, so this would land on main verbatim (#4000). Amend the commits; the "
+        "commit-msg hook refuses them locally."
+    )
+
+
+def test_pr_commits_scan_catches_a_planted_trailer(tmp_path, monkeypatch):
+    """Mutation control for the scan above: a planted trailer in the second message reds."""
+    f = tmp_path / "commits.txt"
+    f.write_text("feat: clean\n\nbody\n---\nfix: dirty\n\nCo-Authored-By: Claude Opus <noreply@anthropic.com>\n", encoding="utf-8")
+    monkeypatch.setenv("PR_COMMITS_FILE_UNDER_TEST", str(f))
+    msgs = pr_commit_messages_under_test()
+    assert msgs and len(msgs) == 2 and not trailer_forms(msgs[0]) and trailer_forms(msgs[1])
+    with pytest.raises(AssertionError):
+        test_pr_commits_under_test_carry_no_attribution()
+
+
+def test_the_commit_msg_hook_refuses_a_trailer(tmp_path):
+    """Drives the REAL commit-msg heredoc out of install_hooks.sh (never a hand copy): a message
+    carrying a banned form is refused before the Conventional-Commit subject check."""
+    import re as _re
+    import stat as _stat
+
+    installer = Path(REPO) / "scripts" / "install_hooks.sh"
+    m = _re.search(r"cat > \"\$MSG_HOOK_FILE\" << 'MSGEOF'\n(.*?)\nMSGEOF\n", installer.read_text(encoding="utf-8"), _re.S)
+    assert m, "install_hooks.sh commit-msg heredoc markers not found"
+    repo = tmp_path / "hookrepo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+    (repo / "deploy" / "lib").mkdir(parents=True)
+    (repo / "deploy" / "lib" / "commit_subject_pattern.sh").write_text(
+        (Path(REPO) / "deploy" / "lib" / "commit_subject_pattern.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    hook = repo / "hook.sh"
+    hook.write_text(m.group(1), encoding="utf-8")
+    hook.chmod(hook.stat().st_mode | _stat.S_IXUSR)
+
+    def run(msg):
+        mf = repo / "MSG"
+        mf.write_text(msg, encoding="utf-8")
+        return subprocess.run(["bash", str(hook), str(mf)], cwd=str(repo), capture_output=True, text=True)
+
+    clean = run("fix(x): a clean subject\n\nbody\n")
+    assert clean.returncode == 0, clean.stderr
+    dirty = run("fix(x): a clean subject\n\nClaude-Session: https://claude.ai/code/session_x\n")
+    assert dirty.returncode == 1 and "attribution" in dirty.stderr.lower(), dirty.stderr
+    dirty2 = run("fix(x): a clean subject\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n")
+    assert dirty2.returncode == 1, dirty2.stderr
 
 
 def test_pr_body_carries_no_attribution():

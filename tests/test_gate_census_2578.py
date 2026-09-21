@@ -842,24 +842,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # disposable `git archive origin/main` export -> 668 {118, 540, 6, 4}. Exactly
         # {structural::test_ip_hash_salt_sweep_3620.py} enters, {} leaves — so unproven does NOT
         # move and BASELINE_UNPROVEN_GATES is untouched.
-        # 119 -> 120 (2026-09-21, #3971): the 120th proof is
-        # `guard::mcp/hevy_prescription_gate.py` — the subtract-only refusal on the CHAT commit
-        # path (`manage_hevy_routine commit` returns SUBTRACT_ONLY_VIOLATION on a conditional
-        # up-branch or a working set under its band-matched prescription floor; #3927 gated only
-        # the cron path). A `declared-entrypoint` row — nothing in the module raises or exits, so
-        # the `# gate-entrypoint:` marker is the first thing in the file and
-        # `tools_hevy_routine._action_commit` is the blocking consumer. Hand-record in
-        # scripts/gate_census_proofs.py::GUARD_PROOFS: three defects planted ONE AT A TIME in the
-        # real tracked module under `-B`, each restored from a byte copy before the next — the
-        # refusal deleted (9 failed, 9 passed in 0.37s), the floor/re_entry exemption widened to
-        # `ideal` (14 failed, 4 passed in 0.40s), the floor arm blinded at `_template_id_for`
-        # (5 failed, 13 passed in 0.35s); baseline 18 passed in 0.33s, reverted 18 passed in
-        # 0.31s. Measured by id-set diff on COMMITTED trees, never by arithmetic: this lane ->
-        # 670 rows {proven 120, unproven 540, not-applicable 6, attempted-unproven 4}; a
-        # disposable `git archive origin/main` export at 4b498399e -> 669 {119, 540, 6, 4}.
-        # Exactly {guard::mcp/hevy_prescription_gate.py} enters, {} leaves — so unproven does NOT
-        # move and BASELINE_UNPROVEN_GATES is untouched.
-        <= 120
+        # Upper bound 119 -> 120 (2026-09-21, #3005 fix-forward merged after #4006): the install_hooks.sh ALLOWLIST entrant, proven.
+        # Upper bound 120 -> 121 (2026-09-21, #3621 box 4 re-merged onto main AFTER #4007): guard::scripts/verify_citations.py arrives
+        # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=121`), not carried from the lane's 120.
+        # Upper bound 121 -> 122 (2026-09-21, #3971 re-merged onto main AFTER #4005): guard::mcp/hevy_prescription_gate.py arrives
+        # proven (GUARD_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=122`), not carried from the lane's 120.
+        <= 122
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -782,6 +782,30 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         ],
         caps={},
     )
+    # #3700 — the chat path gets the SAME cardio cue the cron path already stamps.
+    # `generate_routines` calls `attach_cardio_cues` at the end of its build; `draft_custom`
+    # builds its blocks straight from the caller's arguments and never reaches it, so a
+    # chat-authored treadmill/cycling block went to Hevy with no baseline in front of it
+    # while an identical generated block carried one. This is the whole residual, and it is
+    # one call wide.
+    #
+    # It runs AFTER `_new_routine_id` (the id is content-derived — a routine must not get a
+    # new id because his history moved) and BEFORE `draft_versioned`, so the PERSISTED draft
+    # carries the cue and `dry_run`/`commit` push the same bytes this response reports.
+    # Fail-soft twice over: `attach_cardio_cues` swallows its own index-load failures and
+    # returns 0 with every note untouched, and the outer guard means no cue path can cost a
+    # draft. It is idempotent on a note already opening "Last:", so a re-draft never stacks.
+    # The count is REPORTED rather than assumed: 0 on a routine with no cardio block is the
+    # honest answer, and 0 on a routine WITH one says the history had nothing to quote.
+    cardio_cues = 0
+    try:
+        from training.routine_generator import attach_cardio_cues
+
+        cardio_cues = attach_cardio_cues(ir)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"draft_custom: cardio cue pass failed ({e}); notes untouched")
+    ir.inputs_snapshot["cardio_cues"] = cardio_cues
+
     draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
@@ -790,6 +814,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         "archetype": archetype,
         "exercise_count": len(blocks),
         "total_sets": total_sets,
+        "cardio_cues": cardio_cues,
         "warnings": warnings,
         "note": "Run action=dry_run with this routine_id to preview the exact Hevy "
         "body, then action=commit to push. Commit requires explicit routine_id.",

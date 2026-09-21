@@ -1879,6 +1879,33 @@ REGISTRY_PROOFS.update(
     }
 )
 
+# ── #3005 fix-forward (2026-09-21): a ninth ALLOWLIST entrant, scripts/install_hooks.sh ─
+# The commit-msg hook now REFUSES the banned forms, and to grep for them it has to name
+# them — so the installer became a sweep-1 offender the moment the clause landed. Watched
+# on this branch: without the entry, `test_no_tracked_file_instructs_the_trailer` reds
+# naming `scripts/install_hooks.sh` and all four form classes (1 failed); with it, the
+# sweep passes (the observation that produced the entry, not a re-run after the fact).
+REGISTRY_PROOFS.update(
+    {
+        "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::scripts/install_hooks.sh": {
+            "gate_name": "ALLOWLIST[scripts/install_hooks.sh]",
+            "command": _ATTRIBUTION_ALLOWLIST_SUITE,
+            "mutation": "the entry's own line deleted from ALLOWLIST, leaving the commit-msg hook's refusal clause unexcused.",
+            "observed": (
+                "ARMED: exit 1, `FAILED ...::test_no_tracked_file_instructs_the_trailer` naming `scripts/install_hooks.sh` "
+                "(co-author trailer, session trailer, generated-with footer / session link, attribution paraphrase) — "
+                "1 failed / 85 passed, 2026-09-21 00:43Z on this branch, BEFORE the entry existed. REVERTED (entry "
+                "added): 86 passed."
+            ),
+            "scope": (
+                "Load-bearing only, keyed by PATH (see the #3645 block above). The hook clause itself is proven by "
+                "`test_the_commit_msg_hook_refuses_a_trailer`, which drives the real heredoc in a scratch repo."
+            ),
+            "proved_on": "2026-09-21",
+        }
+    }
+)
+
 
 # ── #3544 (second pass): the nine entries of DERIVED_OPACITY_EXEMPT ────────────────────
 #
@@ -2001,6 +2028,55 @@ REGISTRY_PROOFS.update(
                 "number is not at risk, and one that does is, and this rule cannot tell them apart."
             ),
             "proved_on": "2026-09-16",
+        }
+    }
+)
+
+
+# ── #3621 box 4: the citation NETWORK re-resolution arm ────────────────────────────────
+#
+# scripts/verify_citations.py's own eutils/Crossref calls sit behind one seam
+# (`_fetch_json`), so the mutation is transport-level per this family's stated bar (the
+# planted condition is on the REAL call shapes both arms make, not a synthetic detector).
+GUARD_PROOFS.update(
+    {
+        "guard::scripts/verify_citations.py": {
+            "gate_name": "scripts/verify_citations.py",
+            "command": "python3 -m pytest tests/test_verify_citations_3621.py -q   # 21 cases, fully offline",
+            "mutation": (
+                "`_fetch_json` monkeypatched to return each of the three eutils/Crossref shapes the guard "
+                "exists to catch, one at a time: a PMID/DOI that no longer resolves (empty eutils `title`, "
+                "a Crossref HTTPError 404); a retraction (eutils `status: retracted`; a Crossref `update-to` "
+                "record of type `retraction`); and a live title that no longer matches the stored one (PMID "
+                "reassignment / a corrected DOI title). Each has a matching-title PASS control on the same "
+                "code path, so a detector that always reports drift (or never does) fails either the mutation "
+                "or the control, never both silently."
+            ),
+            "observed": (
+                "2026-09-20. RED (one failure line each, `check_pubmed`/`check_doi`): the 404 shape -> "
+                "'did not resolve (404/withdrawn)' / 'did not resolve (HTTP 404)'; the retraction shape -> "
+                "'is RETRACTED' / 'carries a RETRACTION notice'; the title-mismatch shape -> 'is now ... "
+                "stored ...' on both arms. GREEN on the matching-title control for both arms "
+                "(test_check_pubmed_passes_when_the_live_title_matches_stored, "
+                "test_check_doi_passes_when_the_live_title_matches_stored). Also watched: `check_pubmed([])` "
+                "makes zero network calls (a monkeypatched `_fetch_json` that raises proves it is never "
+                "invoked), and `main()` exits 1 on drift / 0 clean. Live run against the real registries at "
+                "the same commit (no plant): 47 PubMed + 3 DOI citations, zero drift — `verify()`'s own "
+                "clean-count print distinguishes 'zero found' from 'zero checked'. 21 passed."
+            ),
+            "scope": (
+                "The mutation is the seam (`_fetch_json`'s return shape), not a live NCBI/Crossref outage or "
+                "rate-limit response — a genuinely malformed or non-JSON body from either API raises inside "
+                "`_fetch_json` itself; `check_pubmed`'s broad except reports an eutils lookup failure for the "
+                "whole batch and `check_doi`'s per-DOI except (URLError/ValueError) reports it per citation, "
+                "but that catch path is NOT separately watched red/green the way #3112 requires of family 6 — "
+                "this is family 2 (guard-script), held to the single-defect bar, not the two-half one. The "
+                "scheduled CI wiring (`ci::.github/workflows/citation-network-check.yml::verify::1`) is "
+                "ATTEMPTED_UNPROVEN: a genuine live drift needs a real retraction/reassignment on NCBI/"
+                "Crossref to reproduce end to end, which this lane cannot plant without mutating third-party "
+                "public records."
+            ),
+            "proved_on": "2026-09-20",
         }
     }
 )
