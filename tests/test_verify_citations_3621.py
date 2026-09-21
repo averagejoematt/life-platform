@@ -67,7 +67,10 @@ def _independent_supplement_pmid_count():
 def _independent_doi_count():
     path = os.path.join(_REPO, "config", "experiment_library.json")
     data = json.load(open(path, encoding="utf-8"))
-    return sum(1 for e in data["experiments"] if "doi.org/" in (e.get("source_url") or ""))
+    from urllib.parse import urlparse
+
+    # host check, not a substring (CodeQL py/incomplete-url-substring-sanitization)
+    return sum(1 for e in data["experiments"] if urlparse(e.get("source_url") or "").netloc in ("doi.org", "dx.doi.org"))
 
 
 def test_pubmed_enumeration_includes_the_full_supplement_registry_count():
