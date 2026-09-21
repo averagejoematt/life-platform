@@ -1165,6 +1165,53 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-20",
     },
+    # #3621 box 5: the PROTOCOL# write contract. Three mutations, each a REAL state rather
+    # than a synthetic plant — the softened predicate that was the obvious alternative
+    # design, a catalogue entry without the field, and the pre-#3621 shell writer restored
+    # verbatim from origin/main.
+    "structural::test_protocol_lever_contract_3621.py": {
+        "gate_name": "test_protocol_lever_contract_3621.py",
+        "command": "python3 -B -m pytest tests/test_protocol_lever_contract_3621.py -q -p no:cacheprovider   # 27 tests, baseline 27 passed",
+        "mutation": (
+            "Three defects planted ONE AT A TIME in the real tracked files, each reverted with `git checkout --` "
+            "and re-run green before the next (the pycache purged and `-B` used throughout, per the #3599 trap). "
+            "M1 — `spawned_by_problem` softened to a truthiness check: the two shape clauses "
+            "(`== PRE_PLATFORM` / `HYPOTHESIS_SK.match`) deleted so any non-empty string passes, which is exactly "
+            "the design that would let `origin`'s prose citation stand in for a linkage. "
+            "M2 — `spawned_by` removed from the FIRST entry of site/config/protocols.json, i.e. the catalogue door "
+            "the /api/protocols S3 fallback serves. "
+            "M3 — deploy/seed_protocols_to_dynamodb.sh restored byte-for-byte from origin/main "
+            "(`git show origin/main:…`), which is the inline `python3 -c` heredoc with its own `table.put_item` — "
+            "a second writer, and a real historical state rather than an invented one."
+        ),
+        "observed": (
+            "2026-09-20, watched one at a time. BASELINE 27 passed, exit 0. "
+            "M1 RED (4 failed, 23 passed) — test_every_unlinked_shape_is_refused[Published literature (Walker, 2017)], "
+            "…[hypothesis-4], test_the_literature_label_is_accepted_at_its_exact_spelling_only, and the in-test "
+            "control test_mutation_control_a_truthiness_check_admits_a_prose_citation. "
+            "M2 RED (5 failed, 22 passed) — test_every_catalogue_lever_carries_a_valid_spawned_by, "
+            "test_the_catalogue_and_the_writer_are_graded_by_the_same_predicate, "
+            "test_the_catalogue_keeps_origin_as_its_own_field, the dry-run-over-the-real-catalogue leg of "
+            "test_the_seeder_is_dry_run_by_default_and_never_imports_boto3_to_print (the seeder REFUSED the batch, "
+            "which is the behaviour under test), and the in-test control for the catalogue leg. "
+            "M3 RED (1 failed, 26 passed) — test_the_shell_entrypoint_delegates_rather_than_carrying_its_own_writer, "
+            "and only that one, which is the right blast radius for a clause about the shell entrypoint. "
+            "RESTORED after each: 27 passed, exit 0, `git status --porcelain` empty."
+        ),
+        "scope": (
+            "Covers the write path and the catalogue: no PROTOCOL# item can be built without an admissible "
+            "`spawned_by`, the only two modules in lambdas/deploy/mcp that mention PROTOCOL# and call put_item are "
+            "the chokepoint and its seeder, and every entry in site/config/protocols.json carries the field. What "
+            "it does NOT prove: (a) that the LIVE partition satisfies it — the nine live PROTOCOL# rows are "
+            "tombstone=true/cycle=5 archives of the 2026-07-13 reset and are deliberately NOT re-put, so the "
+            "contract binds the next write and the first live proof is the next seed; (b) that `spawned_by` is "
+            "RESOLVABLE — a `HYPOTHESIS#…` value is shape-checked, not looked up, because CI has no table (the "
+            "sk's existence is a live check, named in the module docstring); (c) anything about a lever written "
+            "by a future Lambda that bypasses the chokepoint at runtime — the sweep is repo-shape and sees source, "
+            "not calls."
+        ),
+        "proved_on": "2026-09-20",
+    },
     "structural::test_v4_build_sitemap_3567.py": {
         "gate_name": "test_v4_build_sitemap_3567.py",
         "command": "python3 -m pytest tests/test_v4_build_sitemap_3567.py -q -p no:cacheprovider",
