@@ -1828,6 +1828,33 @@ REGISTRY_PROOFS.update(
     }
 )
 
+# ── #3005 fix-forward (2026-09-21): a ninth ALLOWLIST entrant, scripts/install_hooks.sh ─
+# The commit-msg hook now REFUSES the banned forms, and to grep for them it has to name
+# them — so the installer became a sweep-1 offender the moment the clause landed. Watched
+# on this branch: without the entry, `test_no_tracked_file_instructs_the_trailer` reds
+# naming `scripts/install_hooks.sh` and all four form classes (1 failed); with it, the
+# sweep passes (the observation that produced the entry, not a re-run after the fact).
+REGISTRY_PROOFS.update(
+    {
+        "registry::tests/test_no_tool_attribution_3005.py::ALLOWLIST::scripts/install_hooks.sh": {
+            "gate_name": "ALLOWLIST[scripts/install_hooks.sh]",
+            "command": _ATTRIBUTION_ALLOWLIST_SUITE,
+            "mutation": "the entry's own line deleted from ALLOWLIST, leaving the commit-msg hook's refusal clause unexcused.",
+            "observed": (
+                "ARMED: exit 1, `FAILED ...::test_no_tracked_file_instructs_the_trailer` naming `scripts/install_hooks.sh` "
+                "(co-author trailer, session trailer, generated-with footer / session link, attribution paraphrase) — "
+                "1 failed / 85 passed, 2026-09-21 00:43Z on this branch, BEFORE the entry existed. REVERTED (entry "
+                "added): 86 passed."
+            ),
+            "scope": (
+                "Load-bearing only, keyed by PATH (see the #3645 block above). The hook clause itself is proven by "
+                "`test_the_commit_msg_hook_refuses_a_trailer`, which drives the real heredoc in a scratch repo."
+            ),
+            "proved_on": "2026-09-21",
+        }
+    }
+)
+
 
 # ── #3544 (second pass): the nine entries of DERIVED_OPACITY_EXEMPT ────────────────────
 #
