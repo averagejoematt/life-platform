@@ -383,7 +383,11 @@ class WebStack(Stack):
             # One page: a handful of cross-region DDB queries plus N presign calls (presigning
             # is local signing, not an API call). 15s is headroom over that, not a budget.
             timeout_seconds=15,
-            memory_mb=512,
+            # 256MB is the cap this stack's web-facing Lambdas hold to
+            # (tests/test_reserved_concurrency.py) and is ample here: a handful of
+            # cross-region DDB queries plus N local presign signatures, no image bytes
+            # ever passing through the function.
+            memory_mb=256,
             environment={
                 "USER_ID": "matthew",
                 "TABLE_NAME": TABLE_NAME,

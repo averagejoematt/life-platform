@@ -212,6 +212,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - life-platform-site-api → SPECIAL BUILD — `bash deploy/deploy_site_api.sh` (see Special case above)
 - life-platform-site-api-ai → `lambdas/web/site_api_ai_lambda.py`
 - og-image-generator → `lambdas/web/og_image_lambda.py`
+- progress-viewer → `lambdas/web/progress_viewer_lambda.py` (region: us-east-1)
 - recap-card-generator → `lambdas/web/recap_card_lambda.py`
 - site-stats-refresh → `lambdas/web/site_stats_refresh_lambda.py`
 - subscriber-onboarding → `lambdas/web/subscriber_onboarding_lambda.py`
