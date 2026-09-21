@@ -675,6 +675,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible at runtime — the generator would plan a PPL week while another caller
         # graded a session against the old grid, with nothing red anywhere.
         "test_program_structure_3755.py",
+        # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
+        # whose argument mentions an IP, triaged against an explicit allowlist. Pure
+        # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own
+        # diff, and the whole point of this file is that it must red BEFORE the merge
+        # that introduces it, not sit invisible post-merge the way the six sites this
+        # PR fixed did.
+        "test_ip_hash_salt_sweep_3620.py",
     }
 )
 

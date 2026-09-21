@@ -927,8 +927,7 @@ def _handle_ask(event: dict) -> dict:
             }
 
         # #3620 (security ROW4): fail CLOSED — no salt, no digest, no unmetered door.
-        ip_hash = salted_ip_hash(source_ip, logger)
-        if ip_hash is None:
+        if (ip_hash := salted_ip_hash(source_ip, logger)) is None:
             return _error(503, "Service temporarily unavailable. Please try again shortly.")
         # WR-24: Check for valid subscriber token → higher rate limit
         sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
@@ -1118,8 +1117,7 @@ def _handle_explain(event: dict) -> dict:
         return _error(400, "Unknown surface")
 
     # #3620 (security ROW4): fail CLOSED — no salt, no digest, no unmetered door.
-    ip_hash = salted_ip_hash(source_ip, logger)
-    if ip_hash is None:
+    if (ip_hash := salted_ip_hash(source_ip, logger)) is None:
         return _error(503, "Service temporarily unavailable. Please try again shortly.")
     sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
     is_subscriber = bool(sub_token) and _validate_subscriber_token(sub_token)
@@ -1424,11 +1422,7 @@ def _handle_board_followup(body: dict, ip_hash: "str | None") -> dict:
     # Which coach — map legacy ids, reject unknowns BEFORE any DDB read / spend.
     persona = LEGACY_PERSONA_MAP.get(str(body.get("persona")), str(body.get("persona")))
     if persona not in COACH_ROSTER:
-        return {
-            "statusCode": 400,
-            "headers": CORS_HEADERS,
-            "body": json.dumps({"error": f"Unknown persona id. Valid: {', '.join(COACH_ROSTER)}"}),
-        }
+        return _error(400, f"Unknown persona id. Valid: {', '.join(COACH_ROSTER)}")
 
     # #2688: same untrusted `question` as the opening turn, same AttributeError.
     question = _req.text_field(body, "question")
@@ -1464,11 +1458,7 @@ def _handle_board_followup(body: dict, ip_hash: "str | None") -> dict:
 
     sess = _load_board_session(token)
     if not sess:
-        return {
-            "statusCode": 404,
-            "headers": CORS_HEADERS,
-            "body": json.dumps({"error": "Session expired or not found. Ask the board a fresh question."}),
-        }
+        return _error(404, "Session expired or not found. Ask the board a fresh question.")
     # Bind the token to its originating network — a leaked token can't be replayed.
     if sess.get("ip_hash") != ip_hash:
         return {"statusCode": 403, "headers": CORS_HEADERS, "body": json.dumps({"error": "Session does not match this client"})}

@@ -829,7 +829,20 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # disposable `git archive origin/main` export -> 667 {117, 540, 6, 4}. Exactly
         # {structural::test_prior_cut_disclosure_3754.py} enters, {} leaves — so unproven does NOT
         # move and BASELINE_UNPROVEN_GATES is untouched.
-        <= 118
+        # 118 -> 119 (2026-09-20, #3620): the 119th proof is
+        # `structural::test_ip_hash_salt_sweep_3620.py` — the repo-wide sha256(ip) sweep (an
+        # os.walk of lambdas/+mcp/ for any `.sha256(...)` call whose argument mentions `ip`,
+        # triaged against an explicit allowlist). Mutation-backed via the same re-runnable harness
+        # (`gate_census_mutations.py --run --gate test_ip_hash_salt_sweep_3620.py`: ARMED 1/1 — an
+        # untracked lambdas/common/_census_probe_2999.py planting
+        # `hashlib.sha256(source_ip.encode())`; baseline 4 passed in 0.30s, mutated 1 failed
+        # (test_every_sha256_ip_call_site_is_triaged) + 3 passed in 0.31s, reverted 4 passed in
+        # 0.28s). Measured by id-set diff on COMMITTED trees, never by arithmetic: this lane ->
+        # 669 rows {proven 119, unproven 540, not-applicable 6, attempted-unproven 4}; a
+        # disposable `git archive origin/main` export -> 668 {118, 540, 6, 4}. Exactly
+        # {structural::test_ip_hash_salt_sweep_3620.py} enters, {} leaves — so unproven does NOT
+        # move and BASELINE_UNPROVEN_GATES is untouched.
+        <= 119
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
