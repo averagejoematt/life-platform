@@ -22,6 +22,16 @@ from __future__ import annotations
 ARCHIVE_PREFIX = "ARCHIVE#"
 RECORD_KIND_PRIOR = "prior_extraction"
 
+# ── The §7 pre-flight's own lookback (#3972) ────────────────────────────────
+# `get_exercise_notes` (mcp/tools_training_notes.py) is, by its own docstring, "the §7
+# pre-flight pain surface" — this is the window it looks back over when a caller doesn't
+# name one. `elevate_pain` (training_notes.py) imports this SAME constant to decide
+# whether a note is old enough that raising a live "confirm or dismiss" prompt about it
+# makes no sense — a note the pre-flight itself would never see is not a pre-flight
+# question. One number, not two: a hand-picked threshold here would drift from the
+# surface it is meant to describe the very first time either one changed alone.
+PREFLIGHT_LOOKBACK_DAYS = 180
+
 
 def normalize_exercise_key(exercise: dict) -> tuple[str, str]:
     """(template_id, display_name) for an exercise block. Hevy template_id is stable

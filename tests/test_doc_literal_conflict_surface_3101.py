@@ -155,7 +155,7 @@ def test_the_pre_commit_hook_stages_the_generated_module_on_main_only_and_never_
     assert "lambdas/web/platform_counts.py" in main_arm, "on main the hook must stage the regenerated counter"
     assert "lambdas/web/platform_counts.py" not in off_main_arm, "off main the counter must never be staged (#3984)"
     assert re.search(
-        r'git -C "\$PROJ_ROOT" checkout HEAD -- lambdas/web/platform_counts\.py', src
+        r'git -C "\$PROJ_ROOT" checkout "\$RESTORE_FROM" -- lambdas/web/platform_counts\.py', src
     ), "off main the hook must restore the counter to HEAD before staging (#3984)"
     assert re.search(r'if \[\[ "\$HOOK_BRANCH" == "main" \]\]', src), "the two arms must key on the checked-out branch"
     for spec in specs:

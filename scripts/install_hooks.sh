@@ -112,9 +112,18 @@ if [[ -f "$PROJ_ROOT/deploy/sync_doc_metadata.py" ]]; then
   if [[ "$HOOK_BRANCH" == "main" ]]; then
     SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/platform_counts.py || true)
   else
-    git -C "$PROJ_ROOT" checkout HEAD -- lambdas/web/platform_counts.py 2>/dev/null || true
+    # In a MERGE commit (MERGE_HEAD exists — a lane merging origin/main into itself), HEAD is
+    # the branch's OLD tip: restoring to HEAD here silently threw away the counter the merge
+    # had just brought in from main, and the next reconcile on main conflicted with the branch
+    # again (#4005/#4006, 2026-09-21). The bot-owned file follows the side being merged IN.
+    if [[ -f "$(git -C "$PROJ_ROOT" rev-parse --git-path MERGE_HEAD)" ]]; then
+      RESTORE_FROM="MERGE_HEAD"
+    else
+      RESTORE_FROM="HEAD"
+    fi
+    git -C "$PROJ_ROOT" checkout "$RESTORE_FROM" -- lambdas/web/platform_counts.py 2>/dev/null || true
     SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md || true)
-    echo "[pre-commit] off main ($HOOK_BRANCH): lambdas/web/platform_counts.py restored to HEAD, not staged (#3984)"
+    echo "[pre-commit] off main ($HOOK_BRANCH): lambdas/web/platform_counts.py restored to $RESTORE_FROM, not staged (#3984)"
   fi
   if [[ -n "$SYNCED_CHANGED" ]]; then
     git -C "$PROJ_ROOT" add $SYNCED_CHANGED
@@ -163,6 +172,17 @@ fi
 . "$CSP_LIB"
 
 # Subject = first line that is neither blank nor a comment.
+# #3005 (owner decision, CLAUDE.md 'Authorship'): no tool-attribution trailer in any commit.
+# The repo squash-merges with COMMIT_MESSAGES, so a lane's trailer becomes main's message
+# (PR #4000, 2026-09-20). Refused here, before the subject check, on the WHOLE message.
+if grep -vE '^[[:space:]]*#' "$MSG_FILE" | grep -qiE '^(Claude-Session:|Co-Authored-By:[[:space:]]*Claude)|Generated with \[Claude Code\]'; then
+  {
+    echo "[commit-msg] ❌ the message carries a Claude tool-attribution form (Claude-Session / Co-Authored-By: Claude / Generated with [Claude Code])."
+    echo "  Commits carry the work, not the tooling — owner decision 2026-08-12 (CLAUDE.md 'Authorship')."
+    echo "  Remove the trailer lines and commit again."
+  } >&2
+  exit 1
+fi
 SUBJECT="$(grep -vE '^[[:space:]]*#' "$MSG_FILE" | grep -vE '^[[:space:]]*$' | head -n1)"
 
 # Skip subjects git itself generates.
