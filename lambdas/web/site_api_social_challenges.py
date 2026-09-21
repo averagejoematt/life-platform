@@ -160,7 +160,7 @@ def _handle_challenge_vote(event: dict, *, _g) -> dict:
     _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -191,7 +191,12 @@ def _handle_challenge_vote(event: dict, *, _g) -> dict:
     if catalog_id not in valid_ids:
         return _error(404, "Unknown challenge")
 
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): this dedup row carries a 24h TTL, but the digest is
+    # still worth salting — a snapshot of the table inside that window is exactly
+    # the reversible-in-minutes exposure the issue names.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     rate_pk = "VOTES#rate_limit"
     rate_sk = f"IP#{ip_hash}#CH#{catalog_id}"
     now_epoch = int(datetime.now(timezone.utc).timestamp())
@@ -249,6 +254,7 @@ def _handle_challenge_follow(event: dict, *, _g) -> dict:
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -282,7 +288,12 @@ def _handle_challenge_follow(event: dict, *, _g) -> dict:
         return _error(404, "Unknown challenge")
 
     email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
-    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    # #3620 (security ROW4): only the IP side is the reversible-in-minutes exposure
+    # the issue names — the email itself is already the address, hashed only for
+    # the sort key, not for anonymity.
+    ip_hash = salted_ip_hash(source_ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     now_epoch = int(datetime.now(timezone.utc).timestamp())
 
     # Rate limit: FOLLOW_RATE_LIMIT follows per IP per hour
@@ -583,7 +594,7 @@ def _handle_challenge_checkin(event: dict, *, _g) -> dict:
     _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
-    hashlib = _g["hashlib"]
+    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -621,7 +632,9 @@ def _handle_challenge_checkin(event: dict, *, _g) -> dict:
     # Rate limit: 1 check-in per IP per challenge per day (#358). Applied
     # unconditionally via the module chokepoint (#2237) — never skipped.
     ip = extract_client_ip(event)
-    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    ip_hash = salted_ip_hash(ip, logger)
+    if ip_hash is None:
+        return _error(503, "Service temporarily unavailable. Please try again shortly.")
     allowed, _rem, _retry = _rate_check(f"challenge_checkin:{challenge_id}", ip_hash, limit=1, window_seconds=86400)
     if not allowed:
         return _rate_limited("challenge_checkin", "Already checked in for this challenge today.", retry_after=86400)

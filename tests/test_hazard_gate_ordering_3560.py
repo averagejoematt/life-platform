@@ -28,7 +28,6 @@ Run: python3 -m pytest tests/test_hazard_gate_ordering_3560.py -v
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import sys
@@ -158,7 +157,9 @@ def test_board_ask_serves_the_resource_copy_past_the_in_memory_hourly_budget(mon
     store: dict = {}
     monkeypatch.setattr(A, "_board_rate_store", store, raising=False)
     ev = _event({"question": HAZARD_Q})
-    ip_hash = hashlib.sha256(A._rate_limit_identity(ev).encode()).hexdigest()[:16]
+    # #3620: the handler now salts this key (common.client_ip.salted_ip_hash) —
+    # seed the store under the SAME digest it will compute.
+    ip_hash = A.salted_ip_hash(A._rate_limit_identity(ev), A.logger)
     store[ip_hash] = [int(time.time())] * A.BOARD_RATE_LIMIT
 
     _safety_payload(A._handle_board_ask(ev), "response")
