@@ -350,7 +350,7 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "status": {"type": "string", "enum": ["pending", "confirmed", "refuted", "inconclusive", "expired"]},
+                    "status": {"type": "string", "enum": ["pending", "confirmed", "refuted", "inconclusive", "expired", "declined"]},
                     "coach_id": {"type": "string"},
                     "limit": {"type": "number"},
                 },
