@@ -751,6 +751,12 @@ FORECAST_HISTORY_WEEKS = 260
 # check_expiry takes the same posture).
 GRADE_GRACE_DAYS = 7
 
+# How stale a derived adjustment may be and still set the coming week's target.
+# Three weekly runs. A derivation older than that is describing a plan that is no
+# longer running, so past it the target is re-read from the proven band rather than
+# carried forward from a miss nobody has revisited since.
+ADJUSTMENT_MAX_AGE_DAYS = 21
+
 
 def build_prescription_forecast_item(fc: dict) -> dict:
     """The frozen weekly claim, as a DynamoDB item. Pure builder (tested)."""
@@ -877,7 +883,8 @@ def run_prescription_forecast(weigh_ins: list, activities: list, ref: dict, toda
         row.update(update)
         resolved_rows.append(row)
         table.put_item(Item=floats_to_decimal({k: v for k, v in row.items() if v is not None}))
-    out["adjustment"] = resolved_rows[-1].get("adjustment") if resolved_rows else None
+    latest_resolved = resolved_rows[-1] if resolved_rows else None
+    out["adjustment"] = (latest_resolved or {}).get("adjustment")
 
     # ── 2. issue the coming week's claim ─────────────────────────────────────
     weeks = pf.weekly_weeks(weigh_ins, activities, today, FORECAST_HISTORY_WEEKS)
@@ -889,11 +896,29 @@ def run_prescription_forecast(weigh_ins: list, activities: list, ref: dict, toda
         for r in resolved_rows
         if r.get("grade_status") == "graded" and r.get("signed_error_lb_wk") is not None
     ]
-    # An adherence-derived target supersedes the proven volume for the coming week:
-    # it is what the miss said to prescribe, and re-issuing the proven number over
-    # the top of it would discard the derivation.
+    # THE DERIVED NUMBER WINS, ON EVERY BASIS (#3712 box 3). `derive_adjustment`
+    # returns a target for all five bases; the allowlist this replaces honoured two
+    # of them, so the three that HOLD the standing target or ramp toward the proven
+    # volume were silently re-authored here as the raw proven number. Measured on a
+    # covered week that delivered 8.0 hr/wk against a 14.0 proven band:
+    # derive_adjustment returned 8.8 (the 10%/wk ramp ceiling, ramp_capped=True) and
+    # this line prescribed 14.0 — a 75% step the ramp cap exists to forbid, printed
+    # beside a derivation describing a number nobody used. "An ungraded week moves
+    # nothing" was violated the same way: a retired week's carried-forward target was
+    # dropped for the proven volume.
+    #
+    # The one thing that still re-reads the band is AGE. `_read_prescription_rows`
+    # looks back 180 days, so the last resolved row can be months old after an
+    # outage; past ADJUSTMENT_MAX_AGE_DAYS the derivation is describing a plan that
+    # is no longer running and the proven band is the honest fallback.
     adj = out.get("adjustment") or {}
-    prescribed = adj.get("next_cardio_hr_wk") if adj.get("basis") in ("adherence_shortfall", "model_over_predicted") else proven_cardio
+    resolved_on = str((latest_resolved or {}).get("resolved_at") or "")[:10]
+    try:
+        fresh = bool(resolved_on) and (today_d - _d(resolved_on)).days <= ADJUSTMENT_MAX_AGE_DAYS
+    except ValueError:
+        fresh = False  # an unparseable stamp is not a fresh one
+    prescribed = adj.get("next_cardio_hr_wk") if fresh else None
+    out["adjustment_applied"] = prescribed is not None
     if prescribed is None:
         prescribed = proven_cardio
     target_start = (today_d + timedelta(days=1)).isoformat()
@@ -909,6 +934,11 @@ def run_prescription_forecast(weigh_ins: list, activities: list, ref: dict, toda
     )
     fc["current_weight_lb"] = round(weight, 1) if weight is not None else None
     fc["adjustment_from_last_week"] = adj or None
+    # Provenance of the TARGET itself, stored on the row so the prescription surface
+    # can say which of the two it is holding rather than a reader having to infer it
+    # by comparing two numbers (#3712 box 3).
+    fc["target_source"] = "derived_from_last_grade" if out.get("adjustment_applied") else "proven_band"
+    fc["proven_cardio_hr_wk"] = round(float(proven_cardio), 2) if proven_cardio is not None else None
     table.put_item(Item=build_prescription_forecast_item(fc))
     out["issued"] = bool(fc.get("issued"))
     out["declined_reason"] = fc.get("declined_reason")
