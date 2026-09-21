@@ -196,8 +196,12 @@ Matthew authors at night and trains the next morning with zero chance to adjust.
     never his job to trigger mid-set at 5am — if the platform knows he hit 80, the
     prescription says 80. Down-branches are the sanctioned form ("drop to 40x10 if set 1
     exceeds the cap"). `recovery_authoring.find_conditional_up(text)` is the detector,
-    and `audit_prescription(exercises, routine_notes, floors)` reds on both classes —
-    run it over the draft before `dry_run`.
+    and `audit_prescription(exercises, routine_notes, floors)` reds on both classes.
+    **Since #3971 this is a GATE, not a reminder:** `dry_run` reports the audit in
+    `prescription_audit`, and `commit` REFUSES with `SUBTRACT_ONLY_VIOLATION` on any
+    conditional up-branch or any working set under its floor, naming the clause or the
+    set and the floor's provenance. There is no chat-side override — fix the draft and
+    re-`draft_custom`. `floor` / `re_entry` variants are exempt and say so in the result.
 - Lower the GREEN ceiling / raise floors for week-position (consecutive training days),
   deep deficit, and novel-pattern tendons — green recovery does not clear a
   3-sessions-in tendon.
@@ -216,6 +220,9 @@ Matthew authors at night and trains the next morning with zero chance to adjust.
     the revised body; do not re-apply it by hand. `model: {paused: …}` on a verdict means
     the deterministic layer alone decided at this budget tier — say so; it is not an
     approval by a critic that ran.
+  - Read `prescription_gate` on the commit result the same way. `SUBTRACT_ONLY_VIOLATION`
+    (#3971) is the second named refusal on this path; unlike a critic veto it is purely
+    deterministic, so "the model disagreed" is never the explanation.
   - The historian's packet carries the #3717 attestation with `OWNER-ATTESTED, NOT
     MEASURED` on it. Whenever you cite a band the attestation covers, say that the
     measured figure is a floor and the attested minutes are his statement, not a record.
