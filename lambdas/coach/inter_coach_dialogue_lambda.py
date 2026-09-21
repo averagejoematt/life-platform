@@ -304,8 +304,11 @@ def _air_one(pick, this_week):
 
     slug = topic.get("sk", "ACTIVE#dispute").replace("ACTIVE#", "")[:60]
     thread_sk = f"THREAD#{this_week}#{slug}"
+    from experiment.phase_taxonomy import experiment_stamp_for  # #3900: ENSEMBLE#dispute is tagger-blind
+
     table.put_item(
         Item={
+            **experiment_stamp_for(DISPUTE_PK, thread_sk),
             "pk": DISPUTE_PK,
             "sk": thread_sk,
             "record_type": "inter_coach_thread",

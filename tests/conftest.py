@@ -256,6 +256,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # deploy/write_pk_family_census.py regenerates — a PR that lands a refreshed
         # artifact must red on that PR, not on whoever pushes next (#2975).
         "test_schema_families_census.py",
+        # #3754: os.walk sweep of lambdas/ + mcp/ for a literal copy of the ADR-104
+        # "not comparable to the prior cut" sentence — a new nutrition surface that
+        # hand-types a drifted paraphrase (rather than importing the shared constant)
+        # must red on the PR that adds it, not sit invisible post-merge.
+        "test_prior_cut_disclosure_3754.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the
@@ -670,6 +675,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible at runtime — the generator would plan a PPL week while another caller
         # graded a session against the old grid, with nothing red anywhere.
         "test_program_structure_3755.py",
+        # #3621 box 3: an AST sweep of lambdas/experiment/experiment_gates.py asserting
+        # every module-level arming threshold carries a {value, kind, source} facet. Its
+        # verdict depends only on that file's text, and the failure it catches is a bare
+        # new literal added in the very PR that should red on it — post-merge is too late
+        # for a gate whose whole job is to stop an unpriced number shipping into a public
+        # zero-state payload.
+        "test_gate_threshold_provenance_3621.py",
     }
 )
 

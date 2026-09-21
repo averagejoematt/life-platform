@@ -53,6 +53,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from health import deficit_disclosures
+
 from training import owner_redlines, program_structure, training_context_registry
 
 ENGINE_VERSION = "plan-engine@1.1.0"  # #3755: the program block + the computed rotation check
@@ -237,7 +239,7 @@ def constraint_block(
                             if proven.get("measurement_is_a_floor")
                             else None
                         ),
-                        "intake is NOT comparable to the prior cut — MacroFactor begins 2025-11-24 (ADR-104)",
+                        deficit_disclosures.INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT,
                     ]
                     if s
                 ],

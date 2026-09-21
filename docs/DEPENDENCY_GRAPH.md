@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-694 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+695 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -192,7 +192,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `labs` | — | ai_expert_analyzer_lambda.py, nutrition_review_lambda.py |
 | `ledger` | — | site_api_ledger.py |
 | `life_events` | — | site_api_journey.py |
-| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
+| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
 | `macrofactor_meals` | — | — |
 | `macrofactor_workouts` | — | tools_training.py |
 | `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, site_api_physical.py |

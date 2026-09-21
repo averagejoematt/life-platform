@@ -434,7 +434,29 @@ _HAND_TYPED_PHASE_DOOR_PY = (
     "    }\n"
 )
 
+# #3754: a nutrition surface that hand-types its own copy of the ADR-104 "not comparable
+# to the prior cut" sentence instead of importing lambdas/health/deficit_disclosures.py's
+# INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT. Deliberately NOT git-added: the gate walks lambdas/ +
+# mcp/ on disk (os.walk), so an untracked module is exactly the shape a half-landed surface
+# has.
+_DRIFTED_PRIOR_CUT_NOTE_PY = (
+    '"""probe — a nutrition surface hand-typing its own copy of the ADR-104 note."""\n\n'
+    'NOTE = "intake is NOT comparable to the prior cut — MacroFactor begins 2025-11-24 (ADR-104)"\n'
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_prior_cut_disclosure_3754.py": MutationSpec(
+        gate_id="structural::test_prior_cut_disclosure_3754.py",
+        target="tests/test_prior_cut_disclosure_3754.py",
+        detects=(
+            "a second, hand-typed copy of the ADR-104 'not comparable to the prior cut' sentence "
+            "living anywhere under lambdas/ or mcp/ instead of importing the shared constant — the "
+            "drift class #3754 box 5 exists to prevent (a paraphrase reads as a second, independent "
+            "claim rather than the one ADR-104 fact restated)"
+        ),
+        plants=(("lambdas/health/_census_probe_3754.py", _DRIFTED_PRIOR_CUT_NOTE_PY),),
+        track=False,  # the gate walks lambdas/+mcp/ on disk (os.walk), so an untracked module is in scope
+    ),
     "structural::test_gsi_set_premerge_3609.py": MutationSpec(
         gate_id="structural::test_gsi_set_premerge_3609.py",
         target="tests/test_gsi_set_premerge_3609.py",
@@ -793,6 +815,19 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_prior_cut_disclosure_3754.py": _proof(
+        "structural::test_prior_cut_disclosure_3754.py",
+        "baseline: 3 passed in 0.17s | mutated: 1 failed, 2 passed in 0.18s :: "
+        "test_the_adr104_sentence_is_defined_in_exactly_one_file | reverted: 3 passed in 0.15s",
+        "lambdas/ + mcp/ on disk (os.walk, .py only), so an UNTRACKED module hand-typing the "
+        "sentence is in scope; scripts/ tests/ cdk/ deploy/ deliberately are not — a proof "
+        "fixture or a census constant elsewhere quoting the sentence for its OWN test purposes "
+        "is not the drift this gate exists to catch. It matches the sentence as an exact "
+        "substring, so a paraphrase (a different em-dash, a reworded clause, a dropped date) is "
+        "invisible to it by design — that class reads as a NEW claim, not a restated one, and is "
+        "a content-review item, not a structural one.",
+        proved_on="2026-09-20",
+    ),
     "structural::test_gsi_set_premerge_3609.py": _proof(
         "structural::test_gsi_set_premerge_3609.py",
         "baseline: 7 passed in 4.54s | mutated: 1 failed, 6 passed in 5.24s :: "

@@ -125,6 +125,25 @@ CYCLE_GENESES = {
     17: "2026-09-06",  # appended by restart_pipeline --close-cycle
 }
 
+# Genesis dates that were WRITTEN INTO THE RECORD and then abandoned — the reset ran and
+# stamped rows with `tombstoned_reason = experiment_restart_<date>`, and only afterwards
+# was the anchor moved. Maps the abandoned genesis date -> the cycle number it was
+# opening, so a provenance read of those rows still RESOLVES (#3621).
+#
+# 2026-09-04 -> 16: the entry above says the cycle-16 re-anchor was corrected in place,
+# which is true of this registry and false of the table. restart_intelligence_wipe.py
+# writes `tombstoned_reason`/`cycle`/`tombstoned_at` with if_not_exists PRECISELY so a
+# later reset can never overwrite the generation a record was first archived in (#1202,
+# ADR-077) — which is exactly why an in-place correction here could not reach the rows
+# the Friday run had already stamped. 328 of them were still live on 2026-09-20, all
+# stamped cycle=15 (the cycle that run closed), and `closing_cycle_for_genesis` returned
+# None for every one. Re-putting those 328 reason strings is REJECTED: it would destroy
+# the record that the Friday genesis was written at all. The alias is how the record
+# stays true in both directions — the Friday date happened, and it belongs to cycle 16.
+ABANDONED_GENESES = {
+    "2026-09-04": 16,
+}
+
 # #1066: container cache for the training-phase registry (read by the routine handler
 # via the `_g` hand-off; the routine test patches sad._load_phase_state).
 _phase_state_cache = None

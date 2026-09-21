@@ -816,6 +816,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # `git archive origin/main` export at d7bbecdd5 -> 666 {116, 540, 6, 4}. Exactly
         # {structural::test_program_structure_3755.py} enters, {} leaves — so unproven does NOT move
         # and BASELINE_UNPROVEN_GATES is untouched.
+        # Upper bound 118 -> 119 (2026-09-20, merge of #3621 box 4 onto main after #3754): both proofs below entered.
         # Upper bound raised 117 -> 118 (2026-09-20, #3621 box 4): the 118th proof is
         # `guard::scripts/verify_citations.py` — the citation NETWORK re-resolution arm's own
         # script, mutation-backed by monkeypatching its one transport seam (`_fetch_json`) to
@@ -825,7 +826,20 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # script gained (`ci::citation-network-check.yml::verify::1`) arrives `attempted-unproven`
         # instead — the failing arm needs a genuine live retraction/reassignment on NCBI/Crossref,
         # which is a third-party public record this lane cannot mutate.
-        <= 118
+        # 117 -> 118 (2026-09-20, #3754): the 118th proof is
+        # `structural::test_prior_cut_disclosure_3754.py` — the ADR-104 "not comparable to the
+        # prior cut" sentence-uniqueness sweep (an os.walk of lambdas/+mcp/ asserting the sentence
+        # is a literal string in exactly one file). Mutation-backed via the same re-runnable harness
+        # (`gate_census_mutations.py --run --gate test_prior_cut_disclosure_3754.py`: ARMED 1/1 — an
+        # untracked lambdas/health/_census_probe_3754.py planting a second, hand-typed copy of the
+        # sentence; baseline 3 passed in 0.17s, mutated 1 failed
+        # (test_the_adr104_sentence_is_defined_in_exactly_one_file) + 2 passed in 0.18s, reverted 3
+        # passed in 0.15s). Measured by id-set diff on COMMITTED trees, never by arithmetic: this
+        # lane -> 668 rows {proven 118, unproven 540, not-applicable 6, attempted-unproven 4}; a
+        # disposable `git archive origin/main` export -> 667 {117, 540, 6, 4}. Exactly
+        # {structural::test_prior_cut_disclosure_3754.py} enters, {} leaves — so unproven does NOT
+        # move and BASELINE_UNPROVEN_GATES is untouched.
+        <= 119
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

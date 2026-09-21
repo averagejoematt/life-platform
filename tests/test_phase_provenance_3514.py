@@ -22,6 +22,15 @@ WHAT IS PINNED HERE
      a CROSS_PHASE row and still stamp an EXPERIMENT_SCOPED one.
   3. The SET: every remaining direct `experiment_stamp(` call in `lambdas/` is enumerated
      from source and must carry a written exemption. A new ungated writer reds this file.
+
+IT IS ALSO #3599's ACCEPTANCE BOX 4 ("coach_state_updater stamps only when
+should_phase_stamp(pk, sk) — a RELATIONSHIP#state put carries no phase key"), which is the
+same contract named from the other issue. Both legs were re-run with the gate removed on
+2026-09-20 — reverting `coach_state_updater._put_item` from `experiment_stamp_for(pk, sk)`
+to the pre-fix `experiment_stamp()` (md5 7e1384ca… → 19451a96…, asserted changed before any
+verdict was read) reds 5 of these 24 tests: the three CROSS_PHASE sk cases through the real
+writer plus both AST-enumeration legs. Anyone re-opening box 4 should start here rather than
+writing a second guard.
 """
 
 from __future__ import annotations

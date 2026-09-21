@@ -107,6 +107,11 @@ INSIGHTS_PK = f"USER#{USER_ID}#SOURCE#insights"
 
 # ENSEMBLE#influence_graph is deliberately excluded: SYSTEM_STATE static config
 # (phase_taxonomy._PK_RULES), not an EXPERIMENT_SCOPED write, never phase-stamped.
+# #3900 (2026-09-20 residual): ENSEMBLE#dispute (the inter-coach dialogue thread, #540) needs no
+# new family-list entry — it has sat here, unprefixed, since this tool's original creation, which
+# already covers the two live W38 THREAD# rows the nightly found unstamped. What was missing was
+# the WRITER's stamp (inter_coach_dialogue_lambda._air_one never called experiment_stamp_for);
+# that's fixed at the write site, so this run only needs to repair the two rows already live.
 _ENSEMBLE_PKS = ["ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "ENSEMBLE#docket"]
 
 
