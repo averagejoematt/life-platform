@@ -79,6 +79,12 @@ _API_ORIGIN_HEADERS = ("Origin", "Content-Type", "X-Subscriber-Token", VIEWER_AD
 # The /api/* cache key, preserved verbatim from the pre-migration ForwardedValues.
 _API_CACHE_KEY_HEADERS = ("Origin", "Content-Type")
 
+# #3760: the private progress viewer's session cookie. The literal is duplicated from
+# `lambdas/privacy/progress_access.COOKIE_NAME` rather than imported, because CDK synth does
+# not put `lambdas/` on the path — `tests/test_progress_viewer_privacy_3760.py` asserts the
+# two spellings match, which is the derivation guard the import would have been.
+PROGRESS_COOKIE_NAME = "__lp_progress"
+
 
 def build_api_policies(scope) -> dict:
     """Create the four policies and return them keyed for the behaviour table.
@@ -131,9 +137,43 @@ def build_api_policies(scope) -> dict:
         cookie_behavior=cloudfront.OriginRequestCookieBehavior.none(),
     )
 
+    # #3760: the private progress viewer. Its own pair rather than a reuse of the two above,
+    # for one reason each:
+    #   * the CACHE policy must name the session cookie. CloudFront strips `Set-Cookie` from a
+    #     response on a behaviour whose cache policy forwards no cookies, which would make the
+    #     one-time link exchange silently fail — a 302 the browser follows into a 401, with
+    #     nothing in any log saying a cookie was dropped. Naming it in a TTL-0 cache key costs
+    #     nothing: `max_ttl=0` means nothing is ever cached, so the key is unobservable.
+    #   * the ORIGIN-REQUEST policy must forward the cookie AND the query string (`?k=` is the
+    #     one-time token). `origin_qs` forwards query strings but no cookies.
+    private_no_cache = cloudfront.CachePolicy(
+        scope,
+        "ProgressViewerNoCachePolicy",
+        cache_policy_name="life-platform-progress-viewer-no-cache",
+        comment="#3760: TTL 0 for the private progress viewer. Cookie named so CloudFront does not strip Set-Cookie.",
+        min_ttl=Duration.seconds(0),
+        default_ttl=Duration.seconds(0),
+        max_ttl=Duration.seconds(0),
+        header_behavior=cloudfront.CacheHeaderBehavior.none(),
+        query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+        cookie_behavior=cloudfront.CacheCookieBehavior.allow_list(PROGRESS_COOKIE_NAME),
+    )
+
+    origin_private = cloudfront.OriginRequestPolicy(
+        scope,
+        "ProgressViewerOriginRequestPolicy",
+        origin_request_policy_name="life-platform-progress-viewer-origin",
+        comment="#3760: forwards the viewer session cookie + the one-time link token (query string) to the site-api.",
+        header_behavior=cloudfront.OriginRequestHeaderBehavior.allow_list(*_API_ORIGIN_HEADERS),
+        query_string_behavior=cloudfront.OriginRequestQueryStringBehavior.all(),
+        cookie_behavior=cloudfront.OriginRequestCookieBehavior.allow_list(PROGRESS_COOKIE_NAME),
+    )
+
     return {
         "no_cache": no_cache,
         "default_cache": default_cache,
         "origin_qs": origin_qs,
         "origin_no_qs": origin_no_qs,
+        "private_no_cache": private_no_cache,
+        "origin_private": origin_private,
     }

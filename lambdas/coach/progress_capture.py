@@ -360,6 +360,60 @@ def handle(
     }
 
 
+# ── the other call the worker makes: the private viewer's link (#3760) ────────
+def handle_view(order: dict, *, chat_ids, secret: str, base_url: str, now: float) -> dict:
+    """Mint the one-time link to the private viewer, or refuse with a reason.
+
+    Returns the same `{"ok", "reason", "reply"}` shape `handle` does, and is narrow in the
+    same three ways, for the same reasons:
+
+      * ONE bot — only the bot that captured the photos may hand out a way to see them.
+      * ONE chat — his own 1:1. A group id is negative and is refused by construction here
+        the way it is above; a body-photo link posted into the board room cannot be unposted.
+      * ONE shape — `/progress view`, anchored. Anything else is not this command.
+
+    The refusal asymmetry runs the OPPOSITE way from `handle`. A capture that fails always
+    texts him back, because a photo silently lost is unrecoverable. A view that fails from
+    the wrong chat says NOTHING: telling a stranger "not your chat" confirms both that the
+    command exists and that they guessed a real one.
+
+    Pure — no client, no clock, no secret read. The worker resolves all four and passes them.
+    """
+    from privacy import progress_access
+
+    if str(order.get("bot_key") or "") != CAPTURE_BOT_KEY:
+        return {"ok": True, "reason": "not the capture bot", "reply": ""}
+    if order.get("is_group"):
+        return {"ok": False, "reason": "group chat", "reply": ""}
+
+    from coach import telegram_group
+
+    owner_chat = telegram_group.first_private_chat_id(chat_ids)
+    if owner_chat is None or str(order.get("chat_id")) != str(owner_chat):
+        return {"ok": False, "reason": "not the owner's chat", "reply": ""}
+
+    if not secret:
+        # He asked and the machine cannot answer — that one he IS told, because unlike the
+        # refusals above he is the person who can fix it.
+        return {
+            "ok": False,
+            "reason": "no signing secret",
+            "reply": "I can't mint a viewer link right now — the signing key is unreadable.",
+        }
+
+    url = progress_access.link_url(base_url, progress_access.mint_link_token(secret, now=now))
+    return {
+        "ok": True,
+        "reason": "link issued",
+        "reply": (
+            f"Progress photos: {url}\n\n"
+            f"One use, {progress_access.LINK_TTL_S // 3600} hours. Opening it signs that browser in for "
+            f"{progress_access.SESSION_TTL_S // 3600} hours. The page is not linked from anywhere."
+        ),
+        "url": url,
+    }
+
+
 def expected_capture_day(date: str, experiment_start: str = "") -> Optional[str]:
     """The protocol's target capture date (`YYYY-MM-DD`) for the week containing `date`.
 
@@ -394,6 +448,17 @@ def _protocol_offset_phrase(date: str, experiment_start: str) -> str:
         return ""
     off = abs((d - t).days)
     return "on the protocol day" if off == 0 else f"{off} day{'s' if off != 1 else ''} off the protocol day"
+
+
+def week_of(date: str, experiment_start: str):
+    """`_week_of` under a public name, argument order matching `expected_capture_day` (#3760).
+
+    The viewer needs the same week number the bot acked with. It could recompute
+    `((day_n - 1) // 7) + 1` in two lines and be right today — and that is exactly how the
+    ack and the page start disagreeing the first time either definition moves. One
+    arithmetic, one caller-visible name.
+    """
+    return _week_of(experiment_start, date)
 
 
 def _week_of(experiment_start: str, date: str):

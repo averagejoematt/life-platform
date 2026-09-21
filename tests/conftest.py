@@ -738,6 +738,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # verifying) and a clause weakened with no owner-signed line. Both are
         # reviewable in the PR and pointless after the merge.
         "test_anchor_freeze_3607.py",
+        # #3760: an rglob sweep of site/** + scripts/** asserting the private progress
+        # viewer's route appears in no shipped byte, no sitemap/feed/redirects map, and no
+        # QA-manifest page entry — plus the edge behaviour and the two IAM grants that make
+        # it a presign-only read. Pure repo shape, and it must red BEFORE the merge for the
+        # reason the route exists: a nav partial or a sitemap generator that starts emitting
+        # `/progress-photos/` is introduced by a PR's own diff, and once merged it is a
+        # crawler-visible link to Matthew's body photographs that nothing else would notice.
+        "test_progress_viewer_privacy_3760.py",
     }
 )
 

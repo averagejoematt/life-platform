@@ -353,6 +353,55 @@ class WebStack(Stack):
 
         subscriber_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", subscriber_url.url))
 
+        # ══════════════════════════════════════════════════════════════
+        # Progress-photo viewer Lambda — #3760 (epic #3743)
+        # The owner-only page behind a one-time Telegram link. Its own function, its own
+        # role, its own origin — because #3757 ruled that NO `site_api*` role may name
+        # `raw/`, and presigning a photo requires GetObject on exactly that prefix. Folding
+        # this into the site-api would have handed the public read path (~134 anonymous
+        # endpoints) a route into the raw zone.
+        #
+        # Defined HERE, in us-east-1, rather than in LifePlatformServe beside the site-api:
+        # the CloudFront behaviour below needs this function's URL domain, and an in-stack
+        # `add_function_url()` resolves it directly. A us-west-2 function would have to
+        # travel through a `cdk.json` context value written by hand between two deploys —
+        # the same two-step the site-api origin still carries, and not one to reproduce.
+        # Its data clients are pinned to us-west-2 (S3_REGION below), the way
+        # email-subscriber's DYNAMODB_REGION already is.
+        # ══════════════════════════════════════════════════════════════
+        progress_viewer_fn = create_platform_lambda(
+            self,
+            "ProgressViewerLambda",
+            function_name="progress-viewer",
+            source_file="lambdas/web/progress_viewer_lambda.py",
+            handler="web.progress_viewer_lambda.lambda_handler",
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            custom_policies=rp.progress_viewer(),
+            # One page: a handful of cross-region DDB queries plus N presign calls (presigning
+            # is local signing, not an API call). 15s is headroom over that, not a budget.
+            timeout_seconds=15,
+            memory_mb=512,
+            environment={
+                "USER_ID": "matthew",
+                "TABLE_NAME": TABLE_NAME,
+                "S3_BUCKET": BUCKET,
+                "S3_REGION": "us-west-2",  # where the bucket, the table and the secret are
+                "DYNAMODB_REGION": "us-west-2",
+                "PROGRESS_SIGNING_SECRET_NAME": "life-platform/progress-photos-signing",
+                "SITE_API_ORIGIN_SECRET": site_api_origin_secret,  # SEC-04: 403 a direct Function-URL hit
+            },
+        )
+
+        progress_viewer_url = progress_viewer_fn.add_function_url(
+            # NONE like every other origin here — the guard is the X-AMJ-Origin header the
+            # distribution injects (SEC-04), checked in the handler before any data call.
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+        )
+        progress_viewer_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", progress_viewer_url.url))
+
         # Viral defence note: Reserved concurrency removed — us-east-1 account
         # concurrency headroom is limited (cf-auth Lambda@Edge functions already
         # consume reserved slots). Primary defence is CloudFront TTL caching
@@ -630,6 +679,25 @@ class WebStack(Stack):
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=subscriber_url_domain,
                         id="SubscriberLambdaOrigin",
+                        custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
+                            http_port=80,
+                            https_port=443,
+                            origin_protocol_policy="https-only",
+                            origin_ssl_protocols=["TLSv1.2"],
+                        ),
+                        origin_custom_headers=[
+                            cloudfront.CfnDistribution.OriginCustomHeaderProperty(
+                                header_name=SITE_API_ORIGIN_HEADER_NAME,
+                                header_value=site_api_origin_secret,
+                            )
+                        ],
+                    ),
+                    # Origin 7: progress-viewer Lambda Function URL (#3760, private page).
+                    # Same X-AMJ-Origin guard header as every other Lambda origin here — the
+                    # handler 403s a request that did not arrive through this distribution.
+                    cloudfront.CfnDistribution.OriginProperty(
+                        domain_name=progress_viewer_url_domain,
+                        id="ProgressViewerOrigin",
                         custom_origin_config=cloudfront.CfnDistribution.CustomOriginConfigProperty(
                             http_port=80,
                             https_port=443,
@@ -1045,6 +1113,28 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # #3760: /progress-photos* — the PRIVATE viewer, its OWN Lambda origin.
+                    # Ahead of /api/* only for readability; the patterns do not overlap.
+                    #
+                    # This behaviour exists so a private PAGE can be served without a private
+                    # object under site/ — every byte there is anonymously readable at the S3
+                    # origin (#3741's lesson), so the page is Lambda-rendered behind a signed
+                    # cookie instead. Nothing is cached (TTL 0/0/0) and the cookie is named in
+                    # the cache policy so CloudFront does not strip the Set-Cookie that the
+                    # one-time link exchange depends on.
+                    #
+                    # NOT linked from any nav, sitemap, RSS or the redirects map, and not in
+                    # the QA page registry — tests/test_progress_viewer_privacy_3760.py is
+                    # what keeps that true rather than this comment.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/progress-photos*",
+                        target_origin_id="ProgressViewerOrigin",
+                        viewer_protocol_policy="https-only",
+                        cache_policy_id=_api_pol["private_no_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_private"].origin_request_policy_id,
+                        allowed_methods=["GET", "HEAD", "OPTIONS"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     # /api/* — site-api Lambda (all methods, query strings forwarded).
                     # POST endpoints (nudge, vote, follow, submit_finding) need POST.
                     # GET endpoints (experiment_detail) need query_string=True.
@@ -1192,8 +1282,30 @@ class WebStack(Stack):
         # #2829: the rest of the us-east-1 alarm estate (adopted orphans + this alarm's
         # missing action) lives in the sibling module — see web_alarms.py's docstring
         # for the full per-alarm disposition.
+        # #3760: the private progress viewer's error alarm. It has no `schedule=`, so the
+        # heartbeat ledger structurally cannot see it (the og-image reasoning immediately
+        # above, same class) — and its silence would be especially quiet: the one person who
+        # would notice a broken viewer only opens it when he asks for a link, which is the
+        # definition of a surface that can be dark for weeks.
+        progress_viewer_errors_alarm = cloudwatch.Alarm(
+            self,
+            "ProgressViewerErrors",
+            alarm_name="progress-viewer-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "progress-viewer"},
+                period=Duration.minutes(5),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+
         # #3161/test_web_alarms_2829.py: positional, not keyword — the delegation guard
         # (_alarm_action_status in tests/test_web_alarms_2829.py) only recognizes a
         # variable passed via `stmt.value.args` (positional) as "routed elsewhere"; a
         # keyword arg reads as an unrouted bare alarm construct.
-        add_web_alarms(self, subscriber_errors_alarm, og_image_errors_alarm)
+        add_web_alarms(self, subscriber_errors_alarm, og_image_errors_alarm, progress_viewer_errors_alarm)

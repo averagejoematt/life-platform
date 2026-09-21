@@ -609,6 +609,11 @@ _PK_RULES: list = [
     (lambda pk, sk: pk.startswith("CANARY#"), SYSTEM_STATE),  # synthetic-monitor state (canary_lambda)
     (lambda pk, sk: pk.startswith("SYSTEM#"), SYSTEM_STATE),  # ops namespace (SYSTEM#dlq-ledger)
     (lambda pk, sk: pk.startswith("OAUTH#"), SYSTEM_STATE),  # TTL'd MCP auth codes + session bearers (#779/#909)
+    # #3760: one-time viewer-link nonces (PROGRESS_LINK#<nonce>). Spent-token exhaust with a
+    # TTL, exactly the OAUTH#/BOARDSESS# shape — the PHOTOS are CROSS_PHASE (see the
+    # progress_photos source ruling above), but the thing that proves a link was already
+    # redeemed is auth state and carries nothing about the experiment.
+    (lambda pk, sk: pk.startswith("PROGRESS_LINK#"), SYSTEM_STATE),
     # Narrator persona state for personas OTHER than Elena (PERSONA#margaret editor
     # state, etc.). Durable narrative identity that deliberately spans cycles — this
     # classification preserves the de-facto behavior (never touched); wiping these

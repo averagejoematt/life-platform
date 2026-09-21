@@ -147,6 +147,15 @@ _DYNAMIC_REFERENCES: dict[str, str] = {
     "secret:lambdas.ingestion.health_auto_export_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
     "secret:lambdas.ingestion.ingestion_framework.run_ingestion": "SIMP-2 reads the id from the source registry facet",
     "secret:lambdas.ingestion.notion_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
+    # #3760: both surfaced when `progress-viewer` joined the fleet — this sweep's population
+    # IS the create_platform_lambda call sites, so `site_api_common._cached_secret` had been
+    # the same unparseable wrapper all along and was simply not yet reachable from a swept
+    # construction (the #2846 HAE shape, one row up). Neither hides anything from the
+    # lockstep in practice: both ids resolve to `life-platform/progress-photos-signing`,
+    # which IS a literal — in `privacy/progress_access.DEFAULT_SECRET_NAME`, granted by name
+    # to exactly two roles and pinned by tests/test_secret_references.py.
+    "secret:lambdas.coach.telegram_worker_lambda._progress_signing_secret": "secret id is env-or-constant inside the local wrapper (#3760)",
+    "secret:lambdas.web.site_api_common._cached_secret": "secret id is a parameter of the shared cache wrapper (#3760 made it reachable)",
     "secret:mcp.core.get_api_key": "id from env (MCP_API_KEY_SECRET)",
     "secret:lambdas.operational.key_rotator_lambda.create_secret": "rotation Lambda — the id IS the event payload",
     "secret:lambdas.operational.key_rotator_lambda.test_secret": "rotation Lambda — the id IS the event payload",

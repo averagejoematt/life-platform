@@ -87,6 +87,35 @@ check_status() {
   fi
 }
 
+# #3760: a private route. The assertion is NOT "some status" — it is "anonymous never gets
+# 200, and the status is one the private route is allowed to answer". Written as a set rather
+# than a single code on purpose: the site-api answers 401, but before the CloudFront behaviour
+# is deployed the edge answers 403/404 from the S3 default, and a check that red-lined on THAT
+# would fail the deploy that ships the page rather than the one that leaks it. The property
+# that actually matters — a 200 body to a stranger — is caught either way.
+_probe_private() {
+  local url="$1" allowed="$2"
+  PROBE_GOT=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+  [[ "$PROBE_GOT" != "200" ]] && [[ ",$allowed," == *",$PROBE_GOT,"* ]]
+}
+
+check_private() {
+  local label="$1"
+  local url="$2"
+  local allowed="$3"
+  CURRENT_CHECK="$label ($url)"
+  if _probe_private "$url" "$allowed"; then
+    echo "  ✅ $label — anonymous got $PROBE_GOT"
+    PASS=$((PASS + 1))
+  elif smoke_confirm _probe_private "$url" "$allowed"; then
+    echo "  ⟳ $label — transient on first probe, clean on confirm (#2978)"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $label — anonymous got $PROBE_GOT, expected one of $allowed (never 200) ($url)"
+    smoke_record_fail "$label — anonymous got $PROBE_GOT, expected one of $allowed (never 200)"
+  fi
+}
+
 # 301 + exact Location target (single hop — the destination must be final, never
 # another redirect source). Added for #1108 (/now/ -> /cockpit/).
 _probe_redirect() {
@@ -196,6 +225,23 @@ fi
 # a genuinely missing page must 404 at the origin directly, not via a redirect hop.
 check_status "404 page"             "$BASE/nonexistent-page-xyz/" "404"
 check_status "www redirect"         "https://www.averagejoematt.com/" "200"
+echo ""
+
+# ── Private routes (#3760) — anonymous must NEVER get 200 ─────────────────────
+# Derived from tests/qa_manifest.PRIVATE_ROUTES, the same registry the page sweep above
+# derives from, so a second private route joins this sweep by existing rather than by
+# somebody remembering this file.
+SMOKE_SURFACE="infra"  # the gate is the site-api + a CloudFront behaviour; no site/** revert repairs it
+echo "── Private routes (anonymous, expect a refusal) ──────────"
+if PRIVATE_ROWS=$(python3 "$QA_MANIFEST" --emit private); then
+  while IFS='|' read -r priv_path priv_codes _priv_reason; do
+    [[ -z "$priv_path" ]] && continue
+    check_private "private $priv_path" "$BASE$priv_path" "$priv_codes"
+  done <<< "$PRIVATE_ROWS"
+else
+  echo "  ❌ qa_manifest private emit failed — private-route sweep did not run"
+  smoke_record_fail "qa_manifest private emit failed — private-route sweep did not run"
+fi
 echo ""
 
 # ── Legacy v3 URLs → 301 (the v4-redirects CloudFront fn) ──────────────────────

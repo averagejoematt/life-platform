@@ -340,6 +340,12 @@
       "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL \u2014 wired to API Gateway /api/subscribe.",
       "stack": "LifePlatformWeb"
     },
+    "lambdas/web/progress_viewer_lambda.py": {
+      "function": "progress-viewer",
+      "region": "us-east-1",
+      "note": "#3760 the owner-only progress-photo viewer \u2014 one path (/progress-photos/) behind a one-time Telegram link + signed cookie. Defined in LifePlatformWeb (us-east-1) so its Function URL domain resolves in the stack that builds the CloudFront behaviour; its data clients are pinned to us-west-2.",
+      "stack": "LifePlatformWeb"
+    },
     "lambdas/web/og_image_lambda.py": {
       "function": "og-image-generator"
     },

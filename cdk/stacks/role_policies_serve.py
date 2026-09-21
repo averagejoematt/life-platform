@@ -184,6 +184,63 @@ def site_api() -> list[iam.PolicyStatement]:
     ]
 
 
+def progress_viewer() -> list[iam.PolicyStatement]:
+    """Progress-photo viewer Lambda (#3760, epic #3743) — the ONE role that may read the photos.
+
+    Deliberately NOT folded into `site_api()`. #3757 ruled that no `site_api*` role may name
+    `raw/` at all, and `tests/test_progress_photos_registration_3757.py` enforces it: the
+    public read path answers ~134 anonymous endpoints, and giving it `GetObject` on the raw
+    zone would make every one of those endpoints a potential path to a body photograph. The
+    honest way past a gate that says no is a narrower principal, not a wider gate.
+
+    Four statements, and each one is the minimum that makes a page render:
+
+      * **DDB read** — the photo index (`USER#matthew#SOURCE#progress_photos`), plus the
+        `withings` and `measurements` partitions the weight/tape figures come from. Read-only.
+      * **DDB write, LeadingKeys `PROGRESS_LINK#*`** — the one-time link nonce, and nothing
+        else on the table. This single conditional put is what makes a link single-use; the
+        rows are TTL'd auth exhaust (SYSTEM_STATE in `phase_taxonomy`).
+      * **S3 GetObject on the photo prefix** — for PRESIGNING. No `ListBucket` (the DDB index
+        is the enumeration; a list grant would let a bug walk the prefix), no Put, no Delete.
+        `telegram_worker` holds the matching PutObject and neither role holds both.
+      * **The signing secret** — its own key, never the subscriber/ritual one.
+
+    No Bedrock, no SSM, no CloudWatch reads, no cost APIs: this function renders one page.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDBRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DynamoDBLinkNonceWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["PROGRESS_LINK#*"],
+                },
+            },
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3ProgressPhotoRead",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/raw/matthew/progress_photos/*"],
+        ),
+        iam.PolicyStatement(
+            sid="ProgressPhotoSigningSecret",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/progress-photos-signing")],
+        ),
+    ]
+
+
 def site_api_ai() -> list[iam.PolicyStatement]:
     """Site API AI Lambda: read-only DDB + S3 config + Secrets Manager for AI endpoints.
 
@@ -788,6 +845,15 @@ def telegram_worker() -> list[iam.PolicyStatement]:
             sid="TelegramSecretRead",
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/telegram"), _secret_arn("life-platform/google-tts")],  # google-tts: voice notes (#2494)
+        ),
+        iam.PolicyStatement(
+            # #3760: the same viewer signing key the site-api reads. The worker MINTS links
+            # with it and never verifies one; the site-api verifies and never mints. Read-only
+            # on both sides — the asymmetry is in the code, not in the grant, because there is
+            # no IAM action that distinguishes signing from verifying an HMAC.
+            sid="ProgressPhotoSigningSecret",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/progress-photos-signing")],
         ),
         iam.PolicyStatement(
             sid="SSMRead",

@@ -410,6 +410,7 @@ The count and the table below must agree, and the count's `live-verified` stamp 
 | `life-platform/site-api-origin-secret` | CloudFront ↔ site-api origin verification header (CDK-injected) |
 | `life-platform/subscriber-token-secret` | Site API — HMAC signing for subscriber tokens |
 | `life-platform/ritual-token-secret` | Site API + `evening-nudge` — HMAC signing for ritual links |
+| `life-platform/progress-photos-signing` | `progress-viewer` + `telegram-coach-worker` — HMAC signing for the private progress-photo link + session cookie (#3760) |
 | `life-platform/github-dispatch-token` | `life-platform-remediation-dispatcher` — repo-scoped PAT |
 | `life-platform/github-billing` | `deploy/sentinel_quota.py` — Actions-minutes quota probe (user-scoped PAT) |
 | `life-platform/google-tts` | Podcast pipeline — TTS credentials (ADR-087) |

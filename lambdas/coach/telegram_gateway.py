@@ -232,6 +232,11 @@ def route(event: dict, *, secret: Optional[str], routing: dict, allowed_chat_ids
     return {
         "coach_id": coach_id,
         "chat_id": chat_id,
+        # #3760: the bot key travels on the TEXT order too, not just the capture order. Only
+        # the gateway knows which bot the webhook hit, and `/progress view` has the same
+        # one-bot rule a capture does — without this the worker would have to infer it from
+        # the coach id, which is a mapping that can change under it.
+        "bot_key": bot_key,
         "text": message.get("text") or "",
         "message_id": message.get("message_id"),
         "is_group": str(((message.get("chat") or {}).get("type") or "")).endswith("group"),

@@ -858,7 +858,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # {123, 540, 6, 5}. Exactly {structural::test_scoped_writer_provenance_guard_3599.py} enters, {} leaves — unproven does NOT move.
         # Upper bound 124 -> 125 (2026-09-21, #3621 boxes 2+5 re-merged onto main AFTER #4019): structural::test_protocol_lever_contract_3621.py
         # arrives proven (STRUCTURAL_HAND_PROOFS); MEASURED on the merged tree by this test (`proven verdicts n=125`), not carried from the lane's 124.
-        <= 125
+        # Upper bound 125 -> 126 (2026-09-21, #3760): structural::test_progress_viewer_privacy_3760.py arrives PROVEN via the re-runnable
+        # harness (MutationSpec in scripts/gate_census_mutations.py, ARMED 1/1 — an untracked site/_census_probe_3760.html linking the
+        # owner-only viewer: baseline 16 passed, mutated 1 failed :: test_no_site_file_mentions_the_route, reverted 16 passed). MEASURED by
+        # id-set diff, never by arithmetic: this lane -> 677 rows {proven 126, unproven 540, not-applicable 6, attempted-unproven 5}; a
+        # disposable `git archive origin/main` export -> 676 {125, 540, 6, 5}. Exactly {structural::test_progress_viewer_privacy_3760.py}
+        # enters, {} leaves — unproven does NOT move.
+        <= 126
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
