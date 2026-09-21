@@ -352,6 +352,19 @@ _HEVY_WORKED_SET_REASON = (
     "sides cannot disagree silently."
 )
 
+_WHOOP_HISTORY_READ_REASON = (
+    "#4025: a READ-ONLY, fail-soft consumer (resolve_vitals_history). It reads four named whoop daily fields "
+    "(recovery_score, hrv, resting_heart_rate, sleep_duration_hours) through dict.get() only — never [] indexing "
+    "— and wraps the whole DDB call in a bare except that returns None. VERIFIED, not assumed: a writer-side field "
+    "rename or shape drift just makes that metric's per-day entry absent from the returned history dict, which "
+    "routes assess_cross_surface_vitals's dated-citation exemption to 'no matching day' — the pre-#4025 STRICT "
+    "compare, byte-identical to today's behaviour. So the two sides cannot disagree SILENTLY: the worst case a "
+    "shape drift causes is the exemption going dark (a stale citation still correctly FAILs), never a coach's "
+    "wrong number being wrongly forgiven. Pinned by "
+    "tests/test_cross_surface_vitals_dated_citation_4025.py::test_resolve_vitals_history_parses_the_real_whoop_field_names "
+    "and its fail-soft/mutation-control siblings in the same file."
+)
+
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     # #3900 (2026-09-20): the writer gained a write-time `phase`/`cycle` stamp via
@@ -412,6 +425,14 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     "hevy::mcp/tools_nutrition.py::read": (
         "2026-09-20",
         _HEVY_WORKED_SET_REASON,
+    ),
+    # #4025 (2026-09-21): weight_truth_qa.checks() gained an optional `table=` param so
+    # the nightly's already-instantiated DDB Table is reused to resolve trailing Whoop
+    # history — the fix for a coach narrating a PAST reading BY DATE (e.g. "the 97%
+    # recovery reading on September 18th") being judged as a claim about TODAY.
+    "whoop::lambdas/operational/weight_truth_qa.py::read": (
+        "2026-09-21",
+        _WHOOP_HISTORY_READ_REASON,
     ),
 }
 
