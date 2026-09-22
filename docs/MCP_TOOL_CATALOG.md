@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-21
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-22
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-21 | **Total tools:** 84
+**Version:** v8.6.0 | **Last updated:** 2026-09-22 | **Total tools:** 84
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -116,7 +116,7 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_exercise_history` | exercise_name=, template_id=, start_date=, end_date=, include_warmups= | Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, the note written on it, per-session volume, PR chronology and estimated-1RM trend. Pass an exact Hevy `template_id` (preferred — stable) or a fuzzy `exercise_name`. No default lookback AND no phase filter (#4030): it answers from the whole history back to 2021, across every experiment cycle, with the superseded legacy daily-aggregate generation excluded so nothing is double-counted. Every answer — including an empty one — carries a `searched` block naming the window, the phases actually read and the number of workouts read, so 'no sets found' can never be read as 'never done'. Use for: 'have I done leg extensions before?', 'what did I last squat?', 'how has my bench progressed?', 'what loads did I use at this bodyweight?' — and as the pre-flight pull before prescribing a load on any movement. This reads raw Hevy; `get_exercise_notes` reads the DERIVED note-signal layer built from it. Zero notes there with sessions here means he logged the work and wrote nothing about it — never that the work is absent. The summary is always scoped to ONE `template_id` (#3932): `exercise_name` is a substring match, so 'bench press' matches both 'Bench Press (Barbell)' and 'Bench Press (Incline Dumbbell)' — different movements, never folded into one series. When a fuzzy name resolves to more than one template_id, this returns `ambiguous: true` with a `candidates` list and one `results` summary per movement instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly. |
-| `get_muscle_volume` | start_date=, end_date=, period= | Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?' |
+| `get_muscle_volume` | start_date=, end_date=, period= | Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Counts every set in the window across EVERY experiment cycle (#4031 — no phase filter; the superseded legacy daily-aggregate generation is excluded so nothing is double-counted), so a trailing window no longer truncates to the current cycle's age. Default window is the trailing 28 days (4 whole weeks) for period='week' and 90 days for period='month' — a rate needs a window it can be a rate over; pass start_date/end_date to choose your own. The answer echoes what it did in `searched`: the window, whether that window was yours or the default, and the phases read. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?' |
 
 ### Nutrition (`mcp/tools_nutrition.py`)
 

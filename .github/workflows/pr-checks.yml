@@ -71,7 +71,14 @@ jobs:
     # of PR #4007's job completed every step green in 19m55s and was still rendered
     # `cancelled`. The lane grew (11,177 premerge tests; the pre-merge step alone is
     # ~15.5min on the runner) — the ceiling followed the measurement, not the other way.
-    timeout-minutes: 22
+    # 22 -> 26 (2026-09-22, session AQ, the #3678 recurrence again — the third re-derivation in
+    # five days): `scripts/check_job_timeout_headroom.py` read RED at 22 — p95 of the trailing 28
+    # runs' genuine completions = 21.42min (n=23 genuine / 28) x 1.2 = 25.7min required. PR #4042's
+    # job ran every step green and was killed at 22m00s (`lane-wallclock 1401s`). The lane grew
+    # again (11,553 premerge tests after #4023/#4028/#4033/#4039). Ceiling follows the measurement;
+    # the growth itself is epic #3493's line — the lane has no budget, and the next red here is a
+    # split, not a fourth raise.
+    timeout-minutes: 26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

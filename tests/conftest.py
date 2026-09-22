@@ -296,6 +296,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # impossibility check that would otherwise catch it (it publishes an "unverified"
         # target instead of refusing).
         "test_energy_budget_cross_phase_4032.py",
+        # #4031: the same cross-cycle read one tool over — and here the truncated number IS a
+        # prescription. `get_muscle_volume` read SOURCE#hevy through the ADR-058 phase filter, so
+        # every trailing window silently shrank to the cycle's AGE, and what shrank is
+        # `volume_landmark_status` ("below maintenance" / "optimal" / "exceeding MRV – overtraining
+        # risk"). Same file also defaulted the window to 2000-01-01 and divided by it (~1,380
+        # weeks -> ~0.0 sets/wk -> "below maintenance" everywhere). Pre-merge because the failure
+        # is INVISIBLE after the merge: a well-formed, confident verdict with no error anywhere,
+        # consumed by `plan_next_session` and the routine-authoring freshness gate. The fake table
+        # IS the wire and the mutation arm restores the filter.
+        "test_muscle_volume_cross_phase_4031.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the
@@ -323,6 +333,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_grounding_sets_3614.py",
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
         "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
+        # #3913: two AST sweeps — lambdas/ingestion/ for the modules that DERIVE a UTC calendar
+        # day (a Zulu fetch window, an astimezone-then-day cast), each of which must carry an
+        # EXPLICIT day_key_frame on its registry entry; and lambdas/ + mcp/ for any function that
+        # hand-anchors a YYYY-MM-DD day with a literal tzinfo and then measures a duration from it.
+        # Pure repo shape, and pre-merge because the failure it catches is INVISIBLE after the
+        # merge: an undeclared frame reads as the "pacific" default at every call site and the only
+        # symptom is a freshness age off by exactly 7h/8h — whoop carried it for months, and the
+        # third consumer this sweep found (site_api_status) survived two separate fixes of "the
+        # two consumers" because both were applied to a remembered list.
+        "test_day_key_frame_declaration_guard_3913.py",
         # #3559: AST sweep of lambdas/ — every reader-input capture door keys through
         # web.site_api_capture_store.capture_key(), whose prefix is derived-not-public
         # against deploy/bucket_policy.json. A door minting its own `generated/` key must
