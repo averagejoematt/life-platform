@@ -106,6 +106,40 @@ def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
     return week_cfg["schedule"][str(dow)]["archetype"]
 
 
+def _schedule_entry_for_date(target_date: str, week_cfg: dict[str, Any]) -> dict[str, Any]:
+    """The whole schedule entry for the day. #3755 v0.3: the module grid carries two keys the
+    JSON grid never had — `session_role` (heavy / moderate / heavy_moderate / optional_fourth)
+    and `optional` (the fourth full-body day, gated on two green recovery days). They ride on
+    the rationale and the title so the flag reaches the pushed routine; nothing is gated on
+    them here — the program reports, the owner decides."""
+    dow = date.fromisoformat(target_date).weekday()
+    return dict(week_cfg["schedule"].get(str(dow)) or {})
+
+
+def _trim_budgets_to_ceiling(budgets: dict[str, int], ceiling: int) -> dict[str, int]:
+    """Scale per-muscle set budgets so their sum fits `session_set_ceiling` (#3755 v0.3).
+
+    Six landmark muscles on a full-body day ask for ~23 sets at MEV//2 each; the v0.3 grid
+    caps a session at 18. Before this the ceiling was ASSERTED after selection (the
+    `BUG: total_sets > cap` line below), which is a crash in a Lambda, not a program. The
+    trim is proportional and deterministic: floor each share, then hand the remainder out
+    by largest fractional part, ties in target order. A budget of 0 stays 0.
+    """
+    total = sum(budgets.values())
+    if ceiling <= 0 or total <= ceiling:
+        return dict(budgets)
+    scaled: dict[str, int] = {}
+    fractions: list[tuple[float, int, str]] = []
+    for order, (muscle, b) in enumerate(budgets.items()):
+        exact = b * ceiling / total
+        scaled[muscle] = int(exact)
+        fractions.append((exact - int(exact), -order, muscle))
+    remainder = ceiling - sum(scaled.values())
+    for _frac, _neg_order, muscle in sorted(fractions, reverse=True)[: max(0, remainder)]:
+        scaled[muscle] += 1
+    return scaled
+
+
 def _seeded_random(target_date: str, variant: str) -> random.Random:
     return random.Random(f"{target_date}:{variant}")
 
@@ -683,6 +717,11 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     rationale: list[str] = []
     rationale.append(f"week grid source={resolved_week.source} ({resolved_week.detail})")
     rationale.append(f"archetype={archetype}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})")
+    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg)
+    if day_entry.get("session_role"):
+        rationale.append(f"session_role={day_entry['session_role']}")
+    if day_entry.get("optional"):
+        rationale.append(f"OPTIONAL session — {day_entry.get('gate') or 'not required this week'}")
     if not z2_ok:
         rationale.append(f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {week_cfg['z2_floor_minutes']}; portfolio guard active")
 
@@ -740,10 +779,19 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         except Exception as e:
             logger.warning(f"whoop workout index load failed (cardio cue loses HR-at-level): {e}")
 
+    budgets: dict[str, int] = {}
     for muscle in targets:
         budget = _muscle_budget(muscle, landmarks, week_cfg, inputs.volume_7d, autoreg, inputs.add_load_enabled)
         if not z2_ok:
             budget = min(budget, landmarks["muscles"][muscle]["MEV"] // 2)
+        budgets[muscle] = max(0, budget)
+    trimmed = _trim_budgets_to_ceiling(budgets, int(week_cfg["session_set_ceiling"]))
+    if trimmed != budgets:
+        rationale.append(
+            f"session_set_ceiling {week_cfg['session_set_ceiling']}: budgets trimmed {sum(budgets.values())} -> {sum(trimmed.values())} sets"
+        )
+    for muscle in targets:
+        budget = trimmed[muscle]
         if budget <= 0:
             continue
         picks = _select_movements_for_muscle(
@@ -802,7 +850,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         target_date=inputs.target_date,
         archetype=archetype,
         variant="ideal",
-        title=f"{archetype.title()} — {inputs.target_date}",
+        title=f"{archetype.title()} — {inputs.target_date}" + (" (optional)" if day_entry.get("optional") else ""),
         notes="\n".join(rationale[:6]),
         version=1,
         created_at=_now_iso(),

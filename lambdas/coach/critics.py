@@ -39,9 +39,9 @@ anyone reads a verdict off it.
 WHERE THE REDLINES COME FROM
 
 Two sources, and the provenance rides on every flag:
-  * `training.owner_redlines` (#3753) — PROPOSED until the owner signs it; its tripwires
-    produce `change`, never `veto`, while `ACTIVE` is False (a plan may not be refused on a
-    rule he has not yet signed);
+  * `training.owner_redlines` (#3753) — ACTIVE since the owner approved v3 on 2026-09-21; its
+    tripwires produce `change`, never `veto`, whenever `ACTIVE` is False (a plan may not be
+    refused on a rule he has not signed);
   * the owner's private calibration doc, §4 "NEVER (regardless of motivation)" — his own
     words, edited by him, so these ARE vetoes. They are paraphrased here, not quoted: the
     doc is owner-private (#3043) and this file ships in a public repo.

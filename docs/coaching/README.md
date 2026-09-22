@@ -1,6 +1,6 @@
 # `docs/coaching/` — what lives here, and what deliberately does not
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-23 (#3043, DIL-001)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-21 (#3753/#3755 v0.3 flip; #3043, DIL-001)
 
 This repo is **deliberately public** (since 2026-07-20). Owner-private coaching
 material therefore does not live in this directory — or anywhere in the tree.
@@ -13,15 +13,21 @@ prefix, owner-credential access only). Relocated there 2026-08-23 (#3043):
 
 - `PROVEN_BLUEPRINT.md` — the empirical anchor (owner's own history, mined)
 - `TRAINING_CALIBRATION.md` — how the coach calibrates the owner
-- `TRAINING_PROGRAM.md` — the current plan, in prose. **The machine-readable half is
-  `lambdas/training/program_structure.py`** (#3755): the anchors, the rotating accessory
-  pool, the rotation rule and the v0.2 week grid as data the engine reads, plus the
-  computed `accessory_rotation` check that `plan_engine.constraint_block` reports. It ships
-  in the Lambda bundle because `config/*.json` does not (#3675). Both readers of the week
-  grid go through one seam, `training.program_seam.resolve_week_grid`, which serves the live
-  `config/training_week.json` until `program_structure.ACTIVE` flips — **PROPOSED and
-  UNAPPROVED** (`gate:owner`, #3755) until the owner reviews v0.2 and sets `ACTIVE = True`
-  with a review date.
+- `TRAINING_PROGRAM_v0.3.md` — the current plan, in prose (**v0.3, owner-approved
+  2026-09-21**, #3753/#3755; its red-team record is `TRAINING_PROGRAM_v0.3_redteam.md`;
+  `TRAINING_PROGRAM.md` is the unapproved v0.2 and `TRAINING_PROGRAM_v0.1_2026-09-19.md` the
+  original draft). **The machine-readable half is two bundled modules:**
+  `lambdas/training/owner_redlines.py` (v3.0 — the §6 redlines and §7 tripwires, provenance
+  on each; `landing()` is the §8 block) and `lambdas/training/program_structure.py` (v0.3 —
+  three full-body sessions + an optional fourth, six anchor patterns 2x/wk, trap bar until
+  275 lb, loads that hold, accessories fixed for the block, and the week grid as data the
+  engine reads, plus the computed accessory-drift check that `plan_engine.constraint_block`
+  reports). They ship in the Lambda bundle because `config/*.json` does not (#3675). Both
+  readers of the week grid go through one seam, `training.program_seam.resolve_week_grid`,
+  which serves the module's grid now that `program_structure.ACTIVE` is True (with the
+  review date) and would fall back to the live `config/training_week.json` if it were
+  flipped off. The owner's 2026-09-19 PPL ruling on #3755 is superseded by his 2026-09-21
+  approval; `SPLIT_DECISION` records both dates.
 - `TRAINING_CONTEXT.md` — standing injury + equipment constraints, each dated (#3715).
   **Not yet uploaded** (no AWS write access from this agent) — render it from the
   registry with `python3 scripts/render_training_context_md.py`, then pipe to
