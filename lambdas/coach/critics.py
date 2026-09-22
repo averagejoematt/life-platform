@@ -58,9 +58,9 @@ import json
 import re
 from typing import Any, Callable
 
-from training import owner_redlines
+from training import owner_redlines, training_context_registry
 
-CRITICS_VERSION = "critics@1.0.0"
+CRITICS_VERSION = "critics@1.1.0"  # #4036: the joints packet reads the owner-dismissal layer
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
@@ -238,11 +238,20 @@ def build_joints_packet(
     days_since_by_idx: dict[int, int | None] | None,
     consecutive_days: int | None,
     pain_layer_status: str | None,
+    dismissals: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Pain flags on the draft's movements, novelty, and where he is in the week.
 
     Carries the ONLY vetoes a critic can issue without the owner having signed #3753: the
-    calibration doc's own §4 rules, which are his."""
+    calibration doc's own §4 rules, which are his.
+
+    `dismissals` (#4036) are the owner-dismissal records the caller read from
+    `USER#matthew#SOURCE#training_constraints`. A flag instance he has dismissed does NOT
+    produce the `pain_flag_loaded` veto — the §4 redline is his rule, and so is the
+    dismissal; the packet still carries the flag and says who overrode it, because the
+    critic must argue from what happened, not from a cleaned-up version of it. A note dated
+    AFTER the dismissal re-arms the veto on its own (`training_context_registry`, one rule,
+    shared with `plan_engine`)."""
     numbers: dict[str, Any] = {"consecutive_training_days": consecutive_days, "pain_layer_status": pain_layer_status}
     flags: list[dict[str, Any]] = []
     violations: list[dict[str, Any]] = []
@@ -260,6 +269,7 @@ def build_joints_packet(
             )
         )
     heavy_axial_cold: list[dict[str, Any]] = []
+    dismissed_rows: list[dict[str, Any]] = []  # #4036 — every owner dismissal this packet met
     for ex in draft["exercises"]:
         i = ex["idx"]
         ds = (days_since_by_idx or {}).get(i, None)
@@ -298,11 +308,28 @@ def build_joints_packet(
             numbers[pk] = bool(pain.get("pain_flag_any"))
             if pain.get("pain_flag_any"):
                 dates = pain.get("pain_dates") or []
+                # #4036: did the owner dismiss THIS instance, and does the dismissal still hold?
+                res = training_context_registry.resolve_flag(movement=ex["label"], note_dates=dates, dismissals=dismissals)
+                if res is not None:
+                    dismissed_rows.append({**res, "idx": i})
+                    numbers[f"pain_dismissed[{i}]"] = bool(res.get("dismissed"))
+                if res is not None and res.get("dismissed"):
+                    # No flag and no violation on a dismissed instance — deliberately. A `flags`
+                    # entry here would be an escalation handle: `reconcile` lets the model raise
+                    # info -> change on any metric the packet flags, so "carried but not objected
+                    # to" has to mean carried OUTSIDE `flags` (see `owner_dismissals` below).
+                    continue
+                reason = f"{ex['label']}: pain flag on {', '.join(dates[-2:]) or 'a recent session'} — {CALIBRATION_REDLINES['pain_flag_loaded']}"
+                if res is not None:
+                    # A dismissal exists but does not hold: re-armed by a later note, or
+                    # uncomparable because the flag carries no readable date. Either way the
+                    # veto stands AND says why the override did not save it (#4036).
+                    reason = f"{reason} [{res['detail']}]"
                 violations.append(
                     {
                         "redline": "pain_flag_loaded",
                         "metric": pk,
-                        "reason": f"{ex['label']}: pain flag on {', '.join(dates[-2:]) or 'a recent session'} — {CALIBRATION_REDLINES['pain_flag_loaded']}",
+                        "reason": reason,
                         "field": f"exercises[{i}].drop",
                         "to": True,
                     }
@@ -331,7 +358,16 @@ def build_joints_packet(
                 provenance="owner",
             )
         )
-    return {"critic": "joints_tendons", "numbers": numbers, "flags": flags, "unknown": unknown, "violations": violations}
+    return {
+        "critic": "joints_tendons",
+        "numbers": numbers,
+        "flags": flags,
+        "unknown": unknown,
+        "violations": violations,
+        # #4036 — carried on the packet so the verdict a human reads names the override and
+        # its date. An empty list means no dismissal was in play, never that none exist.
+        "owner_dismissals": dismissed_rows,
+    }
 
 
 def _walking_split_sentence(walking: dict[str, Any]) -> str:

@@ -274,6 +274,16 @@ SOURCE_CLASS: dict[str, str] = {
     # "calibration", it measures the PLATFORM's priors against the whole cross-cycle history —
     # wiping it at reset would un-earn every badge and destroy the only record of priors that
     # failed to confirm (/method/wrong publishes those as findings).
+    # #4036: owner dismissals of derived PAIN FLAGS (DISMISSAL#<site>#<YYYY-MM-DD>, written by
+    # mcp/tools_training_notes.py::tool_manage_pain_dismissals). Ruling 2026-09-21, ADR-077:
+    # CROSS_PHASE, not SYSTEM_STATE and not EXPERIMENT_SCOPED. It is Matthew's own statement
+    # about his BODY — the same class as "labs", "progress_photos" and "coach_corrections" —
+    # and it is the record that stops a stale flag benching a lift against his word. An
+    # experiment reset that wiped it would silently re-arm every site he has already said is
+    # resolved, at exactly the moment nobody remembers he said it; and unlike a derived
+    # score it cannot be recomputed from anything, because the input was a sentence he spoke
+    # once. NEVER tagged, never wiped, never phase-filtered.
+    "training_constraints": CROSS_PHASE,
     "coach_corrections": CROSS_PHASE,  # #1689 (epic #1687 "The Coach Correction Loop"): Matthew's
     # class-tagged corrections to weekly AI-review-pack items (`lambdas/coach_corrections.py`,
     # pk USER#matthew#SOURCE#coach_corrections / sk CORRECTION#<date>#<id8>). Same rationale as

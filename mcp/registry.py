@@ -65,6 +65,7 @@ from mcp.tools_descriptions import (
     GET_DUE_RECALLS_DESCRIPTION,
     GET_EXERCISE_HISTORY_DESCRIPTION,
     GET_EXERCISE_NOTES_DESCRIPTION,
+    GET_EXERCISE_NOTES_INPUT,
     GET_EXPERIMENT_CYCLE_DESCRIPTION,
     GET_EXPERIMENT_RESULTS_DESCRIPTION,
     GET_FIELD_NOTES_DESCRIPTION,
@@ -110,6 +111,8 @@ from mcp.tools_descriptions import (
     LOG_HABIT_REFLECTION_DESCRIPTION,
     MANAGE_DIARY_CLAIMS_DESCRIPTION,
     MANAGE_HEVY_ROUTINE_DESCRIPTION,
+    MANAGE_PAIN_DISMISSALS_DESCRIPTION,
+    MANAGE_PAIN_DISMISSALS_INPUT,
     MANAGE_READING_DESCRIPTION,
     MANAGE_SICK_DAYS_DESCRIPTION,
     MARK_JOURNAL_QUOTE_DESCRIPTION,
@@ -186,28 +189,30 @@ from mcp.tools_strength import tool_get_exercise_history, tool_get_muscle_volume
 from mcp.tools_surfaces import tool_describe_platform_surfaces, tool_get_platform_surface
 from mcp.tools_todoist import close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
-from mcp.tools_training_notes import tool_get_exercise_notes
+from mcp.tools_training_notes import tool_get_exercise_notes, tool_manage_pain_dismissals
 
 # Vacation fund tracker ($1/workout-mile since experiment start).
 
 TOOLS = {
+    # #4036 pays this module's #1665 ceiling the way #3891 did — by extraction, never by
+    # raising the ratchet: both parameter tables below live in the cohesive sibling
+    # mcp/tools_descriptions.py. The schema NAME stays here, which is what R3 reads.
     "get_exercise_notes": {
         "fn": tool_get_exercise_notes,
         "schema": {
             "name": "get_exercise_notes",
             "description": GET_EXERCISE_NOTES_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "exercise": {
-                        "type": "string",
-                        "description": "Exercise name (e.g. 'calf raise', 'cycling') — resolved to its Hevy template via recent workouts.",
-                    },
-                    "template_id": {"type": "string", "description": "Hevy exercise template id (hex or uuid). Alternative to 'exercise'."},
-                    "lookback_days": {"type": "integer", "description": "Days of history to include (default 180)."},
-                },
-                "required": [],
-            },
+            "inputSchema": GET_EXERCISE_NOTES_INPUT,
+        },
+    },
+    # #4036: the dismissal half of the note layer's own "confirm or dismiss before loading
+    # that movement". OWNER-ONLY — the record carries his verbatim words about his body.
+    "manage_pain_dismissals": {
+        "fn": tool_manage_pain_dismissals,
+        "schema": {
+            "name": "manage_pain_dismissals",
+            "description": MANAGE_PAIN_DISMISSALS_DESCRIPTION,
+            "inputSchema": MANAGE_PAIN_DISMISSALS_INPUT,
         },
     },
     "get_sources": {

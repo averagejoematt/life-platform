@@ -85,6 +85,19 @@ def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
     )
 
 
+def _pain_dismissals() -> list[dict[str, Any]]:
+    """The owner's pain-flag dismissals (#4036), read from the ONE store that holds them.
+
+    Read through `mcp.tools_training_notes` rather than re-querying the partition here: the
+    write and the read share a module, so a change to the key scheme cannot leave a second,
+    stale reader behind. A raise propagates — `_safe` turns it into None at the call site,
+    which the engine reports as "not read", never as "no dismissals".
+    """
+    from mcp.tools_training_notes import _dismissal_records
+
+    return _dismissal_records()
+
+
 def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | None]:
     """(window start, Hevy rows) for the program's trailing accessory-rotation window (#3755).
 
@@ -213,6 +226,11 @@ def tool_plan_next_session(args):
     except Exception:  # noqa: BLE001
         pass
 
+    # #4036: the owner-dismissal layer, read beside the flag layer. `_safe` yields None when
+    # the read RAISES — which is NOT an empty list: the engine must never read an unreadable
+    # dismissal store as "he has dismissed nothing".
+    dismissals = _safe(_pain_dismissals)
+
     evidence = _gather_draft_evidence(ir, target_date, layer_status) if ir is not None else None
     worst = _worst_anchor(evidence) if evidence else (None, None)
 
@@ -247,6 +265,14 @@ def tool_plan_next_session(args):
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],
         pain_flag_sites=([e["label"] for e in evidence["exercises"] if e.get("pain_flag_any")] if evidence else None),
+        # #4036: the flag's own note dates travel with it, because the owner-dismissal rule
+        # is a DATE comparison — a flag with no readable date can never read as dismissed.
+        pain_flag_instances=(
+            [{"movement": e["label"], "note_dates": e.get("pain_dates") or []} for e in evidence["exercises"] if e.get("pain_flag_any")]
+            if evidence
+            else None
+        ),
+        pain_dismissals=dismissals,
         # with a draft in hand the per-movement note reads report the layer's status themselves
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,
@@ -277,7 +303,14 @@ def tool_plan_next_session(args):
     out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
     if ir is not None:
         out["critics"] = _run_stage_2(
-            ir, block, reference if isinstance(reference, dict) else None, evidence, protein_missed, protein_measured, target_date
+            ir,
+            block,
+            reference if isinstance(reference, dict) else None,
+            evidence,
+            protein_missed,
+            protein_measured,
+            target_date,
+            dismissals,
         )
         out["how_to_use"] = (
             "Stage 2 ran. Read `critics.verdicts` — each names the metric and number it argued from. A `veto` blocks "
@@ -430,6 +463,7 @@ def _run_stage_2(
     protein_missed,
     protein_measured,
     target_date: str,
+    dismissals: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     from coach import critics
     from training.routine_repo import put_versioned
@@ -452,6 +486,7 @@ def _run_stage_2(
                 days_since_by_idx={i: e.get("days_since") for i, e in by_idx.items()},
                 consecutive_days=evidence.get("consecutive_days"),
                 pain_layer_status=evidence.get("pain_layer_status"),
+                dismissals=dismissals,  # #4036 — the owner's own override of a flag instance
             ),
             "rate_advocate": critics.build_rate_advocate_packet(
                 draft,

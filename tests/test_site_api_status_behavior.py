@@ -73,7 +73,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-for _p in (ROOT / "lambdas", ROOT / "lambdas" / "web"):
+# deploy/ joins the path for `doc_drift_verdict` — the #3984 owner predicate, READ rather
+# than copied, so this file and `sync_doc_metadata --check` cannot disagree about who owns a
+# stale generated counter (see the MCP tool-count test below).
+for _p in (ROOT / "lambdas", ROOT / "lambdas" / "web", ROOT / "deploy"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -82,6 +85,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
+import doc_drift_verdict as _doc_drift_verdict  # noqa: E402
 from web import site_api_status as sas  # noqa: E402
 from web.site_api_common import STATUS_CACHE_TTL, USER_PREFIX  # noqa: E402
 
@@ -1428,7 +1432,32 @@ def test_the_published_mcp_tool_count_matches_the_registry(monkeypatch):
     desc = by_id(Harness(monkeypatch, healthy_platform().build()).body(), "infrastructure", "mcp_server")["description"]
     published = re.search(r"(\d+)\s+tools", desc)
     assert published, f"the MCP row stopped publishing a tool count: {desc!r}"
-    assert int(published.group(1)) == tool_count
+    published_n = int(published.group(1))
+
+    # THE SEAM, always: the published number is the GENERATED counter, not a hand-typed one.
+    # That is the #2220 defect ("MCP server · 116 tools" beside a registry of 76) and this
+    # assertion is what keeps it closed.
+    from web import platform_counts
+
+    assert published_n == platform_counts.DISCOVERED_COUNTS["mcp_tools"], (
+        f"the panel published {published_n} but the generated counter says "
+        f"{platform_counts.DISCOVERED_COUNTS['mcp_tools']} — the splice stopped reading platform_counts.py"
+    )
+
+    # …and the counter equals the registry, EXCEPT where regenerating it is not this
+    # checkout's job. #3984: `lambdas/web/platform_counts.py` has one writer — the reconcile
+    # job, on main, after the merge — and `deploy/agent_commit.sh` plus the pre-commit hook
+    # refuse to let any branch carry it. Before #4036 a PR whose own diff added a tool faced
+    # a gate it could only satisfy by committing the file it is forbidden to commit, which is
+    # not a choice a guard should force. The same predicate `sync_doc_metadata --check` uses
+    # decides it here, so the two cannot disagree, and the strict arm survives wherever a
+    # human genuinely owns the fix (main with no bot following).
+    if published_n != tool_count and _doc_drift_verdict.bot_owns_pending_drift_here():
+        pytest.skip(
+            f"pending-reconcile (#3984): counter {published_n} vs registry {tool_count} — the reconcile job "
+            "regenerates platform_counts.py on main after the merge; a branch may not carry it"
+        )
+    assert published_n == tool_count
 
 
 def test_wednesday_chronicle_description_is_cadence_derived_not_hand_typed(monkeypatch):

@@ -760,6 +760,15 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # verifying) and a clause weakened with no owner-signed line. Both are
         # reviewable in the PR and pointless after the merge.
         "test_anchor_freeze_3607.py",
+        # #4036: the owner-dismissal path for pain flags. Pre-merge because the contract it
+        # holds spans THREE modules a PR can change independently — the rule
+        # (training_context_registry), the tripwire (plan_engine) and the joints critic —
+        # and the failure mode is silent in the direction that matters: a dismissal that
+        # stops re-arming reads as a clean plan, with a benched lift or a loaded flagged
+        # movement as the only symptom, days later and in the gym rather than in CI. It also
+        # pins the three registrations a new owner-only SOURCE# family needs (taxonomy class,
+        # privacy tier, SCHEMA row), which are repo shape by definition.
+        "test_pain_dismissal_4036.py",
     }
 )
 

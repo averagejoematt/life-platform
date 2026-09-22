@@ -28,6 +28,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
+from coach import critics  # noqa: E402
 from training import hevy_write_client as wc  # noqa: E402
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
@@ -180,7 +181,7 @@ def test_stage_2_stores_the_verdicts_as_a_new_version_and_writes_the_thread_row(
     out, stored, thread = _run(ir, _evidence(), invoke=invoke)
     assert "error" not in out, out
     crit = out["critics"]
-    assert crit["engine"] == "critics@1.0.0" and crit["model_ran"] is True and crit["veto"] is False
+    assert crit["engine"] == critics.CRITICS_VERSION and crit["model_ran"] is True and crit["veto"] is False
     assert [v["critic"] for v in crit["verdicts"]] == ["muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian"]
     assert len(calls) == 4, "one model call per critic"
     assert stored and stored[-1] is ir and ir.version == 2 and ir.parent_version == 1
@@ -231,7 +232,7 @@ def test_stage_2_applies_a_change_before_storing_and_the_dry_run_shows_the_revis
             st.enter_context(cm)
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
     notes = preview["wire_body"]["routine"]["exercises"][0]["notes"]
-    assert notes.startswith("Legs — quality day.\n\nRED TEAM (critics@1.0.0, 4 critics,")
+    assert notes.startswith(f"Legs — quality day.\n\nRED TEAM ({critics.CRITICS_VERSION}, 4 critics,")
     assert f"applied: exercises[0].weight_lbs -> {h['to']}" in notes
     assert preview["wire_body"]["routine"]["exercises"][0]["sets"][0]["weight_kg"] == pytest.approx(h["to"] * KG, abs=0.01)
 
@@ -333,9 +334,12 @@ def test_commit_carries_the_verdicts_and_their_numbers_into_the_hevy_notes():
             st.enter_context(cm)
         res = t.tool_manage_hevy_routine({"action": "commit", "routine_id": ir.routine_id})
     assert res["status"] == "committed", res
-    assert res["critics"] == "critics@1.0.0: muscle-defense approve, joints/tendons approve, rate-advocate approve, historian change"
+    assert (
+        res["critics"]
+        == f"{critics.CRITICS_VERSION}: muscle-defense approve, joints/tendons approve, rate-advocate approve, historian change"
+    )
     notes = created[0]["routine"]["exercises"][0]["notes"]
-    assert "RED TEAM (critics@1.0.0, 4 critics," in notes
+    assert f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics," in notes
     for line in (
         "- muscle-defense APPROVE",
         "- joints/tendons APPROVE",
@@ -466,7 +470,7 @@ def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually
     ir = _ir(squat_lbs=200.0)
     ir.exercises[0].notes = "Anchor cue."
     out, _, _ = _run(ir, _evidence())
-    assert ir.exercises[0].notes.startswith("RED TEAM (critics@1.0.0, 4 critics,")
+    assert ir.exercises[0].notes.startswith(f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics,")
     assert ir.exercises[0].notes.endswith("Anchor cue.")
     assert "- historian CHANGE" in ir.exercises[0].notes
     # re-run: one block, not two

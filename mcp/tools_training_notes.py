@@ -167,3 +167,142 @@ def tool_get_exercise_notes(args):
         if reason:
             out["layer_reason"] = reason
     return out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4036 — the other half of "confirm or dismiss before loading that movement"
+# ══════════════════════════════════════════════════════════════════════════════
+# The layer above flags pain over-inclusively on purpose and says so in its own `note`.
+# The dismissal half had nowhere to land until now: `training_context_registry` ships in
+# the bundle, so a chat turn cannot edit it (the #3675 inertness class in reverse). So the
+# dismissal is a DDB record — `USER#matthew#SOURCE#training_constraints /
+# DISMISSAL#<site>#<YYYY-MM-DD>`, CROSS_PHASE (ADR-077), Tier 2 owner-only — written here
+# and read at runtime by `plan_engine._tripwire_states` and `critics.build_joints_packet`.
+#
+# ONE write action and one read action, on ONE tool. The rule (what a dismissal is, how it
+# re-arms) is not restated here: it is imported from the registry, so this surface cannot
+# disagree with the engines that consume what it writes.
+
+
+def _dismissal_records() -> list:
+    """Every dismissal on the record, newest first. Paginated — a partition read that stops
+    at the first page reports a stale world as the live one (#3729)."""
+    from training import training_context_registry as tcr
+
+    items: list = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(tcr.DISMISSAL_PK) & Key("sk").begins_with(tcr.DISMISSAL_SK_PREFIX),
+        "ScanIndexForward": False,
+    }
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return [decimal_to_float(i) for i in items]
+
+
+def tool_manage_pain_dismissals(args):
+    """Owner dismissals of derived pain flags: `dismiss` (write one) / `list` (read them).
+
+    OWNER-ONLY. The record carries his verbatim words; nothing public reads this partition
+    (`privacy.field_tiers.SOURCE_TIERS['training_constraints'] = TIER_OWNER_ONLY`).
+    """
+    from datetime import datetime, timezone
+
+    from training import training_context_registry as tcr
+
+    args = args or {}
+    action = str(args.get("action") or "list").strip().lower()
+
+    if action == "list":
+        records = _dismissal_records()
+        return {
+            "count": len(records),
+            "store": tcr.DISMISSAL_RULE["store"],
+            "rule": tcr.DISMISSAL_RULE,
+            "dismissals": [
+                {
+                    "sk": r.get("sk"),
+                    "site": r.get("site"),
+                    "dismissed_on": r.get("dismissed_on"),
+                    "words": r.get("words"),
+                    "movements": r.get("movements") or [],
+                    "flag_note_date": r.get("flag_note_date"),
+                    "recorded_at": r.get("recorded_at"),
+                }
+                for r in records
+            ],
+            "how_to_use": (
+                "A dismissal does not make a flag disappear — plan_next_session reads the tripwire as "
+                "`dismissed_by_owner` with the date and his words, and it re-arms on its own if a later note "
+                "flags the same movement. Ask him again before dismissing a site he has already re-flagged."
+            ),
+            "_disclaimer": (
+                "For personal health tracking only. Not medical advice. Descriptive of Matthew's own n=1 history. "
+                "Consult a qualified healthcare provider before making health decisions based on this data."
+            ),
+        }
+
+    if action != "dismiss":
+        return {"error": f"Unknown action '{action}'.", "valid_actions": ["dismiss", "list"]}
+
+    # ── dismiss: the owner overrides one flag instance, in his own words ──────────
+    try:
+        record = tcr.build_dismissal_record(
+            site=args.get("site") or "",
+            dismissed_on=(args.get("dismissed_on") or pacific_now().date().isoformat()),
+            words=args.get("words") or "",
+            movements=args.get("movements") or ([args["movement"]] if args.get("movement") else []),
+            flag_note_date=args.get("flag_note_date") or "",
+            recorded_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+    except ValueError as e:
+        return {"error": f"refused: {e}", "rule": tcr.DISMISSAL_RULE}
+
+    # The dismissal must point at a flag that EXISTS. An override of nothing is not an
+    # override — the same ADR-104 grounding rule manage_diary_claims applies to a claim
+    # that cannot name its entry. Reported honestly, and nothing is written.
+    notes = tool_get_exercise_notes({"exercise": record["movements"][0], "lookback_days": PREFLIGHT_LOOKBACK_DAYS})
+    if notes.get("error"):
+        return {"error": f"refused: could not read the note layer for {record['movements'][0]!r} ({notes['error']})", "wrote": False}
+    if notes.get("pain_flag_any") is None:
+        return {
+            "error": f"refused: the derived note layer is {notes.get('layer_status')!r} for {record['movements'][0]!r} — "
+            "its silence is not evidence of a flag to dismiss (#3768)",
+            "wrote": False,
+        }
+    pain_dates = [str(d)[:10] for d in (notes.get("pain_dates") or [])]
+    if record["flag_note_date"] not in pain_dates:
+        return {
+            "error": f"refused: no pain flag dated {record['flag_note_date']} on {record['movements'][0]!r} "
+            f"(flagged note dates in the last {PREFLIGHT_LOOKBACK_DAYS}d: {pain_dates or 'none'})",
+            "why": "a dismissal names the instance it dismisses, so it can be checked against it later",
+            "wrote": False,
+        }
+
+    table.put_item(
+        Item={
+            # literal (orphan-gate greppable); == training_context_registry.DISMISSAL_PK
+            "pk": "USER#matthew#SOURCE#training_constraints",
+            **record,
+        }
+    )
+    resolution = tcr.resolve_flag(movement=record["movements"][0], note_dates=pain_dates, dismissals=[record])
+    return {
+        "status": "dismissed",
+        "wrote": True,
+        "sk": record["sk"],
+        "record": record,
+        "reads_as": resolution,
+        "next": (
+            "Call plan_next_session — the pain_flag_named_site tripwire now reads `dismissed_by_owner` with this "
+            "date and these words, and the joints/tendons critic will not veto the dismissed instance."
+        ),
+        "re_arms": tcr.DISMISSAL_RULE["re_arms"],
+        "_disclaimer": (
+            "For personal health tracking only. Not medical advice. Descriptive of Matthew's own n=1 history. "
+            "Consult a qualified healthcare provider before making health decisions based on this data."
+        ),
+    }
