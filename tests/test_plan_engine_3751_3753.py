@@ -190,7 +190,7 @@ def test_approved_redlines_are_reported_active_not_proposed():
     assert block["redlines"]["active"] is True
     assert not any("redlines are PROPOSED" in line for line in block["honesty"])
     assert any("NOT evaluated by this" in line for line in block["honesty"])
-    assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-21"
+    assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-22"
     assert owner_redlines.REDLINES_VERSION == "3.0"
 
 
@@ -202,7 +202,7 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
     assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
     assert "2026-09-21" in owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"]
-    assert summ["active"] is True and summ["version"] == "3.0" and summ["last_reviewed_by_owner"] == "2026-09-21"
+    assert summ["active"] is True and summ["version"] == "3.0" and summ["last_reviewed_by_owner"] == "2026-09-22"
     assert summ["plan"].endswith("TRAINING_PROGRAM_v0.3.md") and summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
     assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 4.0 and rate["schedule_step_above_lb"] == 295
@@ -299,6 +299,12 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
         and any("RMR" in b for b in m["baseline"])
         and any("gallbladder" in b for b in m["baseline"])
     )
+    # Owner ruling 2026-09-22: no fresh baseline — the latest on record IS week 0, and the file says so
+    # with the scan, the labs date and the caveat, not by silently dropping the booking.
+    w0 = m["week0_reference"]
+    assert w0["dxa"]["date"] == "2026-03-30" and w0["dxa"]["lean_lb"] == 170.6 and w0["labs"]["date"] == "2026-04-03"
+    assert w0["wired_to_engine"] is False and w0["next_scan"]["week"] == 8
+    assert "WAIVED" in m["baseline_status"] and "2026-03-30" in " ".join(m["baseline"])
     assert R["logging_completeness"]["dark_day_kcal"] == 600
 
 

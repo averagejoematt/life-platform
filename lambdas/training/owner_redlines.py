@@ -112,7 +112,7 @@ CHANGELOG_V2_TO_V3: list[str] = [
     "the Minimum Viable Week, the mood firewall, band-matched load anchoring with the detraining discount",
 ]
 
-LAST_REVIEWED_BY_OWNER: str | None = "2026-09-21"
+LAST_REVIEWED_BY_OWNER: str | None = "2026-09-22"
 """ISO date the owner last read this file. None means never."""
 
 
@@ -392,6 +392,30 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "medical_cover": {
         "baseline_within_weeks": 2,
+        "baseline_status": "WAIVED by owner ruling 2026-09-22 — no fresh baseline is booked; the latest on record is week 0 (see week0_reference)",
+        "week0_reference": {
+            "ruling": "owner 2026-09-22: disregard the fresh baseline; arm v0.3 on the latest the platform holds",
+            "dxa": {
+                "date": "2026-03-30",
+                "lean_lb": 170.6,
+                "weight_lb_that_week": 307.2,
+                "weight_lb_at_ruling": 315.0,
+                "caveat": (
+                    "he is ~8 lb heavier than at the reference scan, so the lean-share-of-loss arithmetic runs across weight he had "
+                    "already lost once — a small bias in the strict direction, accepted by the ruling"
+                ),
+            },
+            "labs": {
+                "date": "2026-04-03",
+                "where": "USER#matthew#SOURCE#labs / DATE#2026-04-03 — the stop lines' 'from baseline' reference",
+            },
+            "next_scan": {
+                "week": 8,
+                "approx_date": "2026-11-01",
+                "earns": "the DXA-gated 3.5 (lean share ≤ 12 %) — nothing is earned before it",
+            },
+            "wired_to_engine": False,
+        },
         "baseline": [
             "CMP with phosphate and Mg",
             "CBC",
@@ -407,7 +431,7 @@ REDLINES: dict[str, dict[str, Any]] = {
             "urinalysis",
             "12-lead ECG with QTc",
             "gallbladder ultrasound",
-            "DXA (week 0 — the 2026-03-30 scan is six months stale)",
+            "DXA (week 0 — by owner ruling 2026-09-22 the 2026-03-30 scan STANDS as week 0; the next scan is week 8, ~2026-11-01)",
             "BP + orthostatics",
             "PHQ-9",
             "RMR by indirect calorimetry",
@@ -757,7 +781,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "derived_by": "obesity-medicine physician (red team 2026-09-22)",
         "action": "slow one band; > 25 % of the loss, or appendicular lean −5 % from week 0 → maintenance until the next scan",
         "evaluated_by_engine": False,
-        "note": "The instrument that answers his actual question (did I keep the muscle) and the one that earns the DXA-gated 3.5 / 3.0 steps. Needs the week-0 scan — an owner act.",
+        "note": "The instrument that answers his actual question (did I keep the muscle) and the one that earns the DXA-gated 3.5 / 3.0 steps. Week 0 = the 2026-03-30 scan by owner ruling 2026-09-22 (medical_cover.week0_reference); it earns nothing until the week-8 scan.",
     },
     {
         "id": "sleep",
