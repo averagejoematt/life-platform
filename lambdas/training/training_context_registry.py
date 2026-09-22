@@ -164,3 +164,224 @@ def summary() -> dict[str, Any]:
         ),
         "if_unreadable": format_unconfirmed_notice(),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4036 — THE OWNER-DISMISSAL RULE (the RULE lives here; the RECORD never does)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# The derived note layer flags pain over-inclusively on purpose — its own reader says so:
+# "pain_flag is over-inclusive by design — confirm or dismiss before loading that movement."
+# Until #4036 there was nowhere for the second half of that sentence to land. On 2026-09-21
+# Matthew said the right lower back flagged from the 2026-09-13 Romanian Deadlift note was
+# "gone", and under the v0.3 program a tripped pain flag substitutes the movement pattern
+# for two weeks — so a stale flag benches the lift against his own word.
+#
+# WHY THE RECORD IS NOT IN THIS FILE
+#   `RECORDED_CONSTRAINTS` above is CODE. It ships inside the Lambda bundle, so an MCP write
+#   at chat time cannot touch it — the #3675 inertness class in reverse: a value a chat turn
+#   produces cannot live in a module a deploy produces. The dismissal is therefore a
+#   DynamoDB record (`USER#matthew#SOURCE#training_constraints / DISMISSAL#<site>#<date>`,
+#   CROSS_PHASE, owner-only Tier 2) written by ONE MCP action and read at runtime by
+#   `plan_engine._tripwire_states` and `coach.critics.build_joints_packet`.
+#
+# WHAT LIVES HERE INSTEAD
+#   The rule: what a dismissal IS (site + the date he said it + his verbatim words + the
+#   flag instance it dismisses), how a record is shaped and validated, and — the whole
+#   point — how it RE-ARMS. Both consumers derive their answer from `resolve_flags` below
+#   rather than each implementing a date comparison, because two copies of that comparison
+#   is how one of them silently keeps dismissing a flag the other has already re-armed.
+
+DISMISSAL_SOURCE = "training_constraints"
+DISMISSAL_PK = f"USER#matthew#SOURCE#{DISMISSAL_SOURCE}"
+DISMISSAL_SK_PREFIX = "DISMISSAL#"
+DISMISSAL_ISSUE = "#4036"
+
+DISMISSAL_RULE: dict[str, Any] = {
+    "issue": DISMISSAL_ISSUE,
+    "what": (
+        "An owner dismissal is Matthew's own statement that a flagged site is resolved. It is scoped to the "
+        "SITE he named, dated the day he said it, carries his verbatim words, and names the flag instance it "
+        "dismisses (the note date + the movement that carried the flag)."
+    ),
+    "is_not": (
+        "A dismissal is NOT an absence. A dismissed flag never reads `clear` — the flag happened, and the row "
+        "says `dismissed_by_owner` with the date and the words, so a reader can see a human overrode it."
+    ),
+    "re_arms": (
+        "A derived-note pain flag on the same site with a note date AFTER the dismissal date trips again and "
+        "marks the dismissal superseded. He never has to remember he once dismissed it."
+    ),
+    "undated_flag": (
+        "A flag whose note date cannot be read is NOT dismissed: with nothing to compare, 'dismissed' would be "
+        "an assumption wearing a verdict's clothes (the #3767 rule for safety conditions)."
+    ),
+    "store": f"{DISMISSAL_PK} / {DISMISSAL_SK_PREFIX}<site>#<YYYY-MM-DD> — CROSS_PHASE (ADR-077), Tier 2 owner-only",
+}
+
+
+def normalize_dismissal_key(text: str) -> str:
+    """The match key for a site or a movement label: lowercase, non-alphanumerics collapsed.
+
+    'Right lower back', 'right_lower_back' and 'RIGHT LOWER BACK' are one site; 'Romanian
+    Deadlift (Barbell)' and 'romanian deadlift barbell' are one movement. The key is also
+    what goes in the sk, so two spellings of the same site cannot become two records.
+    """
+    out: list[str] = []
+    for ch in str(text or "").strip().lower():
+        out.append(ch if ch.isalnum() else " ")
+    return "_".join("".join(out).split())
+
+
+def dismissal_sk(site: str, dismissed_on: str) -> str:
+    """`DISMISSAL#<normalized site>#<YYYY-MM-DD>` — one record per site per day he says it."""
+    return f"{DISMISSAL_SK_PREFIX}{normalize_dismissal_key(site)}#{str(dismissed_on)[:10]}"
+
+
+def _is_iso_date(value: Any) -> bool:
+    s = str(value or "")
+    if len(s) != 10 or s[4] != "-" or s[7] != "-":
+        return False
+    try:
+        y, m, d = int(s[0:4]), int(s[5:7]), int(s[8:10])
+    except ValueError:
+        return False
+    return 1 <= m <= 12 and 1 <= d <= 31 and y >= 2000
+
+
+def build_dismissal_record(
+    *,
+    site: str,
+    dismissed_on: str,
+    words: str,
+    movements: list[str],
+    flag_note_date: str,
+    recorded_at: str,
+) -> dict[str, Any]:
+    """Validate an owner dismissal and return the DDB item body (no floats — Decimal-safe
+    by construction: every value here is a string or a list of strings).
+
+    Raises ValueError with the reason. A dismissal that cannot name the instance it
+    dismisses is refused rather than stored: 'the back is fine' with no flag attached is a
+    sentiment, and a safety override has to be checkable against the thing it overrode.
+    """
+    site = str(site or "").strip()
+    words = str(words or "").strip()
+    movements = [str(m).strip() for m in (movements or []) if str(m).strip()]
+    if not site:
+        raise ValueError("site is required — the body site he named, in his own words (e.g. 'right lower back')")
+    if not words:
+        raise ValueError("words is required and must be VERBATIM — the override is his statement, not a paraphrase of it")
+    if not _is_iso_date(dismissed_on):
+        raise ValueError("dismissed_on must be YYYY-MM-DD — the day he said it")
+    if not _is_iso_date(flag_note_date):
+        raise ValueError("flag_note_date must be YYYY-MM-DD — the note date of the flag instance being dismissed")
+    if not movements:
+        raise ValueError("movements must name at least one movement — the flag instance is (note date + movement)")
+    if str(flag_note_date)[:10] > str(dismissed_on)[:10]:
+        raise ValueError(
+            f"refused: the flag instance is dated {flag_note_date}, AFTER the dismissal {dismissed_on} — "
+            "a dismissal cannot precede the flag it dismisses (it would be superseded the moment it was written)"
+        )
+    return {
+        "sk": dismissal_sk(site, dismissed_on),
+        "site": site,
+        "site_key": normalize_dismissal_key(site),
+        "dismissed_on": str(dismissed_on)[:10],
+        "words": words,
+        "movements": movements,
+        "movement_keys": sorted({normalize_dismissal_key(m) for m in movements}),
+        "flag_note_date": str(flag_note_date)[:10],
+        "recorded_at": recorded_at,
+        "recorded_via": "get_exercise_notes/dismiss",
+        "issue": DISMISSAL_ISSUE,
+        "rule": DISMISSAL_RULE["re_arms"],
+    }
+
+
+def _dismissal_matches(dismissal: dict[str, Any], *, movement: str | None, site: str | None) -> bool:
+    """Does this dismissal cover this flag? By MOVEMENT first — the only identifier the flag
+    layer and the dismissal share, because the derived note layer is keyed per exercise and
+    knows no anatomy — and by SITE when a caller has one (`pain_flag_sites` carries movement
+    labels today, so the site leg is the forward-compatible half, not the live one)."""
+    keys = {str(k) for k in (dismissal.get("movement_keys") or [])}
+    if not keys:
+        keys = {normalize_dismissal_key(m) for m in (dismissal.get("movements") or [])}
+    site_key = str(dismissal.get("site_key") or normalize_dismissal_key(dismissal.get("site", "")))
+    for candidate in (movement, site):
+        if not candidate:
+            continue
+        k = normalize_dismissal_key(candidate)
+        if k and (k in keys or k == site_key):
+            return True
+    return False
+
+
+def resolve_flag(
+    *,
+    movement: str | None,
+    note_dates: list[str] | None,
+    dismissals: list[dict[str, Any]] | None,
+    site: str | None = None,
+) -> dict[str, Any] | None:
+    """The ONE date comparison. Returns None when no dismissal covers this flag, else a row.
+
+    `note_dates` are the flag's own note dates (the derived layer's `pain_dates`). The
+    latest one decides:
+      * latest note <= the dismissal date  -> `dismissed_by_owner`
+      * latest note  > the dismissal date  -> `re_armed`, and the dismissal is `superseded`
+      * no readable note date              -> `undated_flag`: NOT dismissed (see DISMISSAL_RULE)
+    """
+    covering = [d for d in (dismissals or []) if _dismissal_matches(d, movement=movement, site=site)]
+    if not covering:
+        return None
+    latest = max(covering, key=lambda d: str(d.get("dismissed_on") or ""))
+    dismissed_on = str(latest.get("dismissed_on") or "")[:10]
+    dates = sorted(str(d)[:10] for d in (note_dates or []) if _is_iso_date(d))
+    row: dict[str, Any] = {
+        "movement": movement,
+        "site": latest.get("site"),
+        "dismissed_on": dismissed_on,
+        "words": latest.get("words"),
+        "sk": latest.get("sk"),
+        "flag_note_date": latest.get("flag_note_date"),
+        "latest_note_date": dates[-1] if dates else None,
+    }
+    if not dates:
+        row["state"] = "undated_flag"
+        row["dismissed"] = False
+        row["superseded"] = False
+        row["detail"] = DISMISSAL_RULE["undated_flag"]
+        return row
+    # THE comparison this whole issue turns on. Remove it and a dismissal never expires.
+    if dates[-1] > dismissed_on:
+        row["state"] = "re_armed"
+        row["dismissed"] = False
+        row["superseded"] = True
+        row["detail"] = (
+            f"a note dated {dates[-1]} is AFTER the owner's {dismissed_on} dismissal of {latest.get('site')!r} — "
+            "the flag re-armed and the dismissal is superseded"
+        )
+        return row
+    row["state"] = "dismissed_by_owner"
+    row["dismissed"] = True
+    row["superseded"] = False
+    row["detail"] = f"owner dismissed {latest.get('site')!r} on {dismissed_on}: {str(latest.get('words'))!r}"
+    return row
+
+
+def resolve_flags(instances: list[dict[str, Any]] | None, dismissals: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """`resolve_flag` over every flagged instance. `instances` are
+    `{"movement": <label>, "note_dates": [...], "site": <optional>}`; unmatched flags are
+    omitted, so an empty list means no dismissal is in play at all."""
+    out: list[dict[str, Any]] = []
+    for inst in instances or []:
+        res = resolve_flag(
+            movement=(inst or {}).get("movement"),
+            note_dates=(inst or {}).get("note_dates"),
+            site=(inst or {}).get("site"),
+            dismissals=dismissals,
+        )
+        if res is not None:
+            out.append(res)
+    return out

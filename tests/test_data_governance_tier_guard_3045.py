@@ -142,6 +142,15 @@ ROW_MAP: list[dict] = [
     # object is stored under no tier. No `claims` — this source has no public projection
     # at all, which is the distinction the prose row turns on.
     {"key": "progress_photos", "pattern": r"^Progress photos", "requirements": [("source", "progress_photos", OO)], "claims": []},
+    # #4036: declared before the first dismissal exists, for the progress_photos reason —
+    # an owner statement about an injury must never be stored under no tier. No `claims`:
+    # this source has no public projection at all.
+    {
+        "key": "pain_dismissals",
+        "pattern": r"^Owner pain-flag dismissals",
+        "requirements": [("source", "training_constraints", OO)],
+        "claims": [],
+    },
     # #3719: already served publicly with no tier and no consent stamp. The owner ruled
     # keep-publishing (2026-09-13), so this records the consent rather than changing the
     # surface — publication by STAMP, never by omission.
