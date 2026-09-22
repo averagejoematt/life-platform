@@ -65,6 +65,7 @@ from mcp.tools_descriptions import (
     GET_DUE_RECALLS_DESCRIPTION,
     GET_EXERCISE_HISTORY_DESCRIPTION,
     GET_EXERCISE_NOTES_DESCRIPTION,
+    GET_EXERCISE_NOTES_INPUT,
     GET_EXPERIMENT_CYCLE_DESCRIPTION,
     GET_EXPERIMENT_RESULTS_DESCRIPTION,
     GET_FIELD_NOTES_DESCRIPTION,
@@ -191,23 +192,16 @@ from mcp.tools_training_notes import tool_get_exercise_notes
 # Vacation fund tracker ($1/workout-mile since experiment start).
 
 TOOLS = {
+    # #4036 pays this module's #1665 ceiling the way #3891 did — by extraction, never by
+    # raising the ratchet: this tool's parameter table (which the issue extends with the
+    # owner-dismissal action) lives in the cohesive sibling mcp/tools_descriptions.py. The
+    # schema NAME stays here, which is what R3 reads.
     "get_exercise_notes": {
         "fn": tool_get_exercise_notes,
         "schema": {
             "name": "get_exercise_notes",
             "description": GET_EXERCISE_NOTES_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "exercise": {
-                        "type": "string",
-                        "description": "Exercise name (e.g. 'calf raise', 'cycling') — resolved to its Hevy template via recent workouts.",
-                    },
-                    "template_id": {"type": "string", "description": "Hevy exercise template id (hex or uuid). Alternative to 'exercise'."},
-                    "lookback_days": {"type": "integer", "description": "Days of history to include (default 180)."},
-                },
-                "required": [],
-            },
+            "inputSchema": GET_EXERCISE_NOTES_INPUT,
         },
     },
     "get_sources": {

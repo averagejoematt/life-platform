@@ -107,7 +107,12 @@ def _config_constants() -> dict:
     consts = _module_constants(CONFIG)
     for mod in sorted(CONFIG.parent.glob("tools_*.py")):
         for name, value in _module_constants(mod).items():
-            if isinstance(value, str) and name.isupper():
+            # str OR dict (#4036): registry.py sat 6 logical lines under its #1665 baseline,
+            # so the tool that issue adds paid the ceiling the #3891 way — by extraction. What
+            # moved this time is a parameter TABLE, not only a description, and harvesting only
+            # strings here made `_eval_schema`'s "a bare Name is an extracted constant" branch
+            # raise on it. The published catalog is byte-identical either way.
+            if isinstance(value, (str, dict)) and name.isupper():
                 consts.setdefault(name, value)
     return consts
 
