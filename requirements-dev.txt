@@ -34,7 +34,7 @@ pyyaml==6.0.3
 # CQ-01 (AUDIT 2026-06-30): pinned to MATCH the CI gate (ci-cd.yml) — CI is the
 # source of truth for the enforced gate versions; a mismatch let local formatting
 # diverge from what the build enforces. Bump both together, never one alone.
-playwright==1.62.0
+playwright==1.63.0
 # Pillow — visual_ai_qa._prepare_image downscales full-page captures that exceed
 # Bedrock's 8000px-per-dimension image limit (#2973: home.png at 1440x11827 drew a
 # ValidationException and the page went silently unevaluated). LOAD-BEARING in every
@@ -64,8 +64,8 @@ mypy==2.3.1
 
 # AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-boto3==1.43.93
-botocore==1.43.93
+boto3==1.43.98
+botocore==1.43.98
 
 # CI supply-chain gates (#2760 — the one-legged-pin class): both were pinned as
 # workflow literals with NO Dependabot leg, so the pins could only rot. This file
@@ -80,11 +80,11 @@ pip-licenses==5.5.5
 # Remediation-agent runtime (remediation-agent.yml, ADR-064/065). Installed
 # UNPINNED (floating latest) until #2760; now pinned here and Dependabot-bumped,
 # resolved by the workflow via scripts/ci_pins.py.
-claude-agent-sdk==0.2.152
+claude-agent-sdk==0.2.157
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
 # reach CI unpinned). Bump both files together as a deliberate PR, plus the
 # `npm install -g aws-cdk@X.Y.Z` CLI pin in ci-cd.yml.
-aws-cdk-lib==2.269.0
+aws-cdk-lib==2.270.0
 constructs==10.8.1
