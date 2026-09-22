@@ -875,6 +875,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 5 failed + 11 passed, reverted 16 passed). MEASURED by id-set diff against a disposable
         # `git archive origin/main` export at bfb163388: lane {proven 128, unproven 540, not-applicable 6,
         # attempted-unproven 5} vs main {127, 540, 6, 5} — exactly one entrant, and unproven does not move.
+        # Re-measured after merging origin/main into the lane (tip had moved to 5c729ec9c): merged lane
+        # {128, 540, 6, 5} vs a fresh export {127, 540, 6, 5} — same one entrant, same verdicts.
         <= 128
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
