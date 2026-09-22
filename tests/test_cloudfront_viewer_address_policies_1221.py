@@ -184,3 +184,45 @@ def test_guard_would_catch_the_regression_it_names():
             if kw.arg == "header_behavior" and VIEWER_ADDRESS in _expand(_literal_strings(kw.value), consts):
                 leaked = True
     assert leaked, "planting the header in the cache key did NOT trip the detection — this guard is vacuous"
+
+
+# ── the CloudFront constraint the first #3760 deploy found by failing ─────────
+
+
+def _seconds(node):
+    """`Duration.seconds(N)` → N, else None."""
+    if isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant):
+        return node.args[0].value
+    return None
+
+
+def _is_none_behaviour(node):
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "none"
+
+
+def test_a_cache_policy_with_a_key_entry_has_caching_nominally_enabled():
+    """CloudFront rejects a CachePolicy whose max_ttl is 0 AND whose key names any cookie,
+    header or query string: "CookieBehavior is invalid for policy with caching disabled".
+    LifePlatformWeb learned it live on 2026-09-22 (#3760's first deploy: CREATE_FAILED, full
+    stack rollback). The rule is over the SET — every CachePolicy in the module — so the next
+    TTL-0 policy that needs a key entry (a cookie that must survive Set-Cookie stripping) is
+    caught at PR time, not at UPDATE_ROLLBACK_COMPLETE."""
+    tree = _tree()
+    calls = _calls(tree, "CachePolicy")
+    assert calls, "no CachePolicy found"
+    for call in calls:
+        name = _kwarg(call, "cache_policy_name")
+        label = name.value if isinstance(name, ast.Constant) else "<unnamed>"
+        max_ttl = _seconds(_kwarg(call, "max_ttl"))
+        keyed = [
+            kw.arg
+            for kw in call.keywords
+            if kw.arg in ("header_behavior", "query_string_behavior", "cookie_behavior") and not _is_none_behaviour(kw.value)
+        ]
+        if keyed:
+            assert max_ttl is not None and max_ttl >= 1, (
+                f"CachePolicy {label!r} names {keyed} in its cache key with max_ttl={max_ttl}: CloudFront rejects a key "
+                "entry on a policy with caching disabled. Use max_ttl >= 1 with default_ttl 0 and an origin `no-store`."
+            )
+        if max_ttl == 0:
+            assert not keyed, f"CachePolicy {label!r} has max_ttl 0 and a key entry {keyed} — CloudFront rejects it"
