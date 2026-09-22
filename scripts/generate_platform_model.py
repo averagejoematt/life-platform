@@ -395,7 +395,15 @@ def extract_cost_surface(alarms: dict[str, dict], schedules: list[dict]) -> dict
 
 # Seam functions whose literal first argument IS the partition name (bare source
 # id, no "SOURCE#") — the #2805 resolution mechanism for the query layer.
-_SEAM_READ_FUNCS = {"query_source", "_query_source", "query_metrics"}
+#
+# `query_source_cross_phase` (#4032) is the same call with `include_pilot` derived from
+# the source's taxonomy class; it MUST be listed here for the same reason DIL-025/#3113
+# added `_FIXED_PARTITION_FUNCS` below. When `tools_health`/`tools_nutrition` moved their
+# energy-budget reads onto it, the literal-only walk reported that those modules had
+# stopped reading `hevy` and `strava` altogether — three seams went dead in the #2847
+# ledger and the model got LESS true because the code got better, which is the one
+# failure mode a generated model must not have.
+_SEAM_READ_FUNCS = {"query_source", "_query_source", "query_source_cross_phase", "query_metrics"}
 
 # Shared helpers whose partition is FIXED by the helper, not named by an
 # argument — the caller passes a LAMBDA name, never a partition. DIL-025/#3113
@@ -409,6 +417,11 @@ _FIXED_PARTITION_FUNCS = {
     "already_sent": ("email_log", "read"),
     "should_skip_replay": ("email_log", "read"),
     "record_sent": ("email_log", "write"),
+    # #4030/#4032: THE Hevy read path. The partition is fixed by the helper and its
+    # callers pass a DATE WINDOW, never a source name, so the literal walk above cannot
+    # see it — the same shape `send_ledger` forced above. Without this row, a module
+    # adopting the shared helper disappears from the `hevy` read edges.
+    "_read_hevy_all_phases": ("hevy", "read"),
 }
 _READ_ATTRS = {"query", "get_item", "batch_get_item"}
 _WRITE_ATTRS = {"put_item", "update_item", "delete_item"}

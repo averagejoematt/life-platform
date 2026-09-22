@@ -81,7 +81,13 @@ _ITEMS = [_BARBELL_SESSION_1, _INCLINE_DB_SESSION, _BARBELL_SESSION_2]
 
 
 def _run(monkeypatch, args, items=_ITEMS):
-    monkeypatch.setattr(ts, "query_source_range", lambda *_a, **_k: items)
+    # #4032: the read seam moved. `_read_hevy_all_phases` (#4030) used to call
+    # `query_source_range("hevy", …, include_pilot=…)`; it now delegates to
+    # `mcp.core.query_source_cross_phase`, the ONE place the taxonomy-derived
+    # `include_pilot` and the tombstone exclusion live. This patch is the same
+    # stand-in it always was — it replaces the read, not the phase decision — and
+    # `tools_strength` no longer imports `query_source_range` at all.
+    monkeypatch.setattr(ts, "query_source_cross_phase", lambda *_a, **_k: items)
     return ts.tool_get_exercise_history(args)
 
 

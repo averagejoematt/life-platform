@@ -284,6 +284,18 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # anywhere, and the surface that shows it is a coach prescribing a load off a phantom
         # "never done". A cross-cycle read regression cannot wait for a post-merge lane.
         "test_exercise_history_cross_phase_4030.py",
+        # #4032: the same defect on the ENERGY BUDGET — `_get_energy_expenditure` and the
+        # ADR-152 `_energy_budget` read hevy/strava/withings/macrofactor (all four
+        # raw_timeseries) through the ADR-058 filter, so every trailing window truncated at
+        # the current genesis and the published TDEE and calorie target stepped at every
+        # restart. Carries an AST leg — no phase-filtered reader may reappear inside
+        # `_get_energy_expenditure` or anywhere in tools_nutrition — which is a
+        # registry-join check a NEW read inherits wrongly and silently. Pre-merge because
+        # the failure is a well-formed, confident number the owner eats to: nothing
+        # post-merge errors, and the mutation arm shows the truncation also DISARMS the
+        # impossibility check that would otherwise catch it (it publishes an "unverified"
+        # target instead of refusing).
+        "test_energy_budget_cross_phase_4032.py",
         # #4031: the same cross-cycle read one tool over — and here the truncated number IS a
         # prescription. `get_muscle_volume` read SOURCE#hevy through the ADR-058 phase filter, so
         # every trailing window silently shrank to the cycle's AGE, and what shrank is

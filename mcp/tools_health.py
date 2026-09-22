@@ -8,7 +8,7 @@ from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DA
 from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
 
 from mcp.config import logger
-from mcp.core import date_diff_days, decimal_to_float, get_profile, query_source
+from mcp.core import date_diff_days, decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
 from mcp.helpers import normalize_whoop_sleep
 from mcp.tools_training import _get_training_load
 
@@ -747,7 +747,17 @@ def _get_energy_expenditure(args):
     sex = profile.get("biological_sex", "male").lower()
     target_deficit_kcal = args.get("target_deficit_kcal", tdee_core.DEFAULT_DEFICIT_KCAL)
 
-    withings_recent = query_source("withings", d7_start, end_date)
+    # #4032: every partition this function reads — withings, strava, hevy, macrofactor —
+    # is RAW_TIMESERIES in `phase_taxonomy`, i.e. kept forever and genesis-ANCHORED on
+    # read: the DATE window above is what bounds recency, not the phase tag. Each read
+    # goes through `query_source_cross_phase`, which DERIVES `include_pilot` from
+    # `phase_filter.source_reads_cross_phase(source)` (#2109) and drops superseded
+    # `tombstone=true` rows. Read through the plain default these windows truncated at the
+    # current genesis, so on the morning after a restart the 30-day term collapsed to one
+    # day of training and `exercise_energy` under-reported the worked-set input to the
+    # TDEE and the calorie target for a month afterwards — the exact loss #3931 added that
+    # term to prevent.
+    withings_recent = query_source_cross_phase("withings", d7_start, end_date)
     current_weight_lbs = None
     for item in sorted(withings_recent, key=lambda x: x.get("date", ""), reverse=True):
         if item.get("weight_lbs"):
@@ -771,15 +781,21 @@ def _get_energy_expenditure(args):
         # `age_basis: date_of_birth_unparseable` marker is the signal a reader acts on.
         logger.warning("_get_energy_expenditure: could not parse date_of_birth (len=%d) — %s", len(str(dob_str or "")), _age_err)
 
-    strava_7d = query_source("strava", d7_start, end_date)
-    strava_30d = query_source("strava", d30_start, end_date)
+    strava_7d = query_source_cross_phase("strava", d7_start, end_date)
+    strava_30d = query_source_cross_phase("strava", d30_start, end_date)
 
     weight_kg = current_weight_lbs * tdee_core.LB_TO_KG
     # #3931: the Hevy set log is the worked-set input — without it the lifting term falls
     # back to the stated 0.25 work fraction of logged duration, never to full duration.
+    # #4032: read through #4030's `_read_hevy_all_phases` — the ONE Hevy read path — so
+    # the worked-set term and `get_exercise_history` can never disagree about what was
+    # lifted. Imported lazily: `tools_strength` is only needed on this branch and the
+    # module-level import graph stays as it was.
     try:
-        hevy_7d = query_source("hevy", d7_start, end_date) or []
-        hevy_30d = query_source("hevy", d30_start, end_date) or []
+        from mcp.tools_strength import _read_hevy_all_phases
+
+        hevy_7d = _read_hevy_all_phases(d7_start, end_date)[0]
+        hevy_30d = _read_hevy_all_phases(d30_start, end_date)[0]
     except Exception:
         hevy_7d, hevy_30d = [], []
     ex_7d = tdee_core.exercise_energy(strava_7d, weight_kg, hevy_7d)
@@ -789,13 +805,14 @@ def _get_energy_expenditure(args):
     # weight trend. Both are read here rather than assumed — an absent one is reported as
     # "unverified", never as agreement.
     try:
-        mf_7d = query_source("macrofactor", d7_start, end_date) or []
+        mf_7d = query_source_cross_phase("macrofactor", d7_start, end_date)
     except Exception:
         mf_7d = []
     _logged = [float(i["total_calories_kcal"]) for i in mf_7d if i.get("total_calories_kcal") not in (None, "")]
     intake_avg = round(sum(_logged) / len(_logged), 1) if _logged else None
+    _wt_trend_start = (_end_dt - timedelta(days=14)).strftime("%Y-%m-%d")
     try:
-        wt_trend_rows = query_source("withings", (_end_dt - timedelta(days=14)).strftime("%Y-%m-%d"), end_date) or []
+        wt_trend_rows = query_source_cross_phase("withings", _wt_trend_start, end_date)
     except Exception:
         wt_trend_rows = []
     trend_lb_wk, trend_days = tdee_core.weight_trend_lb_per_wk(wt_trend_rows)
@@ -865,6 +882,21 @@ def _get_energy_expenditure(args):
                 else None
             ),
         },
+        # #4032: what was actually read, per source and per window, and across which
+        # phases. Every figure below is computed off these rows; an answer that silently
+        # truncated at a cycle boundary is indistinguishable from an honest one unless it
+        # says so.
+        "phase_scope": phase_scope_block(
+            {
+                f"withings_7d[{d7_start}..{end_date}]": withings_recent,
+                f"withings_trend_14d[{_wt_trend_start}..{end_date}]": wt_trend_rows,
+                f"strava_7d[{d7_start}..{end_date}]": strava_7d,
+                f"strava_30d[{d30_start}..{end_date}]": strava_30d,
+                f"hevy_7d[{d7_start}..{end_date}]": hevy_7d,
+                f"hevy_30d[{d30_start}..{end_date}]": hevy_30d,
+                f"macrofactor_7d[{d7_start}..{end_date}]": mf_7d,
+            }
+        ),
         "exercise_kcal_7d_daily_avg": ex_daily_7d_avg,
         "exercise_kcal_30d_daily_avg": ex_daily_30d_avg,
         "exercise_energy_basis_7d": ex_basis_7d,
