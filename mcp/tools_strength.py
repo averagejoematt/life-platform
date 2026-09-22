@@ -7,7 +7,7 @@ from datetime import datetime
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import logger, table
-from mcp.core import query_source_range
+from mcp.core import phases_of, query_source_cross_phase, query_source_range
 from mcp.strength_helpers import (
     _VOLUME_LANDMARKS,
     assess_volume_completeness,
@@ -44,15 +44,16 @@ def _read_hevy_all_phases(start_date: str, end_date: str) -> tuple[list, list[st
        TWICE on the fuzzy-name path (`exercise_name="squat"`: 486 sessions vs 250 real ones;
        `"bench press"`: 655 vs 344). Dropping `tombstone=true` is the item-level rule
        `phase_filter.singleton_visible` already encodes for key reads. Nothing is lost.
-    """
-    from experiment.phase_filter import source_reads_cross_phase
 
-    # Derived from the class registry (#2109), never asserted here.
-    cross_phase = source_reads_cross_phase("hevy")
-    rows = query_source_range("hevy", start_date, end_date, include_pilot=cross_phase) or []
-    items = [r for r in rows if not r.get("tombstone")]
-    phases_read = sorted({str(r.get("phase") or "unstamped") for r in items})
-    return items, phases_read
+    #4032 moved both corrections down into `mcp.core.query_source_cross_phase`, which is
+    now the ONE implementation of them. The energy-budget surface reads the same Hevy set
+    log through THIS helper (`tools_health._get_energy_expenditure`,
+    `tools_nutrition._hevy_workouts`) and its sibling raw_timeseries partitions through
+    that core helper directly — so there is a single read path, not a second one that can
+    drift from this docstring.
+    """
+    items = query_source_cross_phase("hevy", start_date, end_date)
+    return items, phases_of(items)
 
 
 def _searched_block(exercise_name: str, template_id: str, start_date: str, end_date: str, items: list, phases_read: list[str]) -> dict:

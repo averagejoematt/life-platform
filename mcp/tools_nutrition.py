@@ -11,7 +11,13 @@ from health import (
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
 )
 
-from mcp.core import get_profile, pacific_today, parallel_query_sources, query_source
+from mcp.core import (
+    get_profile,
+    pacific_today,
+    parallel_query_sources_cross_phase,
+    phase_scope_block,
+    query_source_cross_phase,
+)
 from mcp.nutrition_micronutrients import (  # noqa: F401 — re-exported; dispatch + tests read them here
     _MICRO_CATEGORY_ORDER,
     _MICRONUTRIENT_TARGETS,
@@ -95,7 +101,7 @@ def _trend_check(end_date, tdee, intake_avg, days=14):
     except (TypeError, ValueError):
         return tdee_core.implied_deficit_vs_trend(tdee, intake_avg, None, 0)
     try:
-        wt_rows = query_source("withings", (end_dt - timedelta(days=days)).strftime("%Y-%m-%d"), end_date)
+        wt_rows = query_source_cross_phase("withings", (end_dt - timedelta(days=days)).strftime("%Y-%m-%d"), end_date)
     except Exception:
         wt_rows = []
     trend, span = tdee_core.weight_trend_lb_per_wk(wt_rows)
@@ -108,9 +114,18 @@ def _hevy_workouts(start_date, end_date):
     #3931: without it the lifting term falls back to the stated 0.25 work fraction of
     logged duration. A Hevy outage therefore costs precision, never correctness, and the
     branch names itself in the returned `basis`.
+
+    #4032: read through #4030's `_read_hevy_all_phases` — the ONE Hevy read path — rather
+    than the plain `query_source("hevy", …)` default. `SOURCE#hevy` is RAW_TIMESERIES in
+    `phase_taxonomy`: kept forever, genesis-ANCHORED on read, never HIDDEN, so the window
+    passed in is what bounds recency. Through the default this trailing window truncated
+    at the current genesis, which re-introduced on a schedule exactly the worked-set loss
+    #3931 added this term to prevent — and made the calorie TARGET step at every restart.
     """
     try:
-        return query_source("hevy", start_date, end_date) or []
+        from mcp.tools_strength import _read_hevy_all_phases
+
+        return _read_hevy_all_phases(start_date, end_date)[0]
     except Exception:
         return []
 
@@ -135,7 +150,9 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
         return None
     if weight_lbs is None:
         try:
-            weight_lbs = _latest_weight_lbs(query_source("withings", (end_dt - timedelta(days=14)).strftime("%Y-%m-%d"), end_date))
+            weight_lbs = _latest_weight_lbs(
+                query_source_cross_phase("withings", (end_dt - timedelta(days=14)).strftime("%Y-%m-%d"), end_date)
+            )
         except Exception:
             return None
     if weight_lbs is None:
@@ -154,7 +171,7 @@ def _energy_budget(end_date, deficit_kcal=tdee_core.DEFAULT_DEFICIT_KCAL, weight
     weight_kg = float(weight_lbs) * tdee_core.LB_TO_KG
     d7_start = (end_dt - timedelta(days=tdee_core.EXERCISE_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
     try:
-        strava_7d = query_source("strava", d7_start, end_date)
+        strava_7d = query_source_cross_phase("strava", d7_start, end_date)
     except Exception:
         strava_7d = []
     ex = tdee_core.exercise_energy(strava_7d, weight_kg, _hevy_workouts(d7_start, end_date))
@@ -215,7 +232,7 @@ def _avg_sleep_onset_hour(start_date, end_date):
     """
     onsets = []
     try:
-        for si in query_source("eightsleep", start_date, end_date):
+        for si in query_source_cross_phase("eightsleep", start_date, end_date):
             hour = si.get("sleep_onset_hour")
             if hour is None and si.get("sleep_start"):
                 hour = _hour_from_iso_local(si["sleep_start"])
@@ -256,7 +273,7 @@ def _get_meal_timing(args):
     """
     start_date, end_date = _nutrition_default_range(args)
 
-    items = query_source("macrofactor", start_date, end_date)
+    items = query_source_cross_phase("macrofactor", start_date, end_date)
     if not items:
         return {"error": "No MacroFactor data for range.", "start_date": start_date, "end_date": end_date}
 
@@ -429,7 +446,7 @@ def _get_nutrition_summary(args):
     """
     start_date, end_date = _nutrition_default_range(args)
 
-    items = query_source("macrofactor", start_date, end_date)
+    items = query_source_cross_phase("macrofactor", start_date, end_date)
 
     if not items:
         return {"error": "No MacroFactor data found for the requested range.", "start_date": start_date, "end_date": end_date}
@@ -526,7 +543,7 @@ def _get_macro_targets(args):
     calorie_target = args.get("calorie_target")  # optional override
     protein_target = args.get("protein_target")  # optional override
 
-    items = query_source("macrofactor", start_date, end_date)
+    items = query_source_cross_phase("macrofactor", start_date, end_date)
 
     if not items:
         return {"error": "No MacroFactor data found.", "start_date": start_date, "end_date": end_date}
@@ -610,6 +627,11 @@ def _get_macro_targets(args):
     n = len(daily_rows)
     return {
         "period": {"start_date": start_date, "end_date": end_date, "days_with_data": n},
+        # #4032: the MacroFactor rows this view graded, and the phases they came from.
+        # The budget's own inputs (withings + strava + hevy) are read inside
+        # `_energy_budget` over their own 7-day window and are named in
+        # `targets.calorie_target_detail.inputs`.
+        "phase_scope": phase_scope_block({f"macrofactor[{start_date}..{end_date}]": items}),
         "targets": {
             "calories_kcal": calorie_target,
             "protein_g": protein_target,
@@ -698,7 +720,7 @@ def tool_get_deficit_sustainability(args):
     start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
     # ── 1. Caloric deficit detection ──
-    mf_items = query_source("macrofactor", start_date, end_date)
+    mf_items = query_source_cross_phase("macrofactor", start_date, end_date)
     if len(mf_items) < 7:
         return {"error": f"Need ≥7 days of MacroFactor data. Found {len(mf_items)}."}
 
@@ -739,7 +761,7 @@ def tool_get_deficit_sustainability(args):
     _deficit_published = bool(_tdee_check is None or _tdee_check.get("publish", True))
 
     # ── 2. Pull multi-source data ──
-    sources = parallel_query_sources(["whoop", "habitify", "strava", "hevy"], start_date, end_date)
+    sources = parallel_query_sources_cross_phase(["whoop", "habitify", "strava", "hevy"], start_date, end_date)
     whoop_items = sorted(sources.get("whoop", []), key=lambda x: x.get("date", ""))
     habit_items = sorted(sources.get("habitify", []), key=lambda x: x.get("date", ""))
     strava_items = sorted(sources.get("strava", []), key=lambda x: x.get("date", ""))
@@ -916,6 +938,15 @@ def tool_get_deficit_sustainability(args):
         # computed over however many days actually carried a calorie rollup. Publishing
         # only the request let seven logged days inside a fourteen-day ask read as "days: 14".
         "period": {"start_date": start_date, "end_date": end_date, "days": days, "days_with_data": len(cals)},
+        # #4032: every partition this tool reads is raw_timeseries, so the window above —
+        # not the cycle it lands in — is what bounds it. Stated here because the five
+        # channels and the deficit are all computed off these rows.
+        "phase_scope": phase_scope_block(
+            {
+                f"macrofactor[{start_date}..{end_date}]": mf_items,
+                **{f"{src}[{start_date}..{end_date}]": rows for src, rows in sorted(sources.items())},
+            }
+        ),
         "deficit": {
             "in_deficit": in_deficit,
             "avg_intake_kcal": round(avg_cal),
@@ -984,7 +1015,7 @@ def _get_metabolic_adaptation(args):
     start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks)).strftime("%Y-%m-%d")
 
     # Pull nutrition + weight data
-    data = parallel_query_sources(["macrofactor", "withings"], start_date, end_date)
+    data = parallel_query_sources_cross_phase(["macrofactor", "withings"], start_date, end_date)
     mf_items = sorted(data.get("macrofactor", []), key=lambda x: x.get("date", ""))
     wt_items = sorted(data.get("withings", []), key=lambda x: x.get("date", ""))
 
