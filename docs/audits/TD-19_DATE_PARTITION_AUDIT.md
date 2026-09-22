@@ -345,3 +345,128 @@ instant falls inside `[anchor, anchor+24h)`. **Post-merge, the same curl should 
   midnight and keeps its own date, with the board's derived `frame: "utc"` label.
 - It does not touch the reconciler or the writer. Re-framing either would mint a phantom
   nightly gap — the thing #3677 measured and pinned.
+
+---
+
+# 2026-09-21 — #3913 box 3: the deploy proof, the whole-history re-measure, and the third consumer
+
+*Added by the second #3913 lane. Scope: **the live read the flip was left open on, plus the
+derivation guard that makes the next one loud.** No ingestion code, no stored key, no
+backfill.*
+
+## Box 3, met — read live inside the straddling window
+
+The flip's own section above left one thing owed: the post-deploy curl. Taken
+**2026-09-21 21:02 PT / 2026-09-22 04:02Z** — deliberately after the UTC day rolled, which
+is the only ~7h of the day the defect was ever visible.
+
+Both deployed artifacts were read read-only first (`aws lambda get-function` → unzip →
+grep); `life-platform-freshness-checker` and `life-platform-site-api` both carry
+`"day_key_frame": "utc"` on the whoop entry, `build_info.built_at 2026-09-22T01:09:36Z`.
+
+`GET https://averagejoematt.com/api/source_freshness`, same payload, four rows:
+
+| source | frame | `last_update_ts` | `age_hours` |
+|---|---|---|---|
+| **whoop** | utc | `2026-09-21T00:00:00+00:00` | **28.0** |
+| apple_health | utc | `2026-09-22T00:00:00+00:00` | 4.0 |
+| eightsleep | pacific | `2026-09-21T00:00:00-07:00` | 21.0 |
+| withings | pacific | `2026-09-21T00:00:00-07:00` | 21.0 |
+
+- `04:02Z − 2026-09-21T00:00Z = 28.04h` → the served 28.0 **is** the UTC anchor. The
+  pre-flip Pacific anchor would have served **21.0h** — the two Pacific-framed rows in the
+  same payload still do, which is the per-source claim, not a sweep.
+- The actual last-written whoop key is `DATE#2026-09-21`, holding a sleep begun
+  `2026-09-21T04:50:14Z` = **2026-09-20 21:50 PT** — a straddling row, keyed by its UTC
+  day. Stated honestly: the board ages the KEY's day, not the datum's instant, so 28.0h is
+  *older* than the datum's true 23.2h. The pre-flip 21.0h was *younger* than it. A day-
+  granular anchor can only round one way, and the flip moved it to the conservative side —
+  the number no longer claims the data is fresher than it is.
+
+**Box 3 is met. The issue's acceptance is closed on this read, not on the merge.**
+
+## The whole-history re-measure
+
+Read-only paginated `Query` on `USER#matthew#SOURCE#whoop`, projecting `sk, sleep_start,
+start_time`; daily rows judged on `sleep_start`, workout sub-records on `start_time`
+(#3677's own methodology, re-run without its fallback and byte-identical either way).
+
+| | #3677 (2026-09-19) | this re-measure (2026-09-21) |
+|---|---|---|
+| rows in partition | 4,858 | **4,866** |
+| key range | 2020-03-23 … 2026-09-19 | **2020-03-20 … 2026-09-21** |
+| straddling rows (UTC day ≠ Pacific day of start) | 2,249 | **2,250** (1,650 daily + 600 workout) |
+| …keyed by the **UTC** day | 2,249 | **2,250** |
+| …keyed by the **Pacific** day | 0 | **0** |
+| …matching neither | 0 | **0** |
+
+**The issue's 2,249 is confirmed, and corrected upward by exactly one** — the single night
+that elapsed between the two reads (`DATE#2026-09-21`, the sleep begun 21:50 PT on 09-20).
+The registry's `day_key_frame_consequence` now carries the dated re-measure alongside the
+original. 182 daily rows carry no start attribute at all and are counted in neither column.
+
+*(Separately, and not part of the straddling count: **223** rows across all history carry a
+key matching **neither** frame — 37 daily (**all pre-2026**, exactly #3677's count and its
+"zero since 2026-01-01" claim, re-confirmed) and 186 workout (164 pre-2026, 22 in 2026).
+Their UTC start hours are 19:00–23:59 (215 of 223 at 22:0x–23:5x), i.e. 12:00–16:59 PT —
+mid-afternoon, so none of them straddles anything in either frame. They are the
+provider-window effect #3677's #3913 section named on 4 rows: the fetch window catches a
+workout that **ends** inside it and files it on the next UTC day. Start-vs-end, not
+Pacific-vs-UTC; **not one of the 223 is a Pacific keying**, so the ruling is unaffected. The
+larger n is only because #3677's parenthetical counted the daily half.)*
+
+## The third consumer — `site_api_status._comp_status`, fixed here
+
+#3257 fixed "the two consumers that age a `DATE#` key". #2817 had fixed one of the same two
+days earlier. Both were applied to a *remembered* list. Re-deriving the sweep — every
+function that turns a `%Y-%m-%d` day into an instant with a literal `tzinfo` **and** then
+measures a duration from it — found a third:
+
+`lambdas/web/site_api_status.py::_comp_status`, the public status page's per-source dot,
+hand-anchored **every** source at UTC midnight. Its `_hours_ago` therefore ran **7h (PDT) /
+8h (PST) high for the eleven Pacific-framed sources**, and was right about whoop and
+apple_health only by coincidence. It now calls `anchor_day_key(last_date_str, source_id)`,
+so the frame comes from the facet like everywhere else.
+
+**Blast radius, bounded:** the same function derives `days_ago` from `last_dt.date()`, and
+attaching a `tzinfo` never shifts a date — so the green/yellow/red verdict, which is driven
+by `effective_days`, is bit-identical. Only `_hours_ago` moves, and it is read in exactly
+one branch (`elif _hours_ago <= red_h`, reachable only at ≥3 lagged-adjusted days stale),
+where the correction makes a Pacific source *less* likely to be called red at the boundary
+— it was overstating. Pinned by
+`test_the_status_page_day_bucket_is_unaffected_by_the_fix`.
+
+**Checked and unchanged** (same sweep, registered with written reasons in the guard):
+`lambdas/operational/nudge_ledger_qa.py::_stamped_age_hours` anchors a NUDGE-ledger sk, not
+a source key; `lambdas/emails/coach_panel_podcast_lambda.py::_hold_age_days` anchors a
+platform-written hold stamp and divides into whole days. Neither is governed by a facet.
+`lambdas/web/site_api_status.py`'s `_LAGGED_SOURCES = {"eightsleep", "whoop"}` is a
+wake-date *lag* convention, day-granular and independent of the frame — named here so the
+next reader does not mistake it for a second frame record.
+
+## The guard: `tests/test_day_key_frame_declaration_guard_3913.py`
+
+The specimen was already pinned (`tests/test_whoop_day_key_frame_3913.py`, every assertion
+naming whoop). The **class** was not, and the class is the whole defect:
+`day_key_frame_for()` answers `"pacific"` for a source that declares nothing, so silence
+and a correct declaration are indistinguishable through the accessor.
+
+- **Leg 1 — declaration.** An AST scan of `lambdas/ingestion/` for the two signatures that
+  produce a UTC calendar day (`utc_window_literal`, a Zulu-anchored fetch window — whoop's,
+  the one no reviewer found for months; and `astimezone_utc_then_day` — HAE's). Over the
+  whole package it derives exactly `{health_auto_export_lambda.py, whoop_lambda.py}`: the
+  UTC set now falls out of the code rather than a list. Each member's source must carry an
+  **explicit** `day_key_frame` KEY — a claim `day_key_frame_for(s) == "utc"` cannot make,
+  since that is also satisfied by silence resolving to a default that happens to be wrong.
+  The planted-missing-facet control deletes whoop's facet from a copied registry and
+  asserts the guard reds on whoop alone; the same control runs for apple_health.
+- **Leg 2 — anchoring.** The sweep above, as a ratchet, with `common/pacific_time.py`
+  excluded (it *is* the anchor) and the two frame-blind sites registered with reasons.
+  Mutation-proved against the real tree: reverting `_comp_status` to the hand anchor reds
+  two named tests.
+- The `.total_seconds()` conjunct is load-bearing — ~20 sites in `lambdas/` attach a
+  `tzinfo` to a parsed day and immediately take `.date()`, where the frame provably cannot
+  matter. Flagging those would bury the two that count.
+
+Registered in `tests/conftest.py`'s `_PREMERGE_EXTRA_FILES`: the verdict is a function of
+the tree alone, and the failure it catches is invisible after a merge.
