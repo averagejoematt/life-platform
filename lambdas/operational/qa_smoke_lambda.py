@@ -1137,7 +1137,7 @@ def check_steps():
             lambda: chronicle_manifest_qa.check_chronicle_manifest_provenance(table, s3, S3_BUCKET, Check, CONTENT_TRUTH),
         ),  # #1243: a same-title podcast episode must date-match its journal article
         ("published_permalink_reachable", check_published_permalink_reachable),  # #3284: no published post url may be a redirect source
-        ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)),  # #1894: home/cockpit vs coaching
+        ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH, table=table)),  # #1894/#4025
         ("receipt_replay", check_receipt_replay),  # #1373: progression-receipt drift alarm (deterministic replay)
         ("redirect_spotcheck", check_redirect_spotcheck),  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         ("notion_template_schema", check_notion_template_schema),  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
