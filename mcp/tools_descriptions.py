@@ -150,7 +150,16 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
     "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly."
 )
 
-GET_MUSCLE_VOLUME_DESCRIPTION = "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?'"
+GET_MUSCLE_VOLUME_DESCRIPTION = (
+    "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is "
+    "below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. "
+    "Counts every set in the window across EVERY experiment cycle (#4031 — no phase filter; the superseded legacy "
+    "daily-aggregate generation is excluded so nothing is double-counted), so a trailing window no longer truncates to the "
+    "current cycle's age. Default window is the trailing 28 days (4 whole weeks) for period='week' and 90 days for "
+    "period='month' — a rate needs a window it can be a rate over; pass start_date/end_date to choose your own. The answer "
+    "echoes what it did in `searched`: the window, whether that window was yours or the default, and the phases read. "
+    "Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?'"
+)
 
 GET_NUTRITION_DESCRIPTION = (
     "Unified nutrition intelligence from MacroFactor. Use 'view' to select the analysis: "

@@ -284,6 +284,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # anywhere, and the surface that shows it is a coach prescribing a load off a phantom
         # "never done". A cross-cycle read regression cannot wait for a post-merge lane.
         "test_exercise_history_cross_phase_4030.py",
+        # #4031: the same cross-cycle read one tool over — and here the truncated number IS a
+        # prescription. `get_muscle_volume` read SOURCE#hevy through the ADR-058 phase filter, so
+        # every trailing window silently shrank to the cycle's AGE, and what shrank is
+        # `volume_landmark_status` ("below maintenance" / "optimal" / "exceeding MRV – overtraining
+        # risk"). Same file also defaulted the window to 2000-01-01 and divided by it (~1,380
+        # weeks -> ~0.0 sets/wk -> "below maintenance" everywhere). Pre-merge because the failure
+        # is INVISIBLE after the merge: a well-formed, confident verdict with no error anywhere,
+        # consumed by `plan_next_session` and the routine-authoring freshness gate. The fake table
+        # IS the wire and the mutation arm restores the filter.
+        "test_muscle_volume_cross_phase_4031.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the
