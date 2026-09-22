@@ -321,6 +321,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_grounding_sets_3614.py",
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
         "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
+        # #3913: two AST sweeps — lambdas/ingestion/ for the modules that DERIVE a UTC calendar
+        # day (a Zulu fetch window, an astimezone-then-day cast), each of which must carry an
+        # EXPLICIT day_key_frame on its registry entry; and lambdas/ + mcp/ for any function that
+        # hand-anchors a YYYY-MM-DD day with a literal tzinfo and then measures a duration from it.
+        # Pure repo shape, and pre-merge because the failure it catches is INVISIBLE after the
+        # merge: an undeclared frame reads as the "pacific" default at every call site and the only
+        # symptom is a freshness age off by exactly 7h/8h — whoop carried it for months, and the
+        # third consumer this sweep found (site_api_status) survived two separate fixes of "the
+        # two consumers" because both were applied to a remembered list.
+        "test_day_key_frame_declaration_guard_3913.py",
         # #3559: AST sweep of lambdas/ — every reader-input capture door keys through
         # web.site_api_capture_store.capture_key(), whose prefix is derived-not-public
         # against deploy/bucket_policy.json. A door minting its own `generated/` key must
