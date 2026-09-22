@@ -275,7 +275,7 @@ SOURCE_CLASS: dict[str, str] = {
     # wiping it at reset would un-earn every badge and destroy the only record of priors that
     # failed to confirm (/method/wrong publishes those as findings).
     # #4036: owner dismissals of derived PAIN FLAGS (DISMISSAL#<site>#<YYYY-MM-DD>, written by
-    # mcp/tools_training_notes.py::tool_manage_pain_dismissals). Ruling 2026-09-21, ADR-077:
+    # mcp/tools_training_notes.py::tool_get_exercise_notes, action='dismiss'). Ruling 2026-09-21, ADR-077:
     # CROSS_PHASE, not SYSTEM_STATE and not EXPERIMENT_SCOPED. It is Matthew's own statement
     # about his BODY — the same class as "labs", "progress_photos" and "coach_corrections" —
     # and it is the record that stops a stale flag benching a lift against his word. An

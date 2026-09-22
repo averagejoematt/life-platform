@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-21
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-21 | **Total tools:** 85
+**Version:** v8.6.0 | **Last updated:** 2026-09-21 | **Total tools:** 84
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,11 +21,11 @@
 
 ---
 
-## All 85 Tools — by module
+## All 84 Tools — by module
 
 | Module | Tools |
 |---|---|
-| `mcp/tools_training_notes.py` | 2 |
+| `mcp/tools_training_notes.py` | 1 |
 | `mcp/tools_data.py` | 6 |
 | `mcp/tools_coach_intelligence.py` | 5 |
 | `mcp/tools_training.py` | 2 |
@@ -61,8 +61,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_exercise_notes` | exercise=, template_id=, lookback_days= | The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or dismiss before loading that movement. |
-| `manage_pain_dismissals` | action=, site=, words=, movement=, movements=[], flag_note_date=, dismissed_on= | OWNER-ONLY. Record or read Matthew's own dismissal of a derived PAIN FLAG (#4036). The note layer flags pain over-inclusively by design; this is the 'confirm or dismiss' half. action='dismiss' writes one dismissal — site (the body site in HIS words, e.g. 'right lower back'), words (VERBATIM, never a paraphrase), movement(s) and flag_note_date (the flag instance being dismissed), dismissed_on (defaults to today, Pacific). action='list' (default) returns every dismissal on the record. A dismissal never makes a flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the date and his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its own — a note dated after the dismissal trips the flag again and marks the dismissal superseded. A dismissal that cannot name an existing flag instance is refused, not stored. |
+| `get_exercise_notes` | action=, exercise=, template_id=, lookback_days=, site=, words=, movement=, flag_note_date=, dismissed_on= | The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + a prominent pain_flag. Use for: 'what did I note on calf raises lately?', 'how's the cycling progression going?', 'any pain flags on squats?', and as a standard pre-flight pull alongside get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or dismiss before loading that movement. action='dismiss' is the DISMISS half (#4036, OWNER-ONLY): record Matthew's own statement that a flagged site is resolved — site (his words), words (VERBATIM), flag_note_date (the flagged note being dismissed, checked against the real pain_dates first) and optionally dismissed_on. It never makes the flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the date and his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its own — a note dated after the dismissal trips the flag again and marks the dismissal superseded. action='dismissals' lists them. |
 
 ### Core Data Access (`mcp/tools_data.py`)
 

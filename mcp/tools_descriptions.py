@@ -55,71 +55,64 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their "
     "notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + "
     "confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or "
-    "dismiss before loading that movement."
+    "dismiss before loading that movement. "
+    "action='dismiss' is the DISMISS half (#4036, OWNER-ONLY): record Matthew's own statement that a "
+    "flagged site is resolved — site (his words), words (VERBATIM), flag_note_date (the flagged note "
+    "being dismissed, checked against the real pain_dates first) and optionally dismissed_on. It never "
+    "makes the flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the "
+    "date and his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its "
+    "own — a note dated after the dismissal trips the flag again and marks the dismissal superseded. "
+    "action='dismissals' lists them."
 )
 
-# ── inputSchemas that live beside their description (the #3692 ceiling) ──────────────
+# ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
 # `mcp/registry.py` is baselined at 2,130 logical lines by the #1665 ratchet and the ratchet
-# is shrink-only, so the sanctioned way to add a tool there is the one #3891 used: extract a
-# cohesive block to this sibling and reference it by name. The schema NAME stays inline in
-# the registry (tests/test_mcp_registry.py::test_r3_schema_structure reads the registry text
-# for it); only the parameter table moves. `scripts/generate_mcp_tool_catalog.py` resolves
-# these by name, so the published catalog is byte-identical either way.
+# is shrink-only — it had SIX logical lines of headroom when #4036 needed to add the owner
+# dismissal action below. Paid the #3891 way: the parameter table moved to this cohesive
+# sibling and the registry references it by name. The schema NAME stays inline in the
+# registry (tests/test_mcp_registry.py::test_r3_schema_structure reads the registry text for
+# it); only the table moves, and `scripts/generate_mcp_tool_catalog.py` resolves it by name
+# so the published catalog row is byte-identical.
 GET_EXERCISE_NOTES_INPUT = {
     "type": "object",
     "properties": {
+        "action": {
+            "type": "string",
+            "enum": ["read", "dismiss", "dismissals"],
+            "description": (
+                "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
+                "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record."
+            ),
+        },
         "exercise": {
             "type": "string",
             "description": "Exercise name (e.g. 'calf raise', 'cycling') — resolved to its Hevy template via recent workouts.",
         },
         "template_id": {"type": "string", "description": "Hevy exercise template id (hex or uuid). Alternative to 'exercise'."},
         "lookback_days": {"type": "integer", "description": "Days of history to include (default 180)."},
-    },
-    "required": [],
-}
-
-MANAGE_PAIN_DISMISSALS_INPUT = {
-    "type": "object",
-    "properties": {
-        "action": {
+        "site": {
             "type": "string",
-            "enum": ["list", "dismiss"],
-            "description": "list (default) = every dismissal on record; dismiss = record one.",
+            "description": "action='dismiss': the body site in HIS words (e.g. 'right lower back'). Required.",
         },
-        "site": {"type": "string", "description": "The body site in HIS words (e.g. 'right lower back'). Required for dismiss."},
         "words": {
             "type": "string",
-            "description": "His VERBATIM statement (e.g. 'right lower back gone'). Required for dismiss — never a paraphrase.",
+            "description": ("action='dismiss': his VERBATIM statement (e.g. 'right lower back gone'). Required — never a paraphrase."),
         },
         "movement": {
             "type": "string",
-            "description": "The movement carrying the dismissed flag (e.g. 'Romanian Deadlift (Barbell)'). Required for dismiss.",
-        },
-        "movements": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "Several movements, when one statement dismisses the flag on more than one.",
+            "description": "action='dismiss': the movement carrying the flag, if different from `exercise`.",
         },
         "flag_note_date": {
             "type": "string",
-            "description": "YYYY-MM-DD of the flagged NOTE being dismissed — must be a real one (get_exercise_notes.pain_dates).",
+            "description": (
+                "action='dismiss': YYYY-MM-DD of the flagged NOTE being dismissed. Required, and must be a real "
+                "one — it is checked against this movement's own pain_dates before anything is written."
+            ),
         },
-        "dismissed_on": {"type": "string", "description": "YYYY-MM-DD he said it. Defaults to today (Pacific)."},
+        "dismissed_on": {"type": "string", "description": "action='dismiss': YYYY-MM-DD he said it. Defaults to today (Pacific)."},
     },
     "required": [],
 }
-
-MANAGE_PAIN_DISMISSALS_DESCRIPTION = (
-    "OWNER-ONLY. Record or read Matthew's own dismissal of a derived PAIN FLAG (#4036). The note layer "
-    "flags pain over-inclusively by design; this is the 'confirm or dismiss' half. action='dismiss' writes "
-    "one dismissal — site (the body site in HIS words, e.g. 'right lower back'), words (VERBATIM, never a "
-    "paraphrase), movement(s) and flag_note_date (the flag instance being dismissed), dismissed_on (defaults "
-    "to today, Pacific). action='list' (default) returns every dismissal on the record. A dismissal never "
-    "makes a flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the date and "
-    "his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its own — a note "
-    "dated after the dismissal trips the flag again and marks the dismissal superseded. A dismissal that "
-    "cannot name an existing flag instance is refused, not stored."
-)
 
 GET_SOURCES_DESCRIPTION = "List all available data sources and their date ranges in the life platform."
 

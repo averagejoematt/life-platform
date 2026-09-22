@@ -182,7 +182,7 @@ def summary() -> dict[str, Any]:
 #   at chat time cannot touch it — the #3675 inertness class in reverse: a value a chat turn
 #   produces cannot live in a module a deploy produces. The dismissal is therefore a
 #   DynamoDB record (`USER#matthew#SOURCE#training_constraints / DISMISSAL#<site>#<date>`,
-#   CROSS_PHASE, owner-only Tier 2) written by ONE MCP tool and read at runtime by
+#   CROSS_PHASE, owner-only Tier 2) written by ONE MCP action and read at runtime by
 #   `plan_engine._tripwire_states` and `coach.critics.build_joints_packet`.
 #
 # WHAT LIVES HERE INSTEAD
@@ -293,7 +293,7 @@ def build_dismissal_record(
         "movement_keys": sorted({normalize_dismissal_key(m) for m in movements}),
         "flag_note_date": str(flag_note_date)[:10],
         "recorded_at": recorded_at,
-        "recorded_via": "manage_pain_dismissals",
+        "recorded_via": "get_exercise_notes/dismiss",
         "issue": DISMISSAL_ISSUE,
         "rule": DISMISSAL_RULE["re_arms"],
     }

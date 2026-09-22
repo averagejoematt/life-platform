@@ -315,3 +315,35 @@ def test_the_census_disposition_follow_up_is_armed():
         )
     else:
         assert tcr.DISMISSAL_SOURCE not in reg.UNREGISTERED_PARTITIONS, "an exemption for a partition the census cannot see is fiction"
+
+
+def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
+    """#4036's ONE MCP write. It is an ACTION on `get_exercise_notes` rather than a tool of
+    its own: minting a tool moves `mcp_tools`, a generated literal that lives only in
+    `lambdas/web/platform_counts.py` and that no branch may carry (#3101/#3984), so the
+    stale-number gate would red the PR on doc headers the reconcile job owns. The issue's
+    acceptance sanctions an action on an existing owner tool, and this is the tool whose own
+    `note` says "confirm or dismiss before loading that movement"."""
+    import os
+
+    os.environ.setdefault("TABLE_NAME", "life-platform")
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    os.environ.setdefault("USER_ID", "matthew")
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    sys.path.insert(0, str(REPO))
+
+    from mcp import tools_training_notes as ttn
+    from mcp.tools_descriptions import GET_EXERCISE_NOTES_INPUT
+
+    action = GET_EXERCISE_NOTES_INPUT["properties"]["action"]
+    assert set(action["enum"]) == {"read", "dismiss", "dismissals"}
+    for field in ("site", "words", "flag_note_date", "dismissed_on"):
+        assert field in GET_EXERCISE_NOTES_INPUT["properties"], f"{field} is not documented on the tool that writes it"
+
+    # dispatch, without touching DynamoDB: an unknown action is named, never silently read.
+    out = ttn.tool_get_exercise_notes({"action": "nope"})
+    assert "error" in out and out["valid_actions"] == ["read", "dismiss", "dismissals"]
+
+    # a dismissal that cannot name its instance is refused BEFORE any read or write.
+    refused = ttn.tool_get_exercise_notes({"action": "dismiss", "site": "right lower back", "words": ""})
+    assert refused["error"].startswith("refused:") and "VERBATIM" in refused["error"]

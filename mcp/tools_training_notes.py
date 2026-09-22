@@ -1,10 +1,16 @@
 """
-tools_training_notes.py — read surface for the derived note-signal layer (Phase 1).
+tools_training_notes.py — the derived note-signal layer's surface: read, and one owner write.
 
 get_exercise_notes returns the per-exercise note timeline the coach reads as a trajectory
 (the arc, not the latest line). pain_flag is surfaced prominently — this is the §7
-pre-flight pain surface. Raw notes stay sovereign; this only reads the derived
+pre-flight pain surface. Raw notes stay sovereign; the read only reads the derived
 `training_notes` projection (written by the on-ingest extractor in hevy_backfill_lambda).
+
+`action='dismiss'` (#4036) is the one WRITE here, and it writes a different partition:
+`USER#matthew#SOURCE#training_constraints`, the owner's dismissal of a pain flag. It is the
+second half of this layer's own instruction — "pain_flag is over-inclusive by design —
+confirm or dismiss before loading that movement" — and until #4036 only the first half
+existed anywhere. See the block at the end of this file.
 """
 
 from datetime import timedelta
@@ -55,8 +61,24 @@ def _resolve_template_id(exercise: str, lookback_days: int) -> tuple[str | None,
 
 
 def tool_get_exercise_notes(args):
-    """Per-exercise note timeline (the arc) + signals + pain flags from the derived layer."""
+    """Per-exercise note timeline (the arc) + signals + pain flags — and, on `action`, the
+    OWNER-ONLY dismissal of one of those flags (#4036, see the block at the end of this file).
+
+    The write lives on this tool rather than on one of its own (which is what #4036's design
+    note reached for first) because minting a tool moves `mcp_tools`, a generated count that
+    lives ONLY in `lambdas/web/platform_counts.py` and that no branch may carry (#3101/#3984)
+    — the stale-number gate would red this PR on six doc headers the reconcile job owns. The
+    issue's acceptance sanctions "a new action on an existing owner tool", and this is the
+    tool that owns the pain-flag surface: its own `note` is the sentence the action answers.
+    `action` defaults to `read`, so every existing caller is unchanged."""
     args = args or {}
+    action = str(args.get("action") or "read").strip().lower()
+    if action == "dismiss":
+        return _dismiss_pain_flag(args)
+    if action in ("dismissals", "list_dismissals"):
+        return _list_dismissals()
+    if action != "read":
+        return {"error": f"Unknown action '{action}'.", "valid_actions": ["read", "dismiss", "dismissals"]}
     exercise = args.get("exercise") or args.get("template_id") or ""
     lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)
     if not exercise:
@@ -179,9 +201,13 @@ def tool_get_exercise_notes(args):
 # DISMISSAL#<site>#<YYYY-MM-DD>`, CROSS_PHASE (ADR-077), Tier 2 owner-only — written here
 # and read at runtime by `plan_engine._tripwire_states` and `critics.build_joints_packet`.
 #
-# ONE write action and one read action, on ONE tool. The rule (what a dismissal is, how it
-# re-arms) is not restated here: it is imported from the registry, so this surface cannot
-# disagree with the engines that consume what it writes.
+# It is TWO ACTIONS on this existing tool rather than a tool of its own — #4036's acceptance
+# sanctions either, and the count of MCP tools is a generated literal that lives only in
+# `lambdas/web/platform_counts.py`, which no branch may carry (#3101/#3984): minting one here
+# would red the stale-number gate on six doc headers the reconcile job owns and this lane may
+# not touch. The rule (what a dismissal is, how it re-arms) is not restated here either: it is
+# imported from the registry, so this surface cannot disagree with the engines that consume
+# what it writes.
 
 
 def _dismissal_records() -> list:
@@ -203,58 +229,55 @@ def _dismissal_records() -> list:
     return [decimal_to_float(i) for i in items]
 
 
-def tool_manage_pain_dismissals(args):
-    """Owner dismissals of derived pain flags: `dismiss` (write one) / `list` (read them).
+def _list_dismissals():
+    """Every owner dismissal on the record (action='dismissals').
 
-    OWNER-ONLY. The record carries his verbatim words; nothing public reads this partition
+    OWNER-ONLY. The records carry his verbatim words; nothing public reads this partition
     (`privacy.field_tiers.SOURCE_TIERS['training_constraints'] = TIER_OWNER_ONLY`).
     """
+    from training import training_context_registry as tcr
+
+    records = _dismissal_records()
+    return {
+        "count": len(records),
+        "store": tcr.DISMISSAL_RULE["store"],
+        "rule": tcr.DISMISSAL_RULE,
+        "dismissals": [
+            {
+                "sk": r.get("sk"),
+                "site": r.get("site"),
+                "dismissed_on": r.get("dismissed_on"),
+                "words": r.get("words"),
+                "movements": r.get("movements") or [],
+                "flag_note_date": r.get("flag_note_date"),
+                "recorded_at": r.get("recorded_at"),
+            }
+            for r in records
+        ],
+        "how_to_use": (
+            "A dismissal does not make a flag disappear — plan_next_session reads the tripwire as "
+            "`dismissed_by_owner` with the date and his words, and it re-arms on its own if a later note "
+            "flags the same movement. Ask him again before dismissing a site he has already re-flagged."
+        ),
+        "_disclaimer": (
+            "For personal health tracking only. Not medical advice. Descriptive of Matthew's own n=1 history. "
+            "Consult a qualified healthcare provider before making health decisions based on this data."
+        ),
+    }
+
+
+def _dismiss_pain_flag(args):
+    """action='dismiss' — the owner overrides one flag instance, in his own words."""
     from datetime import datetime, timezone
 
     from training import training_context_registry as tcr
 
-    args = args or {}
-    action = str(args.get("action") or "list").strip().lower()
-
-    if action == "list":
-        records = _dismissal_records()
-        return {
-            "count": len(records),
-            "store": tcr.DISMISSAL_RULE["store"],
-            "rule": tcr.DISMISSAL_RULE,
-            "dismissals": [
-                {
-                    "sk": r.get("sk"),
-                    "site": r.get("site"),
-                    "dismissed_on": r.get("dismissed_on"),
-                    "words": r.get("words"),
-                    "movements": r.get("movements") or [],
-                    "flag_note_date": r.get("flag_note_date"),
-                    "recorded_at": r.get("recorded_at"),
-                }
-                for r in records
-            ],
-            "how_to_use": (
-                "A dismissal does not make a flag disappear — plan_next_session reads the tripwire as "
-                "`dismissed_by_owner` with the date and his words, and it re-arms on its own if a later note "
-                "flags the same movement. Ask him again before dismissing a site he has already re-flagged."
-            ),
-            "_disclaimer": (
-                "For personal health tracking only. Not medical advice. Descriptive of Matthew's own n=1 history. "
-                "Consult a qualified healthcare provider before making health decisions based on this data."
-            ),
-        }
-
-    if action != "dismiss":
-        return {"error": f"Unknown action '{action}'.", "valid_actions": ["dismiss", "list"]}
-
-    # ── dismiss: the owner overrides one flag instance, in his own words ──────────
     try:
         record = tcr.build_dismissal_record(
             site=args.get("site") or "",
             dismissed_on=(args.get("dismissed_on") or pacific_now().date().isoformat()),
             words=args.get("words") or "",
-            movements=args.get("movements") or ([args["movement"]] if args.get("movement") else []),
+            movements=args.get("movements") or [m for m in (args.get("movement"), args.get("exercise")) if m][:1],
             flag_note_date=args.get("flag_note_date") or "",
             recorded_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
