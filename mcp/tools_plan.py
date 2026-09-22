@@ -222,7 +222,7 @@ def tool_plan_next_session(args):
     walk_layer = _safe(_walking_volume_last_7d, target_date)
 
     # #3755: the performed Hevy record over the program's rotation window, so the engine
-    # can COMPUTE whether the accessory layer is rotating instead of assuming the pool.
+    # can COMPUTE whether the accessory layer is holding still (v0.3: fixed for the block) instead of assuming the pool.
     rotation_start, rotation_rows = _safe(_rotation_window, target_date) or (None, None)
 
     block = plan_engine.constraint_block(

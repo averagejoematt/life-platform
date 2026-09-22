@@ -273,6 +273,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # zero episodes) on a `site/**` PR, which AUTO-DEPLOYS on merge (#750). Post-merge
         # this gate would only ever red on something already published.
         "test_podcast_feed_link_3615.py",
+        # #4030: the all-time exercise-history read must never be wrapped in the ADR-058 phase
+        # filter — `SOURCE#hevy` is raw_timeseries (cross-phase by the taxonomy's own ruling), and
+        # with the filter on the tool answered from the current cycle only: 15 of 499 workouts, the
+        # owner's June RDL session absent, "no logged sets found" for a movement with 250 of them.
+        # The fake table IS the wire (it applies the real FilterExpression mcp.core mints) and the
+        # mutation arm restores the filter. Pre-merge because the failure is INVISIBLE after the
+        # merge: the tool returns a well-formed, confident, truncated answer with no error
+        # anywhere, and the surface that shows it is a coach prescribing a load off a phantom
+        # "never done". A cross-cycle read regression cannot wait for a post-merge lane.
+        "test_exercise_history_cross_phase_4030.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the

@@ -366,6 +366,12 @@ def _generated(monkeypatch):
     """Drive the real generator with the live history/bodyweight fixtures in place of the
     two DynamoDB queries. Nothing else is stubbed — configs, selection and the caps are
     the production ones."""
+    # #3753: these fixtures exercise the generator against the committed config/training_week.json;
+    # pin the seam to that grid so the approved v0.3 program (now ACTIVE) does not change the specimen.
+    from training import program_structure as _ps
+
+    monkeypatch.setattr(_ps, "ACTIVE", False)
+    monkeypatch.setattr(_ps, "LAST_REVIEWED_BY_OWNER", None)
     from training import exercise_history, routine_generator as rg
 
     monkeypatch.setattr(rg, "CONFIG_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config")))
