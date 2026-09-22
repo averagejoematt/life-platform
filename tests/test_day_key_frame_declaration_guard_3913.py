@@ -433,15 +433,19 @@ def test_the_status_page_is_no_longer_one_of_them():
 def test_the_status_pages_source_age_now_comes_from_the_facet():
     """Per-source, from the registry — not one frame swept over twelve sources, which is
     the mistake in both directions (#3257 swept UTC, #2817 swept Pacific)."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from common.pacific_time import anchor_day_key
 
+    # The instant is DERIVED from the day constant, never bound to a wall clock — and it is
+    # the live instant this lane actually read the board at (2026-09-21 21:02 PT), which is
+    # inside the straddling window where the two frames disagree (#2376's rule, and the only
+    # ~7h of the day the defect was ever visible).
     day = "2026-09-21"
-    now = datetime(2026, 9, 22, 4, 0, tzinfo=timezone.utc)
+    at = datetime.fromisoformat(f"{day}T00:00:00+00:00") + timedelta(hours=28)
 
     def hours(source):
-        return (now - anchor_day_key(day, source)).total_seconds() / 3600
+        return (at - anchor_day_key(day, source)).total_seconds() / 3600
 
     assert hours("whoop") == 28.0, "a UTC-named day must be anchored at UTC midnight"
     assert hours("apple_health") == 28.0
