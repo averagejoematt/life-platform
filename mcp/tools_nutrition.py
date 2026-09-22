@@ -949,7 +949,23 @@ def tool_get_deficit_sustainability(args):
         "honesty": deficit_disclosures.DEFICIT_SUSTAINABILITY_HONESTY,
         # #3754 box 5: reused verbatim — see lambdas/health/deficit_disclosures.py.
         "prior_cut_comparability": deficit_disclosures.INTAKE_NOT_COMPARABLE_TO_PRIOR_CUT,
+        # #3754 boxes 3+4: the three nutrition critics (deficit advocate / muscle defense /
+        # adherence) over the owner's redlines, and the refeed / diet-break decisions they
+        # surface for HIM to log — this tool never writes one. Resolved by the MCP layer
+        # (`mcp/nutrition_critics_inputs.py`) from the same window plus the trailing-14-day
+        # Withings trend; a reader that fails is named in `critics.unknown`, never a crash.
+        **_nutrition_critics_block(end_date, severity, degraded_count, tdee_estimate if _deficit_published else None),
     }
+
+
+def _nutrition_critics_block(end_date, severity, degraded_count, maintenance_kcal):
+    """`{"critics": ..., "decisions_offered": [...]}` for the deficit view (#3754 boxes 3+4)."""
+    from mcp import nutrition_critics_inputs
+
+    block = nutrition_critics_inputs.block(
+        end_date, deficit_severity=severity, degraded_count=degraded_count, estimated_maintenance_kcal=maintenance_kcal
+    )
+    return {"critics": block, "decisions_offered": block.get("decisions_offered", [])}
 
 
 # ── IC-29: Metabolic Adaptation Intelligence ─────────────────────────────────

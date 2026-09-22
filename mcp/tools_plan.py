@@ -270,6 +270,11 @@ def tool_plan_next_session(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
+    # #3754 boxes 3+4: the nutrition critics ride beside the constraint block on the daily
+    # surface the owner reads — the same block get_deficit_sustainability carries, built by
+    # the same resolver, so the two surfaces cannot disagree. Owner-only (MCP), never a site
+    # or email surface.
+    out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
     if ir is not None:
         out["critics"] = _run_stage_2(
             ir, block, reference if isinstance(reference, dict) else None, evidence, protein_missed, protein_measured, target_date
@@ -280,6 +285,27 @@ def tool_plan_next_session(args):
             "`critics.changes`); dry_run shows the revised body. Then commit — the verdicts ride in the Hevy notes."
         )
     return out
+
+
+def _nutrition_critics_block() -> dict[str, Any]:
+    """The #3754 block from `get_deficit_sustainability` (one call, its own window ending on the
+    latest COMPLETE nutrition day). When that tool refuses (fewer than 7 logged days) the
+    resolver still runs, with the deficit tool's own severity named unknown."""
+    from mcp import nutrition_critics_inputs
+    from mcp.tools_nutrition import _nutrition_through_date, tool_get_deficit_sustainability
+
+    res = _safe(tool_get_deficit_sustainability, {})
+    if isinstance(res, dict) and isinstance(res.get("critics"), dict):
+        block = dict(res["critics"])
+        block["via"] = "get_deficit_sustainability"
+        return block
+    block = nutrition_critics_inputs.block(_nutrition_through_date())
+    block["via"] = (
+        "resolver (get_deficit_sustainability unavailable: "
+        + str((res or {}).get("error") if isinstance(res, dict) else "raised")[:120]
+        + ")"
+    )
+    return block
 
 
 # ── stage 2 evidence: the SAME readers a chat turn would call, gathered per draft lift ──

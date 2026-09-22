@@ -863,7 +863,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # baseline 8 passed, mutated 1 failed + 7 passed, reverted 8 passed). MEASURED by id-set diff against a disposable
         # `git archive origin/main` export at e2dac0e7e: lane {proven 126, unproven 540, not-applicable 6, attempted-unproven 5}
         # vs main {125, 540, 6, 5} — exactly one entrant, and unproven does not move.
-        <= 126
+        # Upper bound 126 -> 127 (2026-09-21, #3754 boxes 3+4): structural::test_nutrition_critics_3754.py arrives proven
+        # (STRUCTURAL_PROOFS, ARMED 1/1 via the re-runnable harness — an untracked lambdas/web/ module importing the owner-only
+        # nutrition critics: baseline 62 passed, mutated 1 failed + 61 passed, reverted 62 passed). MEASURED by id-set diff
+        # against a disposable `git archive origin/main` export at 2c3b47d48: lane {proven 127, unproven 540, not-applicable 6,
+        # attempted-unproven 5} vs main {126, 540, 6, 5} — exactly one entrant, and unproven does not move.
+        <= 127
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

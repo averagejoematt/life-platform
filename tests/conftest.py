@@ -261,6 +261,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # hand-types a drifted paraphrase (rather than importing the shared constant)
         # must red on the PR that adds it, not sit invisible post-merge.
         "test_prior_cut_disclosure_3754.py",
+        # #3754 boxes 3+4: os.walk sweep of lambdas/ for any importer of health.nutrition_critics
+        # outside the MCP layer — the block is OWNER-ONLY (a refeed decision with a
+        # `log_decision` payload must never reach site-api, a narrative or an email). A new
+        # importer is a repo-shape change that must red on the PR that adds it.
+        "test_nutrition_critics_3754.py",
         # #3615 box 5: sweeps every committed site/**/*.html for a `rel=alternate` link to a
         # feed the hook registry declares DARK. A repo-shape ratchet in the strict sense —
         # its verdict is a function of the tree alone — and pre-merge because the failure it

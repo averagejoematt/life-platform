@@ -428,8 +428,11 @@ GET_DEFICIT_SUSTAINABILITY_DESCRIPTION = (
     "Tier 0 habit completion, and training output. When 3+ degrade concurrently "
     "during an active deficit → flags with severity and calorie increase recommendation. "
     "Attia / Huberman: aggressive deficits destroy adherence, sleep, and muscle. "
+    "Also carries `critics` (deficit advocate / muscle defense / adherence, verdicts against the owner's "
+    "redlines) and `decisions_offered` — refeed / diet-break decisions with a ready `log_decision` payload "
+    "the owner accepts or declines himself (#3754). "
     "Use for: 'is my deficit sustainable?', 'am I cutting too hard?', "
-    "'deficit health check', 'should I eat more?', 'deficit sustainability'."
+    "'deficit health check', 'should I eat more?', 'deficit sustainability', 'refeed or diet break?'."
 )
 
 GET_WORKOUTS_DESCRIPTION = (
