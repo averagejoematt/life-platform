@@ -45,22 +45,25 @@ PROTEIN = rl.REDLINES["protein_floor_g"]
 LIFTS = rl.REDLINES["lifting_sessions_per_wk"]
 TW = {t["id"]: t for t in rl.TRIPWIRES}
 LO, HI = ENERGY["prescribed"]
+TARGET_317 = rl.rate_target_lb_per_wk(317.0)["target_lb_wk"]  # the scheduled target at the fixture's weight, never a literal
 
 
 def _inputs(**over):
-    """A clean, adherent fortnight at 317 lb: inside the band, protein at target, lifting 5 of 7,
-    losing on the schedule, walking flat week over week. Every rule's NEGATIVE fixture."""
+    """A clean, adherent fortnight at 317 lb: inside the band, protein at target, lifting 5 of 7
+    (above the redline's low), losing exactly on the schedule, walking flat week over week. Every
+    rule's NEGATIVE fixture. The loss rate is the redlines' own scheduled target at 317 lb, so the
+    fixture follows a v3 → v4 rate edit instead of silently going stale (#3753 v3: 3.0 → 3.5)."""
     base = {
         "window_end": "2026-09-20",
         "intake_kcal_by_day": [2100] * 14,
         "protein_g_by_day": [205] * 14,
         "lifting_day_flags": [True, True, False, True, True, True, False] * 2,
         "weight_lb": 317.0,
-        "weight_trend_lb_wk": -3.0,
+        "weight_trend_lb_wk": -TARGET_317,
         "weighin_count": 12,
         "weighin_span_days": 13,
         "rate_provisional": False,
-        "weekly_loss_rates_lb_wk": [3.0, 3.0],
+        "weekly_loss_rates_lb_wk": [TARGET_317, TARGET_317],
         "weeks_since_genesis": 6,
         "walking_hr_this_wk": 9.0,
         "walking_hr_last_wk": 9.0,
@@ -415,7 +418,7 @@ def test_weight_stall_without_adherence_offers_nothing(over):
 
 
 def test_stall_conditions_are_read_from_the_redlines_not_literals():
-    assert LIFTS["low"] == 5 and PROTEIN["days_of_7"] == 6  # the values the fixture above is built around
+    assert LIFTS["low"] == 3 and PROTEIN["days_of_7"] == 6  # the values the fixture above is built around (v3: 3–4 sessions)
     short = LIFTS["low"] - 1  # one lift under the redline's low in the trailing 7
     inputs = _inputs(**STALL, lifting_day_flags=[True] * 7 + [True] * short + [False] * (7 - short))
     offered = nc.decisions_offered(nc.run(inputs)["verdicts"], inputs, already_logged=[])

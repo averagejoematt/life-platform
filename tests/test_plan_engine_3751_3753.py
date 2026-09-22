@@ -118,7 +118,7 @@ def test_tripwires_can_actually_trip():
         **{
             **_FULL,
             "protein_days_missed_7d": 4,
-            "readiness_low_streak_days": 3,
+            "readiness_low_streak_days": 5,  # v3: 7-day mean < 50 read over 5–7 days; the engine's proxy is the streak
             "anchor_lift_drop_pct": 12.0,
             "anchor_lift_drop_sessions": 2,
         }
@@ -182,25 +182,33 @@ def test_the_block_says_the_critics_have_not_run():
     assert "#3752" in block["critics"]["note"]
 
 
-def test_unconfirmed_redlines_are_reported_as_proposed():
+def test_approved_redlines_are_reported_active_not_proposed():
+    """Approved 2026-09-21 (#3753, v3): the block no longer calls the redlines PROPOSED, but still names
+    the tripwires the engine does not evaluate (ADR-105: silence is not clearance).
+    Mutation control (recorded in the PR): set owner_redlines.ACTIVE = False → this reds."""
     block = plan_engine.constraint_block(**_FULL)
-    assert block["redlines"]["active"] is False
-    assert any("PROPOSED" in line or "not yet" in line for line in block["honesty"])
+    assert block["redlines"]["active"] is True
+    assert not any("redlines are PROPOSED" in line for line in block["honesty"])
+    assert any("NOT evaluated by this" in line for line in block["honesty"])
+    assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-21"
+    assert owner_redlines.REDLINES_VERSION == "3.0"
 
 
-def test_the_rate_tension_is_resolved_as_a_schedule_and_still_proposed():
-    """He stated a 0.5-1.0%/wk window on 09-07 and asked for 3 lb/wk on 09-20. v2 resolves the two
-    as a SCHEDULE (the window's top now, stepping down at 295/260/230/200) rather than silently
-    picking one — and it stays PROPOSED until he approves v0.2."""
+def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
+    """He stated a 0.5-1.0%/wk window on 09-07, asked for 3 lb/wk on 09-20, and on 09-21 approved v0.3's
+    'reproduce the 2024–25 velocity' schedule. The two owner statements are reconciled as a SCHEDULE
+    in one file — the envelope kept as history, superseded above 240 lb by what he approved."""
     summ = owner_redlines.summary()
     assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
     assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
-    assert summ["active"] is False and summ["version"].endswith("-proposed")
+    assert "2026-09-21" in owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"]
+    assert summ["active"] is True and summ["version"] == "3.0" and summ["last_reviewed_by_owner"] == "2026-09-21"
+    assert summ["plan"].endswith("TRAINING_PROGRAM_v0.3.md") and summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
-    assert rate["target_lb_wk"] == 3.0 and rate["cap_lb_wk"] == 3.5 and rate["schedule_step_above_lb"] == 295
-    assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 2.0
+    assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 4.0 and rate["schedule_step_above_lb"] == 295
+    assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 2.75
     assert owner_redlines.rate_target_lb_per_wk(199.0)["target_lb_wk"] == 0.0  # the maintenance block
-    # the v2 tripwires the engine cannot compute are named in the block, never silent (ADR-105)
+    # the tripwires the engine cannot compute are named in the block, never silent (ADR-105)
     block = plan_engine.constraint_block(**_FULL)
     assert set(block["unevaluated_tripwires"]) == set(owner_redlines.unevaluated_tripwires())
     assert any("NOT evaluated by this engine" in line and "walking_collapse" in line for line in block["honesty"])
@@ -208,6 +216,164 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_still_proposed():
     assert rate["low_lb_wk"] == pytest.approx(1.6, abs=0.05)
     assert rate["high_lb_wk"] == pytest.approx(3.2, abs=0.05)
     assert rate["owner_to_resolve"] is None and rate["resolution"].startswith("RESOLVED as a schedule")
+
+
+# ── 5b. v3 (#3753 approved 2026-09-21): the §1 table, the landing, the new tripwires ────
+_V3_TABLE = [
+    # (weight_lb, target, cap, step_above_lb) — the plan's §1 rows, sampled INSIDE each band
+    (317.0, 3.5, 4.0, 295),
+    (296.0, 3.5, 4.0, 295),
+    (290.0, 3.25, 3.75, 275),
+    (276.0, 3.25, 3.75, 275),
+    (270.0, 3.0, 3.5, 260),
+    (250.0, 2.75, 3.25, 240),
+    (230.0, 2.25, 2.75, 220),
+    (215.0, 1.75, 2.25, 210),
+    (207.0, 1.25, 1.75, 205),
+    (203.0, 0.0, 0.0, 0),  # inside the 200–205 landing band → maintenance
+    (200.0, 0.0, 0.0, 0),
+]
+
+
+@pytest.mark.parametrize("weight,target,cap,above", _V3_TABLE)
+def test_v3_rate_schedule_matches_the_plans_section_1_table(weight, target, cap, above):
+    """Mutation control (recorded in the PR): delete the `above_lb: 275` step → the 290/276 rows red."""
+    r = owner_redlines.rate_target_lb_per_wk(weight)
+    assert (r["target_lb_wk"], r["cap_lb_wk"], r["schedule_step_above_lb"]) == (target, cap, above), weight
+    assert r["landing_phase"] is (weight <= 240)
+
+
+def test_v3_schedule_boundaries_are_strict_and_the_dxa_gates_travel():
+    """A weight exactly ON a boundary belongs to the band below it (`weight > above_lb`), and the
+    DXA-gated steps carry their gate text so a coach cannot take 3.5 at 270 without seeing it."""
+    steps = owner_redlines.REDLINES["rate_schedule_lb_wk"]["steps"]
+    assert [s["above_lb"] for s in steps] == [295, 275, 260, 240, 220, 210, 205, 0]
+    assert [s["target"] for s in steps] == [3.5, 3.25, 3.0, 2.75, 2.25, 1.75, 1.25, 0.0]
+    assert [s["cap"] for s in steps] == [4.0, 3.75, 3.5, 3.25, 2.75, 2.25, 1.75, 0.0]
+    assert owner_redlines.rate_target_lb_per_wk(295.0)["target_lb_wk"] == 3.25
+    assert owner_redlines.rate_target_lb_per_wk(240.0)["target_lb_wk"] == 2.25
+    assert "12 %" in owner_redlines.rate_target_lb_per_wk(270.0)["dxa_gate"]
+    assert "15 %" in owner_redlines.rate_target_lb_per_wk(250.0)["dxa_gate"]
+    assert owner_redlines.rate_target_lb_per_wk(317.0)["dxa_gate"] is None
+    assert "ursodiol" in owner_redlines.REDLINES["rate_schedule_lb_wk"]["overshoot_rule"]
+
+
+def test_v3_landing_block_is_data_the_coach_reads():
+    land = owner_redlines.landing()
+    assert land is owner_redlines.REDLINES["landing"]
+    assert land["deceleration_begins_lb"] == 240
+    assert land["rehearsal_maintenance_weeks_at_lb"] == [260, 240, 220]
+    assert land["land_lb"] == [200, 205] and land["never_lb"] == 188
+    assert land["maintenance_weeks"] == 26 and land["band_lb"] == [195, 205]
+    assert "14 days at the last cut prescription" in land["overshoot_rules"]["plus_5_for_3_days"]
+    assert "re-entered" in land["overshoot_rules"]["over_208"]
+    assert land["walking_floor_hr_wk"] == 10 == owner_redlines.REDLINES["walking_floor_hr_wk"]["maintenance_floor_hr_wk"]
+    assert land["provenance"] and land["stated"] and land["derived_by"]
+    assert owner_redlines.summary()["landing"] == land
+
+
+def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
+    R = owner_redlines.REDLINES
+    e = R["energy_floor_kcal"]
+    assert (e["floor_7d_mean"], e["floor_lifting_day"], e["floor_any_day"], e["opening_kcal"]) == (1800, 1900, 1600, 2100)
+    assert e["titration"]["step_kcal"] == 150 and e["titration"]["never_on_a_week_with_fewer_complete_logs_than"] == 6
+    assert R["protein_floor_g"]["value"] == 180 and R["protein_floor_g"]["target_g"] == 200 and R["protein_floor_g"]["days_of_7"] == 6
+    assert R["protein_floor_g"]["g_per_kg_dxa_lean"]["floor"] == 2.3
+    assert R["fat_floor_g"]["value"] == 65 and R["carb_floor_g"]["value"] == 120
+    w = R["walking_floor_hr_wk"]
+    assert (w["value"], w["target_hr_wk"], w["target_by_week"], w["front_load_permitted_hr_wk"], w["maintenance_floor_hr_wk"]) == (
+        8.5,
+        13,
+        6,
+        16,
+        10,
+    )
+    assert w["front_load_weeks"] == [3, 12] and w["hr_ceiling_bpm"] == 105 and w["permanent"] is True
+    lift = R["lifting_sessions_per_wk"]
+    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (3, 4, [6, 10], [55, 70])
+    assert R["run_gate_lb"]["value"] == 240 and "12 h walking" in R["run_gate_lb"]["gate"]
+    m = R["medical_cover"]
+    assert m["dxa_every_weeks"] == 8 and m["baseline_within_weeks"] == 2 and m["ursodiol"]["trend_threshold_lb_wk"] == 3.0
+    assert (
+        any("DXA (week 0" in b for b in m["baseline"])
+        and any("RMR" in b for b in m["baseline"])
+        and any("gallbladder" in b for b in m["baseline"])
+    )
+    assert R["logging_completeness"]["dark_day_kcal"] == 600
+
+
+_V3_NEW_TRIPWIRES = {
+    "loss_acceptable",
+    "loss_excessive_clean",
+    "loss_excessive_flagged",
+    "rate_ceiling",
+    "loss_insufficient_adherent",
+    "loss_insufficient_nonadherent",
+    "under_floor",
+    "walking_vs_fork",
+    "leverage_not_deterioration",
+    "lean_mass",
+    "sleep",
+    "weigh_in_dark",
+    "joy",
+    "post_goal_walking",
+}
+
+
+def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
+    """Report, don't compute: every §7 addition is in TRIPWIRES with `evaluated_by_engine: False`, is
+    named in the block's honesty line, and never appears among the computed rows."""
+    ids = {t["id"] for t in owner_redlines.TRIPWIRES}
+    assert _V3_NEW_TRIPWIRES <= ids
+    assert "abstinence_violation_spiral" not in ids, "folded into weigh_in_dark + logging_dark in v3"
+    unevaluated = set(owner_redlines.unevaluated_tripwires())
+    assert _V3_NEW_TRIPWIRES <= unevaluated
+    assert {
+        "intake_floor_breached",
+        "rate_overshoot",
+        "walking_collapse",
+        "logging_dark",
+        "volume_ceiling",
+        "medical_stop_lines",
+        "mood_declared",
+        "self_added_volume",
+    } <= unevaluated
+    assert [t["id"] for t in owner_redlines.engine_evaluated_tripwires()] == [
+        "anchor_lift_strength_drop",
+        "protein_floor_missed",
+        "readiness_floor",
+        "pain_flag_named_site",
+        "weight_stall_with_adherence",
+    ]
+    for t in owner_redlines.TRIPWIRES:
+        assert t.get("provenance") in ("owner", "owner-history", "population-derived"), t["id"]
+        assert t.get("action") and t.get("signal"), t["id"]
+    block = plan_engine.constraint_block(**_FULL)
+    computed = {t["id"] for t in block["tripwires"]}
+    assert not (computed & _V3_NEW_TRIPWIRES)
+    line = next(line for line in block["honesty"] if "NOT evaluated by this engine" in line)
+    assert all(tid in line for tid in _V3_NEW_TRIPWIRES)
+    assert f"v{owner_redlines.REDLINES_VERSION} tripwire(s)" in line
+
+
+def test_v3_updated_thresholds_on_the_kept_tripwires():
+    tw = {t["id"]: t for t in owner_redlines.TRIPWIRES}
+    assert tw["readiness_floor"]["threshold"] == 50 and tw["readiness_floor"]["consecutive_days"] == 5
+    assert tw["anchor_lift_strength_drop"]["threshold_pct"] == 5 and "e1RM median" in tw["anchor_lift_strength_drop"]["signal"]
+    assert (
+        "cap" in tw["rate_overshoot"]["signal"]
+        and "ursodiol" in tw["rate_overshoot"]["action"]
+        and tw["rate_overshoot"]["threshold_weeks"] == 2
+    )
+    assert (
+        tw["logging_dark"]["dark_day_kcal"] == 600
+        and tw["logging_dark"]["threshold_days_of_7"] == 2
+        and tw["logging_dark"]["threshold_days_of_14"] == 4
+    )
+    assert tw["volume_ceiling"]["threshold"]["sets_per_muscle_wk"] == 10
+    assert tw["walking_collapse"]["threshold_pct"] == 30 and tw["walking_collapse"]["provenance"] == "owner-history"
+    assert tw["intake_floor_breached"]["threshold_days"] == 2 and tw["protein_floor_missed"]["threshold_days"] == 3
+    assert "PHQ-9 ≥ 10" in tw["mood_declared"]["signal"]
 
 
 # ── 6. Standing constraints (#3715) — read here, not only by the S3 mirror ────
