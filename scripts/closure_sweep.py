@@ -139,13 +139,24 @@ def evaluate_issue(issue: Issue, open_children: tuple = ()) -> list:
     # #3595: an instrument closes on its first non-degraded live output, never on the merge.
     # The class is the label (a sweep sees labels, never a diff); the proof is structural.
     if cc.INSTRUMENT_LABEL in issue.labels and issue.closed_at.date().isoformat() >= cc.LIVE_PROOF_SINCE:
-        if not any(cc.names_live_proof(body) for (_t, _login, body) in issue.comments):
+        proven = any(cc.names_live_proof(body) for (_t, _login, body) in issue.comments)
+        # ADR-077 amendment 2026-09-21: a path the owner ruled will never run live again closes
+        # on a REHEARSAL proof — only when the issue opted in with the second label.
+        rehearsal_ok = cc.rehearsal_proof_accepted(issue.labels) and any(
+            cc.names_rehearsal_proof(body) for (_t, _login, body) in issue.comments
+        )
+        if not proven and not rehearsal_ok:
             findings.append(
                 Finding(
                     "no-live-proof",
                     issue.number,
                     f"labelled `{cc.INSTRUMENT_LABEL}` and closed with no `**Live proof:** <instant> — <where>` "
-                    "comment — an instrument closes on its first non-degraded output, not on the merge",
+                    "comment — an instrument closes on its first non-degraded output, not on the merge"
+                    + (
+                        f" (it also carries `{cc.REHEARSAL_LABEL}`, so a `**Rehearsal proof:** <instant> — <command> — <output>` line would satisfy it)"
+                        if cc.REHEARSAL_LABEL in issue.labels
+                        else ""
+                    ),
                 )
             )
 

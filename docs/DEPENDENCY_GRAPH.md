@@ -114,9 +114,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `notion`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
 
-### system_state (16)
+### system_state (17)
 
-`coach_gen_cache`, `composite_scores`, `deletion_log`, `dropbox_tracker`, `email_digest`, `email_log`, `experiment_suggestions`, `google_calendar`, `health_check`, `hevy_id_map`, `ingest_liveness`, `journal_analysis`, `personal_baselines`, `qa_predict_dark`, `routine_index`, `sleep_unified`
+`coach_gen_cache`, `composite_scores`, `deletion_log`, `dropbox_tracker`, `email_digest`, `email_log`, `experiment_suggestions`, `google_calendar`, `health_check`, `hevy_id_map`, `ingest_liveness`, `journal_analysis`, `personal_baselines`, `qa_hook_matrix`, `qa_predict_dark`, `routine_index`, `sleep_unified`
 
 ## 3. Consumer Edges (module → partition)
 
@@ -499,7 +499,7 @@ Field-level rulings (only non-default fields are declared):
 - Alarms: 131 literal-named declarations across three idioms, 4 composite; routing digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 90 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
-- Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `qa_hook_matrix`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
+- Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
 ## 7. Cost-bearing surface (#3374 R1)
