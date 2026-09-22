@@ -142,18 +142,23 @@ def build_api_policies(scope) -> dict:
     #   * the CACHE policy must name the session cookie. CloudFront strips `Set-Cookie` from a
     #     response on a behaviour whose cache policy forwards no cookies, which would make the
     #     one-time link exchange silently fail — a 302 the browser follows into a 401, with
-    #     nothing in any log saying a cookie was dropped. Naming it in a TTL-0 cache key costs
-    #     nothing: `max_ttl=0` means nothing is ever cached, so the key is unobservable.
+    #     nothing in any log saying a cookie was dropped. The key therefore names the cookie —
+    #     and CloudFront REJECTS a key entry on a policy whose `max_ttl` is 0 ("CookieBehavior is
+    #     invalid for policy with caching disabled" — #3760's first LifePlatformWeb deploy,
+    #     2026-09-22, CREATE_FAILED and a full stack rollback). So `max_ttl` is ONE second, not
+    #     zero: caching is nominally enabled, the origin answers `Cache-Control: no-store` on
+    #     every response (progress_viewer_lambda) and `default_ttl=0` stores nothing without an
+    #     explicit origin max-age. Nothing is ever cached; the key is still unobservable.
     #   * the ORIGIN-REQUEST policy must forward the cookie AND the query string (`?k=` is the
     #     one-time token). `origin_qs` forwards query strings but no cookies.
     private_no_cache = cloudfront.CachePolicy(
         scope,
         "ProgressViewerNoCachePolicy",
         cache_policy_name="life-platform-progress-viewer-no-cache",
-        comment="#3760: TTL 0 for the private progress viewer. Cookie named so CloudFront does not strip Set-Cookie.",
+        comment="#3760: private progress viewer. default_ttl 0, max_ttl 1s (a cookie key needs caching nominally on); origin sends no-store.",
         min_ttl=Duration.seconds(0),
         default_ttl=Duration.seconds(0),
-        max_ttl=Duration.seconds(0),
+        max_ttl=Duration.seconds(1),
         header_behavior=cloudfront.CacheHeaderBehavior.none(),
         query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
         cookie_behavior=cloudfront.CacheCookieBehavior.allow_list(PROGRESS_COOKIE_NAME),
