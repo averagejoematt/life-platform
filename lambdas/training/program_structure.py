@@ -29,10 +29,11 @@ Both readers reach the week grid through ONE seam (`training.program_seam.
 resolve_week_grid`), so there is exactly one place that decides module-vs-JSON and exactly
 one answer. The seam names its source in its result; it never silently substitutes.
 
-STATUS: NOT ACTIVE. `ACTIVE = False` until the owner has read v0.2 and said yes
-(gate:owner, #3755). While it is False the seam serves the live JSON grid unchanged and
-`plan_engine.constraint_block` reports this program as PROPOSED — the same posture #3753
-and #3715 took, for the same reason: an unratified program must not steer a prescription.
+STATUS: ACTIVE since 2026-09-21 — the owner approved v0.2 (gate:owner, #3753/#3755). From that
+date the seam serves THIS module's week grid and `plan_engine.constraint_block` reports the
+program as ACTIVE. While it was False the seam served the live JSON grid unchanged and the
+block said PROPOSED — the same posture #3753 and #3715 took, for the same reason: an
+unratified program must not steer a prescription.
 
 PROVENANCE VOCABULARY (ADR-105 — every number says where it came from)
 
@@ -58,10 +59,10 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-ACTIVE = False
-"""Flip to True only when the owner has approved v0.2. gate:owner (#3755)."""
+ACTIVE = True
+"""True since 2026-09-21: the owner approved v0.2 (#3753/#3755, gate:owner satisfied)."""
 
-LAST_REVIEWED_BY_OWNER: str | None = None
+LAST_REVIEWED_BY_OWNER: str | None = "2026-09-21"
 """ISO date the owner last read this program. None means never."""
 
 PROGRAM_VERSION = "0.2"
@@ -323,7 +324,7 @@ def week_grid() -> dict[str, Any]:
             f"v{PROGRAM_VERSION}: split={SPLIT} (owner, 2026-09-19); big-3 anchors 2-3x/wk (population-derived, not his variance).",
             "The PM easy-cardio session is NOT in this grid — `schedule` holds one archetype per day. Read program_structure.DAY_SHAPE.",
             "session_set_ceiling 25 -> 18 and session_minutes_ceiling 75 -> 60 are arithmetic from six sessions/wk against an UNCHANGED weekly cap of 22; both are platform-proposed, not measured.",
-            "UNRESOLVED: six lifting days contradicts owner_redlines.REDLINES['lifting_sessions_per_wk'] (2-3). See program_structure.summary()['conflicts'].",
+            "RESOLVED with v2 of the redlines (5-6 lifting sessions/wk, approved 2026-09-21): six lifting days no longer contradicts owner_redlines.REDLINES['lifting_sessions_per_wk']; `conflicts()` computes it rather than asserting it.",
         ],
     }
 

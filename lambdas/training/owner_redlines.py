@@ -37,25 +37,26 @@ number. "population-derived" means it came from literature, not from his own var
 and it says so at the point of use — a threshold whose origin is unstated is the class of
 defect the rigor bar exists to prevent.
 
-STATUS: NOT YET ACTIVE. `ACTIVE = False` until the owner has read and edited this file.
-An unconfirmed redline must not steer a prescription — the same posture #3717 took, and
-for the same reason. `plan_engine` reports the redlines as PROPOSED while this is False.
+STATUS: ACTIVE since 2026-09-21 — the owner approved v0.2 on #3753 (the red-teamed proposal below,
+unchanged from the record he read). While it was False `plan_engine` reported the redlines
+as PROPOSED — the same posture #3717 took, and for the same reason: an unconfirmed redline
+must not steer a prescription. Every later edit to a threshold is a dated commit.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-ACTIVE = False
-"""Flip to True only when the owner has reviewed the values below. gate:owner (#3753)."""
+ACTIVE = True
+"""True since 2026-09-21: the owner reviewed and approved v0.2 (#3753, gate:owner satisfied)."""
 
-REDLINES_VERSION = "2.0-proposed"
+REDLINES_VERSION = "2.0"
 """v1 (2026-09-13) was drafted from the owner's recorded statements. v2 (2026-09-20) is the
 red-teamed proposal: five independent personas (transformation coach, obesity-medicine physician,
 performance dietitian, strength & conditioning coach, lived experience) argued from one evidence
 packet compiled from the platform's own record, at the owner's 3 lb/wk ask. The record is
-`RED_TEAM_RECORD`; the plan is TRAINING_PROGRAM.md v0.2 in the same owner-private home. Still
-PROPOSED: nothing below is his instruction until he approves v0.2 and flips ACTIVE."""
+`RED_TEAM_RECORD`; the plan is TRAINING_PROGRAM.md v0.2 in the same owner-private home. Approved
+by the owner 2026-09-21 (#3753): from that date the values below are his instruction to the coach."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.2_redteam.md"
 
@@ -75,7 +76,7 @@ CHANGELOG_V1_TO_V2: list[str] = [
     "kitchen; nine NEW tripwires added that the engine does not yet evaluate (each says so)",
 ]
 
-LAST_REVIEWED_BY_OWNER: str | None = None
+LAST_REVIEWED_BY_OWNER: str | None = "2026-09-21"
 """ISO date the owner last read this file. None means never."""
 
 
@@ -96,7 +97,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "resolution": (
             "RESOLVED as a schedule (red team 2026-09-20): hold the window's top while above 295 lb, then step "
             "the absolute target down so the %BW never rises as the fat reserve shrinks. Not 'widen the window'. "
-            "Pending the owner's approval of v0.2."
+            "Approved by the owner 2026-09-21 (#3753)."
         ),
     },
     "rate_schedule_lb_wk": {
@@ -170,7 +171,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "load_wave": "5-week blocks: wk1-3 3-4x6 @ 75-80% e1RM, wk4 top double @ RIR 2 re-mints e1RM, wk5 deload half the sets",
         "accessory_rule": "6-8 accessories fixed for the whole 5-week block; rotate only at block boundaries",
         "provenance": "population-derived",
-        "derived_by": "red-team consensus 2026-09-20 (supersedes the owner's 2026-09-07 '2-3x/wk' pending his approval)",
+        "derived_by": "red-team consensus 2026-09-20 (supersedes the owner's 2026-09-07 '2-3x/wk'; approved by him 2026-09-21)",
         "stated": "2026-09-20",
         "note": (
             "The 2–3 sessions rule was a bandwidth-preservation rule for people whose failure mode is training burnout; "

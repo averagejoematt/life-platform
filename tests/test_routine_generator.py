@@ -154,6 +154,12 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
     week["exercise_notes_mode"] = "off"
     (cfg_dir / "training_week.json").write_text(json.dumps(week))
     monkeypatch.setattr(rg, "CONFIG_DIR", str(cfg_dir))
+    # #3753: the test sets the mode in the JSON grid; pin the seam to JSON so the ACTIVE v0.2 program
+    # (whose grid carries its own exercise_notes_mode) does not bypass the file being tested.
+    from training import program_structure as _ps
+
+    monkeypatch.setattr(_ps, "ACTIVE", False)
+    monkeypatch.setattr(_ps, "LAST_REVIEWED_BY_OWNER", None)
 
     from training import exercise_history
 

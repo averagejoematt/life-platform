@@ -182,10 +182,13 @@ def test_the_block_says_the_critics_have_not_run():
     assert "#3752" in block["critics"]["note"]
 
 
-def test_unconfirmed_redlines_are_reported_as_proposed():
+def test_approved_redlines_are_reported_active_not_proposed():
+    """Approved 2026-09-21 (#3753): the block no longer calls the redlines PROPOSED, but still names
+    the v2 tripwires the engine does not evaluate (ADR-105: silence is not clearance)."""
     block = plan_engine.constraint_block(**_FULL)
-    assert block["redlines"]["active"] is False
-    assert any("PROPOSED" in line or "not yet" in line for line in block["honesty"])
+    assert block["redlines"]["active"] is True
+    assert not any("redlines are PROPOSED" in line for line in block["honesty"])
+    assert any("NOT evaluated by this" in line for line in block["honesty"])
 
 
 def test_the_rate_tension_is_resolved_as_a_schedule_and_still_proposed():
@@ -195,7 +198,7 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_still_proposed():
     summ = owner_redlines.summary()
     assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
     assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
-    assert summ["active"] is False and summ["version"].endswith("-proposed")
+    assert summ["active"] is True and summ["version"] == "2.0" and summ["last_reviewed_by_owner"] == "2026-09-21"
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
     assert rate["target_lb_wk"] == 3.0 and rate["cap_lb_wk"] == 3.5 and rate["schedule_step_above_lb"] == 295
     assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 2.0

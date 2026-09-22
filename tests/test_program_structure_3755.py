@@ -56,10 +56,11 @@ def _hevy_rows() -> list[dict]:
 
 
 # ── 1. gate:owner cannot be simulated ────────────────────────────────────────
-def test_active_is_false_until_the_owner_approves_v0_2():
-    """The must-fail test: the only thing between an unapproved program and the engine."""
-    assert program_structure.ACTIVE is False
-    assert program_structure.LAST_REVIEWED_BY_OWNER is None
+def test_active_is_true_only_with_the_owner_review_date():
+    """The owner approved v0.2 on 2026-09-21 (#3753/#3755). ACTIVE without that date is the
+    inherited-assumption failure this module exists to prevent — the pair is pinned."""
+    assert program_structure.ACTIVE is True
+    assert program_structure.LAST_REVIEWED_BY_OWNER == "2026-09-21"
 
 
 def test_active_and_review_date_cannot_disagree():
@@ -69,10 +70,10 @@ def test_active_and_review_date_cannot_disagree():
         assert program_structure.LAST_REVIEWED_BY_OWNER is None, "a review date exists but ACTIVE is still False"
 
 
-def test_summary_reports_proposed_while_inactive():
+def test_summary_reports_active_with_the_review_date():
     s = program_structure.summary()
-    assert s["active"] is False
-    assert s["status_note"].startswith("PROPOSED")
+    assert s["active"] is True
+    assert s["status_note"].startswith("ACTIVE") and "2026-09-21" in s["status_note"]
     assert s["split"] == "ppl"
     assert s["program_version"] == "0.2"
 
@@ -140,7 +141,9 @@ def _loader_stub(calls: list[str]):
     return _load
 
 
-def test_seam_serves_the_json_while_the_program_is_proposed():
+def test_seam_serves_the_json_while_the_program_is_proposed(monkeypatch):
+    monkeypatch.setattr(program_structure, "ACTIVE", False)
+    monkeypatch.setattr(program_structure, "LAST_REVIEWED_BY_OWNER", None)
     calls: list[str] = []
     resolved = program_seam.resolve_week_grid(_loader_stub(calls))
     assert resolved.source == "json"
@@ -303,9 +306,9 @@ def test_constraint_block_carries_the_program_summary():
     block = _block()
     assert block["program"]["program_version"] == "0.2"
     assert block["program"]["split"] == "ppl"
-    assert block["program"]["active"] is False
-    assert any("PROPOSED" in line for line in block["honesty"])
-    assert any("conflicts" in line for line in block["honesty"])
+    assert block["program"]["active"] is True
+    assert not any("is PROPOSED, not approved" in line for line in block["honesty"])
+    assert any("conflicts" in line for line in block["honesty"])  # barbell anchors vs skill ceiling is still computed
 
 
 def test_constraint_block_rotation_is_unknown_without_the_rows():
