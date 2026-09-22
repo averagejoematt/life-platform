@@ -102,9 +102,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (16)
+### cross_phase (17)
 
-`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (34)
 
@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-698 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+700 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -221,6 +221,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `temptations` | — | site_api_mind.py |
 | `time_affluence` | — | — |
 | `todoist` | — | daily_insight_compute_lambda.py, intelligence_common.py, site_api_fulfillment.py, site_api_sleep.py, tools_todoist.py |
+| `training_constraints` | tools_training_notes.py | — |
 | `training_notes` | training_notes_llm.py | tools_training_notes.py, training_notes_llm.py |
 | `training_reference` | — | site_api_nutrition.py, site_api_training.py |
 | `travel` | — | adaptive_mode_lambda.py, anomaly_detector_lambda.py, tools_lifestyle.py |
@@ -442,6 +443,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `state_of_mind` | owner_only |
 | `strava` | owner_only |
 | `supplements` | owner_only |
+| `training_constraints` | owner_only |
 
 Field-level rulings (only non-default fields are declared):
 
@@ -494,10 +496,10 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1206 total · 864 resolved · 342 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1209 total · 866 resolved · 343 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
 - Alarms: 131 literal-named declarations across three idioms, 4 composite; routing digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 15 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 90 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)

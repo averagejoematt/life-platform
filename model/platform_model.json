@@ -3814,6 +3814,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/training_context_registry.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": null,
       "module": "lambdas/training/training_notes.py",
@@ -5809,6 +5816,13 @@
       "via": "pk"
     },
     {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training_notes.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_training_notes.py",
@@ -7231,23 +7245,23 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 698,
+      "edges": 700,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
-      "partitions": 108,
+      "partitions": 109,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 14,
+      "privacy_sources_owner_only": 15,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 82,
       "schedules": 90
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 342,
-        "sites_resolved": 864,
-        "sites_total": 1206
+        "sites_dynamic": 343,
+        "sites_resolved": 866,
+        "sites_total": 1209
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7811,6 +7825,11 @@
       "privacy_tier": "public",
       "stale_hours": 72
     },
+    "training_constraints": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "training_notes": {
       "class": "raw_timeseries",
       "ingestion": false,
@@ -7992,7 +8011,8 @@
       "sick_days": "owner_only",
       "state_of_mind": "owner_only",
       "strava": "owner_only",
-      "supplements": "owner_only"
+      "supplements": "owner_only",
+      "training_constraints": "owner_only"
     },
     "tiers": {
       "0": "public",
