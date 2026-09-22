@@ -92,13 +92,36 @@ def _check(strict=True) -> int:
     (exit 0) cannot reach it — a test asserting "the guard is gone" must never be able
     to pass because of a CI-only exemption.
     """
+    return _run(strict).returncode
+
+
+def _run(strict=True):
     return subprocess.run(  # nosec B603 — fixed argv
         [sys.executable, str(_SCRIPT), "--check"],
         cwd=str(_REPO),
         capture_output=True,
         text=True,
         env=_gate_env(strict=strict),
-    ).returncode
+    )
+
+
+def _drift_set(strict=True) -> frozenset:
+    """The `~ …` lines the gate reports, as a SET.
+
+    THE EXIT CODE IS NOT ENOUGH ON A BRANCH (#3760). Cases A and D below used to assert
+    `_check() == 0` — "the tree is clean" — and that is unsatisfiable on any branch whose
+    own diff moves a bot-owned counter. A PR that adds a Lambda or an alarm leaves
+    `lambdas`/`alarms` stale by construction, and #3984 makes that state DELIBERATE: the
+    pre-commit hook RESTORES `lambdas/web/platform_counts.py` off main and
+    `deploy/agent_commit.sh` refuses the file outright, so a lane cannot hand-fix the
+    number even if it wanted to. The reconcile bot owns it, on main, after the merge.
+
+    So the property these tests are really about — a date-only difference ADDS NOTHING,
+    a wrong count ADDS A LINE — is stated on the drift SET instead, which is both branch-
+    independent and strictly stronger than the exit code it replaces (an exit code cannot
+    tell "3 because of my Lambda" from "3 because of the planted defect"; a set can).
+    """
+    return frozenset(line.strip() for line in _run(strict).stdout.splitlines() if line.strip().startswith("~ "))
 
 
 @pytest.fixture
@@ -142,24 +165,42 @@ def _live_lambda_phrase(doc_text: str) -> str:
 
 
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
-def test_d_a_clean_tree_passes(doc_text):
-    """Baseline. If this fails, every other case below is uninterpretable."""
-    assert _check() == 0, "the gate is not green on a clean tree — fix that before reading the rest"
+def test_d_the_tree_carries_no_unownable_drift(doc_text):
+    """Baseline. If this fails, every other case below is uninterpretable.
+
+    "No drift a bot cannot regenerate" rather than "no drift at all" — see `_drift_set`.
+    EXIT_FAILURE is still a red here: that is drift a human has to fix, and it must never
+    be sitting in the tree while the cases below plant their own.
+    """
+    code = _check()
+    assert code in (_verdict.EXIT_SUCCESS, _verdict.EXIT_PENDING_RECONCILE), (
+        f"the gate reports substantive (non-regenerable) drift on this tree (exit {code}) — " "fix that before reading the rest"
+    )
 
 
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
 def test_a_a_stale_date_stamp_alone_is_not_drift(doc_text):
-    """The bug: this used to exit 1 once per UTC midnight."""
+    """The bug: this used to exit 1 once per UTC midnight.
+
+    Asserted as "the drift set does not grow", which is the same claim without the
+    branch-must-be-counter-clean assumption the exit-code form carried.
+    """
+    before = _drift_set()
     _DOC.write_text(_stale_the_date(doc_text), encoding="utf-8")
-    assert _check() == 0, "a date-only difference still fails the gate (#2649)"
+    after = _drift_set()
+    assert after == before, f"ageing the date stamp added drift: {sorted(after - before)} (#2649)"
 
 
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
 def test_b_a_substantive_drift_still_fails(doc_text):
     """The fix must not buy green by weakening the gate."""
     phrase = _live_lambda_phrase(doc_text)
+    before = _drift_set()
     _DOC.write_text(doc_text.replace(phrase, "999 Lambdas", 1), encoding="utf-8")
     assert _check() == _verdict.EXIT_PENDING_RECONCILE, "a wrong Lambda count no longer fails the gate — the guard is gone"
+    # The exit code alone cannot distinguish "3 because of the plant" from "3 because this
+    # branch moved a counter" — the set can, and must GROW.
+    assert _drift_set() - before, "the planted wrong count added no drift line — the gate did not see it"
 
 
 @pytest.mark.skipif(not _SCRIPT.exists(), reason="sync_doc_metadata.py not present")
@@ -173,9 +214,11 @@ def test_b2_off_main_the_same_substantive_drift_is_a_tolerated_notice(doc_text):
 def test_c_a_stale_date_does_not_hide_a_substantive_drift(doc_text):
     """The subtle one. Both literals live on the SAME line, so masking the date must
     not mask the count that shares it."""
+    before = _drift_set()
     both = _stale_the_date(doc_text).replace(_live_lambda_phrase(doc_text), "999 Lambdas", 1)
     _DOC.write_text(both, encoding="utf-8")
     assert _check() == _verdict.EXIT_PENDING_RECONCILE, "a stale date stamp masked a real drift on the same line (#2649)"
+    assert _drift_set() - before, "the stale date stamp swallowed the count that shares its line (#2649)"
 
 
 def test_the_date_masker_is_not_a_blanket_line_ignore():

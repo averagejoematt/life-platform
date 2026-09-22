@@ -158,6 +158,7 @@ from stacks.role_policies_serve import (  # noqa: F401  (re-export)
     measurements_ingestion,
     og_image,
     pipeline_health_check,
+    progress_viewer,
     site_api,
     site_api_ai,
     subscriber_onboarding,

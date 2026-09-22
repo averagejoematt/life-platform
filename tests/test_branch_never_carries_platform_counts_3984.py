@@ -75,10 +75,21 @@ def counts_text():
     _COUNTS.write_text(original, encoding="utf-8")
 
 
+#: How far the fixture moves the counter. Any non-zero delta expresses "stale"; this one is
+#: large because +1 has an accidental-agreement mode the fixture never intended. A branch whose
+#: OWN diff adds a Lambda already leaves the stored counter one BELOW the discovered value, so
+#: bumping it by one lands exactly ON the discovered value — the drift vanishes, the expected
+#: `~ DISCOVERED_COUNTS lambdas:` line is absent, and this test reds on a PR that did nothing
+#: wrong. Found on #3760 (which adds the `progress-viewer` function); it would fire the same way
+#: for any Lambda-adding PR, and the counter itself may not be hand-corrected off main (#3101:
+#: platform_counts.py is bot-owned, and deploy/agent_commit.sh refuses it outright).
+_STALE_BUMP = 1000
+
+
 def _bump_lambdas(text: str) -> str:
     """`lambdas` is a NON-exempt field (PR_EXEMPT_FIELDS is exactly {test_count, adrs}) — so the
     #3384 pull_request exemption cannot be what makes the off-main case pass."""
-    new, n = re.subn(r'("lambdas": )(\d+)', lambda m: f"{m.group(1)}{int(m.group(2)) + 1}", text, count=1)
+    new, n = re.subn(r'("lambdas": )(\d+)', lambda m: f"{m.group(1)}{int(m.group(2)) + _STALE_BUMP}", text, count=1)
     assert n == 1, 'no literal `"lambdas": <int>` in platform_counts.py — the counter file changed shape'
     return new
 

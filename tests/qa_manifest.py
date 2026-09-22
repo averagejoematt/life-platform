@@ -878,6 +878,35 @@ _CURATED = [
     },
 ]
 
+# ── PRIVATE ROUTES (#3760) ────────────────────────────────────────────────────
+# Viewer paths that are served by a LAMBDA behind an auth gate and have no `site/**` object
+# at all. They are not manifest pages and must never become one: a manifest entry means
+# "expect 200 anonymously", and the whole property of a route listed here is that an
+# anonymous request must NOT get 200.
+#
+# This registry exists because the alternative is silence. Without it, every page list in the
+# repo simply has no row for `/progress-photos/` and nothing anywhere states WHY — so the
+# first person to notice the gap has no way to tell a deliberate omission from a forgotten
+# page, and the smoke suite has nothing to assert. With it, `--emit private` hands
+# deploy/smoke_test_site.sh the set, and tests/test_progress_viewer_privacy_3760.py asserts
+# each entry is absent from the sitemap, the RSS feed, the redirects map and every nav.
+#
+# path → (expected anonymous statuses, reason)
+PRIVATE_ROUTES = {
+    "/progress-photos/": (
+        ("401", "302", "403", "404"),
+        "#3760 the owner-only progress-photo viewer: a one-time Telegram link exchanged for a "
+        "signed cookie. 401 is what the site-api answers; 403/404 are accepted because they are "
+        "what the edge returns before the CloudFront behaviour is deployed. 200 never is.",
+    ),
+}
+
+
+def private_rows():
+    """`path|status1,status2,…|reason` — one row per private route, for the bash smoke."""
+    return [f"{path}|{','.join(codes)}|{reason}" for path, (codes, reason) in sorted(PRIVATE_ROUTES.items())]
+
+
 # Files under site/ that are deliberately NOT pages (or excluded by policy).
 # path-prefix match for directories, exact for files. Every exemption carries
 # its reason — the completeness gate treats anything else as unregistered.
@@ -1222,7 +1251,8 @@ def self_check():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument(
-        "--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens", "api_deps", "api_sweep"]
+        "--emit",
+        choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens", "api_deps", "api_sweep", "private"],
     )
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
@@ -1266,6 +1296,9 @@ def main():
             print(d)
     elif args.emit == "api_sweep":
         for row in api_sweep_rows():
+            print(row)
+    elif args.emit == "private":
+        for row in private_rows():
             print(row)
     else:
         ap.print_help()

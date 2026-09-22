@@ -2,11 +2,11 @@
   "_purpose": "#3374 R1 — the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff — that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
   "counts": {
     "ai_features": 19,
-    "alarms": 131,
+    "alarms": 132,
     "emf_namespaces": 31,
     "schedules": 90,
-    "secrets": 29
+    "secrets": 30
   },
-  "measured_on": "2026-09-19",
-  "_last_change": "#3752 (2026-09-19): ai_features 18 -> 19 — ONE budget-guard feature, `plan_critics`, band 2 (Matthew-facing coach voice). Cost-bearing surface named per #3374 R1: four short Haiku calls per drafted routine, at most once a night, inside the existing life-platform-mcp Lambda (which made no other Bedrock call — zero EstimatedCostUSD datapoints over the trailing 30d). Ledger row EXCLUSIVE on `life-platform-mcp` at the $1.00/mo floor (scripts/ai_budget_ledger.py). No new Lambda, no new schedule, no new alarm, no new EMF namespace, no new secret. A paused tier reports the model as paused on every verdict and the deterministic layer still runs at $0."
+  "measured_on": "2026-09-21",
+  "_last_change": "#3760 (2026-09-21): alarms 131 -> 132 and secrets 29 -> 30 — the private progress-photo viewer. ONE new alarm, `progress-viewer-errors` (AWS/Lambda Errors on FunctionName=progress-viewer, 5-min sum >= 1, routed to the us-east-1 alerts topic by web_alarms.add_web_alarms): the viewer has no schedule, so the heartbeat ledger structurally cannot see it, and its only reader opens it a few times a month — a surface that can be dark for weeks without anyone noticing is exactly the one that must not report its own health. ONE new secret, `life-platform/progress-photos-signing`, read by exactly two roles (telegram_worker mints the one-time link, progress_viewer verifies it and the session cookie); its own key because a key that signs two credential families lets either one forge the other. Also new but NOT cost-surface: one Lambda (progress-viewer, us-east-1, invoked only by his own taps), one CloudFront behaviour and two TTL-0 policies. No new schedule, no new EMF namespace, no new AI feature — this path reaches no model. PRIOR: #3752 (2026-09-19): ai_features 18 -> 19 — ONE budget-guard feature, `plan_critics`, band 2 (Matthew-facing coach voice); four short Haiku calls per drafted routine inside the existing life-platform-mcp Lambda."
 }

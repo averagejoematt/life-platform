@@ -563,6 +563,11 @@ class ServeStack(Stack):
                 "USER_ID": "matthew",
                 "TABLE_NAME": TABLE_NAME,
                 "TELEGRAM_SECRET_ID": "life-platform/telegram",
+                # #3760: `/progress view` mints the viewer link with this key, pointed at this
+                # origin. Both are env vars so a non-production deploy of this worker cannot
+                # mint a live link into the live distribution by defaulting into it.
+                "PROGRESS_SIGNING_SECRET_NAME": "life-platform/progress-photos-signing",
+                "SITE_BASE_URL": "https://averagejoematt.com",
             },
         )
         # A chatty evening must not starve the site: the worker gets a small reserved

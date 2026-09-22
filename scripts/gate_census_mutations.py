@@ -483,6 +483,15 @@ _UNCLAIMED_READER_HOOK_JS = (
     "}\n"
 )
 
+# #3760: a shipped site page that links the PRIVATE progress viewer. This is the defect the
+# derivation guard exists for — the URL is not the secret, but a link in a crawler-visible
+# page turns "nobody knows to try" into "every index has a row", and the route is owner-only
+# body photography (Tier 2, epic #3743).
+_LINKED_PRIVATE_ROUTE_HTML = (
+    "<!doctype html><html lang=en><head><meta charset=utf-8><title>census probe</title></head>\n"
+    '<body><a href="/progress-photos/">progress</a></body></html>\n'
+)
+
 # #3615 box 5: a page under site/ advertising a feed the hook registry DECLARES dark —
 # i.e. offering a reader a podcast subscription to a show with zero episodes. This is the
 # exact 11-page defect the gate was written for, planted as a NEW page so it also proves
@@ -538,6 +547,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/emails/_census_probe_3599.py", _UNSTAMPED_SCOPED_WRITER_PY),),
         track=False,  # the guard rglobs lambdas/ mcp/ deploy/ scripts/ on disk, so an untracked module is in scope
+    ),
+    "structural::test_progress_viewer_privacy_3760.py": MutationSpec(
+        gate_id="structural::test_progress_viewer_privacy_3760.py",
+        target="tests/test_progress_viewer_privacy_3760.py",
+        detects=(
+            "a shipped `site/**` page that links the owner-only progress viewer — the leak that "
+            "cannot be undone once a crawler has it, and the one nothing else in the repo would "
+            "catch: the route has no site/ object of its own, so every page list simply has no row "
+            "for it and no gate has an opinion about the link"
+        ),
+        plants=(("site/_census_probe_3760.html", _LINKED_PRIVATE_ROUTE_HTML),),
+        track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
     ),
     "structural::test_hook_registry_3615.py": MutationSpec(
         gate_id="structural::test_hook_registry_3615.py",
@@ -987,6 +1008,27 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "its real EVENT# rows). It judges SOURCE SHAPE, never live rows: whether an unstamped row "
         "actually exists is the qa-smoke inverse leg's question, not this gate's.",
         proved_on="2026-09-20",
+    ),
+    "structural::test_progress_viewer_privacy_3760.py": _proof(
+        "structural::test_progress_viewer_privacy_3760.py",
+        "ARMED 1/1 — baseline: 16 passed in 0.19s | mutated: 1 failed, 15 passed in 0.20s :: "
+        "test_no_site_file_mentions_the_route | reverted: 16 passed in 0.18s",
+        "site/ on disk (rglob, every file except binary image/font/archive suffixes), so an "
+        "UNTRACKED page is in scope — plus a named sweep of the sitemap, both feeds, robots.txt "
+        "and redirects.map, and an rglob of scripts/**/*.py for a GENERATOR that would emit the "
+        "link on the next build. Also pinned: the route carries a tests/qa_manifest.PRIVATE_ROUTES "
+        "row whose accepted anonymous statuses exclude 200, it is in no manifest page entry, the "
+        "CloudFront behaviour targets the viewer's own origin with the no-cache policy pair, the "
+        "cookie literal agrees between the Lambda and the CDK policy, and the site-api role still "
+        "names no `raw/` resource (#3757's ruling, which is why this is a separate Lambda). "
+        "STILL INVISIBLE, stated rather than papered over: a link in a `generated/**` artifact a "
+        "Lambda writes at runtime (no repo file to sweep), a link in prose a coach emits, and the "
+        "one this gate structurally cannot judge — whether the LOCK works, which is "
+        "tests/test_progress_viewer_3760.py's own mutation control. scripts/gate_census_mutations.py "
+        "is excluded from the generator sweep because it carries the plant; "
+        "test_the_plant_owner_still_carries_the_plant asserts that exclusion is still excluding "
+        "what it claims to.",
+        proved_on="2026-09-21",
     ),
     "structural::test_hook_registry_3615.py": _proof(
         "structural::test_hook_registry_3615.py",

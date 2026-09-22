@@ -144,14 +144,20 @@ GT = cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD
 NOT_BREACHING = cloudwatch.TreatMissingData.NOT_BREACHING
 
 
-def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm, og_image_alarm: cloudwatch.Alarm = None) -> None:
+def add_web_alarms(
+    scope: Construct,
+    subscriber_alarm: cloudwatch.Alarm,
+    og_image_alarm: cloudwatch.Alarm = None,
+    progress_viewer_alarm: cloudwatch.Alarm = None,
+) -> None:
     """Wire the us-east-1 alarm estate onto `scope` (WebStack, us-east-1).
 
     `subscriber_alarm` is the existing OBS-07 `email-subscriber-errors` Alarm construct
     (still defined in web_stack.py — it already existed there; this only supplies the
     `.add_alarm_action()` call it was missing). `og_image_alarm` (#3161) is the new
     `life-platform-og-image-errors` Alarm construct — same missing-action shape, wired
-    the same way. Everything else is adopted fresh here.
+    the same way. `progress_viewer_alarm` (#3760) is the third, for the same reason and in
+    the same shape. Everything else is adopted fresh here.
     """
     topic = sns.Topic.from_topic_arn(scope, "AlertsTopicUsEast1", ALERTS_TOPIC_ARN_US_EAST_1)
 
@@ -162,6 +168,11 @@ def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm, og_imag
     # describe-alarms) — route the new error alarm into the same us-east-1 topic.
     if og_image_alarm is not None:
         og_image_alarm.add_alarm_action(cw_actions.SnsAction(topic))
+
+    # #3760: the private progress viewer. A surface its only reader opens a few times a
+    # month cannot be left to report its own health.
+    if progress_viewer_alarm is not None:
+        progress_viewer_alarm.add_alarm_action(cw_actions.SnsAction(topic))
 
     # ── The three orphan adoptions are CLOSED: DO NOT ADOPT (#2961, resolved 2026-08-27) ──
     #

@@ -116,6 +116,7 @@ KNOWN_SECRETS = {
     "life-platform/google-tts",  # 2026-06-14 (ADR-087): Google Chirp 3:HD TTS key for the podcasts — lambdas/ai/google_tts.py, lambdas/ai/gemini_tts.py
     "life-platform/hevy-write",  # ADR-066 (2026-05-31): write-capable Hevy key, separate from the read key — lambdas/training/hevy_write_client.py
     "life-platform/ritual-token-secret",  # #769 (ADR-124): HMAC key for the evening-ritual one-tap links (mint: evening-nudge, verify: site-api)
+    "life-platform/progress-photos-signing",  # #3760: HMAC key for the private progress viewer (mint: telegram-coach-worker, verify: progress-viewer)
     "life-platform/site-api-origin-secret",  # #815 R22-SEC-03 / #1589: the x-amj-origin CloudFront gate value, read at runtime by the AI-quality canary
     "life-platform/ip-hash-salt",  # #3620 (security ROW4): the salt for every reader ip_hash in site_api_social_engage.py. Owner-provisioned random value; the doors fail CLOSED (503) until it exists.
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)

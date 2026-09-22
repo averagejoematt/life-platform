@@ -88,6 +88,17 @@ KNOWN_SECRETS = [
     "life-platform/google-tts",  # 2026-06-14: Google Cloud Chirp 3: HD API key for the podcasts (chronicle-podcast + coach-panel-podcast). Created as a prerequisite.
     "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (wednesday-chronicle + coach-panel-podcast). Created with the editorial-image feature.
     "life-platform/ritual-token-secret",  # #769 (ADR-124): dedicated HMAC signing key for the evening-ritual one-tap links (mint: evening-nudge, verify: site-api). Must be created in Secrets Manager before deploy.
+    # #3760: the private progress viewer. Its OWN key — never the subscriber/ritual one, because a key that signs two
+    # credential families lets either one forge the other. Mint: telegram-coach-worker (the one-time link). Verify:
+    # progress-viewer (the link and the session cookie). Must be created in Secrets Manager before the deploy (the
+    # viewer answers 503 until it exists — never 200).
+    #
+    # DELIBERATELY NOT YET IN docs/ARCHITECTURE.md's Secrets Manager table: that table is the LIVE inventory, stamped
+    # with a live-verified count and date, and `scripts/check_doc_facts.py` reds when the rows outnumber the stamp. A
+    # secret that has not been created yet is not live, so it joins the table on the `--refresh-secrets` run AFTER the
+    # one-time `aws secretsmanager create-secret` (named in #3760's PR). KNOWN_SECRETS here is the DECLARED set and is
+    # what the IAM lockstep reads, so the grant is checked from the moment it ships.
+    "life-platform/progress-photos-signing",
     "life-platform/site-api-origin-secret",  # #815 R22-SEC-03: the x-amj-origin CloudFront gate value. Resolved at CDK deploy time into serve/web env; #1589 added a runtime read by the AI-quality canary so its direct-invoke probes can present the header.
     "life-platform/ip-hash-salt",  # #3620 (security ROW4): the salt for every reader ip_hash in site_api_social_engage.py. Read at runtime by site-api through secret_cache; the doors answer 503 until it exists (fail-closed, never an unsalted fallback).
     "life-platform/youtube",  # #1669 (epic #1668): inbound-social YouTube channel id (key `channel_id`). Keyless RSS needs no token — this secret carries only the owner-supplied channel id. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
@@ -259,7 +270,7 @@ def test_s4_known_secrets_count_matches_architecture():
     #   (CDK deploy-time env resolution since #815); first RUNTIME reader is the AI-quality
     #   canary, so it now needs registry membership.
     # Total = 22 actual secrets + 1 wildcard = 23.
-    EXPECTED_COUNT = 30  # +1 2026-09-19: life-platform/ip-hash-salt (#3620)  # +1 2026-08-10: life-platform/continuity-contacts (#1400)  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
+    EXPECTED_COUNT = 31  # +1 2026-09-21: life-platform/progress-photos-signing (#3760)  # +1 2026-09-19: life-platform/ip-hash-salt (#3620)  # +1 2026-08-10: life-platform/continuity-contacts (#1400)  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

@@ -61,6 +61,9 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 STORE_PATH = os.environ.get("TELEGRAM_SECRET_ID", "life-platform/telegram")
+# #3760: the public origin the viewer link points at. An env var rather than a literal so a
+# non-production deploy cannot silently mint links into the live distribution.
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://averagejoematt.com")
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
 # Narrative register on a personal chat surface — Sonnet, same tier as the coach
@@ -865,6 +868,50 @@ def _progress_photo(order: dict) -> dict:
     return result
 
 
+def _progress_view(order: dict) -> dict:
+    """Text him the one-time link to the private viewer (#3760).
+
+    The thin half, exactly like `_progress_photo` above: this resolves the token, the chat
+    roster, the signing key and the clock, and `progress_capture.handle_view` makes every
+    decision. Nothing here judges who may view.
+    """
+    import time as _time
+
+    from coach import progress_capture
+
+    coach_id = order.get("coach_id")
+    result = progress_capture.handle_view(
+        order,
+        chat_ids=_bot_chat_ids(coach_id),
+        secret=_progress_signing_secret(),
+        base_url=SITE_BASE_URL,
+        now=_time.time(),
+    )
+    token = _bot_token(coach_id)
+    if result.get("reply") and token:
+        # No link preview: Telegram's own crawler would spend the single use before he ever
+        # taps it, and he would meet a 401 on a link that was never his.
+        _tg(token, "sendMessage", {"chat_id": order.get("chat_id"), "text": result["reply"], "disable_web_page_preview": True})
+    logger.info("[progress] view: %s", result.get("reason"))
+    return result
+
+
+def _progress_signing_secret():
+    """The viewer's HMAC key, or None when it cannot be read (then no link is minted)."""
+    global _secrets
+    if _secrets is None:
+        _secrets = boto3.client("secretsmanager", region_name=REGION)
+    from common.secret_cache import get_secret
+    from privacy import progress_access
+
+    name = os.environ.get(progress_access.SECRET_NAME_ENV, progress_access.DEFAULT_SECRET_NAME)
+    try:
+        return get_secret(name, _secrets)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[progress] signing secret unreadable (%s)", type(e).__name__)
+        return None
+
+
 # ── Outbound path 2: the morning check-in ─────────────────────────────────────
 
 
@@ -1098,6 +1145,15 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     if not token:
         logger.warning("[telegram] no bot token for %s — dropping", coach_id)
         return {"ok": False, "reason": "no token"}
+
+    # #3760: `/progress view` mints the private viewer's one-time link. Deterministic and
+    # free, and answered BEFORE the group branch below — a body-photo link must never be
+    # minted into the board room, and checking after that branch would route the phrase to
+    # a coach for a chatty reply instead.
+    from privacy import progress_access
+
+    if progress_access.is_view_command(text):
+        return _progress_view(order)
 
     # The board room (epic #2363): a group order takes the room's whole path —
     # who-speaks decision, shared thread, speaker-stamped storage — and a silent

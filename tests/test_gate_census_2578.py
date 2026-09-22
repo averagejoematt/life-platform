@@ -877,7 +877,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # attempted-unproven 5} vs main {127, 540, 6, 5} — exactly one entrant, and unproven does not move.
         # Re-measured after merging origin/main into the lane (tip had moved to 5c729ec9c): merged lane
         # {128, 540, 6, 5} vs a fresh export {127, 540, 6, 5} — same one entrant, same verdicts.
-        <= 128
+        # Upper bound 128 -> 129 (2026-09-21, #3760, resolved on top of #3913's 128): structural::test_progress_viewer_privacy_3760.py
+        # arrives PROVEN via the re-runnable harness (MutationSpec in scripts/gate_census_mutations.py, ARMED 1/1 — an untracked
+        # site/_census_probe_3760.html linking the owner-only viewer: baseline 16 passed, mutated 1 failed :: test_no_site_file_mentions_the_route,
+        # reverted 16 passed). MEASURED by id-set diff on the MERGE RESOLUTION tree, never by arithmetic: lane {proven 129, unproven 540,
+        # not-applicable 6, attempted-unproven 5} vs a disposable `git archive origin/main` export {128, 540, 6, 5} — exactly one entrant,
+        # and unproven does not move.
+        <= 129
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
