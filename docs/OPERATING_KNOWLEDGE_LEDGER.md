@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-22 (Session AQ: +1 reference +1 project this session; snapshot and counters updated from the rows in the same edit). Prior: 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 478** — feedback 25 · reference 280 · security 1 · project 169 · user 1 · index 2
+**Files in the memory index snapshot: 480** — feedback 25 · reference 281 · security 1 · project 170 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 306** — homed-here 81 · already-homed 192 · superseded 7 · narrative 21 · off-repo 5
+**Rule-class files (feedback + reference + security): 307** — homed-here 81 · already-homed 192 · superseded 7 · narrative 21 · off-repo 6
 
-**Program/session files (project): 169** — already-homed 14 · superseded 1 · narrative 151 · off-repo 2 · index 1
+**Program/session files (project): 170** — already-homed 14 · superseded 1 · narrative 152 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-09-17 (Session AI: regenerated from the live directory — +12 files across Sessions AG/AH/AI that had rows in neither place). Prior: 2026-09-13 (Session AD: regenerated from the live directory — +3 files, two of them rows the Session AB wrap added here but never to this block). Prior: 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
+## Snapshot of the memory index — 2026-09-22 (Session AQ: +2 files, this session's own). Prior: 2026-09-17 (Session AI: regenerated from the live directory — +12 files across Sessions AG/AH/AI that had rows in neither place). Prior: 2026-09-13 (Session AD: regenerated from the live directory — +3 files, two of them rows the Session AB wrap added here but never to this block). Prior: 2026-09-07 (Session X: regenerated from the live directory — +11 files across Sessions V/W/X that were added as rows but never here, plus this session's 4). Prior: 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -220,6 +220,7 @@ project_session_al_2026_09_19.md
 project_session_an_2026_09_20.md
 project_session_ao_2026_09_20.md
 project_session_ap_2026_09_21.md
+project_session_aq_2026_09_21.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -335,6 +336,7 @@ reference_asset_hasher_comment_paths.md
 reference_asset_hashing_full_graph.md
 reference_ast_walk_annassign_blindness.md
 reference_attest_never_backfill.md
+reference_auto_mode_classifier_prompts_regardless_of_allow_rules.md
 reference_audit_mislabels_loadbearing_dirs.md
 reference_autoclose_keyword_ignores_negation.md
 reference_averagejoematt_dns_and_mail.md
@@ -625,6 +627,7 @@ user_who_is_matthew.md
 | `reference_ast_walk_annassign_blindness.md` | reference | `tests/test_wallclock_fixture_bombs_2376.py`, `tests/test_site_api_namespace_guard_3002.py` (AnnAssign walked) | already-homed |
 | `reference_audit_mislabels_loadbearing_dirs.md` | reference | — narrative: one audit's mislabelling; the rule it implies is CHARTER's registry primitive | narrative |
 | `reference_autoclose_keyword_ignores_negation.md` | reference | `docs/OPERATING_DISCIPLINE.md` §2.5 | already-homed |
+| `reference_auto_mode_classifier_prompts_regardless_of_allow_rules.md` | reference | — off-repo: the cause is the Claude Code permission MODE (auto mode's classifier decides independently of `permissions.allow`); the fix is the owner's mode choice, the session reflex is one fleet deploy per checkpoint in auto mode | off-repo |
 | `reference_averagejoematt_dns_and_mail.md` | reference | `docs/INFRASTRUCTURE.md` (registrar vs hosted zone) + `docs/ACCOUNTS.md` | already-homed |
 | `reference_backlog_drain_epic_tails.md` | reference | `docs/OPERATING_DISCIPLINE.md` §2.8 | already-homed |
 | `reference_baselining_needs_severity_free_write.md` | reference | fixed by #2981 — `tests/truth_baseline_audit.py` (the write path is severity-free; gating stays high-only at read time) | superseded |
@@ -1031,6 +1034,7 @@ carries an operating rule.
 | `project_session_an_2026_09_20.md` | project | — narrative: Session AN's record (the overnight drain, the split fleet) | narrative |
 | `project_session_ao_2026_09_20.md` | project | — narrative: Session AO's record (the red-teamed plan, the treadmill fix, the trailer that reached main) | narrative |
 | `project_session_ap_2026_09_21.md` | project | — narrative: Session AP's record (the ceiling, the migrate bug, the 9-hour stall) | narrative |
+| `project_session_aq_2026_09_21.md` | project | — narrative: Session AQ's record (the flip that waited on a ruling, three lanes landed, the prompt that still stalls deploys) | narrative |
 | `project_sessions_am_an_2026_09_19.md` | project | — narrative: Sessions AM+AN's posting-pack record | narrative |
 | `reference_a_blanket_lease_reject_catches_another_lanes_deploy.md` | reference | `docs/CONVENTIONS.md` §4d (leases are actioned BY NAME, never `--status waiting` wholesale) | already-homed |
 | `reference_a_cdk_deploy_re_bundles_its_stacks_from_the_checkout_tip.md` | reference | — narrative: the split-fleet read (build_info per function) is a handover duty stated in every deploy checkpoint line, not a repo rule yet | narrative |
