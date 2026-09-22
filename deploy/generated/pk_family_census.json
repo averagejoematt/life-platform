@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "captured_at": "2026-09-21",
-    "family_count": 98,
+    "captured_at": "2026-09-22",
+    "family_count": 99,
     "generated_by": "lambdas/experiment/pk_census.py::census_snapshot via deploy/write_pk_family_census.py \u2014 never hand-edit this artifact",
-    "item_count": 45696,
+    "item_count": 45896,
     "region": "us-west-2",
     "table": "life-platform"
   },
@@ -168,7 +168,7 @@
     "SOURCE#achievements": {
       "class": "experiment_scoped",
       "rep_pk": "USER#matthew#SOURCE#achievements",
-      "rep_sk": "BADGE#first_level_up"
+      "rep_sk": "BADGE#apprentice"
     },
     "SOURCE#adaptive_mode": {
       "class": "experiment_scoped",
@@ -178,7 +178,7 @@
     "SOURCE#ai_analysis": {
       "class": "experiment_scoped",
       "rep_pk": "USER#matthew#SOURCE#ai_analysis",
-      "rep_sk": "EXPERT#glucose"
+      "rep_sk": "EXPERT#explorer"
     },
     "SOURCE#anomalies": {
       "class": "experiment_scoped",
@@ -475,6 +475,11 @@
       "rep_pk": "USER#matthew#SOURCE#protocols",
       "rep_sk": "PROTOCOL#cgm"
     },
+    "SOURCE#qa_hook_matrix": {
+      "class": "system_state",
+      "rep_pk": "USER#matthew#SOURCE#qa_hook_matrix",
+      "rep_sk": "DATE#2026-09-21"
+    },
     "SOURCE#qa_predict_dark": {
       "class": "system_state",
       "rep_pk": "USER#matthew#SOURCE#qa_predict_dark",
@@ -601,7 +606,7 @@
       "rep_sk": "COUNT"
     }
   },
-  "family_count": 98,
-  "generated_at": "2026-09-21T04:48:35.787907+00:00",
+  "family_count": 99,
+  "generated_at": "2026-09-22T03:45:37.645533+00:00",
   "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py."
 }

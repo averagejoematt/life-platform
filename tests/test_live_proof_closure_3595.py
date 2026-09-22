@@ -402,3 +402,50 @@ def test_cli_fixture_mode_exits_1_on_a_blocking_finding_under_an_explicit_warn_e
     )
     assert p.returncode == 1, p.stdout + p.stderr
     assert "blocking=no-live-proof" in p.stdout, p.stdout
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. THE REHEARSAL LEG (ADR-077 amendment 2026-09-21 — no further resets)
+# ══════════════════════════════════════════════════════════════════════════════
+
+REHEARSAL_LINE = (
+    "**Rehearsal proof:** 2026-09-22T05:10Z — `python3 deploy/restart_pipeline.py --genesis 2026-10-01 --dry-run` "
+    "— Step [0] census printed 107 partitions / 37 EXPERIMENT_SCOPED families, 0 unruled"
+)
+
+
+def _both_labels(node: dict) -> dict:
+    node["labels"]["nodes"].append({"name": cc.REHEARSAL_LABEL})
+    return node
+
+
+def test_MUTATION_each_part_of_the_rehearsal_proof_line_is_load_bearing():
+    assert cc.names_rehearsal_proof(REHEARSAL_LINE)
+    assert not cc.names_rehearsal_proof(REHEARSAL_LINE.replace("**Rehearsal proof:**", "Rehearsal proof:")), "the marker is structural"
+    assert not cc.names_rehearsal_proof("**Rehearsal proof:** the dry run passed"), "no instant = an assertion"
+    assert not cc.names_rehearsal_proof("**Rehearsal proof:** 2026-09-22T05:10Z — restart_pipeline.py --dry-run"), "no output = a promise"
+    assert not cc.names_live_proof(REHEARSAL_LINE), "a rehearsal is NOT a live proof — the two markers never alias"
+
+
+def test_a_rehearsal_line_satisfies_the_sweep_ONLY_with_both_labels():
+    # opted in: both labels + the rehearsal line → clean
+    node = _both_labels(_node(2254, labelled=True, closed=_AFTER))
+    node["comments"]["nodes"][-1]["body"] += "\n\n" + REHEARSAL_LINE
+    assert "no-live-proof" not in _codes(sweep.evaluate_issue(sweep.parse_issue(node)))
+    # NOT opted in: live-proof label alone + the same rehearsal line → still a hit (the contract does not widen)
+    node = _node(2254, labelled=True, closed=_AFTER)
+    node["comments"]["nodes"][-1]["body"] += "\n\n" + REHEARSAL_LINE
+    findings = sweep.evaluate_issue(sweep.parse_issue(node))
+    assert "no-live-proof" in _codes(findings), findings
+    # opted in but no proof line of either kind → a hit, and the detail names the rehearsal option
+    node = _both_labels(_node(2254, labelled=True, closed=_AFTER))
+    findings = sweep.evaluate_issue(sweep.parse_issue(node))
+    (hit,) = [f for f in findings if f.code == "no-live-proof"]
+    assert cc.REHEARSAL_LABEL in hit.detail
+
+
+def test_rehearsal_acceptance_is_derived_from_the_label_pair_never_from_one_label():
+    assert cc.rehearsal_proof_accepted([cc.INSTRUMENT_LABEL, cc.REHEARSAL_LABEL])
+    assert not cc.rehearsal_proof_accepted([cc.REHEARSAL_LABEL]), "the rehearsal label alone is not an instrument class"
+    assert not cc.rehearsal_proof_accepted([cc.INSTRUMENT_LABEL])
+    assert not cc.rehearsal_proof_accepted([])
