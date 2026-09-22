@@ -7235,7 +7235,7 @@
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
-      "partitions": 107,
+      "partitions": 108,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 14,
@@ -7260,7 +7260,6 @@
       "intelligence_quality",
       "journal",
       "platform_memory",
-      "qa_hook_matrix",
       "zone2_efficiency"
     ],
     "scope_cuts": [
@@ -7702,6 +7701,11 @@
     },
     "protocols": {
       "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "qa_hook_matrix": {
+      "class": "system_state",
       "ingestion": false,
       "privacy_tier": "public"
     },

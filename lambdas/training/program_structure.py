@@ -516,9 +516,16 @@ def classify_movement(name: str) -> str:
 
 
 def _shift_day(day: str, delta_days: int) -> str:
+    """Shift a DATE# day key by whole days — through THE calendar-day parse (#3609: the ISO-parse
+    registry is shrink-only, so a day key is never parsed with `date.fromisoformat` here)."""
     import datetime as _dt
 
-    return (_dt.date.fromisoformat(day) + _dt.timedelta(days=delta_days)).isoformat()
+    from common.pacific_time import parse_day_key
+
+    parsed = parse_day_key(day)
+    if parsed is None:
+        raise ValueError(f"not a YYYY-MM-DD day key: {day!r}")
+    return (parsed + _dt.timedelta(days=delta_days)).isoformat()
 
 
 def accessory_rotation(
