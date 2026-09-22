@@ -642,6 +642,12 @@
       "stack": "monitoring_prediction_alarms",
       "via": "declaration"
     },
+    "progress-viewer-errors": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "web_stack",
+      "via": "helper:add_web_alarms"
+    },
     "qa-paused-by-budget": {
       "kind": "metric",
       "routing": "digest",
@@ -923,10 +929,10 @@
   ],
   "cost_surface": {
     "ai_features": 19,
-    "alarms": 131,
+    "alarms": 132,
     "emf_namespaces": 31,
     "schedules": 90,
-    "secrets": 29
+    "secrets": 30
   },
   "edges": [
     {
@@ -3903,6 +3909,20 @@
       "module": "lambdas/web/email_subscriber_lambda.py",
       "partition": "subscribers",
       "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "progress-viewer",
+      "module": "lambdas/web/progress_viewer_lambda.py",
+      "partition": "progress_photos",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "progress-viewer",
+      "module": "lambdas/web/progress_viewer_lambda.py",
+      "partition": "withings",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -6918,6 +6938,15 @@
       "stack": "operational_stack",
       "timeout_seconds": 300
     },
+    "progress-viewer": {
+      "declared_alarm": null,
+      "handler": "web.progress_viewer_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/web/progress_viewer_lambda.py",
+      "schedules": [],
+      "stack": "web_stack",
+      "timeout_seconds": 15
+    },
     "reading-cover-pipeline": {
       "declared_alarm": null,
       "handler": "reading.cover_pipeline_lambda.lambda_handler",
@@ -7245,13 +7274,13 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 131,
+      "alarms": 132,
       "alarms_by_routing": {
         "digest": 88,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
-        "urgent": 25,
+        "urgent": 26,
         "via-composite": 3
       },
       "alarms_composite": 4,
@@ -7259,8 +7288,8 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 702,
-      "lambdas": 105,
+      "edges": 704,
+      "lambdas": 106,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
       "partitions": 109,
@@ -7274,8 +7303,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 344,
-        "sites_resolved": 869,
-        "sites_total": 1213
+        "sites_resolved": 871,
+        "sites_total": 1215
       },
       "schedule_resolution": {
         "dynamic": 0,
