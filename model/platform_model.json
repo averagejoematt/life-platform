@@ -3688,6 +3688,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/operational/weight_truth_qa.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/privacy/diary_claims.py",
@@ -7224,7 +7231,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 697,
+      "edges": 698,
       "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7239,8 +7246,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 341,
-        "sites_resolved": 863,
-        "sites_total": 1204
+        "sites_resolved": 864,
+        "sites_total": 1205
       },
       "schedule_resolution": {
         "dynamic": 0,
