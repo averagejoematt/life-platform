@@ -48,6 +48,9 @@ WRITER = os.path.join(REPO_ROOT, "deploy", "write_lane_posture.py")
 # over the trailing 30 runs). Raise ONLY with a new measurement and a new date —
 # never to make a red go away.
 #
+# 2026-09-22 (session AQ, the #3678 recurrence a third time): re-frozen 1055s -> 1286s (p95 of n=22 genuine
+# completions in the trailing 28 runs, `write_lane_posture.py --measure`); the ceiling followed to 26 min
+# (21.42 x 1.2 = 25.7). The lane took #4023/#4028/#4033/#4039 in one night (11,553 premerge tests).
 # 2026-09-21 (#4011, the #3678 recurrence): re-frozen 1037s -> 1055s (n=13 genuine of
 # 28; 15 were timeout casualties, censored). The growth is ACCEPTED and named: the
 # premerge lane reached 11,177 tests and the pre-merge step alone runs ~15.5min on the
@@ -61,7 +64,7 @@ WRITER = os.path.join(REPO_ROOT, "deploy", "write_lane_posture.py")
 # a gate people learn to widen. The posture file carries whichever reading the
 # writer last took; this is the bar it may not cross.
 LAST_MEASURED_SECONDS_2026_09_21 = {
-    "Collect + deploy-critical + format": 1055,
+    "Collect + deploy-critical + format": 1286,
     "gitleaks (PR commit range only, not full history)": 12,
 }
 
@@ -101,7 +104,7 @@ def test_the_ratchet_reds_above_the_last_measured_value():
         )
         assert check["typical_seconds"] <= ceiling, (
             f"{ctx}: typical_seconds {check['typical_seconds']}s exceeds the last measured {ceiling}s "
-            f"(frozen 2026-09-21). The lane got slower. Decide whether that is acceptable, then re-freeze "
+            f"(frozen 2026-09-22). The lane got slower. Decide whether that is acceptable, then re-freeze "
             "this row WITH the new measurement date — do not widen it to clear a red."
         )
 
