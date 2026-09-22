@@ -25,6 +25,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import anchor_day_key  # #3913: a DATE# day key is aged in the calendar that NAMED it — never a hardcoded tz
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
 from ingestion.source_registry import AVAILABILITY_PAUSED, availability_facet, due_months  # #3669 cadence, #3615 absence facets
 
@@ -555,8 +556,14 @@ def status(*, _g) -> dict:
         # unguarded call of the four in this module, so a single malformed `DATE#` sort
         # key anywhere in the table raised ValueError out of the handler and took down
         # the whole status page AND the footer dot (status_summary delegates to status).
+        # #3913: the THIRD consumer that ages a source `DATE#` key, found by re-deriving the
+        # sweep rather than by re-reading #3257's list. It hand-anchored EVERY source at UTC
+        # midnight — the exact defect #3257 fixed in site_api_freshness and #2817 in
+        # freshness_checker — so `_hours_ago` ran 7h (PDT) / 8h (PST) HIGH for the eleven
+        # Pacific-framed sources and was right about whoop/apple_health only by coincidence.
+        # It now goes through the ONE anchor, so the frame comes from the registry facet.
         try:
-            last_dt = datetime.strptime(last_date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            last_dt = anchor_day_key(last_date_str, source_id or "")
         except (ValueError, TypeError):
             return "yellow", "unknown", "Freshness unreadable — the newest record's date could not be parsed"
         now = datetime.now(PT)

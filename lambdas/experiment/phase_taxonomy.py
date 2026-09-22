@@ -274,6 +274,16 @@ SOURCE_CLASS: dict[str, str] = {
     # "calibration", it measures the PLATFORM's priors against the whole cross-cycle history —
     # wiping it at reset would un-earn every badge and destroy the only record of priors that
     # failed to confirm (/method/wrong publishes those as findings).
+    # #4036: owner dismissals of derived PAIN FLAGS (DISMISSAL#<site>#<YYYY-MM-DD>, written by
+    # mcp/tools_training_notes.py::tool_get_exercise_notes, action='dismiss'). Ruling 2026-09-21, ADR-077:
+    # CROSS_PHASE, not SYSTEM_STATE and not EXPERIMENT_SCOPED. It is Matthew's own statement
+    # about his BODY — the same class as "labs", "progress_photos" and "coach_corrections" —
+    # and it is the record that stops a stale flag benching a lift against his word. An
+    # experiment reset that wiped it would silently re-arm every site he has already said is
+    # resolved, at exactly the moment nobody remembers he said it; and unlike a derived
+    # score it cannot be recomputed from anything, because the input was a sentence he spoke
+    # once. NEVER tagged, never wiped, never phase-filtered.
+    "training_constraints": CROSS_PHASE,
     "coach_corrections": CROSS_PHASE,  # #1689 (epic #1687 "The Coach Correction Loop"): Matthew's
     # class-tagged corrections to weekly AI-review-pack items (`lambdas/coach_corrections.py`,
     # pk USER#matthew#SOURCE#coach_corrections / sk CORRECTION#<date>#<id8>). Same rationale as
@@ -397,6 +407,13 @@ SOURCE_CLASS: dict[str, str] = {
     # — SYSTEM_STATE: ops/infra/cache/dead (phase machinery ignores) —
     "journal_analysis": SYSTEM_STATE,  # regenerating Haiku cache (TTL 180d)
     "health_check": SYSTEM_STATE,
+    # #3615/#4015 wrote this partition on 2026-09-21 (the nightly hook-liveness matrix, one row per
+    # PT day keyed by cycle_day) with NO rule here — the first reset REHEARSAL under the owner's
+    # no-further-resets ruling (2026-09-21, ADR-077 amendment) aborted at the census preflight on
+    # exactly this family. Ruling (session AQ, 2026-09-22): SYSTEM_STATE — an operational
+    # instrument's own output, regenerated every night from live probes, never evidence about the
+    # experiment; it survives a reset and is read genesis-anchored like every other census.
+    "qa_hook_matrix": SYSTEM_STATE,
     "dropbox_tracker": SYSTEM_STATE,
     "hevy_id_map": SYSTEM_STATE,
     "routine_index": SYSTEM_STATE,

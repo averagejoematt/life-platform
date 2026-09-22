@@ -98,13 +98,13 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `withings-data-ingestion` | ingestion_stack | `cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
 | `youtube-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
 
-**Unscheduled lambdas (24)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
+**Unscheduled lambdas (23)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `reading-cover-pipeline`, `telegram-webhook`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (16)
+### cross_phase (17)
 
-`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (34)
 
@@ -114,13 +114,13 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `notion`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
 
-### system_state (16)
+### system_state (17)
 
-`coach_gen_cache`, `composite_scores`, `deletion_log`, `dropbox_tracker`, `email_digest`, `email_log`, `experiment_suggestions`, `google_calendar`, `health_check`, `hevy_id_map`, `ingest_liveness`, `journal_analysis`, `personal_baselines`, `qa_predict_dark`, `routine_index`, `sleep_unified`
+`coach_gen_cache`, `composite_scores`, `deletion_log`, `dropbox_tracker`, `email_digest`, `email_log`, `experiment_suggestions`, `google_calendar`, `health_check`, `hevy_id_map`, `ingest_liveness`, `journal_analysis`, `personal_baselines`, `qa_hook_matrix`, `qa_predict_dark`, `routine_index`, `sleep_unified`
 
 ## 3. Consumer Edges (module → partition)
 
-699 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+702 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -221,6 +221,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `temptations` | — | site_api_mind.py |
 | `time_affluence` | — | — |
 | `todoist` | — | daily_insight_compute_lambda.py, intelligence_common.py, site_api_fulfillment.py, site_api_sleep.py, tools_todoist.py |
+| `training_constraints` | tools_training_notes.py | — |
 | `training_notes` | training_notes_llm.py | tools_training_notes.py, training_notes_llm.py |
 | `training_reference` | — | site_api_nutrition.py, site_api_training.py |
 | `travel` | — | adaptive_mode_lambda.py, anomaly_detector_lambda.py, tools_lifestyle.py |
@@ -228,8 +229,8 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `weekly_correlations` | weekly_correlation_compute_lambda.py | ai_expert_analyzer_lambda.py, daily_insight_compute_lambda.py, site_api_ai_context.py, site_api_discovery.py, site_api_journey.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
-| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_training.py, whoop_lambda.py |
-| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
+| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_training.py, weight_truth_qa.py, whoop_lambda.py |
+| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
 ## 4. MCP Layer
@@ -267,7 +268,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 132 alarms (4 composite)
+Routing: digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 — of 131 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -373,7 +374,6 @@ Routing: digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
 | `prediction-gradable-share-low` | monitoring_prediction_alarms | metric | digest | declaration |  |
-| `progress-viewer-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
 | `qa-paused-by-budget` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `qa-smoke-failures` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `qa-smoke-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
@@ -443,6 +443,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `state_of_mind` | owner_only |
 | `strava` | owner_only |
 | `supplements` | owner_only |
+| `training_constraints` | owner_only |
 
 Field-level rulings (only non-default fields are declared):
 
@@ -495,12 +496,12 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1206 total · 865 resolved · 341 dynamic (unresolvable at AST time, tagged — never guessed)
-- Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
-- Alarms: 132 literal-named declarations across three idioms, 4 composite; routing digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 14 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
+- Edge sites: 1213 total · 869 resolved · 344 dynamic (unresolvable at AST time, tagged — never guessed)
+- Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (105 lambdas total)
+- Alarms: 131 literal-named declarations across three idioms, 4 composite; routing digest 88 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 25 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Privacy: 15 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 90 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
-- Record families referenced in code but outside the SOURCE_CLASS census (7): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `qa_hook_matrix`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
+- Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
 ## 7. Cost-bearing surface (#3374 R1)
@@ -514,9 +515,9 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 19 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 132 | this model's alarms plane (CDK AST) |
+| alarms | 131 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 90 | this model's schedules plane (CDK AST) |
-| secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
+| secrets | 29 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

@@ -55,8 +55,64 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "get_exercise_history (which reads the MEASURED sets; this reads the DERIVED layer built from their "
     "notes). Pass a human exercise name OR a Hevy template_id. Signals are inferred + "
     "confidence-tagged; raw notes are sovereign. pain_flag is over-inclusive by design — confirm or "
-    "dismiss before loading that movement."
+    "dismiss before loading that movement. "
+    "action='dismiss' is the DISMISS half (#4036, OWNER-ONLY): record Matthew's own statement that a "
+    "flagged site is resolved — site (his words), words (VERBATIM), flag_note_date (the flagged note "
+    "being dismissed, checked against the real pain_dates first) and optionally dismissed_on. It never "
+    "makes the flag read 'clear': plan_next_session reports the tripwire as dismissed_by_owner with the "
+    "date and his words, and the joints/tendons critic stops vetoing that instance. It RE-ARMS on its "
+    "own — a note dated after the dismissal trips the flag again and marks the dismissal superseded. "
+    "action='dismissals' lists them."
 )
+
+# ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
+# `mcp/registry.py` is baselined at 2,130 logical lines by the #1665 ratchet and the ratchet
+# is shrink-only — it had SIX logical lines of headroom when #4036 needed to add the owner
+# dismissal action below. Paid the #3891 way: the parameter table moved to this cohesive
+# sibling and the registry references it by name. The schema NAME stays inline in the
+# registry (tests/test_mcp_registry.py::test_r3_schema_structure reads the registry text for
+# it); only the table moves, and `scripts/generate_mcp_tool_catalog.py` resolves it by name
+# so the published catalog row is byte-identical.
+GET_EXERCISE_NOTES_INPUT = {
+    "type": "object",
+    "properties": {
+        "action": {
+            "type": "string",
+            "enum": ["read", "dismiss", "dismissals"],
+            "description": (
+                "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
+                "movement (#4036, OWNER-ONLY WRITE). dismissals = list every dismissal on the record."
+            ),
+        },
+        "exercise": {
+            "type": "string",
+            "description": "Exercise name (e.g. 'calf raise', 'cycling') — resolved to its Hevy template via recent workouts.",
+        },
+        "template_id": {"type": "string", "description": "Hevy exercise template id (hex or uuid). Alternative to 'exercise'."},
+        "lookback_days": {"type": "integer", "description": "Days of history to include (default 180)."},
+        "site": {
+            "type": "string",
+            "description": "action='dismiss': the body site in HIS words (e.g. 'right lower back'). Required.",
+        },
+        "words": {
+            "type": "string",
+            "description": ("action='dismiss': his VERBATIM statement (e.g. 'right lower back gone'). Required — never a paraphrase."),
+        },
+        "movement": {
+            "type": "string",
+            "description": "action='dismiss': the movement carrying the flag, if different from `exercise`.",
+        },
+        "flag_note_date": {
+            "type": "string",
+            "description": (
+                "action='dismiss': YYYY-MM-DD of the flagged NOTE being dismissed. Required, and must be a real "
+                "one — it is checked against this movement's own pain_dates before anything is written."
+            ),
+        },
+        "dismissed_on": {"type": "string", "description": "action='dismiss': YYYY-MM-DD he said it. Defaults to today (Pacific)."},
+    },
+    "required": [],
+}
 
 GET_SOURCES_DESCRIPTION = "List all available data sources and their date ranges in the life platform."
 
@@ -133,8 +189,12 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
 GET_EXERCISE_HISTORY_DESCRIPTION = (
     "Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, "
     "the note written on it, per-session volume, PR chronology and estimated-1RM trend. Pass an exact "
-    "Hevy `template_id` (preferred — stable) or a fuzzy `exercise_name`. No default lookback: it answers "
-    "from the whole history, back to 2021. Use for: 'have I done leg extensions before?', 'what did I "
+    "Hevy `template_id` (preferred — stable) or a fuzzy `exercise_name`. No default lookback AND no phase "
+    "filter (#4030): it answers from the whole history back to 2021, across every experiment cycle, with "
+    "the superseded legacy daily-aggregate generation excluded so nothing is double-counted. Every answer "
+    "— including an empty one — carries a `searched` block naming the window, the phases actually read and "
+    "the number of workouts read, so 'no sets found' can never be read as 'never done'. "
+    "Use for: 'have I done leg extensions before?', 'what did I "
     "last squat?', 'how has my bench progressed?', 'what loads did I use at this bodyweight?' — and as "
     "the pre-flight pull before prescribing a load on any movement. This reads raw Hevy; "
     "`get_exercise_notes` reads the DERIVED note-signal layer built from it. Zero notes there with "
@@ -146,7 +206,16 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
     "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly."
 )
 
-GET_MUSCLE_VOLUME_DESCRIPTION = "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?'"
+GET_MUSCLE_VOLUME_DESCRIPTION = (
+    "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is "
+    "below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. "
+    "Counts every set in the window across EVERY experiment cycle (#4031 — no phase filter; the superseded legacy "
+    "daily-aggregate generation is excluded so nothing is double-counted), so a trailing window no longer truncates to the "
+    "current cycle's age. Default window is the trailing 28 days (4 whole weeks) for period='week' and 90 days for "
+    "period='month' — a rate needs a window it can be a rate over; pass start_date/end_date to choose your own. The answer "
+    "echoes what it did in `searched`: the window, whether that window was yours or the default, and the phases read. "
+    "Use for: 'am I training enough chest?', 'what is my weekly volume?', 'am I overtraining?', 'is my push/pull ratio balanced?'"
+)
 
 GET_NUTRITION_DESCRIPTION = (
     "Unified nutrition intelligence from MacroFactor. Use 'view' to select the analysis: "
@@ -428,8 +497,11 @@ GET_DEFICIT_SUSTAINABILITY_DESCRIPTION = (
     "Tier 0 habit completion, and training output. When 3+ degrade concurrently "
     "during an active deficit → flags with severity and calorie increase recommendation. "
     "Attia / Huberman: aggressive deficits destroy adherence, sleep, and muscle. "
+    "Also carries `critics` (deficit advocate / muscle defense / adherence, verdicts against the owner's "
+    "redlines) and `decisions_offered` — refeed / diet-break decisions with a ready `log_decision` payload "
+    "the owner accepts or declines himself (#3754). "
     "Use for: 'is my deficit sustainable?', 'am I cutting too hard?', "
-    "'deficit health check', 'should I eat more?', 'deficit sustainability'."
+    "'deficit health check', 'should I eat more?', 'deficit sustainability', 'refeed or diet break?'."
 )
 
 GET_WORKOUTS_DESCRIPTION = (

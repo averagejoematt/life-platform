@@ -2,12 +2,12 @@
 Strength training tools: exercise history, PRs, volume, progress, frequency, standards.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import logger, table
-from mcp.core import query_source_range
+from mcp.core import phases_of, query_source_cross_phase
 from mcp.strength_helpers import (
     _VOLUME_LANDMARKS,
     assess_volume_completeness,
@@ -18,13 +18,116 @@ from mcp.strength_helpers import (
 )
 
 
+def _read_hevy_all_phases(start_date: str, end_date: str) -> tuple[list, list[str]]:
+    """Every Hevy workout in [start_date, end_date] — ALL phases — plus the phases read (#4030).
+
+    Returns `(items, phases_read)`. Two corrections to the plain `query_source_range("hevy", …)`
+    this replaces, both measured against live DynamoDB on 2026-09-21:
+
+    1. **The phase filter comes off.** `query_source` defaults `include_pilot=False`, which applies
+       the ADR-058 filter. `SOURCE#hevy` is `raw_timeseries` in `phase_taxonomy` — kept forever,
+       genesis-ANCHORED on read (bounded by the caller's DATE window), never HIDDEN — and the
+       taxonomy's own decision helper `phase_filter.source_reads_cross_phase("hevy")` already
+       returns True. Nothing asked it. With the filter on, an all-time read of the partition
+       returned 15 of 499 workouts (`{'pilot': 484, 'experiment': 15}`) and
+       `get_exercise_history(template_id="2B4B7310")` reported the Romanian Deadlift's history as
+       three September sessions with a `-31.2 lb` "1RM decline" — the 2026-06-21 session at
+       83.91 kg x 8 x 3 was simply not there. The bypass is DERIVED, not hard-coded: if the
+       taxonomy ever reclassifies hevy, this read follows it.
+
+    2. **The superseded generation stays out.** The partition holds two shapes: 499 per-workout
+       rows (`DATE#…#WORKOUT#<uuid>`) and 421 legacy daily aggregates (`DATE#…`) superseded in
+       place on 2026-05-26 — every one of the 421 carries `tombstone=true,
+       tombstoned_reason="legacy_daily_aggregate_superseded_by_per_workout"`, and every one of
+       their dates is also covered by a per-workout row. `normalize_hevy_items` parses BOTH
+       shapes, so lifting the phase filter alone would have returned each pre-2025-11-08 session
+       TWICE on the fuzzy-name path (`exercise_name="squat"`: 486 sessions vs 250 real ones;
+       `"bench press"`: 655 vs 344). Dropping `tombstone=true` is the item-level rule
+       `phase_filter.singleton_visible` already encodes for key reads. Nothing is lost.
+
+    #4032 moved both corrections down into `mcp.core.query_source_cross_phase`, which is
+    now the ONE implementation of them. The energy-budget surface reads the same Hevy set
+    log through THIS helper (`tools_health._get_energy_expenditure`,
+    `tools_nutrition._hevy_workouts`) and its sibling raw_timeseries partitions through
+    that core helper directly — so there is a single read path, not a second one that can
+    drift from this docstring.
+    """
+    items = query_source_cross_phase("hevy", start_date, end_date)
+    return items, phases_of(items)
+
+
+def _searched_block(exercise_name: str, template_id: str, start_date: str, end_date: str, items: list, phases_read: list[str]) -> dict:
+    """The provenance every answer carries (#4030) — what was asked, over what window, across which phases.
+
+    An empty answer that does not name its window and its phases is indistinguishable from
+    "never done"; that read is the whole reason this issue exists.
+    """
+    block = {
+        "window": {"start": start_date, "end": end_date},
+        "phases": phases_read,
+        "phase_filter": "none — SOURCE#hevy is raw_timeseries (ADR-077/#2109), read across every phase",
+        "workouts_read": len(items),
+    }
+    # #4031: `tool_get_muscle_volume` reuses this block and asks about no single movement.
+    # Two null movement keys there would read as "asked for a movement and found nothing",
+    # which is the same misreading this block exists to prevent. Only a read that names a
+    # movement carries the movement keys; `tool_get_exercise_history` refuses the call
+    # unless one of them is set, so its block is unchanged.
+    if exercise_name or template_id:
+        return {"exercise_name": exercise_name or None, "template_id": template_id or None, **block}
+    return block
+
+
+# #4031: a RATE needs a window it can plausibly be a rate over. The old default was
+# `2000-01-01`, which `avg_sets_per_period` then divided by — ~1,380 weeks, so the default
+# call reported ~0.0 sets/week for every muscle and "below maintenance" across the board
+# (measured live 2026-09-21: num_periods_analyzed 1394.3, Chest 72 sets -> 0.1/wk). The
+# all-time default is right for `get_exercise_history` (a RECORD) and wrong here.
+# 28 days = four whole weeks, the RP mesocycle unit the landmarks are defined over; the
+# month view takes 90 days ≈ 2.96 months for the same reason.
+_DEFAULT_LOOKBACK_DAYS = {"week": 28, "month": 90}
+
+
 def tool_get_muscle_volume(args):
-    """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks."""
-    start_date = args.get("start_date", "2000-01-01")
+    """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks — cross-phase (#4031).
+
+    Two read defects fixed here, both found by #4030's consumer audit and both measured
+    read-only against live DynamoDB on 2026-09-21. Neither touches the prescription logic:
+    `volume_status`, `classify_exercise` and `_VOLUME_LANDMARKS` are untouched. What changes
+    is what gets COUNTED and what it is divided BY — which does move the verdict, and that
+    is the point of the issue.
+
+    1. **The phase filter comes off.** This read `query_source_range("hevy", …)` — an alias
+       for `query_source(..., include_pilot=False)`, the ADR-058 filter — over a partition
+       `phase_taxonomy` classifies `raw_timeseries`, i.e. cross-phase by design. Every
+       pre-genesis row is stamped `phase=pilot` by the restart tagger, so every trailing
+       window silently truncated to the CYCLE'S AGE: a 30-day window 15 days after genesis
+       counted 15 days of work and divided by 4.3 weeks. Measured, 30d (2026-08-22..09-21):
+       Chest 72 -> 84 sets, Triceps 87 -> 99, Shoulders 56 -> 66. The error is a function of
+       days-since-genesis, so it is smallest exactly when anyone looks for it and TOTAL on
+       day 1 of a cycle. The bypass is derived from `source_reads_cross_phase("hevy")` via
+       `_read_hevy_all_phases` (#4030), never hard-coded here, and that helper also drops the
+       421 superseded `tombstone=true` legacy daily aggregates so nothing is double-counted.
+
+    2. **The default window is a rate window.** See `_DEFAULT_LOOKBACK_DAYS`.
+
+    The answer echoes what it actually did in `searched`: the window, whether that window
+    was the caller's or the default, and the phases read.
+    """
     end_date = args.get("end_date", pacific_now().date().isoformat())
     period = args.get("period", "week")  # "week" or "month"
+    # Same "anything not 'week' is a month" rule the period label and divisor below use —
+    # the enum itself is validated at the handler boundary (#2660).
+    lookback_days = _DEFAULT_LOOKBACK_DAYS["week" if period == "week" else "month"]
 
-    items = query_source_range("hevy", start_date, end_date)
+    caller_start = args.get("start_date")
+    if caller_start:
+        start_date = caller_start
+    else:
+        start_date = (datetime.fromisoformat(end_date) - timedelta(days=lookback_days)).date().isoformat()
+
+    # #4031: cross-phase by the taxonomy's own ruling, minus the superseded legacy generation.
+    items, phases_read = _read_hevy_all_phases(start_date, end_date)
 
     start_dt = datetime.fromisoformat(start_date)
     end_dt = datetime.fromisoformat(end_date)
@@ -100,10 +203,19 @@ def tool_get_muscle_volume(args):
         logger.warning("muscle_volume completeness high-water query failed: %s", _e)
     completeness = assess_volume_completeness(aggregated_dates, latest_ingested, end_date, start_date)
 
+    searched = {
+        **_searched_block("", "", start_date, end_date, items, phases_read),
+        # #4031: which window this rate is actually over, and whose window it was. A
+        # divisor the caller did not choose must never be invisible in the answer.
+        "window_source": ("caller" if caller_start else f"default trailing {lookback_days}d ({period_label} view)"),
+        "default_lookback_days": lookback_days,
+    }
+
     return {
         "date_range": {"start": start_date, "end": end_date},
         "analysis_period": period_label,
         "num_periods_analyzed": round(num_periods, 1),
+        "searched": searched,
         "completeness": completeness,
         "muscle_volume": volume_report,
         "movement_balance": {
@@ -180,7 +292,30 @@ def _summarize_exercise_sessions(template_id: str, sessions: list) -> dict:
 
 
 def tool_get_exercise_history(args):
-    """Every logged set for ONE movement, across all time (#3766).
+    """Every logged set for ONE movement, across all time and EVERY experiment phase (#3766, #4030).
+
+    The guarantee, stated precisely: this reads the whole `SOURCE#hevy` partition inside
+    `[start_date, end_date]` — default `2000-01-01` → today (Pacific) — with **no phase filter**,
+    so a pre-genesis session counts exactly as much as one logged this morning. The superseded
+    legacy daily-aggregate generation (`tombstone=true`) is excluded so nothing is double-counted.
+    Every answer, empty or not, carries a `searched` block naming the window, the phases actually
+    read and how many workouts were read, so "no data" can never be misread as "never done".
+
+    #4030 — why that paragraph had to be written. `query_source_range` is an alias for
+    `query_source(..., include_pilot=False)`, which applies the ADR-058 phase filter. The reset
+    stamps every pre-genesis row `phase=pilot`, so this tool — whose entire purpose is the whole
+    record — was answering from the CURRENT CYCLE ONLY. Measured live 2026-09-21: 15 of 499
+    workouts visible, 26 of 557 distinct movements; `template_id="2B4B7310"` returned
+    `2026-09-09..2026-09-17, n_sessions 3` and a `total_1rm_gain` of `-31.2 lb` computed over
+    eight days of a five-year record, with the owner's 2026-06-21 Romanian Deadlift (83.91 kg x 8
+    x 3) absent; `exercise_name="squat", start_date="2021-01-01"` returned "No logged sets found"
+    against 250 real squat-matching sessions. `get_workout_detail` reads by key and applies no
+    filter, which is why the two tools disagreed. `phase_taxonomy.classify` rules the partition
+    `raw_timeseries` — CROSS-PHASE by design — and `phase_filter.source_reads_cross_phase("hevy")`
+    already returned True; the read simply never asked. Same defect class as #3615 box 4 (the
+    voice sampler) and #2109 (the compute layer's generic readers). See `_read_hevy_all_phases`.
+
+    ---
 
     RESTORED 2026-09-13. This tool shipped, went unused for the 30 days the #884 prune
     measured, and was removed — while three surfaces kept telling the coach to call it
@@ -218,14 +353,23 @@ def tool_get_exercise_history(args):
     end_date = args.get("end_date", pacific_now().date().isoformat())
     include_warmups = bool(args.get("include_warmups", False))
 
-    items = query_source_range("hevy", start_date, end_date)
+    # #4030: cross-phase by the taxonomy's own ruling, minus the superseded legacy generation.
+    items, phases_read = _read_hevy_all_phases(start_date, end_date)
+    searched = _searched_block(exercise_name, template_id, start_date, end_date, items, phases_read)
     sessions = extract_hevy_sessions(items, exercise_name, include_warmups, template_id=template_id)
 
     if not sessions:
         label = f"template_id {template_id!r}" if template_id else f"'{exercise_name}'"
+        phases_txt = ", ".join(phases_read) if phases_read else "none (no workouts in this window)"
         out = {
-            "error": f"No logged sets found for {label} in [{start_date}, {end_date}].",
-            "searched": {"exercise_name": exercise_name or None, "template_id": template_id or None},
+            # #4030: the window AND the phases, in the sentence itself — a caller that reads only
+            # the `error` string must still be unable to mistake this for "never done".
+            "error": (
+                f"No logged sets found for {label} in [{start_date}, {end_date}] "
+                f"across {len(items)} workouts spanning phases: {phases_txt}. "
+                "No phase filter was applied — this searched every experiment cycle in that window."
+            ),
+            "searched": searched,
             "n_sessions": 0,
             "source": "raw hevy (measured)",
         }
@@ -265,7 +409,7 @@ def tool_get_exercise_history(args):
             results.append(_summarize_exercise_sessions(tid, tid_sessions))
         return {
             "ambiguous": True,
-            "searched": {"exercise_name": exercise_name or None, "template_id": None},
+            "searched": searched,
             "note": (
                 f"'{exercise_name}' matched {len(candidates)} distinct movements (template_ids) — one summary "
                 "per movement below, never merged into a single series. Pass template_id to pin one."
@@ -274,4 +418,5 @@ def tool_get_exercise_history(args):
             "results": results,
         }
 
-    return _summarize_exercise_sessions(template_id, sessions)
+    # #4030: the window and the phases ride on the answer, not just on the failure.
+    return {**_summarize_exercise_sessions(template_id, sessions), "searched": searched}

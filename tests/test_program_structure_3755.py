@@ -25,8 +25,13 @@ What these tests hold:
      week is a measured `not rotating`, not a pass.
   5. UNKNOWN IS NOT OK. An unreadable window, and a window with zero sessions, both report
      `ok is None`. A rotation rule with nothing to check is not a satisfied rule (#3767).
-  6. gate:owner CANNOT BE SIMULATED. `ACTIVE` is False in the tree and pairs with a null
-     review date — the same must-fail shape `training_context_registry` carries.
+  6. gate:owner CANNOT BE SIMULATED. `ACTIVE` is True in the tree ONLY together with the
+     owner's review date (2026-09-21, the v0.3 approval on #3753) — the same must-fail shape
+     `training_context_registry` carries. Flipping ACTIVE back to False reds the pin.
+  7. v0.3 IS THE GRID (#3753 approval): three full-body sessions on non-consecutive days,
+     an optional fourth flagged `optional`, every anchor pattern reachable 2x/wk on the
+     required days, the trap-bar gate recorded once, loads that HOLD; the accessory check
+     now measures DRIFT (accessories added mid-block), because v0.3 fixes them per block.
 """
 
 from __future__ import annotations
@@ -56,10 +61,13 @@ def _hevy_rows() -> list[dict]:
 
 
 # ── 1. gate:owner cannot be simulated ────────────────────────────────────────
-def test_active_is_false_until_the_owner_approves_v0_2():
-    """The must-fail test: the only thing between an unapproved program and the engine."""
-    assert program_structure.ACTIVE is False
-    assert program_structure.LAST_REVIEWED_BY_OWNER is None
+def test_active_is_true_only_with_the_owner_review_date():
+    """The owner approved v0.3 on 2026-09-21 (#3753/#3755). ACTIVE without that date is the
+    inherited-assumption failure this module exists to prevent — the pair is pinned.
+    Mutation control (recorded in the PR): set ACTIVE = False → this reds."""
+    assert program_structure.ACTIVE is True
+    assert program_structure.LAST_REVIEWED_BY_OWNER == "2026-09-21"
+    assert program_structure.PROGRAM_VERSION == "0.3"
 
 
 def test_active_and_review_date_cannot_disagree():
@@ -69,12 +77,21 @@ def test_active_and_review_date_cannot_disagree():
         assert program_structure.LAST_REVIEWED_BY_OWNER is None, "a review date exists but ACTIVE is still False"
 
 
-def test_summary_reports_proposed_while_inactive():
+def test_summary_reports_active_with_the_review_date():
     s = program_structure.summary()
-    assert s["active"] is False
-    assert s["status_note"].startswith("PROPOSED")
-    assert s["split"] == "ppl"
-    assert s["program_version"] == "0.2"
+    assert s["active"] is True
+    assert s["status_note"].startswith("ACTIVE") and "2026-09-21" in s["status_note"]
+    assert s["split"] == "full_body"
+    assert s["program_version"] == "0.3"
+    assert s["prose_home"].endswith("TRAINING_PROGRAM_v0.3.md")
+
+
+def test_the_split_decision_records_both_owner_dates():
+    """The 2026-09-19 PPL ruling was real and was overtaken, not ignored — both dates travel."""
+    d = program_structure.SPLIT_DECISION
+    assert d["chosen"] == "full_body" and d["stated"] == "2026-09-21" and d["provenance"] == "owner"
+    assert d["supersedes"]["stated"] == "2026-09-19" and "PPL" in d["supersedes"]["ruling"]
+    assert any("ppl" in r for r in d["rejected"])
 
 
 def test_every_anchor_and_knob_carries_provenance():
@@ -84,20 +101,29 @@ def test_every_anchor_and_knob_carries_provenance():
         assert anchor["stated"], name
         assert anchor["frequency_per_week"]["provenance"], name
         assert anchor["frequency_per_week"]["note"], name
-    assert program_structure.ROTATION_RULE["provenance"] == "platform-proposed"
+    assert program_structure.ROTATION_RULE["provenance"] == "population-derived"
+    assert program_structure.ROTATION_RULE["window_provenance"] == "platform-proposed"  # the window is still the platform's
     assert program_structure.DAY_SHAPE["provenance"]
+    for k, v in program_structure.WEEK_GRID_PROVENANCE.items():
+        assert v.get("provenance"), k
+        if v["provenance"] != "unchanged":
+            assert v.get("note"), k
 
 
 def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
-    """Six lifting days contradicts lifting_sessions_per_wk 2-3. The engine must say so."""
-    # v2 redlines (2026-09-20) allow 5-6 lifting days, so the six-day week no longer conflicts —
-    # the conflict must REAPPEAR under the v1 values (mutation control: the check is live, not deleted).
+    """v3 redlines say 3–4 lifting sessions and v0.3 schedules 3 + an optional 4th, so the frequency
+    conflict is gone BY COMPUTATION — it must REAPPEAR under the v1 (2–3) and v2 (5–6) values
+    (mutation control: the check is live, not deleted). The barbell-bench-vs-skill-ceiling
+    conflict STAYS: skill_ceiling is still 2 and the tier-3 bar is still named as a member."""
     from training import owner_redlines
 
     ids = {c["id"] for c in program_structure.conflicts()}
     assert "lifting_frequency_vs_redline" not in ids
+    assert "barbell_anchors_vs_skill_ceiling" in ids
     assert all(c["resolved"] is False for c in program_structure.conflicts())
     with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 2, "high": 3}):
+        assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
+    with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 5, "high": 6}):
         assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
 
 
@@ -107,16 +133,111 @@ def test_week_grid_keys_equal_the_json_keys():
     assert set(program_structure.week_grid()) == set(live), "week_grid() must be a drop-in for config/training_week.json"
 
 
-def test_week_grid_is_a_ppl_week_the_generator_can_read():
+def test_week_grid_is_a_full_body_week_the_generator_can_read():
     grid = program_structure.week_grid()
+    assert grid["_version"] == 3
     archetypes = {d["archetype"] for d in grid["schedule"].values()}
-    assert {"push", "pull", "legs"} <= archetypes
+    assert archetypes == {"full", "aerobic"}, "v0.3: full-body lifting days and walking days, nothing else"
     # every scheduled archetype must have a targets entry, or the generator silently
     # produces an empty session for that day
     for day in grid["schedule"].values():
         assert day["archetype"] in grid["archetype_targets"], day
-    assert grid["session_set_ceiling"] <= 25, "six sessions/wk against an unchanged weekly cap means the per-session ceiling comes down"
-    assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move for a more aggressive program"
+    assert set(grid["archetype_targets"]["full"]) == {"chest", "back", "shoulders", "quadriceps", "hamstrings", "glutes"}
+    assert grid["session_set_ceiling"] == 18, "v0.3 §3: 12–18 hard sets per session"
+    assert grid["session_minutes_ceiling"] == 70, "v0.3 §3: 55–70 min"
+    assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move; the 6–10 target lives in owner_redlines"
+    assert grid["exercise_notes_mode"] == "one_best_line" and grid["exercise_notes_lookback_days"] == 3650
+
+
+def test_three_required_lifting_days_on_non_consecutive_days_plus_an_optional_fourth():
+    grid = program_structure.week_grid()
+    lifting = [int(k) for k, d in grid["schedule"].items() if d["archetype"] == "full"]
+    required = [int(k) for k, d in grid["schedule"].items() if d["archetype"] == "full" and not d.get("optional")]
+    optional = [d for d in grid["schedule"].values() if d.get("optional")]
+    assert required == [0, 2, 4], "heavy / moderate / heavy-moderate on Mon / Wed / Fri"
+    assert all(b - a >= 2 for a, b in zip(required, required[1:])), "the three required sessions are non-consecutive"
+    assert len(optional) == 1 and optional[0]["session_role"] == "optional_fourth"
+    assert "two consecutive green recovery days" in optional[0]["gate"]
+    assert "OPTIONAL" in optional[0]["label"]
+    assert len(lifting) == 4 and program_structure.lifting_days() == ["0", "2", "4", "5"]
+    roles = [grid["schedule"][k]["session_role"] for k in ("0", "2", "4")]
+    assert roles == ["heavy", "moderate", "heavy_moderate"]
+    # walking is every day: the non-lifting days are aerobic, never rest
+    assert all(d["archetype"] == "aerobic" for k, d in grid["schedule"].items() if int(k) not in lifting)
+
+
+def test_every_anchor_pattern_is_reachable_twice_a_week_on_the_required_days():
+    """Six patterns, each 2x/wk (population-derived). 'Reachable' = a required lifting day whose
+    targets include one of the pattern's primary muscles; the generator selects by muscle."""
+    reach = program_structure.anchor_reachability()
+    assert set(reach) == {"squat", "hinge", "bench", "row", "overhead_press", "vertical_pull"}
+    for name, r in reach.items():
+        assert r["frequency_target"] == 2, name
+        assert r["reachable_at_target"] is True, name
+        assert len(r["reachable_days_excluding_optional"]) >= 2, name
+        assert program_structure.ANCHORS[name]["frequency_per_week"]["provenance"] == "population-derived"
+    assert set(program_structure.CORE_ANCHORS) == {"bench", "row", "squat", "hinge"}
+
+
+def test_the_trap_bar_gate_and_the_load_hold_rule_have_one_home_each():
+    """The hinge is the trap bar until ≤ 275 lb; loads HOLD. Both numbers live in owner_redlines
+    and the program points at them rather than restating a different value."""
+    from training import owner_redlines
+
+    hinge = program_structure.ANCHORS["hinge"]
+    assert hinge["conventional_pull_gate_lb"] == owner_redlines.REDLINES["load_anchoring"]["trap_bar_until_lb"] == 275
+    assert "trap bar" in hinge["pattern"].lower() and "trap_bar_deadlift" in hinge["catalog_keys"]
+    lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
+    assert lifting["load_rule"].startswith("hold")
+    assert lifting["load_entry"]["then"] == "hold" and lifting["load_entry"]["max_pct_of_band_e1rm_until_week_8"] == 85
+    assert lifting["deload"] == {"every_nth_week": 6, "sets_pct": -30, "loads": "held"}
+    assert any("HOLD" in n for n in program_structure.week_grid()["_notes"])
+
+
+def test_the_generator_trims_a_full_body_budget_to_the_session_ceiling():
+    """Six landmark muscles at MEV//2 ask for ~23 sets; the ceiling is 18. The trim is proportional,
+    deterministic, and never invents sets. Mutation control: return `budgets` unchanged from
+    `_trim_budgets_to_ceiling` and the full-body generation below asserts on the BUG line."""
+    from training import routine_generator as rg
+
+    budgets = {"chest": 4, "back": 5, "shoulders": 4, "quadriceps": 4, "hamstrings": 3, "glutes": 3}
+    trimmed = rg._trim_budgets_to_ceiling(budgets, 18)
+    assert sum(trimmed.values()) == 18 and set(trimmed) == set(budgets)
+    assert all(0 < trimmed[m] <= budgets[m] for m in budgets)
+    assert rg._trim_budgets_to_ceiling(budgets, 25) == budgets, "under the ceiling nothing moves"
+    assert rg._trim_budgets_to_ceiling({"chest": 0, "back": 20}, 18) == {"chest": 0, "back": 18}
+    assert rg._trim_budgets_to_ceiling(budgets, 18) == trimmed, "deterministic"
+
+
+def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
+    """The seam serves the module; a Monday generates a valid full session under the ceiling, the
+    Saturday is titled optional, and a walking day is a non-lifting placeholder."""
+    from training import exercise_history, routine_generator as rg
+
+    monkeypatch.setattr(rg, "CONFIG_DIR", str(CONFIG))
+    monkeypatch.setattr(exercise_history, "load_history_indexes", lambda **kw: ({}, {}))
+    monkeypatch.setattr(exercise_history, "load_bodyweight_index", lambda **kw: {})
+    monkeypatch.setattr(exercise_history, "load_whoop_workout_index", lambda **kw: {})
+
+    def _gen(day):
+        return rg.generate_routines(
+            rg.GeneratorInputs(
+                target_date=day, volume_7d={}, recovery_tier="green", acwr_flag="safe", z2_minutes_7d=240.0, days_since_last_workout=1
+            )
+        )
+
+    monday = _gen("2026-09-28")[0]
+    assert monday.archetype == "full" and monday.variant == "ideal"
+    assert 12 <= sum(len(e.sets) for e in monday.exercises) <= 18
+    assert any(r.startswith("week grid source=module") for r in monday.rationale)
+    assert "session_role=heavy" in monday.rationale
+    assert any("budgets trimmed" in r for r in monday.rationale)
+    muscles = {e.rationale_tag.split("_MEV_")[0] for e in monday.exercises}
+    assert muscles == {"chest", "back", "shoulders", "quadriceps", "hamstrings", "glutes"}
+    saturday = _gen("2026-10-03")[0]
+    assert saturday.title.endswith("(optional)") and any(r.startswith("OPTIONAL session") for r in saturday.rationale)
+    tuesday = _gen("2026-09-29")[0]
+    assert tuesday.archetype == "aerobic" and not tuesday.exercises
 
 
 def test_catalog_gaps_names_anchor_members_the_generator_cannot_select():
@@ -129,6 +250,9 @@ def test_catalog_gaps_names_anchor_members_the_generator_cannot_select():
     reported = {k for keys in gaps.values() for k in keys}
     assert reported <= named
     assert all(k in catalog for k in named - reported)
+    # v0.3 names lifts the catalog does not carry — they must be REPORTED, by anchor
+    assert "trap_bar_deadlift" in gaps["anchor:hinge"]
+    assert {"safety_bar_squat", "high_bar_back_squat"} <= set(gaps["anchor:squat"])
 
 
 # ── 3. the seam, with its mutation control ───────────────────────────────────
@@ -140,7 +264,9 @@ def _loader_stub(calls: list[str]):
     return _load
 
 
-def test_seam_serves_the_json_while_the_program_is_proposed():
+def test_seam_serves_the_json_while_the_program_is_proposed(monkeypatch):
+    monkeypatch.setattr(program_structure, "ACTIVE", False)
+    monkeypatch.setattr(program_structure, "LAST_REVIEWED_BY_OWNER", None)
     calls: list[str] = []
     resolved = program_seam.resolve_week_grid(_loader_stub(calls))
     assert resolved.source == "json"
@@ -150,10 +276,9 @@ def test_seam_serves_the_json_while_the_program_is_proposed():
 
 
 def test_seam_serves_the_module_when_active__mutation_control(monkeypatch):
-    """THE CONTROL. Flip ACTIVE and the source must change; the JSON loader must not run.
-
-    Without this leg every other assertion here is satisfied by a seam hard-wired to the
-    JSON — which is exactly the state this issue is trying to leave behind.
+    """THE CONTROL. ACTIVE is True in the tree; the source must be the module and the JSON
+    loader must not run. Flipping ACTIVE off (the test above) changes the source — a seam
+    that returned "module" under both states would be wired to nothing.
     """
     calls: list[str] = []
     monkeypatch.setattr(program_structure, "ACTIVE", True)
@@ -162,6 +287,7 @@ def test_seam_serves_the_module_when_active__mutation_control(monkeypatch):
     assert resolved.source == "module"
     assert calls == [], "the JSON must not be read at all once the program is active"
     assert set(resolved.week) == set(program_structure.week_grid())
+    assert "v0.3" in resolved.detail and "full_body" in resolved.detail and "2026-09-21" in resolved.detail
 
 
 def test_seam_result_always_names_its_source():
@@ -240,33 +366,58 @@ def test_the_delegation_check_can_fail__must_fail_control():
     assert _week_json_literals(bad)
 
 
-# ── 5. the rotation check, computed from the Hevy wire shape ─────────────────
-def test_accessory_rotation_is_computed_from_the_live_hevy_shape():
-    """The fixture IS the wire: DDB `USER#matthew#SOURCE#hevy` rows captured for #3930."""
+# ── 5. the accessory check, computed from the Hevy wire shape ────────────────
+def _shift(rows: list[dict], days: int) -> list[dict]:
+    import datetime as _dt
+
+    out = []
+    for r in rows:
+        d = _dt.date.fromisoformat(r["date"][:10]) + _dt.timedelta(days=days)
+        out.append({**r, "date": d.isoformat()})
+    return out
+
+
+def test_accessory_check_on_the_live_week_is_unknown_without_a_prior_week():
+    """The fixture IS the wire: DDB `USER#matthew#SOURCE#hevy` rows captured for #3930 — seven days.
+    v0.3's verdict is DRIFT (accessories added mid-block), which needs a prior week to compare
+    against; a window whose earlier half holds no session is `unknown`, never `ok`."""
     rows = _hevy_rows()
     out = program_structure.accessory_rotation(window_start="2026-09-06", window_end="2026-09-19", hevy_workouts=rows)
-    assert out["n_sessions"] == 7
+    assert out["n_sessions"] == 7 and out["n_early_session_days"] == 0
     assert out["window"] == {"start": "2026-09-06", "end": "2026-09-19", "days": 14}
-    assert out["distinct_accessories"] >= 10
-    # the measured verdict on that real week: accessories DID repeat inside 14 days
-    assert out["ok"] is False
-    assert out["state"] == "repeating"
-    repeats = {r["movement"] for r in out["repeats_within_window"]}
-    assert "lateral raise (dumbbell)" in repeats
-    # anchors are exempt and reported separately — a bench that repeats is the program
-    assert set(out["anchors_trained"]) == {"bench", "deadlift", "squat"}
+    assert out["ok"] is None and out["state"] == "unknown"
+    # the measurement still travels: what was performed, classified against the SIX v0.3 anchors
+    assert out["distinct_accessories"] == 11
+    assert set(out["anchors_trained"]) == {"bench", "hinge", "squat", "row", "overhead_press", "vertical_pull"}
     assert out["anchor_families_missing"] == []
+    repeats = {r["movement"] for r in out["repeats_within_window"]}
+    assert "lateral raise (dumbbell)" in repeats  # repeats are reported, not graded — v0.3 fixes accessories
     # cardio blocks logged inside the session are NOT accessory diversity
     assert {"treadmill", "cycling"} <= set(out["cardio_blocks_excluded"])
     assert all(c not in repeats for c in out["cardio_blocks_excluded"])
 
 
+def test_a_fixed_accessory_set_across_two_weeks_is_ok_and_an_addition_is_drift():
+    """Two passes of the live week (the second shifted back seven days) = a FIXED set; one movement
+    that appears only in the trailing week = DRIFT, named. Both legs on the wire shape."""
+    rows = _hevy_rows()
+    two_weeks = _shift(rows, -7) + rows
+    fixed = program_structure.accessory_rotation(window_start="2026-09-06", window_end="2026-09-19", hevy_workouts=two_weeks)
+    assert fixed["n_sessions"] == 14 and fixed["n_early_session_days"] == 7
+    assert fixed["ok"] is True and fixed["state"] == "fixed" and fixed["added_in_trailing_7d"] == []
+    drift_rows = two_weeks + [{"date": "2026-09-18", "exercises": [{"name": "Preacher Curl (Machine)", "sets": [{"reps": 12}]}]}]
+    drift = program_structure.accessory_rotation(window_start="2026-09-06", window_end="2026-09-19", hevy_workouts=drift_rows)
+    assert drift["ok"] is False and drift["state"] == "drifting"
+    assert drift["added_in_trailing_7d"] == ["preacher curl (machine)"]
+    assert any("block calendar" in h for h in drift["honesty"])
+
+
 def test_rotation_window_is_respected():
-    """A movement repeated OUTSIDE the window is not a repeat inside it."""
+    """Rows OUTSIDE the window are not counted inside it."""
     rows = _hevy_rows()
     narrow = program_structure.accessory_rotation(window_start="2026-09-18", window_end="2026-09-19", hevy_workouts=rows)
     assert narrow["n_sessions"] < 7
-    assert narrow["ok"] is True, "one session in the window cannot repeat anything"
+    assert narrow["ok"] is None, "no prior session in a two-day window — unknown, not a pass"
 
 
 def test_unreadable_window_is_unknown_not_ok():
@@ -286,8 +437,13 @@ def test_empty_window_is_unknown_not_ok():
 
 def test_classify_movement_separates_anchors_cardio_and_accessories():
     assert program_structure.classify_movement("Bench Press (Barbell)") == "anchor:bench"
-    assert program_structure.classify_movement("Romanian Deadlift (Barbell)") == "anchor:deadlift"
+    assert program_structure.classify_movement("Romanian Deadlift (Barbell)") == "anchor:hinge"
+    assert program_structure.classify_movement("Trap Bar Deadlift") == "anchor:hinge"
     assert program_structure.classify_movement("Leg Press (Machine)") == "anchor:squat"
+    assert program_structure.classify_movement("Seated Cable Row - V Grip (Cable)") == "anchor:row"
+    assert program_structure.classify_movement("Rowing Machine") == "cardio", "the row hint must not swallow the rower"
+    assert program_structure.classify_movement("Lat Pulldown (Cable)") == "anchor:vertical_pull"
+    assert program_structure.classify_movement("Shoulder Press (Dumbbell)") == "anchor:overhead_press"
     assert program_structure.classify_movement("Treadmill") == "cardio"
     assert program_structure.classify_movement("Lateral Raise (Dumbbell)") == "accessory"
 
@@ -301,11 +457,12 @@ def _block(**over):
 
 def test_constraint_block_carries_the_program_summary():
     block = _block()
-    assert block["program"]["program_version"] == "0.2"
-    assert block["program"]["split"] == "ppl"
-    assert block["program"]["active"] is False
-    assert any("PROPOSED" in line for line in block["honesty"])
-    assert any("conflicts" in line for line in block["honesty"])
+    assert block["program"]["program_version"] == "0.3"
+    assert block["program"]["split"] == "full_body"
+    assert block["program"]["active"] is True
+    assert not any("is PROPOSED, not approved" in line for line in block["honesty"])
+    assert any("conflicts" in line and "barbell_anchors_vs_skill_ceiling" in line for line in block["honesty"])
+    assert block["program"]["anchor_reachability"]["hinge"]["reachable_at_target"] is True
 
 
 def test_constraint_block_rotation_is_unknown_without_the_rows():
@@ -314,12 +471,19 @@ def test_constraint_block_rotation_is_unknown_without_the_rows():
     assert block["accessory_rotation"]["state"] == "unknown"
 
 
-def test_constraint_block_computes_rotation_when_the_rows_are_injected():
-    block = _block(hevy_workouts_rotation_window=_hevy_rows(), rotation_window_start="2026-09-06")
-    assert block["accessory_rotation_ok"] is False
+def test_constraint_block_computes_the_accessory_check_when_the_rows_are_injected():
+    rows = _hevy_rows()
+    block = _block(hevy_workouts_rotation_window=rows, rotation_window_start="2026-09-06")
+    assert block["accessory_rotation_ok"] is None, "seven days of rows carry no prior week — unknown, said out loud"
     assert block["accessory_rotation"]["n_sessions"] == 7
     assert block["accessory_rotation"]["window"]["start"] == "2026-09-06"
-    assert any("NOT rotating" in line for line in block["honesty"])
+    assert any("accessory layer is unknown" in line for line in block["honesty"])
+    drift_rows = (
+        _shift(rows, -7) + rows + [{"date": "2026-09-18", "exercises": [{"name": "Preacher Curl (Machine)", "sets": [{"reps": 12}]}]}]
+    )
+    block = _block(hevy_workouts_rotation_window=drift_rows, rotation_window_start="2026-09-06")
+    assert block["accessory_rotation_ok"] is False
+    assert any("DRIFTING" in line and "preacher curl (machine)" in line for line in block["honesty"])
 
 
 def test_constraint_block_stays_deterministic():

@@ -436,6 +436,46 @@ LIVE_PROOF_WHERE_MIN = 8  # chars of "where" after the instant — a bare timest
 # live-proof obligation. Reconstructing one for an older close would be AI guesswork on record.
 LIVE_PROOF_SINCE = "2026-09-06"
 
+# ── the REHEARSAL-proof leg (owner ruling 2026-09-21: no further resets) ─────────────────
+# An instrument whose proof event the owner has ruled will never run live again (the reset
+# pipeline and everything gated on "the next reset") cannot produce a live output — waiting
+# for one leaves the issue open forever. The owner's ruling (ADR-077 amendment 2026-09-21):
+# such a box closes on REHEARSAL proof — a `--dry-run` or a fixture run against scratch data,
+# never the live table — recorded structurally as `**Rehearsal proof:** <instant> — <command>
+# — <output>`. The leg is OPT-IN by a second label so it can never quietly widen the live-proof
+# contract: an issue must carry BOTH `closure:live-proof` and `closure:rehearsal-proof` for a
+# rehearsal line to satisfy the sweep; `closure:live-proof` alone still demands a live output.
+REHEARSAL_LABEL = "closure:rehearsal-proof"
+REHEARSAL_PROOF_MARKER = re.compile(r"\*\*\s*Rehearsal proof\s*:?\s*\*\*:?", re.I)
+REHEARSAL_PROOF_COMMAND_MIN = 8  # chars naming the command/fixture after the instant
+
+
+def names_rehearsal_proof(text: str) -> bool:
+    """True when a closing comment carries `**Rehearsal proof:** <instant> — <command> — <output>`.
+
+    Structural like `names_live_proof`: the marker, a date-and-time instant, and at least two
+    named parts after it (the command or fixture that ran, and what it printed). A rehearsal
+    with no command is an assertion; one with no output is a promise."""
+    for line in (text or "").splitlines():
+        if not REHEARSAL_PROOF_MARKER.search(line):
+            continue
+        m = LIVE_PROOF_INSTANT.search(line)
+        if not m:
+            continue
+        # the instant regex stops before a zone token ("Z", "+00:00", " PT") — drop it before splitting
+        rest = re.sub(r"^(?:Z|[+-]\d{2}:?\d{2}|\s?(?:UTC|PT|PDT|PST))?", "", line[m.end() :]).strip(" -—–:·")
+        parts = [s.strip() for s in re.split(r"\s+[—–-]{1,2}\s+", rest) if s.strip()]
+        if len(parts) >= 2 and len(parts[0]) >= REHEARSAL_PROOF_COMMAND_MIN:
+            return True
+    return False
+
+
+def rehearsal_proof_accepted(labels) -> bool:
+    """The rehearsal leg applies only when the issue carries BOTH labels (opt-in, never a widening)."""
+    labels = set(labels or ())
+    return INSTRUMENT_LABEL in labels and REHEARSAL_LABEL in labels
+
+
 # The DERIVED leg's vocabulary — what makes a changed file an instrument, by AST.
 INSTRUMENT_WRITE_CALLS = ("put_item", "update_item", "delete_item", "put_object", "publish", "send_email", "send_raw_email")
 INSTRUMENT_EMF_CALLS = ("put_metric_data", "emit_skip_metric")

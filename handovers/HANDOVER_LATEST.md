@@ -1,131 +1,126 @@
-# Handover — Session AP: the ceiling that killed green jobs, the migrate bug found by running it, and the nine-hour permission prompt (2026-09-20 19:41 → 2026-09-21 ~08:45 PT)
+# Handover — Session AQ: the flip that waited on a ruling, three lanes that landed, and the prompt that still stalls deploys (2026-09-21 12:20 PT → ~18:40 PT)
 
-**Fable, autonomous, standing merge + deploy authority (fleet, MCP, site-api, CDK).** The brief set 57 → ≤48 with
-a 06:00 PT wrap. The honest number at wrap is **54 open in all / 51 outside the Roadmap milestone** — the target
-was not met, for the same structural reason as AO: most of what merged tonight closes on a next occurrence (a
-Sunday weekly, a nightly, a reset, an owner commit). Gross: **4 closed on live proof (#3918 #3982 #3700 #4011),
-1 filed (#4011, closed the same session), 0 auto-closed.** The wrap ran ~2.5 h past the deadline because the
-session sat 9 h on a permission prompt (below). **The owner has not ruled on #3753 — v0.2 stays `ACTIVE = False`.**
+**Fable, attended-autonomous, standing merge + deploy authority (fleet, single functions, site-api, CDK by name).** The brief set 54 → ≤30 with a 20:00 PT wrap, a 13:00 PT Later triage with the owner, the v0.2 flip as boot item 1 and a 19:00 PT `/daily-debrief`. **The owner was present for one message all afternoon** (the deploy-prompt complaint, ~18:05 PT); the #3753 ruling the brief said was posted was never posted, the Later triage got no answers, no 2026-09-06 photo keys appeared, and the debrief could not run. The honest number at wrap is **53 open in all / 50 outside Roadmap** (was 54 / 51): **3 closed on live proof (#3563 #3900 #3615), 2 filed (#4022 #4025), 0 auto-closed, 0 epics closed.** v0.2 stays `ACTIVE = False`; the flip is one click away as draft PR #4029 (premerge green) the moment the ruling lands.
 
 ---
 
-## The nine hours (05:23Z → 14:30Z), decoded — owner-confirmed
+## What shipped — 4 PRs merged, every one `Refs`, zero trailers (each PR's commits grepped before arming)
 
-The checkpoint-1 deploy was issued as ONE compound line — `{ echo …; bash deploy/deploy_fleet.sh; bash
-deploy/deploy_lambda.sh life-platform-mcp mcp_server.py; bash deploy/deploy_site_api.sh; } > log 2>&1` in the
-background — and it matches no `permissions.allow` rule: `.claude/settings.local.json` allows the bare string
-`bash deploy/deploy_fleet.sh` only (what `/fewer-permission-prompts` had seen), `deploy_lambda.sh` and
-`deploy_site_api.sh` have no rule at all. The harness waited on the prompt; the four Wave 2 lanes (their own
-allowlisted commands) finished at 05:53–06:21Z and their CI concluded by 06:18Z; the Mac never slept (Caffeinated).
-The command started at 14:30:55Z, the minute the owner approved it. **The brief's autonomy grant does not reach
-the permission layer.** Reflex (memory + the CLAUDE.md block): invoke deploy scripts BARE, exactly as the allow
-rule spells them — the final fleet deploy tonight was a bare `bash deploy/deploy_fleet.sh` and prompted nothing.
-Proposed to the owner (ask-first, permissions — diff in the chat): prefix rules `Bash(bash deploy/deploy_fleet.sh*)`,
-`Bash(bash deploy/deploy_lambda.sh *)`, `Bash(bash deploy/deploy_site_api.sh*)`, `Bash(bash deploy/reject_deployment.sh *)`.
+- **#4023** (#3615 boxes 4–5, lane): the voice sampler reads across cycles (`include_pilot=True`, lookback 40, `sample_phase` on every judgment) and 11 pages stop advertising the empty podcast feed — the dark set DERIVED from `hook_registry`'s `declared_dark` rows. Site auto-deploy run 35652316739 success; `voice-fidelity-harness` deployed; force-run → `new_samples 14, cumulative_n 28, scope all cycles, distinct` (per-coach n 3 → 4).
+- **#4026** (driver): `docs/alarm_citations.json` re-cited against the two LIVE causes the boot battery caught — `qa-smoke-failures` on `cross_surface:vitals` (a gate false positive, owned by #4025) and `freshness-interior-gap` on Eight Sleep `DATE#2026-09-20` (vendor returns no session; the gap-exhausted marker lands ~09-27; EXPIRES 2026-09-29).
+- **#4027** (#4025, lane): `assess_cross_surface_vitals` takes a `history=` map and classifies a cited figure that matches a real Whoop day in the trailing 7 as `dated citation (matched YYYY-MM-DD)`; `history=None` stays strict and says so. `life-platform-qa-smoke` deployed.
+- **#4028** (#3754 boxes 3–4, lane, fable): `lambdas/health/nutrition_critics.py` — three deterministic critics over the owner's redlines, ONE verdict rule shared with B2, `decisions_offered` carrying the exact `log_decision` payload (never written by the module), attached to `get_deficit_sustainability` and `plan_next_session`. `life-platform-mcp` deployed in the fleet.
 
-## What shipped — 15 PRs merged, every one `Refs`, zero trailers (each PR's commits grepped before arming)
+**Open at wrap, green, deliberately not merged:** **#4024** (#3760 the private progress-photo viewer — 44 files; a separate `progress-viewer` Lambda in `LifePlatformWeb` because #3757's live test forbids any `site_api*` role from naming `raw/`; needs an owner-created secret, `cdk_deploy.sh LifePlatformWeb` + `LifePlatformServe`, and a phone-side live proof; main moved under it and the census re-merge reads 544 unproven vs 540 with a `stable_key collided` assertion — next session's first driver task, steps on the PR) and **#4029** (DRAFT — the v0.2 flip, see below).
 
-**Driver PRs:** #4010 (#3918 `--only-note` + `--allow-calls`) · #4012 (#4011 the ceiling re-derive 18 → 22) ·
-#4016 (#3918 the migrate keying bug) · #4021 (main's two reds — the hevy gate off `fromisoformat`,
-`docs/engines/HYPOTHESIS.md` re-verified with 12 AST-derived spans). **AO's armed pair:** #4007 (#3005
-fix-forward, hooks installed in the main checkout at 04:0xZ) · #4005 (#3621 box 4). **Lane PRs:** Wave 1 —
-#4009 (#3700) · #4013 (#3712) · #4014 (#3971) · #4015 (#3615 boxes 1–3); Wave 2 — #4017 (#3552) · #4018 (#3607) ·
-#4019 (#3599 boxes 1–2) · #4020 (#3621 boxes 2+5, a `site/**` change: `protocols.json` 1.2.0 live with
-`spawned_by`).
+## The flip — prepared, measured, not merged
 
-**Closed on live proof (4):** #3918 (one Haiku call re-extracted the 06-23 note; `--migrate --apply`;
-`occurrence_mismatches 1 → 0`) · #3982 (`[ BORN ] citation-network-check.yml` on the first cron-freshness run
-after #4005, nothing filed) · #3700 (`draft_custom` → `cardio_cues: 1`, the stored block reads
-`Last: 2.99 mi in 1:00:00 (3.0 mph) — 20 Sep`) · #4011 (seven required jobs green at 14–21 min on the 22-min
-ceiling).
+`owner_redlines.ACTIVE`/`program_structure.ACTIVE` → True, `REDLINES_VERSION 2.0`, `LAST_REVIEWED_BY_OWNER 2026-09-21` (to be corrected to the ruling date). **Blast radius measured on the branch against the LIVE `config/training_week.json`:** the seam switches from S3 JSON to the module — schedule upper/lower/engine → PPL six days, `session_set_ceiling` 25 → 18, `session_minutes_ceiling` 75 → 60, `_version` 1 → 2; every other knob identical. The first premerge run red-ed exactly two fixture suites that exercise the generator against the committed JSON grid (`test_subtract_only_autoregulation_behavior._generated`, `test_routine_generator::test_exercise_notes_off_mode_yields_empty_notes`) — both now pin the seam to JSON explicitly; second run `11442 passed`. **Merge order after the ruling:** merge #4029 → `bash deploy/deploy_fleet.sh` → `plan_next_session` must read redlines + program ACTIVE with the date → close #3753/#3755 on that read-back → that is the build beat.
 
-## Deploys — every function on ONE tip, read from `build_info.json`
+## Closed on live proof (3)
 
-- **Checkpoint 1 (14:30–14:44Z, after the prompt):** fleet 106/0 from `3f9f7388`, then MCP + site-api from
-  `6c4b24f9` — SPLIT, because I `git pull`ed mid-run; fleet re-run 106/0 from `6c4b24f9` to unify.
-- **Checkpoint 2 (14:58–15:05Z):** fleet 106/0 + MCP + site-api from `877e87a9` (postflight OK ×3).
-- **Final (15:07–15:13Z):** bare `bash deploy/deploy_fleet.sh` from **`b047216a`** (#4021's tip) — 106 updated /
-  0 failed, MCP + warmer + site-api + site-api-ai included. Read back from the deployed zips: `life-platform-mcp`,
-  `life-platform-site-api`, `episode-detect`, `hevy-routine-cron`, `life-platform-qa-smoke` all `b047216a ·
-  built_at_source commit · dirty=false`. **CDK: no stack deployed tonight** (no `cdk/` change merged).
-- **Site:** #4020's merge auto-deployed `site/config/protocols.json` (run 35615359410 — "Deploy public site" and
-  the smoke both `success`; the visual + AI-vision job was still in progress at 15:1xZ — the next session reads
-  its verdict; a revert would show as the workflow's rollback job).
-- **Verified by content after the site-api deploy:** `/api/calibration` `interval_forecasts.n` **80 → 80**,
-  strata unchanged (#4013's split moved no historical row); `/api/status` garmin comment now registry-derived
-  (`PAUSED in the source registry — … Last record: 98d ago`, was "stopped 97d ago. Check auth/webhook") (#4015);
-  `/api/hypotheses` `min_days_per_arm: 5` (#4017); `manage_hevy_routine dry_run` returns
-  `prescription_audit.verdict = refuse`, `error_code = SUBTRACT_ONLY_VIOLATION` on the #3927 specimen (#3971).
-
-## Leases — 20 rejected by name, zero blanket
-
-By hand: 35554444488→`4b498399e` (AO's docs push) · 35558266000→`e18d5e3ba`. By the session steward (a loop that
-rejects only runs whose head is a main commit descended from the session base, naming sha + subject):
-35559147640→`8fa232f58` · 35559198041→`c2b75e5b8` · 35559446055→`d1afb022e` · 35559461424→`d9fc6a925` ·
-35559501162→`aa566c55f` · 35560741739→`5d22d00a6` · 35560801596→`863ccf4c1` · 35561354831→`045f3b120` ·
-35561415027→`f0bdd82ce` · 35562703155→`00a3cab4c` · 35562746589→`341860e0a` · 35564327168→`856a51c6a` ·
-35564375803→`3f9f73886` · 35565566258→`325256970` · 35565622175→`1c0b0f956` · 35612741429→`ab1c4bb5d` ·
-35612840326→`d32e073e9` · 35612751428→`6c4b24f91`. The runs on `b667ed342`, `877e87a95` and `b047216a1` were
-still in flight at wrap — the steward was still running; the next session rejects any it did not catch, by name.
+- **#3563** — `/api/status` `wednesday_chronicle` green (was RED 44d) and `ALERTSTATE#notion_journal_dark` exists with `send_count 4` over one open episode (not 155 opens). Residual `not-work`: `resolved_at` stores the boolean `true` where the writer sets None/ISO.
+- **#3900** — the 18:30Z nightly reports ZERO tagger-blind rows; the only residue is the two pre-genesis, tagger-REACHABLE rows AO predicted (`SOURCE#anomalies` / `SOURCE#recap_cards`, `DATE#2026-09-05`). My targeted `phase = pilot` stamp (the tagger's own rule, two keys) was REFUSED by the permission classifier; the one-liner is in the chat log (~12:40 PT) for the owner, or the next reset's tagger sweep stamps them.
+- **#3615** — all five boxes shipped (#4015 + #4023) with live output for each; `qa_hook_matrix / DATE#2026-09-21` exists; box 6 stays carried on epic #3490.
 
 ## Found by measuring, not by reading
 
-- **The required job's ceiling, not lane load.** #4007's `Collect + deploy-critical + format` rerun SOLO: every
-  step green, `Complete job` at 19m55s, rendered `cancelled`. `scripts/check_job_timeout_headroom.py` already read
-  RED (p95 17.59 × 1.2 = 21.11 vs 18). AO's ×10 cancellations were this, and a rerun cannot fix it. #4012
-  re-derived 22 from the script's number, re-measured the posture (1055 s, n=13) and re-froze the ratchet with
-  the date; then seven required jobs passed at 14–21 min. The lane has no growth budget (epic #3493 line).
-- **`--migrate` was keyed by occurrence alone.** Another block's occurrence 0 (Rowing, Elliptical) shadowed the
-  Treadmill's, so the archived prior read "no stored extraction carries this note text" on 09-10. Found by
-  running the owner-approved migration, fixed with a mutation-controlled test (#4016).
-- **Four PRs moved the gate-census ratchets in one night** (#4005 #4014 #4015 #4020; #4019 too). Each re-merge
-  was measured on the merged tree, never incremented: 669 → 670 → 672 → 673 → 674 → 675 → 676 / proven 119 → 125.
-  A `git checkout --theirs` on `tests/conftest.py` during #4020's re-merge DROPPED the lane's own
-  `_PREMERGE_EXTRA_FILES` entries — rebuilt as the union; check for that whenever conftest conflicts.
-- **The commit-msg hook (#4007) requires a Conventional Commit subject on MERGE commits too** — `chore(merge):
-  origin/main into <branch> — …` is the form that passes.
-- **The ISO-parse registry is shrink-only (65)**: a new `fromisoformat` site cannot be registered, only migrated
-  (`common.pacific_time.parse_day_key` for DATE# day keys).
-- **`gh pr merge --auto` on an already-green PR merges instantly** — #4018/#4019 merged at 14:31Z the moment I
-  re-armed them after the prompt, not when their checks finished (06:1xZ).
-- **Lane findings on live surfaces:** `/api/status` narrated a PAUSED source as a broken pipe on a third surface
-  (#4015 fixed both producers); `/api/protocols` `count=0` is the phase filter over nine archived cycle-5 rows,
-  not an empty table (#4020); the one served hypothesis carried an unlabelled `min_effect: 0.05` (#4017); the
-  #2119 scoped-writer guard sees 44 of 186 `put_item` sites (#4019, recorded as `xfail(strict=True)`).
+- **The permission layer still stalls deploys, prefix rules or not.** Both bare deploys today matched the new `Bash(bash deploy/deploy_lambda.sh *)` rule and still waited: `voice-fidelity-harness` issued ~20:40Z, modified 21:37:05Z; `qa-smoke` issued ~00:34Z, modified 01:07:51Z — ~57 and ~33 minutes on a one-minute script. The owner confirmed at ~18:05 PT ("we are still getting stalled by bash deploy approvals"). This session runs in **auto mode**, whose classifier denied the DynamoDB stamp outright and prompts on deploys regardless of the allowlist. Two exits proposed to him: leave auto mode (`/permissions`, default mode honours the allowlist) or batch to ONE fleet deploy per checkpoint (done: the 01:1xZ fleet was the only deploy after the message).
+- **A gate that reads a coach sentence as a claim about now.** `cross_surface:vitals` failed the mind coach for "the 97% recovery reading on…" (Whoop 09-20 = 97) against today's 90 while the card's own `published_vitals` stamp agreed with the cockpit — the #2978 class in its purest form; #4025 filed and fixed the same afternoon (dated citations resolve against their own day).
+- **The first nutrition-critics output names the real problem.** Window 09-07 → 09-20: **5 of 6 measured days below the 1,700 kcal energy floor** (lowest 1,116; 7-day mean 1,400), protein floor missed 5 of 7 (mean 136 g), loss 2.42 lb/wk against the scheduled 3.0 with intake BELOW the prescribed band → `muscle_defense: change → 2000 kcal`, `deficit_advocate: change → adherence audit`, reported as `change` not `veto` because the redlines are still PROPOSED. This is the owner-facing line of the day.
+- **Session AG's 09-16 rejection of the voice-sampler lever was wrong on the class, not the symptom:** `COACH#*/OUTPUT#*` is EXPERIMENT_SCOPED, but the instrument's published method says "accumulates across every cycle" — voice fidelity is a property of the persona, not the cycle; the filter contradicted the stated method. Written on #3615 with the two-line revert named if the owner disagrees.
+- **Eight Sleep 2026-09-20 is vendor-absent**, not an ingest defect: hourly gap-fill has logged `No day matching 2026-09-20` since 00:15Z; `record_gap_exhausted_absence=True` with `LOOKBACK_DAYS 7` closes it on or about 09-27 (the 08-30 episode's exact shape).
+- **Epic closure sweep, on evidence: zero.** 14 of 18 epics have open children; #3489/#3492/#3494/#3496 (Later) have zero open children but each carries 3–4 folded stories whose scope is explicitly unshipped and no ticked Done-when box; #718/#3943/#3944 are Roadmap parking. Closing the four Later epics needs the owner's ruling to record the folded scope as not planned (proposed to him at 12:4x PT with the count effect, 49 → 45).
+- **Clock:** the triage message went out at ~12:40 PT (19:35Z); the next reliable read was 22:04Z after the #3615 hand-back and the next after that 00:33Z after three hand-backs — two hours of lane wall-clock during which the driver made no deploys and issued no prompts. Recorded because the brief asked for every >30 min gap.
+
+## Leases — 2 rejected by name by the session steward, zero blanket
+
+35652414144 → `2c3b47d48` (the #4023 reconcile) · 35672471025 → `6fc9069d8` (#4027). Run 35672520572 on `c996eda41` (the #4026 reconcile) concluded with Deploy as its sole red job without a steward log line — the janitor or the concurrency eviction actioned it. In flight at wrap: runs on `610f54d44` (#4028) and `d33b37d01` (the fleet tip) — the steward loop dies with the terminal; the next session rejects any that park, by name.
+
+## Deploys — every function on ONE tip, read from `build_info.json`
+
+`voice-fidelity-harness` from `2c3b47d4` (21:37Z) · `life-platform-qa-smoke` from `6fc9069d` (01:07Z) · **checkpoint fleet `bash deploy/deploy_fleet.sh` from `d33b37d0` — 106 updated / 0 failed** (01:1xZ), MCP + warmer + site-api included; read back from the deployed zips: `life-platform-mcp`, `life-platform-site-api`, `life-platform-qa-smoke`, `voice-fidelity-harness`, `telegram-coach-worker` all `d33b37d0 · commit · dirty=false`. **No CDK stack deployed** (#4024's two are next session's, after the secret exists). Site: #4023's `site/**` change auto-deployed, smoke + visual QA success, no rollback.
+
+## Later triage — 15 calls recommended at 12:4x PT, none answered, none executed
+
+Promote to Next: #3528 (direct pushes meet no test gate) · #3913 (whoop `day_key_frame`) · #3972 (pain lexicon — feeds a tripwire that goes load-bearing on the flip). Close not planned: #3373 (design on record; no financial build this cycle) · #3571 · #3600 (duplicate of #3599/#3615's legs) · #3619 · #3828 (#3918 shipped the cap path) · #3946. Keep with reason: #3597 (carrier grammar #4022 depends on) · #3610 (blocked on the off-repo privacy pass) · #3643 (next reset) · #3915 (next nightly + owner-gated strip) · #3945 (owner's list) · #4008 (next reset). Net if taken: 6 close / 3 promote / 6 keep. The four zero-child Later epics: close as not planned with the folded scope in the closing comment, unless a folded bullet is named to re-file.
 
 ## Residual / next picks (every line cites)
 
-- **Owner, morning:** #3753 approve/redline v0.2 (then a one-line `ACTIVE = True` PR + MCP deploy — the build
-  beat) · #3761 box 1 (the 2026-09-06 photo set — no keys tonight) · #3599's amendment publish (attended) ·
-  #3945's register (0 posted by hand) · the permissions diff above (not-work — his settings, ask-first).
-- **Next occurrence:** #3712 (Sun 17:00Z `episode-detect`: `committed_target.available`; the week after: the first
-  `CALIB#…#prescription-week-…` grade) · #3615 (18:30Z nightly: `hooks:liveness_matrix` + the `weeks:*` legs,
-  `qa_hook_matrix` row; boxes 4–5 residual) · #3971 box 4 (the first chat-COMMITTED routine's stored IR
-  `load_floors.status == applied` — not done tonight on purpose, a test commit is litter in his Hevy) · #3621
-  boxes 2b/5 (next attended reset; next `seed_protocols_to_dynamodb.sh --apply`) · #3607 (next `/review` header
-  carrying `sha256 af9f9589…`) · #3552 (next freeze — `min_effect_provenance`) · #3599 (next reset's Step [0]
-  census print; the ten waived writers expire 2026-12-31) · #3563 · #3830 · #3900 + #3915 (the 18:31Z nightly) ·
-  #3601 (October close) · #3671 (next reset) · #3972 (a clean pre-flight).
-- **Not started (design, not tonight):** #3436 · #3754 boxes 3–4 · #3620 boxes 3–4 · #3760 (the private
-  photo viewer) · #3759 (promoted to Now tonight by stored rank; fable; waits on #3760).
-- **Alarm board:** `qa-smoke-warnings` citation EXPIRES 2026-09-22 — not-work — the 09-21 18:30Z nightly clears
-  it or the next session files the defect it names.
-- **Site auto-deploy verdict for #4020** (run 35615359410, visual + AI-vision QA in flight at wrap) — not-work —
-  read `gh run view 35615359410` at boot; a rollback would need the `site/**` re-publish per
-  `docs/SITE_UPLEVEL_PLAYBOOK.md`.
-- **Worktrees:** every merged lane released (`lane_worktree.py release` ×12); `issue-4014-main-red-fixforward`
-  is merged and unreleased — not-work — release at the next boot. 51 older locked worktrees pre-date this session.
-- **Lease steward** (a scratchpad loop) was still running at wrap — not-work — it dies with the terminal; the
-  three in-flight main runs above may park after that and want rejection by name.
+- **Owner, first:** the #3753 ruling on the issue → merge #4029 → fleet deploy → close #3753/#3755 (the beat) · the Later triage answers above (#3528 #3913 #3972 #3373 #3571 #3600 #3619 #3828 #3946 #3597 #3610 #3643 #3915 #3945 #4008) · #3761 box 1 (no 2026-09-06 photo keys exist) · `rm ~/.claude/overnight.flag` — not-work — it was never created this session · the auto-mode-vs-allowlist decision — not-work — his permission layer, two exits named above · the #3900 two-key stamp — not-work — the one-liner is in the chat log; the next reset's tagger also cures it.
+- **Next driver task:** #4024 → #3760: re-merge over main (four generated files take main's side; the census union reads 544 unproven vs 540 with `stable_key collided` — find the four keys that lost their verdicts, `scripts/gate_census_mutations.py`'s auto-merge is the first suspect), then the secret command in the PR body (owner), `cdk_deploy.sh LifePlatformWeb` + `LifePlatformServe`, the live proof (`/progress view` → 200, replay → 401, anonymous → 401); #3759 waits on it.
+- **Next occurrence:** #4025 (the 2026-09-22 18:30Z nightly: `cross_surface:vitals` PASS with a dated citation named) · #3754 box 4 (the first non-`unevaluable` offered decision — the second weekly rate lands 09-27) · #3615's successor reads (per-coach n ≥ 6 after two harness runs — recorded on the closed issue) · #3971 box 4 (the first chat-COMMITTED routine's IR `load_floors.status == applied` — the debrief did not happen tonight) · #3712 (Sun 17:00Z) · #3563 closed · #3830 (next vendor 503) · #3601 (October close) · #3552 (next freeze) · #3607 (next `/review`) · #3621 boxes 2b/5, #3599, #3671, #3643, #4008 (next reset).
+- **Alarm board:** `freshness-interior-gap` self-clears ~09-28, EXPIRES 2026-09-29 (#4026's entry) · `qa-smoke-failures` clears on the first nightly after the #4025 deploy (already live) — if the 09-22 nightly still fails the leg, that is a new defect to file, not the citation.
+- **Not started (design):** #3436 · #3620 boxes 1/3/4 (the next sonnet lane) · #2978 (blocked:date 2026-10-19).
+- **Worktrees:** released — `issue-4014-main-red-fixforward`, `issue-3615-voice-sampler-podcast-link`, `issue-4025-cross-surface-vitals-dated`, `issue-3754-nutrition-critics`, `issue-4025-alarm-recite`; still LOCKED on purpose — `issue-3760-progress-photo-viewer` (open PR #4024) and `issue-3753-v02-active-flip` (draft PR #4029) — not-work — release after their merges.
+- **Lease steward** (scratchpad loop) dies with the terminal — not-work — runs on `610f54d44` / `d33b37d01` may park; reject by name at the next boot.
 
-**Build beat:** none — the red-teamed plan is still owner-gated (#3753 unruled, `ACTIVE = False`); a merge drain plus two CI structural fixes is not a beat.
-**Docs:** `docs/engines/HYPOTHESIS.md` re-verified against #4017 with 12 AST-derived spans (#4021) · `docs/SCHEMA.md` protocols row (#4020) · `docs/reviews/anchors/ANCHORS.json` + sha sibling (#4018) · `docs/INCIDENT_LOG.md` +1 row (Patterns regenerated) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` +17 rows (13 inherited from AM–AO, snapshot regenerated, the 18-test CI check green) · the doc-sync literals by `sync_doc_metadata.py --apply` in this commit.
-**Decisions:** none needed — the ceiling re-derivation follows #3678's existing rule (measured p95 × 1.2), and every other change is an implementation of an existing ADR.
-**Main:** red — main's full suite was red 04:56Z → 15:00Z on two NON-required gates (`test_iso_parse_site_registry_3609` on #4014's `mcp/hevy_prescription_gate.py`; the Docs CI drift gate on `docs/engines/HYPOTHESIS.md` after #4017); fix-forward #4021 merged 15:00:50Z at `b047216a1`, whose CI/CD run 35616034654 was still in progress at the wrap commit — `check_main_green.py` therefore reads the prior red; the next session confirms green on that run. Every deploy tonight was direct from the main checkout and content-verified; no lease was used.
-**Incidents:** 1 row added — main's full suite red ~10h on the two non-required gates, aggravated by the 9-hour permission-prompt wait (P3, no reader impact; Patterns block regenerated).
+
+---
+
+## Post-wrap addendum (2026-09-21 19:15 → ~20:30 PT, owner present) — the evening the objective changed
+
+The wrap above committed at 18:33 PT. Everything below happened after it, with the owner at the terminal, and is recorded here so the next session does not re-derive it.
+
+- **The owner ruled "no further resets"** (~19:00 PT): cycle 17 is terminal. Reset-gated boxes close on **rehearsal proof** (`restart_pipeline.py --dry-run` / the double-reset fixture, never the live table), recorded as `**Rehearsal proof:** <instant> — <command> — <output>`; the phase machinery demotes to dormant with a revive checklist on a Roadmap epic; #3601 box 3 IS this ruling. Plan Step 1b (`~/.claude/plans/serialized-sauteeing-beaver.md`) carries the ADR amendment + the rehearsal pass (#3671 #4008 #3621 #3599 #3643 #3552 + #3601 + epic #3490).
+- **v0.3 red team, then approval** (19:2x → 20:05 PT): the owner asked to reproduce the 2024–25 velocity (3.4–3.5 lb/wk, first 100 lb in ~29–31 weeks) with better retention and a real landing. Six personas ran blind on a packet compiled from the record (238 weigh-ins, 329 Hevy rows, 272 Strava days, a year of Whoop/Eight Sleep, both DEXAs, trough labs, the current block) plus a calibrated energy model. Converged: the rate was made by 16–19 h/wk of walking in weeks 1–9; constant 3.5 stops at 275–260; retention was excellent (161 lean at 15.6 %) and VOLUME was the cost → 3–4 full-body sessions, loads HOLD; highest reproducing intake ~2,000–2,100 at 13–16 h; the current block (8.4 h, 20/28 logged, floor met 2 days) is the risk; land at 200–205, decelerate from 240, 26-week maintenance. **Packet correction:** the post-water 2024–25 phase was 32 weeks / 3.4 lb/wk (the v0.2 packet's "40 / 2.7" divided by the whole window). Model: B lands −100 at ~wk 38 (34 DXA-gated) vs the record's 29–31 — "historical speed, an 1,800 floor and 13 h walking: pick two". Files: `s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3.md` + `_redteam.md`; PDFs on the Desktop; summary on #3753/#3755. **Owner: "yes i approve it" (~20:05 PT); walking 13 h/wk (§13.4); baseline (§13.2) not yet scheduled — the DXA gates stay unarmed; named human (§13.3) later.** Draft PR #4029 (v0.2) superseded; **the v0.3 machine twin lane is in flight** (worktree `issue-3753-v03-active-flip`, 11 files modified, no commit yet at 20:28 PT).
+- **Later triage, one by one, all 15 ruled and executed:** closed not planned #3571 #3600 #3619 #3828 #3946 (two-line closure comments); promoted to Next #3528 #3913 #3972 (milestone + score line); kept with dated reasons #3373 #3597 #3610 #3643 (closes via Step 1b rehearsal) #3915 (**the 64-row strip is AUTHORISED** — dry run then `reconcile_provenance_2026_09.py --only 3514 --apply`) #4008 (closes via the Step 1b backfill). **#3945 closed** on its last ruling (item 9: the rule half of the memory corpus moves into the repo after a privacy pass the owner schedules; carrier #3610).
+- **The four zero-child Later epics closed not planned** (#3489 #3492 #3494 #3496) with Done-when and folded scope quoted verbatim; two folded stories re-filed at the owner's choice — **#4034** (alarm estate, from #3611; re-homed on epic #3493) and **#4035** (newcomer glossary + n beside rates, from #3618; re-homed on #3495).
+- **Filed:** #4030 (get_exercise_history reads the current cycle only — `query_source`'s phase filter over a CROSS_PHASE partition; from a Claude-chat repro; lane running, PR **#4033** open, checks in flight) and its lane's two siblings **#4031** (get_muscle_volume) and **#4032** (the TDEE worked-set input), both Next; **#4036** (an owner dismissal path for pain flags — "right lower back gone", 2026-09-21; load-bearing under v0.3; starts after the flip merges).
+- **Owner-authorised AWS write:** the photo-viewer signing secret `life-platform/progress-photos-signing` created 20:09 PT (PR #4024 can now go live next session). Photos (#3761): later this week. Permission mode: the owner elected to leave auto mode (his `/permissions`; not verified from here).
+- **Count at 20:30 PT: 49 all-open / 46 non-Roadmap** (Later 8 · Next 16 · Now 22 · Roadmap 3) — 13 closed since 00:00Z (#3563 #3900 #3615 #3571 #3600 #3619 #3828 #3946 #3945 #3489 #3492 #3494 #3496), 7 filed (#4030 #4031 #4032 #4034 #4035 #4036 + #4025 earlier), closure sweep clean (scanned 13, hits 0 after two residual rephrasings and the two re-homes).
+- **Next session's first three moves, in order:** (1) merge #4033 (after its checks) and note its consumer audit; (2) the v0.3 twin PR — verify, merge, ONE fleet deploy, `plan_next_session` reads redlines 3.0 + program 0.3 ACTIVE with 2026-09-21, close #3753 and #3755, record the build beat; (3) the #4036 lane, then Step 1b (ADR amendment + rehearsal pass), then #4024's re-merge + two CDK deploys + the phone-side proof when the owner is awake.
+
+**Closures (addendum):** #3563, #3900, #3615 (live proof) · #3571, #3600, #3619, #3828, #3946 (not planned, owner triage) · #3945 (register empty) · #3489, #3492, #3494, #3496 (epics, not planned, scope quoted) — all commented in the two-line shape · DoD after the addendum: scanned=13 window=closed>=2026-09-22 hits=0.
+**Backlog (addendum):** 49 all-open / 46 non-Roadmap; Now 22 (fable 3 / opus startable); promoted #3528 #3913 #3972; re-filed #4034 #4035; hygiene 0 violations, 1 advisory (`now_lane_coverage`).
+
+
+---
+
+## Overnight addendum (2026-09-21 20:50 PT → 2026-09-22 08:50 PT, autonomous under the owner's overnight prompt) — the flip landed, 22 more closed, and a deploy sat nine hours on a prompt again
+
+**The honest number at 08:50 PT: 35 open in all / 31 outside Roadmap** (was 54 / 51 at boot; 49 / 46 at the first addendum). Since the overnight prompt: **13 closed on live proof** (#3753 #3755 #3971 #4030 #4031 #4032 #3913 #3620 #3972 #3643 #3621-rehearsal #3599-rehearsal #3601-rehearsal, plus #4008 on a live re-stamp), **3 epics closed on their children's evidence** (#3762 #3497 #3498), **10 PRs merged** (#4033 #4037 #4039 #4041 #4042 #4043 #4044 #4045 #4046 + the #4026/#4023/#4027/#4028 set earlier), **4 filed** (#4038 the dormant Roadmap epic, #4040 the no-reset stamping gap, #4051 stage-1 pain evidence, plus #4031/#4032 by the #4030 lane), **0 auto-closed**, **5 leases rejected by name** by the steward (`2c3b47d48`, `6fc9069d8`, `0d6b2e755`, + two), zero blanket. **The wrap deadline (06:00 PT) was missed by 2.7 h — see the incident.**
+
+### The build beat — v0.3 ACTIVE and deployed (`2026-09-22-the-plan-he-signed`)
+The owner approved v0.3 at ~20:05 PT; the machine twin (PR #4039: `owner_redlines.py` 3.0, `program_structure.py` 0.3 full-body) merged 04:06Z; fleet `7a9fad73` 106/0; `plan_next_session` read back `redlines.active true · 3.0 · 2026-09-21`, `program.active true · 0.3 · full_body`, `rate_target 3.5 cap 4.0`; #3753 and #3755 closed on that read. The nutrition critics moved from `change` to **`veto`** on the energy floor the moment the redlines went active — the first verdict the approved plan issued was against his own intake (5 of 6 logged days under the floor; by 15:47Z: 4 of 5, and **no food log for the last two days** — the `logging_dark` tripwire is firing).
+
+### Step 1b — the no-reset ruling, executed
+PR #4037: ADR-077 amendment (cycle 17 terminal; reset-gated boxes close on `**Rehearsal proof:**` under BOTH labels — opt-in so the live-proof contract never widens; phase machinery Dormant with the double-reset fixture as dead-man); `closure:rehearsal-proof` minted; #4038 filed as the revive carrier. **The first rehearsal (`restart_pipeline.py --dry-run`) aborted at the census preflight on `SOURCE#qa_hook_matrix`** — a family #4015 created the day before with no taxonomy rule — the guard #3599 built caught a real totality violation on its first run; rule + SCHEMA row + measured-set header (84 live / 68 unregistered) landed in the same PR. The full dry run then ran every sub-step; `restart_verify_gates` red on the dry run's own uncommitted rewrites (the #3477 shape). Closed on rehearsal proof: #3621, #3599, #3601. Closed on LIVE proof instead: #3643 (check 14 failed on Day 16 with one chronicle escapee → `reconcile_countdown_gap.py --apply` 1 row → `escapees=0`), #4008 (`reconcile_tombstone_cycle_4008.py --apply` → 412 rows re-stamped, check 22's later-cycle class 0). Stay open: #3671 (box 4 needs a cron-drafted title — every routine this cycle is chat-authored), #3552 (Sunday's hypothesis-engine write is the live proof), #3915 (durable leg of the strip applied: 50 rows; box 3 re-measures on the 09-22 nightly). #3490 supersedes onto #4038 once #3671 and #3915 resolve.
+
+### Fixed forward on main (PR #4045, 05:33Z)
+Two reds every lane inherited: the flip's `date.fromisoformat` day-key parse (the #3609 registry is shrink-only → migrated to `parse_day_key`), and the required job's ceiling outgrown a third time in five days (22 → 26 from p95 21.42 × 1.2; posture re-frozen 1286 s). `gh pr update-branch` on the three open lanes, never `rerun --failed`.
+
+### Deploys — every function on one tip, read from the deployed zips
+`7a9fad73` (04:1xZ, the flip + #4033) · `623fdd00` (06:0xZ, #4042 + #4043 — site-api's `_comp_status` frame fix) · `9044deea` MCP only (issued 06:06Z, **modified 15:30:34Z — the 9.4-hour prompt**) · **`81d700d5` (15:4xZ, #4046)** — 106/0 each time, MCP + warmer + site-api included; five functions read back `dirty=false` at each checkpoint. No CDK stack deployed; #4024's two CDK stacks + the phone-side proof are the morning's first owner-present task (the secret exists).
+
+### Found by measuring
+- **The single-function deploy script prompts where the fleet script does not.** Same night, same session: two `deploy_fleet.sh` runs unprompted, one `deploy_lambda.sh` waited 9.4 h. The driver cannot read its own permission mode; from here every deploy goes through the fleet path until the owner confirms the mode in chat (incident row added).
+- **`get_muscle_volume` flipped two landmark verdicts** once it read the whole window (Chest 21.0/wk → exceeding MRV; push/pull 1.25 push-dominant) — real prescription changes, stated on #4031; the planner now sees them.
+- **Stage 1 of `plan_next_session` carries no pain-flag instances without a draft** (#4051): the owner's dismissal ("right lower back gone") was written 15:34Z through the new `get_exercise_notes/dismiss` action and its own `reads_as` computes `dismissed_by_owner`, but stage 1 reads `clear` with `days_since_movement: {}` because its evidence set is empty — #4036 stays open on box 5 until #4051 lands.
+- **The Haiku training-notes monthly cap (300) is reached**: the note layer is deterministic-only (`cap_exceeded ×24`) for the rest of September.
+- **13 pre-genesis EXPERIMENT_SCOPED rows still read as current** (#4040) after the #3900 pair and the chronicle escapee were stamped; in a no-reset world nothing owns that stamp.
+
+### Residual / next picks (every line cites)
+- **Owner, this morning:** #4024 → #3760 (census re-merge reads 544 vs 540; `cdk_deploy.sh LifePlatformWeb` + `LifePlatformServe`; `/progress view` proof) · the baseline booking (v0.3 §13.2, unarmed DXA gates) · the named human (§13.3) · photos (#3761) · **eat and log** — `logging_dark` is firing and the energy floor is vetoed.
+- **Next driver:** #4051 (stage-1 evidence) → then #4036's box 5 read-back; #4040's write-time/nightly stamp; #4022; the `test_muscle_volume_cross_phase_4031.py` midnight-straddle flake (`_TODAY` captured at import — freeze the clock) — not-work — file it if it reds a PR again; the one-entry-day ruling the #4032 lane named — not-work — an ADR-104 question for the owner.
+- **Next occurrence:** #4025 (the 09-22 18:30Z nightly) · #3915 box 3 (same nightly) · #3754 box 4 (09-27) · #3552 (09-27) · #3671 box 4 (first cron-drafted title) · #3712 (09-27) · #3830 · #3607 · #2978 (10-19).
+- **Epics:** #3490 → superseded by #4038 when #3671/#3915 resolve; #3742 (#3754 #4036 #4051 open); #3743 (#3759 #3760 #3761); #3495 (#3552 #4040 #4035); #3592 (#3597 #4022); #3593 (#3607); #3707 (#3712); #3493 (#3528 #3610 #4034).
+- **Worktrees:** released — 4030, 4025-recite, 3601, 4008, 3493, 3753-v02/v03, 3615, 3754, 4031, 3913, 4036, 4032; still LOCKED on purpose — `issue-3760-progress-photo-viewer` (open PR #4024) — not-work — release after its merge; a stale `issue-3913-whoop-day-key-frame` from the #3973 lane is the reaper's.
+- **Steward** dies with the terminal — not-work — reject any parked lease from `81d700d5` / `7c1edc52` by name at the next boot.
+
+**Closures (overnight):** #3753, #3755, #3971, #4030, #4031, #4032, #3913, #3620, #3972, #3643, #3621, #3599, #3601, #4008, #3762, #3497, #3498 commented (Shipped / Outcome / Live or Rehearsal proof / Residual each) · DoD after the addendum: scanned=29 window=closed>=2026-09-22 hits=0 (one `post-close-comment` on #3900 moved to its carrier #4040 and deleted).
+**Backlog (overnight):** 35 all-open / 31 non-Roadmap; Now 16 (fable/opus startable); filed #4038 (Roadmap), #4040 (Next), #4051 (Now); hygiene 0 violations after #4034's six boxes were merged to five, 2 advisories.
+**Main (overnight):** pending — `81d700d5`'s CI/CD run in progress at 15:43Z; every completed run since #4045 failed on the Deploy job alone (rejected/evicted leases); the 04:06Z → 05:33Z full-suite red (#3609 gate) is fixed forward by #4045.
+**Incidents (overnight):** 2 rows added — the 9.4-hour single-deploy prompt (P3, process) and the flip's #3609 red + the 22-min ceiling killing a green job (P4).
+
+**Build beat:** `2026-09-22-the-plan-he-signed` — v0.3 approved, its machine twin merged (PR #4039) and deployed (fleet `7a9fad73`), `plan_next_session` read back ACTIVE, #3753/#3755 closed on that read (the 18:33 PT wrap line said none; the overnight addendum supersedes it).
+**Docs:** `docs/alarm_citations.json` re-cited (PR #4026) · `docs/MCP_TOOL_CATALOG.md` regenerated (PR #4028) · `docs/INCIDENT_LOG.md` +3 rows (Patterns regenerated) · the doc-sync literals by `sync_doc_metadata.py --apply` in this commit.
+**Decisions:** none needed — every change implements an existing ADR (ADR-105 provenance on the nutrition critics, ADR-104 on the dated-citation gate); the v0.2 flip is the owner's pending ruling, not a session decision.
+**Main:** pending — `81d700d5`'s CI/CD run (the #4046 merge + reconcile) was in progress at the overnight addendum (15:43Z); every COMPLETED run since #4045 (05:33Z) concluded `failure` on the Deploy job ALONE (rejected/evicted production leases — the session deploys from the main checkout), never on a test gate; the one full-suite red (04:06Z → 05:33Z, the #3609 registry gate from the flip) is fixed forward by #4045. Session AR confirms green on `81d700d5` / `7c1edc52` at boot.
+**Incidents:** 5 rows added in all (3 at the wrap, 2 overnight — see the overnight addendum) — the deploy permission-prompt stalls recurring under the prefix allow rules (P4, process); `qa-smoke-failures` lit by a gate false positive on a dated coach citation (P4, #4025); the Eight Sleep 2026-09-20 vendor-absent night lighting `freshness-interior-gap` (P4, self-clearing).
 **Stash/hooks:** clean — no stash; the installed pre-commit/commit-msg hooks are #4007's (`session_postflight` hook freshness 🟢).
-**Closures:** #3918, #3982, #3700, #4011 commented (Outcome / Live proof / Residual each) · DoD: scanned=7 window=closed>=2026-09-21 hits=0 findings=0 dispositioned=0 mode=warn blocking=none (one `unhomed-residual` hit on #3700 fixed by editing the closing comment before the sweep re-ran).
-**Backlog:** Now 3 live stories after promoting #3759 by stored rank (milestone + score line both edited); 57 → 54 open (51 non-Roadmap); 1 filed (#4011, closed same session); hygiene: 0 violations, 2 advisories (`now_lane_coverage`, the #3540 grounding specimen — both grandfathered); Later sweep — no stale Later issues.
-**Alarms:** ✅ every lit alarm cites an OPEN issue or a dated self-clearing state (`check_alarm_citations.py` green at 14:4xZ; `qa-smoke-warnings` citation expires 2026-09-22).
-**CI warnings:** none triaged — the latest completed main run was red (see Main), so `check_ci_warnings.py` had no green run to read; the next session triages the annotations on `b047216a1`'s run.
-**Ledger:** omitted — the only standing machinery that shipped rides existing rent: the #4015 census legs are two steps inside the existing qa-smoke nightly (21 key-bounded reads), the #4019 scoped-writer guard is a premerge test, the #4018 anchor seal is a BUILDER with no schedule; the #4005 citation cron's row lands with its first run (October), as AO recorded. `docs/PROPORTIONALITY.md` was regenerated by the reconcile bot after every merge (gate census 669 → 676).
+**Closures:** #3563, #3900, #3615 commented (Shipped / Outcome / Live proof / Residual each) · DoD: scanned=3 window=closed>=2026-09-22 hits=0 findings=0 dispositioned=0 mode=warn blocking=none (two `unhomed-residual` hits fixed by rephrasing both residual lines to `not-work —` before the sweep re-ran).
+**Backlog:** Now 3 live stories (fable 3 / opus 3 startable; #3761 #3753 #2978 owner-gated or blocked) — no promotion needed; 54 → 53 open (51 → 50 non-Roadmap); 2 filed (#4022 Next opus, #4025 Now sonnet); hygiene: 0 violations, 2 advisories (`now_lane_coverage`, the #3540 grounding specimen — both grandfathered); Later sweep — no stale Later issues by age; the 15 owner-facing Later calls are recorded above, unanswered.
+**Alarms:** 0 uncited — the boot battery read two lit alarms with stale citations (`freshness-interior-gap`, `qa-smoke-failures`), both re-cited against their live causes in PR #4026; `check_alarm_citations.py` green at 01:24Z.
+**CI warnings:** none triaged — no completed main run since the session base is green (each concluded `failure` on a rejected Deploy lease), so `check_ci_warnings.py` had no green run to read; the next session triages the annotations on `d33b37d01`'s run.
+**Ledger:** none — no standing machinery shipped (the nutrition critics ride two existing MCP tools with no schedule; the podcast-link and dated-citation gates are premerge tests / a leg inside the existing nightly; #4024's `progress-viewer` function + alarm are unmerged and get their row when they land).

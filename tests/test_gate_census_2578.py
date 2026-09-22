@@ -863,13 +863,27 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # baseline 8 passed, mutated 1 failed + 7 passed, reverted 8 passed). MEASURED by id-set diff against a disposable
         # `git archive origin/main` export at e2dac0e7e: lane {proven 126, unproven 540, not-applicable 6, attempted-unproven 5}
         # vs main {125, 540, 6, 5} — exactly one entrant, and unproven does not move.
-        # Upper bound 126 -> 127 (2026-09-21, #3760, resolved on top of #3615 boxes 4+5's 126): structural::test_progress_viewer_privacy_3760.py
+        # Upper bound 126 -> 127 (2026-09-21, #3754 boxes 3+4): structural::test_nutrition_critics_3754.py arrives proven
+        # (STRUCTURAL_PROOFS, ARMED 1/1 via the re-runnable harness — an untracked lambdas/web/ module importing the owner-only
+        # nutrition critics: baseline 62 passed, mutated 1 failed + 61 passed, reverted 62 passed). MEASURED by id-set diff
+        # against a disposable `git archive origin/main` export at 2c3b47d48: lane {proven 127, unproven 540, not-applicable 6,
+        # attempted-unproven 5} vs main {126, 540, 6, 5} — exactly one entrant, and unproven does not move.
+        # Upper bound 127 -> 128 (2026-09-21, #3913 box 3): structural::test_day_key_frame_declaration_guard_3913.py
+        # arrives proven (STRUCTURAL_PROOFS, ARMED 1/1 via the re-runnable harness — an untracked
+        # lambdas/ingestion/ module carrying a Zulu-anchored fetch window, the signature that makes a source's
+        # DATE# key name a UTC day with nothing in the module going near a clock: baseline 16 passed, mutated
+        # 5 failed + 11 passed, reverted 16 passed). MEASURED by id-set diff against a disposable
+        # `git archive origin/main` export at bfb163388: lane {proven 128, unproven 540, not-applicable 6,
+        # attempted-unproven 5} vs main {127, 540, 6, 5} — exactly one entrant, and unproven does not move.
+        # Re-measured after merging origin/main into the lane (tip had moved to 5c729ec9c): merged lane
+        # {128, 540, 6, 5} vs a fresh export {127, 540, 6, 5} — same one entrant, same verdicts.
+        # Upper bound 128 -> 129 (2026-09-21, #3760, resolved on top of #3913's 128): structural::test_progress_viewer_privacy_3760.py
         # arrives PROVEN via the re-runnable harness (MutationSpec in scripts/gate_census_mutations.py, ARMED 1/1 — an untracked
         # site/_census_probe_3760.html linking the owner-only viewer: baseline 16 passed, mutated 1 failed :: test_no_site_file_mentions_the_route,
-        # reverted 16 passed). MEASURED by id-set diff on the MERGE RESOLUTION tree, never by arithmetic: lane {proven 127, unproven 540,
-        # not-applicable 6, attempted-unproven 5} vs a disposable `git archive origin/main` export {126, 540, 6, 5} — exactly one entrant,
+        # reverted 16 passed). MEASURED by id-set diff on the MERGE RESOLUTION tree, never by arithmetic: lane {proven 129, unproven 540,
+        # not-applicable 6, attempted-unproven 5} vs a disposable `git archive origin/main` export {128, 540, 6, 5} — exactly one entrant,
         # and unproven does not move.
-        <= 127
+        <= 129
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

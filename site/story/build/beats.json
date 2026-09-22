@@ -3595,6 +3595,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3883"
         }
       ]
+    },
+    {
+      "id": "2026-09-22-the-plan-he-signed",
+      "date": "2026-09-22",
+      "title": "The plan he signed",
+      "shipped": "The coaching engine now runs on a training and nutrition program the owner read and approved, not one it inherited. Six independent expert personas argued from his own 2024–25 record — 238 weigh-ins, 329 logged workouts, a year of recovery data, two DEXA scans and the labs from his last trough — and the plan that came out keeps his historical fat-loss speed while the fat reserve is largest, tapers on his own body composition rather than a calendar, cuts lifting to three or four full-body sessions with loads that hold, and treats the landing as the main event: deceleration begins at 240 lb and maintenance runs 26 weeks. The machine twin of that document is live: the constraint block every session starts from reports the redlines as active and dated, the routine generator reads the new week, and the nutrition critics now veto a plan when he eats under his own floor instead of noting it.",
+      "why_it_mattered": "For three months the engine's caution was a design decision from June that the client never signed. The same evening the owner also ruled that the experiment will not be reset again, so the platform's 'next reset' machinery went dormant with a rehearsal path instead of a wait.",
+      "gotcha": "The record's own arithmetic was wrong in the previous packet: the post-water phase of the 2024–25 cut was 32 weeks at 3.4 lb a week, not 40 weeks at 2.7 — one persona built an argument on the wrong figure, and the correction is in the record. And the historical speed was bought with 16 to 19 hours of walking a week; the current block was walking eight.",
+      "honest_miss": "The first live read after the flip shows the plan working against him: five of six logged days under the 1,700 kcal floor and a protein floor met on two of twenty days, so the first verdict the approved plan issued was a veto on his own intake. Two of the three DXA gates that decide how long the fast phase lasts cannot arm until a week-0 scan exists, and that appointment is not booked.",
+      "prs": [
+        {
+          "label": "PR #4039",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4039"
+        },
+        {
+          "label": "PR #4037",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4037"
+        },
+        {
+          "label": "PR #4028",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4028"
+        }
+      ]
     }
   ]
 }

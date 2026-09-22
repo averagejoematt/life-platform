@@ -237,6 +237,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
+        "test_reconcile_tombstone_cycle_4008.py",  # #4008: the opening-cycle tombstone re-stamp planner — pure, mutation-guarded, reuses check 22's predicate
         # #3688: source sweep of lambdas/ mcp/ scripts/ deploy/ cdk/ + the three QA
         # harness files for every site that DECIDES on `stop_reason == "max_tokens"`.
         # A registry-join check, and pre-merge by construction: a NEW AI judge inherits
@@ -261,6 +262,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # hand-types a drifted paraphrase (rather than importing the shared constant)
         # must red on the PR that adds it, not sit invisible post-merge.
         "test_prior_cut_disclosure_3754.py",
+        # #3754 boxes 3+4: os.walk sweep of lambdas/ for any importer of health.nutrition_critics
+        # outside the MCP layer — the block is OWNER-ONLY (a refeed decision with a
+        # `log_decision` payload must never reach site-api, a narrative or an email). A new
+        # importer is a repo-shape change that must red on the PR that adds it.
+        "test_nutrition_critics_3754.py",
         # #3615 box 5: sweeps every committed site/**/*.html for a `rel=alternate` link to a
         # feed the hook registry declares DARK. A repo-shape ratchet in the strict sense —
         # its verdict is a function of the tree alone — and pre-merge because the failure it
@@ -268,6 +274,38 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # zero episodes) on a `site/**` PR, which AUTO-DEPLOYS on merge (#750). Post-merge
         # this gate would only ever red on something already published.
         "test_podcast_feed_link_3615.py",
+        # #4030: the all-time exercise-history read must never be wrapped in the ADR-058 phase
+        # filter — `SOURCE#hevy` is raw_timeseries (cross-phase by the taxonomy's own ruling), and
+        # with the filter on the tool answered from the current cycle only: 15 of 499 workouts, the
+        # owner's June RDL session absent, "no logged sets found" for a movement with 250 of them.
+        # The fake table IS the wire (it applies the real FilterExpression mcp.core mints) and the
+        # mutation arm restores the filter. Pre-merge because the failure is INVISIBLE after the
+        # merge: the tool returns a well-formed, confident, truncated answer with no error
+        # anywhere, and the surface that shows it is a coach prescribing a load off a phantom
+        # "never done". A cross-cycle read regression cannot wait for a post-merge lane.
+        "test_exercise_history_cross_phase_4030.py",
+        # #4032: the same defect on the ENERGY BUDGET — `_get_energy_expenditure` and the
+        # ADR-152 `_energy_budget` read hevy/strava/withings/macrofactor (all four
+        # raw_timeseries) through the ADR-058 filter, so every trailing window truncated at
+        # the current genesis and the published TDEE and calorie target stepped at every
+        # restart. Carries an AST leg — no phase-filtered reader may reappear inside
+        # `_get_energy_expenditure` or anywhere in tools_nutrition — which is a
+        # registry-join check a NEW read inherits wrongly and silently. Pre-merge because
+        # the failure is a well-formed, confident number the owner eats to: nothing
+        # post-merge errors, and the mutation arm shows the truncation also DISARMS the
+        # impossibility check that would otherwise catch it (it publishes an "unverified"
+        # target instead of refusing).
+        "test_energy_budget_cross_phase_4032.py",
+        # #4031: the same cross-cycle read one tool over — and here the truncated number IS a
+        # prescription. `get_muscle_volume` read SOURCE#hevy through the ADR-058 phase filter, so
+        # every trailing window silently shrank to the cycle's AGE, and what shrank is
+        # `volume_landmark_status` ("below maintenance" / "optimal" / "exceeding MRV – overtraining
+        # risk"). Same file also defaulted the window to 2000-01-01 and divided by it (~1,380
+        # weeks -> ~0.0 sets/wk -> "below maintenance" everywhere). Pre-merge because the failure
+        # is INVISIBLE after the merge: a well-formed, confident verdict with no error anywhere,
+        # consumed by `plan_next_session` and the routine-authoring freshness gate. The fake table
+        # IS the wire and the mutation arm restores the filter.
+        "test_muscle_volume_cross_phase_4031.py",
         # #3784: AST sweep of lambdas/ — the bundle-boot PIL baseline must equal the
         # module-scope PIL closure. Belongs in the pre-merge lane precisely because the
         # thing it prevents is a DEPLOY failure: #3780 added three PIL importers, the
@@ -295,6 +333,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_grounding_sets_3614.py",
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
         "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
+        # #3913: two AST sweeps — lambdas/ingestion/ for the modules that DERIVE a UTC calendar
+        # day (a Zulu fetch window, an astimezone-then-day cast), each of which must carry an
+        # EXPLICIT day_key_frame on its registry entry; and lambdas/ + mcp/ for any function that
+        # hand-anchors a YYYY-MM-DD day with a literal tzinfo and then measures a duration from it.
+        # Pure repo shape, and pre-merge because the failure it catches is INVISIBLE after the
+        # merge: an undeclared frame reads as the "pacific" default at every call site and the only
+        # symptom is a freshness age off by exactly 7h/8h — whoop carried it for months, and the
+        # third consumer this sweep found (site_api_status) survived two separate fixes of "the
+        # two consumers" because both were applied to a remembered list.
+        "test_day_key_frame_declaration_guard_3913.py",
         # #3559: AST sweep of lambdas/ — every reader-input capture door keys through
         # web.site_api_capture_store.capture_key(), whose prefix is derived-not-public
         # against deploy/bucket_policy.json. A door minting its own `generated/` key must
@@ -745,6 +793,15 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # verifying) and a clause weakened with no owner-signed line. Both are
         # reviewable in the PR and pointless after the merge.
         "test_anchor_freeze_3607.py",
+        # #4036: the owner-dismissal path for pain flags. Pre-merge because the contract it
+        # holds spans THREE modules a PR can change independently — the rule
+        # (training_context_registry), the tripwire (plan_engine) and the joints critic —
+        # and the failure mode is silent in the direction that matters: a dismissal that
+        # stops re-arming reads as a clean plan, with a benched lift or a loaded flagged
+        # movement as the only symptom, days later and in the gym rather than in CI. It also
+        # pins the three registrations a new owner-only SOURCE# family needs (taxonomy class,
+        # privacy tier, SCHEMA row), which are repo shape by definition.
+        "test_pain_dismissal_4036.py",
         # #3760: an rglob sweep of site/** + scripts/** asserting the private progress
         # viewer's route appears in no shipped byte, no sitemap/feed/redirects map, and no
         # QA-manifest page entry — plus the edge behaviour and the two IAM grants that make

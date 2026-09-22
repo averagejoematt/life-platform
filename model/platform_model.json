@@ -642,12 +642,6 @@
       "stack": "monitoring_prediction_alarms",
       "via": "declaration"
     },
-    "progress-viewer-errors": {
-      "kind": "metric",
-      "routing": "urgent",
-      "stack": "web_stack",
-      "via": "helper:add_web_alarms"
-    },
     "qa-paused-by-budget": {
       "kind": "metric",
       "routing": "digest",
@@ -929,10 +923,10 @@
   ],
   "cost_surface": {
     "ai_features": 19,
-    "alarms": 132,
+    "alarms": 131,
     "emf_namespaces": 31,
     "schedules": 90,
-    "secrets": 30
+    "secrets": 29
   },
   "edges": [
     {
@@ -3694,6 +3688,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/operational/weight_truth_qa.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/privacy/diary_claims.py",
@@ -3813,6 +3814,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/training_context_registry.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": null,
       "module": "lambdas/training/training_notes.py",
@@ -3895,20 +3903,6 @@
       "module": "lambdas/web/email_subscriber_lambda.py",
       "partition": "subscribers",
       "via": "pk"
-    },
-    {
-      "direction": "unknown",
-      "lambda": "progress-viewer",
-      "module": "lambdas/web/progress_viewer_lambda.py",
-      "partition": "progress_photos",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": "progress-viewer",
-      "module": "lambdas/web/progress_viewer_lambda.py",
-      "partition": "withings",
-      "via": "seam"
     },
     {
       "direction": "read",
@@ -5476,7 +5470,7 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_health.py",
       "partition": "hevy",
-      "via": "seam"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -5686,7 +5680,7 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_nutrition.py",
       "partition": "hevy",
-      "via": "seam"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -5763,7 +5757,21 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_strength.py",
       "partition": "hevy",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_strength.py",
+      "partition": "hevy",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_strength.py",
+      "partition": "hevy",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -5819,6 +5827,13 @@
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_training_notes.py",
       "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training_notes.py",
+      "partition": "training_constraints",
       "via": "pk"
     },
     {
@@ -6903,15 +6918,6 @@
       "stack": "operational_stack",
       "timeout_seconds": 300
     },
-    "progress-viewer": {
-      "declared_alarm": null,
-      "handler": "web.progress_viewer_lambda.lambda_handler",
-      "memory_mb": 256,
-      "module": "lambdas/web/progress_viewer_lambda.py",
-      "schedules": [],
-      "stack": "web_stack",
-      "timeout_seconds": 15
-    },
     "reading-cover-pipeline": {
       "declared_alarm": null,
       "handler": "reading.cover_pipeline_lambda.lambda_handler",
@@ -7239,13 +7245,13 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 132,
+      "alarms": 131,
       "alarms_by_routing": {
         "digest": 88,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
-        "urgent": 26,
+        "urgent": 25,
         "via-composite": 3
       },
       "alarms_composite": 4,
@@ -7253,23 +7259,23 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 699,
-      "lambdas": 106,
+      "edges": 702,
+      "lambdas": 105,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
-      "partitions": 107,
+      "partitions": 109,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 14,
+      "privacy_sources_owner_only": 15,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 82,
       "schedules": 90
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 341,
-        "sites_resolved": 865,
-        "sites_total": 1206
+        "sites_dynamic": 344,
+        "sites_resolved": 869,
+        "sites_total": 1213
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7282,7 +7288,6 @@
       "intelligence_quality",
       "journal",
       "platform_memory",
-      "qa_hook_matrix",
       "zone2_efficiency"
     ],
     "scope_cuts": [
@@ -7727,6 +7732,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "qa_hook_matrix": {
+      "class": "system_state",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
     "qa_predict_dark": {
       "class": "system_state",
       "ingestion": false,
@@ -7828,6 +7838,11 @@
       "method": "API pull, 1x daily (14:00 UTC)",
       "privacy_tier": "public",
       "stale_hours": 72
+    },
+    "training_constraints": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "training_notes": {
       "class": "raw_timeseries",
@@ -8010,7 +8025,8 @@
       "sick_days": "owner_only",
       "state_of_mind": "owner_only",
       "strava": "owner_only",
-      "supplements": "owner_only"
+      "supplements": "owner_only",
+      "training_constraints": "owner_only"
     },
     "tiers": {
       "0": "public",

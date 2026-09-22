@@ -33,6 +33,18 @@ at this bodyweight. A planner that argues about heavy-day conservatism while the
 that did the work last time sits near zero is having the wrong argument, and an engine that
 buries that line under six others is helping it.
 
+THE OWNER MAY DISMISS A PAIN FLAG (#4036)
+
+The derived note layer flags pain over-inclusively by design ("confirm or dismiss before
+loading that movement"), and under the v0.3 program a tripped `pain_flag_named_site`
+substitutes the movement pattern for two weeks. Before #4036 the second half of that
+sentence had nowhere to live: on 2026-09-21 Matthew said the right lower back flagged from
+the 2026-09-13 Romanian Deadlift note was gone, and the tripwire had no way to hear it.
+`pain_dismissals` is the owner-only DDB record (`USER#matthew#SOURCE#training_constraints /
+DISMISSAL#<site>#<date>`) the CALLER read — injected like every other input, so this module
+stays pure — and the comparison that decides whether it still holds lives once, in
+`training_context_registry.resolve_flags`, shared with `coach.critics.build_joints_packet`.
+
 STANDING CONSTRAINTS ARE READ HERE TOO (#3715)
 
 `training_context_registry` (#3821) drafted the standing injury/equipment list — the calf
@@ -57,7 +69,7 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.1.0"  # #3755: the program block + the computed rotation check
+ENGINE_VERSION = "plan-engine@1.2.0"  # #4036: the pain tripwire reads the owner-dismissal layer beside the flag layer
 
 
 def _tripwire_states(
@@ -70,12 +82,18 @@ def _tripwire_states(
     pain_layer_status: str | None,
     weight_stall_days: int | None,
     adherence_on_plan: bool | None,
+    pain_flag_instances: list[dict[str, Any]] | None = None,
+    pain_dismissals: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
     A tripwire whose input is absent reports `state: "unknown"`, never `"clear"`. The
     distinction is the whole #3767 lesson applied to safety conditions: a guard that reads
     as clear because nobody could look is worse than no guard, because it is trusted.
+
+    #4036 adds a fourth state for the same reason: a pain flag the OWNER dismissed reads
+    `dismissed_by_owner` with his date and his words, never `clear`. An absence and an
+    override are different facts, and only one of them has a human behind it.
     """
     by_id = {t["id"]: t for t in owner_redlines.engine_evaluated_tripwires()}  # the v2 additions are named, not computed
     out: list[dict[str, Any]] = []
@@ -84,7 +102,7 @@ def _tripwire_states(
         t = by_id[tid]
         row = {
             "id": tid,
-            "state": state,  # tripped | clear | unknown
+            "state": state,  # tripped | clear | unknown | dismissed_by_owner (#4036)
             "observed": observed,
             "signal": t["signal"],
             "action_if_tripped": t["action"],
@@ -139,8 +157,28 @@ def _tripwire_states(
                 f"the derived note layer reports layer_status={pain_layer_status!r} — its silence is not evidence of no pain (#3768)",
             )
         )
-    elif pain_flag_sites:
-        out.append(_row("pain_flag_named_site", "tripped", pain_flag_sites))
+    elif pain_flag_sites or pain_flag_instances:
+        # #4036: the owner may dismiss a flagged site ("right lower back gone", 2026-09-21).
+        # The dismissal is a DDB record the caller read; the RULE — including the date
+        # comparison that re-arms it — lives in `training_context_registry`, once, so this
+        # engine and the joints critic cannot drift into two different answers.
+        instances = pain_flag_instances or [{"movement": s, "note_dates": []} for s in (pain_flag_sites or [])]
+        sites = pain_flag_sites or [str(i.get("movement")) for i in instances]
+        resolutions = training_context_registry.resolve_flags(instances, pain_dismissals)
+        dismissed = {r["movement"] for r in resolutions if r.get("dismissed")}
+        live = [str(i.get("movement")) for i in instances if i.get("movement") not in dismissed]
+        if resolutions and not live:
+            # NEVER "clear": the flag happened and a human overrode it. That is a different
+            # row from "nothing was flagged", and a reader must be able to tell them apart.
+            row = _row("pain_flag_named_site", "dismissed_by_owner", sites, "; ".join(r["detail"] for r in resolutions))
+            row["dismissals"] = resolutions
+            out.append(row)
+        else:
+            detail = "; ".join(r["detail"] for r in resolutions)
+            row = _row("pain_flag_named_site", "tripped", live or sites, detail)
+            if resolutions:
+                row["dismissals"] = resolutions
+            out.append(row)
     else:
         out.append(_row("pain_flag_named_site", "clear", []))
 
@@ -174,6 +212,8 @@ def constraint_block(
     anchor_lift_drop_sessions: int | None = None,
     pain_flag_sites: list[str] | None = None,
     pain_layer_status: str | None = None,
+    pain_flag_instances: list[dict[str, Any]] | None = None,
+    pain_dismissals: list[dict[str, Any]] | None = None,
     weight_stall_days: int | None = None,
     adherence_on_plan: bool | None = None,
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
@@ -259,15 +299,20 @@ def constraint_block(
         pain_layer_status=pain_layer_status,
         weight_stall_days=weight_stall_days,
         adherence_on_plan=adherence_on_plan,
+        pain_flag_instances=pain_flag_instances,
+        pain_dismissals=pain_dismissals,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
+    # #4036: every dismissal in play, named on the block — a reader never has to dig into
+    # the tripwire row to find out that a human overrode a safety flag.
+    dismissals_in_play = [d for t in tripwires for d in (t.get("dismissals") or [])]
 
-    # #3755 — "is the accessory layer rotating" is COMPUTED from the performed Hevy record
-    # over the program's own 14-day window, with its n and window stated (ADR-105), not
-    # asserted from the pool the program declares. A program can list six accessories per
-    # day and still have produced the same four movements every session; only the record
-    # knows. The rows are injected (`mcp.tools_plan` reads them) so this function stays
+    # #3755 — "is the accessory layer holding still" (v0.3: accessories are FIXED for the
+    # block, so the defect is an accessory ADDED mid-block, not one repeated) is COMPUTED
+    # from the performed Hevy record over the program's own 14-day window, with its n and
+    # window stated (ADR-105), not asserted from the pool the program declares. Only the
+    # record knows what was actually done. The rows are injected (`mcp.tools_plan` reads them) so this function stays
     # pure, and an unreadable window reports `unknown`, never `ok`.
     program = program_structure.summary()
     rotation = program_structure.accessory_rotation(
@@ -292,7 +337,7 @@ def constraint_block(
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
         "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
-        # #3753 v2: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
+        # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
         "recovery_tier": recovery_tier,
         "acwr_flag": acwr_flag,
@@ -302,6 +347,7 @@ def constraint_block(
         "tripwires": tripwires,
         "tripped": tripped,
         "unreadable_tripwires": unknown,
+        "owner_dismissals": dismissals_in_play,  # #4036 — empty list means none in play, never "none exist"
         "redlines": redlines,
         # #3755 — the program the plan is supposed to be executing, as data, with its own
         # unresolved conflicts attached. `accessory_rotation_ok` is the computed answer to
@@ -328,12 +374,24 @@ def constraint_block(
                     else "the owner's redlines are PROPOSED, not confirmed — this plan follows a posture he has not yet signed (#3753)"
                 ),
                 (
-                    f"{len(owner_redlines.unevaluated_tripwires())} proposed v2 tripwire(s) are reported but NOT evaluated by this "
+                    f"{len(owner_redlines.unevaluated_tripwires())} v{owner_redlines.REDLINES_VERSION} tripwire(s) are reported but NOT evaluated by this "
                     f"engine: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753)"
                     if owner_redlines.unevaluated_tripwires()
                     else None
                 ),
                 f"{len(unknown)} tripwire(s) could not be evaluated: {', '.join(unknown)}" if unknown else None,
+                # #4036: a dismissal is an owner OVERRIDE of a safety flag. It is named out
+                # loud, with his words and the date, whether it currently holds or has been
+                # superseded by a later note on the same site.
+                *[
+                    (
+                        f"owner dismissal in play — {d['site']!r} dismissed {d['dismissed_on']} ({str(d['words'])!r}): "
+                        f"the {d['movement']} pain flag reads dismissed_by_owner, NOT clear (#4036)"
+                        if d.get("dismissed")
+                        else f"owner dismissal SUPERSEDED — {d['detail']} (#4036)"
+                    )
+                    for d in dismissals_in_play
+                ],
                 (
                     None
                     if program["active"]
@@ -346,13 +404,13 @@ def constraint_block(
                     else None
                 ),
                 (
-                    f"accessory rotation is {rotation['state']}: {rotation['detail']}"
+                    f"the accessory layer is {rotation['state']}: {rotation['detail']}"
                     if rotation["ok"] is None
                     else (
                         None
                         if rotation["ok"]
-                        else "the accessory layer is NOT rotating — "
-                        + ", ".join(f"{r['movement']} on {r['n_days']} days" for r in rotation["repeats_within_window"][:4])
+                        else "the accessory layer is DRIFTING (v0.3 fixes accessories for the block) — added in the trailing 7 days: "
+                        + ", ".join(rotation["added_in_trailing_7d"][:4])
                     )
                 ),
                 (

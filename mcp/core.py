@@ -337,6 +337,97 @@ def query_source_range(source, start_date, end_date, include_pilot=False):
     return query_source(source, start_date, end_date, include_pilot=include_pilot)
 
 
+# ── #4032: the ONE read path for a source whose class says "read every phase" ────────
+#
+# `query_source` defaults `include_pilot=False`, i.e. the ADR-058 phase filter, and the
+# restart tagger stamps every pre-genesis row `phase=pilot` (ADR-077). For an
+# EXPERIMENT_SCOPED partition that is exactly right — the reset tombstones that data on
+# purpose. For a RAW_TIMESERIES partition it is a silent truncation: the body's timeseries
+# does not reset when the experiment does, the caller's DATE window is what bounds recency
+# (#2079/#2080/#2081/#2089), and a trailing 30-day window therefore collapses to the
+# CYCLE'S AGE on the morning after every genesis.
+#
+# `phase_filter.source_reads_cross_phase` (#2109) is the taxonomy-derived answer to that
+# question and the only sanctioned way to ask it. These helpers exist so a caller never
+# re-derives it inline and no second read path can drift from this one: #4030's
+# `tools_strength._read_hevy_all_phases` delegates here, and so do the energy-budget reads
+# in `tools_health._get_energy_expenditure` and `tools_nutrition` (#4032).
+
+
+def query_source_cross_phase(source, start_date, end_date, lean=False):
+    """`query_source` with `include_pilot` DERIVED from the source's taxonomy class (#4032).
+
+    Two differences from `query_source(source, start, end)`:
+
+    1. **The phase decision is derived, never asserted.** `include_pilot` comes from
+       `phase_filter.source_reads_cross_phase(source)`, so a RAW_TIMESERIES /
+       CROSS_PHASE / SYSTEM_STATE partition is read across every phase and an
+       EXPERIMENT_SCOPED one keeps the ADR-058 filter. That helper is fail-soft and
+       conservative by design: an unknown or unclassifiable source keeps the filter.
+       If the taxonomy ever reclassifies a source, every call site here follows it.
+
+    2. **Superseded rows stay out.** Rows carrying `tombstone=true` are dropped — the
+       item-level rule `phase_filter.singleton_visible` already encodes for key reads.
+       This matters the moment the filter comes off: `SOURCE#hevy` holds 421 legacy
+       daily aggregates superseded in place on 2026-05-26, every one of whose dates is
+       also covered by a per-workout row, and `normalize_hevy_items` parses BOTH shapes
+       (#4030). Lifting the filter without this double-counts every pre-2025-11-08
+       session.
+
+    The caller's `[start_date, end_date]` is untouched — the window, not the phase tag,
+    is what bounds recency.
+    """
+    from experiment.phase_filter import source_reads_cross_phase
+
+    cross_phase = source_reads_cross_phase(source)
+    rows = query_source(source, start_date, end_date, lean=lean, include_pilot=cross_phase) or []
+    return [r for r in rows if not r.get("tombstone")]
+
+
+def parallel_query_sources_cross_phase(sources, start_date, end_date, lean=False):
+    """`parallel_query_sources`, but each source's phase decision is its own (#4032).
+
+    `parallel_query_sources` takes ONE `include_pilot` for the whole fan-out, which is the
+    wrong shape for a mixed list — `["whoop", "habitify", "strava", "hevy"]` are all
+    raw_timeseries today, but a list that later also held an experiment-scoped partition
+    must not widen that one. Deriving per source is what makes the right answer survive a
+    list edit.
+    """
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 5)) as pool:
+        future_to_src = {pool.submit(query_source_cross_phase, src, start_date, end_date, lean): src for src in sources}
+        for future in concurrent.futures.as_completed(future_to_src):
+            src = future_to_src[future]
+            try:
+                results[src] = future.result()
+            except Exception as e:
+                logger.warning(f"parallel_query_sources_cross_phase failed for {src}: {e}")
+                results[src] = []
+    return results
+
+
+def phases_of(items) -> list:
+    """The phase tags actually present in `items` — `unstamped` for rows carrying none."""
+    return sorted({str(r.get("phase") or "unstamped") for r in (items or [])})
+
+
+def phase_scope_block(reads: dict) -> dict:
+    """The provenance a cross-phase answer carries: what was read, over what window, across which phases.
+
+    `reads` maps a label (usually `"<source>_<window>"`) to the row list that came back.
+    An answer that silently truncated at a cycle boundary is indistinguishable from an
+    honest one; that read is the whole reason #4030/#4032 exist, so every surface that
+    publishes a number off these reads states its scope alongside it.
+    """
+    return {
+        "phase_filter": (
+            "derived per source from phase_filter.source_reads_cross_phase (ADR-077/#2109) — "
+            "a raw_timeseries partition is read across every phase, bounded only by the window"
+        ),
+        "sources": {label: {"rows": len(rows or []), "phases": phases_of(rows)} for label, rows in (reads or {}).items()},
+    }
+
+
 def date_diff_days(start, end):
     try:
         return (datetime.strptime(end, "%Y-%m-%d") - datetime.strptime(start, "%Y-%m-%d")).days

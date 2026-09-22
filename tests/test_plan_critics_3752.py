@@ -447,7 +447,8 @@ def test_the_notes_block_carries_every_verdict_its_metric_its_number_and_its_pro
     vs = c.run_critics(P, d, invoke=None, model_allowed=False, model_paused_reason="tier 2")
     _with_verdicts(ir, vs, changes=[{"critic": "blueprint_historian", "field": "exercises[0].weight_lbs", "to": 178.6, "applied": True}])
     block = c.notes_block(ir)
-    assert block.startswith("RED TEAM (critics@1.0.0, 4 critics, 2026-09-19):")
+    # the engine version is read from the module, never re-typed here (#4036: a bump used to red five tests)
+    assert block.startswith(f"RED TEAM ({c.CRITICS_VERSION}, 4 critics, 2026-09-19):")
     assert "- muscle-defense CHANGE (model paused): protein_days_missed_7d=3 [owner]" in block
     assert "- historian CHANGE (model paused): band_top_lbs[0]=198.4 [owner]" in block
     assert "- joints/tendons APPROVE" in block and "- rate-advocate APPROVE" in block

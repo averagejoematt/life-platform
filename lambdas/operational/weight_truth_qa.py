@@ -16,7 +16,7 @@ split as `assess_hero_weight` and the `reader_truth_qa` helper.
 """
 
 import re
-from datetime import date as _date
+from datetime import date as _date, timedelta as _timedelta
 
 # Rounding and a same-day reweigh, not a cycle-old figure. The live gap was 3.5 lb.
 CROSS_SURFACE_WEIGHT_TOL_LBS = 1.5
@@ -379,9 +379,112 @@ def publication_baseline(vitals, coach, metric):
         return live, "cockpit"
 
 
-def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
+# ── #4025: a coach narrating a PAST reading BY DATE is not a currency claim ─────
+#
+# The live specimen: the "mind" coach's prose ties its number to a day — "the 97%
+# recovery reading on September 18th" — while `publication_baseline` (above) judges
+# every citation against the reading the CURRENT surface was published against. The
+# stamp and the cockpit agreed (both 90%); the coach was simply, correctly, telling
+# a story about yesterday. `_HISTORICAL_ANCHOR`/`_DATED_SENTENCE` already exempt a
+# figure that anchors itself with a WORD ("as of", "on Day N") — this is the same
+# idea for a figure that anchors itself with an actual CALENDAR DATE the platform can
+# check: a citation that disagrees with today's baseline but matches some OTHER day's
+# real Whoop reading in the trailing week is a dated citation, not a contradiction.
+#
+# Bounded on purpose, same shape as the `_HISTORICAL_ANCHOR` exemption above:
+#   * only the trailing 7 days (from the cockpit's OWN as-of date for that metric,
+#     never a wall-clock read — this function stays pure) are eligible, so a coach
+#     citing a months-old number still fails exactly as before (the #2113 shape:
+#     a pre-genesis 59% is not "dated", it's stale and uncited);
+#   * a metric with no history entry in the window is left to the existing strict
+#     compare — the exemption can only ever narrow a fail into a pass on a REAL
+#     matching day, never widen what counts as agreement;
+#   * `history=None` (the caller could not resolve it — e.g. the Whoop partition
+#     read failed) disables the exemption entirely rather than defaulting it open,
+#     and the returned message says so — absence of history is never a silent pass.
+_WHOOP_HISTORY_FIELD = {"recovery": "recovery_score", "hrv": "hrv", "rhr": "resting_heart_rate", "sleep": "sleep_duration_hours"}
+
+# How many trailing days a dated citation may reach back and still count — the #4025
+# specimen matched 1 day back; #2113's stale 59% is ~30+ days back, well outside it.
+DATED_CITATION_WINDOW_DAYS = 7
+
+
+def _match_dated_history(day_values: dict, cited: float, tol: float, anchor) -> str | None:
+    """The most recent day in `day_values` within the trailing window of `anchor`
+    whose reading is within `tol` of `cited`, or None if none matches.
+
+    `day_values` is ``{"YYYY-MM-DD": value}`` for one metric. `anchor` is a `date` (the
+    cockpit's own as-of day for that metric) or None — no anchor means no window, so
+    nothing can match (never treat a missing anchor as an unbounded lookback).
+    """
+    if not day_values or anchor is None:
+        return None
+    window_start = anchor - _timedelta(days=DATED_CITATION_WINDOW_DAYS - 1)
+    matches = []
+    for day_str, value in day_values.items():
+        day = _iso_day(day_str)
+        if day is None or not (window_start <= day <= anchor):
+            continue
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            continue
+        if abs(cited - v) <= tol:
+            matches.append(day)
+    return max(matches).isoformat() if matches else None
+
+
+def resolve_vitals_history(table, days: int = 14) -> dict | None:
+    """Trailing `days` of Whoop readings, keyed `{metric: {"YYYY-MM-DD": value}}`.
+
+    Read-only, key-bounded (one query, <= `days` rows, no scan). Fail-soft by design,
+    matching `checks()`'s own network handling: a transient DDB error (or `table`
+    being unavailable) returns None rather than raising, which degrades the vitals
+    gate to its pre-#4025 strict behaviour instead of reddening the whole nightly
+    over a read the gate can run perfectly well without.
+    """
+    if table is None:
+        return None
+    try:
+        from boto3.dynamodb.conditions import Key
+        from common.pacific_time import pacific_today, shift_day_key
+
+        end = pacific_today()
+        start = shift_day_key(end, -(days - 1))
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#whoop") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"),
+        )
+        items = resp.get("Items", [])
+    except Exception:
+        return None
+
+    history: dict = {m: {} for m in _WHOOP_HISTORY_FIELD}
+    for item in items:
+        sk = str(item.get("sk", ""))
+        if not sk.startswith("DATE#") or "#WORKOUT#" in sk:
+            continue
+        day = sk[len("DATE#") :]
+        for metric, field in _WHOOP_HISTORY_FIELD.items():
+            raw = item.get(field)
+            if raw is None:
+                continue
+            try:
+                history[metric][day] = float(raw)
+            except (TypeError, ValueError):
+                continue
+    return history
+
+
+def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None, history: dict | None = None):
     """Every recovery / HRV / resting-HR / sleep figure a coach asserts as current
     must match the reading that surface was published against.
+
+    `history` (optional): ``{metric: {"YYYY-MM-DD": value}}`` per-day Whoop readings
+    — see `resolve_vitals_history`. A citation that disagrees with the publication
+    baseline but matches a real day's reading in the trailing
+    `DATED_CITATION_WINDOW_DAYS` is reported as a dated citation instead of failing
+    (#4025). `history=None` keeps the strict pre-#4025 behaviour and the message says
+    so explicitly — omitting history is never a silent pass.
 
     Returns (ok, message). Absence is a clean pass (ADR-104) on BOTH sides: a null
     cockpit field has nothing to contradict, and a coach that cites nothing is silent,
@@ -390,6 +493,7 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
     if not isinstance(vitals, dict):
         return True, "no vitals payload — nothing to compare"
     tol = tol or VITALS_TOL
+    history = history if isinstance(history, dict) else None
 
     truth = {}
     for metric, field in _VITALS_TRUTH_FIELD.items():
@@ -404,6 +508,7 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
         return True, "cockpit vitals are all null (pre-start / no readings) — nothing to compare"
 
     disagreements = []
+    dated_matches = []
     for c in coaches or []:
         if not isinstance(c, dict):
             continue
@@ -417,14 +522,33 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
             if baseline is None:
                 continue
             for cited in values:
-                if abs(cited - baseline) > tol[metric]:
+                if abs(cited - baseline) <= tol[metric]:
+                    continue  # agrees with the reading it was published against
+                matched_day = None
+                if history is not None:
+                    anchor = _iso_day(vitals.get(_STAMP_ASOF_FIELD[metric]))
+                    matched_day = _match_dated_history(history.get(metric) or {}, cited, tol[metric], anchor)
+                if matched_day:
+                    dated_matches.append(f"{name} cites {metric} {cited:g}{unit} — dated citation (matched {matched_day})")
+                else:
                     disagreements.append(f"{name} cites {metric} {cited:g}{unit} vs {provenance} {baseline:g}{unit}")
 
+    no_history_note = " (no per-day history supplied — dated citations judged strictly)" if history is None else ""
+
     if disagreements:
-        return False, "coach-cited vitals disagree with the reading they were published against — " + "; ".join(
-            sorted(set(disagreements))[:4]
+        return (
+            False,
+            "coach-cited vitals disagree with the reading they were published against — "
+            + "; ".join(sorted(set(disagreements))[:4])
+            + no_history_note,
         )
-    return True, "coach narratives agree with the cockpit vitals (" + ", ".join(f"{k} {v:g}" for k, v in sorted(truth.items())) + ")"
+
+    base = "coach narratives agree with the cockpit vitals (" + ", ".join(f"{k} {v:g}" for k, v in sorted(truth.items())) + ")"
+    if dated_matches:
+        base += " — " + "; ".join(sorted(set(dated_matches)))
+    else:
+        base += no_history_note
+    return True, base
 
 
 # ── #3451: the OTHER cross-surface question — same night, different DEVICE ─────
@@ -482,7 +606,7 @@ def assess_cross_surface_sleep_disclosure(vitals, sleep_detail, tol: float = CRO
     )
 
 
-def checks(check_cls, site_base_url, partition, timeout=15):
+def checks(check_cls, site_base_url, partition, timeout=15, table=None):
     """The qa_smoke-facing entrypoint: fetch both surfaces and return [Check].
 
     `check_cls` is injected rather than imported so this module stays a leaf —
@@ -494,6 +618,12 @@ def checks(check_cls, site_base_url, partition, timeout=15):
     copy of that vocabulary free to drift. The caller decides — and because the
     parameter is required, a Check built here can never slip through
     unpartitioned.
+
+    `table` (#4025, optional): the caller's already-instantiated DDB Table resource
+    (the same one qa_smoke_lambda reads elsewhere) — reused here, read-only, to
+    resolve the trailing Whoop history `assess_cross_surface_vitals` judges a dated
+    citation against. Omitted or erroring resolves to `history=None`, which is the
+    documented strict fallback, never a silent skip of the whole check.
     """
     import json
     import urllib.request
@@ -526,7 +656,7 @@ def checks(check_cls, site_base_url, partition, timeout=15):
         served_vitals = payloads.get("/api/vitals", {}).get("vitals", {})
         served_coaches = payloads.get("/api/coaching-dashboard", {}).get("coaches", [])
         ok, msg = assess_cross_surface_weight(served_vitals, served_coaches)
-        v_ok, v_msg = assess_cross_surface_vitals(served_vitals, served_coaches)
+        v_ok, v_msg = assess_cross_surface_vitals(served_vitals, served_coaches, history=resolve_vitals_history(table))
         weight_vitals_checks = [
             check.ok(msg) if ok else check.fail(msg),
             vitals_check.ok(v_msg) if v_ok else vitals_check.fail(v_msg),

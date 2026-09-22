@@ -506,7 +506,36 @@ _DARK_FEED_ADVERTISED_HTML = (
     "</head><body><p>census probe</p></body></html>\n"
 )
 
+# #3754 boxes 3+4: a site-api module importing the nutrition critics — the block carries a
+# refeed / diet-break decision with a ready `log_decision` payload and is OWNER-ONLY; the
+# gate's whole job is that no lambdas/web, emails, content or coach narrative module ever
+# reaches it. Planted under lambdas/web/ as a NEW file (the gate os.walks lambdas/ + mcp/ on
+# disk, so untracked is in scope), as a parenthesised multi-line import so the RED also
+# proves the sweep is AST-based rather than a single-line regex.
+_WEB_IMPORTS_NUTRITION_CRITICS_PY = "from health import (  # census probe\n    deficit_disclosures,\n    nutrition_critics,\n)\n"
+
+# Assembled: tests/test_day_key_frame_declaration_guard_3913.py globs lambdas/ingestion/*.py
+# for a Zulu-anchored fetch-window literal, which is whoop's own signature — a Pacific date
+# LABEL turned into a UTC WINDOW, so the day key names the UTC day while nothing in the module
+# goes anywhere near a clock. The plant is that shape on a module tied to no registered source,
+# which is what an undeclared new UTC-keying ingestion source looks like on the day it lands.
+_UNDECLARED_UTC_DAY_WRITER_PY = (
+    '"""probe."""\n\n\n'
+    "def fetch_day(date_str, next_day):\n"
+    '    return {"start": f"{date_str}T00:00:00.000' + 'Z", "end": f"{next_day}T00:00:00.000' + 'Z"}\n'
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_nutrition_critics_3754.py": MutationSpec(
+        gate_id="structural::test_nutrition_critics_3754.py",
+        target="tests/test_nutrition_critics_3754.py",
+        detects=(
+            "a module under lambdas/web/ (site-api) importing health.nutrition_critics — the owner-only "
+            "refeed / diet-break decision block reaching a reader-facing surface (#3754 boxes 3+4)"
+        ),
+        plants=(("lambdas/web/_census_probe_3754.py", _WEB_IMPORTS_NUTRITION_CRITICS_PY),),
+        track=False,  # the gate os.walks lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
     "structural::test_scoped_writer_provenance_guard_3599.py": MutationSpec(
         gate_id="structural::test_scoped_writer_provenance_guard_3599.py",
         target="tests/test_scoped_writer_provenance_guard_3599.py",
@@ -566,6 +595,19 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/health/_census_probe_3754.py", _DRIFTED_PRIOR_CUT_NOTE_PY),),
         track=False,  # the gate walks lambdas/+mcp/ on disk (os.walk), so an untracked module is in scope
+    ),
+    "structural::test_day_key_frame_declaration_guard_3913.py": MutationSpec(
+        gate_id="structural::test_day_key_frame_declaration_guard_3913.py",
+        target="tests/test_day_key_frame_declaration_guard_3913.py",
+        detects=(
+            "a NEW ingestion module that derives its DATE# day in UTC (a Zulu-anchored fetch window) "
+            "whose source declares no day_key_frame facet — the #3913 class verbatim. The defect is "
+            "silent by construction: day_key_frame_for() answers 'pacific' for a source that declares "
+            "nothing, so the only symptom is a freshness age wrong by exactly the 7h/8h offset, which "
+            "is what whoop's staleness understated for months before anyone measured the partition"
+        ),
+        plants=(("lambdas/ingestion/_census_probe_3913.py", _UNDECLARED_UTC_DAY_WRITER_PY),),
+        track=False,  # the gate globs lambdas/ingestion/*.py on disk, so an untracked module is in scope
     ),
     "structural::test_gsi_set_premerge_3609.py": MutationSpec(
         gate_id="structural::test_gsi_set_premerge_3609.py",
@@ -932,6 +974,21 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_nutrition_critics_3754.py": _proof(
+        "structural::test_nutrition_critics_3754.py",
+        "ARMED 1/1 — baseline: 62 passed in 1.71s | mutated: 1 failed, 61 passed in 1.70s :: "
+        "test_only_the_mcp_resolver_imports_nutrition_critics | reverted: 62 passed in 1.65s. The plant is a "
+        "parenthesised multi-line `from health import (..., nutrition_critics)` in a NEW lambdas/web/ module, so the "
+        "RED also proves the sweep parses imports (ast) rather than matching one regex line.",
+        "lambdas/**/*.py + mcp/**/*.py on disk (os.walk, __pycache__ excluded; the critic module itself excluded), "
+        "each parsed with `ast` for `from health import nutrition_critics` / `from health.nutrition_critics import` / "
+        "`import health.nutrition_critics`. The allowed set is the ONE MCP resolver (mcp/nutrition_critics_inputs.py); "
+        "any other importer — lambdas/web (site-api), emails, content, coach narrative — reds. Outside the set in both "
+        "directions: an importer that reaches the module through importlib or a string, and a surface that receives the "
+        "block as DATA from an MCP tool's output rather than by import (the MCP layer is owner-only by construction, so "
+        "that path stays behind the same door). Also invisible: a file under a directory other than lambdas/ or mcp/.",
+        proved_on="2026-09-21",
+    ),
     "structural::test_scoped_writer_provenance_guard_3599.py": _proof(
         "structural::test_scoped_writer_provenance_guard_3599.py",
         "ARMED 1/1 — baseline: 13 passed, 1 xfailed in 12.04s | mutated: 1 failed, 12 passed, 1 xfailed in 11.80s :: "
@@ -1331,6 +1388,38 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "tests/test_api_schema_completeness.py's TestDiffShape/TestJsonShape classes and the "
         "scan_json_value_leaks tests, not by this mutation.",
         proved_on="2026-08-31",
+    ),
+    "structural::test_day_key_frame_declaration_guard_3913.py": _proof(
+        "structural::test_day_key_frame_declaration_guard_3913.py",
+        "ARMED 1/1 — baseline: 16 passed in 8.25s | mutated: 5 failed, 11 passed in 8.37s :: "
+        "test_every_utc_day_writer_declares_the_frame_explicitly_on_its_registry_entry; "
+        "test_the_declared_set_matches_what_the_ingestion_code_actually_does; "
+        "test_the_derived_utc_writer_set_is_exactly_the_two_ruled_on; "
+        "test_the_guard_reds_when_whoops_facet_is_removed; test_the_guard_reds_when_apple_healths_facet_is_removed "
+        "| reverted: 16 passed in 8.15s. Five red on one plant, and the last two are the file's own in-tree "
+        "controls saying so: they assert the clean registry produces EXACTLY ONE failure when a facet is "
+        "deleted, which a third undeclared source correctly breaks. Leg 2 is not mechanisable as a plant "
+        "because its mutation is an EDIT to an existing module — hand-run 2026-09-21 on the real tree by "
+        "reverting lambdas/web/site_api_status.py::_comp_status to the hand `strptime(...).replace("
+        "tzinfo=timezone.utc)` anchor: 2 failed, 14 passed "
+        "(test_no_unregistered_site_hand_anchors_a_day_key_for_an_age naming "
+        "'lambdas/web/site_api_status.py::_comp_status', and test_the_status_page_is_no_longer_one_of_them), "
+        "restored from a byte-copy, 16 passed.",
+        "LEG 1: lambdas/ingestion/*.py on disk (glob, so an UNTRACKED module is in scope), parsed with ast. Two "
+        "signatures decide membership — a non-docstring string constant containing 'T00:00:00' and ending in 'Z' "
+        '(a Zulu fetch window), and `.astimezone(<utc>).strftime("%Y-%m-%d")`. Each member\'s source must carry '
+        "an EXPLICIT `day_key_frame` key on its SOURCE_REGISTRY entry; module->source comes from "
+        "tests/test_ingestion_day_key_derivation_3666.py::DAY_KEY_WRITERS. LEG 2: lambdas/ + mcp/ on disk (rglob) "
+        "for any function whose OWN body (nested defs excluded) both hand-anchors a '%Y-%m-%d' day with a literal "
+        "tzinfo and calls .total_seconds(); lambdas/common/pacific_time.py is excluded because it IS the anchor. "
+        "Outside the set in both directions: a UTC day derived by arithmetic rather than either signature (e.g. a "
+        "timedelta offset applied to a naive stamp); a source outside lambdas/ingestion/; an age computed in a "
+        "surface that takes .days rather than .total_seconds() (deliberate — ~20 sites attach a tzinfo and "
+        "immediately take .date(), where the frame provably cannot matter, and flagging them would bury the two "
+        "that count); and the question the guard never claims to answer, which is whether a declared frame is the "
+        "RIGHT one — only a read-only measurement of the live partition settles that (whoop: 2,250 of 2,250 "
+        "straddling rows UTC-keyed, 2026-09-21).",
+        proved_on="2026-09-21",
     ),
     "structural::test_reader_input_prefix_3559.py": _proof(
         "structural::test_reader_input_prefix_3559.py",

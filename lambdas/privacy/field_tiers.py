@@ -211,6 +211,11 @@ SOURCE_TIERS: dict[str, int] = {
     # the row is that there is no window in which a photo is stored under no tier. There is
     # no public projection of this source and no aggregate carve-out: unlike hevy or
     # macrofactor, nothing derived from a progress photo is served publicly either.
+    # #4036: owner dismissals of derived pain flags — the site, the date, and his VERBATIM
+    # words about his own body. Declared before the first record exists (ADR-154's ordering,
+    # the same posture as progress_photos). No public projection and no aggregate carve-out:
+    # the only readers are the owner-facing planning surfaces.
+    "training_constraints": TIER_OWNER_ONLY,
     "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
 }
 
