@@ -2,7 +2,7 @@
 Strength training tools: exercise history, PRs, volume, progress, frequency, standards.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
@@ -61,23 +61,72 @@ def _searched_block(exercise_name: str, template_id: str, start_date: str, end_d
     An empty answer that does not name its window and its phases is indistinguishable from
     "never done"; that read is the whole reason this issue exists.
     """
-    return {
-        "exercise_name": exercise_name or None,
-        "template_id": template_id or None,
+    block = {
         "window": {"start": start_date, "end": end_date},
         "phases": phases_read,
         "phase_filter": "none — SOURCE#hevy is raw_timeseries (ADR-077/#2109), read across every phase",
         "workouts_read": len(items),
     }
+    # #4031: `tool_get_muscle_volume` reuses this block and asks about no single movement.
+    # Two null movement keys there would read as "asked for a movement and found nothing",
+    # which is the same misreading this block exists to prevent. Only a read that names a
+    # movement carries the movement keys; `tool_get_exercise_history` refuses the call
+    # unless one of them is set, so its block is unchanged.
+    if exercise_name or template_id:
+        return {"exercise_name": exercise_name or None, "template_id": template_id or None, **block}
+    return block
+
+
+# #4031: a RATE needs a window it can plausibly be a rate over. The old default was
+# `2000-01-01`, which `avg_sets_per_period` then divided by — ~1,380 weeks, so the default
+# call reported ~0.0 sets/week for every muscle and "below maintenance" across the board
+# (measured live 2026-09-21: num_periods_analyzed 1394.3, Chest 72 sets -> 0.1/wk). The
+# all-time default is right for `get_exercise_history` (a RECORD) and wrong here.
+# 28 days = four whole weeks, the RP mesocycle unit the landmarks are defined over; the
+# month view takes 90 days ≈ 2.96 months for the same reason.
+_DEFAULT_LOOKBACK_DAYS = {"week": 28, "month": 90}
 
 
 def tool_get_muscle_volume(args):
-    """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks."""
-    start_date = args.get("start_date", "2000-01-01")
+    """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks — cross-phase (#4031).
+
+    Two read defects fixed here, both found by #4030's consumer audit and both measured
+    read-only against live DynamoDB on 2026-09-21. Neither touches the prescription logic:
+    `volume_status`, `classify_exercise` and `_VOLUME_LANDMARKS` are untouched. What changes
+    is what gets COUNTED and what it is divided BY — which does move the verdict, and that
+    is the point of the issue.
+
+    1. **The phase filter comes off.** This read `query_source_range("hevy", …)` — an alias
+       for `query_source(..., include_pilot=False)`, the ADR-058 filter — over a partition
+       `phase_taxonomy` classifies `raw_timeseries`, i.e. cross-phase by design. Every
+       pre-genesis row is stamped `phase=pilot` by the restart tagger, so every trailing
+       window silently truncated to the CYCLE'S AGE: a 30-day window 15 days after genesis
+       counted 15 days of work and divided by 4.3 weeks. Measured, 30d (2026-08-22..09-21):
+       Chest 72 -> 84 sets, Triceps 87 -> 99, Shoulders 56 -> 66. The error is a function of
+       days-since-genesis, so it is smallest exactly when anyone looks for it and TOTAL on
+       day 1 of a cycle. The bypass is derived from `source_reads_cross_phase("hevy")` via
+       `_read_hevy_all_phases` (#4030), never hard-coded here, and that helper also drops the
+       421 superseded `tombstone=true` legacy daily aggregates so nothing is double-counted.
+
+    2. **The default window is a rate window.** See `_DEFAULT_LOOKBACK_DAYS`.
+
+    The answer echoes what it actually did in `searched`: the window, whether that window
+    was the caller's or the default, and the phases read.
+    """
     end_date = args.get("end_date", pacific_now().date().isoformat())
     period = args.get("period", "week")  # "week" or "month"
+    # Same "anything not 'week' is a month" rule the period label and divisor below use —
+    # the enum itself is validated at the handler boundary (#2660).
+    lookback_days = _DEFAULT_LOOKBACK_DAYS["week" if period == "week" else "month"]
 
-    items = query_source_range("hevy", start_date, end_date)
+    caller_start = args.get("start_date")
+    if caller_start:
+        start_date = caller_start
+    else:
+        start_date = (datetime.fromisoformat(end_date) - timedelta(days=lookback_days)).date().isoformat()
+
+    # #4031: cross-phase by the taxonomy's own ruling, minus the superseded legacy generation.
+    items, phases_read = _read_hevy_all_phases(start_date, end_date)
 
     start_dt = datetime.fromisoformat(start_date)
     end_dt = datetime.fromisoformat(end_date)
@@ -153,10 +202,19 @@ def tool_get_muscle_volume(args):
         logger.warning("muscle_volume completeness high-water query failed: %s", _e)
     completeness = assess_volume_completeness(aggregated_dates, latest_ingested, end_date, start_date)
 
+    searched = {
+        **_searched_block("", "", start_date, end_date, items, phases_read),
+        # #4031: which window this rate is actually over, and whose window it was. A
+        # divisor the caller did not choose must never be invisible in the answer.
+        "window_source": ("caller" if caller_start else f"default trailing {lookback_days}d ({period_label} view)"),
+        "default_lookback_days": lookback_days,
+    }
+
     return {
         "date_range": {"start": start_date, "end": end_date},
         "analysis_period": period_label,
         "num_periods_analyzed": round(num_periods, 1),
+        "searched": searched,
         "completeness": completeness,
         "muscle_volume": volume_report,
         "movement_balance": {
