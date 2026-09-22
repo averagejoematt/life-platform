@@ -106,7 +106,13 @@ def test_inputs_snapshot_recorded():
     assert "catalog_hash" in snap
 
 
-def test_rest_day_returns_placeholder_only():
+def test_rest_day_returns_placeholder_only(monkeypatch):
+    # #3753: the JSON grid's Sunday is `rest`; the ACTIVE v0.3 program walks every day (Sunday is
+    # `aerobic`). This test is about the rest-day placeholder, so pin the seam to the JSON grid.
+    from training import program_structure as _ps
+
+    monkeypatch.setattr(_ps, "ACTIVE", False)
+    monkeypatch.setattr(_ps, "LAST_REVIEWED_BY_OWNER", None)
     routines = generate_routines(_green_inputs("2026-06-07"))  # Sunday rest
     assert len(routines) == 1
     assert routines[0].archetype == "rest"
@@ -154,6 +160,12 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
     week["exercise_notes_mode"] = "off"
     (cfg_dir / "training_week.json").write_text(json.dumps(week))
     monkeypatch.setattr(rg, "CONFIG_DIR", str(cfg_dir))
+    # #3753: the test sets the mode in the JSON grid; pin the seam to JSON so the ACTIVE v0.3 program
+    # (whose grid carries its own exercise_notes_mode) does not bypass the file being tested.
+    from training import program_structure as _ps
+
+    monkeypatch.setattr(_ps, "ACTIVE", False)
+    monkeypatch.setattr(_ps, "LAST_REVIEWED_BY_OWNER", None)
 
     from training import exercise_history
 

@@ -1454,7 +1454,8 @@ RETIRED_SOURCES: dict[str, dict[str, Any]] = {
 # arrives, how often, and how stale is too stale — so a live `USER#…#SOURCE#<x>`
 # partition that is absent from it is invisible to every derived check. The 2026-09-06
 # ingestion audit named four such partitions; the live pk-family census run for #3669
-# (2026-09-17, 99 families / 44,543 items) measured 83 live SOURCE# families, of which 67
+# (2026-09-17, 99 families / 44,543 items; re-measured 2026-09-22 after `qa_hook_matrix` joined the
+# census) measured 84 live SOURCE# families, of which 68
 # had no registry entry — the audit's set was scoped to ingestion-shaped names and missed
 # the rest.
 #

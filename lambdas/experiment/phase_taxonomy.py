@@ -397,6 +397,13 @@ SOURCE_CLASS: dict[str, str] = {
     # — SYSTEM_STATE: ops/infra/cache/dead (phase machinery ignores) —
     "journal_analysis": SYSTEM_STATE,  # regenerating Haiku cache (TTL 180d)
     "health_check": SYSTEM_STATE,
+    # #3615/#4015 wrote this partition on 2026-09-21 (the nightly hook-liveness matrix, one row per
+    # PT day keyed by cycle_day) with NO rule here — the first reset REHEARSAL under the owner's
+    # no-further-resets ruling (2026-09-21, ADR-077 amendment) aborted at the census preflight on
+    # exactly this family. Ruling (session AQ, 2026-09-22): SYSTEM_STATE — an operational
+    # instrument's own output, regenerated every night from live probes, never evidence about the
+    # experiment; it survives a reset and is read genesis-anchored like every other census.
+    "qa_hook_matrix": SYSTEM_STATE,
     "dropbox_tracker": SYSTEM_STATE,
     "hevy_id_map": SYSTEM_STATE,
     "routine_index": SYSTEM_STATE,

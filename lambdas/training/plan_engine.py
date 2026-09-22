@@ -263,11 +263,11 @@ def constraint_block(
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
 
-    # #3755 — "is the accessory layer rotating" is COMPUTED from the performed Hevy record
-    # over the program's own 14-day window, with its n and window stated (ADR-105), not
-    # asserted from the pool the program declares. A program can list six accessories per
-    # day and still have produced the same four movements every session; only the record
-    # knows. The rows are injected (`mcp.tools_plan` reads them) so this function stays
+    # #3755 — "is the accessory layer holding still" (v0.3: accessories are FIXED for the
+    # block, so the defect is an accessory ADDED mid-block, not one repeated) is COMPUTED
+    # from the performed Hevy record over the program's own 14-day window, with its n and
+    # window stated (ADR-105), not asserted from the pool the program declares. Only the
+    # record knows what was actually done. The rows are injected (`mcp.tools_plan` reads them) so this function stays
     # pure, and an unreadable window reports `unknown`, never `ok`.
     program = program_structure.summary()
     rotation = program_structure.accessory_rotation(
@@ -292,7 +292,7 @@ def constraint_block(
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
         "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
-        # #3753 v2: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
+        # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
         "recovery_tier": recovery_tier,
         "acwr_flag": acwr_flag,
@@ -328,7 +328,7 @@ def constraint_block(
                     else "the owner's redlines are PROPOSED, not confirmed — this plan follows a posture he has not yet signed (#3753)"
                 ),
                 (
-                    f"{len(owner_redlines.unevaluated_tripwires())} proposed v2 tripwire(s) are reported but NOT evaluated by this "
+                    f"{len(owner_redlines.unevaluated_tripwires())} v{owner_redlines.REDLINES_VERSION} tripwire(s) are reported but NOT evaluated by this "
                     f"engine: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753)"
                     if owner_redlines.unevaluated_tripwires()
                     else None
@@ -346,13 +346,13 @@ def constraint_block(
                     else None
                 ),
                 (
-                    f"accessory rotation is {rotation['state']}: {rotation['detail']}"
+                    f"the accessory layer is {rotation['state']}: {rotation['detail']}"
                     if rotation["ok"] is None
                     else (
                         None
                         if rotation["ok"]
-                        else "the accessory layer is NOT rotating — "
-                        + ", ".join(f"{r['movement']} on {r['n_days']} days" for r in rotation["repeats_within_window"][:4])
+                        else "the accessory layer is DRIFTING (v0.3 fixes accessories for the block) — added in the trailing 7 days: "
+                        + ", ".join(rotation["added_in_trailing_7d"][:4])
                     )
                 ),
                 (
