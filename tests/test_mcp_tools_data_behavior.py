@@ -201,19 +201,38 @@ def test_summary_view_omits_sources_with_no_row_for_the_date(fake_table):
     assert list(out) == ["whoop"], "a source with no row that day is absent from the payload entirely"
 
 
-def test_latest_and_summary_apply_the_phase_filter_unless_pilot_is_requested(fake_table):
-    t = fake_table()
+def _pk_of(call):
+    expr = call["KeyConditionExpression"].get_expression()
+    if expr["operator"] == "AND":  # summary: pk = … AND begins_with(sk, …)
+        expr = expr["values"][0].get_expression()
+    return expr["values"][1]
+
+
+def test_latest_and_summary_derive_the_phase_filter_per_source_unless_pilot_is_explicit(fake_table):
+    """#4061: with no `include_pilot` argument the decision is DERIVED per source from the
+    taxonomy — a RAW_TIMESERIES partition (whoop) is read across phases, an EXPERIMENT_SCOPED
+    one (computed_metrics) keeps the ADR-058 filter. An explicit argument wins either way."""
+    sources = ("whoop", "computed_metrics")
+    t = fake_table(sources=sources)
     td.tool_get_daily_snapshot({"view": "latest"})
-    assert all(c["FilterExpression"] == PHASE_EXPR for c in t.calls)
-    assert all(c["ExpressionAttributeValues"] == {":phase_experiment": "experiment"} for c in t.calls)
+    by_pk = {_pk_of(c): c for c in t.calls}
+    assert "FilterExpression" not in by_pk["USER#matthew#SOURCE#whoop"], "raw_timeseries must not be phase-filtered"
+    assert by_pk["USER#matthew#SOURCE#computed_metrics"]["FilterExpression"] == PHASE_EXPR
+    assert by_pk["USER#matthew#SOURCE#computed_metrics"]["ExpressionAttributeValues"] == {":phase_experiment": "experiment"}
 
-    t2 = fake_table()
+    t2 = fake_table(sources=sources)
     td.tool_get_daily_snapshot({"view": "latest", "include_pilot": True})
-    assert all("FilterExpression" not in c for c in t2.calls), "include_pilot must lift the ADR-058 filter"
+    assert all("FilterExpression" not in c for c in t2.calls), "include_pilot=True must lift the ADR-058 filter everywhere"
 
-    t3 = fake_table()
+    t3 = fake_table(sources=sources)
+    td.tool_get_daily_snapshot({"view": "summary", "date": "2026-08-07", "include_pilot": False})
+    assert all(c["FilterExpression"] == PHASE_EXPR for c in t3.calls), "an explicit include_pilot=False still filters every source"
+
+    t4 = fake_table(sources=sources)
     td.tool_get_daily_snapshot({"view": "summary", "date": "2026-08-07"})
-    assert all(c["FilterExpression"] == PHASE_EXPR for c in t3.calls)
+    by_pk = {_pk_of(c): c for c in t4.calls}
+    assert "FilterExpression" not in by_pk["USER#matthew#SOURCE#whoop"]
+    assert by_pk["USER#matthew#SOURCE#computed_metrics"]["FilterExpression"] == PHASE_EXPR
 
 
 # ──────────────────────────────────────────────────────────────────────────────
