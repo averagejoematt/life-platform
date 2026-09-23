@@ -894,7 +894,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # and that nothing else builds the walking layer — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked mcp/_census_probe_4068.py calling walking_volume.build; baseline 24 passed | mutated 1 failed ::
         # test_only_the_shared_module_builds_the_walking_layer | reverted 24 passed). Unproven stays 540; exactly one entrant.
-        <= 131
+        # Upper bound 131 -> 132 (2026-09-23, #4107): structural::test_v03_nearest_band_anchor_4107.py — the AST derivation guard
+        # that load_ramp.v03_floor is the ONE v0.3 load path (nothing else calls ramp_floor / nearest_band_anchor; the generator,
+        # planner and chat commit gate each name it) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
+        # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
+        # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
+        <= 132
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
