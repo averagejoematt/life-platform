@@ -369,7 +369,10 @@ class EmailStack(Stack):
             schedule="cron(0 3 * * ? *)",
             timeout_seconds=60,
             memory_mb=256,
-            environment=_email_env,
+            # #4063: the named-human contact path rides this cron. OFF until the owner
+            # approves a preview (unarmed, the body goes to the owner's inbox instead);
+            # arming = flip to "true" here and deploy LifePlatformEmail.
+            environment={**_email_env, "CONTACT_PATH_ARMED": "false"},
             custom_policies=rp.email_evening_nudge(),
             **shared,
         )

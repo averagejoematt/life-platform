@@ -431,6 +431,15 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
     completion row immediately after its SES call so a DLQ redrive cannot mail the
     same nudge twice. The write fails SOFT, so without this grant the guard would
     read an empty ledger forever and look armed while doing nothing.
+
+    #4063: + s3:GetObject on the ONE private object naming the named human
+    (`config/coaching/named_human.json`) — the contact-path leg reads it only when a
+    rung is due, and fails closed without it. Object-scoped, never `config/coaching/*`:
+    this role also holds ses:SendEmail, so it may read who to mail and nothing else of
+    the owner's private coaching home. The leg's episode row reuses the existing
+    PutItem above; its SES send reuses the existing SES statement (the From is the
+    same verified OWNER_SENDER identity — SES authorises on the identity, not the
+    recipient).
     """
     return [
         iam.PolicyStatement(
@@ -457,6 +466,11 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
             sid="RitualTokenSecret",  # #769 (ADR-124): HMAC signing key for evening-ritual one-tap links.
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/ritual-token-secret")],
+        ),
+        iam.PolicyStatement(
+            sid="NamedHumanConfigRead",  # #4063: the contact-path leg's fail-closed recipient read.
+            actions=["s3:GetObject"],
+            resources=_s3("config/coaching/named_human.json"),
         ),
     ]
 

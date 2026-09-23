@@ -151,6 +151,14 @@ ROW_MAP: list[dict] = [
         "requirements": [("source", "training_constraints", OO)],
         "claims": [],
     },
+    # #4063: declared before the first row exists; identity-free episode state with no
+    # public projection at all.
+    {
+        "key": "named_human_contact",
+        "pattern": r"^Named-human contact state",
+        "requirements": [("source", "named_human_contact", OO)],
+        "claims": [],
+    },
     # #3719: already served publicly with no tier and no consent stamp. The owner ruled
     # keep-publishing (2026-09-13), so this records the consent rather than changing the
     # surface — publication by STAMP, never by omission.
