@@ -360,14 +360,16 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
         "volume_ceiling",
         "medical_stop_lines",
         "mood_declared",
-        "self_added_volume",
     } <= unevaluated
+    # #4081: self_added_volume is computed by the engine now (from adherence's set counts).
+    assert "self_added_volume" not in unevaluated
     assert [t["id"] for t in owner_redlines.engine_evaluated_tripwires()] == [
         "anchor_lift_strength_drop",
         "protein_floor_missed",
         "readiness_floor",
         "pain_flag_named_site",
         "weight_stall_with_adherence",
+        "self_added_volume",
     ]
     for t in owner_redlines.TRIPWIRES:
         assert t.get("provenance") in ("owner", "owner-history", "population-derived"), t["id"]
