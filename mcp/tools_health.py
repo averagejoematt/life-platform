@@ -497,9 +497,11 @@ def tool_get_weight_loss_progress(args):
     height_in = profile.get("height_inches")
 
     # HONOR an explicit start_date verbatim — the old code always overrode it
-    # with journey_start. No leak risk: query_source's phase filter (ADR-058)
-    # hides pre-genesis pilot data regardless of window width. Default to genesis
-    # when no start is passed, then a far-past floor.
+    # with journey_start. Default to the profile's journey_start_date (the genesis —
+    # 2026-09-06 live, read 2026-09-23) when no start is passed, then a far-past floor.
+    # #4061: withings is RAW_TIMESERIES, so query_source no longer phase-filters it; the
+    # "this journey" scope is this DATE window, not the phase tag. An explicit earlier
+    # start_date therefore now returns the pre-genesis weigh-ins it asks for.
     effective_start = explicit_start or journey_start or "2010-01-01"
 
     # Future/empty-window guard: a freshly re-anchored genesis can sit AHEAD of

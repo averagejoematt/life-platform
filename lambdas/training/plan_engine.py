@@ -421,6 +421,36 @@ def _tripwire_states(
     return out
 
 
+def _scheduled_session(day: str, catalog_movements: dict[str, Any] | None, skill_ceiling: int) -> dict[str, Any]:
+    """The session the program schedules on `day` (#4064). Pure.
+
+    ACTIVE program: `program_structure.planned_session` — the block calendar, then the §3
+    prescription. Inactive: the engine runs on the JSON grid, which this pure function
+    cannot read, so it says that rather than inventing a session.
+    """
+    if not program_structure.ACTIVE:
+        return {
+            "date": day,
+            "source": "json",
+            "archetype": None,
+            "note": (
+                f"TRAINING_PROGRAM v{program_structure.PROGRAM_VERSION} is PROPOSED — the live config/training_week.json grid decides "
+                "this day's archetype; `manage_hevy_routine draft` reads it"
+            ),
+        }
+    try:
+        out = program_structure.planned_session(day, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+    except ValueError as e:
+        return {"date": day, "source": "unreadable", "archetype": None, "note": str(e)}
+    if catalog_movements is None and out.get("prescription"):
+        out["catalog_note"] = "the movement catalog was not read — anchors are named by PATTERN, movements unresolved"
+    out["how_to_draft"] = (
+        "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
+        "calendar and prescription); draft_custom only for a deliberate departure"
+    )
+    return out
+
+
 def constraint_block(
     *,
     date: str,
@@ -444,6 +474,8 @@ def constraint_block(
     adherence_on_plan: bool | None = None,
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
     rotation_window_start: str | None = None,
+    catalog_movements: dict[str, Any] | None = None,
+    skill_ceiling: int = 2,
     input_status: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
@@ -583,6 +615,8 @@ def constraint_block(
         hevy_workouts=hevy_workouts_rotation_window,
     )
 
+    session = _scheduled_session(date, catalog_movements, skill_ceiling)
+
     return {
         "engine_version": ENGINE_VERSION,
         "date": date,
@@ -598,6 +632,12 @@ def constraint_block(
         # in the bundle).
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
+        # #4064 — WHAT the program schedules on this date: the block calendar's answer
+        # (block 1 starts Thu 2026-09-24, then Mon/Wed/Fri, deload every 6th week) and, on a
+        # lifting day, the §3 session — anchors at heavy/moderate with their sets and reps,
+        # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
+        # walking and the standing constraints outrank any single session.
+        "session": session,
         "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),

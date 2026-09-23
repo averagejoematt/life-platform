@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
-from ingestion.strava_population import DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL
+from ingestion.strava_population import DISTANCE_POPULATION, DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL, activity_type
 from privacy.field_tiers import strip_map
 
 from mcp.config import RAW_DAY_LIMIT, SOURCES, USER_PREFIX, table
@@ -128,17 +128,31 @@ def tool_get_sources(_args):
     return result
 
 
+def _snapshot_include_pilot(args):
+    """The caller's explicit `include_pilot`, or None to DERIVE it per source (#4061).
+
+    Before #4061 an absent argument meant the ADR-058 filter on every source, so the snapshot
+    of any pre-genesis day (Strava 2024-10-01: 6 activities, `phase=pilot`) came back empty.
+    """
+    raw = args.get("include_pilot")
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw.strip().lower() not in ("false", "0", "no", "")
+    return bool(raw)
+
+
 def _get_latest(args):
-    from mcp.core import _apply_phase_filter  # ADR-058
+    from mcp.core import _apply_phase_filter, _resolve_include_pilot  # ADR-058 / #4061
 
     sources = args.get("sources", SOURCES)
-    include_pilot = bool(args.get("include_pilot"))
+    requested = _snapshot_include_pilot(args)
     result = {}
     for source in sources:
         pk = f"{USER_PREFIX}{source}"
         kwargs = _apply_phase_filter(
             {"KeyConditionExpression": Key("pk").eq(pk), "Limit": 1, "ScanIndexForward": False},
-            include_pilot=include_pilot,
+            include_pilot=_resolve_include_pilot(source, requested)[0],
         )
         response = table.query(**kwargs)
         items = decimal_to_float(response.get("Items", []))
@@ -147,21 +161,25 @@ def _get_latest(args):
 
 
 def _get_daily_summary(args):
-    from mcp.core import _apply_phase_filter  # ADR-058
+    from mcp.core import _apply_phase_filter, _resolve_include_pilot  # ADR-058 / #4061
 
     date = args.get("date")
     if not date:
         raise ValueError("'date' is required (YYYY-MM-DD)")
-    include_pilot = bool(args.get("include_pilot"))
+    requested = _snapshot_include_pilot(args)
     result = {}
     for source in SOURCES:
         pk = f"{USER_PREFIX}{source}"
+        include_pilot, derived = _resolve_include_pilot(source, requested)
         kwargs = _apply_phase_filter(
             {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(f"DATE#{date}")},
             include_pilot=include_pilot,
         )
         response = table.query(**kwargs)
-        items = decimal_to_float(response.get("Items", []))
+        items = response.get("Items", [])
+        if derived:
+            items = [i for i in items if not i.get("tombstone")]  # superseded rows stay out, as in query_source
+        items = decimal_to_float(items)
         if items:
             result[source] = _strip_tier2_many(source, items)
     return result
@@ -421,6 +439,8 @@ def _find_days_filter(args):
         return True
 
     matched = [item for item in items if passes(item)]
+    for item in matched:
+        _annotate_unmeasured_distance(item)
 
     if len(matched) > 200:
         key_fields = {
@@ -434,10 +454,29 @@ def _find_days_filter(args):
             "total_distance_miles",
             "total_elevation_gain_feet",
             "sport_types",
+            "activity_count",
+            "activities_without_distance",
         }
         matched = [{k: v for k, v in m.items() if k in key_fields} for m in matched]
 
     return _strip_tier2_many(source, matched)
+
+
+def _annotate_unmeasured_distance(day):
+    """Stamp a day-aggregate with how many of its activities carry no measured distance (#4061).
+
+    A Strava day's `total_distance_miles` sums MEASURED distance only (`strava_lambda.transform`),
+    and a WHOOP-synced trainer walk stores `distance_miles` absent (`strava_population`) — so a
+    day whose walks were all WHOOP-recorded reads 0.0 miles and a distance filter drops it
+    without a word. The count rides on the row itself, only when non-zero, so the row says
+    what its total leaves out. Rows without an `activities` list are untouched.
+    """
+    acts = day.get("activities")
+    if not isinstance(acts, list):
+        return
+    n = sum(1 for a in acts if isinstance(a, dict) and a.get("distance_miles") is None and activity_type(a) in DISTANCE_POPULATION)
+    if n:
+        day["activities_without_distance"] = n
 
 
 def tool_find_days(args):
@@ -485,6 +524,14 @@ def tool_search_activities(args):
         pos = bisect.bisect_left(all_sort_vals, float(val))
         return round(100.0 * pos / total_for_rank, 1)
 
+    # #4061 box 4: an activity with no measured `distance_miles` / elevation (a WHOOP-synced
+    # trainer walk or ride, a manual entry — `ingestion/strava_population.py` stores those
+    # ABSENT, never 0) used to leave this tool without a word: a `min_*` filter dropped it,
+    # and the default distance sort ranked it as 0 so a `limit` cut it first. It is still
+    # excluded by a `min_*` filter and still ranked after every measured value — both are
+    # correct, it has no value to compare — but the output now COUNTS both, so an answer
+    # like "no walks that month" can be told apart from "the walks carry no distance".
+    excluded_unmeasured = {"distance_miles": 0, "total_elevation_gain_feet": 0}
     matched = []
     for act in all_activities:
         if name_contains:
@@ -496,15 +543,24 @@ def tool_search_activities(args):
             continue
         if min_distance is not None:
             dist = act.get("distance_miles")
-            if dist is None or float(dist) < float(min_distance):
+            if dist is None:
+                excluded_unmeasured["distance_miles"] += 1
+                continue
+            if float(dist) < float(min_distance):
                 continue
         if min_elevation is not None:
             elev = act.get("total_elevation_gain_feet")
-            if elev is None or float(elev) < float(min_elevation):
+            if elev is None:
+                excluded_unmeasured["total_elevation_gain_feet"] += 1
+                continue
+            if float(elev) < float(min_elevation):
                 continue
         matched.append(act)
 
-    matched.sort(key=lambda x: float(x.get(sort_by, 0) or 0), reverse=True)
+    # Measured values first, descending; an activity with no measured `sort_by` after them all.
+    matched.sort(key=lambda x: (x.get(sort_by) is not None, float(x.get(sort_by, 0) or 0)), reverse=True)
+    unmeasured_sort = sum(1 for a in matched if a.get(sort_by) is None)
+    unmeasured_shown = sum(1 for a in matched[:limit] if a.get(sort_by) is None)
 
     results = []
     for act in matched[:limit]:
@@ -535,6 +591,38 @@ def tool_search_activities(args):
         # measured for them, so they are absent rather than zero).
         "population": _population_label(sort_by),
         "activities": results,
+        **_unmeasured_block(sort_by, unmeasured_sort, unmeasured_shown, excluded_unmeasured),
+    }
+
+
+def _unmeasured_block(sort_by, unmeasured_sort, unmeasured_shown, excluded_unmeasured):
+    """Say what the search could not rank or filter, instead of dropping it silently (#4061).
+
+    Empty when nothing was unmeasured, so a fully-measured answer is unchanged.
+    """
+    excluded = {k: v for k, v in excluded_unmeasured.items() if v}
+    if not unmeasured_sort and not excluded:
+        return {}
+    notes = []
+    if unmeasured_sort:
+        cut = unmeasured_sort - unmeasured_shown
+        notes.append(
+            f"{unmeasured_sort} matched activit{'y' if unmeasured_sort == 1 else 'ies'} carry no measured {sort_by} "
+            "(WHOOP-synced trainer sessions and manual entries store it absent, never 0) — ranked after every measured one"
+            + (f"; {cut} of them fell past the limit and are not listed" if cut else "")
+            + ". Pass sort_by='moving_time_seconds' or a sport_type to see them."
+        )
+    for field, n in excluded.items():
+        notes.append(
+            f"{n} activit{'y' if n == 1 else 'ies'} excluded by the min_{'distance_miles' if field == 'distance_miles' else 'elevation_gain_feet'} "
+            f"filter because {field} was never measured for them (not because it was below the threshold)."
+        )
+    return {
+        "unmeasured": {
+            f"matched_without_{sort_by}": unmeasured_sort,
+            "excluded_by_min_filter_unmeasured": excluded,
+            "note": " ".join(notes),
+        }
     }
 
 

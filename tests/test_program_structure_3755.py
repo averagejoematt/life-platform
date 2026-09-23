@@ -226,14 +226,20 @@ def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
             )
         )
 
+    # #4064: from block 1 (Thu 2026-09-24) the block calendar answers, and a v0.3 role is
+    # built as a §3 session (anchor patterns at heavy/moderate), not a muscle-budget one.
+    # Mon 2026-09-28 is week 1's third session: heavy-moderate.
     monday = _gen("2026-09-28")[0]
     assert monday.archetype == "full" and monday.variant == "ideal"
     assert 12 <= sum(len(e.sets) for e in monday.exercises) <= 18
     assert any(r.startswith("week grid source=module") for r in monday.rationale)
-    assert "session_role=heavy" in monday.rationale
-    assert any("budgets trimmed" in r for r in monday.rationale)
-    muscles = {e.rationale_tag.split("_MEV_")[0] for e in monday.exercises}
-    assert muscles == {"chest", "back", "shoulders", "quadriceps", "hamstrings", "glutes"}
+    assert any("session_role=heavy_moderate" in r for r in monday.rationale)
+    assert "block calendar: week 1, block 1" in monday.rationale
+    patterns = {e.rationale_tag.split(":")[1] for e in monday.exercises if e.rationale_tag.startswith("anchor:")}
+    assert patterns == {"hinge", "overhead_press", "bench", "row"}
+    # before block 1 the weekday grid answers — a Monday is still the grid's heavy day
+    pre_block = _gen("2026-09-21")[0]
+    assert pre_block.archetype == "full" and any("session_role=heavy;" in r for r in pre_block.rationale)
     saturday = _gen("2026-10-03")[0]
     assert saturday.title.endswith("(optional)") and any(r.startswith("OPTIONAL session") for r in saturday.rationale)
     tuesday = _gen("2026-09-29")[0]
