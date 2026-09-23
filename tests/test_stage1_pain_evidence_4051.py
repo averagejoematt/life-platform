@@ -421,13 +421,15 @@ class TestTheEmptyPath:
         assert out["constraint_block"]["days_since_movement"] == {}
         assert any("examined NO movements" in h for h in out["constraint_block"]["honesty"])
 
-    def test_an_unreadable_hevy_partition_is_unknown_not_empty(self, monkeypatch):
+    def test_an_unreadable_hevy_partition_is_read_failed_not_empty(self, monkeypatch):
+        """#4072 sharpened this from `unknown`: a raise is a FAILED read, with its error class."""
         fake = _FakeTable(_rows(), raise_on_pk=HEVY_PK)
         monkeypatch.setattr(core, "table", fake)
         monkeypatch.setattr(tn, "table", fake)
         row = _pain_row(_stage1(fake, health={"checked": True, "degraded": 0, "records_found": 4, "extractor_dark": False}))
-        assert row["state"] == "unknown"
-        assert row["evidence"]["status"] == "unreadable"
+        assert row["state"] == "read_failed"
+        assert row["evidence"]["status"] == "read_failed"
+        assert row["evidence"]["error"] == "RuntimeError: DDB down"
         assert "not empty" in row["detail"]
 
     def test_the_block_always_states_the_scope_it_examined(self, wired):

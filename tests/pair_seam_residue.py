@@ -453,6 +453,20 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "tests/test_stage1_pain_evidence_4051.py::TestTheEmptyPath::test_no_session_in_the_window_reads_unknown_with_evidence_none "
         "and by test_mutation_control_break_the_derivation_and_the_planted_flag_disappears.",
     ),
+    # #4072 (2026-09-22): the readiness_floor tripwire had NO producer — nothing supplied
+    # `readiness_low_streak_days`, so it read "no recovery series" with Whoop fresh. Its
+    # input is now read from the whoop partition, which is what joins tools_plan to it.
+    "whoop::mcp/tools_plan.py::read": (
+        "2026-09-22",
+        "#4072: `_readiness_low_streak` reads ONLY `sk` (to keep the DATE#<day> daily rows and drop the "
+        "DATE#<day>#WORKOUT# rows) and `recovery_score`, through `query_source_cross_phase`. VERIFIED, not assumed: "
+        "a writer-side rename of `recovery_score` leaves daily rows with no numeric score, which raises "
+        "InputShapeError, and the plan block then reports the input `read_failed (InputShapeError: ...)` and the "
+        "readiness_floor row `read_failed` BY NAME — it can never read clear, and it no longer reads a merely "
+        "absent `unknown`. A change to the sk scheme empties the daily set and reads `absent` with the window "
+        "named. Pinned by tests/test_plan_input_read_state_4072.py::TestReadinessFloorReadsWhoop::"
+        "test_a_writer_shape_drift_is_read_failed_not_absent and test_an_empty_window_is_absent_not_failed.",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]
