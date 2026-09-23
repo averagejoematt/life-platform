@@ -109,6 +109,31 @@ def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     return value, input_status(MEASURED)
 
 
+def _load_anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
+    """(Hevy history index, bodyweight index) — the two reads the band anchor needs (#4090)."""
+    from training.exercise_history import DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS, load_bodyweight_index, load_history_indexes
+
+    return load_history_indexes(lookback_days=max(DEFAULT_LOOKBACK_DAYS, FLOOR_LOOKBACK_DAYS))[0], load_bodyweight_index()
+
+
+def _attach_session_loads(block: dict[str, Any], target_date: str, catalog_movements: dict[str, Any] | None) -> None:
+    """#4090: stamp the scheduled v0.3 session's exposures with their entry-ramp loads — the
+    same `prescription_floor` -> `load_ramp.ramp_floor` arithmetic the draft writes. A failed
+    read is reported by name on `session.loads`, never as an unloaded session."""
+    session = (block or {}).get("session") or {}
+    rx = session.get("prescription")
+    if not rx:
+        return
+    from training.load_ramp import annotate_prescription
+
+    indexes, status = _read("session_loads", _load_anchor_indexes)
+    if indexes is None:
+        session["loads"] = {"status": status.get("state"), "error": status.get("error")}
+        return
+    history, weights = indexes
+    session["loads"] = annotate_prescription(rx, catalog_movements, history, weights, target_date=target_date, week=session.get("week"))
+
+
 def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]:
     """(consecutive days below the readiness_floor threshold, input status) — from Whoop (#4072).
 
@@ -665,6 +690,7 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    _attach_session_loads(block, target_date, catalog_movements)
 
     out: dict[str, Any] = {
         "target_date": target_date,
