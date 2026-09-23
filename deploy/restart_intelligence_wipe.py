@@ -286,9 +286,16 @@ VOIDED_STATUS = "voided"
 def extract_date(item: dict) -> str | None:
     """Best-effort YYYY-MM-DD extraction.
 
-    Order: explicit `date` attr → YYYY-MM-DD substring in sk → ISO-week
-    (`WEEK#YYYY-WNN`) in sk → timestamp fallbacks.
+    Order: `phase_taxonomy.provenance_date()` FIRST (#4059 — the `USER#matthew/
+    SOURCE#coach_thread*` "pregenesis" partition below is date-gated, and a pain-flag
+    thread's `date` attribute is the underlying note's REFERENCE date, not when the
+    thread itself opened; returns None for every other shape, a no-op elsewhere) →
+    explicit `date` attr → YYYY-MM-DD substring in sk → ISO-week (`WEEK#YYYY-WNN`) in sk →
+    timestamp fallbacks.
     """
+    provenance = taxonomy.provenance_date(item)
+    if provenance:
+        return provenance
     d = item.get("date")
     if isinstance(d, str) and len(d) >= 10 and DATE_RE.match(d[:10]):
         return d[:10]
