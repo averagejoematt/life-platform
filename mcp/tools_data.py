@@ -664,9 +664,12 @@ def tool_get_intelligence_quality(args):
 
     # Query all intelligence_quality records in date range
     try:
-        # ADR-058: phase=pilot hidden by default.
-        from mcp.core import _apply_phase_filter
+        # #4088: `intelligence_quality` is SYSTEM_STATE (the validator's ops ledger) — the
+        # phase machinery ignores it, so the decision is derived from the key's class
+        # rather than the unconditional ADR-058 filter.
+        from mcp.core import _apply_phase_filter, _resolve_include_pilot_key
 
+        _iq_pilot, _ = _resolve_include_pilot_key("USER#matthew", "SOURCE#intelligence_quality#")
         resp = table.query(
             **_apply_phase_filter(
                 {
@@ -675,7 +678,8 @@ def tool_get_intelligence_quality(args):
                         f"SOURCE#intelligence_quality#{start_date}",
                         f"SOURCE#intelligence_quality#{end_date}~",
                     ),
-                }
+                },
+                include_pilot=_iq_pilot,
             )
         )
         items = [decimal_to_float(i) for i in resp.get("Items", [])]

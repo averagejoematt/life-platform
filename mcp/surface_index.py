@@ -272,9 +272,11 @@ SURFACE_NOTES: dict[str, tuple[str, str, list[dict]]] = {
 # Governing-rule derivation (the #3668 second-comment requirement)
 # ═══════════════════════════════════════════════════════════════════════════
 # Every DDB read in the web package goes through one of these helpers, and each takes an
-# `include_pilot` keyword that defaults to False (the ADR-058 filter). So "did this
-# surface hide the pilot rows?" is answerable by counting call sites — not by trusting a
-# comment, and not by a per-surface literal somebody has to remember to update.
+# `include_pilot` keyword. So "did this surface hide the pilot rows?" is answerable by
+# counting call sites — not by trusting a comment, and not by a per-surface literal
+# somebody has to remember to update. Since #4088 the site readers (and MCP's
+# `query_source`, #4061) DERIVE the default from the source's taxonomy class, so a call
+# with no keyword and a literal source is graded by that same derivation.
 _PHASE_READER_FNS = frozenset(
     {
         "_query_source",
@@ -292,6 +294,27 @@ _PACIFIC_MARKERS = ("pacific_today", "pacific_now", "America/Los_Angeles", "PACI
 _UTC_MARKERS = ("utcnow", "timezone.utc", "datetime.UTC")
 _PROVENANCE_MARKERS = ("ingested_at", "backfill", "captured_at", "imported_at", "is_backfill", "write_time")
 
+# The readers whose `include_pilot=None` default is DERIVED per source (#4061/#4088).
+_DERIVED_DEFAULT_READERS = frozenset({"_query_source", "_latest_item", "_latest_item_asof", "query_source", "query_source_range"})
+
+
+def _derived_default_reads_pilot(node: Any, fname_called: str) -> bool:
+    """True when a keyword-less call to a derived-default reader names a literal source the
+    taxonomy reads across phases. A non-literal source is not guessed: it stays counted as
+    a filtered read (the conservative side, as before #4088)."""
+    if fname_called not in _DERIVED_DEFAULT_READERS or any(kw.arg == "include_pilot" for kw in node.keywords):
+        return False
+    first = node.args[0] if node.args else None
+    if not (isinstance(first, ast.Constant) and isinstance(first.value, str)):
+        return False
+    try:
+        from experiment.phase_filter import source_reads_cross_phase
+
+        return bool(source_reads_cross_phase(first.value))
+    except Exception:  # noqa: BLE001 — a rule we cannot derive stays on the conservative side
+        return False
+
+
 PHASE_EXPERIMENT_ONLY = "experiment-only"
 PHASE_INCLUDES_PILOT = "includes-pilot"
 PHASE_MIXED = "mixed"
@@ -303,8 +326,10 @@ _PHASE_MEANING = {
         "excluded on purpose. An empty answer here means 'excluded by a rule you asked for', NOT 'never recorded'."
     ),
     PHASE_INCLUDES_PILOT: (
-        "Reads the partition UNFILTERED (include_pilot=True). Pre-genesis days and prior-cycle rows are INCLUDED, "
-        "so this surface can legitimately report data on days an experiment-only surface reports as empty."
+        "Reads the partition UNFILTERED (include_pilot=True, or derived per source since #4088 for a raw "
+        "timeseries). Prior-cycle rows are eligible and only the handler's DATE window bounds them, so this "
+        "surface can legitimately report data on days an experiment-only surface reports as empty — unless its "
+        "window is clamped to genesis, in which case pre-genesis days are excluded by DATE, not by phase."
     ),
     PHASE_MIXED: (
         "Applies BOTH readings: some reads are experiment-only, some pass include_pilot=True. Compare a specific "
@@ -406,7 +431,9 @@ def _analyse(dotted: str, fname: str, depth: int, seen: set) -> dict:
             continue
         fname_called = node.func.id if isinstance(node.func, ast.Name) else (node.func.attr if isinstance(node.func, ast.Attribute) else "")
         if fname_called in _PHASE_READER_FNS:
-            pilot = any(kw.arg == "include_pilot" and isinstance(kw.value, ast.Constant) and kw.value.value is True for kw in node.keywords)
+            pilot = any(
+                kw.arg == "include_pilot" and isinstance(kw.value, ast.Constant) and kw.value.value is True for kw in node.keywords
+            ) or _derived_default_reads_pilot(node, fname_called)
             acc["pilot_reads" if pilot else "filtered_reads"] += 1
         # One hop onward, two shapes:
         #   `_habits.habits(...)`  — the facade -> split-module delegate every /api door uses

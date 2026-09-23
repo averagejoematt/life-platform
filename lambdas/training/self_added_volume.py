@@ -4,12 +4,18 @@ WHY THIS EXISTS
 
 The v0.3 redlines (owner-approved 2026-09-21, #3753) carry a tripwire the red team's
 lived-experience seat argued for: `self_added_volume` — training above the prescription two
-weeks running, read as an anxiety tell rather than enthusiasm ("the 21-hour week is not his
-strength, it is his hiding place"). It shipped `evaluated_by_engine: False`, so the engine
-named it and never looked. The record it would have read was on the table the whole time:
-across cycle 17's first two weeks he performed 4 sets where the committed routine prescribed
-3 on most movements, and finished isolation work at RPE 9.5–10 — against a program whose
-authoring rule is subtract-only ("never add").
+weeks running, originally read as an anxiety tell rather than enthusiasm ("the 21-hour week is
+not his strength, it is his hiding place"). It shipped `evaluated_by_engine: False`, so the
+engine named it and never looked. The record it would have read was on the table the whole
+time: across cycle 17's first two weeks he performed 4 sets where the committed routine
+prescribed 3 on most movements, and finished isolation work at RPE 9.5–10 — against a program
+whose authoring rule is subtract-only ("never add").
+
+The owner overruled that reading on 2026-09-23 (#4111): "Just give me an end of week report or
+update — I don't think this is anxiety, it's me wanting to do more." `owner_redlines`'s action
+for this tripwire changed to a report; the COMPUTATION below did not — the same `evaluate` still
+answers `tripped` / `clear` / `unknown` with the same set-level evidence, now read for a report
+instead of a veto.
 
 THE COUNT IS NOT COMPUTED HERE
 

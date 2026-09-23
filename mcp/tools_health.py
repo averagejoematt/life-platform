@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
+from training import training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
 from mcp.config import logger
 from mcp.core import date_diff_days, decimal_to_float, get_profile, phase_scope_block, query_source, query_source_cross_phase
@@ -213,8 +214,12 @@ def tool_get_readiness_score(args):
             "load_basis": _tsb_conf or "unknown",
             "source": "pre_computed_metrics",
         }
-        if _tsb_conf and _tsb_conf != "power":
-            raw["load_basis_note"] = "duration-proxy basis — loads are TSS-like estimates from duration/HR, not power-meter data"
+        # #4075: the label follows the load's actual provenance — an HR-scored window is
+        # measured, so `confidence != "power"` no longer means "duration proxy".
+        if training_load.is_duration_proxy(_tsb_basis):
+            raw["load_basis_note"] = "duration-proxy basis — at least half the load is a duration estimate (no HR, no power)"
+        elif _tsb_conf and _tsb_conf != "power":
+            raw["load_basis_note"] = "heart-rate basis — loads are Banister TRIMP above the Zone-1 ceiling, not power-meter data"
         components["training_form"] = {
             "score": round(tsb_score, 1),
             "weight": 0.10,
