@@ -43,6 +43,13 @@ that doc (the Session M/N `CLAUDE.md` shape) still passes this gate and reds Uni
 That residue is the amended issue's stated scope ("docs-only pushes run the derived
 Docs-CI set in seconds"), recorded here rather than implied.
 
+STRICTER THAN CI IN ONE NAMED PLACE. The gates run with the LOCAL event context, so
+`sync_doc_metadata.py --check`'s exit 3 (`VERDICT: pending-reconcile` — a literal only the
+reconcile bot's `--apply` rewrites) is a refusal here, although on the push-to-main event
+CI downgrades it to a warning (#3646). A push that leaves the bot to fix its own literal
+is the author's to fix first (`python3 deploy/sync_doc_metadata.py --apply`); if main
+itself is mid-reconcile, the same command, or waiting ~60 s for the bot, clears it.
+
 WHAT IT GRADES. The gates read the WORKING TREE. A pushed path that also carries unstaged
 edits would be graded as a version that is not the one being pushed, so that is refused
 (exit 1) with the paths named; unrelated dirt elsewhere in the tree is reported, not
@@ -166,6 +173,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base", default=os.environ.get("AGENT_COMMIT_BASE_REF", "origin/main"))
     ap.add_argument("--list", action="store_true", help="classify + print what would run; run nothing")
     args = ap.parse_args(argv)
+    # Line-buffer stdout so the verdict lines interleave with stderr in order when piped.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
     restart = os.environ.get(RESTART_ENV) == "1"
     tag = "[direct-push-gate]"
 

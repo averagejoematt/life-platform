@@ -1279,6 +1279,82 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-23",
     },
+    # #3528: the direct-push landing path. Its two modules and the enumeration test's exemption
+    # registry entered the census once committed (they were untracked on the first census run, so
+    # only the structural test showed then — the reset stand-in's own pytest leg, run in a throwaway
+    # clone, is what surfaced these four). Each is proven by a watched mutation.
+    "guard::deploy/direct_push_gate.py": {
+        "gate_name": "deploy/direct_push_gate.py",
+        "command": (
+            "python3 -m pytest tests/test_agent_commit_push_3528.py tests/test_ci_stand_ins_derive.py -q "
+            "-p no:cacheprovider -k 'refused_naming_the_path or test_classification'"
+        ),
+        "mutation": (
+            "classify()'s `(docs if any(glob_matches(g, p) for g in DOCS_CLASS) else code).append(p)` replaced "
+            "by `docs.append(p)` — every path ruled docs-class, i.e. the refusal can never fire."
+        ),
+        "observed": (
+            "MUTATED: 9 failed, 5 passed — test_a_code_push_to_main_is_refused_naming_the_path (the real "
+            "agent_commit.sh --push against a fixture repo + local bare origin) and the 8 code-class "
+            "test_classification cases. REVERTED: 14 passed. Both watched 2026-09-23. Live, in a throwaway "
+            "clone of this branch with a local bare origin: a one-line lambdas/common/constants.py change "
+            "via `agent_commit.sh --push` on main exited 1 naming the path; the same change on a branch pushed."
+        ),
+        "scope": (
+            "Client-side only: a bare `git push origin main` is not routed through it (ADR-148's bypass actor is "
+            "the owner's account). The docs-only stand-in is a superset of Docs CI, not of CI/CD's Unit Tests."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    "guard::scripts/ci_gate_commands.py": {
+        "gate_name": "scripts/ci_gate_commands.py",
+        "command": (
+            "python3 -m pytest tests/test_ci_stand_ins_derive.py tests/test_restart_verify_gates_3477.py -q " "-p no:cacheprovider -k empty"
+        ),
+        "mutation": "ci_gate_commands()'s `if not cmds: raise RuntimeError(...ZERO gates...)` changed to `if False:`.",
+        "observed": (
+            "MUTATED: 2 failed, 3 passed — test_the_derivation_raises_on_an_empty_or_missing_workflow and "
+            "test_restart_verify_gates_3477::test_an_empty_derivation_raises_rather_than_reporting_a_clean_sweep "
+            "(the delegate inherits the dead-man). REVERTED: 5 passed. Both watched 2026-09-23."
+        ),
+        "scope": (
+            "The line parser sees single-line `run: python3 …` steps only; `run: |` blocks are enumerated by "
+            "multiline_python_steps() and must be declared by the consumer (MULTILINE_RUN_EXEMPT)."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    "registry::tests/test_ci_stand_ins_derive.py::PUSHER_EXEMPT::deploy/merge_train.sh": {
+        "gate_name": "PUSHER_EXEMPT[deploy/merge_train.sh]",
+        "command": "python3 -m pytest tests/test_ci_stand_ins_derive.py -q -p no:cacheprovider -k imports_ci_gate_commands",
+        "mutation": "the `deploy/merge_train.sh` entry deleted from PUSHER_EXEMPT (the leased PR-branch force-push).",
+        "observed": (
+            "MUTATED: 1 failed — test_every_git_push_caller_imports_ci_gate_commands: \"['deploy/merge_train.sh'] run `git push` "
+            'without deriving a CI stand-in from ci_gate_commands(workflow) (#3528)". REVERTED: 30 passed. Both '
+            "watched 2026-09-23. test_every_exemption_is_a_live_pusher_that_never_targets_main is the stale-entry "
+            "direction (an exemption for a file that stopped pushing reds)."
+        ),
+        "scope": (
+            "The never-main half is a textual check (no `refs/heads/main`, `:main` or `origin main` in the file); "
+            "a push target assembled at runtime from a variable is not seen."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    "registry::tests/test_ci_stand_ins_derive.py::PUSHER_EXEMPT::scripts/archive_handover.py": {
+        "gate_name": "PUSHER_EXEMPT[scripts/archive_handover.py]",
+        "command": "python3 -m pytest tests/test_ci_stand_ins_derive.py -q -p no:cacheprovider -k imports_ci_gate_commands",
+        "mutation": "the `scripts/archive_handover.py` entry deleted from PUSHER_EXEMPT (the session-archive branch push).",
+        "observed": (
+            "MUTATED: 1 failed — test_every_git_push_caller_imports_ci_gate_commands: \"['scripts/archive_handover.py'] run `git push` "
+            'without deriving a CI stand-in from ci_gate_commands(workflow) (#3528)". REVERTED: 30 passed. Both '
+            "watched 2026-09-23. test_every_exemption_is_a_live_pusher_that_never_targets_main is the stale-entry "
+            "direction (an exemption for a file that stopped pushing reds)."
+        ),
+        "scope": (
+            "The never-main half is a textual check (no `refs/heads/main`, `:main` or `origin main` in the file); "
+            "a push target assembled at runtime from a variable is not seen."
+        ),
+        "proved_on": "2026-09-23",
+    },
     # #3804: the guard entered the census the moment it was committed (639 -> 640, both
     # `discover_gate_census_count()` and a bare `scripts/gate_census.py` run — confirmed
     # to be the SAME derivation, not two disagreeing ones; see the PR thread). The

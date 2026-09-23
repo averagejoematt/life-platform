@@ -902,8 +902,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 132 -> 133 (2026-09-23, #3528): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
         # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
         # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
-        # -> 2 passed). Unproven stays; one entrant.
-        <= 133
+        # -> 2 passed). Unproven stays. Same PR, 133 -> 137: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
+        # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
+        <= 137
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
