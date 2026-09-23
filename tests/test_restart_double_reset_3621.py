@@ -352,3 +352,105 @@ def test_fake_table_refuses_an_expression_shape_it_cannot_model():
             ExpressionAttributeNames={},
             ExpressionAttributeValues={},
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #4059 — a row's phase-provenance date is its creation/opening instant, never its
+# outcome, a re-stamp, or a content reference
+#
+# Plants BOTH live #4040 shapes and proves the classification: (a) a dispute-docket
+# verdict opened before genesis and graded after it — must be flagged for archival
+# by its OWN open time, not its outcome window; (b) a current-cycle coach pain-thread
+# row whose `date` attribute is a stale content reference — must be LEFT ALONE. The
+# mutation control feeds the predicate `outcome_date` in place of the derived
+# provenance date and asserts (a) then SURVIVES (the #4040 defect exactly), so this
+# file is proven to exercise the derivation and not merely the predicate's shape gate.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# `wipe`'s own import (above) already put repo-root + lambdas/ + deploy/ on sys.path.
+import phase_stamp_sweep  # noqa: E402
+import restart_phase_tag  # noqa: E402
+from experiment import phase_taxonomy as taxonomy  # noqa: E402
+
+GENESIS_4059 = "2026-09-06"
+
+# (a) The live #4040 specimen: a dispute-docket verdict `_write_docket_prediction` writes
+# with `created_at = docket.get("opened_at", "")` (the docket's TRUE open time, 2026-08-03,
+# a month before genesis) sitting beside `outcome_date`/`resolved_at`/`cycle`, all stamped
+# at RESOLUTION time (2026-09-07, after genesis) — none of which is the row's provenance.
+DOCKET_PREDICTION_ROW = {
+    "pk": "COACH#explorer_coach",
+    "sk": "PREDICTION#docket-explorer_coach__nutrition_coach-calories-caloric-variance-interpretation-2026-08-03",
+    "created_at": "2026-08-03T17:41:16+00:00",
+    "outcome_date": "2026-09-07",
+    "resolved_at": "2026-09-07T09:12:00+00:00",
+    "cycle": 17,
+    "phase": "experiment",
+}
+
+# (b) The live #4040 second specimen: `training_notes.elevate_pain` writes `"date":
+# item.get("date")` — the underlying Hevy note's OWN workout day (2022), a content
+# reference — beside `created_at`, the thread's real open time, squarely in cycle 17.
+PAIN_THREAD_ROW = {
+    "pk": "USER#matthew",
+    "sk": "SOURCE#coach_thread#training_coach#2026-09-19T21:08:53Z#pain",
+    "created_at": "2026-09-19T21:08:53Z",
+    "date": "2022-11-03",
+    "phase": None,
+}
+
+
+def test_the_docket_prediction_is_dated_by_its_own_open_time_not_its_outcome():
+    d = restart_phase_tag.extract_date(DOCKET_PREDICTION_ROW)
+    assert d == "2026-08-03", f"provenance must be the docket's opened_at, got {d!r}"
+
+
+def test_the_pain_thread_is_dated_by_its_own_open_time_not_its_content_reference():
+    d = restart_phase_tag.extract_date(PAIN_THREAD_ROW)
+    assert d == "2026-09-19", f"provenance must be the thread's created_at, got {d!r}"
+
+
+def test_a_provenance_dated_pre_genesis_docket_is_archived():
+    """(a) is flagged for archival — its OWN open time predates genesis, whatever its
+    outcome window says."""
+    row = DOCKET_PREDICTION_ROW
+    d = restart_phase_tag.extract_date(row)
+    assert taxonomy.pre_genesis_scoped_violation(row["pk"], row["sk"], row["phase"], d, GENESIS_4059) is True
+
+
+def test_a_current_cycle_pain_thread_is_left_alone():
+    """(b) is NOT flagged — its own open time is squarely in cycle 17, whatever its stale
+    content-reference `date` says."""
+    row = PAIN_THREAD_ROW
+    d = restart_phase_tag.extract_date(row)
+    assert taxonomy.pre_genesis_scoped_violation(row["pk"], row["sk"], row["phase"], d, GENESIS_4059) is False
+
+
+def test_mutation_control_reading_outcome_date_instead_of_provenance_reds_the_contract():
+    """MUTATION CONTROL: feed the predicate `outcome_date` — what a naive read lands on —
+    in place of the derived provenance date. (a) then SURVIVES (the violation is missed,
+    exactly the #4040 defect this issue closes), proving this file exercises the
+    provenance derivation and not merely 'is EXPERIMENT_SCOPED and not pilot'."""
+    row = DOCKET_PREDICTION_ROW
+    wrong_date = row["outcome_date"]
+    assert taxonomy.pre_genesis_scoped_violation(row["pk"], row["sk"], row["phase"], wrong_date, GENESIS_4059) is False
+    right_date = restart_phase_tag.extract_date(row)
+    assert taxonomy.pre_genesis_scoped_violation(row["pk"], row["sk"], row["phase"], right_date, GENESIS_4059) is True
+
+
+def test_the_standing_corrector_archives_a_and_leaves_b_alone():
+    """box 2: the corrector's surface (now widened to COACH# partitions, #4059) catches
+    (a) and does not touch (b) — the same composition `phase_stamp_sweep.main()` drives."""
+    docket_violations = phase_stamp_sweep.find_violations(
+        [DOCKET_PREDICTION_ROW], DOCKET_PREDICTION_ROW["pk"], GENESIS_4059, exempt_keys=set()
+    )
+    assert [v["sk"] for v in docket_violations] == [DOCKET_PREDICTION_ROW["sk"]]
+
+    pain_violations = phase_stamp_sweep.find_violations([PAIN_THREAD_ROW], PAIN_THREAD_ROW["pk"], GENESIS_4059, exempt_keys=set())
+    assert pain_violations == []
+
+
+def test_the_corrector_surface_includes_coach_partitions():
+    """box 2's other clause, literally: the corrector's surface includes the COACH#
+    partitions, so it and check 21 (a full-table scan) agree."""
+    assert any(pk.startswith("COACH#") for pk in phase_stamp_sweep.coach_partitions())

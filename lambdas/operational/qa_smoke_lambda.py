@@ -60,6 +60,7 @@ from operational import (
     canary_precision_qa,  # noqa: E402  (#3485 size-split)
     chronicle_manifest_qa,  # noqa: E402  (#3485)
     chronicle_status_row_qa,  # noqa: E402  (#3563 dead-man)
+    closure_probe_qa,  # noqa: E402  (#4022 close-on-first-live-output)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     hook_liveness_qa,  # noqa: E402  (#3615 box 1: the hook × artifact liveness matrix)
@@ -1233,6 +1234,13 @@ def lambda_handler(event, context):
         all_checks = []
         for _label, _fn in check_steps():
             all_checks += run_isolated(_label, _fn)
+        # #4022: close-on-first-live-output — LAST, so a `qa_check` probe reads THIS run's results
+        all_checks += run_isolated(
+            "closure_proof_probes",
+            lambda: closure_probe_qa.check_closure_proof_probes(
+                all_checks, table, s3, S3_BUCKET, Check, CONTENT_TRUTH, site_base_url=SITE_BASE_URL, event=event, dry_run=dry_run
+            ),
+        )
 
         # #1345 DR-drill hook: an explicit {"synthetic_fail": true} invoke payload
         # injects ONE clearly-labeled synthetic FAIL so the CI smoke→rollback path can
