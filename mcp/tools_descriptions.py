@@ -183,7 +183,11 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
     "change <field> to <value> / veto with the metric and number it argued from. Changes are APPLIED to the "
     "draft and re-checked; a veto BLOCKS commit; the verdicts ride in the Hevy notes and the training coach "
     "thread. Order: plan_next_session → manage_hevy_routine draft_custom → plan_next_session(routine_id) → "
-    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning."
+    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning. "
+    "OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with "
+    "veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other "
+    "critic's changes still apply, and the override is recorded on the routine and in the corrections ledger. "
+    "Never skip stage 2 to get past a veto."
 )
 
 GET_EXERCISE_HISTORY_DESCRIPTION = (
@@ -207,8 +211,12 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
 )
 
 GET_MUSCLE_VOLUME_DESCRIPTION = (
-    "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is "
+    "Weekly WORKING sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is "
     "below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. "
+    "Counting (#4071): warm-up sets are excluded by the Hevy set type; each working set credits ONE primary muscle (1.0) and "
+    "only the secondaries the taxonomy names, at 0.5 each (`direct_sets` + `secondary_sets` = `total_sets`); cardio/mobility "
+    "entries carry no muscle volume and unknown movements are listed in `unattributed`, never folded into a muscle. Windows are "
+    "inclusive whole days (7 days = 1.0 week); every answer also carries `trailing_windows` for the 7 and 28 days ending on end_date. "
     "Counts every set in the window across EVERY experiment cycle (#4031 — no phase filter; the superseded legacy "
     "daily-aggregate generation is excluded so nothing is double-counted), so a trailing window no longer truncates to the "
     "current cycle's age. Default window is the trailing 28 days (4 whole weeks) for period='week' and 90 days for "

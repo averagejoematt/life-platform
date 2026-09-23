@@ -69,22 +69,29 @@ def test_a_session_against_the_old_id_classifies_as_calves():
 
 
 def test_mutation_control_name_alone_does_not_say_calves():
-    """Proves the override — not a name-map fix — is what changed the outcome above.
-    Without a template_id, this exact name still resolves via the pre-existing
-    "leg press" keyword collision, not "calf"."""
-    cls = classify_exercise(CALF_PRESS_NAME)
-    assert cls["muscle_groups"] != ["Calves"]
-    assert "Calves" not in cls["muscle_groups"]
+    """Proves the override — not the name — is what decides the outcome for OLD_ID.
+
+    #4071 fixed the name collision itself ("calf" now sits above "leg press" in
+    `training.muscle_volume.EXERCISE_TAXONOMY`), so CALF_PRESS_NAME alone now reads Calves
+    too. The control therefore uses a name that classifies as something else: the same id
+    under a plain "Leg Press" title reads Quads by name and Calves by id."""
+    assert "Calves" not in classify_exercise("Leg Press")["muscle_groups"]
+    assert classify_exercise("Leg Press", OLD_ID)["muscle_groups"] == ["Calves"]
+
+
+def test_the_name_collision_itself_is_fixed_4071():
+    """#4071: the calf row sits above the leg-press row, so the title alone is Calves now."""
+    assert classify_exercise(CALF_PRESS_NAME)["muscle_groups"] == ["Calves"]
 
 
 def test_mutation_control_empty_override_table_falls_back_to_name(monkeypatch):
-    """Empty the override table and confirm classify_exercise falls all the way back
-    to name-keyword classification — pins that the override check is the ONLY thing
-    standing between OLD_ID and the pre-#3770 shoulders-adjacent misclassification."""
-    import mcp.strength_helpers as sh
+    """Empty the override and confirm classification falls all the way back to the name —
+    pins that the override check is the ONLY thing turning a "Leg Press"-titled OLD_ID into
+    Calves. Patched where the ONE attribution function (#4071) reads it."""
+    import training.muscle_volume as mv
 
-    monkeypatch.setattr(sh, "muscle_override_for", lambda template_id: None)
-    cls = sh.classify_exercise(CALF_PRESS_NAME, OLD_ID)
+    monkeypatch.setattr(mv, "muscle_override_for", lambda template_id: None)
+    cls = classify_exercise("Leg Press", OLD_ID)
     assert "Calves" not in cls["muscle_groups"]
 
 
@@ -95,4 +102,4 @@ def test_an_unrelated_template_id_is_unaffected():
 
 def test_a_true_shoulder_exercise_is_unaffected_by_the_override():
     cls = classify_exercise("Overhead Press", "some-other-template-id")
-    assert cls["muscle_groups"] == ["Shoulders", "Triceps"]
+    assert cls["muscle_groups"] == ["Shoulders", "Triceps"]  # primary + the named 0.5 secondary (#4071)
