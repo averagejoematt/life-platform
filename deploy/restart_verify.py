@@ -156,32 +156,37 @@ def served_genesis(payload) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def pre_genesis_unstamped(pages, genesis: str) -> tuple[list, int]:
+def pre_genesis_unstamped(pages, genesis: str, exempt_keys=()) -> tuple[list, int]:
     """#3513 box 3 — the pure predicate behind check 21: every EXPERIMENT_SCOPED row whose own
     date is strictly before `genesis` must carry phase=pilot. Returns (violations, rows_scanned).
 
-    Family and class are DERIVED per row (`phase_taxonomy.classify`), so a new scoped family is
-    audited the reset it appears; rows the taxonomy cannot classify are skipped here — the
-    totality census is the instrument that rules on those. Date comes from the row itself
+    Family and class are DERIVED per row (`phase_taxonomy.classify`, via the shared
+    `pre_genesis_scoped_violation` predicate), so a new scoped family is audited the reset it
+    appears; rows the taxonomy cannot classify are skipped here — the totality census is the
+    instrument that rules on those. Date comes from the row itself
     (`restart_phase_tag.extract_date`: explicit `date` attr, then the sk, then a timestamp
-    attr); an undated row cannot be pre-genesis by this predicate and is not guessed at."""
+    attr); an undated row cannot be pre-genesis by this predicate and is not guessed at.
+
+    #4040: `exempt_keys` is a set of `(pk, sk)` this predicate must NOT flag however it is
+    stamped — a chronicle row the live journal manifest still serves
+    (`chronicle_manifest_qa.served_chronicle_keys`), whose `sk` can predate genesis by
+    design (a reset-re-dated lead-in) while the row is CURRENT. Defaults to `()`, so a
+    caller that doesn't pass one gets the pre-#4040 behaviour unchanged."""
     sys.path.insert(0, str(REPO_ROOT / "lambdas"))
     from experiment import phase_taxonomy as taxonomy  # noqa: E402
     from restart_phase_tag import extract_date  # noqa: E402
 
+    exempt = set(exempt_keys)
     bad: list = []
     scanned = 0
     for page in pages:
         for it in page:
             scanned += 1
             pk, sk = it.get("pk", ""), str(it.get("sk", ""))
-            try:
-                if taxonomy.classify(pk, sk) != taxonomy.EXPERIMENT_SCOPED:
-                    continue
-            except KeyError:
+            if (pk, sk) in exempt:
                 continue
             d = extract_date(it)
-            if d and d < genesis and it.get("phase") != "pilot":
+            if taxonomy.pre_genesis_scoped_violation(pk, sk, it.get("phase"), d, genesis):
                 bad.append(f"{pk}/{sk}[phase={it.get('phase')}]")
     return bad, scanned
 
@@ -520,13 +525,20 @@ def main():
     # stamps nothing (insight_writer until #3890; the MCP save_insight tool until the same
     # PR as this check) leaves rows PHASE_FILTER_EXPRESSION serves as current on Day 1.
     # One projected full scan (pk_census.scan_provenance_pages — the totality census's RCU).
+    # #4040: a chronicle row the live journal manifest still serves is exempted first — its
+    # `sk` can predate genesis by design (a reset-re-dated lead-in) while it is CURRENT.
     try:
         sys.path.insert(0, str(REPO_ROOT / "lambdas"))
         from experiment.pk_census import scan_provenance_pages  # noqa: E402
+        from operational.chronicle_manifest_qa import served_chronicle_keys  # noqa: E402
 
-        bad, scanned = pre_genesis_unstamped(scan_provenance_pages(t), EXPERIMENT_START_DATE)
+        try:
+            exempt_keys = served_chronicle_keys(t, boto3.client("s3", region_name=REGION), "matthew-life-platform")
+        except Exception:  # noqa: BLE001 — #4040: an unreadable manifest exempts nothing; stays conservative
+            exempt_keys = set()
+        bad, scanned = pre_genesis_unstamped(scan_provenance_pages(t), EXPERIMENT_START_DATE, exempt_keys=exempt_keys)
         detail = f"{len(bad)} pre-genesis scoped row(s) not pilot over {scanned} scanned" + (
-            f"; e.g. {', '.join(bad[:4])}; repair: python3 deploy/backfill_coach_ensemble_phase_stamps.py (dry-run first)" if bad else ""
+            f"; e.g. {', '.join(bad[:4])}; repair: python3 deploy/phase_stamp_sweep.py (dry-run first)" if bad else ""
         )
         check("No pre-genesis EXPERIMENT_SCOPED row without phase=pilot (#3513)", not bad and scanned > 0, detail)
     except Exception as e:  # never let the verifier itself crash the post-reset check

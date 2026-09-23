@@ -50,11 +50,57 @@ wipe/tagger for provenance. The stamp is read-safe: the current phase value matc
 the `with_phase_filter` current-phase clause, so a freshly stamped row stays visible
 exactly as an unstamped one did.
 
+Ruling — provenance in a no-reset world (#4040, 2026-09-22)
+-------------------------------------------------------------
+Under the owner's 2026-09-21 no-further-resets ruling (ADR-077 amendment, PR #4037),
+`deploy/restart_phase_tag.py` (the tagger) never runs again as part of a reset, and it
+was the ONLY thing that stamped `phase=pilot` onto a pre-genesis `EXPERIMENT_SCOPED`
+row. A row written after the tagger's last run, dated before genesis, keeps whatever
+phase it was born with (often none, sometimes the CURRENT phase constant) forever —
+measured 2026-09-22: 16 such rows over 45,896 scanned (`deploy/restart_verify.py`'s
+#3513 check).
+
+**Standing home: the nightly leg, not write-time-only.** `experiment_stamp_for` (below)
+remains the right call for any writer that can itself emit a back-dated row — the
+chronicle publish path, `anomalies`, `recap_cards` — but it only helps writers that call
+it, going forward. It cannot repair a row a writer already emitted wrong, and it does
+nothing for a writer nobody has touched. `data:coach_ensemble_phase_stamp_coverage`
+(`lambdas/operational/qa_smoke_lambda.py`) is therefore widened to WARN, by name and with
+rows, on any `EXPERIMENT_SCOPED` row dated before genesis whose `phase` is not `pilot` —
+whether unstamped or mis-stamped — every night, so a recurrence is a WARN, never silence
+(`experiment.pk_census.scoped_stamp_audit`'s `mis_stamped` leaf). The nightly leg is
+READ-ONLY, matching every other leg in that module; the correction itself is
+`deploy/phase_stamp_sweep.py` (dry-run by default, `--apply` to write), which Queries
+each `EXPERIMENT_SCOPED` SOURCE# partition individually (bounded per-family reads, never
+a full-table scan) and sets `phase=pilot` on any row dated before genesis that isn't
+already `pilot`. One-off `restart_phase_tag.py --apply` remains an acceptable FIRST run
+over the historical backlog; the sweep script (or the nightly WARN + an operator running
+it) is the standing mechanism from here.
+
+**Served-lead-in exemption.** A chronicle row is not "pre-genesis and current" merely
+because its `sk` predates genesis — a reset re-dates a carried-forward lead-in by writing
+a new `date` ATTRIBUTE and leaving the `sk` alone (`lambdas/operational/
+chronicle_manifest_qa.py`, #3650), so a served lead-in's `sk` can be a year old while its
+`date` attribute (and the live journal manifest) say otherwise. **Incident, 2026-09-22:**
+`deploy/reconcile_countdown_gap.py --apply` tombstoned the served `DATE#2026-09-05`
+lead-in on exactly this reasoning ("pre-genesis, therefore stale"); both
+`chronicle:manifest_provenance` and `recall:corpus_freshness` went red 14h later because
+the live manifest kept serving the now-archived row and every later post's derived
+`/journal/posts/week-N/` sequence shifted. The stamp was reverted the same night. RULING:
+a chronicle row the manifest QA's own matcher (`chronicle_manifest_qa._match`, keyed on
+the served post's `date` + `title`, exposed as `served_chronicle_keys`) resolves to a
+live post is CURRENT by design regardless of its `sk` date, and is excluded from both the
+nightly WARN and the sweep script by construction — never guessed at, never reconciled
+away. Only a chronicle row the manifest does NOT serve is a candidate for correction.
+
 v1.0.0 — 2026-06-07 (ADR-077; supersedes the ad-hoc lists in the restart tools)
 v1.1.0 — 2026-07-18 (#1233; add experiment_stamp() for write-time provenance)
 v1.2.0 — 2026-09-05 (#3598; the stamp derives phase + cycle from the WRITE'S DATE
           against CYCLE_GENESES — a countdown-window write is pilot/closing-cycle,
           never the experiment)
+v1.3.0 — 2026-09-22 (#4040; the no-reset-world provenance ruling above — the nightly
+          leg is the standing home, `pre_genesis_scoped_violation` is the shared
+          predicate, served chronicle lead-ins are exempt by construction)
 """
 
 from __future__ import annotations
@@ -740,6 +786,40 @@ def should_phase_stamp(pk: str, sk: str = "") -> bool:
     attribute_not_exists(phase), so a wrong one is not reversible by re-running.
     """
     return is_taggable(classify(pk, sk))
+
+
+def pre_genesis_scoped_violation(pk: str, sk: str, phase, item_date: str | None, genesis: str) -> bool:
+    """#4040 — THE shared predicate: is (pk, sk) an `EXPERIMENT_SCOPED` row dated before
+    `genesis` whose `phase` is not `pilot`?
+
+    True for BOTH shapes the no-reset world produces: unstamped (`phase` is `None`) and
+    mis-stamped (`phase` is set to the current-phase constant, or anything else that
+    isn't `pilot`) — the tagger used to correct either at reset time; nothing does now.
+    `item_date`/`genesis` are `YYYY-MM-DD` strings compared lexically (ISO dates sort
+    correctly as strings) — pass the date already extracted from the row (this function
+    does not read `item`, so it stays testable without a row shape opinion).
+
+    Three callers share this: `deploy/restart_verify.py` check 21 (`pre_genesis_
+    unstamped`), the nightly `data:coach_ensemble_phase_stamp_coverage` leg
+    (`experiment.pk_census.scoped_stamp_audit`'s `mis_stamped` leaf), and
+    `deploy/phase_stamp_sweep.py` (the corrector). One predicate so a fix to the rule
+    reaches all three; guard the SET, not the instance.
+
+    DELIBERATELY DOES NOT KNOW ABOUT THE SERVED-LEAD-IN EXEMPTION (see the v1.3.0 ruling
+    above) — a caller subtracts `chronicle_manifest_qa.served_chronicle_keys()` from its
+    result set BEFORE reporting or correcting a True verdict. Keeping the manifest read
+    (S3 + a DDB query) out of this pure function is what makes the mutation control
+    possible: disabling the date comparison here must break ONLY the date logic, not
+    silently swallow it behind a network call.
+    """
+    try:
+        if classify(pk, sk) != EXPERIMENT_SCOPED:
+            return False
+    except KeyError:
+        return False
+    if not item_date or item_date >= genesis:
+        return False
+    return phase != "pilot"
 
 
 def experiment_stamp_for(pk: str, sk: str = "", **kwargs) -> dict:

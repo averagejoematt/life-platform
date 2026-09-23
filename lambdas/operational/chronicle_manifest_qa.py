@@ -72,6 +72,46 @@ def _match(rows: list[dict], date: str, title: str) -> list[dict]:
     return titled if titled else by_date
 
 
+def served_chronicle_keys(table, s3, bucket: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle") -> set:
+    """The `(pk, sk)` of every chronicle row the LIVE journal manifest resolves to — the
+    same rows `check_chronicle_manifest_provenance` would call "current" for a served post.
+
+    #4040: exists so a phase-stamp corrector (the nightly leg, `deploy/phase_stamp_sweep.py`,
+    or any future one-off) can exempt a served lead-in from a pre-genesis-provenance rule by
+    the SAME derivation the manifest QA already uses, instead of re-deriving "is this row
+    served" a second time (guard the SET, not the instance). The #4040 incident this closes
+    was exactly that second derivation going wrong: `deploy/reconcile_countdown_gap.py
+    --apply` tombstoned a served lead-in on `sk` age alone, and the manifest kept serving it.
+
+    Only an UNAMBIGUOUS match (exactly one chronicle row for the post) is counted as served —
+    same rule as the QA check: a post matching more than one row is a data fault worth
+    surfacing, not a candidate to silently exempt either row for.
+
+    Read-only. A missing/unreadable manifest or partition exempts nothing (returns an empty
+    set) — the manifest QA check is the loud instrument for that failure; this helper
+    degrades quietly because an empty exemption set only makes a stamping tool MORE
+    conservative, never less.
+    """
+    served: set = set()
+    try:
+        rows = _chronicle_rows(table, chronicle_pk)
+    except Exception:  # noqa: BLE001 — an unreadable partition exempts nothing; caller stays conservative
+        return served
+    try:
+        body = s3.get_object(Bucket=bucket, Key=MANIFEST_KEY)["Body"].read()
+        posts = (json.loads(body) or {}).get("posts") or []
+    except Exception:  # noqa: BLE001 — an unreadable manifest exempts nothing
+        return served
+    for post in posts:
+        date = str(post.get("date") or "")
+        if not date:
+            continue
+        matches = _match(rows, date, str(post.get("title") or ""))
+        if len(matches) == 1:
+            served.add((chronicle_pk, str(matches[0].get("sk") or "")))
+    return served
+
+
 def check_chronicle_manifest_provenance(table, s3, bucket: str, Check, tier, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle"):
     c = Check("chronicle:manifest_provenance", "Content Truth", tier)
     try:
