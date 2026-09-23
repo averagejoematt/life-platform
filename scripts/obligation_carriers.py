@@ -13,7 +13,7 @@ THE CLASS (root-cause class 7 of the 2026-09-05 forensic RCA — 15 member findi
 THE RULE — three parts, one module, each part a registry with a derivation guard
   1. OBLIGATION VOCABULARY (`OBLIGATION_CUE_RE`). A block on a governed surface
      (`OBLIGATION_SURFACES`: the ADRs, the proportionality ledger, the alarm-citation
-     registry) that states an obligation — `revisit`, `fast-follow`, `owner decides`, or a
+     registry, and the heartbeat exemptions read by AST) that states an obligation — `revisit`, `fast-follow`, `owner decides`, or a
      deferral to `later` / `step N` / `phase N` — must carry a HOME: a carrier `#N`, the
      `not-work — <home>` tag (the #1340 grammar, imported), or a DATE that the calendar
      probes. A date nobody probes is a wish; so a dated obligation is homed only when
@@ -37,6 +37,12 @@ THE RULE — three parts, one module, each part a registry with a derivation gua
      `tests/obligation_residue_3597.py::OBLIGATION_RESIDUE` (the conformance-residue
      precedent): editing a pinned block re-keys it, and the only green path is a home.
 
+  1b. THE DEMOTE FIELD. Every `Load-bearing` row of `docs/PROPORTIONALITY.md` carries
+     `demote_by: YYYY-MM-DD` (the calendar reds a row past it) or `demote_when: <condition>`.
+     A free-text **Demote trigger:** is read at a quarterly re-read; that is how two of them
+     fired unnoticed for a month. The 81 rows that predate the rule are pinned in
+     `tests/obligation_residue_3597.py::DEMOTE_FIELD_RESIDUE`; the drain is #4122.
+
   2. THE RESIDUE REGISTRY (`RESIDUE_LEDGERS`). Every residue/allowlist ledger — a
      dated, shrink-only record of accepted debt — is registered with a `carrier` (#N, the
      issue that owns draining it), a `condition` (what empties or retires it), an `expires`
@@ -44,12 +50,14 @@ THE RULE — three parts, one module, each part a registry with a derivation gua
      be re-reviewed and re-dated or the ledger drained) and a `consumer` (the test that
      holds it shrink-only). The derivation guard: every module-level binding named
      `*_RESIDUE` in a tracked first-party Python file (`discover_residue_ledgers`) must be
-     registered — a new ledger that is not reds — and every registered symbol must exist
-     (no phantoms). Ledgers whose name predates the convention (`mypy_clean_set.DIRTY`, the
-     a11y baseline JSON) are registered by hand in the same dict.
+     registered — a new ledger that is not reds — and so must every data-file ledger
+     matching `DATA_LEDGER_GLOBS` (`tests/*_baseline.json`, `tests/*residue*.json`); every
+     registered symbol must exist (no phantoms). A ledger whose name predates the
+     convention (`mypy_clean_set.DIRTY`) is registered by hand in the same dict.
 
   3. THE PROBE (`expired_carriers`). One pure function the operating calendar's daily
-     dead-man calls: every registry entry and every dated obligation past its expiry. It
+     dead-man calls: every registry entry, every dated obligation and every Load-bearing
+     `demote_by:` row past its date. It
      is time-based on purpose and lives ONLY in the scheduled sweep — never in the unit
      suite, where a calendar date would red whichever innocent PR ran next (#2975).
 
@@ -60,6 +68,7 @@ line this rule generalises — one day parser for every expiry in the closure la
 USAGE
   python3 scripts/obligation_carriers.py            # the live report: unhomed / pinned / registry
   python3 scripts/obligation_carriers.py --keys     # print the current unhomed keys (seeding aid)
+  python3 scripts/obligation_carriers.py --demote-keys   # Load-bearing rows with no demote field
   python3 scripts/obligation_carriers.py --expired [--today YYYY-MM-DD]
 """
 
@@ -117,6 +126,9 @@ OBLIGATION_SURFACES: Tuple[str, ...] = (
     "docs/DECISIONS.md",
     "docs/PROPORTIONALITY.md",
     "docs/alarm_citations.json",
+    # the heartbeat exemptions (#3506's ledger): one block per `("exempt", date, reason…)`
+    # tuple in the module-level COVERAGE dict — read by AST, never by importing the test.
+    "tests/test_heartbeat_completeness.py",
 )
 
 # (surface, YYYY-MM-DD) → the registration that makes a dated obligation a HOME.
@@ -187,7 +199,33 @@ def json_blocks(doc: Any) -> List[str]:
     return [" ".join(strings(doc))]
 
 
+def exemption_blocks(source: str) -> List[str]:
+    """One block per EXEMPT entry of a module-level ledger dict — `name: <every string in it>`.
+
+    An exemption is a tuple whose first element is the bare name `EXEMPT` (the
+    test_heartbeat_completeness.py grammar). Pure AST: the test module is never imported,
+    so a surface read cannot run its module-level CDK parse."""
+    try:
+        tree = ast.parse(source or "")
+    except SyntaxError:
+        return []
+    blocks: List[str] = []
+    for node in tree.body:
+        value = node.value if isinstance(node, (ast.Assign, ast.AnnAssign)) else None
+        if not isinstance(value, ast.Dict):
+            continue
+        for k, v in zip(value.keys, value.values):
+            if not (isinstance(v, ast.Tuple) and v.elts and isinstance(v.elts[0], ast.Name) and v.elts[0].id == "EXEMPT"):
+                continue
+            name = k.value if isinstance(k, ast.Constant) else "?"
+            parts = [e.value for e in v.elts[1:] if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+            blocks.append(f"{name}: " + " ".join(parts))
+    return blocks
+
+
 def surface_blocks(rel: str, text: str) -> List[str]:
+    if rel.endswith(".py"):
+        return exemption_blocks(text)
     if rel.endswith(".json"):
         try:
             return json_blocks(json.loads(text))
@@ -255,8 +293,69 @@ def live_unhomed_obligations(root: Path = ROOT) -> List[Tuple[str, str, str]]:
     return out
 
 
+# ── 1b. every Load-bearing proportionality row carries a demote field ─────────────────────
+# The ledger's own defect (the RCA's "row 52": two demote triggers fired unnoticed for a
+# month). A free-text **Demote trigger:** is read by a human at a quarterly re-read; a
+# `demote_by: YYYY-MM-DD` is read by the calendar every day. So a Load-bearing row carries
+# `demote_by: <day>` (probed: past it, `operating_calendar.py --due` exits 5) or
+# `demote_when: <measurable condition>` (a condition, homed like any obligation). Rows that
+# predate the rule are pinned shrink-only in `tests/obligation_residue_3597.py::
+# DEMOTE_FIELD_RESIDUE`, keyed on the digit-masked subsystem cell; the drain is #4122.
+PROPORTIONALITY = "docs/PROPORTIONALITY.md"
+DEMOTE_BY_RE = re.compile(r"\bdemote_by:\**\s*`?(\d{4}-\d{2}-\d{2})")
+DEMOTE_WHEN_RE = re.compile(r"\bdemote_when:\**\s*`?[^\s`|]")
+_LOAD_BEARING_RE = re.compile(r"^\**\s*Load-bearing\b")
+
+
+def load_bearing_rows(text: str) -> List[Tuple[str, str]]:
+    """(subsystem cell, whole row) for every table row whose POSTURE cell opens `Load-bearing`."""
+    out: List[Tuple[str, str]] = []
+    for line in (text or "").splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 2 and _LOAD_BEARING_RE.match(cells[1]):
+            out.append((cells[0], line))
+    return out
+
+
+def demote_row_key(subsystem: str) -> str:
+    """`docs/PROPORTIONALITY.md::<sha256-12>` of the subsystem cell, digits masked, space folded."""
+    norm = re.sub(r"\d+", "0", re.sub(r"\s+", " ", subsystem).strip().lower())
+    return f"{PROPORTIONALITY}::{hashlib.sha256(norm.encode('utf-8')).hexdigest()[:12]}"
+
+
+def rows_missing_demote_field(text: str) -> List[Tuple[str, str]]:
+    """Pure. (key, subsystem) for every Load-bearing row with neither `demote_by:` nor `demote_when:`."""
+    return [
+        (demote_row_key(sub), sub[:120])
+        for sub, row in load_bearing_rows(text)
+        if not (DEMOTE_BY_RE.search(row) or DEMOTE_WHEN_RE.search(row))
+    ]
+
+
+def demote_by_dates(text: str) -> List[Tuple[str, Optional[date]]]:
+    """Pure. (subsystem, day-or-None) for every Load-bearing row carrying `demote_by:` —
+    None when the literal is an impossible day, which the probe reports as UNPARSEABLE."""
+    out: List[Tuple[str, Optional[date]]] = []
+    for sub, row in load_bearing_rows(text):
+        m = DEMOTE_BY_RE.search(row)
+        if m:
+            out.append((sub[:120], parse_day_literal(m.group(1))))
+    return out
+
+
+def _proportionality_text(root: Path = ROOT) -> str:
+    path = root / PROPORTIONALITY
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
 # ── 2. the residue registry ────────────────────────────────────────────────────────────────
 RESIDUE_NAME_RE = re.compile(r"^_?[A-Z][A-Z0-9_]*_RESIDUE$")
+# Data-file ledgers: a committed debt baseline directly under tests/ (`a11y_baseline.json`,
+# `truth_baseline.json`) or any `*residue*.json`. Non-recursive on purpose: tests/api_schemas/
+# holds response SNAPSHOTS, not accepted debt. A new file matching these globs must register.
+DATA_LEDGER_GLOBS: Tuple[str, ...] = ("tests/*_baseline.json", "tests/*residue*.json")
 DISCOVERY_ROOTS: Tuple[str, ...] = ("tests", "scripts", "lambdas", "deploy", "mcp", "cdk")
 REQUIRED_FIELDS: Tuple[str, ...] = ("carrier", "condition", "declared", "expires", "consumer")
 
@@ -293,6 +392,20 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "declared": _SEEDED,
         "expires": _REVIEW_BY,
         "consumer": "tests/test_a11y_shrink_deadman_3546.py",
+    },
+    "tests/truth_baseline.json": {
+        "carrier": _DRAIN_CARRIER,
+        "condition": "a (page, category) row leaves when its reader-truth finding clears; each row names its issue (#2956)",
+        "declared": _SEEDED,
+        "expires": _REVIEW_BY,
+        "consumer": "tests/test_truth_baseline_audit.py",
+    },
+    "tests/obligation_residue_3597.py::DEMOTE_FIELD_RESIDUE": {
+        "carrier": _DRAIN_CARRIER,
+        "condition": "a pinned Load-bearing row leaves when it gains `demote_by: YYYY-MM-DD` or `demote_when: …`",
+        "declared": _SEEDED,
+        "expires": _REVIEW_BY,
+        "consumer": "tests/test_obligation_carriers_3597.py",
     },
     "tests/gate_census_unproven_residue.py::UNPROVEN_RESIDUE": {
         "carrier": "#3610",
@@ -374,6 +487,8 @@ def discover_residue_ledgers(root: Path = ROOT) -> List[str]:
             for t in targets:
                 if isinstance(t, ast.Name) and RESIDUE_NAME_RE.match(t.id):
                     found.append(f"{rel}::{t.id}")
+    for pattern in DATA_LEDGER_GLOBS:
+        found.extend(p.relative_to(root).as_posix() for p in sorted(root.glob(pattern)) if p.is_file())
     return sorted(set(found))
 
 
@@ -441,11 +556,18 @@ def expired_carriers(
     today: date,
     registry: Optional[Dict[str, Dict[str, str]]] = None,
     dated: Optional[Dict[Tuple[str, str], Dict[str, str]]] = None,
+    proportionality_text: Optional[str] = None,
 ) -> List[str]:
-    """Pure. Every residue ledger and dated obligation strictly past its expiry on `today`."""
+    """Pure over its inputs. Every residue ledger, dated obligation and Load-bearing
+    `demote_by:` row strictly past its date on `today` (the file is read only when
+    `proportionality_text` is None)."""
     reg = RESIDUE_LEDGERS if registry is None else registry
     dreg = DATED_OBLIGATIONS if dated is None else dated
+    ptext = _proportionality_text() if proportionality_text is None else proportionality_text
     out: List[str] = []
+    for sub, day in demote_by_dates(ptext):
+        if day is None or is_past(day, today):
+            out.append(f"proportionality row {sub!r} — demote_by {day or 'UNPARSEABLE'} has passed: demote it, or re-date it")
     for key, entry in sorted(reg.items()):
         exp = parse_day_literal((entry or {}).get("expires"))
         if exp is None or is_past(exp, today):
@@ -460,12 +582,17 @@ def expired_carriers(
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--keys", action="store_true", help="print every current unhomed obligation key")
+    ap.add_argument("--demote-keys", action="store_true", help="print every Load-bearing row key with no demote field")
     ap.add_argument("--expired", action="store_true", help="the calendar probe: exit 1 if any entry is past its expiry")
     ap.add_argument("--today", default=None)
     args = ap.parse_args(argv)
     if args.keys:
         for key, excerpt, _reason in live_unhomed_obligations():
             print(f"{key}\t{excerpt}")
+        return 0
+    if args.demote_keys:
+        for key, subsystem in rows_missing_demote_field(_proportionality_text()):
+            print(f"{key}\t{subsystem}")
         return 0
     if args.expired:
         today = parse_day_literal(args.today) if args.today else date.today()
@@ -480,6 +607,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     unhomed = live_unhomed_obligations()
     problems = registry_findings() + dated_obligation_findings()
     print(f"obligations unhomed on governed surfaces: {len(unhomed)}")
+    print(f"Load-bearing proportionality rows with no demote_by/demote_when: {len(rows_missing_demote_field(_proportionality_text()))}")
     print(f"residue ledgers registered: {len(RESIDUE_LEDGERS)} · dated obligations: {len(DATED_OBLIGATIONS)}")
     for p in problems:
         print(f"PROBLEM  {p}")

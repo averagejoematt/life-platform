@@ -61,10 +61,12 @@ ARMING POSTURE (ADR-108 / #1872 discipline: flip on a measurement, never the cal
   G-3 28, OBS-1 30+, CPO-2 21 runs).
 
   A SECOND code joined on 2026-09-23: `unhomed-residual` (#3597, the forensic RCA's class 7
-  — a deferral with no carrier). Flipped on a measurement (19 of 263 closures since the
-  cycle-17 genesis, see `BLOCK_CODES`), and its cue vocabulary now includes the obligation
-  words owned by `scripts/obligation_carriers.py` (`revisit`, `fast-follow`, `owner decides`).
-  Its false positive is an edited closing comment. The other requirements are unchanged.
+  — a deferral with no carrier). Flipped on a measurement (32 findings over 271 closures since
+  the cycle-17 genesis, see `BLOCK_CODES`); its cue vocabulary now includes the obligation
+  words owned by `scripts/obligation_carriers.py` (`revisit`, `fast-follow`, `owner decides`),
+  and `closure_sweep.evaluate_issue` reads the whole close-time narrative, not only the
+  verdict's comment. Its false positive is an edited closing comment. The other requirements
+  are unchanged.
 
 USAGE
   python3 scripts/closure_contract.py --render   # the docs/CONVENTIONS.md block, verbatim
@@ -128,8 +130,11 @@ FLIP_BAR = {
 #
 # 2026-09-23 (#3597): `unhomed-residual` joins, per the issue's own shape ("the closure
 # contract's `residual-homed` code flips to block"). Measured at flip time, read-only, over
-# every issue closed since the cycle-17 genesis: `closure_sweep.py --since 2026-09-06` scanned
-# 263 closures → 19 `unhomed-residual` findings (7%). Its false positive costs an EDIT to a
+# every issue closed since the cycle-17 genesis: `closure_sweep.py --since 2026-09-06` on
+# 2026-09-23 scanned 271 closures → 21 `unhomed-residual` findings reading the verdict comment
+# only, 32 once the leg reads the whole close-time narrative (the #2643 shape — its fast-follow
+# sat in the evidence comment beside the verdict). BLOCK fires in the wrap's `--session`
+# window (today's closes), never retroactively. Its false positive costs an EDIT to a
 # closing comment (add the `#N` or the `not-work —` tag), not a reopen — and warn-mode is
 # exactly how #2877's "fast-follow, not done here" went unticketed until a review re-found it.
 BLOCK_CODES = frozenset({"no-live-proof", "unhomed-residual"})

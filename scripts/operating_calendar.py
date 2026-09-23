@@ -143,7 +143,8 @@ USAGE
 Exit codes: 0 clean · 1 at least one OVERDUE · 2 bad --today · 3 no OVERDUE but at least
 one ritual has never produced its artifact · 4 nothing late, but at least one lens grade has
 been carried forward past the 28-day cap (#3603) · 5 none of those, but a residue ledger or a
-dated obligation is past its `expires` (#3597 — `scripts/obligation_carriers.py`).
+dated obligation is past its `expires`, or a Load-bearing proportionality row is past its
+`demote_by:` (#3597 — `scripts/obligation_carriers.py`).
 
 v1.4.0 — 2026-09-19 (#3603, the carry-forward cap + a calibration-aware probe) ·
 v1.3.0 — 2026-08-31 (launch checkpoints, `starts`) · v1.2.0 — 2026-08-30 (#3250, lens set) ·
@@ -648,10 +649,11 @@ def _obligation_carriers_module():
 
 
 def carrier_report(today: date) -> tuple[list[str], list[str]]:
-    """(printable lines, [expired entries]) — every residue ledger / dated obligation past expiry."""
+    """(printable lines, [expired entries]) — every residue ledger, dated obligation and
+    Load-bearing `docs/PROPORTIONALITY.md` `demote_by:` row past its date."""
     expired = _obligation_carriers_module().expired_carriers(today)
     if not expired:
-        return [f"✅ no residue ledger or dated obligation is past its expiry (#3597) as of {today}."], []
+        return [f"✅ no residue ledger, dated obligation or Load-bearing `demote_by:` row is past its date (#3597) as of {today}."], []
     lines = [f"❌ {len(expired)} carrier(s) past expiry (#3597) — re-review: drain it, or re-date it (≤90d) with its carrier still open:"]
     lines += [f"   - {e}" for e in expired]
     return lines, expired
