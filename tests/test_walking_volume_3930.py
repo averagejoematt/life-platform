@@ -236,7 +236,8 @@ def test_the_union_and_its_breakdown_reach_the_constraint_block(live_week):
     with ExitStack() as st:
         for cm in _stage1_patches(rows):
             st.enter_context(cm)
-        out = tp.tool_plan_next_session({"target_date": WINDOW_END})
+        # #4068: the session's week is the 7 COMPLETED days BEFORE it — a plan for 09-20 reads 13..19
+        out = tp.tool_plan_next_session({"target_date": "2026-09-20"})
     walking = out["constraint_block"]["walking"]
     assert walking["state"] == "at_or_above_floor"
     assert walking["now_hr_wk"] >= ACCEPTANCE_HR

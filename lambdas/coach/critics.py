@@ -11,7 +11,8 @@ a persona list cannot.
 THE FOUR CRITICS AND WHAT EACH ONE HOLDS
 
   muscle_defense       anchor-lift strength trend + protein vs the floor
-  joints_tendons       pain flags per movement, novelty (days since), consecutive-day count
+  joints_tendons       pain flags per movement, novelty (days since), the loaded-lifting streak
+                       (rest-day ask) beside the active-day streak (context only, #4067)
   rate_advocate        the owner's redlines + which tripwires are CLEAR — argues for MORE
   blueprint_historian  the weight-band reference + the #3717 attestation, LABELLED
 
@@ -64,9 +65,9 @@ import json
 import re
 from typing import Any, Callable
 
-from training import owner_redlines, training_context_registry
+from training import owner_redlines, training_context_registry, training_streaks
 
-CRITICS_VERSION = "critics@1.2.0"  # #4076: an owner override of ONE vetoing critic, recorded verbatim
+CRITICS_VERSION = "critics@1.3.0"  # #4067: two streaks, the rest-day ask keys on the loaded one; #4068: THE loss rate
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
@@ -160,12 +161,20 @@ def build_muscle_defense_packet(
     anchor_trends: dict[int, dict[str, Any]] | None,
     protein_days_missed_7d: int | None,
     protein_days_measured_7d: int | None,
+    program_week: int | None,
 ) -> dict[str, Any]:
     """Strength trend on the draft's anchor lifts + protein against the owner's floor.
 
-    `anchor_trends` is keyed by draft exercise idx: {last_top_lbs, trailing_best_lbs,
-    drop_pct, sessions_below, n_sessions}. Missing → unknown, never clear.
+    `anchor_trends` is keyed by draft exercise idx: {last_top_lbs, drop_pct, sessions_below,
+    recent_median_e1rm_lb, baseline_median_e1rm_lb, n_sessions} — built by
+    `plan_engine.anchor_e1rm_trend`, the SAME rolling e1RM median the engine's tripwire reads
+    (#4098). Whether a trend trips is `plan_engine.anchor_drop_tripped`, and whether the
+    tripwire is armed at all is `plan_engine.not_before_week_gate` over `program_week` (the
+    block calendar's week — required, so no caller arms it by omission). This packet computes
+    no drop of its own. Missing → unknown, never clear.
     """
+    from training import plan_engine
+
     by_id = {t["id"]: t for t in owner_redlines.TRIPWIRES}
     drop_t = by_id["anchor_lift_strength_drop"]
     prot_t = by_id["protein_floor_missed"]
@@ -199,6 +208,8 @@ def build_muscle_defense_packet(
                 provenance=prot_t["provenance"],
             )
         )
+    gate = plan_engine.not_before_week_gate(drop_t, program_week)
+    numbers["program_week"] = program_week
     for ex in draft["exercises"]:
         tr = (anchor_trends or {}).get(ex["idx"])
         k = f"anchor_drop_pct[{ex['idx']}]"
@@ -208,17 +219,30 @@ def build_muscle_defense_packet(
             continue
         numbers[k] = tr["drop_pct"]
         numbers[f"anchor_sessions_below[{ex['idx']}]"] = tr.get("sessions_below")
-        numbers[f"anchor_trailing_best_lbs[{ex['idx']}]"] = tr.get("trailing_best_lbs")
+        numbers[f"anchor_baseline_median_e1rm_lb[{ex['idx']}]"] = tr.get("baseline_median_e1rm_lb")
+        numbers[f"anchor_recent_median_e1rm_lb[{ex['idx']}]"] = tr.get("recent_median_e1rm_lb")
         numbers[f"anchor_last_top_lbs[{ex['idx']}]"] = tr.get("last_top_lbs")
-        tripped = tr["drop_pct"] >= drop_t["threshold_pct"] and (tr.get("sessions_below") or 0) >= drop_t["consecutive_sessions"]
-        if tripped:
+        tripped = plan_engine.anchor_drop_tripped(tr["drop_pct"], tr.get("sessions_below"))
+        if gate and tr["drop_pct"] > 0:
+            # #4098: the ramp weeks. A detraining return is not a strength loss, so the drop is
+            # REPORTED (with the gate named) and never becomes a change.
+            flags.append(
+                _flag(
+                    k,
+                    "info",
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline — anchor_lift_strength_drop is {gate}",
+                    provenance=drop_t["provenance"],
+                )
+            )
+        elif tripped:
             hold_to = tr.get("last_top_lbs")
             over = ex.get("top_weight_lbs") is not None and hold_to is not None and ex["top_weight_lbs"] > hold_to
             flags.append(
                 _flag(
                     k,
                     "change",
-                    f"{ex['label']}: -{tr['drop_pct']:.1f}% vs trailing best across {tr.get('sessions_below')} session(s) — {drop_t['action']} "
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline, {tr.get('sessions_below')} session(s) below "
+                    f"— {drop_t['action']} "
                     f"[{drop_t['threshold_pct']}%/{drop_t['consecutive_sessions']}-session threshold is {drop_t['provenance']}, not his variance]",
                     provenance=drop_t["provenance"],
                     field=f"exercises[{ex['idx']}].weight_lbs" if over else None,
@@ -230,7 +254,7 @@ def build_muscle_defense_packet(
                 _flag(
                     k,
                     "info",
-                    f"{ex['label']}: -{tr['drop_pct']:.1f}% vs trailing best ({tr.get('n_sessions')} sessions)",
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline ({tr.get('n_sessions')} sessions)",
                     provenance=drop_t["provenance"],
                 )
             )
@@ -242,7 +266,8 @@ def build_joints_packet(
     *,
     pain_by_idx: dict[int, dict[str, Any]] | None,
     days_since_by_idx: dict[int, int | None] | None,
-    consecutive_days: int | None,
+    active_day_streak: int | None,
+    loaded_lifting_streak: int | None,
     pain_layer_status: str | None,
     dismissals: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -258,22 +283,26 @@ def build_joints_packet(
     critic must argue from what happened, not from a cleaned-up version of it. A note dated
     AFTER the dismissal re-arms the veto on its own (`training_context_registry`, one rule,
     shared with `plan_engine`)."""
-    numbers: dict[str, Any] = {"consecutive_training_days": consecutive_days, "pain_layer_status": pain_layer_status}
+    # #4067: TWO streaks, both named. The rest-day ask keys on the LOADED one alone — the old
+    # single `consecutive_training_days` counted Engine (cardio-only) and walk days, read 16
+    # against a loaded streak of 4 and asked for rest. The active streak is context, carried in
+    # `numbers` and deliberately never flagged: a flag is the model's escalation handle.
+    numbers: dict[str, Any] = {
+        "active_day_streak": active_day_streak,
+        "loaded_lifting_streak": loaded_lifting_streak,
+        "pain_layer_status": pain_layer_status,
+    }
     flags: list[dict[str, Any]] = []
     violations: list[dict[str, Any]] = []
     unknown: list[str] = []
     layer_ok = pain_layer_status not in (None, "dark", "unknown")
-    if consecutive_days is None:
-        unknown.append("consecutive_training_days")
-    elif consecutive_days >= 3:
-        flags.append(
-            _flag(
-                "consecutive_training_days",
-                "info",
-                f"day {consecutive_days + 1} of a streak — tendons do not get green recovery's clearance",
-                provenance="owner-history",
-            )
-        )
+    if active_day_streak is None:
+        unknown.append("active_day_streak")
+    streak_flag = training_streaks.loaded_streak_flag(loaded_lifting_streak)
+    if loaded_lifting_streak is None:
+        unknown.append("loaded_lifting_streak")
+    elif streak_flag:
+        flags.append(_flag("loaded_lifting_streak", *streak_flag, provenance=training_streaks.CALIBRATION["provenance"]))
     heavy_axial_cold: list[dict[str, Any]] = []
     dismissed_rows: list[dict[str, Any]] = []  # #4036 — every owner dismissal this packet met
     for ex in draft["exercises"]:
@@ -409,19 +438,25 @@ def build_rate_advocate_packet(
     rate_target: dict[str, Any] | None,
     current_rate_lb_wk: float | None,
     lifting_sessions_7d: int | None,
+    rate_provisional: bool | None = None,
 ) -> dict[str, Any]:
     """The owner's redlines and which tripwires are CLEAR. This critic argues for MORE.
 
     Its deterministic layer never vetoes: an advocate is not a gate. Its `change` is bounded
-    to adding sets, and only where every readable tripwire is clear."""
+    to adding sets, and only where every readable tripwire is clear. `current_rate_lb_wk` is
+    THE loss rate (`mcp.shared_quantities`, #4068); a `rate_provisional` one argues nothing."""
     tw = tripwires or []
     clear = [t["id"] for t in tw if t.get("state") == "clear"]
     tripped = [t["id"] for t in tw if t.get("state") == "tripped"]
     # #4072: a tripwire whose input read FAILED is as unreadable as an absent one — the
     # advocate may not argue for more volume past either.
     unknown_tw = [t["id"] for t in tw if t.get("state") in ("unknown", "read_failed")]
+    # #4098: a tripwire held by its own `not_before_week` is neither clear nor tripped — it is
+    # counted and named, so "all clear" never silently means "all the ones that are armed".
+    inactive = [t["id"] for t in tw if t.get("state") == "not_yet_active"]
     numbers: dict[str, Any] = {
         "tripwires_clear": len(clear),
+        "tripwires_not_yet_active": len(inactive),
         "tripwires_tripped": len(tripped),
         "tripwires_unreadable": len(unknown_tw),
         "walking_gap_hr_wk": (walking or {}).get("gap_hr_wk"),
@@ -434,18 +469,20 @@ def build_rate_advocate_packet(
         "rate_band_high_lb_wk": (rate_target or {}).get("high_lb_wk"),
         "rate_band_low_lb_wk": (rate_target or {}).get("low_lb_wk"),
         "current_rate_lb_wk": current_rate_lb_wk,
+        "current_rate_provisional": rate_provisional,
         "lifting_sessions_7d": lifting_sessions_7d,
         "draft_total_sets": draft.get("total_sets"),
     }
     flags: list[dict[str, Any]] = []
-    unknown: list[str] = [k for k, v in numbers.items() if v is None]
+    unknown: list[str] = [k for k, v in numbers.items() if v is None and k != "current_rate_provisional"]
     sessions_hi = owner_redlines.REDLINES["lifting_sessions_per_wk"]["high"]
     if tw and not tripped and not unknown_tw:
         flags.append(
             _flag(
                 "tripwires_clear",
                 "info",
-                f"all {len(clear)} tripwires clear — nothing in the data argues for holding back",
+                f"all {len(clear)} armed tripwires clear — nothing in the data argues for holding back"
+                + (f" ({len(inactive)} not yet active: {', '.join(inactive)})" if inactive else ""),
                 provenance="owner",
             )
         )
@@ -486,7 +523,9 @@ def build_rate_advocate_packet(
             )
         )
     hi = rt.get("high_lb_wk")
-    if current_rate_lb_wk is not None and hi is not None and current_rate_lb_wk < rt.get("low_lb_wk", 0):
+    # #4068: a provisional rate stays in `numbers` and is never flagged (a flag is an escalation handle).
+    argued = None if rate_provisional else current_rate_lb_wk
+    if argued is not None and hi is not None and argued < rt.get("low_lb_wk", 0):
         flags.append(
             _flag(
                 "current_rate_lb_wk",
@@ -495,7 +534,7 @@ def build_rate_advocate_packet(
                 provenance=rt.get("provenance", "owner"),
             )
         )
-    elif current_rate_lb_wk is not None and hi is not None and current_rate_lb_wk > hi:
+    elif argued is not None and hi is not None and argued > hi:
         flags.append(
             _flag(
                 "current_rate_lb_wk",

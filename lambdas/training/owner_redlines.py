@@ -569,9 +569,11 @@ TRIPWIRES: list[dict[str, Any]] = [
             "honest signal that the rate is outrunning recovery. v3: 5 % (was 7.5 %) on a rolling e1RM MEDIAN, and the action no longer "
             "adds calories by reflex — the wave-and-eat-more loop 'manufactures failures that raise calories for the wrong reason'. "
             "`leverage_not_deterioration` is the companion: an absolute drop ≤ 5 % per 20 lb with allometric strength flat is leverage, "
-            "logged and not acted on. The engine still computes the simpler top-set drop (`threshold_pct` across `consecutive_sessions`) "
-            "until the e1RM-median definition is wired; day-to-day e1RM noise in a trained lifter is ~4–5 % (from practice, not a citation) — "
-            "NOT computed from his own variance; the engine must say so wherever it fires (ADR-105)."
+            "logged and not acted on. Since #4098 the engine computes the rolling 3-session e1RM median against the 6-session baseline "
+            "per template identity (`plan_engine.anchor_e1rm_trend`), trips on `threshold_pct` with `consecutive_sessions` of the last 3 "
+            "below it, on the WORST core anchor, and holds the whole tripwire `not_yet_active` before `not_before_week` on the block "
+            "calendar; the '2 of 4 anchors inside 14 days' and '> 10 % on one anchor for 3 sessions' clauses are not yet computed. "
+            "Day-to-day e1RM noise in a trained lifter is ~4–5 % (from practice, not a citation) — NOT computed from his own variance; the engine must say so wherever it fires (ADR-105)."
         ),
     },
     {
