@@ -252,8 +252,11 @@ def full_body_routines(
     # The Minimum Viable Session (§3): anchors only, top set + one back-off, ~25 min.
     # Resolved at skill tier 1 — the floor has always been machine/DB-only for the version
     # of Matthew who shows up tired, so the bench anchor is the machine press here.
+    # anchor_exempt=False: the #4080 exemption targets the interim Sports-Medicine ceiling
+    # (2), not this deliberately lower tired-day floor — a barbell top set has no business
+    # on the Minimum Viable Session regardless of which pattern family it belongs to.
     mvs_rx = program_structure.session_prescription_for_role(
-        role, deload=False, catalog_movements=catalog.get("movements") or {}, skill_ceiling=1
+        role, deload=False, catalog_movements=catalog.get("movements") or {}, skill_ceiling=1, anchor_exempt=False
     )
     mvs_blocks, _mvs_used, _ = _blocks_from_prescription(mvs_rx, catalog, None, "off", anchors_only=True, top_plus_one=True)
     floor_cap = int(week_cfg.get("floor_session_set_count", 6)) + 2

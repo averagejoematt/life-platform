@@ -114,17 +114,30 @@ def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
     """v3 redlines say 3–4 lifting sessions and v0.3 schedules 3 + an optional 4th, so the frequency
     conflict is gone BY COMPUTATION — it must REAPPEAR under the v1 (2–3) and v2 (5–6) values
     (mutation control: the check is live, not deleted). The barbell-bench-vs-skill-ceiling
-    conflict STAYS: skill_ceiling is still 2 and the tier-3 bar is still named as a member."""
+    conflict is RESOLVED (not deleted — still NAMED, per the #4080 audit-trail style) by the
+    owner's 2026-09-23 exemption: bench is one of the four core anchor families
+    ANCHOR_SKILL_CEILING_RULING carves out of skill_ceiling. Mutation control: drop bench
+    from the exempt set and the conflict reports unresolved again."""
     from training import owner_redlines
 
-    ids = {c["id"] for c in program_structure.conflicts()}
+    conflicts = program_structure.conflicts()
+    ids = {c["id"] for c in conflicts}
+    by_id = {c["id"]: c for c in conflicts}
     assert "lifting_frequency_vs_redline" not in ids
     assert "barbell_anchors_vs_skill_ceiling" in ids
-    assert all(c["resolved"] is False for c in program_structure.conflicts())
+    bench_conflict = by_id["barbell_anchors_vs_skill_ceiling"]
+    assert bench_conflict["resolved"] is True
+    assert bench_conflict["resolved_on"] == "2026-09-23"
+    assert bench_conflict["resolution_source"] == "owner ruling recorded on #4080 (option B)"
     with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 2, "high": 3}):
         assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
     with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 5, "high": 6}):
         assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
+    # mutation control: without the exemption, the bench conflict is unresolved again
+    with unittest.mock.patch.dict(program_structure.ANCHOR_SKILL_CEILING_RULING, {"exempt_families": ("squat", "hinge", "row")}):
+        unresolved = {c["id"]: c for c in program_structure.conflicts()}["barbell_anchors_vs_skill_ceiling"]
+        assert unresolved["resolved"] is False
+        assert "resolved_on" not in unresolved
 
 
 # ── 2. shape parity with the JSON the engine runs on ─────────────────────────
@@ -462,12 +475,16 @@ def _block(**over):
 
 
 def test_constraint_block_carries_the_program_summary():
+    """The only named conflict today (bench vs skill_ceiling) is RESOLVED by the owner's
+    2026-09-23 exemption (#4080) — it must still be NAMED in honesty (audit trail), but as
+    resolved, never as UNRESOLVED."""
     block = _block()
     assert block["program"]["program_version"] == "0.3"
     assert block["program"]["split"] == "full_body"
     assert block["program"]["active"] is True
     assert not any("is PROPOSED, not approved" in line for line in block["honesty"])
-    assert any("conflicts" in line and "barbell_anchors_vs_skill_ceiling" in line for line in block["honesty"])
+    assert not any("UNRESOLVED conflicts" in line for line in block["honesty"])
+    assert any("RESOLVED by owner ruling" in line and "barbell_anchors_vs_skill_ceiling" in line for line in block["honesty"])
     assert block["program"]["anchor_reachability"]["hinge"]["reachable_at_target"] is True
 
 

@@ -204,9 +204,11 @@ def test_generator_builds_the_heavy_full_body_session_on_2026_09_24():
     ideal, floor = _generate("2026-09-24")
     assert ideal.archetype == "full" and ideal.variant == "ideal"
     assert ideal.title.startswith("Full Body HEAVY — W1")
+    # #4080: bench is one of the four core anchor families exempt from skill_ceiling (owner
+    # ruling 2026-09-23) — the heavy bench exposure now resolves to the tier-3 barbell press.
     assert [b.movement_key for b in ideal.exercises] == [
         "leg_press",
-        "db_bench_press_flat",
+        "barbell_bench_press",
         "machine_row",
         "lat_pulldown",
         "leg_curl",
@@ -253,7 +255,7 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
 
 def test_red_recovery_drops_accessories_not_anchors():
     ideal = _generate("2026-09-24", recovery_tier="red")[0]
-    assert [b.movement_key for b in ideal.exercises] == ["leg_press", "db_bench_press_flat", "machine_row", "lat_pulldown"]
+    assert [b.movement_key for b in ideal.exercises] == ["leg_press", "barbell_bench_press", "machine_row", "lat_pulldown"]
 
 
 def test_hevy_folder_for_full_is_the_program_folder():
@@ -348,7 +350,7 @@ def test_plan_next_session_2026_09_24_through_the_mcp_handler_proposes_full_body
     assert rx["hevy_folder"] == "Full Body"
     assert [(e["pattern"], e["intensity"], e["movement_key"]) for e in rx["exposures"] if e["kind"] == "anchor"] == [
         ("squat", "heavy", "leg_press"),
-        ("bench", "heavy", "db_bench_press_flat"),
+        ("bench", "heavy", "barbell_bench_press"),
         ("row", "heavy", "machine_row"),
         ("vertical_pull", "moderate", "lat_pulldown"),
     ]
