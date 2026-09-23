@@ -754,6 +754,9 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible: a second counter feeding one consumer while the planner reads another
         # number reds nothing at runtime.
         "test_muscle_volume_working_sets_4071.py",
+        # #4075: an rglob sweep of lambdas/ + mcp/ keeping the TRIMP exponent in one module. Pure
+        # repo shape — a second copy is exactly a PR's own diff.
+        "test_training_load.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own
