@@ -10,6 +10,13 @@ reachable from every client. It gathers the same inputs the debrief skill enumer
 computes the constraint block with no model in the loop, and returns it — with what the
 evidence cannot support stated in the payload rather than left to the caller's discipline.
 
+Its pain-flag evidence set is the movements he PERFORMED in the trailing
+`PAIN_LOOKBACK_DAYS` (#4051), read from the Hevy partition cross-phase, unioned with a
+draft's exercise list when one exists. It used to be the draft's list ALONE, so on a day
+with no draft the set was empty and a live, owner-dismissed pain flag read `clear`.
+`_gather_performed_evidence` also states the scope it examined, and `clear` is now
+reachable only from a scope that was read and named at least one movement.
+
 STAGE 2 — `plan_next_session(routine_id=...)` is the red team (#3752). Four critics —
 `coach.critics` — each get a DISJOINT evidence packet assembled here from the same readers
 a chat turn would call, each make ONE model call, and each return approve / change <field>
@@ -41,6 +48,12 @@ ANCHOR_HISTORY_LOOKBACK_DAYS = 180
 PAIN_LOOKBACK_DAYS = 28
 STREAK_LOOKBACK_DAYS = 14
 BLOCK_LOOKBACK_DAYS = 56  # 8 weeks, enough to count the trailing consistent block (>=2 lifts/wk)
+# #4051: the stage-1 pain-evidence set is the movements PERFORMED in the trailing
+# PAIN_LOOKBACK_DAYS — the same window the note layer is read over, deliberately ONE number.
+# The cap is a latency bound, not a semantic one: 27 distinct templates is a live 28-day
+# week-and-a-half, so a set that exceeds this is an anomaly and the scope says it truncated
+# rather than silently dropping the tail.
+PERFORMED_MOVEMENT_CAP = 80
 
 
 def _safe(fn, *a, **kw):
@@ -96,6 +109,131 @@ def _pain_dismissals() -> list[dict[str, Any]]:
     from mcp.tools_training_notes import _dismissal_records
 
     return _dismissal_records()
+
+
+def _performed_movements(target_date: str) -> tuple[list[dict[str, Any]], list[str], str, int]:
+    """(rows, phases_read, window_start, blocks_without_template_id) — what he actually did (#4051).
+
+    The distinct movements PERFORMED in the trailing `PAIN_LOOKBACK_DAYS`, newest first, read
+    through `tools_strength._read_hevy_all_phases` — the ONE sanctioned Hevy read path
+    (#4030/#4032). Two things that path buys and a plain `query_source_range("hevy", …)`
+    does not: the phase filter comes off because `phase_filter.source_reads_cross_phase`
+    DERIVES that from the taxonomy (never a hand-typed `include_pilot`), and the 421
+    tombstoned legacy daily aggregates stay out, so no pre-2025-11-08 session is counted
+    twice. Read the docstring there before changing this.
+
+    Keyed by `template_id` because that is the handle the derived note layer is keyed by —
+    a block with no template id can carry no flag, so it is counted and reported rather than
+    silently dropped. The most recent spelling of a template's name wins, because that name
+    is what the dismissal record's `movement_keys` are matched against.
+    """
+    from mcp.strength_helpers import normalize_hevy_items
+    from mcp.tools_strength import _read_hevy_all_phases
+
+    start = _minus_days(target_date, PAIN_LOOKBACK_DAYS)
+    items, phases = _read_hevy_all_phases(start, target_date)
+    by_tid: dict[str, dict[str, Any]] = {}
+    orphan_blocks = 0
+    for w in normalize_hevy_items(items):
+        day = str(w.get("date") or "")[:10]
+        if not day or day > target_date:
+            continue
+        for ex in w.get("exercises") or []:
+            tid = str(ex.get("template_id") or "").strip()
+            name = str(ex.get("name") or "").strip()
+            if not tid or not name:
+                orphan_blocks += 1
+                continue
+            row = by_tid.setdefault(tid, {"label": name, "template_id": tid, "last_performed": day, "sessions": 0})
+            row["sessions"] += 1
+            if day >= row["last_performed"]:
+                row["last_performed"] = day
+                row["label"] = name
+    rows = sorted(by_tid.values(), key=lambda r: (r["last_performed"], r["label"]), reverse=True)
+    for r in rows:
+        r["days_since"] = _days_between(r["last_performed"], target_date)
+    return rows, phases, start, orphan_blocks
+
+
+def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str, Any]:
+    """The stage-1 pain-evidence set: every movement he PERFORMED, with its flags (#4051).
+
+    This is the input stage 1 never had. `_gather_draft_evidence` builds the same shape from
+    a DRAFT's exercise list, which is empty before a draft exists and incomplete after one
+    (a drafted upper-body session cannot show the flag on a lift it omits) — so this set is
+    gathered on EVERY call and unioned with the draft's, never instead of it.
+
+    Raises if the Hevy read raises; the caller wraps it in `_safe` and reports the scope
+    unreadable, because an unread partition is not an empty one.
+    """
+    from mcp.tools_training_notes import pain_flags_for_templates
+
+    rows, phases, start, orphans = _performed_movements(target_date)
+    considered = rows[:PERFORMED_MOVEMENT_CAP]
+    truncated = len(rows) - len(considered)
+    # #3769: the layer's status is resolved ONCE by the caller and rides on every entry the
+    # batch read returns — no count from a derived layer travels without its status.
+    flags = pain_flags_for_templates([r["template_id"] for r in considered], start, layer_status)
+    unreadable = 0
+    for r in considered:
+        f = flags.get(r["template_id"]) or {}
+        if f.get("error"):
+            unreadable += 1
+            r["pain_flag_any"] = None
+            r["pain_dates"] = []
+            r["pain_read_error"] = f["error"]
+            continue
+        r["pain_flag_any"] = bool(f.get("pain_flag_any"))
+        r["pain_dates"] = f.get("pain_dates") or []
+        r["sessions_with_notes"] = f.get("sessions_with_notes")
+    scope = {
+        # `read` is the only value `plan_engine._evidence_scope_read` accepts, and it also
+        # requires movements_considered > 0 — a successful read of an empty window is still
+        # "nothing was examined", which is the state that produced this defect.
+        "status": "read",
+        "source": "hevy",
+        "derivation": "movements PERFORMED in the window, cross-phase per #4030/#4032 (taxonomy-derived, tombstones excluded)",
+        "window": {"start": start, "end": target_date, "days": PAIN_LOOKBACK_DAYS},
+        "phases_read": phases,
+        "movements_considered": len(considered),
+        "movements_flagged": sum(1 for r in considered if r.get("pain_flag_any")),
+        "note_layer_status": layer_status,
+        "reason": (
+            f"{len(considered)} movement(s) performed in {start}..{target_date} were checked against the derived note layer"
+            if considered
+            else f"no Hevy session in {start}..{target_date} — no movement was performed to check against the note layer"
+        ),
+    }
+    if not considered:
+        scope["status"] = "none"
+    if truncated:
+        scope["truncated_movements"] = truncated
+    if orphans:
+        scope["blocks_without_template_id"] = orphans
+    if unreadable:
+        scope["unreadable_movements"] = unreadable
+    return {"exercises": considered, "scope": scope}
+
+
+def _union_evidence_rows(performed: list[dict[str, Any]], draft: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Performed movements UNION the draft's, keyed by template id (#4051).
+
+    The draft row wins where it has something to say — it carries the anchor-lift trend the
+    performed set does not compute — but it never overwrites a performed value with an
+    absent one, which is how a dark per-movement read (`pain_flag_any: None`) used to erase
+    a flag the batch read found.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for r in performed or []:
+        out[str(r.get("template_id") or r.get("label") or "")] = dict(r)
+    for r in draft or []:
+        key = str(r.get("template_id") or r.get("label") or "")
+        merged = dict(out.get(key) or {})
+        for k, v in r.items():
+            if v not in (None, [], "", {}) or k not in merged:
+                merged[k] = v
+        out[key] = merged
+    return list(out.values())
 
 
 def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | None]:
@@ -234,6 +372,25 @@ def tool_plan_next_session(args):
     evidence = _gather_draft_evidence(ir, target_date, layer_status) if ir is not None else None
     worst = _worst_anchor(evidence) if evidence else (None, None)
 
+    # #4051: the evidence set stage 1 never had — every movement PERFORMED in the trailing
+    # window, with the note layer's flags for each. Gathered on EVERY call (a draft's
+    # exercise list cannot show a flag on a lift the draft omits) and UNIONED with the
+    # draft's rows below. `_safe` yields None when the Hevy read RAISES, and an unread
+    # partition is reported as unreadable — never as "he performed nothing".
+    performed = _safe(_gather_performed_evidence, target_date, layer_status)
+    pain_scope = (performed or {}).get("scope") or {
+        "status": "unreadable",
+        "source": "hevy",
+        "movements_considered": None,
+        "note_layer_status": layer_status,
+        "reason": (
+            f"the Hevy partition could not be read for {_minus_days(target_date, PAIN_LOOKBACK_DAYS)}..{target_date} — "
+            "the performed-movement set is unknown, not empty"
+        ),
+    }
+    rows = _union_evidence_rows((performed or {}).get("exercises") or [], (evidence or {}).get("exercises") or [])
+    flagged = [r for r in rows if r.get("pain_flag_any")]
+
     # #3930: the walking read is a UNION layer (Strava + Hevy treadmill/cycling blocks), not a
     # Strava-only number. The engine takes the total in hours — the floor's own unit — and the
     # per-source breakdown is merged onto the block below so no reader has to trust the total.
@@ -257,22 +414,20 @@ def tool_plan_next_session(args):
         # per-muscle table as `muscle_volume`, each row with `total_sets` / `avg_sets_per_week`.
         acwr_flag=(acwr.get("zone") or acwr.get("alert_reason")),
         muscle_volume=_muscle_sets(volume),
-        days_since_movement=(
-            {e["label"]: e["days_since"] for e in evidence["exercises"] if e.get("days_since") is not None} if evidence else None
-        ),
+        # #4051: performed UNION drafted, so the day with no draft is no longer the day with
+        # no movements — `days_since_movement` is non-empty whenever a session is in the window.
+        days_since_movement={r["label"]: r["days_since"] for r in rows if r.get("days_since") is not None},
         reference=reference if isinstance(reference, dict) else None,
         protein_days_missed_7d=protein_missed,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],
-        pain_flag_sites=([e["label"] for e in evidence["exercises"] if e.get("pain_flag_any")] if evidence else None),
+        pain_flag_sites=[r["label"] for r in flagged],
         # #4036: the flag's own note dates travel with it, because the owner-dismissal rule
         # is a DATE comparison — a flag with no readable date can never read as dismissed.
-        pain_flag_instances=(
-            [{"movement": e["label"], "note_dates": e.get("pain_dates") or []} for e in evidence["exercises"] if e.get("pain_flag_any")]
-            if evidence
-            else None
-        ),
+        pain_flag_instances=[{"movement": r["label"], "note_dates": r.get("pain_dates") or []} for r in flagged],
         pain_dismissals=dismissals,
+        # #4051: what was examined, so `clear` is only reachable from a set that was read.
+        pain_evidence_scope=pain_scope,
         # with a draft in hand the per-movement note reads report the layer's status themselves
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,

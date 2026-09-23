@@ -13,6 +13,7 @@ confirm or dismiss before loading that movement" — and until #4036 only the fi
 existed anywhere. See the block at the end of this file.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 from boto3.dynamodb.conditions import Key
@@ -60,6 +61,116 @@ def _resolve_template_id(exercise: str, lookback_days: int) -> tuple[str | None,
     return best or (None, None)
 
 
+def _notes_timeline(rows: list) -> tuple[list, list, object]:
+    """(timeline, pain_dates, latest_progression) from raw note rows. No I/O."""
+    # Corrections win on read (sk …#CORRECTION) and survive recompute.
+    corrections = {r["sk"].replace("#CORRECTION", ""): r for r in rows if r.get("sk", "").endswith("#CORRECTION")}
+    # #3918: the head key is one per (workout, template, OCCURRENCE), so a workout that
+    # logged this template twice now yields TWO entries instead of one. A legacy row (no
+    # suffix) reads as occurrence 0 and yields to the new-scheme row for the same
+    # occurrence while the re-key is pending — a migrated record is never listed twice.
+    grouped: dict[str, list] = {}
+    for r in rows:
+        grouped.setdefault(head_sk_base(r.get("sk", "")), []).append(r)
+    ordered = []
+    for base in sorted(grouped):
+        for occ, row in sorted(dedupe_head_rows(grouped[base]).items()):
+            ordered.append((occ, row))
+
+    timeline: list = []
+    latest_progression = None
+    pain_dates: list = []
+    for occurrence, r in ordered:
+        # A correction written against the pre-migration key still applies to the record
+        # it corrected — it is found by the head's `migrated_from_sk`.
+        ov = corrections.get(r.get("sk", "")) or corrections.get(str(r.get("migrated_from_sk") or ""))
+        signals = (ov or {}).get("signals", r.get("signals", []))
+        pain = (ov or {}).get("pain_flag", r.get("pain_flag", False))
+        entry = {
+            "date": r.get("date"),
+            "workout_uid": r.get("workout_uid"),
+            # Which logging of this template within that workout (0-based). Two entries
+            # with the same date + workout_uid are two real, separately-noted blocks.
+            "occurrence": occurrence,
+            "note_raw": r.get("note_raw"),
+            "signals": signals,
+            "pain_flag": pain,
+            "sentiment": (ov or {}).get("sentiment", r.get("sentiment")),
+            "degraded": r.get("degraded", False),
+            # #3699: a degraded row says WHY on the row itself. A row with no reason field
+            # is not "unknown" — it is a record written before the extractor could say, and
+            # it is reported as such rather than re-extracted (a re-derived signal in a
+            # measured partition is indistinguishable from an original one, forever).
+            "degraded_reason": (
+                r.get("degraded_reason")
+                or (f"{DEGRADE_UNRECORDED}: written before #3699 added the reason field; not re-derived" if r.get("degraded") else None)
+            ),
+            "corrected": bool(ov),
+        }
+        timeline.append(entry)
+        if pain:
+            pain_dates.append(r.get("date"))
+        for s in signals:
+            if s.get("class") == "progression" and s.get("value"):
+                latest_progression = s["value"]
+    return timeline, pain_dates, latest_progression
+
+
+def pain_flags_for_templates(template_ids, start: str, layer_status: str, max_workers: int = 8) -> dict:
+    """The pain-flag record for MANY exercise templates at once — the stage-1 read (#4051).
+
+    `plan_next_session` needs every flag the layer holds for the movements he actually
+    PERFORMED in the lookback, and that set is ~27 templates on a live 28-day window.
+    Calling `tool_get_exercise_notes` once per template would re-run `training_notes_health`
+    27 times for one answer — and that health function is itself ~28 queries. So the status
+    is INJECTED: the caller resolves it once (`mcp.core.derived_layer_status`) and this
+    read stamps it on every entry it returns, which is the #3769 contract — no count from
+    this layer travels without the layer's own status beside it — satisfied without a
+    second identical health sweep inside the same call. The parse is `_notes_timeline`, the
+    same one `tool_get_exercise_notes` uses, over a key spelled from the same `NOTES_SOURCE`.
+
+    Returns `{template_id: {"pain_flag_any", "pain_dates", "sessions_with_notes",
+    "layer_status"}}`, or `{"error": ..., "layer_status": ...}` for a template whose read
+    RAISED — an unreadable template is reported, never folded into the clean ones (#3767).
+
+    **`pain_flag_any` is NOT nulled on a degraded/dark layer here**, and that is deliberate:
+    `pain_flag` on a degraded row is the DETERMINISTIC pass's own verdict (the lexicon hit),
+    written before the semantic pass was even attempted. The layer's health qualifies the
+    ABSENCE of flags — it cannot un-say a flag that is on the record. Today's live layer is
+    `degraded` (`cap_exceeded x24`, the Haiku monthly cap), and the 2026-09-13 Romanian
+    Deadlift flag is one of those degraded rows: withholding it would be the #3768 failure
+    pointed the other way. The status rides along so a reader can tell the two apart.
+    """
+    ids = [str(t) for t in (template_ids or []) if str(t or "").strip()]
+    out: dict = {}
+    if not ids:
+        return out
+
+    def _one(tid: str) -> tuple[str, dict]:
+        try:
+            # The key is spelled at the query site, not behind a helper: both the #2845 model
+            # and the #3769 derived-reader guard resolve the partition from the reading
+            # FUNCTION, so hiding it behind an accessor makes a real read invisible to both.
+            # Its twin is in `tool_get_exercise_notes`; `NOTES_SOURCE` is the one name.
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{tid}") & Key("sk").gte(f"DATE#{start}"),
+            )
+            timeline, pain_dates, _ = _notes_timeline([decimal_to_float(it) for it in resp.get("Items", [])])
+        except Exception as e:  # noqa: BLE001
+            return tid, {"error": f"{type(e).__name__}: {e}", "layer_status": layer_status}
+        return tid, {
+            "pain_flag_any": bool(pain_dates),
+            "pain_dates": [str(d)[:10] for d in pain_dates if d],
+            "sessions_with_notes": len(timeline),
+            "layer_status": layer_status,
+        }
+
+    with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(ids)))) as pool:
+        for tid, res in pool.map(_one, ids):
+            out[tid] = res
+    return out
+
+
 def tool_get_exercise_notes(args):
     """Per-exercise note timeline (the arc) + signals + pain flags — and, on `action`, the
     OWNER-ONLY dismissal of one of those flags (#4036, see the block at the end of this file).
@@ -97,57 +208,10 @@ def tool_get_exercise_notes(args):
     except Exception as e:
         return {"error": f"query failed: {e}", "template_id": template_id}
 
-    rows = [decimal_to_float(it) for it in resp.get("Items", [])]
-    # Corrections win on read (sk …#CORRECTION) and survive recompute.
-    corrections = {r["sk"].replace("#CORRECTION", ""): r for r in rows if r.get("sk", "").endswith("#CORRECTION")}
-    # #3918: the head key is one per (workout, template, OCCURRENCE), so a workout that
-    # logged this template twice now yields TWO entries instead of one. A legacy row (no
-    # suffix) reads as occurrence 0 and yields to the new-scheme row for the same
-    # occurrence while the re-key is pending — a migrated record is never listed twice.
-    grouped: dict[str, list] = {}
-    for r in rows:
-        grouped.setdefault(head_sk_base(r.get("sk", "")), []).append(r)
-    ordered = []
-    for base in sorted(grouped):
-        for occ, row in sorted(dedupe_head_rows(grouped[base]).items()):
-            ordered.append((occ, row))
-
-    timeline = []
-    latest_progression = None
-    pain_dates = []
-    for occurrence, r in ordered:
-        # A correction written against the pre-migration key still applies to the record
-        # it corrected — it is found by the head's `migrated_from_sk`.
-        ov = corrections.get(r.get("sk", "")) or corrections.get(str(r.get("migrated_from_sk") or ""))
-        signals = (ov or {}).get("signals", r.get("signals", []))
-        pain = (ov or {}).get("pain_flag", r.get("pain_flag", False))
-        entry = {
-            "date": r.get("date"),
-            "workout_uid": r.get("workout_uid"),
-            # Which logging of this template within that workout (0-based). Two entries
-            # with the same date + workout_uid are two real, separately-noted blocks.
-            "occurrence": occurrence,
-            "note_raw": r.get("note_raw"),
-            "signals": signals,
-            "pain_flag": pain,
-            "sentiment": (ov or {}).get("sentiment", r.get("sentiment")),
-            "degraded": r.get("degraded", False),
-            # #3699: a degraded row says WHY on the row itself. A row with no reason field
-            # is not "unknown" — it is a record written before the extractor could say, and
-            # it is reported as such rather than re-extracted (a re-derived signal in a
-            # measured partition is indistinguishable from an original one, forever).
-            "degraded_reason": (
-                r.get("degraded_reason")
-                or (f"{DEGRADE_UNRECORDED}: written before #3699 added the reason field; not re-derived" if r.get("degraded") else None)
-            ),
-            "corrected": bool(ov),
-        }
-        timeline.append(entry)
-        if pain:
-            pain_dates.append(r.get("date"))
-        for s in signals:
-            if s.get("class") == "progression" and s.get("value"):
-                latest_progression = s["value"]
+    # The parse is shared with `pain_flags_for_templates` (#4051) — corrections, the #3918
+    # occurrence keys and the legacy-row dedupe live in ONE place, so the two readers of
+    # this partition cannot disagree about what a row says.
+    timeline, pain_dates, latest_progression = _notes_timeline([decimal_to_float(it) for it in resp.get("Items", [])])
 
     # #3767: say whether the layer could be read at all, BEFORE reporting counts from it.
     # The health function has existed since this layer shipped and its docstring says "hook

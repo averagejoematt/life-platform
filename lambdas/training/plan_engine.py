@@ -45,6 +45,22 @@ DISMISSAL#<site>#<date>`) the CALLER read — injected like every other input, s
 stays pure — and the comparison that decides whether it still holds lives once, in
 `training_context_registry.resolve_flags`, shared with `coach.critics.build_joints_packet`.
 
+A TRIPWIRE MUST SAY WHAT IT LOOKED AT (#4051)
+
+The #4036 machinery above was correct and unreachable. Stage 1's flag input was built from
+a DRAFT routine's exercise list, so on a day with no draft the set was empty, every branch
+below fell through to `clear`, and the constraint block reported `pain_flag_named_site:
+clear, observed []` at the same minute the note layer held a live pain flag on the Romanian
+Deadlift and the owner's dismissal of that exact site sat in DynamoDB. A guard that cannot
+see the layer it guards is silence dressed as clearance (#3768's class, one level up).
+
+So `pain_evidence_scope` is now an input in its own right: the caller states which
+movements it examined, over which window, across which phases, with the note layer's
+status. `clear` is reachable ONLY from a scope that was read and named at least one
+movement; an empty or unreadable scope reads `unknown` with `evidence: none — <reason>`.
+And flags are evaluated BEFORE the layer-health branch, because a degraded layer qualifies
+an ABSENCE of flags and can never un-say one that is on the record.
+
 STANDING CONSTRAINTS ARE READ HERE TOO (#3715)
 
 `training_context_registry` (#3821) drafted the standing injury/equipment list — the calf
@@ -69,7 +85,25 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.2.0"  # #4036: the pain tripwire reads the owner-dismissal layer beside the flag layer
+ENGINE_VERSION = "plan-engine@1.3.0"  # #4051: the pain tripwire states the evidence set it examined, and flags outrank layer health
+
+
+def _evidence_scope_read(scope: dict[str, Any] | None) -> bool:
+    """Did the caller actually examine anything? (#4051)
+
+    A scope is only "read" when its own status says so AND it names at least one movement.
+    Zero movements examined is the empty-evidence path that produced the defect — the read
+    succeeded and looked at nothing, which is not the same as looking and finding nothing.
+    """
+    if not scope:
+        return False
+    if str(scope.get("status") or "") != "read":
+        return False
+    n = scope.get("movements_considered")
+    try:
+        return int(n) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _tripwire_states(
@@ -84,6 +118,7 @@ def _tripwire_states(
     adherence_on_plan: bool | None,
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
+    pain_evidence_scope: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -94,6 +129,20 @@ def _tripwire_states(
     #4036 adds a fourth state for the same reason: a pain flag the OWNER dismissed reads
     `dismissed_by_owner` with his date and his words, never `clear`. An absence and an
     override are different facts, and only one of them has a human behind it.
+
+    #4051 closes the hole under both of those: a `clear` (or `unknown`) pain row is only
+    honest if something was actually LOOKED at, and stage 1 was looking at nothing — its
+    flag input came from a draft's exercise list, so with no draft the set was empty and the
+    row read `clear` over a live, flagged, owner-dismissed site. `pain_evidence_scope` is
+    the caller's statement of WHAT it examined (which movements, over which window, across
+    which phases); when it says nothing was examined the row is `unknown` with
+    `evidence: none — <reason>`, never `clear`. Two ordering rules follow from it:
+      * flags are evaluated BEFORE the layer-health check, so a degraded or dark layer can
+        no longer erase a flag that is on the record (it only qualifies absence);
+      * a scope that was read, with movements in it and no flags, is the ONLY thing that
+        earns `clear`.
+    `pain_evidence_scope=None` means the caller did not state a scope — the pre-#4051
+    behaviour, kept for the pure-function callers that inject flags directly.
     """
     by_id = {t["id"]: t for t in owner_redlines.engine_evaluated_tripwires()}  # the v2 additions are named, not computed
     out: list[dict[str, Any]] = []
@@ -146,18 +195,12 @@ def _tripwire_states(
             )
         )
 
-    # The pain tripwire reads the derived note layer, which was dark from the day it
-    # shipped until 2026-09-13 (#3768). Its silence is only meaningful if the layer works.
-    if pain_layer_status in (None, "dark", "unknown"):
-        out.append(
-            _row(
-                "pain_flag_named_site",
-                "unknown",
-                None,
-                f"the derived note layer reports layer_status={pain_layer_status!r} — its silence is not evidence of no pain (#3768)",
-            )
-        )
-    elif pain_flag_sites or pain_flag_instances:
+    # The pain tripwire. Flags FIRST (#4051): a degraded or dark layer qualifies the
+    # ABSENCE of flags — it can never un-say one that is on the record. The live layer is
+    # `degraded` today (`cap_exceeded x24`, deterministic signals only) and the 2026-09-13
+    # Romanian Deadlift flag is one of those degraded rows.
+    scope_read = _evidence_scope_read(pain_evidence_scope)
+    if pain_flag_sites or pain_flag_instances:
         # #4036: the owner may dismiss a flagged site ("right lower back gone", 2026-09-21).
         # The dismissal is a DDB record the caller read; the RULE — including the date
         # comparison that re-arms it — lives in `training_context_registry`, once, so this
@@ -172,15 +215,63 @@ def _tripwire_states(
             # row from "nothing was flagged", and a reader must be able to tell them apart.
             row = _row("pain_flag_named_site", "dismissed_by_owner", sites, "; ".join(r["detail"] for r in resolutions))
             row["dismissals"] = resolutions
-            out.append(row)
         else:
             detail = "; ".join(r["detail"] for r in resolutions)
             row = _row("pain_flag_named_site", "tripped", live or sites, detail)
             if resolutions:
                 row["dismissals"] = resolutions
-            out.append(row)
+        # #4051: the layer's status travels WITH the flags, never instead of them, and the
+        # instances carry their own note dates so the dismissal comparison is auditable.
+        #
+        # `by_movement` is the per-site verdict, because the row's single `state` is an
+        # AGGREGATE and the aggregate is the coarser question. Once stage 1 reads every
+        # movement he PERFORMED rather than the two or three in a draft, two flags on one
+        # day is the ordinary case — measured 2026-09-22: Romanian Deadlift (dismissed
+        # 2026-09-21) AND Walking ("lower back aching", 2026-09-08, never dismissed). The
+        # aggregate is correctly `tripped` there, and a reader who wants to know whether
+        # HIS dismissal held must not have to infer it from that.
+        row["instances"] = instances
+        row["by_movement"] = {
+            str(i.get("movement")): ("dismissed_by_owner" if i.get("movement") in dismissed else "tripped") for i in instances
+        }
+        row["layer_status"] = pain_layer_status
+        if pain_layer_status in (None, "dark", "unknown", "degraded"):
+            row["layer_note"] = (
+                f"the derived note layer reports layer_status={pain_layer_status!r}: these are the DETERMINISTIC flags on "
+                "the record and they stand, but the layer's silence about any other movement is not evidence of no pain (#3768/#4051)"
+            )
+        if pain_evidence_scope:
+            row["evidence"] = pain_evidence_scope
+        out.append(row)
+    elif pain_layer_status in (None, "dark", "unknown"):
+        # #3768: the layer was dark from the day it shipped until 2026-09-13. With no flag
+        # on the record, its silence is only meaningful if the layer works.
+        row = _row(
+            "pain_flag_named_site",
+            "unknown",
+            None,
+            f"the derived note layer reports layer_status={pain_layer_status!r} — its silence is not evidence of no pain (#3768)",
+        )
+        if pain_evidence_scope:
+            row["evidence"] = pain_evidence_scope
+        out.append(row)
+    elif pain_evidence_scope is not None and not scope_read:
+        # #4051: nothing was examined, so nothing can be called clear.
+        row = _row(
+            "pain_flag_named_site",
+            "unknown",
+            None,
+            "evidence: none — " + str(pain_evidence_scope.get("reason") or "the caller stated no readable evidence scope"),
+        )
+        row["evidence"] = pain_evidence_scope
+        row["layer_status"] = pain_layer_status
+        out.append(row)
     else:
-        out.append(_row("pain_flag_named_site", "clear", []))
+        row = _row("pain_flag_named_site", "clear", [])
+        row["layer_status"] = pain_layer_status
+        if pain_evidence_scope:
+            row["evidence"] = pain_evidence_scope
+        out.append(row)
 
     t = by_id["weight_stall_with_adherence"]
     if weight_stall_days is None or adherence_on_plan is None:
@@ -214,6 +305,7 @@ def constraint_block(
     pain_layer_status: str | None = None,
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
+    pain_evidence_scope: dict[str, Any] | None = None,
     weight_stall_days: int | None = None,
     adherence_on_plan: bool | None = None,
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
@@ -301,6 +393,7 @@ def constraint_block(
         adherence_on_plan=adherence_on_plan,
         pain_flag_instances=pain_flag_instances,
         pain_dismissals=pain_dismissals,
+        pain_evidence_scope=pain_evidence_scope,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
@@ -347,6 +440,10 @@ def constraint_block(
         "tripwires": tripwires,
         "tripped": tripped,
         "unreadable_tripwires": unknown,
+        # #4051 — WHAT the pain tripwire looked at: the movements PERFORMED in the trailing
+        # window, the window, the phases read, the note layer's status. A reader can tell an
+        # examined-and-clean row from an empty one without leaving the block.
+        "pain_evidence": pain_evidence_scope or {"status": "not_stated", "reason": "the caller stated no pain-evidence scope"},
         "owner_dismissals": dismissals_in_play,  # #4036 — empty list means none in play, never "none exist"
         "redlines": redlines,
         # #3755 — the program the plan is supposed to be executing, as data, with its own
@@ -380,6 +477,18 @@ def constraint_block(
                     else None
                 ),
                 f"{len(unknown)} tripwire(s) could not be evaluated: {', '.join(unknown)}" if unknown else None,
+                # #4051: the pain row's evidence set, named out loud. An empty one is the
+                # defect this issue is about, so it is a sentence in `honesty`, not a key
+                # a reader has to go looking for.
+                (
+                    None
+                    if _evidence_scope_read(pain_evidence_scope)
+                    else (
+                        "the pain tripwire examined NO movements — "
+                        + str((pain_evidence_scope or {}).get("reason") or "the caller stated no pain-evidence scope")
+                        + " (#4051)"
+                    )
+                ),
                 # #4036: a dismissal is an owner OVERRIDE of a safety flag. It is named out
                 # loud, with his words and the date, whether it currently holds or has been
                 # superseded by a later note on the same site.
