@@ -169,7 +169,7 @@ GET_DAILY_METRICS_DESCRIPTION = (
     "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake'."
 )
 
-GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), and % complete toward goal. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
+GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), % complete toward goal, and recent_weights — the trailing 14 real Withings weigh-ins only (date + weight_lbs + source), where a logging gap shows as missing dates rather than being smoothed over. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
 
 PLAN_NEXT_SESSION_DESCRIPTION = (
     "The planning engine, from one place whichever client asks. STAGE 1 (no routine_id): the DETERMINISTIC "
