@@ -332,17 +332,25 @@ def _commit_patches(ir, created):
     ]
 
 
-def test_commit_without_stage_2_says_the_routine_was_not_red_teamed():
-    """Mutation control: drop the `"critics": commit_status(ir)` line from the commit result → this reds."""
+def test_commit_without_stage_2_refuses_and_only_an_owner_override_pushes_it():
+    """#4066 re-based this: a routine that skipped stage 2 used to COMMIT with a one-line
+    "NOT red-teamed" note (09-22's cdb6ef… reached Hevy exactly that way). It now REFUSES by
+    name; the owner override pushes it, and the result still says it was NOT red-teamed.
+    Mutation control: drop the `"critics": commit_status(ir)` line → the override arm reds."""
     ir = _ir()
     created = []
     with ExitStack() as st:
-        for cm in _commit_patches(ir, created):
+        for cm in _commit_patches(ir, created) + [patch("training.routine_repo.list_by_date_range", return_value=[])]:
             st.enter_context(cm)
-        res = t.tool_manage_hevy_routine({"action": "commit", "routine_id": ir.routine_id})
+        refused = t.tool_manage_hevy_routine({"action": "commit", "routine_id": ir.routine_id})
+        res = t.tool_manage_hevy_routine(
+            {"action": "commit", "routine_id": ir.routine_id, "owner_override_redteam": True, "override_reason": "fixture"}
+        )
+    assert refused["error_code"] == "REDTEAM_BINDING" and "NO stage-2 verdict" in refused["error"], refused
     assert res["status"] == "committed", res
     assert "NOT red-teamed" in res["critics"], res
-    assert "warnings" not in res, "the note rides in its own key — a quiet commit keeps no warnings key (test_tools_hevy_routine)"
+    assert any("OWNER OVERRIDE" in w for w in res["warnings"]), res
+    assert len(created) == 1, "only the override reached Hevy"
     assert "RED TEAM" not in created[0]["routine"]["exercises"][0]["notes"]
 
 

@@ -307,19 +307,86 @@ def _field(obj, name, default=None):
     return obj.get(name, default) if isinstance(obj, dict) else getattr(obj, name, default)
 
 
-def audit_prescription(exercises, routine_notes="", floors=None):
+# #4065 — a load equal to the floor must pass. A floor drawn from Hevy's stored kg
+# (63.50300732) against a draft's lb->kg rounding (140 lb -> 63.5029) differs by 0.0001 kg,
+# and a 1e-6 comparison refused a set AT the floor. 0.05 kg (~0.11 lb) absorbs any kg<->lb
+# round trip and is an order of magnitude under the smallest real plate step (1.25 lb =
+# 0.57 kg), so it cannot let a genuine under-prescription through.
+LOAD_TOLERANCE_KG = 0.05
+
+
+def _is_working(s):
+    return str(_field(s, "type", "normal") or "normal").lower() != "warmup" and _field(s, "weight_kg") is not None
+
+
+def _reps_of(s):
+    for name in ("reps", "rep_range_end", "rep_range_start"):
+        if _field(s, name) is not None:
+            return int(_field(s, name))
+    return None
+
+
+def prescribed_back_offs(sets, floor_kg, scheme):
+    """{set index: exemption} for the back-offs the program's OWN rep scheme prescribes (#4065).
+
+    Derived from `training.rep_scheme` (parsed from the redline prose, never a hand list). The
+    exemption holds only for the scheme's shape: the top set is the heaviest working set, its
+    reps sit in the heavy-exposure range, it is itself at or above the floor, and each exempt
+    set is one of the `back_offs` working sets IMMEDIATELY after it, at no less than the
+    rounded −pct minimum. A set outside that window — an extra back-off, a deeper cut, a
+    back-off off a sub-floor top — is not a prescribed back-off and meets the floor as before.
+    Returns ({index: record}, {index: why_not}) — the second names why a set did NOT qualify.
+    """
+    from training.rep_scheme import back_off_min_kg
+
+    if (scheme or {}).get("status") != "ok":
+        return {}, {}
+    working = [(i, float(_field(s, "weight_kg"))) for i, s in enumerate(sets) if _is_working(s)]
+    if not working:
+        return {}, {}
+    top_kg = max(w for _, w in working)
+    top_pos = next(p for p, (_, w) in enumerate(working) if w >= top_kg - LOAD_TOLERANCE_KG)
+    top_i = working[top_pos][0]
+    lo, hi = scheme["top_reps"]
+    reps = _reps_of(sets[top_i])
+    if reps is None or not lo <= reps <= hi:
+        return {}, {i: f"top set {top_i + 1} is not a heavy exposure ({reps} reps, scheme {lo}-{hi})" for i, _ in working}
+    if top_kg < float(floor_kg) - LOAD_TOLERANCE_KG:
+        return {}, {i: f"top set {top_i + 1} is itself below the floor" for i, _ in working}
+    min_kg = back_off_min_kg(top_kg, scheme)
+    start = top_pos + int(scheme["top_sets"])
+    window = working[start : start + int(scheme["back_offs"])]
+    exempt, why = {}, {}
+    for i, w in window:
+        if w >= min_kg - LOAD_TOLERANCE_KG:
+            exempt[i] = {"set": i + 1, "top_set": top_i + 1, "top_kg": top_kg, "min_kg": min_kg, "prescribed_kg": w}
+        else:
+            why[i] = f"deeper than the scheme's -{scheme['back_off_pct']:g} % back-off (min {min_kg:.2f}kg off a {top_kg:.2f}kg top)"
+    for i, _ in working[start + int(scheme["back_offs"]) :]:
+        why[i] = f"beyond the scheme's {scheme['back_offs']} back-off(s) after top set {top_i + 1}"
+    return exempt, why
+
+
+def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
     """Is this routine subtract-only? Deterministic, no model, no I/O.
 
     Two violation classes, both of them acceptance conditions of #3927:
       • `conditional_up` — prose that makes progression the athlete's job;
       • `below_floor`   — a prescribed load under `floors[movement_key]["floor_kg"]`,
                           the band-matched best from `training.routine_generator.
-                          prescription_floor`.
+                          prescription_floor` — EXCEPT a back-off the program's own rep
+                          scheme prescribes (#4065, `prescribed_back_offs`), which is
+                          listed under `back_offs_exempted` instead of passed over.
 
     `floors` is optional, and its absence is reported (`floors_checked: False`) rather
     than passed over: an audit that could not see the floors is not a clean audit.
+    `scheme` defaults to the ACTIVE program's (`training.rep_scheme.heavy_back_off_scheme`).
     """
-    violations = []
+    if scheme is None:
+        from training.rep_scheme import heavy_back_off_scheme
+
+        scheme = heavy_back_off_scheme()
+    violations, exempted = [], []
     for hit in find_conditional_up(routine_notes):
         violations.append({"kind": "conditional_up", "where": "routine_notes", **hit})
 
@@ -334,30 +401,35 @@ def audit_prescription(exercises, routine_notes="", floors=None):
         floor_kg = floor.get("floor_kg")
         if not floor_kg:
             continue
-        for i, s in enumerate(_sets_of(ex)):
-            if str(_field(s, "type", "normal") or "normal").lower() == "warmup":
+        sets = list(_sets_of(ex))
+        back_offs, why_not = prescribed_back_offs(sets, floor_kg, scheme)
+        for i, s in enumerate(sets):
+            if not _is_working(s):
                 continue
-            w = _field(s, "weight_kg")
-            if w is None:
+            w = float(_field(s, "weight_kg"))
+            if w >= float(floor_kg) - LOAD_TOLERANCE_KG:
                 continue
-            if float(w) < float(floor_kg) - 1e-6:
-                violations.append(
-                    {
-                        "kind": "below_floor",
-                        "where": key,
-                        "set": i + 1,
-                        "prescribed_kg": float(w),
-                        "floor_kg": float(floor_kg),
-                        "basis": floor.get("basis"),
-                        "clause": (
-                            f"set {i + 1} prescribes {float(w):.1f}kg against a floor of {float(floor_kg):.1f}kg "
-                            f"({floor.get('status')})"
-                        ),
-                    }
-                )
+            if i in back_offs:
+                exempted.append({"where": key, "floor_kg": float(floor_kg), **back_offs[i]})
+                continue
+            note = f"; not a prescribed back-off: {why_not[i]}" if i in why_not else ""
+            violations.append(
+                {
+                    "kind": "below_floor",
+                    "where": key,
+                    "set": i + 1,
+                    "prescribed_kg": w,
+                    "floor_kg": float(floor_kg),
+                    "basis": floor.get("basis"),
+                    "back_off_note": why_not.get(i),
+                    "clause": f"set {i + 1} prescribes {w:.1f}kg against a floor of {float(floor_kg):.1f}kg ({floor.get('status')}){note}",
+                }
+            )
     return {
         "ok": not violations,
         "rule": SUBTRACT_ONLY_RULE,
         "floors_checked": bool(floors),
         "violations": violations,
+        "back_offs_exempted": exempted,
+        "back_off_scheme": {k: v for k, v in (scheme or {}).items() if k != "source_text"},
     }

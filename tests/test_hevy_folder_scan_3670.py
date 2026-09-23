@@ -38,6 +38,7 @@ from training import hevy_write_client as wc  # noqa: E402
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 from mcp import tools_hevy_routine as t  # noqa: E402
+from tests.redteam_binding_testkit import bind  # noqa: E402
 
 _TITLE_CTX = {"phase": "Foundation", "type_count_in_phase": 1, "all_time_count": 1}
 
@@ -163,6 +164,7 @@ def test_commit_reports_the_truncated_walk_in_its_own_result():
         archetype="push",
         exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
+    bind(ir)  # #4066
     fake = _pages(*[_folders(f"F{i}", start_id=i) for i in range(40)], page_count=40)
     with (
         patch("training.routine_repo.get_current", return_value=ir),
@@ -203,7 +205,7 @@ def test_update_branch_never_puts_folder_id_on_the_wire_even_when_the_ir_holds_o
     deliberately (hevy_compiler.py). The omission is asserted on the BODY, so a
     future "helpful" backfill that re-adds it reds here rather than shipping a
     PUT Hevy silently ignores while the result claims the routine moved."""
-    ir = _committed_ir("r-no-backfill", 3087792)
+    ir = bind(_committed_ir("r-no-backfill", 3087792))  # #4066
     captured: dict = {}
 
     def fake_update(routine_id, body, expected_updated_at=None):

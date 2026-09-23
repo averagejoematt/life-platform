@@ -1651,6 +1651,12 @@ TOOLS = {
                         "type": "string",
                         "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence.",
                     },
+                    "owner_override_redteam": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "commit only (#4066): push a routine that is NOT the one stage 2 verdicted. OWNER'S call only; needs override_reason.",
+                    },
+                    "override_reason": {"type": "string", "description": "commit only: the owner's own words for the override (#4066)."},
                     "movement_key": {"type": "string", "description": "stall_check: the movement to assess (e.g. 'lat_pulldown')."},
                     "template_id": {"type": "string", "description": "stall_check: exact Hevy template id, when movement_key misses."},
                     "sessions": {"type": "integer", "default": 6, "description": "stall_check: recent sessions to read (3-20)."},

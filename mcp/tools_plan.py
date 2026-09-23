@@ -707,6 +707,12 @@ def _run_stage_2(
     _place_block_on_first_exercise(ir)
     ir.parent_version = ir.version
     ir.version = int(ir.version) + 1
+    # #4066: bind the verdict to THIS routine and THIS content, stamped after every change and
+    # the notes block are applied — commit refuses any other routine_id or any later edit.
+    from mcp.hevy_commit_binding import binding_for
+
+    record["binding"] = binding_for(ir)
+    ir.inputs_snapshot["critics"] = record
     put_versioned(ir)
     out = dict(record)
     out["routine_id"] = ir.routine_id

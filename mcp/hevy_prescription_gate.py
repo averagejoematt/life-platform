@@ -296,6 +296,7 @@ def refusal_message(gate: dict[str, Any] | None) -> str | None:
             lines.append(
                 f"{v.get('where')} set {v.get('set')} prescribes {_fmt(v.get('prescribed_kg'))} "
                 f"against a floor of {_fmt(v.get('floor_kg'))} — {_provenance(gate, v)}"
+                + (f" — not a prescribed back-off: {v['back_off_note']}" if v.get("back_off_note") else "")
             )
     return (
         f"Refusing to commit — subtract-only violation (#3927/#3971), {len(lines)} finding(s): "
@@ -321,5 +322,7 @@ def summary(gate: dict[str, Any] | None) -> str:
         f"load_floors status={floors.get('status', '?')}{reason}, source={floors.get('source', '?')}, "
         f"{with_floor}/{len(movements)} movement(s) carry a band-matched floor; "
         f"conditional-up scan ran on routine notes + every exercise note, "
-        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}"
+        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}, "
+        f"{len(audit.get('back_offs_exempted') or [])} prescribed back-off(s) exempted "
+        f"(rep scheme {(audit.get('back_off_scheme') or {}).get('status', '?')}, #4065)"
     )
