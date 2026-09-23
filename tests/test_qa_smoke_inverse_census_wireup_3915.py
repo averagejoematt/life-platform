@@ -46,6 +46,7 @@ def _base_audit(**overrides):
         "families_audited": {"SOURCE#insights"},
         "unstamped": {},
         "deferred": {},
+        "mis_stamped": {},  # #4040 — additive leaf; empty here, exercised in its own test file
         "wrongly_stamped": [],
         "by_design": 0,
         "unclassified": 0,
@@ -59,7 +60,11 @@ def _base_audit(**overrides):
 
 def _patch_audit(monkeypatch, audit):
     monkeypatch.setattr(qa, "table", _FakeTable())
-    monkeypatch.setattr(pk_census, "scoped_stamp_audit", lambda pages, inverse_pks=(): audit)
+    # #4040: the check now also fetches the served-chronicle exemption set before calling
+    # the audit — patched to empty so this rendering test stays independent of it (that
+    # derivation has its own test file).
+    monkeypatch.setattr(qa.chronicle_manifest_qa, "served_chronicle_keys", lambda *a, **kw: set())
+    monkeypatch.setattr(pk_census, "scoped_stamp_audit", lambda pages, inverse_pks=(), exempt_keys=(): audit)
 
 
 def test_the_ok_branch_names_every_census_family(monkeypatch):

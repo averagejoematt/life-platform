@@ -409,7 +409,7 @@ def format_inverse_census(audit: dict) -> str:
     return f" INVERSE census (#3915): {total} cross-phase row(s) carry provenance, ruled — " + "; ".join(parts) + "."
 
 
-def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dict:
+def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None, exempt_keys=()) -> dict:
     """#3599 box 2 / #3513 / #3877 — the phase-stamp audit over ROWS, not writers.
 
     WHY ROWS
@@ -461,6 +461,18 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
       * `unclassified` counts rows `classify()` cannot resolve; the totality census is the
         instrument that rules on those, this one neither guesses nor stops.
 
+    #4040 — `mis_stamped`: the OTHER shape the no-reset world produces. `unstamped`/
+    `deferred` above both require `phase is None` — they answer "did anyone stamp this
+    row at all". They do not see a row that WAS stamped, wrongly: `phase="experiment"` (or
+    any non-`pilot` value) on a row dated before `genesis`. Under the pre-#4037 world that
+    healed itself at the next reset's tagger pass; under the no-further-resets ruling
+    nothing does. `mis_stamped[family]` lists every such row via the shared
+    `phase_taxonomy.pre_genesis_scoped_violation` predicate, `exempt_keys` subtracted first
+    (a chronicle row the live journal manifest still serves — see
+    `chronicle_manifest_qa.served_chronicle_keys` — is CURRENT by design regardless of its
+    `sk` date, #4040's own incident). `exempt_keys` defaults to `()`, so a caller that
+    doesn't pass one gets the pre-#4040 behaviour on every OTHER axis unchanged.
+
     THE VACUOUS-SCAN TRAP
       An empty scan raises. An all-clear over zero rows is a check that cannot fail.
     """
@@ -469,8 +481,10 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
 
         genesis = EXPERIMENT_START_DATE
     inverse = set(inverse_pks)
+    exempt = set(exempt_keys)
     unstamped: dict = {}
     deferred: dict = {}  # tagger-reachable, in-cycle: stamped by the next reset's tagger, by design
+    mis_stamped: dict = {}  # #4040: stamped, but wrong — pre-genesis and not `pilot`
     wrongly_stamped: list = []
     inverse_census: dict = {}  # #3915: every CROSS_PHASE family carrying provenance, with its ruling
     remediable: dict = {}  # ruled a defect; the ruling names the tool that clears it
@@ -512,12 +526,15 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
                 continue
             fam = pk_family(pk)
             families_audited.add(fam)
-            if it.get("phase") is None:
+            phase = it.get("phase")
+            if phase is None:
                 d = row_date(it)
                 if pk.startswith(TAGGER_REACHABLE_PREFIX) and not (d and d < genesis):
                     deferred.setdefault(fam, []).append(f"{pk}/{sk}")
                 else:
                     unstamped.setdefault(fam, []).append(f"{pk}/{sk}")
+            elif (pk, sk) not in exempt and taxonomy.pre_genesis_scoped_violation(pk, sk, phase, row_date(it), genesis):
+                mis_stamped.setdefault(fam, []).append(f"{pk}/{sk}[phase={phase}]")
     if rows == 0:
         raise CensusPreflightError(
             "phase-stamp row audit: the provenance scan returned ZERO rows. Refusing to certify "
@@ -531,6 +548,9 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None) -> dic
         "families_audited": families_audited,
         "unstamped": unstamped,
         "deferred": deferred,
+        # #4040 — additive: no existing key changed meaning. Empty unless a caller passes
+        # exempt_keys AND a genuinely mis-stamped pre-genesis row exists.
+        "mis_stamped": mis_stamped,
         "wrongly_stamped": wrongly_stamped,
         "by_design": by_design,
         "unclassified": unclassified,

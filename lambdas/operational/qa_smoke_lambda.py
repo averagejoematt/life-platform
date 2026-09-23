@@ -917,6 +917,15 @@ def check_coach_ensemble_phase_stamp_coverage():
     CORRECT state and never a finding; on the COACH#/ENSEMBLE# set those are counted and
     named as excluded rather than silently dropped.
 
+    #4040 (the standing home named in phase_taxonomy.py's v1.3.0 ruling): under the
+    no-further-resets amendment (ADR-077, PR #4037) the tagger that used to fix a
+    PRE-GENESIS scoped row's `phase` at every restart never runs again. `mis_stamped`
+    names any such row — stamped, but not `pilot` — that a served chronicle lead-in
+    doesn't explain (`chronicle_manifest_qa.served_chronicle_keys`, #4040's own incident:
+    a reset-re-dated lead-in's `sk` can predate genesis while the live manifest still
+    serves it). This is a DIFFERENT axis from `unstamped` above (no phase at all) and is
+    reported first when both fire, because it is the one the reset used to silently cure.
+
     Read-only. WARN, not FAIL — the missing-stamp leg is chronic (#2378: a known gap with
     its own dry-run-by-default operator tool); the inverse leg and the errored branch
     (including an EMPTY scan — the vacuous-scan trap) stay on the alarmed side."""
@@ -927,7 +936,11 @@ def check_coach_ensemble_phase_stamp_coverage():
     c = Check("data:coach_ensemble_phase_stamp_coverage", "Phase Stamping", CONTENT_TRUTH)
     inverse_pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
     try:
-        audit = scoped_stamp_audit(scan_provenance_pages(table), inverse_pks=inverse_pks)
+        exempt_keys = chronicle_manifest_qa.served_chronicle_keys(table, s3, S3_BUCKET)
+    except Exception:  # noqa: BLE001 — #4040: an unreadable manifest exempts nothing; stays conservative
+        exempt_keys = set()
+    try:
+        audit = scoped_stamp_audit(scan_provenance_pages(table), inverse_pks=inverse_pks, exempt_keys=exempt_keys)
     except Exception as e:
         return [c.warn(f"phase-stamp coverage check errored: {e}")]
 
@@ -963,6 +976,32 @@ def check_coach_ensemble_phase_stamp_coverage():
                 "never wiped and never phase-filtered — a stamp on one marks durable relationship state as "
                 "belonging to a single cycle. Remediate with deploy/reconcile_provenance_2026_09.py --only 3514."
                 f"{census_note}"
+            )
+        ]
+    mis_stamped = audit.get("mis_stamped") or {}
+    if mis_stamped:
+        # #4040: the no-reset-world gap the tagger used to close at every restart — a
+        # pre-genesis EXPERIMENT_SCOPED row that DOES carry a `phase`, just not `pilot`.
+        # Reported explicitly and by name so a recurrence is a WARN with rows, never
+        # silence (the acceptance criterion this leg exists to satisfy). A served
+        # chronicle lead-in is excluded before it ever reaches here
+        # (chronicle_manifest_qa.served_chronicle_keys) — everything named below is real.
+        total_ms = sum(len(v) for v in mis_stamped.values())
+        by_size_ms = sorted(mis_stamped.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        fam_summary_ms = ", ".join(f"{fam} {len(rows)}" for fam, rows in by_size_ms[:6])
+        fam_more_ms = f" (+{len(by_size_ms) - 6} more families)" if len(by_size_ms) > 6 else ""
+        flat_ms = [r for _, rows in by_size_ms for r in rows]
+        sample_ms = ", ".join(flat_ms[:5])
+        more_ms = f" (+{len(flat_ms) - 5} more)" if len(flat_ms) > 5 else ""
+        return [
+            c.warn(
+                f"#4040: {total_ms} pre-genesis EXPERIMENT_SCOPED row(s) across {len(mis_stamped)} of {n_families} "
+                f"families carry a phase attribute that is not pilot despite a date before genesis — the reset "
+                f"tagger used to correct this at every restart, and no reset runs anymore: {fam_summary_ms}{fam_more_ms}; "
+                f"e.g. {sample_ms}{more_ms}. A row the live journal manifest still serves is exempted by construction. "
+                "Repair with python3 deploy/phase_stamp_sweep.py --apply (dry-run first)."
+                f"{census_note}",
+                chronic=True,
             )
         ]
     unstamped = audit["unstamped"]
