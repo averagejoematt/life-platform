@@ -26,6 +26,15 @@ WHAT IT DOES
   EVERY attempt is gating. That is first-occurrence parity with the alerter, stated in the
   only currency the deploy gate has: a second look.
 
+  It also prints the shared oracle's non-gating lane annotations for every attempt
+  (`smoke_oracle_decision.print_non_gating_annotations`). Those lines used to be printed by
+  `smoke_oracle_decision.main()`, which this wrapper replaced in the canary step — so
+  between #3839 and #3830's completion the canary's stored-state warning (#2051) silently
+  stopped appearing, and `failed_external_transient` never had one. De-gating a finding and
+  then not printing it is a mute, not a re-route; the annotator is called here so both stay
+  loud in the run's own log. It is the oracle's function, keyed on lane counters, so no
+  per-check string matching enters this file (#3830 box 4).
+
 WHAT IT DELIBERATELY DOES NOT DO
   * **No per-check string matching.** This file never reads a check name, a failure
     message, or an exception class. It reads the shared oracle's verdict and counts it.
@@ -180,6 +189,17 @@ def _aws_invoke(function: str, region: str, out: Path, label: str, ok_extra: tup
         if n != 1:
             # The LAST attempt is what the workflow's later steps read.
             out.write_text(target.read_text())
+        # #3830: every non-gating lane this attempt reported gets named here, by the
+        # SHARED oracle's own annotator. Wrapping `decide()` rather than `main()` is
+        # what made the retry possible, and it also skipped the `::warning` lines
+        # `main()` printed — so from #3839 until now the canary's stored-state
+        # annotation (#2051) was absent from the CI log and the external-transient
+        # lane never had one at all. A finding that no longer gates AND no longer
+        # prints has been muted rather than re-routed, which is the same inversion
+        # this file exists to undo. Annotated per ATTEMPT, not once at the end: a
+        # transient that clears on the retry is precisely the case worth naming, and
+        # by then its payload is no longer the one the verdict came from.
+        oracle.print_non_gating_annotations(str(target), label if n == 1 else f"{label} (attempt {n})")
         return oracle.decide(str(target), ok_extra=ok_extra)
 
     return attempt

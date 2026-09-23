@@ -31,6 +31,18 @@ does since #2051) is gated on that key ALONE; the union counters (`all_pass`,
 `failures`) no longer re-admit the non-gating lane. Bodies without a lane
 declaration are unaffected — every failure still gates.
 
+#3830 — the non-gating annotations stopped being `main()`'s private business.
+`deploy/lib/canary_gate_retry.py` (retry-before-gate) wraps `decide()` directly,
+so from #3839 the canary's gating step reached a verdict without ever reaching
+these `::warning` lines and #2051's stored-state annotation quietly stopped
+appearing in the CI log. `print_non_gating_annotations()` is now the one shared
+shout, called by BOTH entry points, and it grows a third lane:
+`failed_external_transient` — a vendor 503 / throttle / timeout on a live
+round-trip, demoted out of the gating lane by #3831 after one of them reverted
+85 Lambdas on 2026-09-15. Each lane is read as ONE counter by key; no per-check
+string matching lives here, and the lane decision stays in
+`lambdas/operational/canary_lanes.py` (#3830 box 4).
+
 The parse/decision logic used to live inline in two shell steps of
 ci-cd.yml. It is extracted here so it is unit-testable (tests/
 test_smoke_oracle_decision.py) and shared byte-for-byte by both the qa-smoke
@@ -215,6 +227,80 @@ def stored_state_count(path):
     return _body_count(path, "failed_stored_state")
 
 
+def external_transient_count(path):
+    """#3830: how many EXTERNAL-TRANSIENT failures this oracle reported, or 0.
+
+    The newest non-gating lane and the one this file exists to stop reverting a
+    fleet: a live round-trip that failed because the dependency on the far end
+    of it was transiently unavailable (`canary_lanes.LANE_EXTERNAL_TRANSIENT` —
+    a vendor 503, a throttle, a read timeout). `failed_deploy_health` already
+    excludes it by construction, so the deploy no longer gates on it; this
+    counter is the other half of that bargain.
+
+    Note what is NOT here: no check name, no exception class, no message
+    substring. This reads ONE lane counter by key, exactly as its two siblings
+    do. The decision of which failures land in that counter is made once, in
+    `lambdas/operational/canary_lanes.py`, and #3830 box 4 requires it to stay
+    there — a second copy of that judgement in the gate reader is the scattering
+    that lost #1921's reasoning in the first place.
+    """
+    return _body_count(path, "failed_external_transient")
+
+
+#: The non-gating lanes, in one list, each with the sentence that has to appear in
+#: the log when it is non-zero. Every entry here is a finding that was DELIBERATELY
+#: taken out of the rollback path, and the rule all three share is #1921's: the
+#: re-routing is only defensible if it is not also a mute. A de-gated lane with no
+#: line in the run's own log is indistinguishable from a check that never ran.
+NON_GATING_ANNOTATIONS = (
+    (
+        "failed_content_truth",
+        "content-truth",
+        "#1921: content findings describe published state, not the code that just shipped, "
+        "and a rollback cannot un-publish them. "
+        "The qa-smoke failure email and the ContentTruthFailCount alarm carry the detail.",
+    ),
+    (
+        "failed_stored_state",
+        "stored-state",
+        "#2051: a residue postcondition describes data written possibly weeks ago, not the code "
+        "that just shipped, and a rollback cannot delete a row. "
+        "Fix the DATA: the canary alert email and the canary-subscribe-residue alarm carry the detail.",
+    ),
+    (
+        "failed_external_transient",
+        "external-transient",
+        "#3830: the dependency on the far end of a live round-trip was transiently unavailable "
+        "(a vendor 503, a throttle, a timeout) — the deploy cannot have caused it and a rollback "
+        "cannot fix it. On 2026-09-15 one of these reverted 85 Lambdas from this step while the "
+        "alerter, reading the same datapoint, declined to even send mail. "
+        "The failing check still emits its own Fail metric, so its alarm is exactly as loud as "
+        "before; lambdas/operational/canary_lanes.py names the check and the failure code.",
+    ),
+)
+
+
+def print_non_gating_annotations(path, label, out=print):
+    """Shout every non-gating lane this oracle reported. Returns the counts printed.
+
+    Split out of `main()` (#3830) because `main()` stopped being the only caller.
+    `deploy/lib/canary_gate_retry.py` wraps `decide()` directly for the retry, so
+    from #3839 until this change the canary path reached the verdict WITHOUT ever
+    reaching these annotations — #2051's stored-state line silently stopped
+    appearing in the CI log the moment retry-before-gate went in front of it.
+    That is the same defect as the one it annotates, one layer up: a finding that
+    no longer gates and no longer prints has been muted, not re-routed.
+    """
+    printed = {}
+    for key, lane_label, why in NON_GATING_ANNOTATIONS:
+        count = _body_count(path, key)
+        if not count:
+            continue
+        printed[key] = count
+        out(f"::warning::{label}: {count} {lane_label} failure(s) — NOT gating this deploy ({why})")
+    return printed
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Smoke-oracle PASS/FAIL/PARSE_ERROR decision (#1345).")
     parser.add_argument("result", help="path to the Lambda invoke result JSON")
@@ -229,30 +315,11 @@ def main(argv=None):
 
     verdict, detail = decide(args.result, args.ok_extra)
 
-    # #1921: surface content-truth failures loudly regardless of the verdict.
-    # They do not gate — they are not evidence about this deploy — but they are
-    # real defects on a live reader surface and must never pass unremarked.
-    content_fails = content_truth_count(args.result)
-    if content_fails:
-        print(
-            f"::warning::{args.label}: {content_fails} content-truth failure(s) — "
-            "NOT gating this deploy (#1921: content findings describe published state, "
-            "not the code that just shipped, and a rollback cannot un-publish them). "
-            "The qa-smoke failure email and the ContentTruthFailCount alarm carry the detail."
-        )
-
-    # #2051: same treatment for the canary's stored-state postconditions
-    # (#1954 residue, cleanup failure). They describe rows at rest — a rollback
-    # cannot delete a row — so they do not gate, and therefore must be named
-    # here rather than hidden behind the word "smoke".
-    stored_fails = stored_state_count(args.result)
-    if stored_fails:
-        print(
-            f"::warning::{args.label}: {stored_fails} stored-state failure(s) — "
-            "NOT gating this deploy (#2051: a residue postcondition describes data written "
-            "possibly weeks ago, not the code that just shipped, and a rollback cannot delete a row). "
-            "Fix the DATA: the canary alert email and the canary-subscribe-residue alarm carry the detail."
-        )
+    # #1921/#2051/#3830: surface every non-gating lane loudly, regardless of the
+    # verdict. None of them is evidence about this deploy — which is exactly why
+    # each one has to be named in the run's own log rather than disappearing
+    # behind the word "smoke".
+    print_non_gating_annotations(args.result, args.label)
 
     if verdict == "PASS":
         print(f"✅ {args.label} passed")
