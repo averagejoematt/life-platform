@@ -327,6 +327,34 @@ dispatches `site-deploy.yml` if the generators dirty `site/**` — wanted, termi
 `Unit Tests` job now runs on every push, which raises total runner time and the queueing
 term the duration budget is mostly made of (#3403).
 
+### 4a0b. The direct push — docs only; code lands through the premerge lane (#3528)
+
+The ruleset in §4a0 binds PRs, and its only bypass actor is the owner's account
+(`bypass_mode: always`), so an owner-authenticated direct push to `main` meets no required
+check at all. The forensic RCA of 2026-09-05 (class 1) measured the cost: 302 of 613 commits
+since 08-22 were direct pushes that met only a formatter, and 26 of 29 red Unit-Test runs on
+`main` were direct pushes. The fix is a refusal, not a second test gate:
+
+- **`bash deploy/agent_commit.sh --push "<msg>" <paths>`** commits, then pushes the current
+  branch to its own name. On a lane branch that is all it does.
+- **On `main`** it first runs `deploy/direct_push_gate.py` over everything the push carries
+  (`origin/main..HEAD` + the index). Any path outside `DOCS_CLASS` (docs/**, README.md,
+  CLAUDE.md, .claude/README.md, .claude/skills/**, .claude/agents/**, and the generated
+  `lambdas/web/platform_counts.py`) is **refused by name** — open a PR. A docs-only push runs
+  the Docs-CI gates **derived** from `docs-ci.yml` by `scripts/ci_gate_commands.py`, in
+  parallel, and is refused on any red.
+- **`RESTART_PIPELINE=1`** is the reset pipeline's one sanctioned code push: the same gates
+  plus #3529's derived artifact-reader pytest leg (and `node --test`). An empty derivation is
+  `UNEVALUABLE` (exit 2), never a pass.
+
+`ci_gate_commands(workflow)` is the one workflow→argv derivation; `restart_verify_gates.py`,
+`wrap_gates.py` and `direct_push_gate.py` all read it, and
+`tests/test_ci_stand_ins_derive.py` enumerates every `scripts/`/`deploy/` module that runs
+`git push` and reds on one that does not derive (or is not a declared never-`main` exemption).
+The honest bounds: this is client-side — a bare `git push origin main` is not stopped here —
+and the docs stand-in is a superset of Docs CI, not of CI/CD's Unit Tests, which also run on a
+docs push.
+
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
 Since ADR-117, `plan` (and therefore `deploy` + the reader-facing visual-QA gate)
@@ -488,7 +516,7 @@ re-measured at flip time, never on the calendar).
 
 <!-- BEGIN GENERATED: closure-contract — scripts/closure_contract.py --render (#3318); do not hand-edit -->
 
-A close is valid when ALL of these hold (registry: `scripts/closure_contract.py`; posture: **warn** — see the flip bar in the registry docstring — except `no-live-proof`, armed **block** from day one and not disarmable by the env override):
+A close is valid when ALL of these hold (registry: `scripts/closure_contract.py`; posture: **warn** — see the flip bar in the registry docstring — except `no-live-proof`, `unhomed-residual`, armed **block** whatever the posture and not disarmable by the env override):
 
 1. **`outcome-verdict`** — Every close carries the ADR-099 closing comment — `**Shipped:** …` + `**Outcome:** <realized|partial|not-realized> — …` — written by the session that merged (wrap step (e8)). A close with no verdict is a silent close. EXEMPT: an instrument's own ledger row (`is_instrument_ledger`) — a bot filed it, no human ever commented, and it carries no `type:` taxonomy, so there is no human closure for a verdict to describe. *Detector:* `scripts/closure_sweep.py` → `no-outcome-verdict`.
 2. **`residual-homed`** — A closing comment that names a residual disposes it to EXACTLY one home: a carrier issue `#N`, a fold onto a named open issue `#N`, or an explicit `not-work — <home>`. This is the handover's residual-queue rule (#1340, wrap (e4)) applied symmetrically to the close — a `partial`/`not-realized` verdict with no home is the #2845/#3208 shape. *Detector:* `scripts/closure_sweep.py` → `unhomed-residual`.
@@ -1347,7 +1375,8 @@ commit — the step letters below stay the per-gate contract anchors):
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
 | A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes, epic link, or a `model:*`/`type:*`/`area:*`/`prio:*` label) | Filing-contract linter (#1867/#1870), step (e7) — blocking by default since #1872, which absorbed and deleted the older #1349 `model:*`-only gate | `scripts/check_backlog_hygiene.py` |
 | An issue closed this session leaves no outcome verdict (53 of the last 60 closures had zero comments) | Closure-comment gate (#1870), step (e8) | `.claude/skills/wrap/SKILL.md` step (e8); contract in ADR-099's amendment ¶3 |
-| A close that the (e8) comment cannot vouch for: the issue kept being worked AFTER `closedAt` (a comment past the grace window — #2848's "stays OPEN" at +15m, #2670's scope assertion at +2.5h), the closing comment named a residual and disposed it nowhere (#2938/#2921/#3208 — the #2845 shape), or an epic closed over an open child | Closure-DoD sweep (#3318), folded into step (e8) — ADVISORY until the registry's flip bar is met, EXCEPT `no-live-proof` (#3595), armed block from day one: an instrument (`closure:live-proof`) closed with no `**Live proof:** <instant> — <where>` comment exits 1 whatever the posture; the structural leg is a timestamp comparison, the residual leg is the (e4) `not-work — <home>` rule applied to the close | `scripts/closure_sweep.py --session`; registry `scripts/closure_contract.py`; §4a2 above |
+| A close that the (e8) comment cannot vouch for: the issue kept being worked AFTER `closedAt` (a comment past the grace window — #2848's "stays OPEN" at +15m, #2670's scope assertion at +2.5h), the closing comment named a residual and disposed it nowhere (#2938/#2921/#3208 — the #2845 shape), or an epic closed over an open child | Closure-DoD sweep (#3318), folded into step (e8) — ADVISORY until the registry's flip bar is met, EXCEPT `no-live-proof` (#3595), armed block from day one: an instrument (`closure:live-proof`) closed with no `**Live proof:** <instant> — <where>` comment exits 1 whatever the posture — and `unhomed-residual` (#3597, armed 2026-09-23): a closing comment naming a residual or an obligation (`revisit`, `fast-follow`, `owner decides`) with no `#N` / `not-work —` home exits 1 too; the structural leg is a timestamp comparison, the residual leg is the (e4) `not-work — <home>` rule applied to the close | `scripts/closure_sweep.py --session`; registry `scripts/closure_contract.py`; §4a2 above |
+| A waiver, citation, exemption, deferral or residue ledger outlives its condition — an ADR's "revisit when …", a PROPORTIONALITY demote trigger that fired unnoticed for a month, a `*_RESIDUE` ledger with no expiry, a closing comment's bare "fast-follow" (the forensic RCA's class 7) | Carrier-expiry rule (#3597): an obligation on a governed surface needs a `#N`, a `not-work —` tag or a calendar-probed date (≤90d); every residue ledger is registered with carrier + condition + expiry + shrink consumer, discovered structurally so a new one cannot hide; every Load-bearing row carries `demote_by:` / `demote_when:`; the daily calendar exits 5 on a lapse. Pre-existing debt is pinned shrink-only (drain: #4122) | `scripts/obligation_carriers.py`; `tests/test_obligation_carriers_3597.py`; `scripts/operating_calendar.py --due` |
 | `Now` sits at zero actionable stories, or a `Later` issue ages past 60d with nobody calling promote-or-close | Now-refill + `Later` sweep (#1870), step (e9) | `scripts/backlog_next.py`; `.claude/skills/wrap/SKILL.md` step (e9) |
 | The blocking `now_liveness` finding fires with no reachable remedy — the refill walked `Next` only while ADR-099 ¶3's `Roadmap` path named no actor; and a milestone-only promotion just swapped it for a blocking `score_line_canonical` | Derived Now-refill plan (#3254), embedded in the (e7) finding and run at (e9) | `backlog_next.plan_now_refill` / `--refill-now`; `tests/test_now_refill_remedy_3254.py` |
 | `Now` is at the liveness floor by COUNT while a whole `model:*` lane has zero startable stories — the refill is dischargeable with work the running session cannot begin | `now_lane_coverage` (#3254, ADVISORY) + the `--lane` scoping on the (e7) gate and the plan | `scripts/check_backlog_hygiene.py --lane`; `scripts/backlog_next.py --refill-now --lane` |

@@ -235,12 +235,7 @@ def parse_block(body: str) -> Optional[ProbeBlock]:
             elif probe is not None:
                 block.probes.append(probe)
         elif key == "expires":
-            em = _EXPIRES_RE.match(line)
-            try:
-                # a calendar-day literal (UTC), built from its parts — no instant is parsed here
-                parsed = date(int(em.group("y")), int(em.group("m")), int(em.group("d"))) if em else None
-            except ValueError:
-                parsed = None
+            parsed = expires_from_line(line)
             if parsed is None:
                 block.errors.append(f"unparseable expires line: {line.strip()[:80]!r}")
             elif block.expires is not None:
@@ -263,8 +258,38 @@ def parse_block(body: str) -> Optional[ProbeBlock]:
     return block
 
 
+# ── the expiry grammar (shared: scripts/obligation_carriers.py reuses it, #3597) ────────
+_DAY_LITERAL_RE = re.compile(r"^\s*(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})\s*$")
+
+
+def parse_day_literal(text: Any) -> Optional[date]:
+    """A bare `YYYY-MM-DD` calendar-day literal (UTC) → date, else None.
+
+    Built from its parts — no instant is parsed here — and an impossible day (`2026-02-30`)
+    is None, never a clamp. The ONE day parser behind every `expires:` in the closure layer:
+    this module's `## Proof probe` block and #3597's residue/obligation registries."""
+    m = _DAY_LITERAL_RE.match(text) if isinstance(text, str) else None
+    if not m:
+        return None
+    try:
+        return date(int(m.group("y")), int(m.group("m")), int(m.group("d")))
+    except ValueError:
+        return None
+
+
+def expires_from_line(line: str) -> Optional[date]:
+    """The date of one `- expires: YYYY-MM-DD` bullet, or None when the line is not one."""
+    em = _EXPIRES_RE.match(line or "")
+    return parse_day_literal(f"{em.group('y')}-{em.group('m')}-{em.group('d')}") if em else None
+
+
+def is_past(expires: Optional[date], today: date) -> bool:
+    """True once `today` is strictly after `expires` — the expiry day itself is still live."""
+    return expires is not None and today > expires
+
+
 def is_expired(block: ProbeBlock, today: date) -> bool:
-    return block.expires is not None and today > block.expires
+    return is_past(block.expires, today)
 
 
 # ── field paths ────────────────────────────────────────────────────────────────────────
