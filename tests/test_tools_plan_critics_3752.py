@@ -65,6 +65,8 @@ def _evidence(pain0=False, drop=0.0, days0=3, weeks_in_block=0):
                 "idx": 0,
                 "label": "Squat (Barbell)",
                 "template_id": "1",
+                # #4069: the engine's anchor tripwire reads CORE-anchor rows only.
+                "anchor_family": "squat",
                 "days_since": days0,
                 "last_top_lbs": 176.0,
                 "trailing_best_lbs": 180.0,
