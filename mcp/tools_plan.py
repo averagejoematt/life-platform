@@ -1080,10 +1080,35 @@ def _record_override_correction(item_ref: dict[str, Any], owner_words: str, erro
 
 _BLOCK_MARK = "RED TEAM ("
 
+# #4070: the owner reported the Hevy app cutting exercise notes at ~150 characters,
+# flagged across 8 chat sessions (09-16, 09-17, 09-19, 09-21, 09-22). Nothing in this repo
+# enforces that cut, and it is not a documented server-side limit — the mirrored OpenAPI
+# contract (docs/specs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31_PREREQS.md §A.3) carries
+# `notes (string, nullable)` with no maxLength, and per the issue's own instruction this
+# was NOT re-verified with a live write (owner ruling: do not probe live Hevy to find the
+# true cut). So the number below is evidence, not a contract: it is used only to size the
+# regression test's "visible window", never as a truncation trigger in code. The actual
+# fix is structural and holds at ANY cut point Hevy turns out to apply: the block this
+# function writes must land AFTER whatever cues are already on exercises[0].notes — the
+# session-adaptive tier cues (`_apply_recovery_adaptation`) and the WHY line the compiler
+# prepends at wire time (`hevy_compiler._place_routine_note`) — never ahead of them.
+HEVY_NOTE_OBSERVED_VISIBLE_CHARS = 150
+
 
 def _place_block_on_first_exercise(ir: Any) -> None:
-    """Prepend the critics' block to exercise[0].notes, replacing any earlier block (a re-run
-    must not stack two)."""
+    """Append the critics' verdict block to exercise[0].notes, AFTER whatever cues are
+    already there, replacing any earlier block (a re-run must not stack two).
+
+    #4070: this used to PREPEND the block, so the owner's own tier cues (the recovery
+    session block + per-lift branch lines `_apply_recovery_adaptation` writes at draft
+    time) sat behind a RED TEAM header that can run to 1000+ characters across four
+    critics. Whatever cuts a long Hevy note — the app's display, or the API itself, the
+    owner has observed ~150 chars but neither is documented or safe to probe live (see
+    HEVY_NOTE_OBSERVED_VISIBLE_CHARS above) — a cut there removed the cues he reads at
+    the gym and kept only verdict boilerplate. The full verdict record is never at risk:
+    it is stored in full on `ir.inputs_snapshot["critics"]` regardless of what reaches
+    the wire. Only the block placed here is allowed to be the part a cut lands on.
+    """
     from coach import critics
 
     block = critics.notes_block(ir)
@@ -1092,11 +1117,10 @@ def _place_block_on_first_exercise(ir: Any) -> None:
     first = ir.exercises[0]
     existing = first.notes or ""
     if _BLOCK_MARK in existing:
-        head, _, tail = existing.partition(_BLOCK_MARK)
-        # drop the old block: everything from the mark to the next blank line
-        rest = tail.split("\n\n", 1)
-        existing = (head + (rest[1] if len(rest) > 1 else "")).strip()
-    first.notes = (block + ("\n\n" + existing if existing else "")).strip()
+        # drop the old block — it is always the LAST thing this function appended, so
+        # everything from the mark onward is the block; nothing trails it.
+        existing = existing.split(_BLOCK_MARK, 1)[0].rstrip()
+    first.notes = (existing + ("\n\n" + block if block else "")).strip()
 
 
 def _model_allowed() -> tuple[bool, str | None]:
