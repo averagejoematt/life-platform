@@ -28,6 +28,8 @@ import sys
 from contextlib import ExitStack
 from unittest.mock import patch
 
+import pytest
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -40,6 +42,14 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 import mcp.tools_plan as tp  # noqa: E402
 
 TODAY = "2026-09-22"
+
+
+@pytest.fixture(autouse=True)
+def frozen_plan_clock(monkeypatch):
+    """Stage 1 defaults its target date from `tools_plan.pacific_today()`; pin it to TODAY so
+    no test here depends on the real wall clock (#2376's time-bomb class)."""
+    monkeypatch.setattr(tp, "pacific_today", lambda: TODAY)
+
 
 _BASE_PATCHES = [
     patch("mcp.tools_benchmark.tool_get_benchmark", return_value={"applicable": False, "reason": "no band"}),
