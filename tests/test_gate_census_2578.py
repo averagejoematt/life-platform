@@ -899,7 +899,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # planner and chat commit gate each name it) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
-        <= 132
+        # Upper bound 132 -> 133 (2026-09-23, #4063): structural::test_named_human_contact_4063.py — the named-human contact
+        # path's no-health-data body contract + the tracked-tree grep for a contact-shaped address — arrives PROVEN via a hand
+        # Proof in scripts/gate_census.PROVEN_CAN_FAIL (a digit planted in the body: 10 failed / 74 passed; a contact address
+        # appended to a tracked doc: 1 failed / 83 passed; baseline and reverted 84 passed). Unproven stays 540; one entrant.
+        <= 133
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
