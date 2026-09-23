@@ -101,6 +101,12 @@ v1.2.0 — 2026-09-05 (#3598; the stamp derives phase + cycle from the WRITE'S D
 v1.3.0 — 2026-09-22 (#4040; the no-reset-world provenance ruling above — the nightly
           leg is the standing home, `pre_genesis_scoped_violation` is the shared
           predicate, served chronicle lead-ins are exempt by construction)
+v1.4.0 — 2026-09-22/23 (#4059; a row's PHASE-PROVENANCE date is its creation/opening
+          instant — `created_at` / `opened_date` / an sk-embedded timestamp — never an
+          `outcome_date`, `resolved_at`, a re-stamped `cycle`, or a content-reference
+          `date`. `provenance_date()` below is the one derivation the tagger, check 21,
+          the nightly leg and `phase_stamp_sweep.py` all read; the sweep's surface was
+          widened to Query the COACH# partitions it used to miss entirely.)
 """
 
 from __future__ import annotations
@@ -786,6 +792,67 @@ def should_phase_stamp(pk: str, sk: str = "") -> bool:
     attribute_not_exists(phase), so a wrong one is not reversible by re-running.
     """
     return is_taggable(classify(pk, sk))
+
+
+# #4059 — the two COACH# shapes whose own sk/attrs also carry a date that is NOT their
+# provenance: a dispute-docket verdict's sk (once it collides with a stale prediction_id
+# scheme) or its `outcome_date`/`resolved_at`, and a coach thread's own `date` attribute
+# when that attribute is a CONTENT reference rather than the row's opening. Shape-gated
+# (not a blanket override) so every other EXPERIMENT_SCOPED family keeps reading its
+# `date` attribute first exactly as it always has — only these two write a same-row
+# outcome/reference date ALONGSIDE their real provenance.
+_PROVENANCE_SHAPE_COACH_SK_PREFIXES = ("PREDICTION#docket-", "THREAD#")
+
+
+def _is_provenance_sensitive_shape(pk: str, sk: str) -> bool:
+    if pk.startswith("COACH#"):
+        return sk.startswith(_PROVENANCE_SHAPE_COACH_SK_PREFIXES)
+    return sk.startswith("SOURCE#coach_thread")
+
+
+def provenance_date(item: dict) -> str | None:
+    """#4059 — a row's PHASE-PROVENANCE date: when it was CREATED or OPENED, never when
+    it was resolved, re-stamped, or what it merely references.
+
+    RULING (dated, 2026-09-22/23 owner chat): a dispute-docket verdict opened before
+    genesis and graded after it is still a pre-genesis row — "archive it with its cycle
+    even when its outcome window falls after genesis". Ten live `COACH#explorer_coach`/
+    `COACH#nutrition_coach` `PREDICTION#docket-*` rows carried `created_at
+    2026-08-03T17:41:16Z` (a month before the 2026-09-06 genesis) yet `cycle=17,
+    phase=experiment` — because the shared predicate was fed `outcome_date`/`resolved_at`/
+    the re-stamped `cycle`, never the docket's own open time
+    (`lambdas/coach/dispute_docket.py::_write_docket_prediction` sets `created_at =
+    docket.get("opened_at", "")`, the true provenance, right beside `outcome_date` and
+    `resolved_at`, which are not). Symmetrically, nine live `USER#matthew` /
+    `SOURCE#coach_thread#training_coach#...#pain` rows (created 2026-09-19, squarely
+    IN cycle 17) were flagged by a full-attribute read of the OTHER predicate input: their
+    `date` attribute carries the underlying Hevy note's 2022–2023 workout date — a
+    CONTENT reference (`lambdas/training/training_notes.py::elevate_pain` sets `"date":
+    item.get("date")`, the pain note's own workout day, not when the coach thread itself
+    was opened) — while `created_at` (the write's own timestamp) is the row's real
+    provenance.
+
+    Reads ONLY `opened_date` then `created_at`, and ONLY for the shapes #4059 named
+    (`_is_provenance_sensitive_shape`) — every other EXPERIMENT_SCOPED family keeps
+    reading its `date` attribute / sk / timestamp-fallback order unchanged
+    (`restart_phase_tag.extract_date`, `restart_intelligence_wipe.extract_date`,
+    `pk_census.row_date` all call this FIRST and fall back to their own generic order
+    when it returns None) — never `outcome_date`, `resolved_at`, or `cycle`, whatever a
+    caller's item happens to carry under those names. Returns None for a non-matching
+    shape or an unparseable/absent value; callers fall back to their generic order rather
+    than guessing.
+    """
+    if not _is_provenance_sensitive_shape(str(item.get("pk", "")), str(item.get("sk", ""))):
+        return None
+    import re as _re
+
+    for attr in ("opened_date", "created_at"):
+        v = item.get(attr)
+        if isinstance(v, str):
+            m = _re.match(r"(\d{4}-\d{2}-\d{2})", v)
+            if m:
+                return m.group(1)
+    return None
 
 
 def pre_genesis_scoped_violation(pk: str, sk: str, phase, item_date: str | None, genesis: str) -> bool:

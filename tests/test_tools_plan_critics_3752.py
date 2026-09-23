@@ -65,9 +65,11 @@ def _evidence(pain0=False, drop=0.0, days0=3, weeks_in_block=0):
                 "idx": 0,
                 "label": "Squat (Barbell)",
                 "template_id": "1",
+                # #4069: the engine's anchor tripwire reads CORE-anchor rows only.
+                "anchor_family": "squat",
                 "days_since": days0,
                 "last_top_lbs": 176.0,
-                "trailing_best_lbs": 180.0,
+                "baseline_median_e1rm_lb": 210.0,
                 "drop_pct": drop,
                 "sessions_below": 2 if drop >= 10 else 0,
                 "n_sessions": 6,
@@ -217,7 +219,12 @@ def test_stage_2_stores_the_verdicts_as_a_new_version_and_writes_the_thread_row(
     assert out["critics"]["recheck"]["passed"] is True
     # stage 2 also fed the constraint block what stage 1 alone could not read
     tw = {t_["id"]: t_["state"] for t_ in out["constraint_block"]["tripwires"]}
-    assert tw["protein_floor_missed"] == "clear" and tw["anchor_lift_strength_drop"] == "clear" and tw["pain_flag_named_site"] == "clear"
+    assert tw["protein_floor_missed"] == "clear" and tw["pain_flag_named_site"] == "clear"
+    # #4098: 2026-09-20 is before block 1 (week 0), so the anchor tripwire is held by its own
+    # `not_before_week` — the input stage 2 fed it still rides along as `state_if_active`.
+    anchor = next(t_ for t_ in out["constraint_block"]["tripwires"] if t_["id"] == "anchor_lift_strength_drop")
+    assert anchor["state"] == "not_yet_active" and anchor["state_if_active"] == "clear"
+    assert anchor["detail"].startswith("not_yet_active (week 0 < 6)")
     assert "Stage 2 ran" in out["how_to_use"]
 
 
@@ -499,17 +506,20 @@ def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually
     """LIVE FINDING 2026-09-20: Hevy's API routine object has no `notes` field; twelve September
     routines read back with 0-char routine notes while exercise notes landed. The block therefore
     goes on exercise[0].notes too, and a re-run replaces it rather than stacking.
+    #4070: the block now lands AFTER whatever cue was already on exercise[0] — a long verdict
+    block used to sit ahead of the owner's own cues, and any downstream truncation (the owner
+    reported the Hevy app cutting notes at ~150 chars) ate the cues, not the verdict boilerplate.
     Mutation control: drop the `_place_block_on_first_exercise(ir)` call → this reds."""
     ir = _ir(squat_lbs=200.0)
     ir.exercises[0].notes = "Anchor cue."
     out, _, _ = _run(ir, _evidence())
-    assert ir.exercises[0].notes.startswith(f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics,")
-    assert ir.exercises[0].notes.endswith("Anchor cue.")
+    assert ir.exercises[0].notes.startswith("Anchor cue.")
+    assert f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics," in ir.exercises[0].notes
     assert "- historian CHANGE" in ir.exercises[0].notes
     # re-run: one block, not two
     ir.version = 1
     _run(ir, _evidence())
-    assert ir.exercises[0].notes.count("RED TEAM (") == 1 and ir.exercises[0].notes.endswith("Anchor cue.")
+    assert ir.exercises[0].notes.count("RED TEAM (") == 1 and ir.exercises[0].notes.startswith("Anchor cue.")
     # and the compiled body carries it where the app shows it
     with ExitStack() as st:
         for cm in _commit_patches(ir, []):
@@ -517,6 +527,49 @@ def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
     wire_notes = preview["wire_body"]["routine"]["exercises"][0]["notes"]
     assert "RED TEAM (" in wire_notes and wire_notes.count("RED TEAM (") == 1  # #3938: WHY line first, block once
+    assert wire_notes.index("Anchor cue.") < wire_notes.index("RED TEAM (")  # #4070: cue before verdict
+
+
+def test_owner_tier_cues_survive_a_maximal_red_team_block_4070():
+    """#4070: the verdict block used to PREPEND ahead of the owner's session-adaptive tier
+    cues on exercises[0].notes, so any downstream truncation (owner-observed ~150 chars in
+    the Hevy app across 8 chat sessions, 09-16..09-22 — not a documented API limit, and not
+    re-verified with a live write per the issue's own instruction) ate the cues and left only
+    verdict-header text. The block must land after the cues regardless of how long it grows.
+    Mutation control: revert `_place_block_on_first_exercise` to prepend order → this reds."""
+    ir = _ir()
+    cues = (
+        "— ADAPT BY WAKE RECOVERY —\n"
+        "🟢 67-100: take the ceiling (top-set bonus, optional work ON, intervals if conditioning)\n"
+        "🟡 34-66: the plan as written (DEFAULT — hold to plan)\n"
+        "🔴 1-33: floor — cut top sets, optional work OFF, Z2/mobility, or rest\n"
+        "Rule: lower of band/feel wins — feel can downgrade a branch, never upgrade it.\n"
+        "Load: subtract-only — never add beyond the plan."
+    )
+    ir.exercises[0].notes = cues
+    # A maximal verdict block: four critics, each near the notes_block per-line cap, plus an
+    # applied change and an owner override — the longest shape the block realistically takes.
+    long_reason = "the packet crossed a stated threshold and here is the full argument. " * 4
+    ir.inputs_snapshot = {
+        "critics": {
+            "engine": critics.CRITICS_VERSION,
+            "ran_at": "2026-09-22T00:00:00+00:00",
+            "verdicts": [
+                {"critic": c, "verdict": "change", "metric": "m", "value": 1.0, "provenance": "p", "reason": long_reason}
+                for c in ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
+            ],
+            "changes": [{"field": "sets", "to": 10, "applied": True}],
+            "owner_overrides": [{"critic": "joints_tendons", "applied": True, "owner_words": "y" * 100, "at": "2026-09-22"}],
+        }
+    }
+    tp._place_block_on_first_exercise(ir)
+    notes = ir.exercises[0].notes
+    assert len(notes) - len(cues) > 500, "the block must actually be maximal for this test to mean anything"
+    assert notes.startswith(cues), notes[:200]
+    visible = notes[: tp.HEVY_NOTE_OBSERVED_VISIBLE_CHARS]
+    assert tp._BLOCK_MARK not in visible, "the owner-observed visible window must be all cue, no verdict"
+    assert visible == cues[: tp.HEVY_NOTE_OBSERVED_VISIBLE_CHARS], "the visible window is cue text, byte for byte — no verdict mixed in"
+    assert "🟢" in cues[: tp.HEVY_NOTE_OBSERVED_VISIBLE_CHARS], "this fixture's own GREEN cue is inside the observed window"
 
 
 def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():

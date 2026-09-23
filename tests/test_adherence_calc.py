@@ -250,18 +250,19 @@ def test_absent_rpe_is_absent_not_compliant():
     assert result["as_prescribed"]["verdict"] == "unknown"
 
 
-def test_no_prescribed_intensity_is_unprescribed_never_compliant():
-    """A routine that names no intensity anywhere cannot grade one. It says
-    `unprescribed` and returns a verdict of `unknown` — it does not invent a ceiling
-    and it does not call the session compliant."""
+def test_cardio_with_no_prescribed_intensity_stays_unprescribed_never_compliant():
+    """A movement the program itself has nothing to say about intensity for — cardio,
+    per `program_structure.classify_movement` — cannot grade one even after #4073's
+    program-default fallback: it says `unprescribed` and returns a verdict of `unknown`.
+    It does not invent a ceiling and it does not call the session compliant."""
     ir = RoutineSpec(
         routine_id="r-none",
         target_date="2026-09-10",
         archetype="pull",
         notes="Easy day.",
-        exercises=[ExerciseBlock(movement_key="lat_pulldown", sets=[Set()] * 3, notes="Full range of motion.")],
+        exercises=[ExerciseBlock(movement_key="treadmill", sets=[Set()] * 3, notes="Full range of motion.")],
     )
-    performed = {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(9.5, 9.5, 10.0)}]}
+    performed = {"exercises": [{"exercise_template_id": "243710DE", "sets": _sets(9.5, 9.5, 10.0)}]}  # treadmill's own hint id
     result = calculate_adherence(ir, performed)
     assert result["intensity_adherence"]["status"] == "unprescribed"
     assert result["intensity_adherence"]["pct"] is None
@@ -380,3 +381,107 @@ def test_find_alias_candidates_never_merges_a_genuinely_different_movement():
     emphasis) — the conservative modifier word list must not fold them together."""
     titles = {"3601968B": "Bench Press (Dumbbell)", "07B38369": "Incline Bench Press (Dumbbell)"}
     assert adherence_calc.find_alias_candidates(titles) == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #4073 — a set with no PRESCRIBED ceiling grades against the program's own
+# class-level default (`training.program_structure.EXPOSURES`) instead of dropping out
+# of the intensity dimension entirely.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_accessory_with_no_prescribed_ceiling_defaults_to_rpe_9_and_lowers_adherence():
+    """THE ISSUE'S OWN SPECIMEN (#4073): an isolation accessory with no exercise/routine
+    RPE note, logged at RPE 9.5, used to read `status: unprescribed` and drop out of the
+    intensity dimension entirely — so an RPE-9.5 isolation set never touched the verdict.
+    The movement is the SAME triceps-extension alias pair #3929 already resolves (`tmpl:
+    21310F5F` prescribed, `B5EFBF9C` performed — the shipped, not monkeypatched, registry),
+    so this one fixture proves BOTH halves of #4073 at once: the alias still resolves
+    (zero missing/extra) AND the unprescribed ceiling now grades."""
+    ir = RoutineSpec(
+        routine_id="r-accessory-default",
+        target_date="2026-09-15",
+        archetype="push",
+        exercises=[ExerciseBlock(movement_key="tmpl:21310F5F", sets=[Set(), Set(), Set()])],
+    )
+    performed = {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": _sets(8.0, 9.0, 9.5)}]}
+    result = calculate_adherence(ir, performed)
+
+    # Alias resolution (#3929) still holds — this is not a regression of that fix.
+    assert result["missing"] == []
+    assert result["extra"] == []
+    assert result["overall_pct"] == 100.0  # set-count dimension: every set done
+
+    movement = result["movements"][0]
+    assert movement["intensity"]["ceiling_rpe"] == 9.0
+    assert movement["intensity"]["basis"] == "program_default:accessory"
+    assert movement["intensity"]["status"] == "graded"
+    assert movement["intensity"]["sets_over_ceiling"] == 1  # the 9.5
+
+    assert result["intensity_adherence"]["status"] == "graded"
+    assert result["intensity_adherence"]["pct"] is not None and result["intensity_adherence"]["pct"] < 100.0
+    # THE MUST-FAIL LINE: before #4073 this read "unprescribed" and the composite verdict
+    # was "unknown" no matter how high the logged RPE went — the 93%-reads-fine bug the
+    # owner traced across 8 coaching sessions 2026-09-14 -> 09-22.
+    assert result["as_prescribed"]["verdict"] == "no"
+    assert any("RPE ceiling" in r for r in result["as_prescribed"]["reasons"])
+
+
+def test_anchor_pattern_with_no_prescribed_ceiling_defaults_to_the_heavy_top_rpe():
+    """An anchor-pattern movement (vertical pull, via `lat_pulldown`'s catalog title)
+    with no exercise/routine note defaults to the heavy exposure's top_rpe ceiling (8) —
+    the tightest numeric ceiling `program_structure.EXPOSURES` names — rather than the
+    accessory default, and rather than being left ungraded."""
+    ir = RoutineSpec(
+        routine_id="r-anchor-default",
+        target_date="2026-09-10",
+        archetype="pull",
+        notes="Easy day.",
+        exercises=[ExerciseBlock(movement_key="lat_pulldown", sets=[Set()] * 3, notes="Full range of motion.")],
+    )
+    performed = {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(9.5, 9.5, 10.0)}]}
+    result = calculate_adherence(ir, performed)
+
+    lat = result["movements"][0]
+    assert lat["intensity"]["ceiling_rpe"] == 8.0
+    assert lat["intensity"]["basis"] == "program_default:anchor:vertical_pull"
+    assert lat["intensity"]["sets_over_ceiling"] == 3
+    assert result["intensity_adherence"]["status"] == "graded"
+    assert result["as_prescribed"]["verdict"] == "no"
+
+
+def test_program_default_never_overrides_an_explicit_routine_ceiling():
+    """Mutation control: the default is a FALLBACK applied only when `resolve_ceiling`
+    found nothing. A routine that DID name a ceiling keeps its own number even though the
+    movement also classifies to a program default that would read differently (8.0)."""
+    ir = RoutineSpec(
+        routine_id="r-explicit-wins",
+        target_date="2026-09-10",
+        archetype="pull",
+        notes="",
+        exercises=[ExerciseBlock(movement_key="lat_pulldown", sets=[Set()] * 3, notes="RPE 6 cap.")],
+    )
+    performed = {"exercises": [{"exercise_template_id": "6A6C31A5", "sets": _sets(7.0, 7.0, 7.0)}]}
+    result = calculate_adherence(ir, performed)
+    lat = result["movements"][0]
+    assert lat["intensity"]["ceiling_rpe"] == 6.0  # the routine's OWN number, not the 8.0 anchor default
+    assert lat["intensity"]["basis"] == "exercise_notes:rpe"
+    assert lat["intensity"]["sets_over_ceiling"] == 3  # every set (7.0) over the explicit 6.0 cap
+
+
+def test_movement_with_no_resolvable_title_still_stays_unprescribed():
+    """Mutation control on the OTHER side of #4073: a movement_key the catalog and the
+    alias registry both carry no title for cannot be classified, so it gets no default
+    either — ADR-104's "the plan never said" must stay legible when the program truly has
+    nothing to say, not only for the cardio case."""
+    ir = RoutineSpec(
+        routine_id="r-no-title",
+        target_date="2026-09-15",
+        archetype="push",
+        exercises=[ExerciseBlock(movement_key="tmpl:FFFFFFFF", sets=[Set(), Set()])],
+    )
+    performed = {"exercises": [{"exercise_template_id": "FFFFFFFF", "sets": _sets(9.8, 9.9)}]}
+    result = calculate_adherence(ir, performed)
+    movement = result["movements"][0]
+    assert movement["intensity"]["status"] == "unprescribed"
+    assert movement["intensity"]["ceiling_rpe"] is None

@@ -189,22 +189,38 @@ def scoped_partitions_from_snapshot(snapshot: dict) -> dict:
 # A Scan is billed on the bytes SCANNED, not the bytes projected (see COST above), so the
 # extra attribute is free — while a second full-table pass for the tombstone-provenance
 # census would have doubled the RCU of every caller that wants both.
+# #3915 box 2: `tombstoned_at` joined for the same price. It is a PROVENANCE_ATTRS member,
+# so `forbidden_provenance` checks it — but this projection never read it, and the inverse
+# census was blind to 1,506 calibration rows carrying one (found by the backfill's own
+# dry run, 2026-09-22; a read-only table-wide scan the same day found it on NO other
+# CROSS_PHASE family). The projection is now the whole of PROVENANCE_ATTRS — a test pins it.
 PROVENANCE_PROJECTION = {
-    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb, #treason",
+    # #3915: `#tat` (tombstoned_at) is on the projection so the census sees the 1,506
+    # calibration rows carrying it.
+    # #4059: `#created`/`#opened` feed `phase_taxonomy.provenance_date()` — without them
+    # in the projection, the COACH#*/PREDICTION#docket-* and SOURCE#coach_thread pain-flag
+    # shapes have no way to be dated correctly by a projected scan (check 21, the nightly
+    # leg): `created_at`/`opened_date` simply aren't in the payload to read. Two more
+    # attribute names on an already-cheap projection (Scan bills on bytes SCANNED, not
+    # projected — see COST above).
+    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb, #tat, #treason, #created, #opened",
     "ExpressionAttributeNames": {
         "#phase": "phase",
         "#cycle": "cycle",
         "#tomb": "tombstone",
+        "#tat": "tombstoned_at",
         "#treason": "tombstoned_reason",
+        "#created": "created_at",
+        "#opened": "opened_date",
     },
 }
 
 
 def scan_provenance_pages(table):
     """Yield each page of a FULL-table scan projected to the key plus the provenance
-    attributes (`phase`, `cycle`, `tombstone`, `tombstoned_reason`). The row-side companion to
-    `scan_pk_sk_pages`: same RCU (a Scan is billed on the bytes SCANNED, not projected —
-    see COST above), three more attributes in the payload, and it answers a question the
+    attributes (`phase`, `cycle`, `tombstone`, `tombstoned_at`, `tombstoned_reason`). The
+    row-side companion to `scan_pk_sk_pages`: same RCU (a Scan is billed on the bytes SCANNED,
+    not projected — see COST above), five more attributes in the payload, and it answers a question the
     pk-only scan cannot: does THIS row carry the stamp its class requires?"""
     kwargs = dict(PROVENANCE_PROJECTION)
     while True:
@@ -229,9 +245,16 @@ _ROW_DATE_RE = re.compile(r"(20\d\d-\d\d-\d\d)")
 
 
 def row_date(item: dict) -> str | None:
-    """YYYY-MM-DD for a row's own date dimension, or None: an explicit `date` attr, else the
-    first date in the sk. Mirrors deploy/restart_phase_tag.extract_date's order without
-    importing deploy/ (never staged into the bundle). An undated row is NOT guessed at."""
+    """YYYY-MM-DD for a row's own date dimension, or None: `phase_taxonomy.provenance_date()`
+    FIRST (#4059 — a dispute-docket verdict or coach-thread pain row whose `date`/sk carries
+    an outcome or content-reference date rather than its own creation/opening instant; a
+    no-op for every other shape), else an explicit `date` attr, else the first date in the
+    sk. Mirrors deploy/restart_phase_tag.extract_date's order without importing deploy/
+    (never staged into the bundle) — `phase_taxonomy` IS staged, so the shape-gated override
+    is shared rather than re-derived. An undated row is NOT guessed at."""
+    provenance = taxonomy.provenance_date(item)
+    if provenance:
+        return provenance
     explicit = item.get("date")
     if isinstance(explicit, str) and _ROW_DATE_RE.match(explicit):
         return explicit[:10]
@@ -264,32 +287,78 @@ def row_date(item: dict) -> str | None:
 #   unclearable: widening it would have alarmed 3,121 rows whose only remedy would
 #   have been to delete a label the platform reads.
 #
+# 2026-09-22 ADDENDUM — the owner ruled all four families (in chat, ~19:35 PT, "agree" to
+#   the recommended set; recorded on #3915). Two entries changed:
+#   * calibration: "excluded:cycle-label" -> "in-scope:remediable". The reasoning that
+#     CONTENT was on the row was half right — a deliberate writer put it there — and half
+#     overstated: the row also carries `reset_genesis`, which re-derives the identical
+#     `cycle` number, so nothing is lost by removing the redundant label. See the entry's
+#     own `reason` and `remediation`.
+#   * the chat-tier COACH# CHAT# rows: "in-scope:remediable" -> "excluded:owner-ruled".
+#     Chats are CROSS_PHASE since ADR-153 and the owner-authorised 64-row strip (#3514
+#     group A, 50 applied 2026-09-22 04:22Z) is the ONLY remediation the family gets.
+#     Excluded is NOT sanctioned: unlike a content label, the writers still refuse the
+#     attribute (`cycle_label_forbidden` stays True), so the residue can only shrink.
+#   recall_embeddings and milestones are unchanged.
+#
 # THE SHAPE OF THE REGISTRY
 #   family (as `pk_family` keys it) -> ruling. `allowed` is the provenance the
 #   family's ruling SANCTIONS; anything outside it is never silently excluded —
-#   a `phase` appearing on calibration tomorrow is `unruled` and reported, because
+#   a `phase` appearing on milestones tomorrow is `unruled` and reported, because
 #   nobody has ruled on that. A CROSS_PHASE family with provenance and NO entry here
 #   is `unruled` too, which is the clause that keeps this from being an allowlist
 #   that only grows quiet (the #3851 shape inverted).
 # ─────────────────────────────────────────────────────────────────────────────
 RULED_LABEL = "excluded:cycle-label"  # sanctioned content label; counted, never a finding
 RULED_IN_SCOPE = "in-scope:remediable"  # a real defect, with a named remediation that clears it
+# #3915 (2026-09-22): excluded from the leg by owner ruling, but NOT a sanctioned label —
+# the residue is counted and never a finding, while every writer keeps refusing the
+# attribute (`cycle_label_forbidden` is True), so the count can only go down.
+RULED_EXCLUDED = "excluded:owner-ruled"
 UNRULED = "unruled"  # provenance nobody has ruled on — the leg's only able-to-fail clause
+EXCLUDED_DISPOSITIONS = (RULED_LABEL, RULED_EXCLUDED)
+
+# Stricter verdict wins when two rows of one family disagree — never the quieter one.
+_VERDICT_SEVERITY = {RULED_LABEL: 0, RULED_EXCLUDED: 0, RULED_IN_SCOPE: 1, UNRULED: 2}
 
 CROSS_PHASE_PROVENANCE_RULINGS: dict[str, dict] = {
     "SOURCE#calibration": {
-        "ruled_on": "2026-09-20",
+        "ruled_on": "2026-09-22",
         "ruled_by": 3915,
-        "disposition": RULED_LABEL,
-        "allowed": ("cycle",),
+        "disposition": RULED_IN_SCOPE,
+        "allowed": (),
         "measured_2026_09_20": 2211,
+        "summary": "per-cycle calibration ledger; `cycle` is re-derivable from reset_genesis",
+        "remediation": (
+            "#3915 box 2: (a) the write-time half — `lambdas/experiment/prereg_voids.build_void_calib_item` "
+            "no longer hand-writes a bare `cycle`; it routes the decision through "
+            "`phase_taxonomy.experiment_stamp_for(CALIBRATION_PK, sk)`, which returns `{}` for this "
+            "CROSS_PHASE pk, so a future void pass can never re-mint the attribute this ruling now "
+            "forbids. `deploy/reconcile_prereg_voids.py` records the bet's own tombstone time as "
+            "`bet_tombstoned_at` (content, outside PROVENANCE_ATTRS — the `bet_cycle_stamp` precedent) "
+            "instead of `tombstoned_at`, and `compute/hypothesis_engine_lambda.write_calibration_row` "
+            "drops the `phase` that `tag_record` adds to every compute write. (b) the row half — "
+            "`deploy/backfill_calibration_phase_stamp.py` (dry-run by default, `--apply` to write) "
+            "Queries the single `USER#matthew#SOURCE#calibration` partition (never a full-table scan), "
+            "REMOVEs `cycle` from every CALIB# row that still carries it and MOVES `tombstoned_at` to "
+            "`bet_tombstoned_at` (lossless; dry-run 2026-09-22: 2,280 rows). Owner-gated (--apply)."
+        ),
         "reason": (
-            "The `cycle` on a CALIB# row is CONTENT, written by two deliberate writers. The hypothesis "
-            "writers stamp the cycle a bet was CREATED in; deploy/reconcile_prereg_voids.py stamps the "
-            "cycle whose reset CLOSED it, and its own docstring says the two disagree and keeps the "
-            "creation stamp separately as `bet_cycle_stamp` rather than reconciling them. Strip it and a "
-            "void row stops saying which reset voided the bet — the only thing that distinguishes a void "
-            "from a missing grade (ADR-105). Live: cycles 5..17, 1,433 of them from cycle 5's void pass."
+            "REVISES the 2026-09-20 ruling this entry used to carry [was `excluded:cycle-label`, "
+            "reasoning: 'the cycle on a CALIB# row is CONTENT']. Owner ruling 2026-09-22 ~19:35 PT: "
+            "calibration is the platform's per-cycle prediction-calibration ledger and belongs IN SCOPE "
+            "for the alarmed leg, with a remediation, rather than quietly excluded. The prior reasoning "
+            "was half right and half overstated: `deploy/reconcile_prereg_voids.py`/"
+            "`prereg_voids.build_void_calib_item` DID write the `cycle` deliberately (the CLOSING "
+            "cycle), but every void row it writes ALSO carries `reset_genesis` — the exact date of the "
+            "reset that voided the bet — and `taxonomy.closing_cycle_for_genesis(reset_genesis, "
+            "CYCLE_GENESES)` re-derives the SAME number from it. The `cycle` label was redundant with "
+            "data the row already carries, not (as first reasoned) the only record of which reset "
+            "voided the bet — so stripping it loses nothing ADR-105 needs. `bet_cycle_stamp` (the "
+            "hypothesis/prediction row's OWN create-time cycle, copied onto the void row by "
+            "`deploy/reconcile_prereg_voids.py`) is a DIFFERENT attribute, outside `PROVENANCE_ATTRS`, "
+            "and is untouched by this ruling. Live: cycles 5..17, 1,433 of them from cycle 5's void "
+            "pass, measured 2026-09-20."
         ),
     },
     "SOURCE#recall_embeddings": {
@@ -298,6 +367,7 @@ CROSS_PHASE_PROVENANCE_RULINGS: dict[str, dict] = {
         "disposition": RULED_LABEL,
         "allowed": ("cycle",),
         "measured_2026_09_20": 883,
+        "summary": "embeddings mirror the chronicle across phases; the cycle label is read by recall",
         "reason": (
             "The class's own SOURCE_CLASS comment (#1384) REQUIRES it: 'each item carries its own cycle "
             "stamp, so a precedent from cycle N is still labeled cycle N in cycle N+1 — the archive stays "
@@ -312,6 +382,7 @@ CROSS_PHASE_PROVENANCE_RULINGS: dict[str, dict] = {
         "disposition": RULED_LABEL,
         "allowed": ("cycle",),
         "measured_2026_09_20": 27,
+        "summary": "lifetime achievements, cross-phase by construction",
         "reason": (
             "compute/daily_metrics_compute_lambda writes the ledger with experiment_stamp(include_phase="
             "False) under a comment that names the weight_episodes precedent: cycle-only provenance, never "
@@ -320,18 +391,28 @@ CROSS_PHASE_PROVENANCE_RULINGS: dict[str, dict] = {
         ),
     },
     "COACH": {
-        "ruled_on": "2026-09-20",
+        "ruled_on": "2026-09-22",
         "ruled_by": 3915,
-        "disposition": RULED_IN_SCOPE,
-        "allowed": (),
+        "disposition": RULED_EXCLUDED,
+        # `cycle` is the residue the ruling excludes; any OTHER provenance attr on a chat row
+        # (a `phase`) is still `unruled` — the neighbour clause, as for the label families.
+        "allowed": ("cycle",),
         "measured_2026_09_20": 64,
+        "summary": "chats are CROSS_PHASE since ADR-153; the owner-authorised 64-row strip is its only remediation",
         "remediation": (
-            "#3915: (a) the write-time half — coach_chat.turn_records and coach_chat_summary no longer put "
-            "a `cycle` on a row whose class forbids it (the same predicate this audit uses), and (b) the "
-            "row half — deploy/reconcile_provenance_2026_09.py --only 3514 now scans the chat-tier "
-            "partitions too, so its group-A strip reaches these 64. Owner-gated (--apply)."
+            "HISTORY (the 2026-09-20 in-scope ruling this entry used to carry): (a) the write-time half — "
+            "coach_chat.turn_records and coach_chat_summary no longer put a `cycle` on a row whose class "
+            "forbids it (`cycle_label_forbidden`, still True under the exclusion), and (b) the row half — "
+            "deploy/reconcile_provenance_2026_09.py --only 3514 scans the chat-tier partitions; the "
+            "owner-authorised strip applied 50 of the 64 on 2026-09-22 04:22Z (#3915). No further "
+            "remediation is planned for this family."
         ),
         "reason": (
+            "Owner ruling 2026-09-22 ~19:35 PT (#3915): EXCLUDED from the alarmed leg. Chats are "
+            "CROSS_PHASE since ADR-153, and the 64-row durable strip the owner authorised on 2026-09-21 "
+            "(50 rows applied) is the only remediation this family gets; the residue is counted every "
+            "night and is never a finding, and because the writers keep refusing the attribute it can "
+            "only shrink. REVISES the 2026-09-20 in-scope ruling, whose account follows. "
             "The issue called these 'retired-coach CHAT#'; they are not retired — COACH#eli_marsh (53) and "
             "COACH#career_coach (11) are persona_registry.CHAT_COACH_IDS, the lead and the career coach, "
             "newest row 2026-09-17. They are the SAME defect #3514 already stripped from the operational "
@@ -354,9 +435,11 @@ def ruling_verdict(pk: str, bad: list) -> tuple[str, dict | None]:
     """(verdict, ruling) for a CROSS_PHASE row carrying the provenance attrs `bad`.
 
     RULED_LABEL when every attribute is one the family's ruling sanctions,
+    RULED_EXCLUDED when every attribute is the residue an owner-ruled exclusion covers
+    (#3915, 2026-09-22 — the chat tier: counted, never a finding, still refused on write),
     RULED_IN_SCOPE when the family is ruled a defect with a named remediation,
     UNRULED when there is no ruling — or when the row carries an attribute OUTSIDE
-    the one its ruling sanctions, which is the case nobody has decided yet and must
+    the one its ruling covers, which is the case nobody has decided yet and must
     never be swallowed by the entry that covers its neighbour.
     """
     ruling = provenance_ruling(pk)
@@ -364,7 +447,7 @@ def ruling_verdict(pk: str, bad: list) -> tuple[str, dict | None]:
         return UNRULED, None
     residue = [a for a in bad if a not in ruling["allowed"]]
     if not residue:
-        return RULED_LABEL, ruling
+        return (RULED_EXCLUDED if ruling["disposition"] == RULED_EXCLUDED else RULED_LABEL), ruling
     return (RULED_IN_SCOPE, ruling) if ruling["disposition"] == RULED_IN_SCOPE else (UNRULED, ruling)
 
 
@@ -374,9 +457,11 @@ def cycle_label_forbidden(pk: str, sk: str = "") -> bool:
 
     False when the row's class permits provenance at all (it is not CROSS_PHASE, so the
     ordinary `experiment_stamp*` contract applies), and False when the family's ruling
-    SANCTIONS a cycle label (milestones, recall_embeddings, calibration — where the
-    writers were right and the blanket predicate was too wide). True otherwise, which is
-    where a writer must drop the attribute rather than mint a row the audit will report.
+    SANCTIONS a cycle label (milestones, recall_embeddings — where the writers were right
+    and the blanket predicate was too wide). True otherwise, which is where a writer must
+    drop the attribute rather than mint a row the audit will report — including the
+    calibration ledger (in-scope since 2026-09-22) and the chat tier, whose owner-ruled
+    EXCLUSION is from the alarm, never a licence to write the label again.
 
     One function for both directions on purpose. The whole shape of #3514 was a predicate
     that was correct and unread; a writer that re-derives "is a cycle OK here?" beside the
@@ -389,8 +474,15 @@ def cycle_label_forbidden(pk: str, sk: str = "") -> bool:
 
 
 def format_inverse_census(audit: dict) -> str:
-    """One line naming EVERY family carrying forbidden provenance and its ruling — the
-    box-4 sentence: the four families are enumerated by the check, never invisible to it.
+    """One line naming EVERY ruled family and every family carrying forbidden provenance,
+    with its ruling — the box-4 sentence: the four families are enumerated by the check,
+    never invisible to it.
+
+    Every family in CROSS_PHASE_PROVENANCE_RULINGS is named EVERY night, at its row count
+    (0 included) — a family that a remediation has just cleared must say "0", not vanish,
+    or the enumeration silently shrinks back to "whatever is dirty tonight" (#3915 box 4).
+    An excluded family carries its one-line `summary` so the reason for the exclusion is
+    in the sentence the reader sees, not only in this file.
 
     Written here rather than in the caller so the nightly (qa_smoke_lambda) and any
     operator report render the same sentence from the same derivation. Never returns
@@ -400,13 +492,27 @@ def format_inverse_census(audit: dict) -> str:
     would most reassuringly say "none" (#3915 box 4).
     """
     census = audit.get("inverse_census") or {}
-    if not census:
-        return " INVERSE census (#3915): 0 cross-phase row(s) carry forbidden provenance across the audited families."
     parts = []
     for fam, e in sorted(census.items(), key=lambda kv: (-kv[1]["rows"], kv[0])):
-        parts.append(f"{fam} {e['rows']} [{'+'.join(e['attrs'])}] {e['verdict']}")
+        parts.append(f"{fam} {e['rows']} [{'+'.join(e['attrs'])}] {e['verdict']}{_exclusion_note(fam, e['verdict'])}")
+    for fam, ruling in sorted(CROSS_PHASE_PROVENANCE_RULINGS.items()):
+        if fam not in census:
+            parts.append(f"{fam} 0 {ruling['disposition']}{_exclusion_note(fam, ruling['disposition'])}")
     total = sum(e["rows"] for e in census.values())
-    return f" INVERSE census (#3915): {total} cross-phase row(s) carry provenance, ruled — " + "; ".join(parts) + "."
+    if not census:
+        head = " INVERSE census (#3915): 0 cross-phase row(s) carry forbidden provenance across the audited families"
+    else:
+        head = f" INVERSE census (#3915): {total} cross-phase row(s) carry provenance"
+    return head + ", ruled — " + "; ".join(parts) + "."
+
+
+def _exclusion_note(family: str, verdict: str) -> str:
+    """` (<summary>)` for a family whose verdict is an exclusion, else `` — the reason an
+    excluded family is excluded, carried into the rendered sentence."""
+    if verdict not in EXCLUDED_DISPOSITIONS:
+        return ""
+    summary = (CROSS_PHASE_PROVENANCE_RULINGS.get(family) or {}).get("summary")
+    return f" ({summary})" if summary else ""
 
 
 def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None, exempt_keys=()) -> dict:
@@ -511,9 +617,9 @@ def scoped_stamp_audit(pages, inverse_pks=(), genesis: str | None = None, exempt
                     entry["rows"] += 1
                     entry["attrs"].update(bad)
                     entry["pks"].add(pk)
-                    if verdict != entry["verdict"]:
+                    if _VERDICT_SEVERITY[verdict] > _VERDICT_SEVERITY[entry["verdict"]]:
                         # Two verdicts inside one family: report the stricter one, never the quieter.
-                        entry["verdict"] = UNRULED if UNRULED in (verdict, entry["verdict"]) else RULED_IN_SCOPE
+                        entry["verdict"] = verdict
                     if verdict == RULED_IN_SCOPE:
                         remediable.setdefault(fam, []).append(f"{pk}/{sk}[{'+'.join(bad)}]")
                     elif verdict == UNRULED:

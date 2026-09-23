@@ -235,9 +235,14 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
     }
 
 
+# #4064: v0.3's archetype is `full`; the reader-facing type is "Full Body" (the Hevy folder
+# name too). Every other archetype keeps its title-cased form.
+_TYPE_LABELS = {"full": "Full Body", "full_body": "Full Body"}
+
+
 def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
     """Render the title from IR + context. Re-entry uses the gentle form."""
-    type_label = (ir.archetype or "Session").title()
+    type_label = _TYPE_LABELS.get((ir.archetype or "").lower()) or (ir.archetype or "Session").title()
     if ir.variant == "re_entry":
         title = f"Welcome back · {type_label}"
     else:
@@ -246,6 +251,14 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
         y = ctx.get("all_time_count", 1)
         title = f"{phase} - {type_label} - {n} - {y}"
     return title[:MAX_TITLE_CHARS]
+
+
+_ROLE_WHY = {
+    "heavy": "Full-body heavy: one top set at RPE 7-8, back-offs 10% lighter. Loads hold.",
+    "moderate": "Full-body moderate: steady working sets, 2-3 left in the tank. Loads hold.",
+    "heavy_moderate": "Full-body heavy-moderate: two anchors heavy, two moderate. Loads hold.",
+    "optional_fourth": "Optional session: only after two green recovery days. Skipping it costs nothing.",
+}
 
 
 def format_why_note(ir: RoutineSpec) -> str:
@@ -264,6 +277,13 @@ def format_why_note(ir: RoutineSpec) -> str:
         return "Recovery red. Deloading today; protect joints."
     if "portfolio guard active" in rationale_blob:
         return "Aerobic base low. Holding strength flat to protect Zone 2."
+    # #4064: a v0.3 §3 session says what KIND of day it is before it says anything else.
+    cal = (getattr(ir, "inputs_snapshot", None) or {}).get("calendar") or {}
+    if cal.get("deload"):
+        return "Deload week: fewer sets, same loads. Leave feeling fresh."
+    role_line = _ROLE_WHY.get(str(cal.get("session_role") or ""))
+    if role_line:
+        return role_line
     if "recovery=yellow" in rationale_blob:
         return "Readiness yellow. Holding steady."
     if "recovery=green" in rationale_blob:

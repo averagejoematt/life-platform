@@ -14,8 +14,14 @@ What is pinned here:
   3. The void-row sk is collision-proof across cycles that reuse a slug, while staying
      idempotent for the same bet.
   4. The reconcile script's classification is correct for a synthetic row of each class,
-     and its planned rows are honest: voided, cycle-stamped from the row's OWN
+     and its planned rows are honest: voided, reset-genesis-stamped from the row's OWN
      provenance, never back-graded, never Brier-scorable.
+
+#3915 box 2 (2026-09-22): the void row no longer carries a bare `cycle` — that was the
+attribute the inverse census found 2,211 of on this partition, and the owner ruled the
+family in-scope for the alarmed leg. `reset_genesis` (already on every row) plus
+`taxonomy.closing_cycle_for_genesis` recovers the identical number the tests below used
+to read straight off `row["cycle"]`.
 
 No AWS: a fake table serves fixture rows; everything else is pure.
 """
@@ -184,16 +190,30 @@ def test_closing_cycle_is_derived_from_the_rows_own_provenance():
     assert taxonomy.closing_genesis_of(bet) == "2026-07-13"
     assert taxonomy.closing_cycle_for_genesis("2026-07-13", _CYCLE_GENESES) == 5
     row = reconcile.build_reconcile_row("hypothesis", bet, reconcile.ORPHAN_PRE_FIX, _CYCLE_GENESES, "2026-08-02T00:00:00+00:00", 11)
-    assert row["cycle"] == 5  # the cycle that actually closed it…
+    # #3915 box 2: the row no longer carries a bare `cycle` (the CROSS_PHASE-forbidding
+    # provenance the inverse census found 2,211 of) — the closing cycle that actually
+    # closed it is recoverable from `reset_genesis` alone, which IS still on the row.
+    assert "cycle" not in row
+    assert taxonomy.closing_cycle_for_genesis(row["reset_genesis"], _CYCLE_GENESES) == 5
     assert row["reconciled_at_cycle"] == 11  # …not the cycle the backfill ran in
     assert row["bet_cycle_stamp"] == 1  # the row's own (create-time) stamp is preserved, not overwritten
     assert row["reset_genesis"] == "2026-07-13"
 
 
+def test_a_reconciled_row_carries_no_provenance_its_class_forbids():
+    """#3915 box 2: the bet's tombstone time is kept as CONTENT (`bet_tombstoned_at`,
+    the `bet_cycle_stamp` precedent), never as the provenance attr `tombstoned_at` — the
+    1,506 live reconciled rows that carried one are the backfill's move, not a delete."""
+    bet = _hyp("2026-05-12T00:00:00+00:00", "h_pre", tombstone=True, tombstoned_reason="experiment_restart_2026-07-13", cycle=1)
+    row = reconcile.build_reconcile_row("hypothesis", bet, reconcile.ORPHAN_PRE_FIX, _CYCLE_GENESES, "2026-08-02T00:00:00+00:00", 11)
+    assert taxonomy.forbidden_provenance(row["pk"], row["sk"], row) == []
+    assert row["bet_tombstoned_at"] == bet["tombstoned_at"]
+
+
 def test_unresolvable_closing_cycle_is_reported_not_invented():
     bet = _hyp("2026-05-12T00:00:00+00:00", "h_odd", tombstone=True, tombstoned_reason="experiment_restart_2029-01-01")
     row = reconcile.build_reconcile_row("hypothesis", bet, reconcile.ORPHAN_PRE_FIX, _CYCLE_GENESES, "2026-08-02T00:00:00+00:00", 11)
-    assert "cycle" not in row  # None is dropped rather than defaulted to a number
+    assert "cycle" not in row  # never present now (#3915 box 2) — never defaulted to a number either way
     assert "unknown" in row["cycle_attribution"]
 
 
@@ -214,7 +234,10 @@ def test_post_fix_orphan_reason_names_the_sk_clobber():
     bet = _hyp("2026-07-18T22:02:16+00:00", "genesis_prereg_h1", tombstone=True, tombstoned_reason="experiment_restart_2026-07-20")
     row = reconcile.build_reconcile_row("hypothesis", bet, reconcile.ORPHAN_POST_FIX, _CYCLE_GENESES, "2026-08-02T00:00:00+00:00", 11)
     assert "overwriting it" in row["void_reason"]
-    assert row["cycle"] == 8  # genesis 2026-07-20 opens cycle 9 → closes cycle 8
+    assert "cycle" not in row  # #3915 box 2 — recoverable via reset_genesis, never hand-written
+    assert (
+        taxonomy.closing_cycle_for_genesis(row["reset_genesis"], _CYCLE_GENESES) == 8
+    )  # genesis 2026-07-20 opens cycle 9 → closes cycle 8
 
 
 # ── end-to-end over a fake table ─────────────────────────────────────────────

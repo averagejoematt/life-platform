@@ -23,8 +23,9 @@ retroactive half — the owner's 2026-09-20 ruling on #3770 is RETIRE-AND-RECREA
 TWO TABLES, TWO JOBS
 
 `TEMPLATE_MUSCLE_OVERRIDES` is read by every aggregation that classifies a Hevy
-exercise by template id rather than by name — `mcp/strength_helpers.classify_exercise`
-(feeds `mcp/tools_strength.py::tool_get_muscle_volume`) and
+exercise by template id rather than by name — `training/muscle_volume.attribute_exercise`
+(#4071; feeds `mcp/strength_helpers.classify_exercise` and
+`mcp/tools_strength.py::tool_get_muscle_volume`) and
 `lambdas/web/site_api_training.py::_classify_muscles`. It makes every set ALREADY
 logged against the old id count as the corrected muscle group, forever — nothing
 here re-tags Hevy, it only corrects how this platform reads Hevy.
@@ -39,7 +40,7 @@ two templates share a title in the live Hevy catalogue.
 from __future__ import annotations
 
 #: Hevy template id (lowercased, as the API returns it) -> the corrected muscle-group
-#: label, in THIS platform's vocabulary (matches `_EXERCISE_MUSCLE_MAP` /
+#: label, in THIS platform's vocabulary (matches `training/muscle_volume.MUSCLES` /
 #: `_VOLUME_LANDMARKS` keys in mcp/strength_helpers.py and `_MUSCLE_MAP` /
 #: `_LANDMARKS` keys in lambdas/web/site_api_training.py — both use "Calves").
 TEMPLATE_MUSCLE_OVERRIDES: dict[str, str] = {

@@ -2,78 +2,13 @@
 Strength training helpers: exercise classification, 1RM estimation, volume tracking.
 """
 
-from training.template_muscle_overrides import muscle_override_for
+from training.muscle_volume import attribute_exercise
 
-# #3770: a corrected muscle group carries no movement_pattern of its own — this maps
-# the override's label (this module's own vocabulary) onto the Push/Pull/Legs/Core
-# taxonomy classify_exercise otherwise derives from the name-keyword map below.
-_MUSCLE_TO_PATTERN = {
-    "Chest": "Push",
-    "Shoulders": "Push",
-    "Triceps": "Push",
-    "Back": "Pull",
-    "Biceps": "Pull",
-    "Quads": "Legs",
-    "Glutes": "Legs",
-    "Hamstrings": "Legs",
-    "Calves": "Legs",
-    "Core": "Core",
-}
-
-_EXERCISE_MUSCLE_MAP = [
-    # (keywords, muscle_groups, movement_pattern)
-    (["bench press", "chest press", "pec deck", "fly", "flye", "push up", "pushup"], ["Chest", "Triceps", "Shoulders"], "Push"),
-    (["overhead press", "ohp", "shoulder press", "military press", "dumbbell press", "arnold"], ["Shoulders", "Triceps"], "Push"),
-    (["tricep", "triceps", "skull crusher", "pushdown", "push down", "close grip", "dip"], ["Triceps", "Chest"], "Push"),
-    (["pull up", "pullup", "chin up", "chinup", "lat pulldown", "pull-up", "pull-down"], ["Back", "Biceps"], "Pull"),
-    (["row", "rowing", "cable row", "t-bar", "seated row"], ["Back", "Biceps"], "Pull"),
-    (["deadlift"], ["Back", "Hamstrings", "Glutes", "Quads"], "Pull"),
-    (["back extension", "hyperextension", "good morning"], ["Back", "Hamstrings", "Glutes"], "Pull"),
-    (["bicep", "biceps", "curl", "hammer curl"], ["Biceps"], "Pull"),
-    (["squat", "goblet"], ["Quads", "Glutes", "Hamstrings"], "Legs"),
-    (["leg press"], ["Quads", "Glutes", "Hamstrings"], "Legs"),
-    (["lunge", "step up", "bulgarian"], ["Quads", "Glutes", "Hamstrings"], "Legs"),
-    (["leg extension", "leg curl", "hamstring curl", "nordic"], ["Quads", "Hamstrings"], "Legs"),
-    (["hip thrust", "glute bridge", "hip abduct", "hip adduct"], ["Glutes", "Hamstrings"], "Legs"),
-    (["calf", "calves", "standing calf", "seated calf"], ["Calves"], "Legs"),
-    # Core: direct flexion/oblique work PLUS anti-rotation & loaded carries. Without the
-    # latter, Pallof presses and farmer/suitcase carries fell through to "Other" and
-    # core_sets read 0 even on a day they were trained (B2b, 2026-06-21).
-    (
-        [
-            "plank",
-            "crunch",
-            "ab ",
-            "abs ",
-            "core",
-            "oblique",
-            "sit up",
-            "situp",
-            "hanging leg",
-            "windshield",
-            "leg raise",
-            "knee raise",
-            "russian twist",
-            "hollow",
-            "rollout",
-            "ab wheel",
-            "pallof",
-            "anti-rotation",
-            "anti rotation",
-            "dead bug",
-            "deadbug",
-            "bird dog",
-            "carry",
-            "carries",
-            "farmer",
-            "suitcase",
-            "woodchop",
-            "wood chop",
-        ],
-        ["Core"],
-        "Core",
-    ),
-]
+# #4071: the exercise -> muscle taxonomy lives in ONE place,
+# `lambdas/training/muscle_volume.py::EXERCISE_TAXONOMY` (one primary muscle per row, a
+# secondary only where the row names it, at a stated fraction). The keyword table that used
+# to live here credited every set to every muscle in its row — Quads and Hamstrings came out
+# identical — and let "curl" swallow "Seated Leg Curl". It is gone, not kept beside the new one.
 
 _BODYWEIGHT_EXERCISES = [
     "pull up",
@@ -91,22 +26,24 @@ _BODYWEIGHT_EXERCISES = [
 
 
 def classify_exercise(name: str, template_id: str | None = None) -> dict:
-    """Return {muscle_groups, movement_pattern} for an exercise name.
+    """Return {muscle_groups, movement_pattern, primary_muscle, secondary_muscles} for an exercise.
 
-    #3770: a Hevy template id's own (permanently wrong, un-editable) muscle group can
-    poison this by NAME classification's own logic too — "Calf Press on Leg Press
-    Machine" matches the "leg press" keyword before it ever reaches "calf". `template_id`
-    is checked against the id-keyed override table FIRST, ahead of any name matching, so
-    a corrected id always wins regardless of what its title would otherwise classify as.
+    A LABEL, not a count: `muscle_groups` is the primary followed by any named secondaries, for
+    callers that ask "which muscles does this movement touch" (exercise-history labels, muscle
+    recency). Per-muscle SET counts come only from `training.muscle_volume.working_sets_by_muscle`
+    (#4071), which weights secondaries by their stated fraction.
+
+    #3770: a Hevy template id with an id-keyed override wins over any name match.
     """
-    override = muscle_override_for(template_id)
-    if override:
-        return {"muscle_groups": [override], "movement_pattern": _MUSCLE_TO_PATTERN.get(override, "Other")}
-    nl = name.lower()
-    for keywords, muscles, pattern in _EXERCISE_MUSCLE_MAP:
-        if any(kw in nl for kw in keywords):
-            return {"muscle_groups": muscles, "movement_pattern": pattern}
-    return {"muscle_groups": ["Other"], "movement_pattern": "Other"}
+    attr = attribute_exercise(name, template_id)
+    if attr["primary"] is None:
+        return {"muscle_groups": ["Other"], "movement_pattern": "Other", "primary_muscle": None, "secondary_muscles": {}}
+    return {
+        "muscle_groups": [attr["primary"], *attr["secondary"]],
+        "movement_pattern": attr["movement_pattern"],
+        "primary_muscle": attr["primary"],
+        "secondary_muscles": dict(attr["secondary"]),
+    }
 
 
 def is_bodyweight(name: str) -> bool:
@@ -243,7 +180,10 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
         elif w_lbs is not None and w_kg is None:
             w_kg = float(w_lbs) / _KG_TO_LBS
         out = {
-            "set_type": s.get("set_type", "normal"),
+            # #4071: the live per-workout rows carry the type as `type`; only the legacy daily
+            # aggregates used `set_type`. Reading `set_type` alone defaulted every live warm-up
+            # to "normal", so every warm-up filter downstream had nothing to drop.
+            "set_type": s.get("set_type") or s.get("type") or "normal",
             "weight_lbs": float(w_lbs or 0),
             "weight_kg": float(w_kg or 0),
             "reps": int(s.get("reps") or 0),
@@ -295,25 +235,90 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
     return out
 
 
-def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups: bool = False, template_id: str = "") -> list:
+def exercise_identity(template_id: str | None, name: str | None, alias_map: dict[str, str] | None = None) -> str:
+    """The ONE identity a performed exercise is keyed by in a history / anchor series (#4069).
+
+    A Hevy `template_id` (upper-cased), mapped through the confirmed alias registry
+    (`config/hevy_template_aliases.json`, #3929 — alias id -> canonical id) when one is
+    supplied. A name never enters this key when an id exists: "Bench Press (Barbell)" and
+    "Incline Bench Press (Dumbbell)" share a substring and are two identities. An exercise
+    Hevy never tagged with an id gets `untagged:<exact title>` — its own bucket, never
+    merged with a tagged movement or with a different untagged title.
+    """
+    tid = (template_id or "").strip().upper()
+    if tid:
+        return (alias_map or {}).get(tid, tid)
+    return "untagged:" + " ".join((name or "").strip().lower().split())
+
+
+def resolve_exercise_templates(hevy_items: list, exercise_name: str, alias_map: dict[str, str] | None = None) -> list[dict]:
+    """A user-facing NAME -> the set of template identities it matched (#4069).
+
+    The name is a SEARCH, never an identity: it is matched (case-insensitive substring) against
+    the titles actually logged, and the answer is the list of template ids those titles carry —
+    one row per canonical identity, naming every raw template id and title folded into it (only
+    the alias registry folds two ids together). Every series is then built from these ids, so the
+    substring decides WHICH movements are candidates and never which sets belong to a movement.
+    """
+    needle = " ".join((exercise_name or "").strip().lower().split())
+    if not needle:
+        return []
+    rows: dict[str, dict] = {}
+    for workout in normalize_hevy_items(hevy_items):
+        for ex in workout["exercises"]:
+            title = ex["name"] or ""
+            if needle not in " ".join(title.lower().split()):
+                continue
+            ident = exercise_identity(ex.get("template_id"), title, alias_map)
+            row = rows.setdefault(ident, {"identity": ident, "template_ids": set(), "titles": set(), "n_sessions": 0})
+            raw = (ex.get("template_id") or "").strip().upper()
+            if raw:
+                row["template_ids"].add(raw)
+            row["titles"].add(title)
+            row["n_sessions"] += 1
+    out = []
+    for ident in sorted(rows, key=lambda i: (-rows[i]["n_sessions"], i)):
+        r = rows[ident]
+        out.append({**r, "template_ids": sorted(r["template_ids"]), "titles": sorted(r["titles"])})
+    return out
+
+
+def extract_hevy_sessions(
+    hevy_items: list,
+    exercise_name: str,
+    include_warmups: bool = False,
+    template_id: str = "",
+    alias_map: dict[str, str] | None = None,
+) -> list:
     """
     Given raw DynamoDB hevy items and a target exercise name (fuzzy) OR an exact Hevy
     `template_id`, return a list of session dicts sorted by date.
-    Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, volume}
+    Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, volume,
+    template_id, identity}
+
+    #4069: sets are selected by template IDENTITY only (`exercise_identity`). A `template_id`
+    selects its canonical identity — so a confirmed alias id is the same movement, and nothing
+    else is. A fuzzy name is first RESOLVED to the identities whose logged titles contain it
+    (`resolve_exercise_templates`); the substring never gates a set directly. Each session
+    carries its `identity`, so a caller can never fold two identities into one series without
+    seeing that it did.
     """
-    target = (exercise_name or "").lower()
     # #3766: a Hevy template id is the exact, stable handle for a movement; a name is a
     # fuzzy one. "75A4F6C4" as a substring of a NAME matches nothing, so accept it as an id.
     target_tid = (template_id or "").strip().upper()
-    sessions = []
+    if target_tid:
+        wanted = {exercise_identity(target_tid, "", alias_map)}
+    else:
+        wanted = {r["identity"] for r in resolve_exercise_templates(hevy_items, exercise_name, alias_map)}
+    sessions: list[dict] = []
+    if not wanted:
+        return sessions
     for workout in normalize_hevy_items(hevy_items):
         date_str = workout["date"]
         for ex in workout["exercises"]:
             ex_name = ex["name"]
-            if target_tid:
-                if (ex.get("template_id") or "").strip().upper() != target_tid:
-                    continue
-            elif target not in ex_name.lower():
+            identity = exercise_identity(ex.get("template_id"), ex_name, alias_map)
+            if identity not in wanted:
                 continue
             sets_out = []
             for s in ex["sets"]:
@@ -336,6 +341,7 @@ def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups:
                     "date": date_str,
                     "exercise_name": ex_name,
                     "template_id": ex.get("template_id") or "",
+                    "identity": identity,
                     "note_raw": ex.get("notes") or "",
                     "sets": sets_out,
                     "best_1rm": best_1rm,

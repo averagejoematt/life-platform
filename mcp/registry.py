@@ -546,6 +546,20 @@ TOOLS = {
                         "type": "string",
                         "description": "Stage 2 (#3752): a drafted routine_id to red-team. Runs the four critics over disjoint evidence, applies their changes to the draft, stores the verdicts on it; a veto then blocks commit.",
                     },
+                    "veto_override": {
+                        "type": "object",
+                        "description": (
+                            "#4076, stage 2 only: Matthew overrules ONE vetoing critic. {critic: muscle_defense|joints_tendons|"
+                            "rate_advocate|blueprint_historian, owner_words: his words VERBATIM, error_class?: corrections-ledger class}. "
+                            "Only that critic's veto is marked overridden (recorded on the routine, in the Hevy notes and in the "
+                            "corrections ledger); every other critic's changes still apply and any other veto still blocks."
+                        ),
+                        "properties": {
+                            "critic": {"type": "string"},
+                            "owner_words": {"type": "string"},
+                            "error_class": {"type": "string"},
+                        },
+                    },
                 },
                 "required": [],
             },

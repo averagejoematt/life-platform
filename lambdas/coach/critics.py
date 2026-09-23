@@ -36,6 +36,12 @@ A veto blocks the Hevy commit (`veto_reason`). A change is APPLIED to the draft
 (`apply_changes`) and the revised draft is re-checked deterministically (`recheck`) before
 anyone reads a verdict off it.
 
+THE OWNER OVERRIDE (#4076)
+
+The owner may overrule ONE vetoing critic in his own words (`coach.critic_overrides`). The
+verdict stays `veto` on the record and carries `owner_override`; `standing_vetoes` /
+`veto_reason` stop counting it; every other verdict, veto or change, is untouched.
+
 WHERE THE REDLINES COME FROM
 
 Two sources, and the provenance rides on every flag:
@@ -60,7 +66,7 @@ from typing import Any, Callable
 
 from training import owner_redlines, training_context_registry
 
-CRITICS_VERSION = "critics@1.1.0"  # #4036: the joints packet reads the owner-dismissal layer
+CRITICS_VERSION = "critics@1.2.0"  # #4076: an owner override of ONE vetoing critic, recorded verbatim
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
@@ -154,12 +160,20 @@ def build_muscle_defense_packet(
     anchor_trends: dict[int, dict[str, Any]] | None,
     protein_days_missed_7d: int | None,
     protein_days_measured_7d: int | None,
+    program_week: int | None,
 ) -> dict[str, Any]:
     """Strength trend on the draft's anchor lifts + protein against the owner's floor.
 
-    `anchor_trends` is keyed by draft exercise idx: {last_top_lbs, trailing_best_lbs,
-    drop_pct, sessions_below, n_sessions}. Missing → unknown, never clear.
+    `anchor_trends` is keyed by draft exercise idx: {last_top_lbs, drop_pct, sessions_below,
+    recent_median_e1rm_lb, baseline_median_e1rm_lb, n_sessions} — built by
+    `plan_engine.anchor_e1rm_trend`, the SAME rolling e1RM median the engine's tripwire reads
+    (#4098). Whether a trend trips is `plan_engine.anchor_drop_tripped`, and whether the
+    tripwire is armed at all is `plan_engine.not_before_week_gate` over `program_week` (the
+    block calendar's week — required, so no caller arms it by omission). This packet computes
+    no drop of its own. Missing → unknown, never clear.
     """
+    from training import plan_engine
+
     by_id = {t["id"]: t for t in owner_redlines.TRIPWIRES}
     drop_t = by_id["anchor_lift_strength_drop"]
     prot_t = by_id["protein_floor_missed"]
@@ -193,6 +207,8 @@ def build_muscle_defense_packet(
                 provenance=prot_t["provenance"],
             )
         )
+    gate = plan_engine.not_before_week_gate(drop_t, program_week)
+    numbers["program_week"] = program_week
     for ex in draft["exercises"]:
         tr = (anchor_trends or {}).get(ex["idx"])
         k = f"anchor_drop_pct[{ex['idx']}]"
@@ -202,17 +218,30 @@ def build_muscle_defense_packet(
             continue
         numbers[k] = tr["drop_pct"]
         numbers[f"anchor_sessions_below[{ex['idx']}]"] = tr.get("sessions_below")
-        numbers[f"anchor_trailing_best_lbs[{ex['idx']}]"] = tr.get("trailing_best_lbs")
+        numbers[f"anchor_baseline_median_e1rm_lb[{ex['idx']}]"] = tr.get("baseline_median_e1rm_lb")
+        numbers[f"anchor_recent_median_e1rm_lb[{ex['idx']}]"] = tr.get("recent_median_e1rm_lb")
         numbers[f"anchor_last_top_lbs[{ex['idx']}]"] = tr.get("last_top_lbs")
-        tripped = tr["drop_pct"] >= drop_t["threshold_pct"] and (tr.get("sessions_below") or 0) >= drop_t["consecutive_sessions"]
-        if tripped:
+        tripped = plan_engine.anchor_drop_tripped(tr["drop_pct"], tr.get("sessions_below"))
+        if gate and tr["drop_pct"] > 0:
+            # #4098: the ramp weeks. A detraining return is not a strength loss, so the drop is
+            # REPORTED (with the gate named) and never becomes a change.
+            flags.append(
+                _flag(
+                    k,
+                    "info",
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline — anchor_lift_strength_drop is {gate}",
+                    provenance=drop_t["provenance"],
+                )
+            )
+        elif tripped:
             hold_to = tr.get("last_top_lbs")
             over = ex.get("top_weight_lbs") is not None and hold_to is not None and ex["top_weight_lbs"] > hold_to
             flags.append(
                 _flag(
                     k,
                     "change",
-                    f"{ex['label']}: -{tr['drop_pct']:.1f}% vs trailing best across {tr.get('sessions_below')} session(s) — {drop_t['action']} "
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline, {tr.get('sessions_below')} session(s) below "
+                    f"— {drop_t['action']} "
                     f"[{drop_t['threshold_pct']}%/{drop_t['consecutive_sessions']}-session threshold is {drop_t['provenance']}, not his variance]",
                     provenance=drop_t["provenance"],
                     field=f"exercises[{ex['idx']}].weight_lbs" if over else None,
@@ -224,7 +253,7 @@ def build_muscle_defense_packet(
                 _flag(
                     k,
                     "info",
-                    f"{ex['label']}: -{tr['drop_pct']:.1f}% vs trailing best ({tr.get('n_sessions')} sessions)",
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline ({tr.get('n_sessions')} sessions)",
                     provenance=drop_t["provenance"],
                 )
             )
@@ -411,9 +440,15 @@ def build_rate_advocate_packet(
     tw = tripwires or []
     clear = [t["id"] for t in tw if t.get("state") == "clear"]
     tripped = [t["id"] for t in tw if t.get("state") == "tripped"]
-    unknown_tw = [t["id"] for t in tw if t.get("state") == "unknown"]
+    # #4072: a tripwire whose input read FAILED is as unreadable as an absent one — the
+    # advocate may not argue for more volume past either.
+    unknown_tw = [t["id"] for t in tw if t.get("state") in ("unknown", "read_failed")]
+    # #4098: a tripwire held by its own `not_before_week` is neither clear nor tripped — it is
+    # counted and named, so "all clear" never silently means "all the ones that are armed".
+    inactive = [t["id"] for t in tw if t.get("state") == "not_yet_active"]
     numbers: dict[str, Any] = {
         "tripwires_clear": len(clear),
+        "tripwires_not_yet_active": len(inactive),
         "tripwires_tripped": len(tripped),
         "tripwires_unreadable": len(unknown_tw),
         "walking_gap_hr_wk": (walking or {}).get("gap_hr_wk"),
@@ -437,7 +472,8 @@ def build_rate_advocate_packet(
             _flag(
                 "tripwires_clear",
                 "info",
-                f"all {len(clear)} tripwires clear — nothing in the data argues for holding back",
+                f"all {len(clear)} armed tripwires clear — nothing in the data argues for holding back"
+                + (f" ({len(inactive)} not yet active: {', '.join(inactive)})" if inactive else ""),
                 provenance="owner",
             )
         )
@@ -916,16 +952,28 @@ def _clone(s: Any) -> Any:
     return copy.deepcopy(s)
 
 
-def recheck(ir: Any, rebuild_packets: Callable[[dict[str, Any]], dict[str, dict[str, Any]]]) -> dict[str, Any]:
+def recheck(
+    ir: Any,
+    rebuild_packets: Callable[[dict[str, Any]], dict[str, dict[str, Any]]],
+    *,
+    overridden: Any = (),
+) -> dict[str, Any]:
     """Re-run the DETERMINISTIC layer over the revised draft with the same evidence.
 
     `rebuild_packets(draft_summary)` is the caller's packet builder over the already-fetched
-    evidence — no model, no I/O. Passes only when no packet still carries a violation."""
+    evidence — no model, no I/O. Passes only when no packet still carries a violation that
+    the owner has not overridden (#4076). An overridden critic's remaining veto is still
+    LISTED, marked `owner_overridden`, never dropped from the record."""
     draft = draft_summary(ir)
     packets = rebuild_packets(draft)
-    remaining = [deterministic_verdict(p) | {"critic": cid} for cid, p in packets.items() if p.get("violations")]
+    over = set(overridden or ())
+    remaining = [
+        deterministic_verdict(p) | {"critic": cid} | ({"owner_overridden": True} if cid in over else {})
+        for cid, p in packets.items()
+        if p.get("violations")
+    ]
     return {
-        "passed": not remaining,
+        "passed": not [r for r in remaining if not r.get("owner_overridden")],
         "remaining_vetoes": remaining,
         "total_sets": draft["total_sets"],
         "exercise_count": len(draft["exercises"]),
@@ -933,10 +981,22 @@ def recheck(ir: Any, rebuild_packets: Callable[[dict[str, Any]], dict[str, dict[
 
 
 # ── what rides on the routine ─────────────────────────────────────────────────────────
+def is_overridden(v: dict[str, Any]) -> bool:
+    """True when the owner overrode THIS verdict's veto (#4076). Only a veto can be."""
+    return v.get("verdict") == "veto" and bool(v.get("owner_override"))
+
+
+def standing_vetoes(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The vetoes that still block: every `veto` the owner has not overridden."""
+    return [v for v in verdicts or [] if v.get("verdict") == "veto" and not is_overridden(v)]
+
+
 def veto_reason(ir: Any) -> str | None:
-    """The reason a commit must refuse, or None. Read from the stored verdicts only."""
+    """The reason a commit must refuse, or None. Read from the stored verdicts only.
+
+    An owner-overridden veto (#4076) does not refuse; every other veto still does."""
     rec = ((getattr(ir, "inputs_snapshot", None) or {}).get("critics")) or {}
-    vetoes = [v for v in rec.get("verdicts", []) if v.get("verdict") == "veto"]
+    vetoes = standing_vetoes(rec.get("verdicts", []))
     if not vetoes:
         return None
     return "; ".join(f"{v['critic']}: {v.get('reason')}" for v in vetoes)
@@ -960,7 +1020,7 @@ def commit_status(ir: Any) -> str:
         return NOT_RED_TEAMED
     paused = " (model paused — deterministic layer only)" if rec.get("model_ran") is False else ""
     return f"{rec.get('engine', CRITICS_VERSION)}{paused}: " + ", ".join(
-        f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" for v in verdicts
+        f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" + (" (owner-overridden)" if is_overridden(v) else "") for v in verdicts
     )
 
 
@@ -976,10 +1036,15 @@ def notes_block(ir: Any) -> str:
         prov = f" [{v['provenance']}]" if v.get("provenance") else ""
         paused = " (model paused)" if isinstance(v.get("model"), dict) and v["model"].get("paused") else ""
         reason = (v.get("reason") or "").replace("\n", " ")
-        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {v['verdict'].upper()}{paused}:{num}{prov} {reason}"[:300])
+        over = " OVERRIDDEN BY OWNER" if is_overridden(v) else ""
+        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {v['verdict'].upper()}{over}{paused}:{num}{prov} {reason}"[:300])
     applied = [c for c in rec.get("changes", []) if c.get("applied")]
     if applied:
         lines.append("applied: " + "; ".join(f"{c['field']} -> {c['to']}" for c in applied))
+    for o in rec.get("owner_overrides") or []:
+        if o.get("applied"):
+            words = " ".join(str(o.get("owner_words") or "").split())
+            lines.append(f"owner override of {_SHORT.get(o['critic'], o['critic'])} ({str(o.get('at') or '')[:10]}): \"{words}\""[:300])
     return "\n".join(lines)
 
 
@@ -1017,7 +1082,14 @@ def thread_entry(ir: Any, *, today: str) -> dict[str, Any]:
         "generation_context": "plan_critics",
         "position_summary": f"Red team on routine {getattr(ir, 'routine_id', '?')} for {getattr(ir, 'target_date', '?')}: {summary}",
         "predictions": [],
-        "surprises": [v.get("reason") for v in verdicts if v.get("verdict") == "veto"],
+        "surprises": [v.get("reason") for v in standing_vetoes(verdicts)],
+        # #4076 — an overridden veto is not a surprise the coach carries forward; the owner's
+        # words are, verbatim, beside the critic and signal he overrode.
+        "owner_overrides": [
+            {"critic": o["critic"], "signal": o.get("signal"), "owner_words": o.get("owner_words"), "at": o.get("at")}
+            for o in rec.get("owner_overrides") or []
+            if o.get("applied")
+        ],
         "stance_changes": [
             f"{v['critic']}: {v.get('field')} -> {v.get('to')}" for v in verdicts if v.get("verdict") == "change" and v.get("field")
         ],
@@ -1030,6 +1102,7 @@ def thread_entry(ir: Any, *, today: str) -> dict[str, Any]:
                 "metric": v.get("metric"),
                 "value": v.get("value"),
                 "provenance": v.get("provenance"),
+                "owner_overridden": is_overridden(v),
             }
             for v in verdicts
         ],

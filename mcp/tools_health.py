@@ -497,9 +497,11 @@ def tool_get_weight_loss_progress(args):
     height_in = profile.get("height_inches")
 
     # HONOR an explicit start_date verbatim — the old code always overrode it
-    # with journey_start. No leak risk: query_source's phase filter (ADR-058)
-    # hides pre-genesis pilot data regardless of window width. Default to genesis
-    # when no start is passed, then a far-past floor.
+    # with journey_start. Default to the profile's journey_start_date (the genesis —
+    # 2026-09-06 live, read 2026-09-23) when no start is passed, then a far-past floor.
+    # #4061: withings is RAW_TIMESERIES, so query_source no longer phase-filters it; the
+    # "this journey" scope is this DATE window, not the phase tag. An explicit earlier
+    # start_date therefore now returns the pre-genesis weigh-ins it asks for.
     effective_start = explicit_start or journey_start or "2010-01-01"
 
     # Future/empty-window guard: a freshly re-anchored genesis can sit AHEAD of
@@ -662,6 +664,24 @@ def tool_get_weight_loss_progress(args):
                 ),
             }
 
+    # #4074: `weight_series` above is already real-only (no interpolation exists
+    # anywhere in this function) but it spans the WHOLE requested window and
+    # carries derived fields (bmi, weekly_loss_rate_lbs, rate_flag) computed by
+    # pairing each point with its nearest neighbor within a 4-day tolerance —
+    # a reader skimming it for "how's this week going" can mistake that nearest-
+    # neighbor pairing for daily cadence and miss a real gap. `recent_weights` is
+    # the narrow, honest answer: exactly the Withings partition rows
+    # (USER#matthew#SOURCE#withings) in the trailing 14 days off end_date — date +
+    # weight_lbs + the source row it came from, nothing manufactured. A 6-day gap
+    # in real weigh-ins shows as 6 missing dates here, never an interpolated entry
+    # standing in for them (on 2026-09-20 a chat session read a gap like this as
+    # continuous). #1917: a 14-day window spans 14 dates, anchor-13 .. anchor.
+    recent_weights = [
+        {"date": pt["date"], "weight_lbs": pt["weight_lbs"], "source": "withings"}
+        for pt in weight_series
+        if 0 <= (_anchor - datetime.strptime(pt["date"], "%Y-%m-%d").date()).days <= 13
+    ]
+
     start_weight = weight_series[0]["weight_lbs"]
     current_weight = weight_series[-1]["weight_lbs"]
     total_lost = round(start_weight - current_weight, 1)
@@ -703,6 +723,15 @@ def tool_get_weight_loss_progress(args):
         "milestones_achieved": milestones,
         "next_milestone": upcoming_milestones[0] if upcoming_milestones else None,
         "weight_series": weight_series,
+        # #4074: real weigh-ins only, trailing 14 days off end_date — see the
+        # comment above where this is built. Any smoothed/interpolated weight
+        # trend is a SEPARATE, separately-labelled series (none exists in this
+        # tool today); this field never carries one.
+        "recent_weights": recent_weights,
+        "recent_weights_note": (
+            "Real weigh-ins only, from USER#matthew#SOURCE#withings, trailing 14 days off end_date. "
+            "A gap in logging shows as missing dates here — never an interpolated or smoothed entry."
+        ),
         "clinical_note": "Safe loss rate: 0.5–2.0 lbs/week. >2.5 lbs/week consistently risks lean mass catabolism.",
     }
 

@@ -123,7 +123,7 @@ GET_DAILY_SNAPSHOT_DESCRIPTION = (
     "Use for: 'how was yesterday?', 'what's my latest data?', 'show me today's readings', 'all data for 2026-03-10'."
 )
 
-FIND_DAYS_DESCRIPTION = "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet'. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor."
+FIND_DAYS_DESCRIPTION = "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet' — these day totals sum MEASURED distance only: WHOOP-synced indoor/trainer walks and rides carry no distance, so a distance filter will not find a day whose activities were all unmeasured (a returned Strava day carries 'activities_without_distance' when it holds any); use search_activities with sport_type to see them. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor."
 
 GET_INTELLIGENCE_QUALITY_DESCRIPTION = "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong source-of-truth values. Use for: 'are the coaches accurate?', 'any quality issues?', 'intelligence validation results'."
 
@@ -149,7 +149,7 @@ AUDIT_COACH_DOSSIER_DESCRIPTION = (
 
 EVALUATE_PREDICTION_DESCRIPTION = "Manually resolve a coach prediction — mark as confirmed or refuted with an outcome note."
 
-SEARCH_ACTIVITIES_DESCRIPTION = "Search Strava activities by name keyword, sport type, minimum distance, or minimum elevation gain. ALWAYS use this tool (not find_days) for: named activities ('first century', 'mailbox peak', 'machu picchu'), achievement queries (longest run, biggest hike, first 100-mile ride), or sorting by distance/elevation to find top efforts. CRITICAL: Do NOT filter by sport_type when looking for longest/biggest/most impressive efforts — long walks and hikes count equally to runs and should be included. Only pass sport_type if the user explicitly asks for a specific type (e.g. 'my longest run' vs 'my longest activity'). Results include an all-time percentile rank and a context flag for exceptional values so you can narrate how remarkable the effort was."
+SEARCH_ACTIVITIES_DESCRIPTION = "Search Strava activities by name keyword, sport type, minimum distance, or minimum elevation gain. ALWAYS use this tool (not find_days) for: named activities ('first century', 'mailbox peak', 'machu picchu'), achievement queries (longest run, biggest hike, first 100-mile ride), or sorting by distance/elevation to find top efforts. CRITICAL: Do NOT filter by sport_type when looking for longest/biggest/most impressive efforts — long walks and hikes count equally to runs and should be included. Only pass sport_type if the user explicitly asks for a specific type (e.g. 'my longest run' vs 'my longest activity'). Results include an all-time percentile rank and a context flag for exceptional values so you can narrate how remarkable the effort was. Activities with no measured distance/elevation (WHOOP-synced trainer walks, manual entries) rank after every measured one and are excluded by min_distance_miles/min_elevation_gain_feet — the 'unmeasured' block counts both whenever it happens."
 
 GET_TRAINING_DESCRIPTION = (
     "Unified training intelligence. Use 'view' to select the analysis: "
@@ -169,7 +169,7 @@ GET_DAILY_METRICS_DESCRIPTION = (
     "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake'."
 )
 
-GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), and % complete toward goal. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
+GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), % complete toward goal, and recent_weights — the trailing 14 real Withings weigh-ins only (date + weight_lbs + source), where a logging gap shows as missing dates rather than being smoothed over. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
 
 PLAN_NEXT_SESSION_DESCRIPTION = (
     "The planning engine, from one place whichever client asks. STAGE 1 (no routine_id): the DETERMINISTIC "
@@ -183,7 +183,11 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
     "change <field> to <value> / veto with the metric and number it argued from. Changes are APPLIED to the "
     "draft and re-checked; a veto BLOCKS commit; the verdicts ride in the Hevy notes and the training coach "
     "thread. Order: plan_next_session → manage_hevy_routine draft_custom → plan_next_session(routine_id) → "
-    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning."
+    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning. "
+    "OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with "
+    "veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other "
+    "critic's changes still apply, and the override is recorded on the routine and in the corrections ledger. "
+    "Never skip stage 2 to get past a veto."
 )
 
 GET_EXERCISE_HISTORY_DESCRIPTION = (
@@ -203,12 +207,20 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
     "'bench press' matches both 'Bench Press (Barbell)' and 'Bench Press (Incline Dumbbell)' — different "
     "movements, never folded into one series. When a fuzzy name resolves to more than one template_id, "
     "this returns `ambiguous: true` with a `candidates` list and one `results` summary per movement "
-    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly."
+    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly. "
+    "Identity (#4069): sets are selected by template id only — a name is first resolved to the template "
+    "ids whose logged titles contain it (`searched.name_resolved_to`), and a confirmed Hevy alias pair "
+    "(`config/hevy_template_aliases.json`, #3929) is one movement; every series names what it was built "
+    "from in `matched_templates`."
 )
 
 GET_MUSCLE_VOLUME_DESCRIPTION = (
-    "Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is "
+    "Weekly WORKING sets per muscle group vs MEV/MAV/MRV volume landmarks (Renaissance Periodization). Shows if training volume is "
     "below maintenance, optimal, or exceeding recovery capacity. Also analyses push/pull/legs balance. "
+    "Counting (#4071): warm-up sets are excluded by the Hevy set type; each working set credits ONE primary muscle (1.0) and "
+    "only the secondaries the taxonomy names, at 0.5 each (`direct_sets` + `secondary_sets` = `total_sets`); cardio/mobility "
+    "entries carry no muscle volume and unknown movements are listed in `unattributed`, never folded into a muscle. Windows are "
+    "inclusive whole days (7 days = 1.0 week); every answer also carries `trailing_windows` for the 7 and 28 days ending on end_date. "
     "Counts every set in the window across EVERY experiment cycle (#4031 — no phase filter; the superseded legacy "
     "daily-aggregate generation is excluded so nothing is double-counted), so a trailing window no longer truncates to the "
     "current cycle's age. Default window is the trailing 28 days (4 whole weeks) for period='week' and 90 days for "
@@ -534,7 +546,7 @@ MANAGE_HEVY_ROUTINE_DESCRIPTION = (
     "— DO NOT pass a title; leave it to the compiler. `title` and `force_title` are DRAFT-TIME arguments, read "
     "only by draft_custom: passing either to 'commit' does nothing and the result returns a warning naming it. "
     "To force a title: draft_custom(force_title=true, title=...) → dry_run → commit. NEW routines are filed "
-    "into a per-type Hevy folder (Push/Pull/Legs/Engine); commit's `folder` key reports the outcome and reads "
+    "into a per-type Hevy folder (Full Body under v0.3; Push/Pull/Legs/Engine for the older splits), found or created at the first commit; commit's `folder` key reports the outcome and reads "
     "'unfoldered: <reason>' when that failed. Honest framing: 'deterministic volume-landmark programming with "
     "red-day deload guard' — never describe as 'autoregulated' publicly until the readiness signal is validated."
 )

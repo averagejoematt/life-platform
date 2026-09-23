@@ -5733,6 +5733,13 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
+      "module": "mcp/tools_plan.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_reading.py",
       "partition": "adaptive_mode",
       "via": "pk"
@@ -7295,7 +7302,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 705,
+      "edges": 706,
       "lambdas": 106,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7309,9 +7316,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 346,
-        "sites_resolved": 874,
-        "sites_total": 1220
+        "sites_dynamic": 348,
+        "sites_resolved": 876,
+        "sites_total": 1224
       },
       "schedule_resolution": {
         "dynamic": 0,

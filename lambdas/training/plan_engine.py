@@ -85,7 +85,183 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.3.0"  # #4051: the pain tripwire states the evidence set it examined, and flags outrank layer health
+ENGINE_VERSION = (
+    "plan-engine@1.5.0"  # #4098: `not_before_week` is enforced from the block calendar; the anchor drop is a rolling e1RM median
+)
+# plan-engine@1.4.0 (#4072): every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
+
+# ── #4072: the read state of every engine input ──────────────────────────────────────
+# `measured`   — the reader ran and returned a usable value.
+# `absent`     — the reader ran and the window holds no data (a true absence, with its reason).
+# `read_failed`— the reader RAISED, returned a tool error, or returned a shape with none of the
+#                keys it is known to carry; the error class travels with it.
+# `not_read`   — no reader is wired for this input on this path (named, never implied).
+# `not_supplied` — a pure caller passed neither a value nor a status (the pre-#4072 contract).
+MEASURED = "measured"
+ABSENT = "absent"
+READ_FAILED = "read_failed"
+NOT_READ = "not_read"
+NOT_SUPPLIED = "not_supplied"
+INPUT_STATES = (MEASURED, ABSENT, READ_FAILED, NOT_READ, NOT_SUPPLIED)
+
+# The engine inputs a status is reported for, and the tripwire each one feeds (if any).
+ENGINE_INPUTS = (
+    "walk_hr_wk_now",
+    "weight_lb",
+    "recovery_tier",
+    "readiness_low_streak_days",
+    "acwr_flag",
+    "muscle_volume",
+    "protein_days_missed_7d",
+    "reference",
+    "anchor_lift_drop_pct",
+    "pain_evidence_scope",
+    "pain_layer_status",
+    "pain_dismissals",
+    "weight_stall_days",
+    "adherence_on_plan",
+    "hevy_workouts_rotation_window",
+)
+_TRIPWIRE_INPUT = {
+    "protein_floor_missed": "protein_days_missed_7d",
+    "readiness_floor": "readiness_low_streak_days",
+    "anchor_lift_strength_drop": "anchor_lift_drop_pct",
+    "weight_stall_with_adherence": "weight_stall_days",
+    "pain_flag_named_site": "pain_evidence_scope",
+}
+
+
+def input_status(state: str, detail: str | None = None, *, error: str | None = None, **extra: Any) -> dict[str, Any]:
+    """One input's read state (#4072). `error` is `<ExceptionClass>: <message>` for a failed read."""
+    if state not in INPUT_STATES:
+        raise ValueError(f"unknown input state {state!r}")
+    out: dict[str, Any] = {"state": state}
+    if detail:
+        out["detail"] = detail
+    if error:
+        out["error"] = error
+    out.update({k: v for k, v in extra.items() if v is not None})
+    return out
+
+
+def error_label(exc: BaseException) -> str:
+    """`<ExceptionClass>: <message>`, bounded — the class is the load-bearing half."""
+    msg = str(exc).strip().replace("\n", " ")
+    return f"{type(exc).__name__}: {msg}"[:200] if msg else type(exc).__name__
+
+
+def _empty(v: Any) -> bool:
+    return v is None or (isinstance(v, (list, dict, str)) and not v)
+
+
+def resolve_input_states(values: dict[str, Any], stated: dict[str, dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
+    """Every engine input's state: the caller's stated status, else inferred from the value.
+
+    A value with no stated status is `measured` when non-empty and `not_supplied` when empty —
+    never `absent`, because only the reader knows whether it looked and found nothing.
+    """
+    stated = stated or {}
+    out: dict[str, dict[str, Any]] = {}
+    for name in ENGINE_INPUTS:
+        if name in stated and isinstance(stated[name], dict) and stated[name].get("state") in INPUT_STATES:
+            out[name] = dict(stated[name])
+        elif not _empty(values.get(name)):
+            out[name] = input_status(MEASURED)
+        else:
+            out[name] = input_status(NOT_SUPPLIED, "the caller passed no value and no read status")
+    return out
+
+
+# ── the anchor-lift trend: ONE computation (#4098) ───────────────────────────
+# v3's definition (`owner_redlines.TRIPWIRES` → `anchor_lift_strength_drop.definition_v3`): a
+# rolling 3-session e1RM median against the 6-session baseline before it, per template
+# identity. Before #4098 the engine compared the latest TOP WEIGHT with the trailing best
+# weight, reps ignored — 75 lb × 5 on 2026-05-30 against 45 lb × 8 on 2026-09-19, one
+# template (`878CD1D0`), read as "-40 %". The e1RM here is the session's `best_1rm` exactly as
+# `mcp.strength_helpers.extract_hevy_sessions` computes it (Epley, warm-ups excluded) — this
+# module adds no formula of its own. The per-exercise muscle-defense critic reads the SAME two
+# functions below (`tests/test_anchor_e1rm_not_before_week_4098.py` holds that by AST).
+E1RM_RECENT_SESSIONS = 3
+E1RM_BASELINE_SESSIONS = 6
+
+
+def _anchor_tripwire() -> dict[str, Any]:
+    return next(t for t in owner_redlines.TRIPWIRES if t["id"] == "anchor_lift_strength_drop")
+
+
+def anchor_e1rm_trend(e1rms_lb: list[float | None]) -> dict[str, Any]:
+    """The rolling-median comparison over ONE identity's e1RM series (oldest first). Pure.
+
+    Sessions with no e1RM (a bodyweight lift, reps outside the formula's gate) are skipped and
+    counted. Fewer than `E1RM_RECENT_SESSIONS + E1RM_BASELINE_SESSIONS` usable sessions yields
+    NO `drop_pct` — a comparison the series cannot support is unknown, never a small drop.
+    """
+    t = _anchor_tripwire()
+    threshold = float(t["threshold_pct"])
+    vals = [float(v) for v in e1rms_lb if v is not None and float(v) > 0]
+    need = E1RM_RECENT_SESSIONS + E1RM_BASELINE_SESSIONS
+    out: dict[str, Any] = {
+        "metric": "e1rm_rolling_median",
+        "window_sessions": {"recent": E1RM_RECENT_SESSIONS, "baseline": E1RM_BASELINE_SESSIONS},
+        "n_sessions_e1rm": len(vals),
+    }
+    if len(vals) < len(e1rms_lb):
+        out["sessions_without_e1rm"] = len(e1rms_lb) - len(vals)
+    if len(vals) < need:
+        out["insufficient"] = (
+            f"{len(vals)} session(s) with an e1RM on this template — the rolling {E1RM_RECENT_SESSIONS}-session median against the "
+            f"{E1RM_BASELINE_SESSIONS}-session baseline needs {need}"
+        )
+        return out
+    from statistics import median
+
+    recent = vals[-E1RM_RECENT_SESSIONS:]
+    baseline = vals[-need:-E1RM_RECENT_SESSIONS]
+    r_med = float(median(recent))
+    b_med = float(median(baseline))
+    out["recent_median_e1rm_lb"] = round(r_med, 1)
+    out["baseline_median_e1rm_lb"] = round(b_med, 1)
+    out["drop_pct"] = round(max(0.0, (b_med - r_med) / b_med * 100.0), 1) if b_med else None
+    out["sessions_below"] = sum(1 for v in recent if v < b_med * (1 - threshold / 100.0))
+    return out
+
+
+def anchor_drop_tripped(drop_pct: float | None, sessions_below: int | None) -> bool:
+    """The redline's own threshold over a trend from `anchor_e1rm_trend` — the one place it is applied."""
+    if drop_pct is None:
+        return False
+    t = _anchor_tripwire()
+    return float(drop_pct) >= float(t["threshold_pct"]) and int(sessions_below or 0) >= int(t["consecutive_sessions"])
+
+
+# ── `not_before_week`: a redline that is not armed yet (#4098) ───────────────
+# `anchor_lift_strength_drop` declares `not_before_week: 6` ("the ramp is still under 85 % of
+# band e1RM"). Before #4098 nothing read it: the tripwire was live in the ramp weeks, comparing
+# a detraining return with a best from before the break. The week is the v0.3 block calendar's
+# (`program_structure.calendar_entry`, #4064); before block 1 it is week 0.
+def program_week(day: str) -> int | None:
+    """The block calendar's program week for `day` — 0 before block 1, None for an unreadable day key."""
+    try:
+        entry = program_structure.calendar_entry(day)
+    except ValueError:
+        return None
+    return int(entry["week"]) if entry else 0
+
+
+def not_before_week_gate(tripwire: dict[str, Any], week: int | None) -> str | None:
+    """None when the tripwire is armed; otherwise the `not_yet_active (week N < M)` reason.
+
+    The ONLY reader of `not_before_week` — the engine (`_tripwire_states`) and the
+    muscle-defense critic both call it. An unknown week never arms a gated tripwire.
+    """
+    m = tripwire.get("not_before_week")
+    if m is None:
+        return None
+    if week is None:
+        return f"not_yet_active (week unknown < {int(m)})"
+    if week < int(m):
+        return f"not_yet_active (week {week} < {int(m)})"
+    return None
 
 
 def _evidence_scope_read(scope: dict[str, Any] | None) -> bool:
@@ -106,6 +282,15 @@ def _evidence_scope_read(scope: dict[str, Any] | None) -> bool:
         return False
 
 
+def _pain_read_failed(scope: dict[str, Any] | None, layer_status: str | None, input_states: dict[str, dict[str, Any]]) -> bool:
+    """Did the pain row's evidence fail to READ (#4072)? Only asked once no flag is on the record."""
+    if scope is not None and str(scope.get("status") or "") == READ_FAILED:
+        return True
+    if scope is None and (input_states.get("pain_evidence_scope") or {}).get("state") == READ_FAILED:
+        return True
+    return layer_status in (None, "dark", "unknown") and (input_states.get("pain_layer_status") or {}).get("state") == READ_FAILED
+
+
 def _tripwire_states(
     *,
     protein_days_missed_7d: int | None,
@@ -119,6 +304,8 @@ def _tripwire_states(
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
+    input_states: dict[str, dict[str, Any]] | None = None,
+    week: int | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -143,7 +330,18 @@ def _tripwire_states(
         earns `clear`.
     `pain_evidence_scope=None` means the caller did not state a scope — the pre-#4051
     behaviour, kept for the pure-function callers that inject flags directly.
+
+    #4072: `unknown` is reserved for an input that was ABSENT (or never read). An input whose
+    read FAILED makes its row `read_failed`, with the error class — on 2026-09-15..18 the
+    owner was told recovery, volume and protein were "unknown" while every source was fresh,
+    and a reader cannot act on the difference between "no data" and "the read broke" if the
+    block will not say which one it was. Every row carries its input's `input_state`.
+
+    #4098: every tripwire that declares `not_before_week` reads `not_yet_active (week N < M)`
+    until the block calendar's `week` reaches M — whatever its input says, which rides along
+    as `state_if_active` so the gate never hides the number.
     """
+    input_states = input_states or {}
     by_id = {t["id"]: t for t in owner_redlines.engine_evaluated_tripwires()}  # the v2 additions are named, not computed
     out: list[dict[str, Any]] = []
 
@@ -151,7 +349,7 @@ def _tripwire_states(
         t = by_id[tid]
         row = {
             "id": tid,
-            "state": state,  # tripped | clear | unknown | dismissed_by_owner (#4036)
+            "state": state,  # tripped | clear | unknown | dismissed_by_owner (#4036) | not_yet_active (#4098, set below)
             "observed": observed,
             "signal": t["signal"],
             "action_if_tripped": t["action"],
@@ -162,18 +360,31 @@ def _tripwire_states(
             row["threshold_note"] = t["note"]
         if detail:
             row["detail"] = detail
+        src = _TRIPWIRE_INPUT.get(tid)
+        if src and src in input_states:
+            row["input"] = src
+            row["input_state"] = input_states[src]
         return row
+
+    def _missing(tid: str, fallback: str) -> dict[str, Any]:
+        """The row for a tripwire whose input is None: `read_failed` or `unknown`, never conflated."""
+        st = input_states.get(_TRIPWIRE_INPUT.get(tid, ""), {})
+        if st.get("state") == READ_FAILED:
+            return _row(tid, READ_FAILED, None, f"the read FAILED ({st.get('error') or 'error not captured'}) — not absent, not clear")
+        why = st.get("detail")
+        label = st.get("state")
+        return _row(tid, "unknown", None, f"{label}: {why}" if (label and why and label != NOT_SUPPLIED) else fallback)
 
     t = by_id["protein_floor_missed"]
     if protein_days_missed_7d is None:
-        out.append(_row("protein_floor_missed", "unknown", None, "no intake rollup for the trailing 7d"))
+        out.append(_missing("protein_floor_missed", "no intake rollup for the trailing 7d"))
     else:
         tripped = protein_days_missed_7d >= t["threshold_days"]
         out.append(_row("protein_floor_missed", "tripped" if tripped else "clear", f"{protein_days_missed_7d} of 7 days below floor"))
 
     t = by_id["readiness_floor"]
     if readiness_low_streak_days is None:
-        out.append(_row("readiness_floor", "unknown", None, "no recovery series"))
+        out.append(_missing("readiness_floor", "no recovery series was supplied to the engine"))
     else:
         tripped = readiness_low_streak_days >= t["consecutive_days"]
         out.append(
@@ -184,14 +395,21 @@ def _tripwire_states(
 
     t = by_id["anchor_lift_strength_drop"]
     if anchor_lift_drop_pct is None or anchor_lift_drop_sessions is None:
-        out.append(_row("anchor_lift_strength_drop", "unknown", None, "no band-matched anchor-lift comparison available"))
+        out.append(
+            _missing(
+                "anchor_lift_strength_drop",
+                f"no core-anchor e1RM comparison available (the rolling {E1RM_RECENT_SESSIONS}-session median needs "
+                f"{E1RM_RECENT_SESSIONS + E1RM_BASELINE_SESSIONS} sessions on one template)",
+            )
+        )
     else:
-        tripped = anchor_lift_drop_pct >= t["threshold_pct"] and anchor_lift_drop_sessions >= t["consecutive_sessions"]
+        tripped = anchor_drop_tripped(anchor_lift_drop_pct, anchor_lift_drop_sessions)
         out.append(
             _row(
                 "anchor_lift_strength_drop",
                 "tripped" if tripped else "clear",
-                f"-{anchor_lift_drop_pct:.1f}% across {anchor_lift_drop_sessions} session(s)",
+                f"-{anchor_lift_drop_pct:.1f}% rolling e1RM median, {anchor_lift_drop_sessions} of the last "
+                f"{E1RM_RECENT_SESSIONS} session(s) below threshold",
             )
         )
 
@@ -243,6 +461,27 @@ def _tripwire_states(
         if pain_evidence_scope:
             row["evidence"] = pain_evidence_scope
         out.append(row)
+    elif _pain_read_failed(pain_evidence_scope, pain_layer_status, input_states):
+        # #4072: the performed-movement read (or the note layer's health read) RAISED. That
+        # is not an empty set and not an unknown one — it is a broken read, and it says which
+        # error broke it.
+        scope = pain_evidence_scope or {}
+        err = (
+            scope.get("error")
+            or (input_states.get("pain_evidence_scope") or {}).get("error")
+            or (input_states.get("pain_layer_status") or {}).get("error")
+            or "error not captured"
+        )
+        row = _row(
+            "pain_flag_named_site",
+            READ_FAILED,
+            None,
+            f"evidence: read FAILED ({err}) — " + str(scope.get("reason") or "the pain evidence could not be read"),
+        )
+        if pain_evidence_scope:
+            row["evidence"] = pain_evidence_scope
+        row["layer_status"] = pain_layer_status
+        out.append(row)
     elif pain_layer_status in (None, "dark", "unknown"):
         # #3768: the layer was dark from the day it shipped until 2026-09-13. With no flag
         # on the record, its silence is only meaningful if the layer works.
@@ -275,7 +514,7 @@ def _tripwire_states(
 
     t = by_id["weight_stall_with_adherence"]
     if weight_stall_days is None or adherence_on_plan is None:
-        out.append(_row("weight_stall_with_adherence", "unknown", None, "needs both a weight trend and an adherence read"))
+        out.append(_missing("weight_stall_with_adherence", "needs both a weight trend and an adherence read"))
     else:
         tripped = weight_stall_days >= t["threshold_days"] and adherence_on_plan
         out.append(
@@ -284,6 +523,47 @@ def _tripwire_states(
             )
         )
 
+    # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
+    # never per-tripwire, so a new declaration is read the day it is written.
+    for row in out:
+        reason = not_before_week_gate(by_id[row["id"]], week)
+        if reason:
+            row["state_if_active"] = row["state"]
+            row["state"] = "not_yet_active"
+            row["not_before_week"] = by_id[row["id"]]["not_before_week"]
+            row["program_week"] = week
+            row["detail"] = reason + (f" — {row['detail']}" if row.get("detail") else "")
+
+    return out
+
+
+def _scheduled_session(day: str, catalog_movements: dict[str, Any] | None, skill_ceiling: int) -> dict[str, Any]:
+    """The session the program schedules on `day` (#4064). Pure.
+
+    ACTIVE program: `program_structure.planned_session` — the block calendar, then the §3
+    prescription. Inactive: the engine runs on the JSON grid, which this pure function
+    cannot read, so it says that rather than inventing a session.
+    """
+    if not program_structure.ACTIVE:
+        return {
+            "date": day,
+            "source": "json",
+            "archetype": None,
+            "note": (
+                f"TRAINING_PROGRAM v{program_structure.PROGRAM_VERSION} is PROPOSED — the live config/training_week.json grid decides "
+                "this day's archetype; `manage_hevy_routine draft` reads it"
+            ),
+        }
+    try:
+        out = program_structure.planned_session(day, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+    except ValueError as e:
+        return {"date": day, "source": "unreadable", "archetype": None, "note": str(e)}
+    if catalog_movements is None and out.get("prescription"):
+        out["catalog_note"] = "the movement catalog was not read — anchors are named by PATTERN, movements unresolved"
+    out["how_to_draft"] = (
+        "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
+        "calendar and prescription); draft_custom only for a deliberate departure"
+    )
     return out
 
 
@@ -310,18 +590,53 @@ def constraint_block(
     adherence_on_plan: bool | None = None,
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
     rotation_window_start: str | None = None,
+    catalog_movements: dict[str, Any] | None = None,
+    skill_ceiling: int = 2,
+    input_status: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
     Every argument is a value a caller already fetched, so this function is pure: the same
     inputs produce the same block, byte for byte, which is what makes it auditable and what
     lets chat and Claude Code be held to the same answer.
+
+    `input_status` (#4072) is the caller's statement of HOW each value was obtained —
+    `measured` / `absent` / `read_failed` (+ error class) / `not_read`. It is reported per
+    input on `inputs`, and it is what lets a None read `read_failed` instead of `unknown`.
     """
+    states = resolve_input_states(
+        {
+            "walk_hr_wk_now": walk_hr_wk_now,
+            "weight_lb": weight_lb,
+            "recovery_tier": recovery_tier,
+            "readiness_low_streak_days": readiness_low_streak_days,
+            "acwr_flag": acwr_flag,
+            "muscle_volume": muscle_volume,
+            "protein_days_missed_7d": protein_days_missed_7d,
+            "reference": reference,
+            "anchor_lift_drop_pct": anchor_lift_drop_pct,
+            "pain_evidence_scope": pain_evidence_scope,
+            "pain_layer_status": pain_layer_status,
+            "pain_dismissals": pain_dismissals,
+            "weight_stall_days": weight_stall_days,
+            "adherence_on_plan": adherence_on_plan,
+            "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
+        },
+        input_status,
+    )
+    failed_reads = {k: v for k, v in states.items() if v["state"] == READ_FAILED}
     redlines = owner_redlines.summary()
     walking_floor = owner_redlines.REDLINES["walking_floor_hr_wk"]
 
     # FIRST, deliberately. See the module docstring.
-    if walk_hr_wk_now is None:
+    if walk_hr_wk_now is None and "walk_hr_wk_now" in failed_reads:
+        walking = {
+            "state": READ_FAILED,
+            "floor_hr_wk": walking_floor["value"],
+            "error": failed_reads["walk_hr_wk_now"].get("error"),
+            "detail": "the walking-volume read FAILED — the largest lever on the board is unread, which is not the same as zero (#4072)",
+        }
+    elif walk_hr_wk_now is None:
         walking = {
             "state": "unknown",
             "floor_hr_wk": walking_floor["value"],
@@ -382,6 +697,9 @@ def constraint_block(
             "no weight-matched reference was retrieved — do not substitute the current band, which is the period he is trying to escape"
         ]
 
+    # #4098: the block calendar's week decides which redlines are armed (`not_before_week`).
+    week = program_week(date)
+
     tripwires = _tripwire_states(
         protein_days_missed_7d=protein_days_missed_7d,
         readiness_low_streak_days=readiness_low_streak_days,
@@ -394,9 +712,13 @@ def constraint_block(
         pain_flag_instances=pain_flag_instances,
         pain_dismissals=pain_dismissals,
         pain_evidence_scope=pain_evidence_scope,
+        input_states=states,
+        week=week,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
+    failed_tripwires = [t["id"] for t in tripwires if t["state"] == READ_FAILED]
+    not_yet_active = [t["id"] for t in tripwires if t["state"] == "not_yet_active"]
     # #4036: every dismissal in play, named on the block — a reader never has to dig into
     # the tripwire row to find out that a human overrode a safety flag.
     dismissals_in_play = [d for t in tripwires for d in (t.get("dismissals") or [])]
@@ -414,6 +736,8 @@ def constraint_block(
         hevy_workouts=hevy_workouts_rotation_window,
     )
 
+    session = _scheduled_session(date, catalog_movements, skill_ceiling)
+
     return {
         "engine_version": ENGINE_VERSION,
         "date": date,
@@ -429,6 +753,12 @@ def constraint_block(
         # in the bundle).
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
+        # #4064 — WHAT the program schedules on this date: the block calendar's answer
+        # (block 1 starts Thu 2026-09-24, then Mon/Wed/Fri, deload every 6th week) and, on a
+        # lifting day, the §3 session — anchors at heavy/moderate with their sets and reps,
+        # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
+        # walking and the standing constraints outrank any single session.
+        "session": session,
         "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
@@ -439,7 +769,15 @@ def constraint_block(
         "reference": ref_block,
         "tripwires": tripwires,
         "tripped": tripped,
-        "unreadable_tripwires": unknown,
+        # #4072: both kinds of "could not evaluate", kept apart — `unreadable_tripwires` is the
+        # union (its pre-#4072 meaning: not evaluable), `failed_read_tripwires` the broken reads.
+        "unreadable_tripwires": unknown + failed_tripwires,
+        "failed_read_tripwires": failed_tripwires,
+        # #4072: every input's read state — measured / absent / read_failed (+ error) / not_read.
+        "inputs": states,
+        # #4098 — the block calendar's week, and the tripwires its `not_before_week` holds off.
+        "program_week": week,
+        "not_yet_active_tripwires": not_yet_active,
         # #4051 — WHAT the pain tripwire looked at: the movements PERFORMED in the trailing
         # window, the window, the phases read, the note layer's status. A reader can tell an
         # examined-and-clean row from an empty one without leaving the block.
@@ -477,6 +815,22 @@ def constraint_block(
                     else None
                 ),
                 f"{len(unknown)} tripwire(s) could not be evaluated: {', '.join(unknown)}" if unknown else None,
+                (
+                    f"{len(not_yet_active)} tripwire(s) are not yet active in program week {week}: "
+                    + ", ".join(not_yet_active)
+                    + " — held off by their own not_before_week, not cleared (#4098)"
+                    if not_yet_active
+                    else None
+                ),
+                # #4072: a failed read is named as FAILED, with its error class — never folded
+                # into "could not be evaluated", which a reader takes to mean "no data".
+                (
+                    f"{len(failed_reads)} engine input(s) FAILED to read — not absent, not clear: "
+                    + "; ".join(f"{k} ({v.get('error') or 'error not captured'})" for k, v in failed_reads.items())
+                    + " (#4072)"
+                    if failed_reads
+                    else None
+                ),
                 # #4051: the pain row's evidence set, named out loud. An empty one is the
                 # defect this issue is about, so it is a sentence in `honesty`, not a key
                 # a reader has to go looking for.
@@ -537,13 +891,20 @@ def gather(readers: dict[str, Callable[[], Any]]) -> dict[str, Any]:
     """Call injected readers defensively and return kwargs for `constraint_block`.
 
     A reader that raises yields None for its field rather than failing the whole block —
-    a plan built on nine of ten inputs, with the tenth reported unknown, is worth more
-    than no plan. What it may never do is report the missing one as clear.
+    a plan built on nine of ten inputs, with the tenth reported, is worth more than no plan.
+    What it may never do is report the missing one as clear — or, since #4072, as merely
+    "unknown": the raise is recorded under `input_status` as `read_failed` with its error
+    class, and an empty return as `absent`.
     """
     out: dict[str, Any] = {}
+    status: dict[str, dict[str, Any]] = {}
     for key, fn in readers.items():
         try:
             out[key] = fn()
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             out[key] = None
+            status[key] = input_status(READ_FAILED, error=error_label(e))
+            continue
+        status[key] = input_status(ABSENT, "the reader returned no data") if _empty(out[key]) else input_status(MEASURED)
+    out["input_status"] = status
     return out

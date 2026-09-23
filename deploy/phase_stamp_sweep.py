@@ -2,6 +2,14 @@
 """phase_stamp_sweep.py — the standing corrector for #4040: a no-reset world stamps no
 pre-genesis EXPERIMENT_SCOPED row.
 
+#4059: the SOURCE# surface below used to be the WHOLE surface — a dispute-docket verdict
+(`COACH#<coach>/PREDICTION#docket-*`) or a coach thread (`COACH#<coach>/THREAD#*`) mis-
+stamped pre-genesis was invisible to this corrector even though it lives on an
+EXPERIMENT_SCOPED pk the shared predicate happily classifies; check 21 (a full-table scan)
+saw it, this script did not, and the two disagreed. Every `OPERATIONAL_COACH_IDS` pk is now
+also Queried (bounded, per-coach — the same #4040 acceptance criterion the SOURCE# loop
+already met), so the sweep's surface and check 21's now agree.
+
 THE DEFECT
   `deploy/restart_phase_tag.py` (the tagger) was the only thing that stamped `phase=pilot`
   onto an `EXPERIMENT_SCOPED` row dated before genesis, and it ran only as part of a reset.
@@ -69,6 +77,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
+from coach.persona_registry import OPERATIONAL_COACH_IDS  # noqa: E402 — #4059: the corrector's COACH# surface
 from experiment.phase_taxonomy import SCOPED_SOURCES, pre_genesis_scoped_violation  # noqa: E402
 from operational.chronicle_manifest_qa import served_chronicle_keys  # noqa: E402
 from restart_phase_tag import extract_date  # noqa: E402  — the tagger's own date reader, one derivation
@@ -111,6 +120,48 @@ def find_violations(items: list[dict], pk: str, genesis: str, exempt_keys: set) 
     return out
 
 
+def coach_partitions() -> list[str]:
+    """#4059: the corrector's COACH# surface — one pk per operational coach. A dispute-
+    docket verdict (`PREDICTION#docket-*`) or a coach thread (`THREAD#*`) lives here, not
+    under `USER#matthew#SOURCE#*`; `find_violations` already filters correctly via
+    `pre_genesis_scoped_violation` (CHAT#/RELATIONSHIP#/DEDUPE# classify away from
+    EXPERIMENT_SCOPED), so the whole partition is Queried rather than hand-picking sk
+    prefixes — a new EXPERIMENT_SCOPED sk family on a coach's pk is covered the day it
+    appears, not the day someone remembers to list it here."""
+    return [f"COACH#{coach_id}" for coach_id in OPERATIONAL_COACH_IDS]
+
+
+def _sweep_partition(table, pk: str, genesis: str, exempt_keys: set, apply: bool) -> tuple[int, int]:
+    """Query one pk, find its violations, print + (if apply) correct them. Returns
+    (found, fixed) — shared by the SOURCE# and #4059 COACH# surfaces so both are
+    corrected identically rather than by two hand-kept copies of this loop."""
+    items = query_partition(table, pk)
+    if not items:
+        return 0, 0
+    violations = find_violations(items, pk, genesis, exempt_keys)
+    if not violations:
+        return 0, 0
+    fixed = 0
+    print(f"\n{pk}: {len(items)} row(s) scanned — {len(violations)} pre-genesis violation(s)")
+    for it in violations:
+        sk = str(it.get("sk", ""))
+        before = it.get("phase")
+        suffix = "" if apply else "  (dry-run)"
+        print(f"    {sk}  phase={before!r} -> {EXPERIMENT_PHASE_PRIOR!r}{suffix}")
+        if apply:
+            try:
+                table.update_item(
+                    Key={"pk": pk, "sk": sk},
+                    UpdateExpression="SET #p = :p",
+                    ExpressionAttributeNames={"#p": "phase"},
+                    ExpressionAttributeValues={":p": EXPERIMENT_PHASE_PRIOR},
+                )
+                fixed += 1
+            except Exception as e:  # noqa: BLE001 — one row's write error must not stop the sweep
+                print(f"      SKIP (write error: {e})")
+    return len(violations), fixed
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true", help="write DynamoDB (default: dry-run)")
@@ -133,30 +184,15 @@ def main() -> int:
     total_fixed = 0
     for source in SCOPED_SOURCES:
         pk = f"USER#{USER_ID}#SOURCE#{source}"
-        items = query_partition(table, pk)
-        if not items:
-            continue
-        violations = find_violations(items, pk, genesis, exempt_keys)
-        if not violations:
-            continue
-        total_found += len(violations)
-        print(f"\n{pk}: {len(items)} row(s) scanned — {len(violations)} pre-genesis violation(s)")
-        for it in violations:
-            sk = str(it.get("sk", ""))
-            before = it.get("phase")
-            suffix = "" if args.apply else "  (dry-run)"
-            print(f"    {sk}  phase={before!r} -> {EXPERIMENT_PHASE_PRIOR!r}{suffix}")
-            if args.apply:
-                try:
-                    table.update_item(
-                        Key={"pk": pk, "sk": sk},
-                        UpdateExpression="SET #p = :p",
-                        ExpressionAttributeNames={"#p": "phase"},
-                        ExpressionAttributeValues={":p": EXPERIMENT_PHASE_PRIOR},
-                    )
-                    total_fixed += 1
-                except Exception as e:  # noqa: BLE001 — one row's write error must not stop the sweep
-                    print(f"      SKIP (write error: {e})")
+        found, fixed = _sweep_partition(table, pk, genesis, exempt_keys, args.apply)
+        total_found += found
+        total_fixed += fixed
+
+    # #4059: the COACH# surface check 21 always saw and this corrector used to miss.
+    for pk in coach_partitions():
+        found, fixed = _sweep_partition(table, pk, genesis, exempt_keys, args.apply)
+        total_found += found
+        total_fixed += fixed
 
     if total_found == 0:
         print("\nnothing to repair — every EXPERIMENT_SCOPED row dated before genesis carries phase=pilot.")
