@@ -29,6 +29,8 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 
@@ -304,6 +306,13 @@ def test_a_serious_axe_entry_with_no_issue_is_red_and_with_one_is_green():
 # ═══════════════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.fixture(scope="module")
+def discovered():
+    """One tracked-tree AST walk (~3 s) shared by the mutated-registry tests below; the live
+    contract test walks for itself, because it is the one the census mutation must red."""
+    return oc.discover_residue_ledgers()
+
+
 def test_the_live_residue_registry_meets_its_contract():
     assert oc.registry_findings() == []
 
@@ -319,18 +328,18 @@ def test_the_registry_names_the_four_ledgers_the_issue_lists():
         assert must in keys, must
 
 
-def test_an_entry_without_an_expiry_is_red():
+def test_an_entry_without_an_expiry_is_red(discovered):
     reg = {k: dict(v) for k, v in oc.RESIDUE_LEDGERS.items()}
     reg["tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE"].pop("expires")
-    problems = oc.registry_findings(registry=reg)
+    problems = oc.registry_findings(registry=reg, discovered=discovered)
     assert any("PAIR_SEAM_RESIDUE" in p and "expires" in p for p in problems), problems
 
 
-def test_an_entry_past_ninety_days_or_without_an_issue_carrier_is_red():
+def test_an_entry_past_ninety_days_or_without_an_issue_carrier_is_red(discovered):
     reg = {k: dict(v) for k, v in oc.RESIDUE_LEDGERS.items()}
     reg["tests/conformance_residue.py::CONFORMANCE_RESIDUE"].update(expires="2031-01-01")
     reg["tests/mypy_clean_set.py::DIRTY"].update(carrier="someday")
-    problems = oc.registry_findings(registry=reg)
+    problems = oc.registry_findings(registry=reg, discovered=discovered)
     assert any("CONFORMANCE_RESIDUE" in p and "90 days" in p for p in problems)
     assert any("DIRTY" in p and "not an issue" in p for p in problems)
 
@@ -351,10 +360,10 @@ def test_a_new_data_file_ledger_not_in_the_registry_is_red(tmp_path):
     assert any("contrast_baseline.json" in p for p in oc.registry_findings(registry={}, root=tmp_path))
 
 
-def test_a_phantom_registration_is_red():
+def test_a_phantom_registration_is_red(discovered):
     reg = dict(oc.RESIDUE_LEDGERS)
     reg["tests/nowhere.py::GHOST_RESIDUE"] = dict(oc.RESIDUE_LEDGERS["tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE"])
-    assert any("GHOST_RESIDUE" in p and "phantom" in p for p in oc.registry_findings(registry=reg))
+    assert any("GHOST_RESIDUE" in p and "phantom" in p for p in oc.registry_findings(registry=reg, discovered=discovered))
 
 
 def test_the_probe_names_a_lapsed_ledger_and_is_silent_before_it():

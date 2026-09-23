@@ -899,7 +899,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # planner and chat commit gate each name it) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
-        <= 132
+        # Upper bound 132 -> 133 (2026-09-23, #3597): structural::test_obligation_carriers_3597.py — the residue-registry
+        # derivation guard (every `*_RESIDUE` binding and tests/*_baseline.json registered with carrier + condition + expiry +
+        # shrink consumer) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: a git-added
+        # tests/_census_probe_3597.py binding PROBE_RESIDUE; baseline 32 passed | mutated 1 failed ::
+        # test_the_live_residue_registry_meets_its_contract | reverted 32 passed). Unproven stays; one entrant.
+        <= 133
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
