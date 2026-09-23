@@ -119,7 +119,7 @@ def _load_anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
 
 def _attach_session_loads(block: dict[str, Any], target_date: str, catalog_movements: dict[str, Any] | None) -> None:
     """#4090: stamp the scheduled v0.3 session's exposures with their entry-ramp loads — the
-    same `prescription_floor` -> `load_ramp.ramp_floor` arithmetic the draft writes. A failed
+    same `load_ramp.v03_floor` the draft writes (#4107: anchor -> nearest-band fallback -> ramp). A failed
     read is reported by name on `session.loads`, never as an unloaded session."""
     session = (block or {}).get("session") or {}
     rx = session.get("prescription")

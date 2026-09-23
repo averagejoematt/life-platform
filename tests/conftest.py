@@ -754,6 +754,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible: a second counter feeding one consumer while the planner reads another
         # number reds nothing at runtime.
         "test_muscle_volume_working_sets_4071.py",
+        # #4107: an AST sweep asserting `load_ramp.v03_floor` is the ONE v0.3 load path
+        # (generator + chat gate). Pure repo shape: a second load path is exactly a PR's
+        # own diff, so it must red pre-merge.
+        "test_v03_nearest_band_anchor_4107.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own
