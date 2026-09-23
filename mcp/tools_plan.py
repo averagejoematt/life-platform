@@ -49,6 +49,7 @@ from typing import Any
 from common.pacific_time import pacific_today
 
 from mcp.core import LAYER_UNKNOWN
+from mcp.plan_helpers import _catalog_and_ceiling, _minus_days, _resolver, _union_evidence_rows  # noqa: F401  (#4081/#4105 size fix)
 
 logger = logging.getLogger("tools_plan")
 
@@ -118,7 +119,7 @@ def _load_anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
 
 def _attach_session_loads(block: dict[str, Any], target_date: str, catalog_movements: dict[str, Any] | None) -> None:
     """#4090: stamp the scheduled v0.3 session's exposures with their entry-ramp loads — the
-    same `prescription_floor` -> `load_ramp.ramp_floor` arithmetic the draft writes. A failed
+    same `load_ramp.v03_floor` the draft writes (#4107: anchor -> nearest-band fallback -> ramp). A failed
     read is reported by name on `session.loads`, never as an unloaded session."""
     session = (block or {}).get("session") or {}
     rx = session.get("prescription")
@@ -336,27 +337,6 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
     return {"exercises": considered, "scope": scope}
 
 
-def _union_evidence_rows(performed: list[dict[str, Any]], draft: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Performed movements UNION the draft's, keyed by template id (#4051).
-
-    The draft row wins where it has something to say — it carries the anchor-lift trend the
-    performed set does not compute — but it never overwrites a performed value with an
-    absent one, which is how a dark per-movement read (`pain_flag_any: None`) used to erase
-    a flag the batch read found.
-    """
-    out: dict[str, dict[str, Any]] = {}
-    for r in performed or []:
-        out[str(r.get("template_id") or r.get("label") or "")] = dict(r)
-    for r in draft or []:
-        key = str(r.get("template_id") or r.get("label") or "")
-        merged = dict(out.get(key) or {})
-        for k, v in r.items():
-            if v not in (None, [], "", {}) or k not in merged:
-                merged[k] = v
-        out[key] = merged
-    return list(out.values())
-
-
 def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | None]:
     """(window start, Hevy rows) for the program's trailing accessory-rotation window (#3755).
 
@@ -451,20 +431,6 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
     return sum(1 for r in rows if float(r["protein_g"]) < floor_g), len(rows)
 
 
-def _catalog_and_ceiling() -> tuple[dict[str, Any] | None, int]:
-    """(movement catalog `movements` dict or None, the week grid's skill ceiling) — #4064."""
-    try:
-        from training.program_seam import resolve_week_grid
-        from training.routine_generator import _load_json
-
-        catalog = (_load_json("movement_catalog.json") or {}).get("movements")
-        ceiling = int(resolve_week_grid(_load_json).week.get("skill_ceiling", 2))
-        return (catalog if isinstance(catalog, dict) else None), ceiling
-    except Exception as e:  # noqa: BLE001 — a missing catalog degrades the session to patterns, never fails the plan
-        logger.warning(f"movement catalog unreadable for plan_next_session: {e}")
-        return None, 2
-
-
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
     four critics over disjoint evidence, verdicts stored on the draft (#3752)."""
@@ -472,7 +438,7 @@ def tool_plan_next_session(args):
     target_date = args.get("target_date") or pacific_today()
     routine_id = args.get("routine_id")
 
-    from training import plan_engine
+    from training import accessory_strength_trend, plan_engine
 
     # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
     # never a stage-2 run that silently ignored it and left the veto standing unexplained.
@@ -715,6 +681,9 @@ def tool_plan_next_session(args):
     )
     _merge_walking_volume(block, walk_layer)
     _attach_session_loads(block, target_date, catalog_movements)
+    # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
+    # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
+    accessory_strength_trend.attach(block, evidence)
 
     out: dict[str, Any] = {
         "target_date": target_date,
@@ -878,12 +847,6 @@ def _weeks_in_block(dates: list[str], target_date: str, min_per_week: int = 2, m
         else:
             break
     return weeks
-
-
-def _resolver():
-    from mcp.tools_hevy_routine import _make_resolver
-
-    return _make_resolver()
 
 
 def _workout_dates(start: str, end: str) -> list[str]:
@@ -1276,15 +1239,3 @@ def _muscle_sets(volume: dict[str, Any]) -> dict[str, Any]:
         elif isinstance(row, (int, float)):
             out[muscle] = row
     return out
-
-
-def _minus_days(date_str: str, days: int) -> str:
-    """#3751: day-key arithmetic belongs to the Pacific frame, not to this module.
-
-    Was a local `date.fromisoformat(...) - timedelta(...)`, which is the idiom #3609's
-    registry exists to inventory. `shift_day_key` is that operation, named once, with
-    the same return-it-unchanged fallback this function already had.
-    """
-    from common.pacific_time import shift_day_key
-
-    return shift_day_key(date_str, -days)

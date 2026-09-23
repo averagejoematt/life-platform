@@ -231,7 +231,17 @@ def test_a_tripped_owner_tripwire_is_a_change_not_a_veto_while_3753_is_unsigned(
     P = _packets(
         d,
         protein=3,
-        trends={0: {"drop_pct": 12.0, "sessions_below": 2, "baseline_median_e1rm_lb": 233.3, "last_top_lbs": 170.0, "n_sessions": 6}},
+        trends={
+            0: {
+                "drop_pct": 12.0,
+                "sessions_below": 2,
+                "baseline_median_e1rm_lb": 233.3,
+                "last_top_lbs": 170.0,
+                "n_sessions": 6,
+                # #4112: idx 0 is Squat (Barbell) in `_ir` — a core anchor, so it can escalate.
+                "anchor_family": "squat",
+            }
+        },
     )
     m = next(v for v in c.run_critics(P, d, invoke=None, model_allowed=False) if v["critic"] == "muscle_defense")
     assert m["verdict"] == "change"
@@ -240,6 +250,36 @@ def test_a_tripped_owner_tripwire_is_a_change_not_a_veto_while_3753_is_unsigned(
     drop = next(f for f in P["muscle_defense"]["flags"] if f["metric"] == "anchor_drop_pct[0]")
     assert drop["provenance"] == "population-derived" and "not his variance" in drop["reason"]
     assert drop["field"] == "exercises[0].weight_lbs" and drop["to"] == 170.0
+
+
+# ── #4112: the tier gate — an accessory drop never escalates the critic's own verdict ─
+def test_an_accessory_drop_never_reaches_the_muscle_defense_verdict_4112():
+    """The SAME trip-eligible numbers as the test above, minus `anchor_family` (idx 0 read as
+    an accessory, not the drafted squat's core-anchor identity) — the drop stays `info` and
+    cannot promote the critic's verdict past whatever the clean run would already be.
+
+    MUTATION CONTROL: this is the positive-control test above with one key removed; if the
+    tier gate in `critics_muscle_defense.build_muscle_defense_packet` is dropped, this reds
+    (`anchor_drop_pct[0]` would read `change` and `m["verdict"]` would carry the anchor
+    metric instead of staying on the clean-draft's `approve`).
+    """
+    d = c.draft_summary(_ir())
+    P = _packets(
+        d,
+        trends={
+            0: {
+                "drop_pct": 12.0,
+                "sessions_below": 2,
+                "baseline_median_e1rm_lb": 233.3,
+                "last_top_lbs": 170.0,
+                "n_sessions": 6,
+            }
+        },
+    )
+    drop = next(f for f in P["muscle_defense"]["flags"] if f["metric"] == "anchor_drop_pct[0]")
+    assert drop["severity"] == "info" and "accessory" in drop["reason"]
+    m = next(v for v in c.run_critics(P, d, invoke=None, model_allowed=False) if v["critic"] == "muscle_defense")
+    assert m["verdict"] == "approve"
 
 
 def test_the_historian_argues_a_load_down_with_the_detraining_discount_never_up():

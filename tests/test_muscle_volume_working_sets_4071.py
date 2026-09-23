@@ -21,8 +21,13 @@ THE FIXTURES ARE THE WIRE
 
 THE DERIVATION GUARD
   `training.muscle_volume.working_sets_by_muscle` is the ONE per-muscle set computation.
-  The AST guard below fails on any function in mcp/ or lambdas/training/ that both attributes
-  an exercise to muscles and reads its sets, unless it is on the (reasoned) allowlist.
+  The AST guard below fails on any function in mcp/, lambdas/training/ or lambdas/web/ that
+  both attributes an exercise to muscles and reads its sets, unless it is on the (reasoned)
+  allowlist. #4095 widened the scope from mcp/ + lambdas/training/ to also cover lambdas/web/:
+  `lambdas/web/site_api_training._compute_muscle_volume` (behind the public
+  `/api/training_overview`) carried its own every-muscle-in-the-row table, outside the
+  original guard's reach, and credited Chest 28/wk and Triceps 32/wk where the corrected
+  count (and a hand count) reads 12 and 13.
 """
 
 from __future__ import annotations
@@ -352,9 +357,12 @@ def _per_muscle_set_computations(source: str) -> list[str]:
     ]
 
 
-def test_no_second_per_muscle_set_computation_in_mcp_or_training():
+def test_no_second_per_muscle_set_computation_in_mcp_training_or_web():
+    """#4095: widened from mcp/ + lambdas/training/ to also cover lambdas/web/ — the public
+    `/api/training_overview` counter (`_compute_muscle_volume`) had its OWN every-muscle-in-
+    the-row table, invisible to the original guard because that scope never scanned lambdas/web."""
     found = set()
-    for root in ("mcp", "lambdas/training"):
+    for root in ("mcp", "lambdas/training", "lambdas/web"):
         for path in sorted((REPO / root).rglob("*.py")):
             rel = path.relative_to(REPO).as_posix()
             for name in _per_muscle_set_computations(path.read_text()):
