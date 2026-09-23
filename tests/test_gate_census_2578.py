@@ -901,12 +901,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
         # 132 -> 133 (2026-09-23, #4075 on top of #4107): structural::test_training_load.py, PROVEN (ARMED 1/1).
-        # 133 -> 134 (2026-09-23, #3528, on top of #4075): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
+        # Upper bound 133 -> 134 (2026-09-23, #4063, re-merged on top of #4075's 133): structural::test_named_human_contact_4063.py — the named-human contact
+        # path's no-health-data body contract + the tracked-tree grep for a contact-shaped address — arrives PROVEN via a hand
+        # Proof in scripts/gate_census.PROVEN_CAN_FAIL (a digit planted in the body: 10 failed / 74 passed; a contact address
+        # appended to a tracked doc: 1 failed / 83 passed; baseline and reverted 84 passed). Unproven stays 540; one entrant.
+        # 134 -> 135 (2026-09-23, #3528, re-merged on top of #4063's 134): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
         # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
         # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
-        # -> 2 passed). Unproven stays. Same PR, 134 -> 138: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
+        # -> 2 passed). Unproven stays. Same PR, 135 -> 139: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
         # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
-        <= 138
+        <= 139
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

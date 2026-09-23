@@ -1146,6 +1146,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/named_human_contact.py",
+      "partition": "travel",
+      "via": "local-seam"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/coach/progress_capture.py",
@@ -5460,6 +5467,13 @@
     {
       "direction": "unknown",
       "lambda": "life-platform-mcp",
+      "module": "mcp/tools_data.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_decisions.py",
       "partition": "decisions",
       "via": "pk"
@@ -7302,23 +7316,23 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 706,
+      "edges": 708,
       "lambdas": 106,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
-      "partitions": 109,
+      "partitions": 110,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 15,
+      "privacy_sources_owner_only": 16,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 82,
       "schedules": 90
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 349,
-        "sites_resolved": 878,
-        "sites_total": 1227
+        "sites_dynamic": 354,
+        "sites_resolved": 880,
+        "sites_total": 1234
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7734,6 +7748,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "named_human_contact": {
+      "class": "system_state",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "notion": {
       "category": "Inputs",
       "class": "raw_timeseries",
@@ -8061,6 +8080,7 @@
       "labs": "owner_published",
       "macrofactor": "owner_only",
       "measurements": "owner_published",
+      "named_human_contact": "owner_only",
       "notion": "owner_only",
       "private_intake": "owner_only",
       "progress_photos": "owner_only",

@@ -179,3 +179,77 @@ def report(total_drift, bot_drift, drifted_docs, out=None):
     print(f"  VERDICT: {verdict}", file=out)
     print(f"{'='*60}\n", file=out)
     return _EXIT_FOR[verdict]
+
+
+# ── #4123: a bot-owned COUNTER read by a pre-merge test ──────────────────────────────────
+#
+# `tests/test_site_api_status_behavior.py::test_the_published_mcp_tool_count_matches_the_registry`
+# asserted `PLATFORM_STATS["mcp_tools"] == <AST count of mcp/registry.py TOOLS>` in the
+# required pre-merge job. After #3984 that equality is unsatisfiable on any branch that adds
+# a tool: the counter has ONE writer (the reconcile job on main) and the hook restores the
+# file on every off-main commit, so `84 == 85` was red by construction (PR #4119, 2026-09-23).
+# The same partition the doc literals use applies: off main a stale bot-owned counter is
+# PENDING, not wrong — provided it is stale by exactly the tools THIS branch added, i.e. the
+# literal still equals the registry count of the merge-base. Anything else (a hand-carried
+# counter, a counter that disagrees with main's own registry) is a failure everywhere.
+
+
+def bot_owned_counter_verdict(literal, discovered, base_discovered=None):
+    """Verdict for one bot-owned DISCOVERED_COUNTS field compared to its live discovery.
+
+    success             literal == discovered — nothing to reconcile.
+    failure             on main (no tolerance: the bot runs `--apply` next or a human must);
+                        OR off main when `base_discovered` is known and the literal does not
+                        equal it — the counter is not "main's value awaiting the bot", it has
+                        drifted on its own (hand edit, wrong merge side).
+    pending-reconcile   off main, literal != discovered, and either the merge-base discovery
+                        is unknown (shallow checkout — fail-open to the #3984 skip, which
+                        `test_platform_stats_truth` already grants every counter) or the
+                        literal equals the merge-base's discovery: the delta IS this branch's
+                        own additions and the reconcile job writes it on main after the merge.
+    """
+    if literal == discovered:
+        return VERDICT_SUCCESS
+    if _checked_out_ref_is_main():
+        return VERDICT_FAILURE
+    if base_discovered is not None and literal != base_discovered:
+        return VERDICT_FAILURE
+    return VERDICT_PENDING_RECONCILE
+
+
+def merge_base_file_text(relpath, upstream="origin/main", cwd=None):
+    """The content of `relpath` at `git merge-base <upstream> HEAD`, or None when git cannot
+    answer (shallow CI checkout with no upstream ref, detached tree, no git). None is the
+    honest "unknown" — callers fall back to the weaker #3984 verdict, never to a guess."""
+    try:
+        mb = subprocess.run(  # nosec B603 B607 — fixed argv
+            ["git", "merge-base", upstream, "HEAD"], capture_output=True, text=True, timeout=10, cwd=cwd
+        )
+        if mb.returncode != 0 or not mb.stdout.strip():
+            return None
+        show = subprocess.run(  # nosec B603 B607 — fixed argv
+            ["git", "show", f"{mb.stdout.strip()}:{relpath}"], capture_output=True, text=True, timeout=10, cwd=cwd
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if show.returncode != 0:
+        return None
+    return show.stdout
+
+
+def registry_tool_count(registry_src):
+    """Top-level key count of the `TOOLS = {...}` dict literal in mcp/registry.py SOURCE TEXT —
+    the same AST discovery the status test used inline, lifted so it can run on a merge-base's
+    copy of the file (not just the checkout's path, which is all `_auto_discover_tool_count`
+    reads). None when the source no longer defines TOOLS as a dict literal."""
+    import ast
+
+    try:
+        tree = ast.parse(registry_src)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "TOOLS" for t in node.targets):
+            if isinstance(node.value, ast.Dict):
+                return len(node.value.keys)
+    return None
