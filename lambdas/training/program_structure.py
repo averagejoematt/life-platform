@@ -130,7 +130,9 @@ ANCHORS: dict[str, dict[str, Any]] = {
     "squat": {
         "pattern": "knee-dominant squat (SSB / high-bar; leg press as the listed fallback at 316 lb)",
         "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
-        "catalog_keys": ["leg_press", "goblet_squat", "safety_bar_squat", "high_bar_back_squat"],
+        # #4108 catalog keys (2026-09-23): Squat (Barbell) ×85 and Front Squat ×7 are what he has trained; §3's SSB /
+        # high-bar are not in his Hevy history. Barbell first per the owner's #4080 option B; machine/DB stay as fallbacks.
+        "catalog_keys": ["squat_barbell", "front_squat", "leg_press", "goblet_squat"],
         "hevy_title_hints": ["squat", "leg press", "hack squat"],
         "primary_muscles": ["quadriceps", "glutes"],
         "provenance": "owner",
@@ -145,7 +147,8 @@ ANCHORS: dict[str, dict[str, Any]] = {
     "hinge": {
         "pattern": "hip hinge — TRAP BAR until ≤ 275 lb; the conventional pull is gated by bodyweight",
         "frequency_per_week": {"low": 2, "high": 2, "provenance": "population-derived", "note": _FREQ_NOTE},
-        "catalog_keys": ["trap_bar_deadlift", "machine_hip_thrust", "leg_curl"],
+        # #4108: the catalog key is `deadlift_trap_bar` (Deadlift (Trap bar) ×14); §3 keeps the trap bar until <= 275 lb.
+        "catalog_keys": ["deadlift_trap_bar", "machine_hip_thrust", "leg_curl"],
         "hevy_title_hints": ["deadlift", "romanian deadlift", "rdl", "good morning", "back extension", "hip thrust", "trap bar"],
         "primary_muscles": ["hamstrings", "glutes"],
         "conventional_pull_gate_lb": 275,
