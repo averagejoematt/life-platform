@@ -883,7 +883,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # reverted 16 passed). MEASURED by id-set diff on the MERGE RESOLUTION tree, never by arithmetic: lane {proven 129, unproven 540,
         # not-applicable 6, attempted-unproven 5} vs a disposable `git archive origin/main` export {128, 540, 6, 5} — exactly one entrant,
         # and unproven does not move.
-        <= 129
+        # Upper bound 129 -> 130 (2026-09-22, #4071): structural::test_muscle_volume_working_sets_4071.py — the AST derivation guard
+        # that training.muscle_volume.working_sets_by_muscle is the ONE per-muscle set computation in mcp/ + lambdas/training/ —
+        # arrives PROVEN via the re-runnable harness (MutationSpec, ARMED 1/1: an untracked lambdas/training/_census_probe_4071.py
+        # carrying the pre-#4071 loop shape; baseline 63 passed | mutated 1 failed :: test_no_second_per_muscle_set_computation_in_mcp_or_training
+        # | reverted 63 passed). MEASURED by id-set diff: lane {proven 130, unproven 540, not-applicable 6, attempted-unproven 5} vs a
+        # disposable `git archive origin/main` export at 24996c6c2 {129, 540, 6, 5} — exactly one entrant, none leaves.
+        <= 130
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
