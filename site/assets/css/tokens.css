@@ -1652,6 +1652,13 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 .provenance .pv-src { color: var(--ink-muted); }
 .provenance .pv-stale { color: var(--ember); }
 
+/* ── .gloss — the newcomer's glossary (#4035): a registered term's FIRST appearance
+   per page, from site/config/glossary.json via scripts/v4_glossary.py. Native <abbr>
+   semantics (title = the definition, keyboard/AT accessible with zero JS) dressed in a
+   dotted underline the same muted-ink weight as the rest of the type triad — never
+   ember (the single-ember rule: this is a reading aid, not a call to action). */
+.gloss { border-bottom: 1px dotted var(--ink-faint); text-decoration: none; cursor: help; }
+
 /* ── .tabset — accessible tab strip (Coaching profiles, Protocols sub-sections).
    Pair buttons (role=tab, aria-selected) with .tabpanel regions. */
 .tabset { display: flex; flex-wrap: wrap; gap: var(--sp-1); border-bottom: var(--border-hair); margin-bottom: var(--sp-5); }
