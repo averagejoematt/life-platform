@@ -67,7 +67,21 @@ provenance only the reset tooling (or a #1233 write-time stamp) produces:
     sufficient — countdown writers running in the 00:00–07:00Z stretch stamp
     UTC dates that already read as the genesis date while the content is still
     the closing cycle's (measured live: that looseness swallowed ~50 real
-    COMMITMENT#/PREDICTION# escapees).
+    COMMITMENT#/PREDICTION# escapees);
+  - a chronicle row the LIVE JOURNAL MANIFEST still serves — `(pk, sk)` in
+    `chronicle_manifest_qa.served_chronicle_keys(table, s3, bucket)`, the same
+    matcher the `chronicle:manifest_provenance` dead-man uses (#4040/#4055; one
+    derivation, never a second hand list). A reset re-dates a carried-forward
+    lead-in by writing a new `date` ATTRIBUTE and leaving its `sk` alone
+    (#3650), so its `sk` can predate genesis by design while the row is
+    CURRENT. Incident, 2026-09-22: `reconcile_countdown_gap.py --apply`
+    tombstoned the served `DATE#2026-09-05` Prologue Part III lead-in on `sk`
+    age alone (this exemption did not exist yet); the live manifest kept
+    serving the now-archived row and `chronicle:manifest_provenance` +
+    `recall:corpus_freshness` both went red 14h later. `run_sweep()` derives
+    this set itself (read-only, degrades to empty on any failure — see
+    `_served_exempt_keys`) unless a caller passes `served_keys` explicitly, so
+    `restart_verify.py` check 14 and `reconcile_countdown_gap.py` always agree.
 
 Rows whose `phase` attribute exists but is NOT the current experiment phase
 (e.g. the rebuild steps' phase="pilot" outputs) classify ALREADY_HIDDEN: they
@@ -234,7 +248,11 @@ def extract_write_ts(item: dict):
 
 
 def sanctioned_reason(
-    item: dict, genesis_date_str: str, current_cycle: int | None = None, current_prereg_sha: str | None = None
+    item: dict,
+    genesis_date_str: str,
+    current_cycle: int | None = None,
+    current_prereg_sha: str | None = None,
+    served_keys: set | None = None,
 ) -> str | None:
     """Reset-pipeline provenance: rows the reset itself seeds for the NEW cycle.
 
@@ -242,7 +260,15 @@ def sanctioned_reason(
     stamp) produces — a bare content date >= genesis is deliberately NOT enough
     (countdown writers stamp UTC dates that read as the genesis date during the
     00:00–07:00Z pre-genesis stretch while the content is the closing cycle's).
+
+    `served_keys` (#4055): a set of `(pk, sk)` the live journal manifest resolves
+    to — `chronicle_manifest_qa.served_chronicle_keys`, the SAME derivation the
+    manifest dead-man uses. Checked first: a served row is current by design
+    however its `sk` is dated, so it is never reached by the other, narrower
+    rules below.
     """
+    if served_keys and (item.get("pk"), str(item.get("sk", ""))) in served_keys:
+        return "served journal manifest lead-in (chronicle_manifest_qa.served_chronicle_keys, #4055)"
     if item.get("redated_from_sk") is not None:
         return "chronicle keep-resurrection (redated_from_sk)"
     # #3643: the cycle's OWN pre-registration chronicle post. publish_genesis_preregistration
@@ -301,6 +327,7 @@ def classify_item(
     genesis_date_str: str,
     current_cycle: int | None = None,
     current_prereg_sha: str | None = None,
+    served_keys: set | None = None,
 ) -> str:
     """Classify one row against the countdown window. See module docstring."""
     if item.get("tombstone"):
@@ -319,7 +346,7 @@ def classify_item(
     # ADR-153 exists to protect, and would have undone the #3514 reconcile.
     if not wipe.should_tombstone(item, mode, pk=str(item.get("pk", ""))):
         return MODE_SKIP
-    if sanctioned_reason(item, genesis_date_str, current_cycle, current_prereg_sha) is not None:
+    if sanctioned_reason(item, genesis_date_str, current_cycle, current_prereg_sha, served_keys) is not None:
         return SANCTIONED
     kind, val = extract_write_ts(item)
     if kind == "full":
@@ -360,12 +387,38 @@ def _scan(table, partitions):
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
+S3_BUCKET = "matthew-life-platform"
+
+
+def _served_exempt_keys(table) -> set:
+    """The served chronicle lead-in exemption (#4040/#4055), read-only.
+
+    Same derivation the manifest dead-man uses —
+    `chronicle_manifest_qa.served_chronicle_keys` — never a second hand list, so
+    `restart_verify.py` check 14 and `reconcile_countdown_gap.py` always agree
+    with `chronicle:manifest_provenance`. Degrades quietly to an empty set on
+    any read failure (unreadable manifest, unreadable partition, no boto3
+    credentials in a local run): that only ever makes the sweep MORE
+    conservative — a served row it fails to except surfaces as an escapee here,
+    which is loud, never a silent false exemption.
+    """
+    try:
+        import boto3
+        from operational.chronicle_manifest_qa import served_chronicle_keys
+
+        s3 = boto3.client("s3", region_name=wipe.REGION)
+        return served_chronicle_keys(table, s3, S3_BUCKET)
+    except Exception:  # noqa: BLE001 — an unreadable manifest/partition exempts nothing
+        return set()
+
+
 def run_sweep(
     table,
     wipe_ts: datetime | None = None,
     genesis_boundary: datetime | None = None,
     genesis_date_str: str | None = None,
     current_cycle: int | None = None,
+    served_keys: set | None = None,
 ) -> dict:
     """Sweep every EXPERIMENT_SCOPED partition for countdown-gap escapees.
 
@@ -377,6 +430,10 @@ def run_sweep(
     current_cycle: for the self-declared-provenance exemption; defaults to the
     SSM cycle via wipe.current_cycle().
 
+    served_keys: `(pk, sk)` set the live journal manifest serves (#4055). When
+    None (every caller today) it is DERIVED here via `_served_exempt_keys` —
+    pass an explicit set (including `set()`) only to pin it, e.g. in tests.
+
     Returns a report dict; performs READS ONLY.
     """
     genesis_date_str = genesis_date_str or wipe.EXPERIMENT_START_DATE
@@ -384,6 +441,8 @@ def run_sweep(
     if current_cycle is None:
         current_cycle = wipe.current_cycle()
     current_prereg_sha = current_prereg_sha_for(genesis_date_str)
+    if served_keys is None:
+        served_keys = _served_exempt_keys(table)
     partitions = scoped_partitions()
 
     rows: list[tuple[str, str, dict, dict]] = []
@@ -413,7 +472,7 @@ def run_sweep(
     sanctioned: list[tuple[str, str, str, str]] = []
     totals: Counter = Counter()
     for label, mode, extra, item in rows:
-        cat = classify_item(item, mode, wipe_ts, window_end, genesis_date_str, current_cycle, current_prereg_sha)
+        cat = classify_item(item, mode, wipe_ts, window_end, genesis_date_str, current_cycle, current_prereg_sha, served_keys)
         per_partition.setdefault(label, Counter())[cat] += 1
         totals[cat] += 1
         pk, sk = item.get("pk", ""), item.get("sk", "")
@@ -423,13 +482,16 @@ def run_sweep(
         elif cat in FLAG_CATEGORIES:
             flagged.append((label, pk, sk, cat))
         elif cat == SANCTIONED:
-            sanctioned.append((label, pk, sk, sanctioned_reason(item, genesis_date_str, current_cycle, current_prereg_sha) or ""))
+            sanctioned.append(
+                (label, pk, sk, sanctioned_reason(item, genesis_date_str, current_cycle, current_prereg_sha, served_keys) or "")
+            )
     return {
         "window_start": wipe_ts,
         "window_end": window_end,
         "wipe_ts_source": wipe_ts_source,
         "genesis": genesis_date_str,
         "current_cycle": current_cycle,
+        "served_keys": served_keys,
         "per_partition": per_partition,
         "totals": totals,
         "escapees": escapees,
