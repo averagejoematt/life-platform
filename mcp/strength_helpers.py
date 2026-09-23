@@ -235,25 +235,90 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
     return out
 
 
-def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups: bool = False, template_id: str = "") -> list:
+def exercise_identity(template_id: str | None, name: str | None, alias_map: dict[str, str] | None = None) -> str:
+    """The ONE identity a performed exercise is keyed by in a history / anchor series (#4069).
+
+    A Hevy `template_id` (upper-cased), mapped through the confirmed alias registry
+    (`config/hevy_template_aliases.json`, #3929 — alias id -> canonical id) when one is
+    supplied. A name never enters this key when an id exists: "Bench Press (Barbell)" and
+    "Incline Bench Press (Dumbbell)" share a substring and are two identities. An exercise
+    Hevy never tagged with an id gets `untagged:<exact title>` — its own bucket, never
+    merged with a tagged movement or with a different untagged title.
+    """
+    tid = (template_id or "").strip().upper()
+    if tid:
+        return (alias_map or {}).get(tid, tid)
+    return "untagged:" + " ".join((name or "").strip().lower().split())
+
+
+def resolve_exercise_templates(hevy_items: list, exercise_name: str, alias_map: dict[str, str] | None = None) -> list[dict]:
+    """A user-facing NAME -> the set of template identities it matched (#4069).
+
+    The name is a SEARCH, never an identity: it is matched (case-insensitive substring) against
+    the titles actually logged, and the answer is the list of template ids those titles carry —
+    one row per canonical identity, naming every raw template id and title folded into it (only
+    the alias registry folds two ids together). Every series is then built from these ids, so the
+    substring decides WHICH movements are candidates and never which sets belong to a movement.
+    """
+    needle = " ".join((exercise_name or "").strip().lower().split())
+    if not needle:
+        return []
+    rows: dict[str, dict] = {}
+    for workout in normalize_hevy_items(hevy_items):
+        for ex in workout["exercises"]:
+            title = ex["name"] or ""
+            if needle not in " ".join(title.lower().split()):
+                continue
+            ident = exercise_identity(ex.get("template_id"), title, alias_map)
+            row = rows.setdefault(ident, {"identity": ident, "template_ids": set(), "titles": set(), "n_sessions": 0})
+            raw = (ex.get("template_id") or "").strip().upper()
+            if raw:
+                row["template_ids"].add(raw)
+            row["titles"].add(title)
+            row["n_sessions"] += 1
+    out = []
+    for ident in sorted(rows, key=lambda i: (-rows[i]["n_sessions"], i)):
+        r = rows[ident]
+        out.append({**r, "template_ids": sorted(r["template_ids"]), "titles": sorted(r["titles"])})
+    return out
+
+
+def extract_hevy_sessions(
+    hevy_items: list,
+    exercise_name: str,
+    include_warmups: bool = False,
+    template_id: str = "",
+    alias_map: dict[str, str] | None = None,
+) -> list:
     """
     Given raw DynamoDB hevy items and a target exercise name (fuzzy) OR an exact Hevy
     `template_id`, return a list of session dicts sorted by date.
-    Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, volume}
+    Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, volume,
+    template_id, identity}
+
+    #4069: sets are selected by template IDENTITY only (`exercise_identity`). A `template_id`
+    selects its canonical identity — so a confirmed alias id is the same movement, and nothing
+    else is. A fuzzy name is first RESOLVED to the identities whose logged titles contain it
+    (`resolve_exercise_templates`); the substring never gates a set directly. Each session
+    carries its `identity`, so a caller can never fold two identities into one series without
+    seeing that it did.
     """
-    target = (exercise_name or "").lower()
     # #3766: a Hevy template id is the exact, stable handle for a movement; a name is a
     # fuzzy one. "75A4F6C4" as a substring of a NAME matches nothing, so accept it as an id.
     target_tid = (template_id or "").strip().upper()
-    sessions = []
+    if target_tid:
+        wanted = {exercise_identity(target_tid, "", alias_map)}
+    else:
+        wanted = {r["identity"] for r in resolve_exercise_templates(hevy_items, exercise_name, alias_map)}
+    sessions: list[dict] = []
+    if not wanted:
+        return sessions
     for workout in normalize_hevy_items(hevy_items):
         date_str = workout["date"]
         for ex in workout["exercises"]:
             ex_name = ex["name"]
-            if target_tid:
-                if (ex.get("template_id") or "").strip().upper() != target_tid:
-                    continue
-            elif target not in ex_name.lower():
+            identity = exercise_identity(ex.get("template_id"), ex_name, alias_map)
+            if identity not in wanted:
                 continue
             sets_out = []
             for s in ex["sets"]:
@@ -276,6 +341,7 @@ def extract_hevy_sessions(hevy_items: list, exercise_name: str, include_warmups:
                     "date": date_str,
                     "exercise_name": ex_name,
                     "template_id": ex.get("template_id") or "",
+                    "identity": identity,
                     "note_raw": ex.get("notes") or "",
                     "sets": sets_out,
                     "best_1rm": best_1rm,

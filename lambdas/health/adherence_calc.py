@@ -50,6 +50,31 @@ programmed exercises already use, and applied to the performed side BEFORE missi
 are computed. The registry is shrink-only-honest: it is the ONLY source of resolution —
 nothing here infers or auto-merges a pairing at runtime. `find_alias_candidates()` is the
 reporting tool for an unconfirmed pairing; it never feeds back into scoring.
+`canonical_template_ids()` is the same resolution exposed for OTHER readers (#4069's
+exercise-history / anchor-lift trend key in `mcp/strength_helpers.exercise_identity()`) —
+one alias table, read once, never a second one grown beside it (#4073).
+
+PROGRAM-DEFAULT INTENSITY CEILING (#4073). `intensity_prescription.resolve_ceiling`
+correctly refuses to invent a ceiling — a movement whose OWN prescription names no RPE/RIR
+returns `{"rpe": None}` on purpose (ADR-105: no invented thresholds). But a `None` ceiling
+made `grade_sets` report `status: "unprescribed"` and drop the movement out of the
+intensity denominator entirely — so an isolation accessory logged at RPE 9.5 (to-failure
+territory) still read a clean `as_prescribed` verdict, because nothing was ever compared.
+The program itself (v0.3 §3, `training.program_structure.EXPOSURES`, prose home
+`owner_redlines.REDLINES["lifting_sessions_per_wk"]["rep_scheme"]`) already names a ceiling
+for every movement CLASS even when a specific session's notes don't repeat it: accessories
+are RIR 1-2 (RPE <= 9), and the anchor pattern families train at the heavy exposure's top_rpe
+ceiling (<= 8) at the loosest. `_program_default_ceiling` applies that class-level default
+ONLY when the routine's own prescription is silent (`resolve_ceiling` returned `rpe: None`)
+— an explicit routine/exercise ceiling always wins, this is a fallback, never an override.
+Classification is by the SAME `program_structure.classify_movement` the accessory-rotation
+check already uses, read against the movement's Hevy catalog/alias title (never the raw
+movement_key string, which has no spaces for the title hints to match). A movement that
+classifies `cardio` — or that cannot be classified at all because no title is available —
+gets no default: ADR-104 absence semantics still apply where the program truly has nothing
+to say. `intensity["basis"]` names a defaulted ceiling `"program_default:accessory"` /
+`"program_default:anchor:<family>"` so a reader can always tell an inherited program number
+from the routine's own words.
 """
 
 from __future__ import annotations
@@ -62,7 +87,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from common.repo_config import config_dir
-from training.intensity_prescription import grade_sets, resolve_ceiling
+from training.intensity_prescription import RIR_RPE_ANCHOR, grade_sets, resolve_ceiling
+from training.program_structure import EXPOSURES, classify_movement
 from training.routine_ir import RoutineSpec
 
 logger = logging.getLogger("adherence_calc")
@@ -167,6 +193,65 @@ def _resolve_alias_canonical_tids(catalog: dict[str, Any], cache: dict[str, Any]
                 movement_key,
             )
     return resolved
+
+
+def canonical_template_ids() -> dict[str, str]:
+    """alias template_id -> canonical template_id, both upper-cased — the registry above,
+    resolved through the SAME `_resolve_alias_canonical_tids` path adherence scoring uses.
+
+    Public for the exercise-history and anchor-lift reads (#4069), so identity has ONE alias
+    table (#3929's) and not a second one grown beside it. Raises if the catalog cannot be
+    read; the caller decides how an unreadable registry is reported (never as "no aliases")."""
+    resolved = _resolve_alias_canonical_tids(_load_catalog(), _load_template_cache(), _load_template_aliases().get("aliases", {}))
+    return {str(a).strip().upper(): str(c).strip().upper() for a, c in resolved.items() if a and c}
+
+
+# ── program-default intensity ceiling (#4073) ─────────────────────────────────
+# Derived from training.program_structure.EXPOSURES, never re-typed as a literal — a
+# change to the program's own numbers must move this too, not silently drift from it.
+# The one prose home for both is owner_redlines.REDLINES["lifting_sessions_per_wk"]["rep_scheme"]
+# ("heavy exposure 4-6: one top set at RPE 7-8 plus two back-offs at -10%; moderate 6-10;
+# accessories 8-15 at RIR 1-2").
+_ACCESSORY_DEFAULT_RPE: float = RIR_RPE_ANCHOR - min(EXPOSURES["accessory"]["rir"])  # RIR 1-2 -> RPE <= 9
+_ANCHOR_DEFAULT_RPE: float = float(max(EXPOSURES["heavy"]["top_rpe"]))  # the tightest numeric ceiling EXPOSURES names
+
+
+def _movement_title_for_classification(movement_key: str, catalog: dict[str, Any], alias_titles: dict[str, str]) -> str:
+    """The Hevy-catalog title for one movement_key, for `program_structure.classify_movement`
+    — which matches against TITLE substrings ("bench press", "pulldown") and would silently
+    miss every one of them if handed a raw movement_key (`db_bench_press_flat` has no space).
+
+    Catalog entry title first; the ADR-069 `tmpl:<id>` escape hatch (a movement with no
+    catalog entry of its own — the exact case the #3929 alias specimen is) falls back to the
+    alias registry's OWN `titles` map, keyed by the plain template id — the same file already
+    read for aliasing, not a second title source (#4073)."""
+    entry = (catalog.get("movements", {}) or {}).get(movement_key) or {}
+    if entry.get("title"):
+        return str(entry["title"])
+    if movement_key and movement_key.startswith("tmpl:"):
+        return str(alias_titles.get(movement_key[len("tmpl:") :], "") or "")
+    return ""
+
+
+def _program_default_ceiling(movement_key: str, catalog: dict[str, Any], alias_titles: dict[str, str]) -> dict[str, Any]:
+    """The program's own class-level RPE ceiling for a movement whose OWN prescription
+    named none (#4073). Never consulted when `resolve_ceiling` already found one — this is
+    the fallback, not an override.
+
+    Classification is `program_structure.classify_movement` against the movement's title.
+    A movement with no resolvable title, or one that classifies `cardio`, gets no default —
+    ADR-104 absence semantics: "the plan never said" stays legible, it is not manufactured.
+    Returns {"rpe": float|None, "basis": str|None}, the same shape `resolve_ceiling` returns.
+    """
+    title = _movement_title_for_classification(movement_key, catalog, alias_titles)
+    if not title:
+        return {"rpe": None, "basis": None}
+    cls = classify_movement(title)
+    if cls == "cardio":
+        return {"rpe": None, "basis": None}
+    if cls.startswith("anchor:"):
+        return {"rpe": _ANCHOR_DEFAULT_RPE, "basis": f"program_default:{cls}"}
+    return {"rpe": _ACCESSORY_DEFAULT_RPE, "basis": "program_default:accessory"}
 
 
 # Conservative on purpose (#3929): only orientation/variant words known to describe the
@@ -294,7 +379,9 @@ def _as_prescribed(sets_pct: float, intensity: dict[str, Any], movements: list[d
 def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str, Any]:
     catalog = _load_catalog()
     cache = _load_template_cache()
-    alias_to_canonical_tid = _resolve_alias_canonical_tids(catalog, cache, _load_template_aliases().get("aliases", {}))
+    alias_registry = _load_template_aliases()  # #3929's one registry — aliases AND titles read from it
+    alias_to_canonical_tid = _resolve_alias_canonical_tids(catalog, cache, alias_registry.get("aliases", {}))
+    alias_titles = alias_registry.get("titles", {})
     routine_notes = getattr(ir, "notes", "") or ""
     recovery_branches = ((getattr(ir, "inputs_snapshot", None) or {}) or {}).get("recovery_branches")
     programmed: list[dict[str, Any]] = []
@@ -303,6 +390,10 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
         tid = _ir_movement_to_template(catalog, ex.movement_key, cache)
         sets = len(ex.sets)
         ceiling = resolve_ceiling(ex.movement_key, getattr(ex, "notes", "") or "", routine_notes, recovery_branches)
+        if ceiling["rpe"] is None:
+            # #4073 — the routine's own words named no ceiling; fall back to the program's
+            # class-level default (accessory / anchor pattern) before calling it ungraded.
+            ceiling = _program_default_ceiling(ex.movement_key, catalog, alias_titles)
         programmed.append({"movement_key": ex.movement_key, "template_id": tid, "sets": sets, "ceiling": ceiling})
         if tid:
             template_to_key[tid] = ex.movement_key

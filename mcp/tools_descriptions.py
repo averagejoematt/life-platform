@@ -169,7 +169,7 @@ GET_DAILY_METRICS_DESCRIPTION = (
     "'energy balance', 'calorie burn', 'am I in a deficit?', 'hydration score', 'water intake'."
 )
 
-GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), and % complete toward goal. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
+GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION = "The core weight-loss coaching report. Returns: weekly rate of loss with fast/slow flags, full BMI series with clinical milestone flags (Obese III→II→I→Overweight→Normal), projected goal date at current pace, plateau detection (14+ days of minimal movement), % complete toward goal, and recent_weights — the trailing 14 real Withings weigh-ins only (date + weight_lbs + source), where a logging gap shows as missing dates rather than being smoothed over. Use for: 'how is my weight loss going?', 'when will I reach my goal?', 'am I losing too fast?', 'am I in a plateau?', 'what BMI am I at?'. Requires journey_start_date, goal_weight_lbs in profile."
 
 PLAN_NEXT_SESSION_DESCRIPTION = (
     "The planning engine, from one place whichever client asks. STAGE 1 (no routine_id): the DETERMINISTIC "
@@ -207,7 +207,11 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
     "'bench press' matches both 'Bench Press (Barbell)' and 'Bench Press (Incline Dumbbell)' — different "
     "movements, never folded into one series. When a fuzzy name resolves to more than one template_id, "
     "this returns `ambiguous: true` with a `candidates` list and one `results` summary per movement "
-    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly."
+    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly. "
+    "Identity (#4069): sets are selected by template id only — a name is first resolved to the template "
+    "ids whose logged titles contain it (`searched.name_resolved_to`), and a confirmed Hevy alias pair "
+    "(`config/hevy_template_aliases.json`, #3929) is one movement; every series names what it was built "
+    "from in `matched_templates`."
 )
 
 GET_MUSCLE_VOLUME_DESCRIPTION = (

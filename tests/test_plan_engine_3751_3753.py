@@ -434,7 +434,7 @@ def test_a_confirmed_registry_would_not_repeat_the_unconfirmed_notice():
     assert not any("NOT owner-confirmed" in line for line in block["honesty"])
 
 
-# ── gather(): a failing reader yields unknown, never a wrong value ────────────
+# ── gather(): a failing reader yields read_failed (#4072), never a wrong value ─
 def test_a_failing_reader_yields_none_not_a_default():
     def _boom():
         raise RuntimeError("DDB down")
@@ -442,7 +442,10 @@ def test_a_failing_reader_yields_none_not_a_default():
     out = plan_engine.gather({"walk_hr_wk_now": _boom, "weight_lb": lambda: 319.7})
     assert out["walk_hr_wk_now"] is None and out["weight_lb"] == 319.7
     block = plan_engine.constraint_block(date="2026-09-14", **out)
-    assert block["walking"]["state"] == "unknown"
+    # #4072 replaced "unknown" here: a raise is a FAILED read, and says which error.
+    assert block["walking"]["state"] == "read_failed"
+    assert block["inputs"]["walk_hr_wk_now"]["error"] == "RuntimeError: DDB down"
+    assert block["inputs"]["weight_lb"]["state"] == "measured"
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -151,14 +151,24 @@ def build_void_calib_item(kind: str, bet: dict, genesis: str, closing_cycle, now
     (calibration_core.outcome_to_binary → None), so it never distorts the calibration
     curve — it keeps the accountability record without pretending the bet resolved. The
     sk comes from taxonomy.void_row_sk: keyed on genesis + kind + id + a digest of the
-    bet's own registration stamp, because slugs repeat across cycles (#1978)."""
+    bet's own registration stamp, because slugs repeat across cycles (#1978).
+
+    #3915 box 2: `closing_cycle` is accepted for every existing caller (restart_pipeline,
+    reconcile_prereg_voids) but is NO LONGER hand-written onto the row as a bare `cycle` —
+    that was exactly the attribute the #3890 inverse census found 2,211 of on this
+    partition (`pk_census.CROSS_PHASE_PROVENANCE_RULINGS["SOURCE#calibration"]`, ruled
+    in-scope 2026-09-22). Nothing is lost: `reset_genesis` below already carries the
+    closing reset's date, and `taxonomy.closing_cycle_for_genesis(reset_genesis,
+    CYCLE_GENESES)` re-derives the identical number from it on demand. The stamp is now
+    decided the #3514 way — `experiment_stamp_for(CALIBRATION_PK, sk)`, which returns
+    `{}` for this CROSS_PHASE pk — so a future void pass can never re-mint the forbidden
+    label; the existing 2,211 rows are `deploy/backfill_calibration_phase_stamp.py`'s job."""
     common = {
         "outcome": "voided_at_reset",
         "status_at_reset": bet.get("status"),
         "voided_at_reset": True,
         "voided_at": now_iso,
         "reset_genesis": genesis,
-        "cycle": closing_cycle,
     }
     bet_id = taxonomy.bet_id_of(kind, bet)
     sk = taxonomy.void_row_sk(genesis, kind, bet)
@@ -187,6 +197,10 @@ def build_void_calib_item(kind: str, bet: dict, genesis: str, closing_cycle, now
             "pre_registered_at": taxonomy.bet_registered_at(kind, bet),
             **common,
         }
+    # #3915 box 2: the guarded write-time stamp, not a hand-written `cycle` — see the
+    # docstring above. `closing_cycle` stays a parameter for signature compatibility with
+    # every existing caller; it is deliberately unused in the item body from here.
+    item = {**taxonomy.experiment_stamp_for(CALIBRATION_PK, sk), **item}
     return {k: v for k, v in item.items() if v is not None}
 
 

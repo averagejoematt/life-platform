@@ -1050,6 +1050,106 @@ def test_weight_loss_projects_forward_from_the_last_weigh_in_not_from_now(monkey
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 2b. recent_weights (#4074) — real weigh-ins only; a gap is missing dates,
+# never an interpolated entry standing in for them.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Real weigh-ins on TODAY-13, -12, -11, then a real SIX-DAY logging gap
+# (TODAY-10 .. TODAY-5 have no Withings row at all), then real weigh-ins
+# resume TODAY-4 .. TODAY. Plus one row well outside the 14-day window to
+# prove it's excluded.
+GAP_ROWS = [
+    withings(d(TODAY, -20), weight_lbs=330.0),  # outside the trailing-14 window
+    withings(d(TODAY, -13), weight_lbs=320.0),
+    withings(d(TODAY, -12), weight_lbs=319.6),
+    withings(d(TODAY, -11), weight_lbs=319.2),
+    # TODAY-10 .. TODAY-5: no rows at all — the real 6-day gap.
+    withings(d(TODAY, -4), weight_lbs=317.0),
+    withings(d(TODAY, -3), weight_lbs=316.8),
+    withings(d(TODAY, -2), weight_lbs=316.5),
+    withings(d(TODAY, -1), weight_lbs=316.3),
+    withings(TODAY, weight_lbs=316.0),
+]
+
+
+def test_recent_weights_shows_the_six_day_gap_as_missing_dates(monkeypatch):
+    """The defect this reports (#4074): a real multi-day logging gap must render
+    as missing dates, never as an interpolated/carried-forward entry papering
+    over it — this is the fixture from the acceptance criteria, hand-derived."""
+    install(monkeypatch, GAP_ROWS)
+    recent = th.tool_get_weight_loss_progress({})["recent_weights"]
+
+    got_dates = {p["date"] for p in recent}
+    missing = {d(TODAY, -n) for n in range(5, 11)}  # TODAY-10 .. TODAY-5
+    assert got_dates.isdisjoint(missing), f"invented dates inside the real gap: {got_dates & missing}"
+    assert d(TODAY, -20) not in got_dates, "a row outside the trailing-14 window leaked in"
+
+    # Exactly the 8 real in-window rows, nothing manufactured to fill the gap.
+    expected_dates = {d(TODAY, -13), d(TODAY, -12), d(TODAY, -11), d(TODAY, -4), d(TODAY, -3), d(TODAY, -2), d(TODAY, -1), TODAY}
+    assert got_dates == expected_dates
+    assert len(recent) == 8
+
+
+def test_recent_weights_carries_date_weight_and_the_source_row(monkeypatch):
+    """Mutation control: every field on every entry is checked against the
+    literal input row, not just counted — a mutant that drops/renames/rounds a
+    field, or swaps in a different row's weight, fails this."""
+    install(monkeypatch, GAP_ROWS)
+    recent = th.tool_get_weight_loss_progress({})["recent_weights"]
+    by_date = {p["date"]: p for p in recent}
+
+    assert by_date[d(TODAY, -13)] == {"date": d(TODAY, -13), "weight_lbs": 320.0, "source": "withings"}
+    assert by_date[TODAY] == {"date": TODAY, "weight_lbs": 316.0, "source": "withings"}
+    assert by_date[d(TODAY, -4)]["weight_lbs"] == 317.0
+    assert all(p["source"] == "withings" for p in recent)
+    assert all(set(p.keys()) == {"date", "weight_lbs", "source"} for p in recent), "no derived/smoothed field leaked in"
+
+
+def test_recent_weights_matches_the_withings_partition_row_for_row(monkeypatch):
+    """Live-proof shape, exercised locally: recent_weights must be exactly the
+    real Withings rows in the trailing 14 days — same count, same dates — never
+    more (interpolated) or fewer (silently dropped) than the partition holds."""
+    t = install(monkeypatch, GAP_ROWS)
+    recent = th.tool_get_weight_loss_progress({})["recent_weights"]
+    lo, hi = t.window_for("withings")
+    # every real withings row actually in the queried range and within 14 days of TODAY
+    anchor = datetime.strptime(TODAY, "%Y-%m-%d").date()
+    partition_recent = [
+        r
+        for r in GAP_ROWS
+        if lo <= r["sk"].replace("DATE#", "") <= hi and 0 <= (anchor - datetime.strptime(r["date"], "%Y-%m-%d").date()).days <= 13
+    ]
+    assert {p["date"] for p in recent} == {r["date"] for r in partition_recent}
+    assert len(recent) == len(partition_recent)
+
+
+def test_recent_weights_window_honestly_spans_fourteen_days(monkeypatch):
+    """#1917 window-name honesty: a row exactly 14 days back (TODAY-14) is
+    OUTSIDE the window; TODAY-13 is the oldest date the 14-day window admits."""
+    rows = [withings(d(TODAY, -14), weight_lbs=999.0), withings(d(TODAY, -13), weight_lbs=320.0), withings(TODAY, weight_lbs=316.0)]
+    install(monkeypatch, rows)
+    dates = {p["date"] for p in th.tool_get_weight_loss_progress({})["recent_weights"]}
+    assert d(TODAY, -14) not in dates
+    assert d(TODAY, -13) in dates
+
+
+def test_recent_weights_is_empty_rather_than_fabricated_when_the_window_holds_no_real_rows(monkeypatch):
+    """No weigh-ins in the trailing 14 days -> an empty list, never a
+    manufactured entry. (weight_series is non-empty from the older row, so the
+    tool still answers — recent_weights alone reports the real recent silence.)"""
+    install(monkeypatch, [withings(d(TODAY, -20), weight_lbs=330.0)])  # after journey_start, outside the 14-day window
+    out = th.tool_get_weight_loss_progress({})
+    assert out["recent_weights"] == []
+
+
+def test_recent_weights_note_states_the_provenance_and_gap_contract(monkeypatch):
+    install(monkeypatch, GAP_ROWS)
+    note = th.tool_get_weight_loss_progress({})["recent_weights_note"]
+    assert "withings" in note.lower()
+    assert "missing" in note.lower() or "gap" in note.lower()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 3. get_daily_metrics — the view dispatcher
 # ──────────────────────────────────────────────────────────────────────────────
 

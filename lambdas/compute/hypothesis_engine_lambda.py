@@ -79,6 +79,7 @@ from common.numeric import floats_to_decimal  # bundled shared module: canonical
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -790,15 +791,13 @@ def build_calibration_item(hyp, stats, outcome, resolved_at):
 def write_calibration_row(hyp, stats, outcome):
     """Persist one resolution to the calibration ledger (fail-soft)."""
     try:
+        from common.compute_metadata import tag_record  # bundled beside `common` (imported at module top)
+
         item = build_calibration_item(hyp, stats, outcome, datetime.now(timezone.utc).isoformat())
-        item = {k: v for k, v in item.items() if v is not None}
-
-        try:
-            from common.compute_metadata import tag_record
-
-            item = tag_record(item, source_id="calibration")
-        except ImportError:
-            pass
+        item = tag_record({k: v for k, v in item.items() if v is not None}, source_id="calibration")
+        # #3915 box 2: tag_record stamps `phase` on every compute write; this CROSS_PHASE ledger forbids it.
+        for attr in forbidden_provenance(item["pk"], item["sk"], item):
+            item.pop(attr, None)
         table.put_item(Item=floats_to_decimal(item))
         logger.info(f"[#530] Calibration row written: {item['sk']} outcome={outcome}")
     except Exception as e:
