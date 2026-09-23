@@ -639,6 +639,20 @@ def rule_set_section(ctx: Dict[str, Any]) -> List[Finding]:
     return []
 
 
+def rule_proof_probe(ctx: Dict[str, Any]) -> List[Finding]:
+    """A `closure:live-proof` issue declares the live read it closes on (#4022) — ADVISORY.
+
+    The nightly qa-smoke leg (`lambdas/operational/closure_probe_qa.py`) closes such an issue
+    on its first true `## Proof probe` reading; an issue with no parseable probe can only be
+    closed by a human re-reading its stays-open note. Parsed by the ONE grammar
+    (`closure_contract.parse_proof_probe` → `proof_probe.parse_block`). Advisory for now:
+    the flip to a violation is a measured step carried on #4022, not a calendar date —
+    several labelled issues pre-date the grammar and wait on events no probe can read.
+    Rehearsal-only issues (`closure:rehearsal-proof`) are out of scope by construction."""
+    problem = cc.proof_probe_problem(ctx.get("body") or "", ctx["labels"])
+    return [Finding("proof_probe", ctx["number"], problem, ADVISORY)] if problem else []
+
+
 def rule_tracker_close_policy(ctx: Dict[str, Any]) -> List[Finding]:
     """An auto-filed tracker states its own close policy in its body (#3065).
 
@@ -672,6 +686,7 @@ PER_ISSUE_RULES: List[Callable[[Dict[str, Any]], List[Finding]]] = [
     rule_score_line_canonical,
     rule_epic_link,
     rule_set_section,
+    rule_proof_probe,
 ]
 
 # The narrower contract an `auto-filed` ops tracker is held to INSTEAD of (never in
