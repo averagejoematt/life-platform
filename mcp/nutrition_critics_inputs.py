@@ -7,12 +7,13 @@ same way:
 
   * intake / protein by day        — the MacroFactor partition, 14 days ending `end_date`
   * lifting-day flags              — the Hevy partition (a day with a non-cardio exercise)
-  * weight + the 14-day trend      — the Withings partition through the SAME derivation the
-                                     deficit tool's impossibility check already uses
-                                     (`health.tdee.weight_trend_lb_per_wk`), never a new one
-  * weekly loss rates              — that derivation over each 7-day half of the window
-  * walking hr this week / last    — `mcp.tools_plan._walking_volume_last_7d` (Strava UNION
-                                     Hevy, #3930), called twice
+  * weight + the 14-day loss rate  — the Withings partition through THE loss-rate definition,
+                                     `mcp.shared_quantities.loss_rate_from_rows` (#4068: 14 days,
+                                     water weeks 1–2 excluded, least-squares) — the same number
+                                     `rate_advocate` reads off `get_benchmark`
+  * weekly loss rates              — that definition over each trailing 7-day week
+  * walking hr this week / last    — `mcp.shared_quantities.weekly_walking_hours` (Strava UNION
+                                     Hevy, de-duplicated in time, 7 completed days), called twice
   * IC-29 adaptation severity      — `mcp.tools_nutrition._get_metabolic_adaptation`
   * already-logged decisions       — `get_decisions` rows, trailing 14 days, source
                                      `nutrition_critics`, for box 4's dedup
@@ -27,13 +28,10 @@ from typing import Any, Callable
 
 from common.constants import day_n
 from common.pacific_time import shift_day_key
-from health import (
-    nutrition_critics,
-    tdee as tdee_core,
-    weight_trend,
-)
+from health import nutrition_critics, weight_trend
 from training import walking_volume
 
+from mcp import shared_quantities
 from mcp.core import query_source
 
 SERIES_DAYS = 14
@@ -97,7 +95,10 @@ def lifting_day_flags(workouts: list[dict[str, Any]] | None, keys: list[str]) ->
 
 def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[str, Any]:
     """Latest weight, the signed 14-day trend (negative = losing) with its n/span/provisional
-    flag, and the loss rate over each 7-day half — all from `health.tdee.weight_trend_lb_per_wk`."""
+    flag, and the loss rate over each trailing 7-day week — all from THE loss-rate definition
+    (`mcp.shared_quantities`, #4068). It was `health.tdee.weight_trend_lb_per_wk`'s
+    first-vs-last endpoint over the whole window, water weeks included: 2.99 lb/wk on 09-22
+    beside `rate_advocate`'s 4.52 for the same body on the same day."""
     out: dict[str, Any] = {
         "weight_lb": None,
         "weight_trend_lb_wk": None,
@@ -110,32 +111,21 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         return out
     usable = [r for r in rows if (_num(r.get("weight_lbs")) or 0) > 0]
     out["weight_lb"] = weight_trend.latest_weight(usable).get("weight_lbs")
-    trend, span = tdee_core.weight_trend_lb_per_wk(usable)
-    out["weight_trend_lb_wk"] = trend
-    out["weighin_count"] = len(usable)
-    out["weighin_span_days"] = span
-    if trend is not None:
-        out["rate_provisional"] = span < tdee_core.MIN_TREND_DAYS
-    half = len(keys) // 2
-    first, second = set(keys[:half]), set(keys[half:])
-
-    def _day(r: dict[str, Any]) -> str:
-        return str(r.get("date") or str(r.get("sk") or "").replace("DATE#", ""))[:10]
-
-    rates: list[float] = []
-    for bucket in (first, second):
-        t, _ = tdee_core.weight_trend_lb_per_wk([r for r in usable if _day(r) in bucket])
-        if t is not None:
-            rates.append(round(-t, 2))
-    out["weekly_loss_rates_lb_wk"] = rates or None
+    end = shared_quantities.completed_end(keys[-1])
+    rate = shared_quantities.loss_rate_from_rows(usable, end)
+    out["weighin_count"] = rate["n_weighins"]
+    out["weighin_span_days"] = rate["span_days"]
+    if rate["rate_lb_wk"] is not None:
+        out["weight_trend_lb_wk"] = round(-rate["rate_lb_wk"], 2)  # SIGNED, negative = losing — the critic's contract
+        out["rate_provisional"] = rate["provisional"]
+    out["loss_rate"] = rate
+    out["weekly_loss_rates_lb_wk"] = shared_quantities.weekly_loss_rates_from_rows(usable, end)
     return out
 
 
 def _walking_hours(end_date: str) -> float | None:
-    from mcp.tools_plan import _walking_volume_last_7d
-
-    layer = _safe(_walking_volume_last_7d, end_date)
-    return _num((layer or {}).get("total_hr")) if isinstance(layer, dict) else None
+    """THE weekly walking hours for the 7 completed days ending `end_date` (#4068)."""
+    return _num(_safe(shared_quantities.weekly_walking_hours, end_date))
 
 
 def _metabolic_severity(end_date: str) -> str | None:
@@ -178,8 +168,9 @@ def resolve(
     intake, protein = macrofactor_series(mf, keys)
     trend = withings_trend(wt, keys)
     dn = day_n(end_date)
-    this_wk = _walking_hours(end_date)
-    last_wk = _walking_hours(shift_day_key(end_date, -7))
+    walk_end = shared_quantities.completed_end(end_date)  # the week the plan reads, never a day in progress
+    this_wk = _walking_hours(walk_end)
+    last_wk = _walking_hours(shift_day_key(walk_end, -7))
     if this_wk is None or last_wk is None:
         unresolved["walking_volume"] = "the walking-volume layer could not be built for one or both weeks"
     sev = _metabolic_severity(end_date) if include_metabolic else None

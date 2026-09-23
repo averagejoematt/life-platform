@@ -190,6 +190,14 @@ def derive_load_floors(
     dslw = _days_since_last_workout(history_index, target_date)
     audit["days_since_last_workout"] = dslw
     movements = _catalog_movements() if movements is None else movements
+    # #4065: the chat path's half of the #4090 back-off seam. The generator writes
+    # `back_off_floor_kg` for the sets it authors; a hand-drafted v0.3 heavy exposure gets the
+    # same field from the redline rep scheme (parsed, never a hand list; −pct off the floor,
+    # rounded DOWN to the rack step). An unparsed scheme writes none, so back-offs fail closed.
+    from training.rep_scheme import back_off_min_kg, heavy_back_off_scheme
+
+    scheme = heavy_back_off_scheme()
+    audit["back_off_scheme"] = {k: v for k, v in scheme.items() if k != "source_text"}
 
     for ex in getattr(ir, "exercises", None) or []:
         key = getattr(ex, "movement_key", None) or "?"
@@ -204,6 +212,8 @@ def derive_load_floors(
         audit["movements"][key] = {
             k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")
         }
+        if floor.get("floor_kg") and scheme.get("status") == "ok":
+            audit["movements"][key]["back_off_floor_kg"] = back_off_min_kg(float(floor["floor_kg"]), scheme)
     return audit
 
 
@@ -323,6 +333,6 @@ def summary(gate: dict[str, Any] | None) -> str:
         f"{with_floor}/{len(movements)} movement(s) carry a band-matched floor; "
         f"conditional-up scan ran on routine notes + every exercise note, "
         f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}, "
-        f"{len(audit.get('back_offs_exempted') or [])} prescribed back-off(s) exempted "
-        f"(rep scheme {(audit.get('back_off_scheme') or {}).get('status', '?')}, #4065)"
+        f"{audit.get('back_offs_checked', 0)} back-off set(s) held to their back-off floor "
+        f"(rep scheme {(audit.get('back_off_scheme') or {}).get('status', '?')}, #4065/#4090)"
     )

@@ -560,6 +560,9 @@ def _scheduled_session(day: str, catalog_movements: dict[str, Any] | None, skill
         return {"date": day, "source": "unreadable", "archetype": None, "note": str(e)}
     if catalog_movements is None and out.get("prescription"):
         out["catalog_note"] = "the movement catalog was not read — anchors are named by PATTERN, movements unresolved"
+    elif out.get("prescription"):
+        # #4090: the week's direct hard sets per redline muscle, beside the range each must sit in
+        out["weekly_sets_by_muscle"] = program_structure.weekly_sets_by_muscle(catalog_movements or {}, skill_ceiling)
     out["how_to_draft"] = (
         "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
         "calendar and prescription); draft_custom only for a deliberate departure"

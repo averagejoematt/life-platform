@@ -75,7 +75,9 @@ def _commit(ir, args=None, extra=()):
             patch("training.routine_repo.list_by_date_range", return_value=[]),
             patch("training.hevy_template_cache.resolve_movement", return_value="TPL"),
             patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
-            patch("training.hevy_write_client.list_folders", return_value={"routine_folders": [{"id": 1, "title": "Full"}]}),
+            # no folder I/O leaves the process: the title the compiler picks is resolved from a stub
+            patch("training.hevy_write_client.list_folders", return_value={"routine_folders": [{"id": 1, "title": "Full Body"}]}),
+            patch("training.hevy_write_client.create_folder", side_effect=AssertionError("no live folder write in tests")),
             patch("training.hevy_write_client.create_routine", side_effect=_create),
             patch(
                 "training.hevy_write_client.verify_commit_landed",
@@ -101,23 +103,34 @@ def test_the_scheme_parses_from_the_live_redline_prose():
     assert s["source_text"] == owner_redlines.REDLINES["lifting_sessions_per_wk"]["rep_scheme"]
 
 
-def test_the_exemption_follows_the_prose_not_a_hand_list(monkeypatch):
-    """Edit the redline to ONE back-off at −5 %: the same routine's second back-off (and a 126 lb
-    back-off, −10 %) are no longer prescribed, so the gate refuses. Nothing else was touched."""
+def test_the_back_off_floor_follows_the_prose_not_a_hand_list(monkeypatch):
+    """Edit the redline to ONE back-off at −5 %: the back-off floor moves to 130 lb (140 × 0.95,
+    rounded down to the rack) and the second back-off becomes an added set held to the top-set
+    floor. Nothing else was touched."""
     rs = dict(owner_redlines.REDLINES["lifting_sessions_per_wk"])
     rs["rep_scheme"] = "heavy exposure 4–6: one top set at RPE 7–8 plus one back-off at −5 %; moderate 6–10"
     monkeypatch.setitem(owner_redlines.REDLINES, "lifting_sessions_per_wk", rs)
     out = _commit(bind(_heavy()))
     assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION", out
-    assert "deeper than the scheme's -5 % back-off" in out["error"] and "beyond the scheme's 1 back-off" in out["error"]
+    assert "set 3 prescribes 126 lb against a floor of 130 lb" in out["error"], out["error"]
+    assert "set 4 prescribes 126 lb against a floor of 140 lb" in out["error"] and "beyond the rep scheme's 1 back-off" in out["error"]
+
+
+def test_the_chat_path_writes_the_same_back_off_seam_the_generator_does():
+    """#4090 records `back_off_floor_kg` for generator sets; the chat path writes the same field."""
+    floors = gate.derive_load_floors(_heavy())
+    row = floors["movements"][f"tmpl:{TPL}"]
+    assert row["floor_kg"] == HEVY_140_KG
+    assert row["back_off_floor_kg"] == pytest.approx(125 * LB), "−10 % of 140 lb = 126, rounded DOWN to the 125 lb rack step"
+    assert floors["back_off_scheme"]["status"] == "ok"
 
 
 # ── #4065 box 3: the v0.3 heavy scheme commits ─────────────────────────────────────────
-def test_the_v03_heavy_scheme_commits_and_names_its_exempted_back_offs():
+def test_the_v03_heavy_scheme_commits_and_says_its_back_offs_met_their_floor():
     ir = bind(_heavy())
     out = _commit(ir)
     assert out["status"] == "committed", out
-    assert "2 prescribed back-off(s) exempted (rep scheme ok, #4065)" in out["prescription_gate"]
+    assert "2 back-off set(s) held to their back-off floor (rep scheme ok, #4065/#4090)" in out["prescription_gate"]
     assert len(out["_created"]) == 1
 
 
@@ -126,7 +139,7 @@ def test_a_back_off_rounded_down_to_the_rack_passes_and_one_below_it_does_not():
     assert _commit(bind(_heavy(backs=(125, 125))))["status"] == "committed"
     out = _commit(bind(_heavy(backs=(125, 120))))
     assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION"
-    assert "set 4 prescribes 120 lb" in out["error"] and "deeper than" in out["error"]
+    assert "set 4 prescribes 120 lb against a floor of 125 lb" in out["error"], out["error"]
 
 
 # ── #4065 box 2: tolerance — a set AT the floor passes ─────────────────────────────────
@@ -148,21 +161,23 @@ def test_an_extra_back_off_beyond_the_scheme_is_refused():
     """1 top + 3 back-offs: the third is an ADDED set the program did not prescribe."""
     out = _commit(bind(_heavy(backs=(126, 126, 126))))
     assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION", out
-    assert "set 5 prescribes" in out["error"] and "beyond the scheme's 2 back-off(s) after top set 2" in out["error"]
+    assert "set 5 prescribes 126 lb against a floor of 140 lb" in out["error"]
+    assert "beyond the rep scheme's 2 back-off(s)" in out["error"]
     assert out["_created"] == []
 
 
-def test_back_offs_off_a_top_set_below_the_floor_are_not_exempt():
-    out = _commit(bind(_heavy(top=130, backs=(117, 117))))
+def test_a_top_set_below_the_floor_still_refuses_whatever_its_back_offs():
+    out = _commit(bind(_heavy(top=130, backs=(126, 126))))
     assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION"
-    assert "top set 2 is itself below the floor" in out["error"]
+    assert "set 2 prescribes 130 lb against a floor of 140 lb" in out["error"]
 
 
-def test_a_moderate_top_set_carries_no_back_offs():
-    """The scheme's back-offs belong to the HEAVY exposure (4–6 reps); an 8-rep top set has none."""
-    out = _commit(bind(_heavy(top_reps=8)))
-    assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION"
-    assert "is not a heavy exposure (8 reps, scheme 4-6)" in out["error"]
+def test_a_warmup_first_does_not_turn_the_top_set_into_a_back_off():
+    """#4090's seam used `i > 0`; with a warm-up at index 0 that held the TOP set to the back-off
+    floor. The window is over WORKING sets, so the top set still meets the top-set floor."""
+    out = _commit(bind(_routine([(95, 5, "warmup"), (126, 5, None), (126, 6, None), (126, 6, None)])))
+    assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION", out
+    assert "set 2 prescribes 126 lb against a floor of 140 lb" in out["error"]
 
 
 def test_an_above_prescription_up_branch_is_still_refused_on_a_valid_scheme():
@@ -173,9 +188,9 @@ def test_an_above_prescription_up_branch_is_still_refused_on_a_valid_scheme():
     assert "conditional up-branch" in out["error"]
 
 
-def test_mutation_an_unparsed_scheme_exempts_nothing(monkeypatch):
-    """Fail CLOSED: with the scheme unreadable the same v0.3 routine refuses — so the exemption,
-    and nothing else, is what lets the committing test above through."""
+def test_mutation_an_unparsed_scheme_writes_no_back_off_floor(monkeypatch):
+    """Fail CLOSED: with the scheme unreadable the same v0.3 routine refuses — so the seam, and
+    nothing else, is what lets the committing test above through."""
     monkeypatch.setattr(rep_scheme, "heavy_back_off_scheme", lambda: {"status": "unparsed", "reason": "test"})
     out = _commit(bind(_heavy()))
     assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION", out
