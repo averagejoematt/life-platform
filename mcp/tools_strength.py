@@ -14,6 +14,7 @@ from mcp.strength_helpers import (
     classify_exercise,
     extract_hevy_sessions,
     normalize_hevy_items,
+    resolve_exercise_templates,
     volume_status,
 )
 
@@ -54,6 +55,41 @@ def _read_hevy_all_phases(start_date: str, end_date: str) -> tuple[list, list[st
     """
     items = query_source_cross_phase("hevy", start_date, end_date)
     return items, phases_of(items)
+
+
+def template_alias_map() -> tuple[dict[str, str], dict]:
+    """(alias id -> canonical id, registry status) — the ONE alias table (#3929), read for #4069.
+
+    The table is `config/hevy_template_aliases.json`, resolved by the adherence scorer's own
+    `canonical_template_ids` — this module keeps no pairing of its own. An unreadable registry
+    yields an EMPTY map (every id is its own identity, the pre-#3929 behaviour) and a status that
+    says so; it is never reported as "no aliases exist".
+    """
+    try:
+        from health.adherence_calc import canonical_template_ids
+
+        amap = canonical_template_ids()
+        return amap, {"status": "read", "source": "config/hevy_template_aliases.json", "aliases": len(amap)}
+    except Exception as e:  # noqa: BLE001 — identity degrades to raw template ids, and says so
+        logger.warning("template alias registry unreadable (#4069): %s", e)
+        return {}, {
+            "status": "unreadable",
+            "source": "config/hevy_template_aliases.json",
+            "reason": f"{type(e).__name__}: raw template ids used without alias resolution",
+        }
+
+
+def _matched_templates(sessions: list) -> list[dict]:
+    """Which template identities a series was built from, with every raw id and title (#4069)."""
+    rows: dict[str, dict] = {}
+    for s in sessions:
+        ident = s.get("identity") or s.get("template_id") or ""
+        r = rows.setdefault(ident, {"identity": ident, "template_ids": set(), "titles": set(), "n_sessions": 0})
+        if s.get("template_id"):
+            r["template_ids"].add(str(s["template_id"]).upper())
+        r["titles"].add(s.get("exercise_name") or "")
+        r["n_sessions"] += 1
+    return [{**r, "template_ids": sorted(r["template_ids"]), "titles": sorted(r["titles"])} for r in rows.values()]
 
 
 def _searched_block(exercise_name: str, template_id: str, start_date: str, end_date: str, items: list, phases_read: list[str]) -> dict:
@@ -266,6 +302,10 @@ def _summarize_exercise_sessions(template_id: str, sessions: list) -> dict:
     return {
         "exercise_name": sessions[0]["exercise_name"],
         "template_id": sessions[0].get("template_id") or template_id or None,
+        # #4069: the identity this ONE series is keyed on, and every raw template id / title
+        # folded into it (only a confirmed alias folds two ids — never a shared substring).
+        "identity": sessions[0].get("identity") or sessions[0].get("template_id") or template_id or None,
+        "matched_templates": _matched_templates(sessions),
         "muscle_groups": classification["muscle_groups"],
         "movement_pattern": classification["movement_pattern"],
         "date_range": {"start": sessions[0]["date"], "end": sessions[-1]["date"]},
@@ -340,6 +380,14 @@ def tool_get_exercise_history(args):
     name resolves to more than one, this returns the candidate list plus a per-template
     summary for each — never a merged series. Pass `template_id` to pin one movement
     directly and skip the ambiguity check entirely.
+
+    #4069: the substring now only RESOLVES a name to template identities (reported as
+    `searched.name_resolved_to`); sets are selected and grouped by identity
+    (`strength_helpers.exercise_identity` — the raw id through the ONE alias registry,
+    `config/hevy_template_aliases.json`, #3929), never by name. So a confirmed alias pair
+    reads as one movement, a variant is never another variant's history, and every series
+    carries `matched_templates` naming the ids and titles it was built from. The
+    `anchor_lift_strength_drop` input (`tools_plan._anchor_trend`) reads through this path.
     """
     exercise_name = (args.get("exercise_name") or args.get("exercise") or "").strip()
     template_id = (args.get("template_id") or "").strip()
@@ -356,7 +404,13 @@ def tool_get_exercise_history(args):
     # #4030: cross-phase by the taxonomy's own ruling, minus the superseded legacy generation.
     items, phases_read = _read_hevy_all_phases(start_date, end_date)
     searched = _searched_block(exercise_name, template_id, start_date, end_date, items, phases_read)
-    sessions = extract_hevy_sessions(items, exercise_name, include_warmups, template_id=template_id)
+    # #4069: every series keys on template IDENTITY (raw id through the #3929 alias registry).
+    # A name is resolved to the identities it matched FIRST, and the answer names them.
+    alias_map, alias_status = template_alias_map()
+    searched["alias_registry"] = alias_status
+    if not template_id:
+        searched["name_resolved_to"] = resolve_exercise_templates(items, exercise_name, alias_map)
+    sessions = extract_hevy_sessions(items, exercise_name, include_warmups, template_id=template_id, alias_map=alias_map)
 
     if not sessions:
         label = f"template_id {template_id!r}" if template_id else f"'{exercise_name}'"
@@ -390,9 +444,12 @@ def tool_get_exercise_history(args):
     # this only ever triggers on a fuzzy exercise_name. Group by template_id (the empty
     # string groups movements Hevy never tagged with one — treated as their own bucket
     # rather than silently merged with a tagged movement of the same name).
+    #
+    # #4069: grouped by IDENTITY, not raw id — a confirmed alias (#3929) is one movement, and an
+    # untagged title is its own `untagged:<title>` bucket (see `exercise_identity`).
     by_template: dict[str, list] = {}
     for s in sessions:
-        by_template.setdefault(s.get("template_id") or "", []).append(s)
+        by_template.setdefault(s.get("identity") or s.get("template_id") or "", []).append(s)
 
     if not template_id and len(by_template) > 1:
         candidates = []
@@ -402,11 +459,13 @@ def tool_get_exercise_history(args):
             candidates.append(
                 {
                     "exercise_name": tid_sessions[0]["exercise_name"],
-                    "template_id": tid or None,
+                    "template_id": tid_sessions[0].get("template_id") or None,
+                    "identity": tid or None,
+                    "template_ids": sorted({str(x["template_id"]).upper() for x in tid_sessions if x.get("template_id")}),
                     "n_sessions": len(tid_sessions),
                 }
             )
-            results.append(_summarize_exercise_sessions(tid, tid_sessions))
+            results.append(_summarize_exercise_sessions(tid_sessions[0].get("template_id") or "", tid_sessions))
         return {
             "ambiguous": True,
             "searched": searched,

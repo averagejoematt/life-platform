@@ -169,6 +169,17 @@ def _resolve_alias_canonical_tids(catalog: dict[str, Any], cache: dict[str, Any]
     return resolved
 
 
+def canonical_template_ids() -> dict[str, str]:
+    """alias template_id -> canonical template_id, both upper-cased — the registry above,
+    resolved through the SAME `_resolve_alias_canonical_tids` path adherence scoring uses.
+
+    Public for the exercise-history and anchor-lift reads (#4069), so identity has ONE alias
+    table (#3929's) and not a second one grown beside it. Raises if the catalog cannot be
+    read; the caller decides how an unreadable registry is reported (never as "no aliases")."""
+    resolved = _resolve_alias_canonical_tids(_load_catalog(), _load_template_cache(), _load_template_aliases().get("aliases", {}))
+    return {str(a).strip().upper(): str(c).strip().upper() for a, c in resolved.items() if a and c}
+
+
 # Conservative on purpose (#3929): only orientation/variant words known to describe the
 # SAME movement pattern under a different Hevy catalog entry. Deliberately excludes
 # words like "incline"/"decline" that name a genuinely different movement (see
