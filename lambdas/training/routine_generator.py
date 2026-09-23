@@ -596,13 +596,15 @@ def _enforce_load_floors(
     days_since_last_workout: int | None,
     layoff_days: int,
     rationale: list[str],
-    floor_transform: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    floor_fn: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Derive and APPLY the prescription floor for every block. Returns the audit dict.
 
-    `floor_transform` (#4090) re-bases each derived floor before it is applied — the v0.3
-    path passes `load_ramp.ramp_floor`, so its sessions prescribe the §3 entry ramp while
-    every other path keeps the #3927 best-load floor unchanged.
+    `floor_fn` (#4090/#4107) replaces `prescription_floor` with a function of the same
+    signature — the v0.3 path passes `load_ramp.v03_floor` (band anchor -> nearest-band
+    fallback -> the §3 entry ramp), so its sessions prescribe the ramp while every other
+    path keeps the #3927 best-load floor unchanged. One function, so the generator and the
+    chat commit gate cannot derive the v0.3 load two ways.
 
     This is acceptance box 1's enforcement point: one place where a prescribed load is
     compared against what he has already done at this bodyweight, and raised if it is
@@ -631,7 +633,7 @@ def _enforce_load_floors(
 
     for block in exercises:
         template_id = catalog.get("movements", {}).get(block.movement_key, {}).get("hevy_template_id_hint")
-        floor = prescription_floor(
+        floor = (floor_fn or prescription_floor)(
             template_id,
             history_index,
             weight_index,
@@ -640,8 +642,6 @@ def _enforce_load_floors(
             layoff_days=layoff_days,
             as_of=target_date,
         )
-        if floor_transform is not None:
-            floor = floor_transform(floor)
         corrections = apply_prescription_floor(block.sets, floor)
         cue = render_floor_cue(floor)
         if cue:
@@ -655,6 +655,11 @@ def _enforce_load_floors(
             "discount_pct": floor.get("discount_pct"),
             "layoff_reason": floor.get("layoff_reason"),
             "ramp": floor.get("ramp"),
+            # #4107: where the anchor came from — the current band, or the nearest one he has lifted in
+            "anchor_band": floor.get("anchor_band"),
+            "anchor_date": floor.get("anchor_date"),
+            "fallback": floor.get("fallback"),
+            "fallback_detail": floor.get("fallback_detail"),
             "corrections": corrections,
         }
         if corrections:

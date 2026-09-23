@@ -361,7 +361,12 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "load_anchoring": {
         "value": "bodyweight-band-matched history, discounted for detraining",
-        "detraining_discount_pct": [10, 15],
+        # #4107 owner ruling 2026-09-23: the discount is 10 % — the band collapses to its
+        # shallow end, so the ramp (which reads the deep end) and the blueprint-historian
+        # critic (which reports the band) read one number. The 2026-09-08 statement stays below.
+        "detraining_discount_pct": [10, 10],
+        "detraining_discount_provenance": "owner ruling 2026-09-23 (#4107): 10 %, not the lane's conservative 15 %",
+        "detraining_discount_pct_stated_2026_09_08": [10, 15],
         "entry_pct_of_band_best": [85, 90],
         "trap_bar_until_lb": 275,
         "provenance": "owner",

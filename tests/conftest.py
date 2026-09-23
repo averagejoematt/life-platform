@@ -754,6 +754,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible: a second counter feeding one consumer while the planner reads another
         # number reds nothing at runtime.
         "test_muscle_volume_working_sets_4071.py",
+        # #4107: an AST sweep asserting `load_ramp.v03_floor` is the ONE v0.3 load path
+        # (generator + chat gate). Pure repo shape: a second load path is exactly a PR's
+        # own diff, so it must red pre-merge.
+        "test_v03_nearest_band_anchor_4107.py",
         # #4075: an rglob sweep of lambdas/ + mcp/ keeping the TRIMP exponent in one module. Pure
         # repo shape — a second copy is exactly a PR's own diff.
         "test_training_load.py",

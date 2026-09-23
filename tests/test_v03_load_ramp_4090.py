@@ -88,7 +88,9 @@ def test_every_ramp_constant_is_read_from_owner_redlines():
     assert p["ramp_to_week"] == entry["ramp_to_week"] == 6
     lo, hi = entry["start_pct_of_band_e1rm"]
     assert lo <= p["start_pct"] <= hi and p["start_pct"] == 60
-    assert p["discount_pct"] == max(owner_redlines.REDLINES["load_anchoring"]["detraining_discount_pct"]) == 15
+    # #4107: owner ruling 2026-09-23 — the discount is 10 %, not the deep end of the stated 10–15 %
+    assert p["discount_pct"] == max(owner_redlines.REDLINES["load_anchoring"]["detraining_discount_pct"]) == 10
+    assert owner_redlines.REDLINES["load_anchoring"]["detraining_discount_provenance"].startswith("owner ruling 2026-09-23")
     assert [load_ramp.ramp_pct(w) for w in range(1, 11)] == [60, 65, 70, 75, 80, 85, 85, 85, 85, 85]
 
 
