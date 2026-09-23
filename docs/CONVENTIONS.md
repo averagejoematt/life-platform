@@ -327,6 +327,34 @@ dispatches `site-deploy.yml` if the generators dirty `site/**` — wanted, termi
 `Unit Tests` job now runs on every push, which raises total runner time and the queueing
 term the duration budget is mostly made of (#3403).
 
+### 4a0b. The direct push — docs only; code lands through the premerge lane (#3528)
+
+The ruleset in §4a0 binds PRs, and its only bypass actor is the owner's account
+(`bypass_mode: always`), so an owner-authenticated direct push to `main` meets no required
+check at all. The forensic RCA of 2026-09-05 (class 1) measured the cost: 302 of 613 commits
+since 08-22 were direct pushes that met only a formatter, and 26 of 29 red Unit-Test runs on
+`main` were direct pushes. The fix is a refusal, not a second test gate:
+
+- **`bash deploy/agent_commit.sh --push "<msg>" <paths>`** commits, then pushes the current
+  branch to its own name. On a lane branch that is all it does.
+- **On `main`** it first runs `deploy/direct_push_gate.py` over everything the push carries
+  (`origin/main..HEAD` + the index). Any path outside `DOCS_CLASS` (docs/**, README.md,
+  CLAUDE.md, .claude/README.md, .claude/skills/**, .claude/agents/**, and the generated
+  `lambdas/web/platform_counts.py`) is **refused by name** — open a PR. A docs-only push runs
+  the Docs-CI gates **derived** from `docs-ci.yml` by `scripts/ci_gate_commands.py`, in
+  parallel, and is refused on any red.
+- **`RESTART_PIPELINE=1`** is the reset pipeline's one sanctioned code push: the same gates
+  plus #3529's derived artifact-reader pytest leg (and `node --test`). An empty derivation is
+  `UNEVALUABLE` (exit 2), never a pass.
+
+`ci_gate_commands(workflow)` is the one workflow→argv derivation; `restart_verify_gates.py`,
+`wrap_gates.py` and `direct_push_gate.py` all read it, and
+`tests/test_ci_stand_ins_derive.py` enumerates every `scripts/`/`deploy/` module that runs
+`git push` and reds on one that does not derive (or is not a declared never-`main` exemption).
+The honest bounds: this is client-side — a bare `git push origin main` is not stopped here —
+and the docs stand-in is a superset of Docs CI, not of CI/CD's Unit Tests, which also run on a
+docs push.
+
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
 Since ADR-117, `plan` (and therefore `deploy` + the reader-facing visual-QA gate)

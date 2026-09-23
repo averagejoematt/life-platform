@@ -18,10 +18,13 @@ THE DERIVATION GUARD (charter primitive, and the reason this is not a hand-typed
   the original one-gate tail survive. `docs_ci_gate_commands()` raises rather than
   returning a short list, so "found nothing" can never read as "nothing to run".
 
-  This module is the ONE derivation for the whole repo. `scripts/wrap_gates.py` builds
-  its doc leg from `docs_ci_gate_commands()` too (#3531) rather than hand-listing four of
-  the twelve, which is how the wrap battery came to report green over eight gates CI
-  fails on.
+  `docs_ci_gate_commands()` is the Docs-CI view of the ONE derivation for the whole repo,
+  `scripts/ci_gate_commands.ci_gate_commands(workflow)` (#3528 lifted the parser there so
+  every stand-in imports the same function). `scripts/wrap_gates.py` builds its doc leg
+  from `docs_ci_gate_commands()` too (#3531) rather than hand-listing four of the twelve,
+  which is how the wrap battery came to report green over eight gates CI fails on; and
+  `deploy/direct_push_gate.py` (#3528, `agent_commit.sh --push` on main) runs the same set
+  plus, under `RESTART_PIPELINE=1`, this module's derived pytest leg.
 
   #3534: a `run: |` BLOCK invoking python3 would previously have been invisible to the
   line parser — derived silently as "not a gate". `undeclared_multiline_python_steps()`
@@ -76,14 +79,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "docs-ci.yml"
 
-# A single-line `run:` step invoking a python checker.
-_RUN_LINE = re.compile(r"^\s*run:\s*(python3\s+\S+.*?)\s*$")
+# #3528: the workflow parser lives in scripts/ci_gate_commands.py — the ONE derivation
+# every CI stand-in (this sweep, scripts/wrap_gates.py, deploy/direct_push_gate.py) imports.
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from ci_gate_commands import (
+    ci_gate_commands,  # noqa: E402
+    multiline_python_steps as _multiline_python_steps,  # noqa: E402
+)
 
-# A block scalar (`run: |`) — captured separately so it can never be silently ignored.
-_BLOCK_RUN = re.compile(r"^(\s*)run:\s*[|>][-+]?\s*$")
-_STEP_NAME = re.compile(r"^\s*-\s*name:\s*(.+?)\s*$")
-
-# #3534. A `run: |` block whose body invokes python3 is, to the line parser above, simply
+# #3534. A `run: |` block whose body invokes python3 is, to the line parser (scripts/ci_gate_commands.py), simply
 # absent — the exact "derived silently as nothing" shape #3477 was filed about, one level
 # down. Every such block must be named here with a reason, or the sweep refuses to run.
 # `tests/test_restart_verify_gates_3477.py` asserts each key still exists as a step name
@@ -156,55 +160,21 @@ PYTEST_LEG_FLAGS = ["-q", "--no-header", "-p", "no:cacheprovider"]
 def docs_ci_gate_commands() -> list[list[str]]:
     """Every `run: python3 …` gate in docs-ci.yml, in workflow order.
 
-    Raises when the workflow cannot be read or yields no gates — a derived list that
-    silently comes back empty would turn this whole check into a no-op.
+    #3528: a thin delegate to `scripts/ci_gate_commands.ci_gate_commands()` — the ONE
+    workflow-to-argv derivation every stand-in imports. `WORKFLOW` is read at call time so
+    tests (and the census proofs) can still point this module at a scratch workflow.
+    Raises when the workflow cannot be read or yields no gates.
     """
-    if not WORKFLOW.is_file():
-        raise RuntimeError(f"cannot read {WORKFLOW} — the gate list is derived from it, never hand-typed")
-    cmds: list[list[str]] = []
-    for line in WORKFLOW.read_text(encoding="utf-8").splitlines():
-        m = _RUN_LINE.match(line)
-        if m:
-            cmds.append(m.group(1).split())
-    if not cmds:
-        raise RuntimeError(f"derived ZERO gates from {WORKFLOW} — the workflow shape changed; fix the parser, do not pass")
-    return cmds
+    return ci_gate_commands(WORKFLOW)
 
 
 def multiline_python_steps() -> list[tuple[str, str]]:
     """[(step name, block body)] for every `run: |` block whose body invokes python3.
 
-    The line parser above cannot see these. Enumerating them is how the sweep proves it
-    knows what it is NOT running, instead of reporting a clean derivation over a workflow
-    that grew a gate it is blind to.
+    Delegates to `ci_gate_commands.multiline_python_steps` (#3528) — the line parser cannot
+    see these, and enumerating them is how the sweep proves it knows what it is NOT running.
     """
-    if not WORKFLOW.is_file():
-        raise RuntimeError(f"cannot read {WORKFLOW} — the gate list is derived from it, never hand-typed")
-    lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
-    found: list[tuple[str, str]] = []
-    name = "<unnamed step>"
-    i = 0
-    while i < len(lines):
-        nm = _STEP_NAME.match(lines[i])
-        if nm:
-            name = nm.group(1).strip().strip("\"'")
-        blk = _BLOCK_RUN.match(lines[i])
-        if blk:
-            indent = len(blk.group(1))
-            body: list[str] = []
-            i += 1
-            while i < len(lines):
-                cur = lines[i]
-                if cur.strip() and (len(cur) - len(cur.lstrip())) <= indent:
-                    break
-                body.append(cur)
-                i += 1
-            text = "\n".join(body)
-            if re.search(r"(?<![\w./-])python3(?![\w-])", text):
-                found.append((name, text))
-            continue
-        i += 1
-    return found
+    return _multiline_python_steps(WORKFLOW)
 
 
 def undeclared_multiline_python_steps() -> list[tuple[str, str]]:

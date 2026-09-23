@@ -910,7 +910,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # shrink consumer) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: a git-added
         # tests/_census_probe_3597.py binding PROBE_RESIDUE; baseline 32 passed | mutated 1 failed ::
         # test_the_live_residue_registry_meets_its_contract | reverted 32 passed). Unproven stays; one entrant.
-        # Upper bound 135 -> 190 (2026-09-23, #4035, re-merged on top of #3597's 135): 55 new proofs. Two structural gates
+        # 135 -> 136 (2026-09-23, #3528, re-merged on top of #3597's 135): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
+        # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
+        # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
+        # -> 2 passed). Unproven stays. Same PR, 136 -> 140: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
+        # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
+        # Upper bound 140 -> 195 (2026-09-23, #4035, re-merged on top of #3528's 140): 55 new proofs. Two structural gates
         # (`structural::test_glossary_4035.py`, `structural::test_rate_n_contract_4035.py`) arrive PROVEN via the
         # re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 2/2: baseline 9 passed | mutated 2 failed ::
         # test_apply_chrome_check_is_green_for_glossary, test_no_unregistered_acronym_coinage | reverted 9 passed;
@@ -921,11 +926,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # and_not_blanket / ::test_each_exempt_page_entry_is_load_bearing_and_not_blanket, 53 parametrised cases,
         # 53 passed in 0.92s. Building the per-entry proof found three DEAD allowlist entries (single-letter roman
         # numerals I/V/X, which can never match ACRONYM_RE's own {2,6} floor) and removed them — zero live effect.
-        # MEASURED by id-set diff against a real `git clone` of origin/main at 6607d30d2 (which already carries
-        # #3597's own +1): lane {proven 190, unproven 540, not-applicable 6, attempted-unproven 5} vs main {135,
+        # MEASURED by id-set diff against a real `git clone` of origin/main at 7ba9d5720 (which already carries
+        # #3528's own +5): lane {proven 195, unproven 540, not-applicable 6, attempted-unproven 5} vs main {140,
         # 540, 6, 5} — exactly the 55 `structural::test_glossary_4035.py` / `structural::test_rate_n_contract_4035.py`
         # / `registry::scripts/v4_glossary.py::GLOSS_ALLOWLIST::*` / `::GLOSS_EXEMPT_PAGES::*` ids enter, none leaves.
-        <= 190
+        <= 195
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
