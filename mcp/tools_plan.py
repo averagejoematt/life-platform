@@ -47,6 +47,7 @@ from decimal import Decimal
 from typing import Any
 
 from common.pacific_time import pacific_today
+from training.commit_binding import binding_for  # #4066
 
 from mcp.core import LAYER_UNKNOWN
 
@@ -1121,11 +1122,9 @@ def _run_stage_2(
     ir.parent_version = ir.version
     ir.version = int(ir.version) + 1
     # #4066: bind the verdict to THIS routine and THIS content, stamped after every change and
-    # the notes block are applied — commit refuses any other routine_id or any later edit.
-    from training.commit_binding import binding_for
-
+    # the notes block are applied (`record` IS inputs_snapshot["critics"]) — commit refuses any
+    # other routine_id or any later edit.
     record["binding"] = binding_for(ir)
-    ir.inputs_snapshot["critics"] = record
     put_versioned(ir)
     out = dict(record)
     out["routine_id"] = ir.routine_id
