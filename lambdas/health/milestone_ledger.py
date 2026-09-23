@@ -573,13 +573,14 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
                 return items
             kwargs = dict(kwargs, ExclusiveStartKey=last)
 
-    def _range(source: str, start: str, include_subrecords: bool = False) -> list[dict]:
+    def _range(source: str, start: str) -> list[dict]:
         # `~` sorts after any `#`-suffixed sub-record key, so an inclusive end of
-        # DATE#{today}~ also captures DATE#{today}#WORKOUT#… items.
-        end_key = f"DATE#{today}~" if include_subrecords else f"DATE#{today}"
+        # DATE#{today}~ also captures DATE#{today}#WORKOUT#… items. #4129: unconditional —
+        # on a partition with no suffixed rows the `~` admits nothing extra, so an opt-in
+        # flag only ever bought the chance to forget it (scripts/date_range_read_census.py).
         return _query_all(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{start}", ":e": end_key},
+            ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{start}", ":e": f"DATE#{today}~"},
         )
 
     end = datetime.strptime(today, "%Y-%m-%d")
@@ -600,10 +601,10 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     # #1628 window-milestone inputs. The training lookback covers the deepest
     # sustained_sessions rung; the others use their own definition windows.
     training_lookback = max(process_milestones.SUSTAIN_RUNG_WEEKS) * 7
-    hevy = _range("hevy", _back(training_lookback), include_subrecords=True)
+    hevy = _range("hevy", _back(training_lookback))
     strava = _range("strava", _back(training_lookback))
     garmin = _range("garmin", _back(process_milestones.ZONE2_WINDOW_DAYS - 1))
-    whoop = _range("whoop", _back(2 * process_milestones.TREND_WINDOW_DAYS - 1), include_subrecords=True)
+    whoop = _range("whoop", _back(2 * process_milestones.TREND_WINDOW_DAYS - 1))
     macro = _range("macrofactor", _back(process_milestones.STRENGTH_WINDOW_DAYS - 1))
     measurements = _range("measurements", _back(process_milestones.WAIST_WINDOW_DAYS - 1))
 

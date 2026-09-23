@@ -636,10 +636,15 @@ REGISTRY = {
         # `include_pilot` pass-through so the commitment grader can read a window that
         # predates the current genesis, and `_get_source_data`'s cache slot is now
         # derived by `source_cache_key`. Neither touches the verdict.
-        # Re-recorded 2026-09-23: NO source change. The fingerprint itself changed how it
-        # hashes a module-level runtime object (`table`) — by type, not by its env-bearing
-        # repr — so this entry's value no longer depends on TABLE_NAME (see `_value_repr`).
-        "b7bbc762c7fe",
+        # Re-recorded 2026-09-23 (#4129). METHOD unchanged, prose re-read: same EWMA,
+        # same ±2% band, same 9-observation floor. What moved is the read window in
+        # `_fetch_range`: its end bound is now `DATE#{end}~`, so a partition with
+        # suffixed sks returns the END day's sub-rows like every other day of the 30.
+        # The series still reads only rows carrying the metric field.
+        # Re-recorded again 2026-09-23: NO source change. The fingerprint now hashes a
+        # module-level runtime object (`table`) by type, not by its env-bearing repr, so
+        # this entry no longer depends on TABLE_NAME or test order (see `_value_repr`).
+        "fe4ebc90e3fc",
         min_n=9,
         used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),

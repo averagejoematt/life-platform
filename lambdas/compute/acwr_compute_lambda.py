@@ -125,7 +125,7 @@ def _fetch_range(source: str, start: str, end: str) -> list:
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
                 ":s": "DATE#" + start,
-                ":e": "DATE#" + end,
+                ":e": "DATE#" + end + "~",
             },
         },
         include_pilot=True,

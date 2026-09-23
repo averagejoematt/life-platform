@@ -36,7 +36,7 @@ def trailing_values(table, user_id, metric_key, lookback_days):
             "ExpressionAttributeValues": {
                 ":pk": f"USER#{user_id}#SOURCE#{source}",
                 ":s": "DATE#" + start,
-                ":e": "DATE#" + end,
+                ":e": "DATE#" + end + "~",
             },
         }
         rows = []

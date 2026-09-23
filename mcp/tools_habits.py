@@ -64,7 +64,7 @@ def _recent_habitify(days):
     today = pacific_today()
     start = (pacific_now() - timedelta(days=max(1, days) - 1)).strftime("%Y-%m-%d")
     resp = _table_ref.query(
-        KeyConditionExpression=Key("pk").eq(_pk(HABITIFY_SOURCE)) & Key("sk").between(f"DATE#{start}", f"DATE#{today}"),
+        KeyConditionExpression=Key("pk").eq(_pk(HABITIFY_SOURCE)) & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
         ScanIndexForward=True,
     )
     return _d2f(resp.get("Items", []))

@@ -184,7 +184,7 @@ def _metric_has_recent_data(metric_key, liveness_cache):
             "ExpressionAttributeValues": {
                 ":pk": f"USER#{USER_ID}#SOURCE#{source}",
                 ":s": "DATE#" + start,
-                ":e": "DATE#" + end,
+                ":e": "DATE#" + end + "~",
             },
         }
         n = 0
