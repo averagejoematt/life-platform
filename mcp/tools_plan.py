@@ -559,6 +559,7 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
 
     drop_t = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "anchor_lift_strength_drop")
     resolver = _safe(_resolver)
+    anchor_ids = _safe(_core_anchor_identities) or {}
     exercises: list[dict[str, Any]] = []
     for idx, ex in enumerate(getattr(ir, "exercises", None) or []):
         key = getattr(ex, "movement_key", "") or ""
@@ -574,18 +575,12 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
             else None
         )
         sessions = (hist or {}).get("sessions") or []
-        if sessions:
-            last = sessions[-1]
-            row["days_since"] = _days_between(last.get("date"), target_date)
-            row["last_top_lbs"] = last.get("best_weight")
-            prior = [s.get("best_weight") for s in sessions[:-2] if s.get("best_weight")]
-            if prior:
-                best = max(float(w) for w in prior)
-                row["trailing_best_lbs"] = round(best, 1)
-                last_two = [float(s.get("best_weight") or 0) for s in sessions[-2:]]
-                row["drop_pct"] = round(max(0.0, (best - last_two[-1]) / best * 100.0), 1) if best else None
-                row["sessions_below"] = sum(1 for w in last_two if w < best * (1 - drop_t["threshold_pct"] / 100.0))
-                row["n_sessions"] = len(sessions)
+        # #4069: the trend is computed over ONE template identity (see `_anchor_trend`), and the
+        # row says which core anchor family — if any — the drafted lift belongs to.
+        row.update(_anchor_trend(sessions, target_date, float(drop_t["threshold_pct"])))
+        family = _core_anchor_family(key, row.get("identity") or tid, anchor_ids)
+        if family:
+            row["anchor_family"] = family
         pain = _safe(tool_get_exercise_notes, {"template_id": tid, "lookback_days": PAIN_LOOKBACK_DAYS}) if tid else None
         if pain and "error" not in pain:
             row["pain_flag_any"] = pain.get("pain_flag_any")
@@ -645,8 +640,85 @@ def _workout_dates(start: str, end: str) -> list[str]:
     return sorted({(w.get("date") or "")[:10] for w in res.get("workouts") or [] if w.get("date")})
 
 
+def _anchor_trend(sessions: list[dict[str, Any]], target_date: str, threshold_pct: float) -> dict[str, Any]:
+    """The anchor-lift trend over ONE template identity — pure, the tripwire's only input (#4069).
+
+    `sessions` comes from `get_exercise_history(template_id=…)`, which already selects one
+    identity (a raw Hevy template id through the #3929 alias registry). This re-asserts it
+    rather than trusting it: the series is cut to the identity of the LATEST session, so a
+    history that ever mixed variants (the substring merge that put barbell bench and incline
+    DB bench into one '-120 lb' series) compares a lift only with itself. Sessions of any
+    other identity are counted in `excluded_other_identity_sessions`, never dropped silently.
+    A variant switch therefore starts a NEW series — it can never read as a strength drop.
+    """
+    if not sessions:
+        return {}
+
+    def _ident(s: dict[str, Any]) -> str:
+        return str(s.get("identity") or s.get("template_id") or "").upper()
+
+    ident = _ident(sessions[-1])
+    series = [s for s in sessions if _ident(s) == ident]
+    out: dict[str, Any] = {"identity": ident or None}
+    if len(series) != len(sessions):
+        out["excluded_other_identity_sessions"] = len(sessions) - len(series)
+    last = series[-1]
+    out["days_since"] = _days_between(last.get("date"), target_date)
+    out["last_top_lbs"] = last.get("best_weight")
+    prior = [s.get("best_weight") for s in series[:-2] if s.get("best_weight")]
+    if prior:
+        best = max(float(w) for w in prior)
+        out["trailing_best_lbs"] = round(best, 1)
+        last_two = [float(s.get("best_weight") or 0) for s in series[-2:]]
+        out["drop_pct"] = round(max(0.0, (best - last_two[-1]) / best * 100.0), 1) if best else None
+        out["sessions_below"] = sum(1 for w in last_two if w < best * (1 - threshold_pct / 100.0))
+        out["n_sessions"] = len(series)
+    return out
+
+
+def _core_anchor_identities() -> dict[str, str]:
+    """template identity -> core anchor family, for the four the tripwire reads (#4069).
+
+    Built from `program_structure.ANCHORS[family]["catalog_keys"]` for `CORE_ANCHORS`, each
+    key resolved READ-ONLY (`peek_template_id` — never the write-capable resolver) and mapped
+    through the alias registry. A key with no known template id is simply absent; the drafted
+    row can still be recognised by its catalog movement_key (`_core_anchor_family`).
+    """
+    from training import program_structure
+    from training.hevy_template_cache import peek_template_id
+
+    from mcp.strength_helpers import exercise_identity
+    from mcp.tools_strength import template_alias_map
+
+    alias_map, _status = template_alias_map()
+    out: dict[str, str] = {}
+    for family in program_structure.CORE_ANCHORS:
+        for key in program_structure.ANCHORS[family]["catalog_keys"]:
+            tid = _safe(peek_template_id, key)
+            if tid:
+                out.setdefault(exercise_identity(tid, "", alias_map), family)
+                out.setdefault(str(tid).strip().upper(), family)
+    return out
+
+
+def _core_anchor_family(movement_key: str, identity: str | None, anchor_ids: dict[str, str]) -> str | None:
+    """Which of the four core anchors a drafted lift is, by catalog key or template identity — never by name."""
+    from training import program_structure
+
+    for family in program_structure.CORE_ANCHORS:
+        if movement_key and movement_key in program_structure.ANCHORS[family]["catalog_keys"]:
+            return family
+    return anchor_ids.get(str(identity or "").upper()) if identity else None
+
+
 def _worst_anchor(evidence: dict[str, Any]) -> tuple[float | None, int | None]:
-    rows = [e for e in evidence.get("exercises", []) if e.get("drop_pct") is not None]
+    """The engine's `anchor_lift_strength_drop` input: the worst drop among CORE-anchor rows only.
+
+    #4069: the redline's signal names "the four core anchors (bench, row, squat, hinge)"; this
+    used to take the max over EVERY drafted exercise, which is how a shoulder-press series (not a
+    core anchor) reached the tripwire. Non-anchor rows keep their trend for the per-exercise critic.
+    """
+    rows = [e for e in evidence.get("exercises", []) if e.get("drop_pct") is not None and e.get("anchor_family")]
     if not rows:
         return None, None
     w = max(rows, key=lambda e: e["drop_pct"])
