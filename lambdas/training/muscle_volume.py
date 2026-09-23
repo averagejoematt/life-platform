@@ -73,6 +73,41 @@ MUSCLE_TO_PATTERN = {
     "Core": "Core",
 }
 
+#: #4108 — THE one table from Hevy's own `primary_muscle_group` / `secondary_muscle_groups`
+#: enum onto this module's vocabulary. Each row carries two columns of ONE mapping, so there is
+#: no second table to drift:
+#:   [0] the `MUSCLES` label this module credits (None = no muscle volume: cardio, neck,
+#:       full-body, "other", and forearms/adductors, which `MUSCLES` does not carry), and
+#:   [1] the planner key the movement catalog's `primary_muscle` / `secondary_muscles` use —
+#:       `config/training_landmarks.json`'s `muscles` keys (`quadriceps`, `abs`, …), which is
+#:       what `routine_generator._select_movements_for_muscle` matches on. "cardio" is the
+#:       curated cardio entries' own value; "other" is never a landmark, so an entry that maps
+#:       there is catalogued but never selected by muscle.
+#: Every Hevy group in `mcp/tools_hevy_routine._HEVY_MUSCLE_GROUPS` has a row
+#: (`tests/test_movement_catalog_4108.py` holds both columns to their vocabularies).
+HEVY_MUSCLE_GROUP: dict[str, tuple[str | None, str]] = {
+    "chest": ("Chest", "chest"),
+    "lats": ("Back", "back"),
+    "upper_back": ("Back", "back"),
+    "lower_back": ("Back", "back"),
+    "traps": ("Back", "back"),  # the taxonomy's own "shrug" row credits Back
+    "shoulders": ("Shoulders", "shoulders"),
+    "biceps": ("Biceps", "biceps"),
+    "triceps": ("Triceps", "triceps"),
+    "forearms": (None, "forearms"),
+    "quadriceps": ("Quads", "quadriceps"),
+    "hamstrings": ("Hamstrings", "hamstrings"),
+    "glutes": ("Glutes", "glutes"),
+    "abductors": ("Glutes", "glutes"),  # hip abduction is glute medius/minimus — the "hip abduct" row
+    "adductors": (None, "other"),
+    "calves": ("Calves", "calves"),
+    "abdominals": ("Core", "abs"),
+    "cardio": (None, "cardio"),
+    "neck": (None, "other"),
+    "full_body": (None, "other"),
+    "other": (None, "other"),
+}
+
 _HALF = SECONDARY_FRACTION
 
 #: (keywords, primary, {secondary: fraction}, movement_pattern) — FIRST MATCH WINS, so the
