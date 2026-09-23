@@ -135,6 +135,13 @@ def test_exercise_notes_populated_from_history_index(monkeypatch):
 
     # #3700: the generator now takes BOTH indexes from one Query — (weighted, cardio).
     monkeypatch.setattr(exercise_history, "load_history_indexes", lambda lookback_days=180, today=None: (fake_index, {}))
+    # #4064: a v0.3 day now takes the §3 full-body path, whose every block carries its
+    # prescription cue (held in tests/test_fullbody_block_calendar_4064.py). This test
+    # holds the MUSCLE-BUDGET path's ADR-068 rendering, so it runs that path explicitly —
+    # the JSON grid an inactive program serves (v0.2 and earlier).
+    from training import program_structure
+
+    monkeypatch.setattr(program_structure, "ACTIVE", False)
     routines = generate_routines(_green_inputs("2026-06-01"))
     ideal = next(r for r in routines if r.variant == "ideal")
     notes = [(ex.movement_key, ex.notes) for ex in ideal.exercises]

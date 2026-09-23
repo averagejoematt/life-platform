@@ -532,7 +532,7 @@ MANAGE_HEVY_ROUTINE_DESCRIPTION = (
     "— DO NOT pass a title; leave it to the compiler. `title` and `force_title` are DRAFT-TIME arguments, read "
     "only by draft_custom: passing either to 'commit' does nothing and the result returns a warning naming it. "
     "To force a title: draft_custom(force_title=true, title=...) → dry_run → commit. NEW routines are filed "
-    "into a per-type Hevy folder (Push/Pull/Legs/Engine); commit's `folder` key reports the outcome and reads "
+    "into a per-type Hevy folder (Full Body under v0.3; Push/Pull/Legs/Engine for the older splits), found or created at the first commit; commit's `folder` key reports the outcome and reads "
     "'unfoldered: <reason>' when that failed. Honest framing: 'deterministic volume-landmark programming with "
     "red-day deload guard' — never describe as 'autoregulated' publicly until the readiness signal is validated."
 )
