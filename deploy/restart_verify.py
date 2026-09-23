@@ -502,6 +502,10 @@ def main():
     # (cycle 11: ~397 escapees consumed as live coach state). Fails loudly on
     # any determinate escapee; flagged rows (no timestamp anywhere / date-only
     # ambiguity / pre-window stamps) are surfaced in the detail, never hidden.
+    # #4055: a served chronicle lead-in (`chronicle_manifest_qa.served_chronicle_keys`,
+    # the SAME matcher the manifest dead-man uses) is exempted by `run_sweep` itself
+    # before classification — no second hand list, so this check's count and
+    # `reconcile_countdown_gap.py`'s surface always agree.
     try:
         from countdown_gap_sweep import FLAG_CATEGORIES, run_sweep
 
@@ -509,10 +513,12 @@ def main():
         esc = res["totals"].get("escapee", 0)
         flags = sum(res["totals"].get(c, 0) for c in FLAG_CATEGORIES)
         by_part = {k: v.get("escapee", 0) for k, v in res["per_partition"].items() if v.get("escapee", 0)}
+        served_exempt = len(res.get("served_keys") or ())
         detail = (
             f"escapees={esc} flagged={flags} in window [{res['window_start'].isoformat()} → "
             f"{res['window_end'].isoformat()}) ({res['wipe_ts_source']})"
             + (f"; per-partition {by_part}" if by_part else "")
+            + (f"; served-manifest exempt={served_exempt}" if served_exempt else "")
             + ("; repair: python3 deploy/reconcile_countdown_gap.py (dry-run first)" if esc else "")
         )
         check("No countdown-gap escapees (wipe→genesis swept, #1947)", esc == 0, detail)

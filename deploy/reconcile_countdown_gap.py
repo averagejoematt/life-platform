@@ -29,6 +29,18 @@ dry-run, include a specific flagged row with --include-flagged 'PK::SK'
 (COMPRESSED#/VOICE#) that its writer has already rewritten post-genesis is
 LIVE cycle state and must be left alone — only the owner can judge that.
 
+SERVED-MANIFEST EXEMPTION (#4055, never mutated). A chronicle row the LIVE
+journal manifest still serves is SANCTIONED, never an escapee, however its
+`sk` is dated — `sweep.run_sweep` derives the set itself from
+`chronicle_manifest_qa.served_chronicle_keys` (the same matcher the
+`chronicle:manifest_provenance` dead-man uses; one derivation, never a second
+hand list) and this tool never mutates a row in that set, dry-run or --apply.
+Incident, 2026-09-22: before this exemption existed, `--apply` tombstoned the
+served `DATE#2026-09-05` Prologue Part III lead-in on `sk` age alone; the
+live manifest kept serving the now-archived row and two nightly dead-men
+(`chronicle:manifest_provenance`, `recall:corpus_freshness`) went red 14h
+later. It was reverted by hand — this exemption is the standing fix.
+
 Exclude a listed escapee with --exclude 'PK::SK' (repeatable).
 
 The closing cycle defaults to (SSM /life-platform/experiment-cycle) - 1 — the
