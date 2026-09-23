@@ -135,14 +135,15 @@ Two facts the clocks above could not see, added by #3603 and assembled in
 USAGE
 -----
     python3 scripts/operating_calendar.py            # human table, exit 0 always
-    python3 scripts/operating_calendar.py --due      # dead-man: 1 = OVERDUE, 3 = never-run, 4 = stale carry-forward
+    python3 scripts/operating_calendar.py --due      # dead-man: 1 = OVERDUE, 3 = never-run, 4 = stale carry-forward, 5 = expired carrier
     python3 scripts/operating_calendar.py --due --today 2026-12-01   # deterministic (tests)
     python3 scripts/operating_calendar.py --check    # docs/OPERATING_CALENDAR.md drift → exit 1
     python3 scripts/operating_calendar.py --apply    # regenerate docs/OPERATING_CALENDAR.md
 
 Exit codes: 0 clean · 1 at least one OVERDUE · 2 bad --today · 3 no OVERDUE but at least
 one ritual has never produced its artifact · 4 nothing late, but at least one lens grade has
-been carried forward past the 28-day cap (#3603).
+been carried forward past the 28-day cap (#3603) · 5 none of those, but a residue ledger or a
+dated obligation is past its `expires` (#3597 — `scripts/obligation_carriers.py`).
 
 v1.4.0 — 2026-09-19 (#3603, the carry-forward cap + a calibration-aware probe) ·
 v1.3.0 — 2026-08-31 (launch checkpoints, `starts`) · v1.2.0 — 2026-08-30 (#3250, lens set) ·
@@ -626,6 +627,34 @@ EXIT_OVERDUE = 1
 EXIT_BAD_ARG = 2
 EXIT_NEVER_RUN = 3
 EXIT_STALE_CARRY = 4  # #3603 — nothing is late, but a lens grade has been carried past the cap
+EXIT_EXPIRED_CARRIER = 5  # #3597 — a residue ledger or a dated obligation is past its expiry
+
+
+# ── #3597: the carrier probe — waivers, deferrals and residue ledgers expire ───────────
+# The registries (`RESIDUE_LEDGERS`, `DATED_OBLIGATIONS`) and the pure probe live in
+# scripts/obligation_carriers.py; this file only RUNS the probe daily, because an expiry is
+# a fact about the calendar date and must red on the schedule, never on an innocent PR.
+def _obligation_carriers_module():
+    import importlib.util as _ilu
+
+    name = "_obligation_carriers_3597"
+    if name not in sys.modules:
+        spec = _ilu.spec_from_file_location(name, os.path.join(HERE, "obligation_carriers.py"))
+        mod = _ilu.module_from_spec(spec)
+        assert spec.loader is not None
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[name]
+
+
+def carrier_report(today: date) -> tuple[list[str], list[str]]:
+    """(printable lines, [expired entries]) — every residue ledger / dated obligation past expiry."""
+    expired = _obligation_carriers_module().expired_carriers(today)
+    if not expired:
+        return [f"✅ no residue ledger or dated obligation is past its expiry (#3597) as of {today}."], []
+    lines = [f"❌ {len(expired)} carrier(s) past expiry (#3597) — re-review: drain it, or re-date it (≤90d) with its carrier still open:"]
+    lines += [f"   - {e}" for e in expired]
+    return lines, expired
 
 
 def _hold_dates(entry: dict) -> tuple[date, date] | None:
@@ -981,13 +1010,17 @@ def main(argv: list[str] | None = None) -> int:
     print(report)
     carry_lines, expired = carry_forward_report(today)
     print("\n".join(carry_lines))
+    carrier_lines, lapsed = carrier_report(today)
+    print("\n".join(carrier_lines))
     if not args.due:
         return EXIT_CLEAN
     if overdue:
         return EXIT_OVERDUE
     if never:
         return EXIT_NEVER_RUN
-    return EXIT_STALE_CARRY if expired else EXIT_CLEAN
+    if expired:
+        return EXIT_STALE_CARRY
+    return EXIT_EXPIRED_CARRIER if lapsed else EXIT_CLEAN
 
 
 if __name__ == "__main__":

@@ -17,6 +17,8 @@ name: Operating calendar dead-man
 # (nobody has ever done it — it was reporting OK purely because the adoption anchor held
 # its window open). Both red this run on purpose. The honest clearings are running the
 # ritual or retiring it with a dated EXEMPT row; re-anchoring is not a clearing.
+# 5 (#3597) = none of the above, but a registered residue ledger or dated obligation
+# (scripts/obligation_carriers.py) is past its `expires` — a waiver outliving its date.
 #
 # 15:40 UTC daily — offset from the other scheduled workflows (fresh-eyes Sun 15:00,
 # golden-brief-eval Mon 15:17, config-drift daily 15:20, eval-harvest 3rd 16:23,
@@ -58,6 +60,7 @@ jobs:
             1) echo "::error::A judgment ritual is OVERDUE. Run it — its dated artifact is the only honest reset (never re-anchor)." ;;
             3) echo "::error::A ritual has NEVER produced its artifact (#3250): anchored is not run. Run it, or retire it with a dated EXEMPT row." ;;
             4) echo "::error::EXIT_STALE_CARRY (#3603/#3919): nothing is late, but a lens grade has been CARRIED past the 28-day cap — the next review must grade it from scratch (carrying is not grading)." ;;
+            5) echo "::error::EXIT_EXPIRED_CARRIER (#3597): a residue ledger or a dated obligation is past its expiry — drain it, or re-date it (<=90d) with its carrier issue still open (scripts/obligation_carriers.py)." ;;
             *) echo "::error::scripts/operating_calendar.py exited ${rc} — unexpected; read the output above." ;;
           esac
           exit "${rc}"
