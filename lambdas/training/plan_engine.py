@@ -222,7 +222,18 @@ def _tripwire_states(
                 row["dismissals"] = resolutions
         # #4051: the layer's status travels WITH the flags, never instead of them, and the
         # instances carry their own note dates so the dismissal comparison is auditable.
+        #
+        # `by_movement` is the per-site verdict, because the row's single `state` is an
+        # AGGREGATE and the aggregate is the coarser question. Once stage 1 reads every
+        # movement he PERFORMED rather than the two or three in a draft, two flags on one
+        # day is the ordinary case — measured 2026-09-22: Romanian Deadlift (dismissed
+        # 2026-09-21) AND Walking ("lower back aching", 2026-09-08, never dismissed). The
+        # aggregate is correctly `tripped` there, and a reader who wants to know whether
+        # HIS dismissal held must not have to infer it from that.
         row["instances"] = instances
+        row["by_movement"] = {
+            str(i.get("movement")): ("dismissed_by_owner" if i.get("movement") in dismissed else "tripped") for i in instances
+        }
         row["layer_status"] = pain_layer_status
         if pain_layer_status in (None, "dark", "unknown", "degraded"):
             row["layer_note"] = (

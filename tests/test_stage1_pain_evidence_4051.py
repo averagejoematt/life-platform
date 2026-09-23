@@ -368,6 +368,27 @@ class TestTheReadBack:
         row = _pain_row(_stage1(wired))
         assert row["instances"] == [{"movement": RDL, "note_dates": [FLAG_NOTE_DATE]}]
 
+    def test_a_second_undismissed_flag_trips_the_aggregate_without_hiding_the_dismissal(self, wired):
+        """LIVE SHAPE (2026-09-22): widening the set from a draft's lifts to everything
+        performed surfaced a SECOND flag — Walking, "lower back aching", 2026-09-08, never
+        dismissed. The aggregate row is then correctly `tripped`, so the per-site verdict is
+        where #4036's read-back lives. Mutation control: drop the `by_movement` line in
+        `_tripwire_states` and the dismissed site becomes unreadable on a mixed day."""
+        wired.rows.append(
+            {
+                **copy.deepcopy(_LAT_CLEAN_NOTE),
+                "sk": "DATE#2026-09-20#WORKOUT#aaaabbbb-0000-0000-0000-000000000000#0",
+                "date": "2026-09-20",
+                "workout_uid": "hevy:aaaabbbb",
+                "pain_flag": True,
+                "signals": [{"class": "pain_discomfort", "summary": "deterministic pain-lexicon hit", "confidence": 0.6}],
+            }
+        )
+        row = _pain_row(_stage1(wired))
+        assert row["state"] == "tripped" and row["observed"] == [LAT]
+        assert row["by_movement"] == {RDL: "dismissed_by_owner", LAT: "tripped"}
+        assert row["dismissals"][0]["dismissed"] is True, "the dismissal must stay legible when another site is live"
+
     def test_a_later_note_on_the_same_site_re_arms_the_flag_through_the_live_read(self, wired):
         """The re-arm rule is `training_context_registry`'s and is NOT re-implemented here —
         this asserts the stage-1 read feeds it the dates it needs."""
