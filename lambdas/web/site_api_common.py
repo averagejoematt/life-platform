@@ -682,7 +682,7 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
     pk = f"{USER_PREFIX}{source}"
     kwargs = with_phase_filter(
         {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"),
         },
         include_pilot=include_pilot,
     )
@@ -739,7 +739,7 @@ def _latest_item_asof(source: str, date: str, include_pilot: bool | None = None)
     pk = f"{USER_PREFIX}{source}"
     kwargs = with_phase_filter(
         {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between("DATE#0000-00-00", f"DATE#{date}"),
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between("DATE#0000-00-00", f"DATE#{date}~"),
             "ScanIndexForward": False,
             "Limit": 1,
         },

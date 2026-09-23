@@ -159,7 +159,7 @@ def fetch_range(source, start, end):
         cross_phase = source_reads_cross_phase(source)
         kwargs = {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end},
+            "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end + "~"},
         }
         while True:
             r = table.query(**with_phase_filter(kwargs, include_pilot=cross_phase))

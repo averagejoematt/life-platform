@@ -69,7 +69,7 @@ def _get_latest(table, source, days_back=2):
                     "ExpressionAttributeValues": {
                         ":pk": f"USER#{USER_ID}#SOURCE#{source}",
                         ":s": f"DATE#{start}",
-                        ":e": f"DATE#{today}",
+                        ":e": f"DATE#{today}~",
                     },
                     "ScanIndexForward": False,
                     "Limit": 1,

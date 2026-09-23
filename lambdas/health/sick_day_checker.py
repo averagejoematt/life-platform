@@ -55,7 +55,7 @@ def get_sick_days_range(table, user_id, start_date, end_date):
             ExpressionAttributeValues={
                 ":pk": pk,
                 ":s": f"DATE#{start_date}",
-                ":e": f"DATE#{end_date}",
+                ":e": f"DATE#{end_date}~",
             },
         )
         return [_d2f(i) for i in resp.get("Items", [])]

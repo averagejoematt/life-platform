@@ -166,7 +166,7 @@ class TestQuerySource:
         kwargs = fake.calls[0]
         assert kwargs["ExpressionAttributeValues"][":pk"] == "USER#matthew#SOURCE#whoop"
         assert kwargs["ExpressionAttributeValues"][":s"] == "DATE#2026-06-01"
-        assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-06-08"
+        assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-06-08~"  # #4129: end day closed
         assert "FilterExpression" not in kwargs, "a raw series must not be phase-filtered (#4088)"
         assert "#phase" in fake.calls[1]["FilterExpression"], "an EXPERIMENT_SCOPED source keeps the filter"
 

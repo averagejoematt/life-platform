@@ -395,7 +395,7 @@ class TestLoadRawScoreHistories:
 
         eav = table.query_calls[0]["ExpressionAttributeValues"]
         assert eav[":s"] == "DATE#2026-07-15"  # 2026-08-05 minus 21 days
-        assert eav[":e"] == "DATE#2026-08-04"  # never the day being computed
+        assert eav[":e"] == "DATE#2026-08-04~"  # never the day being computed; `~` closes it (#4129)
         assert [r["date"] for r in records] == ["2026-08-04"]
         assert histories["sleep"] == [52.0]
 

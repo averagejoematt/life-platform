@@ -453,7 +453,7 @@ def lambda_handler(event, context):
                     "ExpressionAttributeValues": {
                         ":pk": f"{USER_PREFIX}whoop",
                         ":start": f"DATE#{lookback_start}",
-                        ":end": f"DATE#{today}",
+                        ":end": f"DATE#{today}~",  # #4129: close the END day (WORKOUT# sub-rows)
                     },
                 }
             )

@@ -246,7 +246,7 @@ def fetch_range(source, start, end):
             **with_phase_filter(
                 {
                     "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                    "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
+                    "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}~"},
                 },
                 include_pilot=True,  # #2081: cross-phase rolling baseline
             )

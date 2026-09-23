@@ -494,7 +494,8 @@ def _compute_sleep_consistency(date_str: str, current_onset: int) -> float | Non
     """
     window_start = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
     resp = _table.query(
-        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#whoop") & Key("sk").between(f"DATE#{window_start}", f"DATE#{date_str}"),
+        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#whoop")
+        & Key("sk").between(f"DATE#{window_start}", f"DATE#{date_str}~"),
         ProjectionExpression="sk, sleep_onset_minutes",
         ScanIndexForward=False,
     )

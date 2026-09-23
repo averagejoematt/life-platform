@@ -410,7 +410,7 @@ def collect_inputs(table, user_prefix: str, phase_filter, start_weight_lbs: floa
         table,
         phase_filter,
         KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-        ExpressionAttributeValues={":pk": user_prefix + "habit_scores", ":s": f"DATE#{window_start}", ":e": f"DATE#{today}"},
+        ExpressionAttributeValues={":pk": user_prefix + "habit_scores", ":s": f"DATE#{window_start}", ":e": f"DATE#{today}~"},
     )
     chars = _query_all(
         table,

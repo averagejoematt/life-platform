@@ -529,8 +529,8 @@ class TestGatherData:
             )
             for q in table.queries
         }
-        assert windows[wp.USER_PREFIX + "macrofactor"] == (f"DATE#{START_14D}", f"DATE#{END}")
-        assert windows[wp.USER_PREFIX + "withings"] == (f"DATE#{WEIGHT_START}", f"DATE#{END}")
+        assert windows[wp.USER_PREFIX + "macrofactor"] == (f"DATE#{START_14D}", f"DATE#{END}~")  # #4129: end day closed
+        assert windows[wp.USER_PREFIX + "withings"] == (f"DATE#{WEIGHT_START}", f"DATE#{END}~")
 
     def test_gathered_records_are_keyed_by_date(self, table):
         table.items[("USER#matthew", "PROFILE#v1")] = profile_row()
