@@ -148,14 +148,25 @@ def test_undeclared_is_never_reported_as_unfiltered(live_index):
 # ── 3. Two surfaces, two rules, one reconcilable difference ──────────────────
 
 
-def test_the_nutrition_specimen_is_reconcilable_not_a_contradiction(live_index):
-    """The live 2026-09-06 pair, pinned.
+def test_the_nutrition_specimen_now_reads_its_raw_series_across_phases(live_index):
+    """The live 2026-09-06 specimen, re-graded by #4088.
 
-    `source_freshness` reads the partition with include_pilot=True and reported "fresh
-    through 06 Sep". The nutrition door applies the ADR-058 filter and reported "no data
-    16 Aug - 05 Sep". Six intervening days carry phase=pilot. Both right; nothing said so.
+    `source_freshness` read the partition with include_pilot=True and reported "fresh
+    through 06 Sep"; the nutrition door applied the ADR-058 filter and reported "no data
+    16 Aug - 05 Sep". Since #4088 the site readers derive the phase decision per source, so
+    the nutrition door's raw-series reads (macrofactor, withings, whoop, strava ...) are
+    cross-phase too — its pre-genesis gap is now a genesis DATE clamp (`_experiment_date`),
+    which the index describes in the includes-pilot meaning rather than as a phase rule.
     """
-    a, b = "source_freshness", "nutrition_overview"
+    assert live_index["nutrition_overview"]["rule"]["phase_filter"] == surface_index.PHASE_INCLUDES_PILOT
+    assert "DATE" in live_index["nutrition_overview"]["rule"]["phase_filter_meaning"]
+
+
+def test_a_cross_phase_and_a_scoped_surface_are_reconcilable_not_a_contradiction(live_index):
+    """The discrepancy explainer on a pair that still differs by PHASE after #4088:
+    `habits` reads EXPERIMENT_SCOPED habit_scores (filter kept), `source_freshness` reads
+    unfiltered. Both right; the explanation must say so."""
+    a, b = "source_freshness", "habits"
     assert live_index[a]["rule"]["phase_filter"] == surface_index.PHASE_INCLUDES_PILOT
     assert live_index[b]["rule"]["phase_filter"] == surface_index.PHASE_EXPERIMENT_ONLY
 

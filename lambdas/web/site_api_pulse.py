@@ -253,7 +253,9 @@ def pulse(*, _g) -> dict:
     # resolver — /api/vitals (→ /api/snapshot) and the public_stats writers read
     # the same module, so two surfaces can't disagree about the same morning.
     _vr = resolve_vitals(table, USER_PREFIX)
-    withings = _latest_item("withings") or {}
+    # #4088: the pulse weight is read against the journey start weight — THIS experiment's
+    # frame — so the latest weigh-in is genesis DATE-clamped, not phase-filtered.
+    withings = _latest_item("withings", since=EXPERIMENT_START) or {}
     ah = None
     try:
         # #3287: the query range is deliberately widened to today(UTC) so a boundary
