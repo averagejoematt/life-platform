@@ -617,7 +617,7 @@ def test_commit_result_carries_the_spec_ledger_report():
     Patches the ledger call directly (not through `_commit_patches`, which
     stubs the same target for every OTHER test in this file) so the mock here
     is the one actually observed."""
-    ir = _push_ir("r-spec-ledger")
+    ir = bind(_push_ir("r-spec-ledger"))  # #4066 — the ledger, not the red-team binding, is under test
     with (
         patch("training.routine_repo.get_current", return_value=ir),
         patch("training.routine_repo.put_versioned"),

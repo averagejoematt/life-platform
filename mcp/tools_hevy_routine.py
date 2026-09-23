@@ -1053,10 +1053,7 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # #3718 — what Hevy actually holds, read back after the write.
             **wc.readback_fields(check, took_update_branch),
         }
-        # #4079 — the committed spec's own durable home (S3, private, no git step);
-        # fail-soft by contract, kept in its own helper module (mcp/routine_spec_ledger.py)
-        # so it never grows _action_commit itself.
-        from mcp.routine_spec_ledger import save_routine_spec
+        from mcp.routine_spec_ledger import save_routine_spec  # #4079: private spec ledger, fail-soft, no git step
 
         out["routine_spec"] = save_routine_spec(ir)
         if not check.get("verified"):
@@ -1254,8 +1251,5 @@ def tool_manage_hevy_routine(args: dict[str, Any] | None = None) -> dict[str, An
     args = args or {}
     action = (args.get("action") or "").strip().lower()
     if action not in _VALID_ACTIONS:
-        return mcp_error(
-            f"action must be one of: {sorted(_VALID_ACTIONS)}",
-            error_code="INVALID_ACTION",
-        )
+        return mcp_error(f"action must be one of: {sorted(_VALID_ACTIONS)}", error_code="INVALID_ACTION")
     return _DISPATCH[action](args)
