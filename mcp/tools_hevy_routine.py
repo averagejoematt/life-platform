@@ -1053,6 +1053,9 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # #3718 — what Hevy actually holds, read back after the write.
             **wc.readback_fields(check, took_update_branch),
         }
+        from mcp.routine_spec_ledger import save_routine_spec  # #4079: private spec ledger, fail-soft, no git step
+
+        out["routine_spec"] = save_routine_spec(ir)
         if not check.get("verified"):
             ir.status = "unverified"
             put_versioned(ir)
@@ -1248,8 +1251,5 @@ def tool_manage_hevy_routine(args: dict[str, Any] | None = None) -> dict[str, An
     args = args or {}
     action = (args.get("action") or "").strip().lower()
     if action not in _VALID_ACTIONS:
-        return mcp_error(
-            f"action must be one of: {sorted(_VALID_ACTIONS)}",
-            error_code="INVALID_ACTION",
-        )
+        return mcp_error(f"action must be one of: {sorted(_VALID_ACTIONS)}", error_code="INVALID_ACTION")
     return _DISPATCH[action](args)

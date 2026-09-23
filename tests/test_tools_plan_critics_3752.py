@@ -337,6 +337,8 @@ def _commit_patches(ir, created):
             "verify_commit_landed",
             lambda rid, body, before: {"verified": True, "reason": None, "folder_id": None, "updated_at": "2026-09-20T12:00:00Z"},
         ),
+        # #4079: stub the spec-ledger write — tested on its own in test_routine_spec_ledger_4079.py.
+        patch("mcp.routine_spec_ledger.save_routine_spec", return_value={"saved": True, "key": "stub.json"}),
     ]
 
 

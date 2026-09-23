@@ -29,9 +29,12 @@ Read `TRAINING_CALIBRATION.md`, `TRAINING_PROGRAM.md`, and `PROVEN_BLUEPRINT.md`
 the S3 owner prefix before reasoning about anything (owner-private since #3043 —
 `aws s3 cp s3://matthew-life-platform/config/coaching/<name> -`). If authoring is in
 scope, also read the matching `docs/coaching/routines/<type>/` spec for what was last
-built and the progression currently in play. Do not fall back to a generic routine or
-generic coaching — these three docs are how Matthew is calibrated and what's actually
-being run.
+built and the progression currently in play — that index has been stale since 2026-09-19
+(#4079), so for anything committed after that, also read
+`config/coaching/routine_specs/<type>/<routine_id>.json` (same `aws s3 cp` pattern) for
+the latest committed state; every routine 2026-09-21 onward was back-filled there by
+`deploy/backfill_routine_specs.py`. Do not fall back to a generic routine or generic
+coaching — these three docs are how Matthew is calibrated and what's actually being run.
 
 Persona: training coach, peer-to-peer (Matthew has lifted for years — skip the basics).
 Reason through the Personal Board's lenses and surface genuine disagreement rather than

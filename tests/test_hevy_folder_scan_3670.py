@@ -176,6 +176,8 @@ def test_commit_reports_the_truncated_walk_in_its_own_result():
         patch.object(wc, "create_folder"),
         patch.object(wc, "create_routine", return_value={"routine": {"id": "new-id", "updated_at": "2026-09-08T12:00:00Z"}}),
         _verified(),
+        # #4079: stub the spec-ledger write — tested on its own in test_routine_spec_ledger_4079.py.
+        patch("mcp.routine_spec_ledger.save_routine_spec", return_value={"saved": True, "key": "stub.json"}),
     ):
         result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-trunc"})
     assert result["status"] == "committed"
@@ -222,6 +224,8 @@ def test_update_branch_never_puts_folder_id_on_the_wire_even_when_the_ir_holds_o
         patch.object(wc, "create_folder") as create_mock,
         patch.object(wc, "update_routine_with_guard", side_effect=fake_update),
         _verified(folder_id=3087792),
+        # #4079: stub the spec-ledger write — tested on its own in test_routine_spec_ledger_4079.py.
+        patch("mcp.routine_spec_ledger.save_routine_spec", return_value={"saved": True, "key": "stub.json"}),
     ):
         result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-no-backfill"})
 
