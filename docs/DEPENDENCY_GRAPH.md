@@ -518,7 +518,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 |---------|-------|----------|
 | ai_features | 19 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 132 | this model's alarms plane (CDK AST) |
-| emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
+| emf_namespaces | 32 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 90 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 

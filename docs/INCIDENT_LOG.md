@@ -30,6 +30,10 @@ Last updated: 2026-09-22 Session AQ Fable overnight addendum (#1332 gate; +2 row
 | 2026-09-21 | **P4** (false positive; `qa-smoke-failures` lit 18:30Z; no reader-visible contradiction) | **`cross_surface:vitals` failed the mind coach for "the 97% recovery reading on…" against today's cockpit 90% while the card's own `published_vitals` stamp agreed with the cockpit (90, as of 2026-09-21).** Whoop `DATE#2026-09-20` recovery = 97 — a DATED past reading narrated as such. | `weight_truth_qa.vitals_cited_in()` treated every `<n>% recovery` in the prose as a claim about now; the date sat in the preceding sentence, outside the single-sentence historical-anchor scope. The #2978 class (a gate red a reader would not experience). | ~7 h (nightly 18:30Z → the boot alarm battery 01:2xZ named the live cause). | Same session: #4025 filed, PR #4027 merged 00:33Z, `qa-smoke` deployed 01:07Z; dated citations now resolve against their own day's reading; alarm re-cited (PR #4026), clears on the first nightly after deploy. | No. |
 | 2026-09-22 | **P4** (failed prod CDK deploy, clean automatic rollback; no reader impact — the site answered 200 throughout, the stack returned to its prior state) | **`cdk_deploy.sh LifePlatformWeb` for #3760 failed at 22:07Z on `ProgressViewerNoCachePolicy` — "The parameter CookieBehavior is invalid for policy with caching disabled" — and CloudFormation rolled every resource back (`UPDATE_ROLLBACK_COMPLETE` 22:09Z).** The first attempt (22:05Z) had already stopped at cdk's IAM approval prompt with no TTY (changeset created, never executed). | A CloudFront cache policy with `max_ttl=0` may not name any cookie, header or query string in its key. The lane named the session cookie on purpose (so the edge does not strip `Set-Cookie` on the one-time link exchange) AND set every TTL to 0 (so nothing caches); the two are mutually exclusive at the API, and nothing before the live deploy exercises that constraint — `cdk synth` accepts it, the privacy test asserts the cookie is named, no test knew the rule. | 0 — the deploy's own event stream named the resource and the message. | 27 min: PR #4054 (`max_ttl` 1 s, `default_ttl` 0, origin `no-store`; a SET-level test over every CachePolicy in the module, mutation-proved) merged 22:29Z; redeploy `UPDATE_COMPLETE` 22:34Z; `/progress-photos/` answers 401 at the edge. | No. |
 | 2026-09-22 | **P4** (self-inflicted nightly red; `qa-smoke-failures` ALARM continued; no reader impact — the site served the post throughout, only its row disagreed) | **The 18:31Z nightly failed two content-truth dead-men — `chronicle:manifest_provenance` ("1 archived post(s) live in the manifest — 2026-09-05 'The Plan, On the Record', phase='pilot' cycle=16") and `recall:corpus_freshness` (stored links for 2026-09-08 / 09-15 no longer matched the derived `/journal/posts/week-N/` scheme).** | One root, mine: at 04:19Z `deploy/reconcile_countdown_gap.py --apply` (run for the #3643 "escapee" that restart_verify check 14 named) tombstoned + hid chronicle `DATE#2026-09-05` — which is the SERVED Prologue Part III (published 02:14Z 09-06, after the cycle-17 wipe). The countdown-gap tool's sanction list has one exemption (a prereg sha) and no served-manifest derivation, so the taxonomy rule and the manifest dead-man disagree on the same row and nothing derives one from the other; tombstoning it also shifted every later post's derived sequence by one, which is the recall-link mismatch. | ~14 h (04:19Z stamp → 18:31Z nightly); the driver read the nightly at 23:4xZ when asked what was closable. | Same session: the stamp reverted 23:5xZ (`phase=experiment, cycle=17`, tombstone/hidden removed, `phase_reason` on the row); both checks re-run locally against live data → PASS; alarm re-cited; #4055 filed (the sweep + check 14 derive the exemption from the manifest's own matcher) and the #4040 lane briefed with it — its merged corrector (PR #4058) exempts the 5 served chronicle rows by construction. Clears on the 09-23 nightly. | No. |
+| 2026-09-23 | **P3** (process; ~6 h driver freeze + ~8 h and ~7.6 h lane freezes overnight; no reader impact) | **Three multi-hour permission-prompt stalls under auto mode, all `aws s3` on the private `config/` prefix — the #4065 lane's READ of the v0.3 plan (8 h 02 m), the #4090 lane's same read (7 h 37 m), the driver's calibration-partition archive upload (6 h 02 m, 22:54 → 04:56 PT).** Found by pairing tool_use/tool_result timestamps over the session and subagent transcripts. | Auto mode's classifier escalates private `config/` S3 access (reads included) to a prompt; a pending prompt never returns, so the caller's whole turn freezes and a lane's prompt reaches only the owner — the driver cannot route around its own stall. | ~8 h (owner woke) | ~8 h | No |
+| 2026-09-23 | **P4** (main red on a required gate ~1 h; no reader impact) | **`mcp/tools_plan.py` measured 1019 against the 1000-line ceiling after #4104 and #4105 merged together (each under the ceiling alone); every lane PR touching it inherited the red.** Fixed forward by PR #4121 (four unreferenced pure helpers → `mcp/plan_helpers.py`). | Two concurrent PRs each within the ceiling sum past it; the size gate is per-tree, not per-PR. | ~1 h | ~1.5 h | No |
+| 2026-09-23 | **P3** (process; no reader impact) | **No PR that adds an MCP tool could pass pre-merge (#4123): `test_the_published_mcp_tool_count_matches_the_registry` needs the new count in `platform_counts.py`, and the #3984 hook restores that file on every branch commit.** Fixed by PR #4127 (session AS). | Two contracts shipped two days apart with no test of their interaction. | on first tool-adding PR | ~2 h | No |
+| 2026-09-23 | **P4** (process; 13 lanes stopped mid-work ~06:25 PT; no reader impact) | **Every subagent hit the account's weekly usage limit at once (reset 2026-09-26 17:00 PT); 13 lanes stopped with uncommitted or unpushed work; a parallel Fable session took over eight of them.** | 17 concurrent lanes with no budget headroom check before the fan-out (memory: usage headroom before fan-outs). | immediate | handed off same day | No |
 | 2026-09-21 | **P4** (data gap, vendor-absent; `freshness-interior-gap` ALARM from 16:46Z) | **Eight Sleep `DATE#2026-09-20` absent between 09-19 and 09-21; the freshness checker logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}`.** | The vendor has no session for that night: `eightsleep-data-ingestion`'s hourly gap-fill has logged `No day matching 2026-09-20. Available: ['2026-09-19']` on every run since 00:15Z (the owner sleeps downstairs some nights — the 2026-08-30 episode's exact shape). Not an ingest defect. | ~9 h to the boot battery (the prior citation predated the episode). | Re-cited as dated + self-clearing (PR #4026): `record_gap_exhausted_absence=True` with `LOOKBACK_DAYS 7` writes the absence marker on or about 2026-09-27; EXPIRES 2026-09-29, after which a still-lit alarm is a new defect. | No — a night the device did not see. |
 | 2026-09-21 | **P3** (main's full suite red ~10h on two NON-required gates; no reader impact — every deploy this session was direct from the main checkout and content-verified; the required checks stayed green so lane merges continued) | **Two lane merges each tripped a gate only the post-merge full suite runs, and the session's parent turn then stalled for 9 h with nobody to fix forward.** (1) PR #4014 (#3971) added `mcp/hevy_prescription_gate.py` with a `date.fromisoformat` day subtraction — `tests/test_iso_parse_site_registry_3609.py` is a SHRINK-ONLY registry (65) that the pre-merge lane does not run, red from 04:56Z. (2) PR #4017 (#3552) moved both declared sources of `docs/engines/HYPOTHESIS.md` — the Docs CI drift gate reds until an honest re-verify, red from 05:42Z. Both were reproduced on a clean main checkout by the #3599 and #3607 lanes and posted as PR comments at ~06:1xZ; the parent session did not run between 05:23Z and 14:30Z — the checkpoint-1 deploy was issued as a compound `{ …; bash deploy/deploy_fleet.sh; bash deploy/deploy_lambda.sh …; } > log` line that matches no `permissions.allow` rule (only the bare `bash deploy/deploy_fleet.sh` string is allowed; `deploy_lambda.sh`/`deploy_site_api.sh` have none), so the harness waited on a permission prompt until the owner woke and approved it (owner-confirmed), so the fix-forward (PR #4021: the gate routed through `common.pacific_time.parse_day_key`, the doc re-verified with 12 AST-derived spans) merged at 15:00Z. Same class as the 2026-09-19 row (auto-merge on the two REQUIRED checks with the full suite as a post-merge detector) — by design, and again it cost a fix-forward cycle; what was new is the stall, a permission-layer defect, not a platform one: the brief's autonomy grant does not reach the harness allowlist (memory `reference_a_parent_turn_can_stall_while_its_children_finish`; prefix allow rules for the three deploy scripts proposed to the owner with the diff, and the session reflex is to invoke deploy scripts bare). | ~1.3h for (1) (a lane's full-suite comment at 06:1xZ against 04:56Z), immediate for (2) at the next lane; both sat ~8h unread during the stall | ~10h (04:56Z → 15:00Z merge of #4021); ~35 min of it was work | No |
 | 2026-09-19 | **P3** (main's full suite red ~2h across two merges; no reader impact — every production deploy this session was direct from origin/main and verified by shipped content, never through the red gate) | **Auto-merge on the two required checks let two post-merge full-suite reds onto main — by design, and it cost two fix-forward cycles.** The owner's Session AL brief set the merge posture to `gh pr merge --auto --squash` on `Collect + deploy-critical + format` + `gitleaks` only, with the ~32-min full suite as a post-merge detector. (1) PR #3896 (3646, the `pending-reconcile` verdict) merged green: its four new tests passed under a `pull_request` event and FAILED on main's `push` event, where `doc_drift_verdict` deliberately exits 0 with a `::warning::` — the tests were asserting the gate's verdict but reading CI's exemption (blast radius measured at 6 tests by the must-fail control, not the 4 reported). (2) PR #3902 (3769) merged green on the required lane while its full suite was red: `mcp/layer_status.py` open-coded two `date.fromisoformat` calls the #3609 ratchet rejects, a test only the full suite runs. Main's tip read `failure`/`cancelled` on `test / Unit Tests` from the 19:30Z merge until #3911 merged at 21:38Z; #3912 fixed (2) at 20:55Z. Both lanes reproduced their own red with a watched control before pushing the fix. | A PR-side green is not a main-side green when a gate keys on the CI event (`GITHUB_EVENT_NAME`/`GITHUB_REF`), and the required-check set is the FAST lane by construction — the full suite catches what the lane cannot, after the merge. The fix-forward posture is the posture; the class to guard is tests that shell out to a gate without pinning the child env (F's `_gate_env()` is the shape). | ~20 min (the first push run) | ~2h (both fixes merged; the second waited on a dependent rebase) | No |
@@ -267,7 +271,7 @@ Last updated: 2026-09-22 Session AQ Fable overnight addendum (#1332 gate; +2 row
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 221 dated rows, 186 post-June** (newest row 2026-09-22):
+**Distribution — 225 dated rows, 190 post-June** (newest row 2026-09-23):
 
 | month | rows |
 |---|---|
@@ -278,12 +282,12 @@ Last updated: 2026-09-22 Session AQ Fable overnight addendum (#1332 gate; +2 row
 | 2026-06 | 2 |
 | 2026-07 | 36 |
 | 2026-08 | 126 |
-| 2026-09 | 24 |
+| 2026-09 | 28 |
 
-**By severity:** P1 6 · P2 34 · P3 81 · P4 95 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 34 · P3 83 · P4 97 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
-than one, and 26 match none):
+than one, and 29 match none):
 
 | n | class |
 |---|---|
@@ -294,11 +298,11 @@ than one, and 26 match none):
 | 34 | lane-subset / union-breach main red |
 | 32 | deploy-plane wedge / strand / race |
 | 28 | secret / credential |
-| 22 | IAM / permission |
+| 23 | IAM / permission |
 | 19 | QA false positive — semantic oracle (#2959) |
 | 19 | timezone / wallclock |
 | 7 | data quality / scoring |
-| 26 | *(unclassified)* |
+| 29 | *(unclassified)* |
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:END -->
 
 > **The QA-oracle false-positive rows have an owner: #2978** (the #2841 decision — umbrella,
@@ -324,17 +328,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**53 of 221 rows are silent.**
+**53 of 225 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 53 | 168 |
-| TTD parseable | 40 | 112 |
+| rows | 53 | 172 |
+| TTD parseable | 40 | 115 |
 | median TTD | **29 min** | 20 min |
-| mean TTD | 1,795 min | 1,543 min |
+| mean TTD | 1,795 min | 1,507 min |
 | exceeded 1 day | 6 (15% of parsed) | 9 (8% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.9× more likely to run past a day**. But the *means* are only 14% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **69 of 221 TTD cells (31%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.4× longer to detect at the median** and are **~1.9× more likely to run past a day**. But the *means* are only 16% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **70 of 225 TTD cells (31%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -345,7 +349,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August and 24 in September. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August and 28 in September. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

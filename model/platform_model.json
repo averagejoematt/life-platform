@@ -930,7 +930,7 @@
   "cost_surface": {
     "ai_features": 19,
     "alarms": 132,
-    "emf_namespaces": 31,
+    "emf_namespaces": 32,
     "schedules": 90,
     "secrets": 30
   },
