@@ -110,6 +110,8 @@ def _commit(ir, *, create=None):
             "training.hevy_write_client.verify_commit_landed",
             return_value={"verified": True, "reason": None, "folder_id": 42, "updated_at": "2026-09-19T23:00:00Z"},
         ),
+        # #4079: stub the spec-ledger write — tested on its own in test_routine_spec_ledger_4079.py.
+        patch("mcp.routine_spec_ledger.save_routine_spec", return_value={"saved": True, "key": "stub.json"}),
     ):
         out = t.tool_manage_hevy_routine({"action": "commit", "routine_id": ir.routine_id})
     out["_create_called"] = create_mock.called

@@ -1041,6 +1041,12 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             # #3718 — what Hevy actually holds, read back after the write.
             **wc.readback_fields(check, took_update_branch),
         }
+        # #4079 — the committed spec's own durable home (S3, private, no git step);
+        # fail-soft by contract, kept in its own helper module (mcp/routine_spec_ledger.py)
+        # so it never grows _action_commit itself.
+        from mcp.routine_spec_ledger import save_routine_spec
+
+        out["routine_spec"] = save_routine_spec(ir)
         if not check.get("verified"):
             ir.status = "unverified"
             put_versioned(ir)
