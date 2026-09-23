@@ -226,7 +226,8 @@ def _joints(note_dates, dismissals):
         _draft(),
         pain_by_idx={0: {"pain_flag_any": True, "pain_dates": list(note_dates)}},
         days_since_by_idx={0: 9},
-        consecutive_days=1,
+        active_day_streak=1,
+        loaded_lifting_streak=1,
         pain_layer_status="ok",
         dismissals=dismissals,
     )

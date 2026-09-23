@@ -102,37 +102,39 @@ def _band_for(weight: float) -> str:
 
 
 def _current_weight_and_rate(end_date: str, days: int = 28) -> tuple:
-    """(current_weight, rate_lb_wk [positive=losing], n_weighins) from recent withings.
+    """(current_weight, rate_lb_wk [positive=losing], n_weighins) — the rate is THE loss rate.
 
-    Rate is a least-squares slope over the window — robust to a single noisy weigh-in,
-    unlike the old endpoint difference (two close-but-divergent readings used to
-    manufacture an absurd rate, e.g. 12.75 lb/wk). Requires ≥3 weigh-ins spanning ≥7
-    days; otherwise returns None (honest "unknown" beats a fabricated number).
-
-    include_pilot=True (cross-phase): weight-change rate is physiological, not
-    experiment-scoped. The default ADR-058 filter hides pre-genesis weigh-ins, which
-    right after a reset leaves only a few post-genesis days of water-weight normalization
-    (a steep transient, not a real rate). Like episode-detect, this reads the true recent
-    trajectory across the phase boundary — the rate compares to LIFETIME proven history."""
+    The current weight is the latest weigh-in in the trailing `days` (cross-phase — weight is
+    physiological, not experiment-scoped). The RATE is `mcp.shared_quantities.loss_rate`
+    (#4068): 14 completed days, water weeks 1–2 excluded, least-squares. It was a 28-day
+    cross-phase slope of its own, which on 09-22 read the pre-genesis weigh-ins and both
+    water weeks and handed `rate_advocate` 4.52 lb/wk while the deficit critic read 2.99. A
+    `provisional` rate (window span under 7 days) is returned as None here — the full record,
+    reason included, is `_loss_rate_block(end_date)`."""
     start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
     rows = [r for r in query_source("withings", start, end_date, include_pilot=True) if r.get("weight_lbs") is not None]
     pts = sorted(((r.get("date") or r.get("sk", "").replace("DATE#", ""))[:10], float(r["weight_lbs"])) for r in rows)
     if not pts:
         return None, None, 0
-    current = pts[-1][1]
-    rate = None
-    if len(pts) >= 3:
-        d0 = datetime.strptime(pts[0][0], "%Y-%m-%d")
-        xs = [(datetime.strptime(p[0], "%Y-%m-%d") - d0).days for p in pts]
-        ys = [p[1] for p in pts]
-        if (xs[-1] - xs[0]) >= 7:
-            n = len(xs)
-            xbar, ybar = sum(xs) / n, sum(ys) / n
-            denom = sum((x - xbar) ** 2 for x in xs)
-            if denom > 0:
-                slope = sum((x - xbar) * (y - ybar) for x, y in zip(xs, ys)) / denom  # lb/day
-                rate = round(-slope * 7.0, 2)  # positive when losing
-    return current, rate, len(pts)
+    block = _loss_rate_block(end_date, rows)
+    rate = None if block.get("provisional") else block.get("rate_lb_wk")
+    return pts[-1][1], rate, len(pts)
+
+
+def _loss_rate_block(end_date: str, rows: list | None = None) -> dict:
+    """THE loss rate with its window, n, span and provisional flag (`mcp.shared_quantities`).
+
+    `rows` are the caller's Withings rows when it already read them (any window that covers
+    the 14 days); otherwise the trailing 28 days are read here, cross-phase."""
+    from mcp import shared_quantities
+
+    try:
+        if rows is None:
+            start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=_CHRONIC_WINDOW_DAYS)).strftime("%Y-%m-%d")
+            rows = query_source("withings", start, end_date)  # withings is RAW_TIMESERIES: derived = cross-phase
+        return shared_quantities.loss_rate_from_rows(rows, shared_quantities.completed_end(end_date))
+    except Exception as e:  # noqa: BLE001 — an unreadable rate is unknown, never 0
+        return {"rate_lb_wk": None, "provisional": True, "reason": f"{type(e).__name__}: {e}"[:160]}
 
 
 def _recent_walks_wk(end_date: str, days: int = 14) -> tuple:
@@ -366,9 +368,11 @@ def _recent_volume(end_date: str, days: int = 28) -> dict:
     "now" and "then" are measured with the same denominator rather than one
     being a 14-day slice compared against a month.
     """
+    from mcp import shared_quantities
+
     start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
     weeks = days / 7.0
-    miles = hours = 0.0
+    miles = 0.0
     bpm: list = []
     for it in query_source("strava", start, end_date):
         acts = it.get("activities") if isinstance(it.get("activities"), list) else [it]
@@ -377,13 +381,25 @@ def _recent_volume(end_date: str, days: int = 28) -> dict:
             if st not in ("walk", "hike", "walking", "hiking"):
                 continue
             miles += float(a.get("distance_miles") or 0.0)
-            hours += float(a.get("moving_time_seconds") or 0.0) / 3600.0
             if a.get("average_heartrate"):
                 bpm.append(float(a["average_heartrate"]))
+    # #4068: the HOURS are THE walking definition (Strava UNION Hevy, de-duplicated in time,
+    # completed days) — the same number plan_next_session and the nutrition critics carry. It
+    # was Strava Walk/Hike moving time alone, which on 09-19 read 2.7x below plan_next_session.
+    # Distance and bpm stay Strava-only: Hevy cardio blocks carry neither.
+    layer = week = None
+    try:
+        layer = shared_quantities.walking_layer(end_date, days=days, read=query_source)
+        week = shared_quantities.walking_layer(end_date, days=shared_quantities.WALK_WINDOW_DAYS, read=query_source)
+    except Exception:  # noqa: BLE001 — unknown, never 0 hours
+        pass
     return {
         "window_days": days,
         "walk_mi_wk": round(miles / weeks, 2),
-        "walk_hr_wk": round(hours / weeks, 2),
+        "walk_hr_wk": (layer or {}).get("hr_wk"),
+        "walk_hr_wk_7d": (week or {}).get("total_hr"),
+        "walk_hr_window": (layer or {}).get("window"),
+        "walk_hr_definition": (layer or {}).get("definition"),
         "walk_bpm": round(sum(bpm) / len(bpm)) if bpm else None,
         "n_walk_bpm": len(bpm),
     }
@@ -456,6 +472,9 @@ def _benchmark_prescription(args: dict) -> dict:
         "date": end_date,
         "current_weight": round(weight, 1),
         "current_rate_lb_wk": rate,
+        # #4068: THE loss rate, with its window, n and provisional flag — `current_rate_lb_wk`
+        # above is this block's rate, None while it is provisional.
+        "loss_rate": _loss_rate_block(end_date),
         "n_weighins_28d": n_wi,
         "current_typical": None,
         "proven_target": None,

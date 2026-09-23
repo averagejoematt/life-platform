@@ -85,7 +85,8 @@ def _evidence(pain0=False, drop=0.0, days0=3, weeks_in_block=0):
                 "pain_layer_status": "ok",
             },
         ],
-        "consecutive_days": 1,
+        "active_day_streak": 1,
+        "loaded_lifting_streak": 1,
         "lifting_sessions_7d": 2,
         "weeks_in_block": weeks_in_block,
         "pain_layer_status": "ok",
@@ -537,8 +538,8 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
             to = sent["draft"]["total_sets"] - 4
             reply = {
                 "verdict": "change",
-                "metric": "consecutive_training_days",
-                "value": 9,
+                "metric": "loaded_lifting_streak",
+                "value": 5,
                 "field": "session.total_sets",
                 "to": to,
                 "sentence": f"Streak; trim to {to}.",
@@ -547,7 +548,7 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
         return _approving(body)
 
     ev = _evidence()
-    ev["consecutive_days"] = 9  # info flag on the metric the model cites
+    ev["loaded_lifting_streak"] = 5  # info flag on the metric the model cites (#4067: upper tail)
     ev["exercises"] = [
         {
             "idx": i,

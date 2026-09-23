@@ -61,7 +61,7 @@ def _routine():
 
 def _fixture_evidence(*, pain0=False):
     ev = _evidence(pain0=pain0)  # weeks_in_block=0 -> the historian's squat flag is a `change`
-    ev["consecutive_days"] = 9  # the info flag the joints critic escalates on
+    ev["loaded_lifting_streak"] = 5  # the info flag the joints critic escalates on (#4067: upper tail)
     rows = [dict(ev["exercises"][0])]
     rows += [
         {
@@ -96,8 +96,8 @@ def _model(body):
         return _reply(
             {
                 "verdict": "change",
-                "metric": "consecutive_training_days",
-                "value": 9,
+                "metric": "loaded_lifting_streak",
+                "value": 5,
                 "field": "session.total_sets",
                 "to": to,
                 "sentence": f"Day 10 of a streak; cap at {to}.",
