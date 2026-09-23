@@ -511,6 +511,28 @@ def _number_grounding_report(output_text, generation_brief, generation_date=None
         return {"status": "error", "verdict": None, "advisory": True, "error": str(e)}
 
 
+def _labs_draw_findings(coach_id, output_text):
+    """#4134: the labs coach may not arrange a lab draw (ADR-104) — refused HERE, before it ships.
+
+    The nightly `coach_labs:truth` check caught "Schedule the draw" on 2026-09-23 only after
+    it was served. Its detector (`health.labs_draw_claims`) is imported, never copied, so the
+    gate and the nightly cannot disagree. The labs store only ever holds RESULTED draws and the
+    owner's ruling (#4052, `owner_redlines.REDLINES["medical_cover"]`) books none, so every
+    arranged draw is unsupported; a sentence naming the NEXT panel stays sayable.
+    """
+    if coach_id != "labs_coach":
+        return []
+    from health.labs_draw_claims import schedules_a_past_draw
+
+    return [
+        {
+            "type": "past_draw_scheduling",
+            "detail": f"arranges a lab draw no record supports (no draw is booked; the newest panel is past): '{q}'",
+        }
+        for q in schedules_a_past_draw(output_text)
+    ]
+
+
 def _grounding_findings_summary(grounding, max_findings=6, detail_cap=220):
     """Render the grounding verdict's finding TYPES + DETAILS for the log line (#3202).
 
@@ -827,9 +849,10 @@ def _apply_number_grounding_verdict(result, grounding):
     cycle-boundary rule: one report, one regenerate-or-hold path, no parallel
     enforcement mechanism.
     """
-    if grounding.get("status") != "measured":
-        return result
-    findings = grounding.get("findings") or []
+    findings = list(grounding.get("findings") or []) if grounding.get("status") == "measured" else []
+    # #4134: the labs-draw claim is deterministic and needs no allow-list, so it blocks on
+    # its own — same report, same regenerate-or-hold path, no parallel enforcement.
+    findings += grounding.get("labs_draw_findings") or []
     if not findings:
         return result
     result["passed"] = False
@@ -996,6 +1019,7 @@ def lambda_handler(event, context):
         # repetition this one is BLOCKING: it is the ADR-104 verdict, and the LLM
         # is handed it as a decided input rather than asked to re-decide it.
         grounding = _number_grounding_report(output_text, generation_brief, event.get("generation_date"))
+        grounding["labs_draw_findings"] = _labs_draw_findings(coach_id, output_text)
 
         # Run the quality gate
         report = _run_quality_gate(
