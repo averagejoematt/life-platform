@@ -233,6 +233,21 @@ def _pain_dismissals() -> list[dict[str, Any]]:
     return _dismissal_records()
 
 
+def _training_memory_constraints() -> list[dict[str, Any]]:
+    """Standing training constraints written from chat (the RDL gate, a toe flag, a back
+    flag — #4077) via `write_platform_memory(category='training')`. Read through the SAME
+    tool a chat write would have used — `tool_read_platform_memory` — so the category
+    registry (`ai.platform_memory.MEMORY_CATEGORIES`) stays the one place this taxonomy is
+    validated. A raise (or the tool's own `{"error": ...}` shape) propagates; `_read`
+    reports it `read_failed`, never silently as "no constraints"."""
+    from mcp.tools_memory import tool_read_platform_memory
+
+    resp = tool_read_platform_memory({"category": "training", "days": 730, "limit": 20})
+    if resp.get("error"):
+        raise RuntimeError(resp["error"])
+    return resp.get("records") or []
+
+
 def _performed_movements(target_date: str) -> tuple[list[dict[str, Any]], list[str], str, int]:
     """(rows, phases_read, window_start, blocks_without_template_id) — what he actually did (#4051).
 
@@ -568,6 +583,13 @@ def tool_plan_next_session(args):
     if dismissals == [] and status["pain_dismissals"]["state"] != READ_FAILED:
         status["pain_dismissals"] = st(ABSENT, "no owner dismissal on file")
 
+    # #4077: standing training constraints (RDL gate, toe flag, back flag, …) written from
+    # chat via write_platform_memory(category='training') — the durable home that category
+    # used to reject outright.
+    training_memory, status["training_memory_constraints"] = _read("training_memory_constraints", _training_memory_constraints)
+    if training_memory == [] and status["training_memory_constraints"]["state"] != READ_FAILED:
+        status["training_memory_constraints"] = st(ABSENT, "no training constraint recorded in platform memory (category='training')")
+
     evidence = _gather_draft_evidence(ir, target_date, layer_status) if ir is not None else None
     worst = _worst_anchor(evidence) if evidence else (None, None)
     if evidence is None:
@@ -677,6 +699,7 @@ def tool_plan_next_session(args):
         hevy_workouts_rotation_window=rotation_rows,
         rotation_window_start=rotation_start,
         hevy_workouts_prescription_window=prescription_rows,
+        training_memory_constraints=training_memory,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)

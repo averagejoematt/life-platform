@@ -434,5 +434,33 @@ def test_mcp_list_categories_returns_the_taxonomy(monkeypatch):
     assert {e["category"] for e in out["taxonomy"]} == set(pm.MEMORY_CATEGORIES)
 
 
+# ── #4077 — the `training` category: write + read-back through the MCP handler ──
+
+
+def test_training_category_is_sanctioned_and_conversation_writable():
+    assert pm.canonical_category("training") == "training"
+    assert "training" in pm.conversation_categories()
+    assert "training" in pm.sanctioned_categories()
+
+
+def test_training_category_write_then_read_back_through_mcp_handler(monkeypatch):
+    """The issue's own acceptance: a training constraint written and read back through
+    the MCP handler — `write_platform_memory` used to reject 'training' outright."""
+    fake = FakeDdbTable(filter_by_pk=True)
+    monkeypatch.setattr(tm, "_table_ref", fake)
+
+    written = tm.tool_write_platform_memory(
+        {"category": "training", "content": {"summary": "RDL gate: hold to 40kg until the back flag clears"}}
+    )
+    assert written["status"] == "stored"
+    assert written["category"] == "training"
+    assert written["channel"] == "conversation"  # honest provenance — a chat write
+
+    read_back = tm.tool_read_platform_memory({"category": "training", "days": 365})
+    assert read_back["count"] == 1
+    assert read_back["records"][0]["summary"] == "RDL gate: hold to 40kg until the back flag clears"
+    assert read_back["records"][0]["category"] == "training"
+
+
 def test_mcp_valid_categories_derived_from_registry():
     assert tm.VALID_CATEGORIES == set(pm.MEMORY_CATEGORIES)

@@ -2049,6 +2049,7 @@ Structured key-value memory store for compounding intelligence — computed reco
 |----------|----------|-----------------|--------------|-------------|---------|
 | `life_context` | conversation | 365d | coach_context | cross_phase | Durable life events/situation shared in chat (travel, work stress, family) |
 | `constraints_preferences` | conversation | 730d | coach_context | cross_phase | Standing constraints + preferences (equipment, injuries, food dislikes, framing) |
+| `training` | conversation | 730d | coach_context | cross_phase | Standing training constraints (the RDL gate, a toe flag, a back flag, #4077) — `plan_next_session` stage 1 reads it as `standing_constraints_from_chat`, distinct from `constraints_preferences` so it stays a single-domain, narrow read |
 | `coaching_calibration` | conversation, computed | 365d | coach_context | experiment_scoped | How to coach Matthew — computed response patterns + explicit chat asks |
 | `failure_patterns` | conversation, computed | 180d | coach_context | experiment_scoped | Conditions preceding low days (computed attribution + chat-narrated failure modes) |
 | `what_worked` | conversation, computed | 365d | coach_context | experiment_scoped | Episodic wins (issue alias: `episodic_wins`) |
@@ -2369,7 +2370,7 @@ phase-filtered at restart.
 | Field | Type | Description |
 |-------|------|-------------|
 | `correction_id` | string | The `id8` suffix of the sk |
-| `item_ref` | map | What was corrected — the S1/#1688 ranked-pack convention is `surface`/`coach`/`date`/`pack_number` (or `pack_item_ref`), but the ledger stores whatever the caller passes (Decimal-cast, no schema enforced here) |
+| `item_ref` | map | What was corrected — the ledger stores whatever the caller passes (Decimal-cast, no schema enforced here). Two shapes in practice: the S1/#1688 ranked-pack convention `surface`/`coach`/`date`/`pack_number` (or `pack_item_ref`); and, since #4076/#4083, a live-session/override convention carrying `surface`/`coach`/`signal` — `signal` names the metric/flag id the correction was about, and is what `coach_corrections.false_positive_signal_ranking` groups by (surfaced via `get_intelligence_quality.owner_correction_signals`) |
 | `correction_text` | string | The verbatim correction, as Matthew wrote it |
 | `error_class` | string | One of `lambdas/coach_corrections.ERROR_CLASSES`: `stale-baseline` \| `ungrounded-behavioral` \| `cross-coach-inconsistency` \| `framing` \| `checkable-metric` \| `hedged-safe` \| `defense-held` \| `other`. An unrecognized tag from a caller normalizes to `other` rather than being dropped — see `error_class_raw` |
 | `error_class_raw` | string | Present only when the caller passed a class outside `ERROR_CLASSES`: the original, unnormalized value, preserved so no tag is silently lost |
@@ -2384,6 +2385,7 @@ resource passed in, per the `ai_review_pack_lambda.record_email_send` idiom):**
 - `get_correction(table, sk) -> dict | None`
 - `list_corrections(table, *, status=None, error_class=None, limit=100) -> list` — Query on the pk, newest first, with client-side status/error-class filtering. No new GSI (adding one requires an ADR).
 - `update_status(table, sk, new_status) -> bool` — the open → applied-to-prompt/applied-to-gate transition; raises `ValueError` on an unrecognized status.
+- `false_positive_signal_ranking(corrections, *, limit=20) -> list[dict]` (#4083) — PURE: ranks `item_ref.signal` by count, descending then alphabetical; a row with no `signal` (a weekly-pack correction) is skipped, never bucketed under `None`. Read via `get_intelligence_quality`'s `owner_correction_signals` field, not on a new schedule.
 
 ---
 

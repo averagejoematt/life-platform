@@ -734,4 +734,30 @@ def tool_get_intelligence_quality(args):
         "warnings": total_warnings,
         "flags": all_flags[:20],  # Cap at 20 for readability
         "coaches_checked": list(set(i.get("coach_id") for i in items)),
+        # #4083: owner-logged corrections (log_coach_correction — both the pack-number and
+        # signal-named paths) ranked by which SIGNAL produced the most false positives. A
+        # DIFFERENT ledger than the validator flags above (SOURCE#coach_corrections, not
+        # SOURCE#intelligence_quality) — read alongside them here rather than on a new
+        # schedule, because this IS the existing "how good is the intelligence" surface.
+        # Fails soft: an unreadable corrections ledger never blanks the validator data above it.
+        "owner_correction_signals": _owner_correction_signal_ranking(),
     }
+
+
+def _owner_correction_signal_ranking() -> dict:
+    """The #4083 read: every logged correction (any status — a false positive does not
+    stop counting once a downstream process consumes it), ranked by named signal. Fails
+    soft with an explicit reason — a broken corrections-ledger read must never blank the
+    validator report it rides beside."""
+    try:
+        from coach import coach_corrections
+
+        from mcp.core import table as _table  # deferred import — same freshness/test-patch convention as above
+
+        corrections = coach_corrections.list_corrections(_table, limit=10000)
+        return {
+            "ranking": coach_corrections.false_positive_signal_ranking(corrections),
+            "corrections_read": len(corrections),
+        }
+    except Exception as e:  # noqa: BLE001 — a ledger read failure must not blank the validator report
+        return {"ranking": [], "corrections_read": None, "error": str(e)}

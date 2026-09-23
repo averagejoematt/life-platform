@@ -125,7 +125,15 @@ GET_DAILY_SNAPSHOT_DESCRIPTION = (
 
 FIND_DAYS_DESCRIPTION = "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet' — these day totals sum MEASURED distance only: WHOOP-synced indoor/trainer walks and rides carry no distance, so a distance filter will not find a day whose activities were all unmeasured (a returned Strava day carries 'activities_without_distance' when it holds any); use search_activities with sport_type to see them. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor."
 
-GET_INTELLIGENCE_QUALITY_DESCRIPTION = "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong source-of-truth values. Use for: 'are the coaches accurate?', 'any quality issues?', 'intelligence validation results'."
+GET_INTELLIGENCE_QUALITY_DESCRIPTION = (
+    "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches "
+    "made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong "
+    "source-of-truth values. Also carries `owner_correction_signals` (#4083): every Matthew-logged correction "
+    "(`log_coach_correction`, both the weekly-pack and live-session-signal paths) ranked by which SIGNAL "
+    "(metric/flag id) produced the most false positives — a DIFFERENT ledger than the validator flags above, "
+    "read here rather than on a new schedule. Use for: 'are the coaches accurate?', 'any quality issues?', "
+    "'intelligence validation results', 'which flags get overridden most', 'false positive rate by signal'."
+)
 
 GET_COACH_THREAD_DESCRIPTION = "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'"
 
@@ -702,16 +710,23 @@ GET_CAPTURE_QUEUES_DESCRIPTION = (
 )
 
 LOG_COACH_CORRECTION_DESCRIPTION = (
-    "#1690 (epic #1687): correct a weekly AI-review-pack item by its NUMBER. Matthew reads the "
+    "#1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two "
+    "paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the "
     "ranked review-pack email (each generation carries a stable #N) and corrects an item that's "
     "wrong or misleading — this resolves #N back to the exact archived generation the pack numbered "
-    "and writes ONE row to the corrections ledger, tagged by error-class, so the mistake compounds "
-    "toward not recurring. Args: item_number (the #N, required), correction (what's wrong + what it "
-    "should say, required), error_class (OPTIONAL override — one of stale-baseline, "
-    "ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, "
-    "defense-held, other; an unrecognized value is stored as 'other', never rejected). An unknown "
-    "or out-of-range number is REPORTED (with how many items the week's pack has), never silently "
-    "dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows."
+    "and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range "
+    "number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the "
+    "email-reply channel — a reply of '#N <correction>' lines lands the same rows. "
+    "Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, "
+    "open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to "
+    "resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' "
+    "or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults "
+    "'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), "
+    "error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, "
+    "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an "
+    "unrecognized value is stored as 'other', never rejected). Every logged correction, from either "
+    "path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal "
+    "so that ranking can attribute it."
 )
 
 # #4078: moved out of `mcp/registry.py` to pay for `manage_pending_writes` under the #1665
@@ -720,24 +735,20 @@ LOG_COACH_CORRECTION_DESCRIPTION = (
 LOG_COACH_CORRECTION_INPUT = {
     "type": "object",
     "properties": {
-        "item_number": {
-            "type": "integer",
-            "description": "The pack item number to correct (the #N from this week's review-pack email).",
-        },
-        "correction": {
-            "type": "string",
-            "description": "What was wrong and what it should say — Matthew's correction, stored verbatim.",
-        },
+        "item_number": {"type": "integer", "description": "Path 1 (#1690): the pack #N. One of item_number/signal."},
+        "signal": {"type": "string", "description": "Path 2 (#4083): live-session override — the metric/flag id."},
+        "coach": {"type": "string", "description": "Path 2 only. Optional bare coach id; omitted = surface-wide."},
+        "surface": {"type": "string", "description": "Path 2 only. Optional; defaults to 'chat_coaching'."},
+        "correction": {"type": "string", "description": "What was wrong and what it should say, verbatim."},
         "error_class": {
             "type": "string",
             "description": (
-                "Optional error-class override. One of: stale-baseline, ungrounded-behavioral, "
-                "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other. "
-                "Unrecognized values are stored as 'other' (original label preserved), never rejected."
+                "Optional error-class override: stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, "
+                "framing, checkable-metric, hedged-safe, defense-held, other. Unrecognized -> 'other', never rejected."
             ),
         },
     },
-    "required": ["item_number", "correction"],
+    "required": ["correction"],
 }
 
 DESCRIBE_PLATFORM_SURFACES_DESCRIPTION = (

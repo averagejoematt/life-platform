@@ -519,6 +519,10 @@ MEMORY_DURABLE_CATEGORIES = frozenset(
         # context survives an experiment reset (same reasoning as CHECKIN#).
         "life_context",
         "constraints_preferences",
+        # #4077: standing training constraints (RDL gate, toe flag, back flag) are a
+        # fact about Matthew's body, not the current experiment run — same reasoning
+        # as constraints_preferences, a reset must not silently clear one.
+        "training",
     }
 )
 MEMORY_SCOPED_CATEGORIES = frozenset(
