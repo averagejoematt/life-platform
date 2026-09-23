@@ -5,6 +5,7 @@ observatory_week / cycle_compare / survival. Reads facade state via `_g`."""
 from datetime import datetime, timedelta, timezone
 
 from common import stats_core  # #3549: the ONE sanctioned interval for a served proportion (ADR-105)
+from common.digest_utils import filter_day_rows
 
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -516,7 +517,7 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
             notable = f"Protein averaged {round(avg_protein)}g/day this week"
 
         elif domain == "training":
-            items = _query_source("whoop", start_date, end_date, include_pilot=ip)
+            items = filter_day_rows(_query_source("whoop", start_date, end_date, include_pilot=ip))  # #3442: day strain only
             strains = [float(i.get("strain", 0)) for i in items if i.get("strain")]
             recoveries = [float(i.get("recovery_score", 0)) for i in items if i.get("recovery_score")]
             avg_strain = sum(strains) / len(strains) if strains else 0

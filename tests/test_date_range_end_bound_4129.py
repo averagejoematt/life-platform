@@ -311,3 +311,18 @@ def test_mutation_control_site_window_without_the_suffix_undercounts(common):
     assert END not in {r["date"] for r in items}
     chest = {row["muscle"]: row for row in _compute_muscle_volume(items, 1.0, start_date=START, end_date=END)}["Chest"]
     assert chest["total_sets"] == 8, chest  # the #4129 shape: the rate's window counts a day it did not read
+
+
+def test_the_fingerprint_reads_the_day_strain_not_a_workouts(monkeypatch):
+    """Adversarial review of this PR (2026-09-23): `/api/fingerprint` reads ONE day, so once the
+    end bound includes end-day sub-rows a `#WORKOUT#` row's strain overwrote the day's."""
+    from web import site_api_fingerprint as fp
+
+    rows = {
+        "whoop": [
+            {"sk": "DATE#2026-09-22", "strain": 14.2, "recovery_score": 55},
+            {"sk": "DATE#2026-09-22#WORKOUT#abc", "strain": 6.3},
+        ]
+    }
+    monkeypatch.setattr(fp, "_query_source", lambda src, s, e, **k: rows.get(src, []))
+    assert fp._metrics_index("2026-09-22", "2026-09-22")["2026-09-22"]["strain"] == 14.2
