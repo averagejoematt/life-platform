@@ -135,6 +135,43 @@ def _import_bedrock():
 # reporting a board built from doors nobody actually looked at (#3079/#2973).
 UNREAD_PAGES: list = []
 
+# #4035 box 4: a screenshot whose CAPTURE was fine but whose Bedrock vision call
+# itself raised (throttling, an expired credential, a transient service error) used
+# to degrade silently to "no findings" — indistinguishable from an honest clean read.
+# Populated by vision_read, drained by main(): if EVERY attempted vision call failed
+# this way, the run is a no-op wearing a clean run's exit code and main() reds it.
+VISION_CALL_FAILURES: list = []
+
+RUN_SUMMARY_FILENAME = "run_summary.json"
+
+
+def write_run_artifact(screenshot_dir, **fields) -> None:
+    """#4035 box 4: a per-run local artifact (uploaded to CI as part of the existing
+    `fresh-eyes-screenshots` artifact — no new IAM, no new upload step) naming the
+    budget tier this run saw and the finding count it produced. Written on EVERY exit
+    path, including the two early-return skips, so a run's shape is checkable after
+    the fact instead of inferred from wall-clock duration (the 2026-08-30 incident: a
+    ~50s run against a 2m10s-2m29s norm read clean because nothing about the run's
+    OWN reported shape said otherwise). Fail-soft (a write failure never masks the
+    real pass/fail verdict main() already computed) but never silent: a write failure
+    prints.
+    """
+    try:
+        os.makedirs(screenshot_dir, exist_ok=True)
+        payload = {"generated_at": datetime.now(timezone.utc).isoformat(), **fields}
+        with open(os.path.join(screenshot_dir, RUN_SUMMARY_FILENAME), "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+    except OSError as e:
+        print(f"[warn] fresh-eyes run-summary artifact write failed: {e}")
+
+
+def is_full_vision_outage(screenshots_attempted: int, vision_call_failures: int) -> bool:
+    """Pure predicate (offline-tested): every attempted vision call failed. This is
+    the 2026-08-30 no-op's real shape — captures succeeded, every judge call errored,
+    and the run still exited clean because zero findings and zero UNREAD_PAGES look
+    identical to an honest quiet week. Only trips when reads were actually attempted."""
+    return screenshots_attempted > 0 and screenshots_attempted == vision_call_failures
+
 
 def _image_blocks(path):
     """Judge-legible content block(s) for one capture — THE shared prepare path.
@@ -235,6 +272,8 @@ def vision_read(bedrock, page_name, path, screenshot_path, viewport, model_name=
     try:
         resp = bedrock.invoke(body, model_name=model_name)
     except Exception as e:
+        # #4035 box 4: tracked, not just printed — see VISION_CALL_FAILURES above.
+        VISION_CALL_FAILURES.append(f"{page_name} ({viewport}) — {e}")
         print(f"[warn] vision read failed for {page_name} ({viewport}): {e}")
         return []
     text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
@@ -463,20 +502,25 @@ def main():
     tier = _read_budget_tier()
     if should_skip_for_budget(tier):
         print(f"budget tier {tier} >= 2 — skipping fresh-eyes discovery run this week")
+        write_run_artifact(args.screenshot_dir, status="skipped_budget", budget_tier=tier, findings_count=0, ok=True)
         return 0
 
     bedrock = _import_bedrock()
     if not bedrock:
         print("bedrock_client unavailable — aborting fresh-eyes run (no AI, nothing useful to email)")
+        write_run_artifact(args.screenshot_dir, status="skipped_no_bedrock", budget_tier=tier, findings_count=0, ok=True)
         return 0
 
     pages = capture_screenshots(args.screenshot_dir)
     UNREAD_PAGES.clear()
+    VISION_CALL_FAILURES.clear()
     vision_results = []
+    screenshots_attempted = 0
     for p in pages:
         for shot in p.get("screenshots", []):
             if shot.get("kind") not in ("page", "mobile"):
                 continue  # desktop full-page + mobile only — the issue's literal scope
+            screenshots_attempted += 1
             vision_results.append(vision_read(bedrock, p["page"], p["path"], shot["path"], shot["kind"]))
 
     candidates = extract_candidates(vision_results)
@@ -487,11 +531,37 @@ def main():
 
     audit_log(ranked, board)
     email_board(board)
+
+    # #4035 box 4: EVERY attempted vision call failing is a systemic outage wearing a
+    # "clean run, nothing new" board — the same silent-degrade shape UNREAD_PAGES
+    # already catches for capture failures, one layer up the pipeline for judge
+    # failures. Only trips when reads were actually attempted (an empty page set —
+    # e.g. DOOR_PATHS pruned to nothing — is a config question, not this failure).
+    full_vision_outage = is_full_vision_outage(screenshots_attempted, len(VISION_CALL_FAILURES))
+
+    write_run_artifact(
+        args.screenshot_dir,
+        status="ran",
+        budget_tier=tier,
+        screenshots_attempted=screenshots_attempted,
+        vision_call_failures=len(VISION_CALL_FAILURES),
+        findings_count=len(candidates),
+        survivors_count=len(survivors),
+        board_count=len(board),
+        unread_pages=len(UNREAD_PAGES),
+        ok=not UNREAD_PAGES and not full_vision_outage,
+    )
+
     if UNREAD_PAGES:
         # #3079: the board is real but its coverage is not what it claims — say so
         # in the exit code rather than letting an unread door read as a clean door.
         print(f"[FAIL] {len(UNREAD_PAGES)} capture(s) never reached the judge:")
         for u in UNREAD_PAGES:
+            print(f"  - {u}")
+        return 1
+    if full_vision_outage:
+        print(f"[FAIL] all {screenshots_attempted} vision call(s) failed — a 'clean run' board built from zero real reads:")
+        for u in VISION_CALL_FAILURES:
             print(f"  - {u}")
         return 1
     return 0

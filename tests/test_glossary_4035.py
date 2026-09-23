@@ -118,7 +118,7 @@ def test_apply_glossary_wraps_first_occurrence_only():
     html = "<p>Track your HRV daily. HRV trends matter more than any single HRV reading.</p>"
     out = v4_glossary.apply_glossary(html)
     assert out.count('<abbr class="gloss"') == 1
-    assert out.count(">HRV<") == 0  # the wrapped one has attrs between > and HRV
+    assert out.count("HRV") == 3  # 1 wrapped + 2 bare occurrences; wrapping doesn't touch the text itself
     assert "HRV trends matter" in out  # later occurrences stay plain
     assert "any single HRV reading" in out
 
@@ -156,3 +156,29 @@ def test_exempt_page_is_never_glossed():
     out = v4_glossary.apply_glossary(html, page_path="/method/registry/")
     assert out == html
     assert v4_glossary.scan_content_text(html, page_path="/method/registry/") == ""
+
+
+# ── #4035 regression guard: a build-time gloss is only real if a browser keeps it ──
+
+
+def test_evidence_js_never_blindly_overwrites_the_glossed_topic_lede():
+    """A gate over the BUILT HTML string (the ones above) cannot see that a browser
+    then runs JS over it. `evidence.js` drives ~30 /data/ + /protocols/ + /method/
+    topic pages (the same population this glossary targets), and used to run
+    `main.querySelector("[data-blurb]").textContent = t.blurb;` unconditionally on
+    EVERY render call, including the initial page load — discarding the server's
+    already-glossed `<p class="topic-lede" data-blurb>` (v4_glossary.py's own build-
+    time `<abbr class="gloss">` wrap) for a live reader before they ever saw it. A
+    Playwright render pass (`tests/pr_render_gate.py`) is what actually caught this —
+    this regression test pins the fix at the source level so it can't quietly revert:
+    the unconditional overwrite must not reappear, and a same-content guard must.
+    """
+    src = (SITE / "assets" / "js" / "evidence.js").read_text(encoding="utf-8")
+    assert 'querySelector("[data-blurb]").textContent = t.blurb' not in src, (
+        "evidence.js reintroduced an unconditional data-blurb overwrite — this discards "
+        "the server-rendered glossary wrap on the topic-lede for every real reader, even "
+        "though every offline gate above stays green (they never run a browser)"
+    )
+    assert "be.textContent.trim() !== String(t.blurb" in src, (
+        "the same-content guard that preserves the server's glossed topic-lede on first " "paint is missing from evidence.js"
+    )
