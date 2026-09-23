@@ -195,6 +195,14 @@ def derive_load_floors(
     dslw = _days_since_last_workout(history_index, target_date)
     audit["days_since_last_workout"] = dslw
     movements = _catalog_movements() if movements is None else movements
+    # #4065: the chat path's half of the #4090 back-off seam. The generator writes
+    # `back_off_floor_kg` for the sets it authors; a hand-drafted v0.3 heavy exposure gets the
+    # same field from the redline rep scheme (parsed, never a hand list; −pct off the floor,
+    # rounded DOWN to the rack step). An unparsed scheme writes none, so back-offs fail closed.
+    from training.rep_scheme import back_off_min_kg, heavy_back_off_scheme
+
+    scheme = heavy_back_off_scheme()
+    audit["back_off_scheme"] = {k: v for k, v in scheme.items() if k != "source_text"}
 
     floor_fn, back_off_pct = prescription_floor, None
     v03 = v03_load_rule(target_date)
@@ -230,6 +238,9 @@ def derive_load_floors(
                 from training.routine_generator import _floor_half_kg
 
                 row["back_off_floor_kg"] = _floor_half_kg(float(floor["floor_kg"]) * back_off_pct / 100.0)
+        if "back_off_floor_kg" not in row and floor.get("floor_kg") and scheme.get("status") == "ok":
+            # #4065: outside the v0.3 load rule the back-off floor comes from the redline rep scheme.
+            row["back_off_floor_kg"] = back_off_min_kg(float(floor["floor_kg"]), scheme)
         audit["movements"][key] = row
     return audit
 
@@ -346,6 +357,7 @@ def refusal_message(gate: dict[str, Any] | None) -> str | None:
             lines.append(
                 f"{v.get('where')} set {v.get('set')} prescribes {_fmt(v.get('prescribed_kg'))} "
                 f"against a floor of {_fmt(v.get('floor_kg'))} — {_provenance(gate, v)}"
+                + (f" — not a prescribed back-off: {v['back_off_note']}" if v.get("back_off_note") else "")
             )
     return (
         f"Refusing to commit — subtract-only violation (#3927/#3971), {len(lines)} finding(s): "
@@ -371,5 +383,7 @@ def summary(gate: dict[str, Any] | None) -> str:
         f"load_floors status={floors.get('status', '?')}{reason}, source={floors.get('source', '?')}, "
         f"{with_floor}/{len(movements)} movement(s) carry a band-matched floor; "
         f"conditional-up scan ran on routine notes + every exercise note, "
-        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}"
+        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}, "
+        f"{audit.get('back_offs_checked', 0)} back-off set(s) held to their back-off floor "
+        f"(rep scheme {(audit.get('back_off_scheme') or {}).get('status', '?')}, #4065/#4090)"
     )

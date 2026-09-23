@@ -1667,6 +1667,8 @@ TOOLS = {
                         "type": "string",
                         "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence.",
                     },
+                    "owner_override_redteam": {"type": "boolean", "description": "commit (#4066): owner-only override."},
+                    "override_reason": {"type": "string", "description": "commit (#4066): the owner's own words for that override."},
                     "movement_key": {"type": "string", "description": "stall_check: the movement to assess (e.g. 'lat_pulldown')."},
                     "template_id": {"type": "string", "description": "stall_check: exact Hevy template id, when movement_key misses."},
                     "sessions": {"type": "integer", "default": 6, "description": "stall_check: recent sessions to read (3-20)."},
