@@ -140,3 +140,24 @@ def streaks(
         "active_is_floor": _floor(active) or strava_items is None,
         "loaded_is_floor": _floor(loaded),
     }
+
+
+def loaded_streak_flag(loaded: int | None) -> tuple[str, str] | None:
+    """(severity, reason) for the joints critic's `loaded_lifting_streak` flag, or None for no
+    flag. `change` = the rest-day ask (the next session would outrun his whole record); `info`
+    = the record's upper tail. Nothing below `UPPER_TAIL_AT_STREAK`, and nothing for None."""
+    cal = CALIBRATION
+    if loaded is None or loaded < UPPER_TAIL_AT_STREAK:
+        return None
+    if loaded >= REST_ASK_AT_STREAK:
+        return (
+            "change",
+            f"rest day: this would be loaded day {loaded + 1} in a row — longer than any of his "
+            f"{cal['loaded_streaks_n']} loaded streaks in {cal['window']} (max {cal['loaded_streak_max']})",
+        )
+    return (
+        "info",
+        f"loaded day {loaded + 1} in a row — inside his {cal['window']} record but its upper tail "
+        f"({cal['loaded_streak_lengths'][cal['loaded_streak_max']]} of {cal['loaded_streaks_n']} streaks reached "
+        f"{cal['loaded_streak_max']}; median {cal['loaded_streak_median']})",
+    )

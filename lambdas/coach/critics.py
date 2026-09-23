@@ -298,30 +298,11 @@ def build_joints_packet(
     layer_ok = pain_layer_status not in (None, "dark", "unknown")
     if active_day_streak is None:
         unknown.append("active_day_streak")
-    cal = training_streaks.CALIBRATION
+    streak_flag = training_streaks.loaded_streak_flag(loaded_lifting_streak)
     if loaded_lifting_streak is None:
         unknown.append("loaded_lifting_streak")
-    elif loaded_lifting_streak >= training_streaks.REST_ASK_AT_STREAK:
-        flags.append(
-            _flag(
-                "loaded_lifting_streak",
-                "change",
-                f"rest day: this would be loaded day {loaded_lifting_streak + 1} in a row — longer than any of his "
-                f"{cal['loaded_streaks_n']} loaded streaks in {cal['window']} (max {cal['loaded_streak_max']})",
-                provenance=cal["provenance"],
-            )
-        )
-    elif loaded_lifting_streak >= training_streaks.UPPER_TAIL_AT_STREAK:
-        flags.append(
-            _flag(
-                "loaded_lifting_streak",
-                "info",
-                f"loaded day {loaded_lifting_streak + 1} in a row — inside his {cal['window']} record but its upper tail "
-                f"({cal['loaded_streak_lengths'][cal['loaded_streak_max']]} of {cal['loaded_streaks_n']} streaks reached "
-                f"{cal['loaded_streak_max']}; median {cal['loaded_streak_median']})",
-                provenance=cal["provenance"],
-            )
-        )
+    elif streak_flag:
+        flags.append(_flag("loaded_lifting_streak", *streak_flag, provenance=training_streaks.CALIBRATION["provenance"]))
     heavy_axial_cold: list[dict[str, Any]] = []
     dismissed_rows: list[dict[str, Any]] = []  # #4036 — every owner dismissal this packet met
     for ex in draft["exercises"]:
@@ -462,11 +443,8 @@ def build_rate_advocate_packet(
     """The owner's redlines and which tripwires are CLEAR. This critic argues for MORE.
 
     Its deterministic layer never vetoes: an advocate is not a gate. Its `change` is bounded
-    to adding sets, and only where every readable tripwire is clear.
-
-    `current_rate_lb_wk` is THE loss rate (`mcp.shared_quantities`, #4068) — the same number
-    the deficit critic reads. `rate_provisional` True (the post-water window spans < 7 days)
-    carries the number but argues nothing from it, exactly as the deficit critic does."""
+    to adding sets, and only where every readable tripwire is clear. `current_rate_lb_wk` is
+    THE loss rate (`mcp.shared_quantities`, #4068); a `rate_provisional` one argues nothing."""
     tw = tripwires or []
     clear = [t["id"] for t in tw if t.get("state") == "clear"]
     tripped = [t["id"] for t in tw if t.get("state") == "tripped"]
@@ -545,11 +523,9 @@ def build_rate_advocate_packet(
             )
         )
     hi = rt.get("high_lb_wk")
-    if current_rate_lb_wk is not None and rate_provisional:
-        # Carried in `numbers`, deliberately NOT flagged: a flag is an escalation handle
-        # (`reconcile`), and a provisional rate is not evidence to argue from (#4068).
-        pass
-    elif current_rate_lb_wk is not None and hi is not None and current_rate_lb_wk < rt.get("low_lb_wk", 0):
+    # #4068: a provisional rate stays in `numbers` and is never flagged (a flag is an escalation handle).
+    argued = None if rate_provisional else current_rate_lb_wk
+    if argued is not None and hi is not None and argued < rt.get("low_lb_wk", 0):
         flags.append(
             _flag(
                 "current_rate_lb_wk",
@@ -558,7 +534,7 @@ def build_rate_advocate_packet(
                 provenance=rt.get("provenance", "owner"),
             )
         )
-    elif current_rate_lb_wk is not None and hi is not None and current_rate_lb_wk > hi:
+    elif argued is not None and hi is not None and argued > hi:
         flags.append(
             _flag(
                 "current_rate_lb_wk",
