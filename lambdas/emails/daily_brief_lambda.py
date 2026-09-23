@@ -404,7 +404,7 @@ def fetch_range(source, start, end):
         kwargs = with_phase_filter(
             {
                 "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end},
+                "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start, ":e": "DATE#" + end + "~"},
             },
             include_pilot=_source_reads_cross_phase(source),
         )

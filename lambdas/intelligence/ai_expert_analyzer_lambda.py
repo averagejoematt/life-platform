@@ -138,7 +138,7 @@ from experiment import phase_taxonomy as _phase_taxonomy  # noqa: E402 — #2113
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
     start_date = _phase_taxonomy.cycle_read_floor(pk, start_date)  # #2113: genesis floor, EXPERIMENT_SCOPED only
-    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"))
     return _decimal_to_float(resp.get("Items", []))
 
 

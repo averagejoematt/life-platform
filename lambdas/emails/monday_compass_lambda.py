@@ -177,7 +177,7 @@ def query_source(source, start_date, end_date, include_pilot=None):
     items = []
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}"},
+        "ExpressionAttributeValues": {":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}~"},
     }
     while True:
         resp = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))

@@ -212,7 +212,7 @@ def _fetch_range(source, start_date, end_date, include_pilot=False):
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
                 ":s": "DATE#" + start_date,
-                ":e": "DATE#" + end_date,
+                ":e": "DATE#" + end_date + "~",
             },
         }
         while True:

@@ -16,6 +16,8 @@ same byte-identical artifact AC1 pins):
 
 from datetime import datetime, timedelta
 
+from common.digest_utils import filter_day_rows
+
 from web.fingerprint import build_mark, mark_to_svg
 from web.site_api_common import EXPERIMENT_START, PT, _ok, _query_source
 
@@ -46,7 +48,10 @@ def _metrics_index(start_date, end_date):
     same real numbers the vitals page shows."""
     if start_date > end_date:
         return {}
-    whoop = _query_source("whoop", start_date, end_date)
+    # Day rows only (#3442): a `DATE#<d>#WORKOUT#…` row carries its own `strain` and would
+    # overwrite the day's — on every day of the wall, and on the fingerprint's one day since
+    # #4129 made the end bound include end-day sub-rows.
+    whoop = filter_day_rows(_query_source("whoop", start_date, end_date))
     ah = _query_source("apple_health", start_date, end_date)
     garmin = _query_source("garmin", start_date, end_date)
 

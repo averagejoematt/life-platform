@@ -423,7 +423,7 @@ def _find_missing_dates(table, config, logger):
 
     oldest = min(check_dates)
     resp = table.query(
-        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}"),
+        KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{oldest}", f"DATE#{today_str}~"),
         ProjectionExpression="sk",
     )
     existing = {item["sk"][5:] for item in resp.get("Items", [])}

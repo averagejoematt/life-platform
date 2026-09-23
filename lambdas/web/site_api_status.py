@@ -621,7 +621,7 @@ def status(*, _g) -> dict:
 
             _q = {
                 "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source_id}")
-                & Key("sk").between(f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}"),
+                & Key("sk").between(f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}~"),
                 "ProjectionExpression": "sk",
             }
             if field_check:

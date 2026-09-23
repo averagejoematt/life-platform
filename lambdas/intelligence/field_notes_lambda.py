@@ -97,7 +97,7 @@ def genesis_week_label(iso_week):
 
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
-    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"))
     return _decimal_to_float(resp.get("Items", []))
 
 
