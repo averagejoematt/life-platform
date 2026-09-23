@@ -551,13 +551,10 @@ def _nutrition_critics_block() -> dict[str, Any]:
 def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict[str, Any]:
     """Per-draft-exercise evidence for the critics: anchor-lift trend, pain flags, days since.
     Plus the streak and lifting-session count from the performed Hevy record."""
-    from training import owner_redlines
-
     from mcp.recovery_authoring import _consecutive_days
     from mcp.tools_strength import tool_get_exercise_history
     from mcp.tools_training_notes import tool_get_exercise_notes
 
-    drop_t = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "anchor_lift_strength_drop")
     resolver = _safe(_resolver)
     anchor_ids = _safe(_core_anchor_identities) or {}
     exercises: list[dict[str, Any]] = []
@@ -577,7 +574,7 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         sessions = (hist or {}).get("sessions") or []
         # #4069: the trend is computed over ONE template identity (see `_anchor_trend`), and the
         # row says which core anchor family — if any — the drafted lift belongs to.
-        row.update(_anchor_trend(sessions, target_date, float(drop_t["threshold_pct"])))
+        row.update(_anchor_trend(sessions, target_date))
         family = _core_anchor_family(key, row.get("identity") or tid, anchor_ids)
         if family:
             row["anchor_family"] = family
@@ -640,8 +637,8 @@ def _workout_dates(start: str, end: str) -> list[str]:
     return sorted({(w.get("date") or "")[:10] for w in res.get("workouts") or [] if w.get("date")})
 
 
-def _anchor_trend(sessions: list[dict[str, Any]], target_date: str, threshold_pct: float) -> dict[str, Any]:
-    """The anchor-lift trend over ONE template identity — pure, the tripwire's only input (#4069).
+def _anchor_trend(sessions: list[dict[str, Any]], target_date: str) -> dict[str, Any]:
+    """The anchor-lift trend over ONE template identity — pure, the tripwire's only input (#4069, #4098).
 
     `sessions` comes from `get_exercise_history(template_id=…)`, which already selects one
     identity (a raw Hevy template id through the #3929 alias registry). This re-asserts it
@@ -650,7 +647,14 @@ def _anchor_trend(sessions: list[dict[str, Any]], target_date: str, threshold_pc
     DB bench into one '-120 lb' series) compares a lift only with itself. Sessions of any
     other identity are counted in `excluded_other_identity_sessions`, never dropped silently.
     A variant switch therefore starts a NEW series — it can never read as a strength drop.
+
+    #4098: the comparison is the redline's v3 definition — a rolling e1RM median, computed by
+    `plan_engine.anchor_e1rm_trend` over each session's `best_1rm` — never the top weight with
+    its reps thrown away (75 × 5 against 45 × 8 is ~87 vs ~57 lb e1RM, not "75 vs 45").
+    `last_top_lbs` stays on the row for the critic's hold-to load; it is not the comparison.
     """
+    from training import plan_engine
+
     if not sessions:
         return {}
 
@@ -665,14 +669,8 @@ def _anchor_trend(sessions: list[dict[str, Any]], target_date: str, threshold_pc
     last = series[-1]
     out["days_since"] = _days_between(last.get("date"), target_date)
     out["last_top_lbs"] = last.get("best_weight")
-    prior = [s.get("best_weight") for s in series[:-2] if s.get("best_weight")]
-    if prior:
-        best = max(float(w) for w in prior)
-        out["trailing_best_lbs"] = round(best, 1)
-        last_two = [float(s.get("best_weight") or 0) for s in series[-2:]]
-        out["drop_pct"] = round(max(0.0, (best - last_two[-1]) / best * 100.0), 1) if best else None
-        out["sessions_below"] = sum(1 for w in last_two if w < best * (1 - threshold_pct / 100.0))
-        out["n_sessions"] = len(series)
+    out["n_sessions"] = len(series)
+    out.update(plan_engine.anchor_e1rm_trend([s.get("best_1rm") for s in series]))
     return out
 
 
@@ -756,6 +754,7 @@ def _run_stage_2(
             "muscle_defense": critics.build_muscle_defense_packet(
                 draft,
                 anchor_trends={i: e for i, e in by_idx.items() if e.get("drop_pct") is not None},
+                program_week=block.get("program_week"),
                 protein_days_missed_7d=protein_missed,
                 protein_days_measured_7d=protein_measured,
             ),

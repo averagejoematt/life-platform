@@ -37,6 +37,8 @@ sys.path.insert(0, str(REPO / "lambdas"))
 
 from training import owner_redlines, plan_engine, training_context_registry  # noqa: E402
 
+WEEK_7 = "2026-11-04"  # #4098: program week 7 on the v0.3 block calendar (#4064)
+
 _FULL = dict(
     date="2026-09-14",
     weight_lb=319.7,
@@ -102,7 +104,8 @@ def test_absent_walking_volume_is_unknown_not_zero():
 # ── 3. Unknown is not clear ───────────────────────────────────────────────────
 def test_a_tripwire_with_no_input_is_unknown():
     block = plan_engine.constraint_block(
-        **{**_FULL, "protein_days_missed_7d": None, "readiness_low_streak_days": None, "anchor_lift_drop_pct": None}
+        # #4098: a program week past `not_before_week`, so the anchor tripwire reads its input rather than the gate
+        **{**_FULL, "date": WEEK_7, "protein_days_missed_7d": None, "readiness_low_streak_days": None, "anchor_lift_drop_pct": None}
     )
     states = {t["id"]: t["state"] for t in block["tripwires"]}
     assert states["protein_floor_missed"] == "unknown"
@@ -117,6 +120,7 @@ def test_tripwires_can_actually_trip():
     block = plan_engine.constraint_block(
         **{
             **_FULL,
+            "date": WEEK_7,  # #4098: armed — before week 6 the anchor tripwire is not_yet_active
             "protein_days_missed_7d": 4,
             "readiness_low_streak_days": 5,  # v3: 7-day mean < 50 read over 5–7 days; the engine's proxy is the streak
             "anchor_lift_drop_pct": 12.0,
@@ -128,7 +132,7 @@ def test_tripwires_can_actually_trip():
 
 def test_tripwires_can_actually_clear():
     """The other half of the control — a guard that always fires is noise."""
-    block = plan_engine.constraint_block(**_FULL)
+    block = plan_engine.constraint_block(**{**_FULL, "date": WEEK_7})
     assert block["tripped"] == []
     assert {t["state"] for t in block["tripwires"]} <= {"clear", "unknown"}
 
