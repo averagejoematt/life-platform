@@ -121,6 +121,7 @@ def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]
     breaks it (an unmeasured day is not a low day). v3 names a 7-day MEAN < 50; the engine
     computes the simpler consecutive-days proxy, as `owner_redlines` already says.
     """
+    from common.digest_utils import filter_day_rows
     from training import owner_redlines
     from training.plan_engine import ABSENT, MEASURED, input_status
 
@@ -130,7 +131,7 @@ def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]
     threshold = float(t["threshold"])
     start = _minus_days(target_date, STREAK_LOOKBACK_DAYS)
     rows = query_source_cross_phase("whoop", start, target_date) or []
-    daily = [r for r in rows if str(r.get("sk") or "").count("#") == 1]
+    daily = filter_day_rows(rows)  # the #3442 predicate: drops DATE#<day>#WORKOUT#<id> sub-records
     by_day: dict[str, float] = {}
     for r in daily:
         if r.get("recovery_score") is None:
@@ -164,7 +165,7 @@ def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]
         n_days=len(by_day),
         latest_day=latest,
         threshold=threshold,
-        phases_read=sorted({str(r.get("phase") or "unstamped") for r in rows if str(r.get("sk") or "").count("#") == 1}),
+        phases_read=sorted({str(r.get("phase") or "unstamped") for r in daily}),
     )
 
 
