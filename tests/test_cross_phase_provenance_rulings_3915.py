@@ -27,12 +27,14 @@ THE FIXTURES ARE THE WIRE
 WHAT IS PROVED HERE (each assertion is a mutation, not a restatement)
   1. Every family in the live census has a ruling, with a date, and an in-scope ruling
      names its remediation.
-  2. The audit ENUMERATES all four (box 4) — off the live shapes, in one pass.
+  2. The audit ENUMERATES all four (box 4) — off the live shapes, in one pass — and the
+     rendered line names every ruled family every night (0 included) with the three
+     exclusions' reasons.
   3. The ALARMED set does not grow: `wrongly_stamped` is still exactly the inverse_pks
      leg. The census is visibility, not a new page.
   4. The leg can still FAIL: an unruled family, and a ruled family carrying an attribute
-     its ruling does NOT sanction (a `phase` on calibration), both land in
-     `unruled_provenance` rather than being swallowed by the neighbouring entry.
+     its ruling does NOT cover (a `phase` on recall_embeddings or on a chat turn), both
+     land in `unruled_provenance` rather than being swallowed by the neighbouring entry.
   5. The write-time half: a chat turn no longer mints the attribute the strip removes,
      and the reconcile that strips it now reaches the chat-tier partitions.
 """
@@ -97,6 +99,24 @@ def _audit(rows, inverse_pks=()):
     return census.scoped_stamp_audit([rows], inverse_pks=inverse_pks)
 
 
+# The owner's 2026-09-22 rulings (#3915 comment, ~19:35 PT) REVISED two entries of the
+# 2026-09-20 first pass: calibration `excluded:cycle-label` -> `in-scope:remediable`, and
+# the chat tier `in-scope:remediable` -> `excluded:owner-ruled`. recall_embeddings and
+# milestones are unchanged from 2026-09-20.
+_RULED_ON = {
+    "SOURCE#calibration": "2026-09-22",
+    "SOURCE#recall_embeddings": "2026-09-20",
+    "COACH": "2026-09-22",
+    "SOURCE#milestones": "2026-09-20",
+}
+_DISPOSITION = {
+    "SOURCE#calibration": census.RULED_IN_SCOPE,
+    "SOURCE#recall_embeddings": census.RULED_LABEL,
+    "COACH": census.RULED_EXCLUDED,
+    "SOURCE#milestones": census.RULED_LABEL,
+}
+
+
 # ── 1. the rulings themselves ────────────────────────────────────────────────────
 def test_every_measured_family_has_a_dated_ruling():
     """Box 1: each of the four families carries a written ruling — in-scope with a
@@ -105,10 +125,11 @@ def test_every_measured_family_has_a_dated_ruling():
     for family, count in MEASURED_2026_09_20.items():
         ruling = census.CROSS_PHASE_PROVENANCE_RULINGS.get(family)
         assert ruling is not None, f"{family} carries {count} rows and no ruling"
-        assert ruling["ruled_on"] == "2026-09-20"
+        assert ruling["ruled_on"] == _RULED_ON[family]
         assert ruling["ruled_by"] == 3915
-        assert ruling["disposition"] in (census.RULED_LABEL, census.RULED_IN_SCOPE)
+        assert ruling["disposition"] == _DISPOSITION[family]
         assert len(ruling["reason"]) > 120, f"{family}: a ruling is a reason, not a label"
+        assert 20 < len(ruling["summary"]) <= 100, f"{family}: the rendered one-line reason"
         assert ruling["measured_2026_09_20"] == count
 
 
@@ -143,18 +164,19 @@ def test_the_audit_enumerates_every_family_off_the_live_shapes():
         assert entry["attrs"] == ["cycle"], entry  # the live fact: cycle, and only cycle
 
 
-def test_the_three_label_families_are_excluded_and_the_chat_tier_is_remediable():
+def test_three_families_are_excluded_and_calibration_alone_is_remediable():
+    """The owner's 2026-09-22 set: calibration IN SCOPE; recall_embeddings, milestones and
+    the chat tier EXCLUDED, each with its written reason."""
     out = _audit(LIVE_ROWS)
     verdicts = {fam: e["verdict"] for fam, e in out["inverse_census"].items()}
-    assert verdicts["SOURCE#calibration"] == census.RULED_LABEL
+    assert verdicts["SOURCE#calibration"] == census.RULED_IN_SCOPE
     assert verdicts["SOURCE#recall_embeddings"] == census.RULED_LABEL
     assert verdicts["SOURCE#milestones"] == census.RULED_LABEL
-    assert verdicts["COACH"] == census.RULED_IN_SCOPE
+    assert verdicts["COACH"] == census.RULED_EXCLUDED
     assert out["unruled_provenance"] == {}
-    assert sorted(out["remediable"]["COACH"]) == [
-        "COACH#career_coach/CHAT#2026-09-02#0f2b41aa[cycle]",
-        "COACH#eli_marsh/CHAT#2026-08-12#18818e69[cycle]",
-    ]
+    assert out["remediable"] == {
+        "SOURCE#calibration": ["USER#matthew#SOURCE#calibration/CALIB#2026-07-13#void#hyp#genesis_prereg_h1#ca0ed3ee[cycle]"]
+    }
 
 
 def test_the_formatted_line_names_all_four_families():
@@ -163,7 +185,43 @@ def test_the_formatted_line_names_all_four_families():
     line = census.format_inverse_census(_audit(LIVE_ROWS))
     for family in MEASURED_2026_09_20:
         assert family in line
-    assert census.RULED_IN_SCOPE in line and census.RULED_LABEL in line
+    assert census.RULED_IN_SCOPE in line and census.RULED_LABEL in line and census.RULED_EXCLUDED in line
+
+
+def test_the_formatted_line_carries_each_exclusion_reason():
+    """Box 4 as the owner phrased it: the guard enumerates all four, the three excluded
+    ones WITH their reasons — in the rendered sentence, not only in this registry."""
+    line = census.format_inverse_census(_audit(LIVE_ROWS))
+    for family, ruling in census.CROSS_PHASE_PROVENANCE_RULINGS.items():
+        if ruling["disposition"] in census.EXCLUDED_DISPOSITIONS:
+            assert f"({ruling['summary']})" in line, family
+        else:
+            assert f"({ruling['summary']})" not in line, family
+
+
+def test_a_cleared_family_is_still_named_at_zero():
+    """The enumeration may not shrink back to 'whatever is dirty tonight': once the
+    calibration backfill is applied its family must render as 0, not vanish. Mutation
+    control — an empty audit (every family cleared) still names all four."""
+    only_recall = _audit([r for r in LIVE_ROWS if r["pk"] == RECALL_PK])
+    line = census.format_inverse_census(only_recall)
+    assert f"SOURCE#calibration 0 {census.RULED_IN_SCOPE}" in line
+    assert f"COACH 0 {census.RULED_EXCLUDED}" in line
+    assert "SOURCE#recall_embeddings 1 [cycle]" in line
+    empty = census.format_inverse_census({"inverse_census": {}})
+    assert "0 cross-phase row(s)" in empty
+    for family in census.CROSS_PHASE_PROVENANCE_RULINGS:
+        assert f"{family} 0 " in empty, family
+
+
+def test_the_nightly_projection_reads_every_provenance_attr():
+    """#3915 box 2 finding: the projection omitted `tombstoned_at`, so 1,506 calibration
+    rows carrying one were invisible to the census that `forbidden_provenance` would
+    have flagged them in. The projection must cover the whole of PROVENANCE_ATTRS."""
+    projected = set(census.PROVENANCE_PROJECTION["ExpressionAttributeNames"].values())
+    assert set(tax.PROVENANCE_ATTRS) <= projected
+    for placeholder in census.PROVENANCE_PROJECTION["ExpressionAttributeNames"]:
+        assert placeholder in census.PROVENANCE_PROJECTION["ProjectionExpression"]
 
 
 # ── 3. the ALARMED set does not grow ────────────────────────────────────────────
@@ -195,15 +253,46 @@ def test_a_cross_phase_family_with_no_ruling_is_reported_not_swallowed():
 
 
 def test_an_attribute_outside_a_families_own_ruling_is_unruled_not_excluded():
-    """The neighbour clause: calibration's ruling sanctions a `cycle` LABEL and nothing
-    else. A `phase` on the same row is the damaging attribute (it is phase-filtered), and
-    it must not inherit the exclusion written for its neighbour."""
+    """The neighbour clause: recall_embeddings's ruling sanctions a `cycle` LABEL and
+    nothing else. A `phase` on the same row is the damaging attribute (it is
+    phase-filtered), and it must not inherit the exclusion written for its neighbour.
+    (Post-#3915-box-2: calibration itself is no longer a label family — it is
+    `RULED_IN_SCOPE` now, so ANY forbidden attribute on it is remediable rather than
+    unruled; this clause is exercised against a family that is still `RULED_LABEL`.)"""
+    row = {"pk": RECALL_PK, "sk": "DOC#chronicle#2026-02-22", "cycle": 5, "phase": "pilot"}
+    out = _audit([row])
+    assert out["unruled_provenance"]["SOURCE#recall_embeddings"] == [
+        "USER#matthew#SOURCE#recall_embeddings/DOC#chronicle#2026-02-22[phase+cycle]"
+    ]
+    assert out["inverse_census"]["SOURCE#recall_embeddings"]["verdict"] == census.UNRULED
+
+
+def test_a_calibration_row_with_any_forbidden_attribute_is_remediable_not_unruled():
+    """Post-#3915-box-2 shape: since calibration is `RULED_IN_SCOPE` with `allowed=()`,
+    an attribute the writer never should have produced (a `phase`, alongside the
+    familiar `cycle`) still lands in `remediable`, not `unruled` — the in-scope
+    ruling covers the whole family, not just the one attribute historically seen."""
     row = {"pk": CALIBRATION_PK, "sk": "CALIB#2026-07-13#void#hyp#genesis_prereg_h1#ca0ed3ee", "cycle": 5, "phase": "pilot"}
     out = _audit([row])
-    assert out["unruled_provenance"]["SOURCE#calibration"] == [
+    assert out["unruled_provenance"] == {}
+    assert out["remediable"]["SOURCE#calibration"] == [
         "USER#matthew#SOURCE#calibration/CALIB#2026-07-13#void#hyp#genesis_prereg_h1#ca0ed3ee[phase+cycle]"
     ]
-    assert out["inverse_census"]["SOURCE#calibration"]["verdict"] == census.UNRULED
+    assert out["inverse_census"]["SOURCE#calibration"]["verdict"] == census.RULED_IN_SCOPE
+
+
+def test_the_chat_tier_exclusion_covers_cycle_only_and_a_phase_is_unruled():
+    """The neighbour clause for the owner-ruled exclusion: it covers the `cycle` residue
+    of the authorised strip and nothing else. A `phase` on a chat turn is a NEW defect
+    nobody ruled on, and a family mixing the two reports the stricter verdict."""
+    rows = [
+        {"pk": CHAT_TIER_PK, "sk": "CHAT#2026-08-12#18818e69", "cycle": 13},
+        {"pk": CHAT_TIER_PK, "sk": "CHAT#2026-09-21#aaaabbbb", "phase": "experiment"},
+    ]
+    out = _audit(rows)
+    assert out["unruled_provenance"] == {"COACH": ["COACH#eli_marsh/CHAT#2026-09-21#aaaabbbb[phase]"]}
+    assert out["inverse_census"]["COACH"]["verdict"] == census.UNRULED
+    assert out["remediable"] == {}
 
 
 def test_a_clean_cross_phase_row_is_not_in_the_census_at_all():
@@ -215,9 +304,11 @@ def test_a_clean_cross_phase_row_is_not_in_the_census_at_all():
 # ── 5. the write-time half, and the remediation's reach ─────────────────────────
 def test_the_write_side_predicate_agrees_with_the_audit_on_every_live_family():
     """One ruling, both directions (#3792: a writer that re-derives the judgment beside
-    the audit is the same drift with an import in front)."""
+    the audit is the same drift with an import in front). Post-#3915-box-2: calibration
+    flipped to `True`; the chat tier STAYS `True` under its owner-ruled exclusion — an
+    exclusion from the alarm is never a licence to write the label again."""
     assert census.cycle_label_forbidden(CHAT_TIER_PK, "CHAT#2026-09-20#abcd1234") is True
-    assert census.cycle_label_forbidden(CALIBRATION_PK, "CALIB#2026-07-13#void#hyp#x#ca0ed3ee") is False
+    assert census.cycle_label_forbidden(CALIBRATION_PK, "CALIB#2026-07-13#void#hyp#x#ca0ed3ee") is True
     assert census.cycle_label_forbidden(RECALL_PK, "DOC#chronicle#2026-02-22") is False
     assert census.cycle_label_forbidden(MILESTONES_PK, "MILESTONE#days_tracked_100") is False
     # An EXPERIMENT_SCOPED row is none of this function's business — it carries the full

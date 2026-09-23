@@ -29,7 +29,7 @@ But #1199 was forward-only, and two things escaped it:
 What this script does
 ---------------------
 Reads every bet + the whole calibration ledger (read-only), classifies each bet, and
-plans one cycle-stamped ``voided_at_reset`` row per orphan:
+plans one ``voided_at_reset`` row per orphan:
 
   ``graded``          terminal status (confirmed/refuted/inconclusive/…) — nothing owed
   ``live_open``       open and NOT tombstoned — still visible to the grader; the next
@@ -48,12 +48,16 @@ and ``voided_at_reset`` stays outside the Brier curve
 (``calibration_core.outcome_to_binary`` → None) so the reconcile can never flatter the
 calibration record.
 
-Cycle stamping
---------------
-``cycle`` is the cycle the reset actually CLOSED, derived per row from that row's own
-provenance (``tombstoned_reason = experiment_restart_<genesis>``) against the
+Cycle attribution
+-----------------
+The closing cycle is the cycle the reset actually CLOSED, derived per row from that
+row's own provenance (``tombstoned_reason = experiment_restart_<genesis>``) against the
 CYCLE_GENESES registry — not from today's SSM cycle, which would misattribute a
-2026-05 bet to cycle 11. The row's own ``cycle`` attribute is preserved separately as
+2026-05 bet to cycle 11. Since #3915 box 2 (2026-09-22) it is NOT written as a bare
+``cycle`` (a provenance attribute the CROSS_PHASE calibration class forbids): the row
+carries ``reset_genesis``, and ``taxonomy.closing_cycle_for_genesis(reset_genesis,
+CYCLE_GENESES)`` re-derives it. The bet's own tombstone time rides as
+``bet_tombstoned_at`` for the same reason. The row's own ``cycle`` attribute is preserved separately as
 ``bet_cycle_stamp`` (the hypothesis writers stamp the cycle a bet was CREATED in, the
 wipe stamps the cycle it was CLOSED in — the two disagree, so both are recorded rather
 than silently reconciled). ``reconciled_at_cycle`` records when the backfill ran, read
@@ -148,7 +152,7 @@ def classify_bet(kind: str, bet: dict, voided_keys: set, fix_landed: str = taxon
 
 
 def build_reconcile_row(kind: str, bet: dict, klass: str, cycle_geneses: dict, now_iso: str, current_cycle: int | None) -> dict:
-    """The cycle-stamped ledger row for one orphan.
+    """The ledger row for one orphan (closing cycle recoverable from `reset_genesis`, #3915).
 
     Built on top of the pipeline's own ``build_void_calib_item`` so a backfilled row and
     a reset-written row are the same shape — then overlaid with the per-row provenance
@@ -162,7 +166,11 @@ def build_reconcile_row(kind: str, bet: dict, klass: str, cycle_geneses: dict, n
     row["void_class"] = klass
     row["reconciled_by"] = "reconcile_prereg_voids.py (#1978)"
     row["reconciled_at"] = now_iso
-    row["tombstoned_at"] = str(bet.get("tombstoned_at") or "")
+    # #3915 box 2: the bet's own tombstone time is CONTENT on a void row, so it is kept
+    # under a non-provenance name (the `bet_cycle_stamp` precedent below) — a bare
+    # `tombstoned_at` is a PROVENANCE_ATTRS member its CROSS_PHASE class forbids, and
+    # deploy/backfill_calibration_phase_stamp.py moves the existing ones the same way.
+    row["bet_tombstoned_at"] = str(bet.get("tombstoned_at") or "")
     if current_cycle is not None:
         row["reconciled_at_cycle"] = current_cycle
     if bet.get("cycle") is not None:
@@ -225,7 +233,10 @@ def main() -> int:
     if args.show_plan:
         print("\nPlanned ledger rows:")
         for r in rows:
-            print(f"  {r['sk']}  cycle={r.get('cycle')}  class={r['void_class']}  status_at_reset={r.get('status_at_reset')}")
+            # #3915 box 2: the row itself no longer carries a bare `cycle` — the closing
+            # cycle is shown here for readability, re-derived from `reset_genesis`.
+            closing_cycle = taxonomy.closing_cycle_for_genesis(r.get("reset_genesis"), cycle_geneses)
+            print(f"  {r['sk']}  closing_cycle={closing_cycle}  class={r['void_class']}  status_at_reset={r.get('status_at_reset')}")
 
     if not rows:
         print("\n✓ Ledger complete — every open+tombstoned bet already has a void row.")

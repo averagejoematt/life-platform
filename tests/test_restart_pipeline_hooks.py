@@ -352,7 +352,11 @@ def test_void_apply_writes_one_calib_row_per_open_bet():
         assert row["sk"].startswith(f"CALIB#{_GENESIS}#void#")
         assert row["outcome"] == "voided_at_reset"
         assert row["voided_at_reset"] is True
-        assert row["cycle"] == _CLOSING_CYCLE  # stamped with the CLOSING cycle
+        # #3915 box 2: no bare `cycle` (the CROSS_PHASE-forbidding provenance the
+        # inverse census found 2,211 of) — `reset_genesis` carries the closing reset's
+        # date instead, from which the SAME closing cycle is always re-derivable.
+        assert "cycle" not in row
+        assert row["reset_genesis"] == _GENESIS
         assert row["record_type"] in ("hypothesis_void", "prediction_void")
     # None of the terminal/tombstoned bets leaked a row.
     voided_ids = {r.get("hypothesis_id") or r.get("prediction_id") for r in fake.puts}

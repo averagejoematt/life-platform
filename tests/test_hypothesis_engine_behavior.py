@@ -1337,6 +1337,16 @@ class TestCalibrationLedger:
         eng.write_calibration_row(hyp, {"verdict": "inconclusive"}, "expired_undecided")
         assert "predicted_direction" not in table.puts[0]
 
+    def test_the_cross_phase_ledger_row_carries_no_phase_provenance(self, table, frozen_clock):
+        """#3915 box 2: tag_record stamps `phase` on every compute write, and the calibration
+        ledger is CROSS_PHASE — the row must reach put_item with none of PROVENANCE_ATTRS."""
+        from experiment.phase_taxonomy import PROVENANCE_ATTRS
+
+        eng.write_calibration_row(_pending(), {"verdict": "supported"}, "confirmed")
+        item = table.puts[0]
+        assert item["record_type"] == "hypothesis_resolution"
+        assert [a for a in PROVENANCE_ATTRS if a in item] == []
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Downstream coaching context (ADR-104/105 — measured numbers or none)
