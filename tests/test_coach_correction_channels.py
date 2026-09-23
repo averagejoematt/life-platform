@@ -128,6 +128,87 @@ def test_mcp_tool_requires_text_and_number(mcp_tool):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# #4083 — Path 2: the live-session SIGNAL override (no pack number)
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def test_mcp_tool_signal_path_writes_ledger_row_with_named_signal(mcp_tool):
+    tcc, table = mcp_tool
+    res = tcc.tool_log_coach_correction(
+        {"signal": "readiness_low_streak_days", "coach": "physical", "correction": "he was fine — no low-readiness streak"}
+    )
+    assert res["status"] == "logged"
+    assert res["item"]["signal"] == "readiness_low_streak_days"
+    assert res["item"]["surface"] == "chat_coaching"  # default
+    assert res["item"]["coach"] == "physical"
+    assert res["error_class"] == "other"  # no override supplied
+    assert len(table.puts) == 1
+    item = table.puts[0]
+    assert item["item_ref"]["signal"] == "readiness_low_streak_days"
+    assert item["item_ref"]["surface"] == "chat_coaching"
+    assert item["item_ref"]["coach"] == "physical"
+    assert res["correction_id"] == item["sk"]
+
+
+def test_mcp_tool_signal_path_accepts_suffixed_coach_id(mcp_tool):
+    tcc, table = mcp_tool
+    tcc.tool_log_coach_correction({"signal": "toe_flag", "coach": "physical_coach", "correction": "toe is fine now"})
+    assert table.puts[0]["item_ref"]["coach"] == "physical"  # normalized, bare form
+
+
+def test_mcp_tool_signal_path_coach_optional_is_surface_wide(mcp_tool):
+    tcc, table = mcp_tool
+    tcc.tool_log_coach_correction({"signal": "toe_flag", "correction": "toe is fine now"})
+    assert table.puts[0]["item_ref"]["coach"] is None
+
+
+def test_mcp_tool_signal_path_custom_surface(mcp_tool):
+    tcc, table = mcp_tool
+    tcc.tool_log_coach_correction({"signal": "toe_flag", "surface": "plan_critics", "correction": "toe is fine now"})
+    assert table.puts[0]["item_ref"]["surface"] == "plan_critics"
+
+
+def test_mcp_tool_signal_path_class_override_and_unknown_class(mcp_tool):
+    tcc, table = mcp_tool
+    res = tcc.tool_log_coach_correction({"signal": "toe_flag", "correction": "toe is fine", "error_class": "made-up"})
+    assert res["error_class"] == "other"
+    assert "error_class_note" in res
+    assert table.puts[0]["error_class_raw"] == "made-up"
+
+
+def test_mcp_tool_rejects_both_item_number_and_signal(mcp_tool):
+    tcc, table = mcp_tool
+    res = tcc.tool_log_coach_correction({"item_number": 1, "signal": "toe_flag", "correction": "ambiguous"})
+    assert "error" in res
+    assert table.puts == []
+
+
+def test_mcp_tool_requires_signal_text_when_neither_number_nor_signal(mcp_tool):
+    tcc, table = mcp_tool
+    res = tcc.tool_log_coach_correction({"correction": "no anchor at all"})
+    assert "error" in res
+    assert table.puts == []
+
+
+def test_mcp_tool_signal_path_blank_signal_is_reported(mcp_tool):
+    tcc, table = mcp_tool
+    res = tcc.tool_log_coach_correction({"signal": "   ", "correction": "text"})
+    assert "error" in res
+    assert table.puts == []
+
+
+def test_mcp_tool_signal_and_pack_number_paths_are_ranked_together(mcp_tool):
+    """Both correction paths feed the SAME false-positive-by-signal ranking (#4083)."""
+    tcc, table = mcp_tool
+    tcc.tool_log_coach_correction({"signal": "toe_flag", "correction": "toe is fine"})
+    tcc.tool_log_coach_correction({"signal": "toe_flag", "correction": "toe is fine again"})
+    from coach import coach_corrections as cc
+
+    ranking = cc.false_positive_signal_ranking([table.puts[0], table.puts[1]])
+    assert ranking == [{"signal": "toe_flag", "false_positive_count": 2}]
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # Channel 2 — the email-reply parser
 # ════════════════════════════════════════════════════════════════════════════
 @pytest.fixture

@@ -105,6 +105,7 @@ from mcp.tools_descriptions import (
     LOG_COACH_CALIBRATION_DESCRIPTION,
     LOG_COACH_CHECKIN_DESCRIPTION,
     LOG_COACH_CORRECTION_DESCRIPTION,
+    LOG_COACH_CORRECTION_INPUT,
     LOG_DECISION_DESCRIPTION,
     LOG_EVENING_INTAKE_DESCRIPTION,
     LOG_FIELD_NOTE_RESPONSE_DESCRIPTION,
@@ -154,6 +155,7 @@ from mcp.tools_memory import (
 )
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
+from mcp.tools_pending_writes import MANAGE_PENDING_WRITES_DESCRIPTION, MANAGE_PENDING_WRITES_INPUT, tool_manage_pending_writes  # #4078
 from mcp.tools_plan import tool_plan_next_session
 
 # #3668: the three hot-path named tools (cycle / habits / cost) over the same waiter
@@ -1665,6 +1667,8 @@ TOOLS = {
                         "type": "string",
                         "description": "Platform routine_id. Required for dry_run, commit, get, archive, adherence.",
                     },
+                    "owner_override_redteam": {"type": "boolean", "description": "commit (#4066): owner-only override."},
+                    "override_reason": {"type": "string", "description": "commit (#4066): the owner's own words for that override."},
                     "movement_key": {"type": "string", "description": "stall_check: the movement to assess (e.g. 'lat_pulldown')."},
                     "template_id": {"type": "string", "description": "stall_check: exact Hevy template id, when movement_key misses."},
                     "sessions": {"type": "integer", "default": 6, "description": "stall_check: recent sessions to read (3-20)."},
@@ -2097,28 +2101,16 @@ TOOLS = {
         "schema": {
             "name": "log_coach_correction",
             "description": LOG_COACH_CORRECTION_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "item_number": {
-                        "type": "integer",
-                        "description": "The pack item number to correct (the #N from this week's review-pack email).",
-                    },
-                    "correction": {
-                        "type": "string",
-                        "description": "What was wrong and what it should say — Matthew's correction, stored verbatim.",
-                    },
-                    "error_class": {
-                        "type": "string",
-                        "description": (
-                            "Optional error-class override. One of: stale-baseline, ungrounded-behavioral, "
-                            "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other. "
-                            "Unrecognized values are stored as 'other' (original label preserved), never rejected."
-                        ),
-                    },
-                },
-                "required": ["item_number", "correction"],
-            },
+            "inputSchema": LOG_COACH_CORRECTION_INPUT,
+        },
+    },
+    # #4078: chat's "queued pending approval" made real — enqueue / list / approve / discard.
+    "manage_pending_writes": {
+        "fn": tool_manage_pending_writes,
+        "schema": {
+            "name": "manage_pending_writes",
+            "description": MANAGE_PENDING_WRITES_DESCRIPTION,
+            "inputSchema": MANAGE_PENDING_WRITES_INPUT,
         },
     },
     # ── #3668: the surface index, the waiter, and the three hot-path named tools ──

@@ -27,6 +27,7 @@ from datetime import timedelta, timezone
 
 from common.pacific_time import pacific_day_n  # #1955 — THE one PT day-index formula
 from health import weight_trend  # shared weekly-rate + projection
+from training import training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
 from web.site_api_common import (
     CORS_HEADERS,
@@ -170,7 +171,9 @@ def vitals(date: str | None = None, *, _g) -> dict:
     # window. The old code inspected only the single latest apple_health item —
     # usually a steps record — so the Apple fallback engaged same-day only.
     # Time-travel: the latest weigh-in on-or-before the anchor (else the live latest).
-    withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings")
+    # #4088: the LIVE read carries the same genesis DATE clamp as d7/d30 above (#1084), so a
+    # prior-cycle weigh-in is excluded by its date, not by a phase tag on a raw series.
+    withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings", since=EXPERIMENT_START)
     try:
         _ah_start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
         if not ip:
@@ -380,8 +383,11 @@ def _latest_readiness(*, _g) -> dict | None:
     # (pre-#492 records) we serve none rather than the wrong ones.
     # #490/M-3: the TSB component names its provenance — the load behind it is a
     # duration proxy unless the basis says power-backed.
-    _tsb_conf = str((rec.get("tsb_load_basis") or {}).get("confidence") or "")
-    _tsb_label = "training balance" + (" (duration-proxy)" if _tsb_conf and _tsb_conf != "power" else "")
+    # #4075: the label follows `training_load.is_duration_proxy` — an HR-scored window is
+    # measured, so "not power" no longer means "duration proxy".
+    _tsb_basis = rec.get("tsb_load_basis") or {}
+    _tsb_conf = str(_tsb_basis.get("confidence") or "")
+    _tsb_label = "training balance" + (" (duration-proxy)" if training_load.is_duration_proxy(_tsb_basis) else "")
     label_map = {"recovery": "recovery", "sleep": "sleep", "hrv_trend": "HRV trend", "tsb": _tsb_label}
     components = [
         {"key": c.get("key"), "label": label_map.get(c.get("key"), c.get("key")), "score": round(float(c["score"]), 1)}

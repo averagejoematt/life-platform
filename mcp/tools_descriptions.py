@@ -125,7 +125,15 @@ GET_DAILY_SNAPSHOT_DESCRIPTION = (
 
 FIND_DAYS_DESCRIPTION = "Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet' — these day totals sum MEASURED distance only: WHOOP-synced indoor/trainer walks and rides carry no distance, so a distance filter will not find a day whose activities were all unmeasured (a returned Strava day carries 'activities_without_distance' when it holds any); use search_activities with sport_type to see them. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor."
 
-GET_INTELLIGENCE_QUALITY_DESCRIPTION = "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong source-of-truth values. Use for: 'are the coaches accurate?', 'any quality issues?', 'intelligence validation results'."
+GET_INTELLIGENCE_QUALITY_DESCRIPTION = (
+    "Query intelligence quality validation results from the post-generation validator. Shows flags where coaches "
+    "made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong "
+    "source-of-truth values. Also carries `owner_correction_signals` (#4083): every Matthew-logged correction "
+    "(`log_coach_correction`, both the weekly-pack and live-session-signal paths) ranked by which SIGNAL "
+    "(metric/flag id) produced the most false positives — a DIFFERENT ledger than the validator flags above, "
+    "read here rather than on a new schedule. Use for: 'are the coaches accurate?', 'any quality issues?', "
+    "'intelligence validation results', 'which flags get overridden most', 'false positive rate by signal'."
+)
 
 GET_COACH_THREAD_DESCRIPTION = "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'"
 
@@ -539,7 +547,9 @@ MANAGE_HEVY_ROUTINE_DESCRIPTION = (
     "'get' (one IR by routine_id), 'archive' (RENAME only — Hevy has no DELETE, and folder_id is create-only "
     "so the routine is NOT moved out of its folder), 'floor' (≈20-min variant), 're_entry' (deliberately "
     "easy after a break), 'adherence' (programmed-vs-performed), 'stall_check' (prescribed-vs-performed stall verdict for ONE movement — pass movement_key; it returns 'unknown', NEVER 'stall', when he performed exactly what was prescribed at a fixed load x reps, because e1RM is constant by construction there, and it labels any verdict that leaned on RPE as self-reported). Typical custom flow: draft_custom → dry_run "
-    "→ commit. Subtract-only autoregulation on the 'draft' path. TITLES ARE AUTO-RENDERED: the compiler names "
+    "→ plan_next_session(routine_id) (stage 2) → commit. Commit REFUSES (REDTEAM_BINDING, #4066) any routine that is not the "
+    "one stage 2 verdicted, unchanged since — only the owner may override (owner_override_redteam + override_reason). "
+    "Subtract-only autoregulation on the 'draft' path. TITLES ARE AUTO-RENDERED: the compiler names "
     "every routine 'Phase - Type - N - Y' (e.g. 'Foundation - Push - 2 - 2') from config + performed history "
     "— DO NOT pass a title; leave it to the compiler. `title` and `force_title` are DRAFT-TIME arguments, read "
     "only by draft_custom: passing either to 'commit' does nothing and the result returns a warning naming it. "
@@ -695,7 +705,9 @@ GET_CAPTURE_QUEUES_DESCRIPTION = (
     "deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, "
     "mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, "
     "and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a "
-    "dark source proposes nothing, skipping records nothing. Each section fails soft "
+    "dark source proposes nothing, skipping records nothing. (8) pending_writes — #4078: writes an "
+    "earlier chat QUEUED for Matthew's approval (manage_pending_writes), each with age_days and an "
+    "overdue flag past 3 days; unlike the rest, name these once and ask approve or discard. Each section fails soft "
     "independently: a broken sub-query never blocks the others, it just reports "
     "{status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, "
     "journal interview, speak-to-the-coaches, open check-in) instead of calling the "
@@ -703,17 +715,46 @@ GET_CAPTURE_QUEUES_DESCRIPTION = (
 )
 
 LOG_COACH_CORRECTION_DESCRIPTION = (
-    "#1690 (epic #1687): correct a weekly AI-review-pack item by its NUMBER. Matthew reads the "
+    "#1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two "
+    "paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the "
     "ranked review-pack email (each generation carries a stable #N) and corrects an item that's "
     "wrong or misleading — this resolves #N back to the exact archived generation the pack numbered "
-    "and writes ONE row to the corrections ledger, tagged by error-class, so the mistake compounds "
-    "toward not recurring. Args: item_number (the #N, required), correction (what's wrong + what it "
-    "should say, required), error_class (OPTIONAL override — one of stale-baseline, "
-    "ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, "
-    "defense-held, other; an unrecognized value is stored as 'other', never rejected). An unknown "
-    "or out-of-range number is REPORTED (with how many items the week's pack has), never silently "
-    "dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows."
+    "and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range "
+    "number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the "
+    "email-reply channel — a reply of '#N <correction>' lines lands the same rows. "
+    "Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, "
+    "open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to "
+    "resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' "
+    "or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults "
+    "'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), "
+    "error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, "
+    "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an "
+    "unrecognized value is stored as 'other', never rejected). Every logged correction, from either "
+    "path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal "
+    "so that ranking can attribute it."
 )
+
+# #4078: moved out of `mcp/registry.py` to pay for `manage_pending_writes` under the #1665
+# ceiling (2,128 of 2,130 logical lines) — the #3891/#4036 idiom: the parameter table moves, the
+# schema NAME stays inline in the registry, and the catalog resolves this by name (byte-identical).
+LOG_COACH_CORRECTION_INPUT = {
+    "type": "object",
+    "properties": {
+        "item_number": {"type": "integer", "description": "Path 1 (#1690): the pack #N. One of item_number/signal."},
+        "signal": {"type": "string", "description": "Path 2 (#4083): live-session override — the metric/flag id."},
+        "coach": {"type": "string", "description": "Path 2 only. Optional bare coach id; omitted = surface-wide."},
+        "surface": {"type": "string", "description": "Path 2 only. Optional; defaults to 'chat_coaching'."},
+        "correction": {"type": "string", "description": "What was wrong and what it should say, verbatim."},
+        "error_class": {
+            "type": "string",
+            "description": (
+                "Optional error-class override: stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, "
+                "framing, checkable-metric, hedged-safe, defense-held, other. Unrecognized -> 'other', never rejected."
+            ),
+        },
+    },
+    "required": ["correction"],
+}
 
 DESCRIBE_PLATFORM_SURFACES_DESCRIPTION = (
     "THE INDEX — call this FIRST whenever you are about to say the platform does not hold something. Lists every "

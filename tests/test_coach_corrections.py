@@ -390,3 +390,50 @@ def test_open_corrections_for_does_not_transition_status():
     t = FakeDdbTable(rows=rows)
     cc.open_corrections_for(t, surface="coach_brief", coach="metabolic_coach")
     assert t.updates == []  # no status write happened on read
+
+
+# ── #4083 — false_positive_signal_ranking: pure, fixture over PLANTED corrections ──────
+
+
+def test_false_positive_signal_ranking_counts_and_sorts_descending():
+    rows = [
+        cc.build_correction_item({"surface": "plan_critics", "signal": "readiness_low_streak_days"}, "a", "other"),
+        cc.build_correction_item({"surface": "chat_coaching", "signal": "readiness_low_streak_days"}, "b", "other"),
+        cc.build_correction_item({"surface": "chat_coaching", "signal": "readiness_low_streak_days"}, "c", "other"),
+        cc.build_correction_item({"surface": "chat_coaching", "signal": "toe_flag"}, "d", "other"),
+    ]
+    ranking = cc.false_positive_signal_ranking(rows)
+    assert ranking == [
+        {"signal": "readiness_low_streak_days", "false_positive_count": 3},
+        {"signal": "toe_flag", "false_positive_count": 1},
+    ]
+
+
+def test_false_positive_signal_ranking_ties_break_alphabetically():
+    rows = [
+        cc.build_correction_item({"signal": "b_signal"}, "x", "other"),
+        cc.build_correction_item({"signal": "a_signal"}, "y", "other"),
+    ]
+    ranking = cc.false_positive_signal_ranking(rows)
+    assert [r["signal"] for r in ranking] == ["a_signal", "b_signal"]
+
+
+def test_false_positive_signal_ranking_excludes_rows_with_no_signal():
+    # A weekly-pack correction (build_item_ref's shape) carries no `signal` key at all —
+    # nothing here invents one for it; it must not silently count under None/"".
+    rows = [
+        cc.build_correction_item({"pack_number": 3, "surface": "coach_brief"}, "the baseline is stale", "stale-baseline"),
+        cc.build_correction_item({"surface": "chat_coaching", "signal": "toe_flag"}, "d", "other"),
+    ]
+    ranking = cc.false_positive_signal_ranking(rows)
+    assert ranking == [{"signal": "toe_flag", "false_positive_count": 1}]
+
+
+def test_false_positive_signal_ranking_empty_input_is_empty_ranking():
+    assert cc.false_positive_signal_ranking([]) == []
+
+
+def test_false_positive_signal_ranking_respects_limit():
+    rows = [cc.build_correction_item({"signal": f"signal_{i}"}, "x", "other") for i in range(5)]
+    ranking = cc.false_positive_signal_ranking(rows, limit=2)
+    assert len(ranking) == 2

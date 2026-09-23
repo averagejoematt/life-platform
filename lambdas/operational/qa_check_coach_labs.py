@@ -21,6 +21,8 @@ import re
 import urllib.error
 import urllib.request
 
+from health.labs_draw_claims import schedules_a_past_draw as _schedules_a_past_draw
+
 from operational.qa_check import CONTENT_TRUTH, Check
 from operational.qa_check_reader_truth import SITE_BASE_URL
 
@@ -68,40 +70,9 @@ _POSITIVE_LABS_CLAIM = re.compile(r"\b(\d{1,3})\s+(?:total\s+)?(?:lab|blood)\s+(
 # green while it is live. So assert the FACT, not the wording: when the store's newest
 # draw is in the PAST, no served text may talk about arranging one, unless it is
 # explicitly talking about the NEXT panel (which is honest and must stay sayable).
-_SCHEDULING_VERB = r"(?:schedul\w*|book\w*|arrang\w*|plan(?:ning|s|ned)?\s+(?:for|to)|prepare\s+for|mark\s+your\s+calendar)"
-_DRAW_NOUN = r"(?:draw|panel|bloodwork|blood\s+work|lab\s+order)"
-_SCHEDULING_A_DRAW = re.compile(_SCHEDULING_VERB + r"[^.!?;\n]{0,40}?\b" + _DRAW_NOUN + r"\b", re.IGNORECASE)
-
-# An honest forward-looking sentence names a FUTURE panel rather than borrowing the date
-# of a past one. These make the sentence legitimate, so they are not findings.
-_FUTURE_PANEL = re.compile(r"\b(?:next|another|a\s+second|follow[-\s]?up|upcoming|re[-\s]?test|repeat)\b", re.IGNORECASE)
-
-
-# The third live shape, and the plainest: an INSTRUCTION anchored to a past draw —
-#     "Report any unusual fatigue or cold sensitivity BEFORE THE APRIL DRAW"
-# — which has no scheduling verb at all. The discriminator against ordinary past tense
-# ("His HbA1c before the April draw was 5.9") is that the sentence OPENS with a bare
-# imperative: the coach is telling him to do something ahead of an event that is over.
-_DIRECTIVE_OPENER = re.compile(
-    r"^\s*(?:Report|Verify|Execute|Document|Confirm|Ensure|Bring|Fast|Avoid|Mark|Check|Make\s+sure|Be\s+sure|Remember)\b",
-    re.IGNORECASE,
-)
-_AHEAD_OF_A_DRAW = re.compile(
-    r"\b(?:before|ahead\s+of|prior\s+to|in\s+advance\s+of)\s+(?:the\s+)?(?:\w+\s+){0,2}?" + _DRAW_NOUN + r"\b", re.IGNORECASE
-)
-
-
-def _schedules_a_past_draw(text):
-    """Sentences that arrange, or instruct ahead of, a draw without naming a future one."""
-    out = []
-    for sentence in _SENTENCE_SPLIT.split(text or ""):
-        if _FUTURE_PANEL.search(sentence):
-            continue  # naming the NEXT panel is honest and must stay sayable
-        arranging = _SCHEDULING_A_DRAW.search(sentence)
-        instructing = _DIRECTIVE_OPENER.search(sentence) and _AHEAD_OF_A_DRAW.search(sentence)
-        if arranging or instructing:
-            out.append(" ".join(sentence.split())[:120])
-    return out
+# The detector itself lives in `health.labs_draw_claims` (#4134) — the coach quality gate
+# imports the same function to refuse the draft before it ships; this nightly catches
+# anything that still reaches the serving edge. One detector, so the two cannot drift.
 
 
 def _zero_claim_is_framed(text):

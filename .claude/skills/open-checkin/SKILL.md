@@ -43,7 +43,9 @@ takeaway to its tool, per the CHAT_MODES.md contract:
 |---|---|
 | An insight, hypothesis, or pattern worth tracking and following up on | `save_insight(text, tags?, source="chat")` — capture the `insight_id` if you'll want `update_insight_outcome` later |
 | A decision — followed or overrode platform/coach advice, and why | `log_decision(decision, followed?, override_reason?, source="mcp", pillars?)` |
-| Durable context that should compound — a failure pattern, what worked, a calibration correction, a journey milestone | `write_platform_memory(category, content, date?)` — pick the category from the 7-value enum; don't force a fit, skip this row if nothing durable came up |
+| Durable context that should compound — a failure pattern, what worked, a calibration correction, a journey milestone | `write_platform_memory(category, content, date?)` — pick the category from the enum; don't force a fit, skip this row if nothing durable came up |
+| A standing training constraint (a gate, a toe flag, a back flag) | `write_platform_memory(category='training', content)` (#4077) — its own narrow category, read by `plan_next_session` stage 1 |
+| Matthew overrides a coach's flag/verdict he brought up in conversation | `log_coach_correction(signal=<metric/flag id>, correction=<verbatim>, coach?)` (#4083) — name the SIGNAL, not a pack number; feeds the false-positive-by-signal ranking (`get_intelligence_quality`) |
 | An answer to an open coach check-in question, if one happened to come up | `log_coach_checkin(checkin_id, answer, ...)` VERBATIM — only if you actually pulled `get_coach_checkin_queue` and asked; don't invent a checkin_id |
 | A habit why/trigger/reward, if he volunteered one | `log_habit_reflection(habit, trigger?, reward?, why_missed?, context?)` |
 | An evening drinks count, if mentioned | `log_evening_intake(count, date?)` |

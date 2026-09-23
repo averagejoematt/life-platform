@@ -44,6 +44,7 @@ import pytest
 from training.routine_ir import deserialize
 
 from mcp import hevy_prescription_gate as gate, tools_hevy_routine as t
+from tests.redteam_binding_testkit import bind
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "subtract_only_3927")
 
@@ -95,7 +96,9 @@ def _offline(monkeypatch):
 
 
 def _commit(ir, *, create=None):
-    """Drive the real `commit` action over one IR and return the tool result."""
+    """Drive the real `commit` action over one IR and return the tool result. The IR carries a
+    #4066 stage-2 binding over its own content — this file is about the subtract-only gate."""
+    bind(ir)
     created = create or {"routine": {"id": "hevy-1", "updated_at": "2026-09-19T23:00:00Z", "folder_id": 42}}
     with (
         patch("training.routine_repo.get_current", return_value=ir),

@@ -82,6 +82,10 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
+if str(ROOT / "deploy") not in sys.path:
+    sys.path.insert(0, str(ROOT / "deploy"))
+import doc_drift_verdict as _verdict  # noqa: E402 — #4123: the bot-owned counter verdict, imported not restated
+from doc_drift_verdict import registry_tool_count  # noqa: E402
 from web import site_api_status as sas  # noqa: E402
 from web.site_api_common import STATUS_CACHE_TTL, USER_PREFIX  # noqa: E402
 
@@ -1410,6 +1414,29 @@ def test_a_shallow_dead_letter_queue_does_not_move_the_traffic_light(monkeypatch
     assert body["overall"] == "green"
 
 
+def assert_counter_matches_or_skip_off_main(literal, discovered):
+    """#4123: enforce `literal == discovered` on main; off main, skip VISIBLY when the delta is
+    this branch's own tool additions (literal == the merge-base registry's count, or the base is
+    unknowable in a shallow checkout), and still FAIL when the counter has drifted on its own."""
+    base_src = _verdict.merge_base_file_text("mcp/registry.py", cwd=ROOT)
+    base_count = registry_tool_count(base_src) if base_src else None
+    verdict = _verdict.bot_owned_counter_verdict(literal, discovered, base_count)
+    if verdict == _verdict.VERDICT_PENDING_RECONCILE:
+        pytest.skip(
+            f"#4123: mcp_tools literal {literal} vs registry {discovered} (merge-base registry {base_count}) — "
+            "bot-owned (#3101/#3984), the reconcile job writes it on main after the merge; main runs enforce"
+        )
+    assert verdict == _verdict.VERDICT_SUCCESS, (
+        f"mcp_tools literal {literal} != registry {discovered}"
+        + (
+            f" and != merge-base registry {base_count}: the counter drifted on its own, not by this branch's tools"
+            if base_count is not None
+            else ""
+        )
+        + " — on main run: python3 deploy/sync_doc_metadata.py --apply"
+    )
+
+
 def test_the_published_mcp_tool_count_matches_the_registry(monkeypatch):
     """#2220: the panel published a hand-typed 'MCP server · 116 tools' while the
     registry held 76. The count now comes from PLATFORM_STATS, which
@@ -1418,17 +1445,21 @@ def test_the_published_mcp_tool_count_matches_the_registry(monkeypatch):
     PLATFORM_STATS is the seam, and this test is what keeps the seam honest."""
     import re
 
-    registry = ast.parse((ROOT / "mcp" / "registry.py").read_text())
-    tool_count = None
-    for node in ast.walk(registry):
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "TOOLS" for t in node.targets):
-            tool_count = len(node.value.keys)
+    tool_count = registry_tool_count((ROOT / "mcp" / "registry.py").read_text())
     assert tool_count, "mcp/registry.py no longer defines TOOLS as a dict literal"
 
     desc = by_id(Harness(monkeypatch, healthy_platform().build()).body(), "infrastructure", "mcp_server")["description"]
     published = re.search(r"(\d+)\s+tools", desc)
     assert published, f"the MCP row stopped publishing a tool count: {desc!r}"
-    assert int(published.group(1)) == tool_count
+    # The SEAM is always enforced: the row publishes the counter, verbatim, on every ref.
+    from web.platform_counts import DISCOVERED_COUNTS
+
+    assert int(published.group(1)) == DISCOVERED_COUNTS["mcp_tools"], "the MCP row no longer publishes PLATFORM_STATS['mcp_tools']"
+    # The COUNTER vs the registry is bot-owned (#3101/#3984): on main it must match; off main a
+    # branch that adds a tool cannot carry the new count (the hook restores the file), so the
+    # equality is pending-reconcile exactly when the literal still equals the merge-base's
+    # registry count — the delta is this branch's own tools (#4123, the 84-vs-85 red on #4119).
+    assert_counter_matches_or_skip_off_main(DISCOVERED_COUNTS["mcp_tools"], tool_count)
 
 
 def test_wednesday_chronicle_description_is_cadence_derived_not_hand_typed(monkeypatch):

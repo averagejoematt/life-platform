@@ -466,6 +466,28 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritua
 LEDGER_NAME = "evening_nudge"
 
 
+def _run_named_human_contact_leg(today: str, dry_run: bool) -> None:
+    """#4063: the named-human contact path rides this daily cron (no new schedule).
+
+    Fail-soft and independent of the nudge: it runs BEFORE the nudge's replay guard and
+    early returns, has its own episode de-dup in DDB, and nothing it does can stop the
+    nudge. It never logs the contact's name or address (see coach.named_human_contact)."""
+    try:
+        from coach import named_human_contact
+
+        named_human_contact.run_leg(
+            table=table,
+            ses_client=ses,
+            today=today,
+            user_id=USER_ID,
+            owner_recipient=RECIPIENT,
+            event_dry_run=dry_run,
+            log=logger.info,
+        )
+    except Exception as e:
+        logger.error(f"[contact] NAMED-HUMAN-CONTACT-FAILED leg raised ({type(e).__name__}) — nudge unaffected")
+
+
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     try:
@@ -473,6 +495,7 @@ def lambda_handler(event, context):
         # a UTC "today" is tomorrow in PT — so every manual source reads "not logged".
         # See AUDIT BUG-02.
         today = pacific_today()
+        _run_named_human_contact_leg(today, dry_run)
 
         # DIL-025 / #3113 replay guard. The period key is the PACIFIC day the
         # nudge is about — the same reason BUG-02 made the rest of this handler

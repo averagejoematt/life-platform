@@ -9,8 +9,10 @@ parser + fallback. Everything with real I/O (screenshot capture, Bedrock
 calls, SES, gh) only runs for real inside the scheduled workflow.
 """
 
+import json
 import os
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
@@ -178,3 +180,76 @@ def test_fallback_board_shape_from_ranked():
     assert len(board) == 1
     assert board[0]["title"] == "some finding"
     assert "reddit_newcomer" in board[0]["audience"]
+
+
+# ── #4035 box 4: the per-run artifact + the full-vision-outage red ─────────────
+
+
+def test_write_run_artifact_records_tier_and_findings(tmp_path):
+    """The artifact's whole job is naming the budget tier and finding count the run
+    saw, so a 50s no-op run's own recorded shape says so — never inferred from
+    wall-clock duration."""
+    fed.write_run_artifact(str(tmp_path), status="ran", budget_tier=1, findings_count=3, ok=True)
+    out = json.loads((tmp_path / fed.RUN_SUMMARY_FILENAME).read_text(encoding="utf-8"))
+    assert out["budget_tier"] == 1
+    assert out["findings_count"] == 3
+    assert out["status"] == "ran"
+    assert out["ok"] is True
+    assert "generated_at" in out
+
+
+def test_write_run_artifact_creates_missing_dir(tmp_path):
+    target = tmp_path / "does" / "not" / "exist"
+    fed.write_run_artifact(str(target), status="skipped_budget", budget_tier=2, findings_count=0, ok=True)
+    assert (target / fed.RUN_SUMMARY_FILENAME).exists()
+
+
+def test_is_full_vision_outage_true_when_every_call_fails():
+    assert fed.is_full_vision_outage(screenshots_attempted=8, vision_call_failures=8) is True
+
+
+def test_is_full_vision_outage_false_when_some_calls_succeed():
+    assert fed.is_full_vision_outage(screenshots_attempted=8, vision_call_failures=3) is False
+
+
+def test_is_full_vision_outage_false_when_nothing_attempted():
+    # An empty page set is a config question (e.g. DOOR_PATHS pruned to nothing),
+    # never mistaken for a systemic vision outage.
+    assert fed.is_full_vision_outage(screenshots_attempted=0, vision_call_failures=0) is False
+
+
+def test_main_reds_when_every_vision_call_fails(tmp_path):
+    """MUTATION PROOF for box 4: reproduces the 2026-08-30 shape — screenshots
+    captured fine, every Bedrock vision call raises, zero findings, zero
+    UNREAD_PAGES. Before this fix that combination returned 0 (a clean-looking
+    50s run); this test pins that it now returns 1 AND the per-run artifact
+    records the outage rather than a false "ok": true.
+    """
+    shot = tmp_path / "home_desktop.png"
+    shot.write_bytes(b"0" * 1024)  # > vision_read's 256-byte legibility floor
+    fake_pages = [{"page": "Home", "path": "/", "screenshots": [{"kind": "page", "path": str(shot)}]}]
+
+    def _always_fails_vision_read(bedrock, page_name, path, screenshot_path, viewport, model_name=None):
+        fed.VISION_CALL_FAILURES.append(f"{page_name} ({viewport}) — simulated Bedrock outage")
+        return []
+
+    with (
+        patch.object(fed, "_read_budget_tier", return_value=0),
+        patch.object(fed, "_import_bedrock", return_value=object()),
+        patch.object(fed, "capture_screenshots", return_value=fake_pages),
+        patch.object(fed, "vision_read", side_effect=_always_fails_vision_read),
+        patch.object(fed, "fetch_open_issue_titles", return_value=[]),
+        patch.object(fed, "synthesize_board", return_value=[]),
+        patch.object(fed, "audit_log"),
+        patch.object(fed, "email_board"),
+        patch.object(sys, "argv", ["fresh_eyes_discovery.py", "--screenshot-dir", str(tmp_path)]),
+    ):
+        rc = fed.main()
+
+    assert rc == 1
+    out = json.loads((tmp_path / fed.RUN_SUMMARY_FILENAME).read_text(encoding="utf-8"))
+    assert out["ok"] is False
+    assert out["budget_tier"] == 0
+    assert out["findings_count"] == 0
+    assert out["screenshots_attempted"] == 1
+    assert out["vision_call_failures"] == 1

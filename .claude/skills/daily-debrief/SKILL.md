@@ -116,7 +116,16 @@ review today's actual session before looking ahead at all.
   `save_insight`; a decision Matthew made against/with platform advice → `log_decision`
   (outcome later via `update_decision_outcome`); anything that belongs in the compounding
   substrate (a calibration correction, a failure pattern, what worked) →
-  `write_platform_memory` with the matching category.
+  `write_platform_memory` with the matching category. **A standing training constraint he
+  states (a gate, a toe flag, a back flag) → `write_platform_memory(category='training')`
+  (#4077)** — its own narrow category, not `constraints_preferences`, so
+  `plan_next_session` stage 1 reads it directly as `standing_constraints_from_chat`.
+- **Matthew overrides a coach's read mid-session** — a flag he says is stale, a verdict
+  he disagrees with — **log it: `log_coach_correction(signal=<the metric/flag id that
+  was wrong>, correction=<his words, verbatim>, coach=<bare id>)` (#4083)**. No pack
+  number is needed for this path — name the SIGNAL, not an item number. This is what
+  feeds `get_intelligence_quality`'s false-positive-by-signal ranking; an override that
+  isn't logged doesn't count toward it.
 
 ### 4. SYNTHESIZE current state (only as deep as authoring needs — don't fan out)
 

@@ -27,6 +27,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
+import v4_apply_chrome as _apply_chrome  # noqa: E402 — #4035: the same post-build normalizer write_page() runs
 import v4_build_game_explained as gx  # noqa: E402
 
 PAGE_PATH = os.path.join(os.path.dirname(__file__), "..", "site", "method", "game", "index.html")
@@ -38,8 +39,19 @@ def _page() -> str:
 
 
 def test_committed_page_matches_generator():
-    """The drift check: config/engine changed => regenerate, or this goes red."""
-    assert _page() == gx.render(gx.load_config()), (
+    """The drift check: config/engine changed => regenerate, or this goes red.
+
+    #4035: `main()` writes the committed page through `_apply_chrome.write_page()`
+    (#3721's sanctioned single writer), which runs the chrome AND glossary passes
+    (`v4_glossary.apply_glossary()`) AFTER `render()` returns — this page carries a
+    registered term ("REM"), so its committed bytes are `render()`'s output PLUS that
+    post-pass, never `render()` alone. Comparing raw `render()` output directly
+    against committed (as this test did pre-#4035) is stale by construction the
+    moment any generator's page introduces a glossary term; the fix is the same
+    normalizer `write_page()` itself runs, applied here without touching disk.
+    """
+    normalized, *_ = _apply_chrome.rewrite(gx.render(gx.load_config()), self_path=gx.CANONICAL)
+    assert _page() == normalized, (
         "site/method/game/index.html is stale against config/character_sheet.json + the engine — "
         "run `python3 scripts/v4_build_game_explained.py` and commit the result"
     )

@@ -425,6 +425,7 @@ _HERE = "tests/test_sentinel_canfail_2578.py"
 _REPL = "tests/test_raw_replication_dil027.py"
 _LR = "tests/test_security_log_retention_3278.py"
 _EV = "tests/test_sentinel_events_3279.py"
+_PC = "tests/test_producer_census_4034.py"
 
 PROOF_INDEX: dict[str, dict[str, object]] = {
     # ── the ten defined in deploy/drift_sentinel.py ───────────────────────────
@@ -545,6 +546,15 @@ PROOF_INDEX: dict[str, dict[str, object]] = {
             "denied (names the grant), one unreadable region (partial is not clean), and a zero-group sweep (#1189)."
         ),
     },
+    "sentinel::deploy/sentinel_producer_census.py::check_producer_census": {
+        "detect": (_PC, "test_check_drifts_on_a_planted_silent_producer_in_the_real_population"),
+        "cannot_observe": (_PC, "test_check_is_error_when_invocations_are_unreadable"),
+        "note": (
+            "NEW 2026-09-23 (#4034). The sweep's first AWS/Lambda Invocations read: every EMF-ledger producer graded on "
+            "its cadence. Detect proved over the REAL derived population with one planted silent member; cannot-observe "
+            "proved on a denied read and on a vacuous (zero-graded) population."
+        ),
+    },
 }
 
 
@@ -657,4 +667,6 @@ def test_json_report_is_still_parseable_with_the_new_verdicts():
     proven = [g for g in payload["gates"] if g["verdict"] == "can-fail (proven)"]
     # 17 -> 18 on 2026-08-30: #3278 added sentinel::deploy/sentinel_log_retention.py::check_log_retention
     # with both halves proved in tests/test_security_log_retention_3278.py. Move only with a new proof to cite.
-    assert len(proven) == len(PROOF_INDEX) == 18
+    # 18 -> 19 on 2026-09-23: #4034 added sentinel::deploy/sentinel_producer_census.py::check_producer_census
+    # with both halves proved in tests/test_producer_census_4034.py.
+    assert len(proven) == len(PROOF_INDEX) == 19

@@ -12,6 +12,7 @@ from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 # The MCP package depends on boto3 + config at import time; conftest sets the
 # path. Importing the tool module is enough.
 from mcp import hevy_resolution as res, tools_hevy_routine as t
+from tests.redteam_binding_testkit import bind
 
 # The dry_run/commit paths render the routine title via routine_title.build_title_context,
 # which reads DynamoDB (phase state + routine index + performed history). Unit tests must
@@ -120,6 +121,7 @@ def test_commit_handles_orphan_created():
         archetype="upper",
         exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
+    bind(ir)  # #4066
     captured: dict = {}
 
     def fake_put(updated):
@@ -464,6 +466,7 @@ def _commit_patches(ir, **folders_kwargs):
 
 
 def _commit(ir, extra=(), args=None, **folders_kwargs):
+    bind(ir)  # #4066 — these tests are about foldering/title warnings, not the red-team binding
     with ExitStack() as stack:
         for cm in [*_commit_patches(ir, **folders_kwargs), *extra]:
             stack.enter_context(cm)
@@ -586,6 +589,7 @@ def test_commit_update_branch_says_the_folder_cannot_change():
     ir = _push_ir("r-update")
     ir.hevy_routine_id = "existing-id"
     ir.hevy_updated_at = "2026-09-06T10:00:00Z"
+    bind(ir)  # #4066
     with (
         patch("training.routine_repo.get_current", return_value=ir),
         patch("training.routine_repo.put_versioned"),

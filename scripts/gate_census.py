@@ -460,6 +460,34 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
         ),
         proved_on="2026-08-21",
     ),
+    # ── #4063: the named-human contact path's no-health-data + no-identity contract ─
+    "structural::test_named_human_contact_4063.py": Proof(
+        gate_name="test_named_human_contact_4063.py",
+        command="python3 -m pytest tests/test_named_human_contact_4063.py -q -p no:randomly",
+        mutation=(
+            "two plants, one at a time, each restored from a byte copy: (a) in "
+            'lambdas/coach/named_human_contact.py the rung-1 span word `"about a week"` '
+            'changed to `"about 7 days"` — a number in the contact-facing body; (b) the line '
+            "`named_human planted: someone@<a real-looking .net domain>` appended to the "
+            "tracked docs/DATA_GOVERNANCE.md — a contact-shaped address in the public tree."
+        ),
+        observed=(
+            "(a) exit 1, 10 failed / 74 passed — `test_body_has_no_digit_address_or_health_term` "
+            "and `test_body_passes_the_sensitive_content_filter` (both quiet params) plus every "
+            "end-to-end send test, because `render_email` refuses the body at runtime "
+            "(`body_contract_failed`). (b) exit 1, 1 failed / 83 passed — "
+            "`test_no_tracked_file_carries_a_named_contact`. Baseline 84 passed; reverted 84 passed."
+        ),
+        scope=(
+            "The body contract is a digit / address / fixed health-vocabulary tripwire over a "
+            "FIXED template — it cannot judge free prose, and there is none. The repo grep reads "
+            "tracked files only (git ls-files, working-tree bytes), skips binaries and files over "
+            '2 MB, and flags an address only in the `"contact": {"email": …}` shape or in a file '
+            "naming the named human; reserved and verified-sender domains are allowed. It cannot "
+            "see the private S3 object or a contact written in any other shape."
+        ),
+        proved_on="2026-09-23",
+    ),
 }
 
 # Family 6 (#3129/#3160) — the fifteen drift-sentinel per-check verdicts, kept in their
