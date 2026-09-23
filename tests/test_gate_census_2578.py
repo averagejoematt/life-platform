@@ -889,7 +889,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # carrying the pre-#4071 loop shape; baseline 63 passed | mutated 1 failed :: test_no_second_per_muscle_set_computation_in_mcp_or_training
         # | reverted 63 passed). MEASURED by id-set diff: lane {proven 130, unproven 540, not-applicable 6, attempted-unproven 5} vs a
         # disposable `git archive origin/main` export at 24996c6c2 {129, 540, 6, 5} — exactly one entrant, none leaves.
-        # Upper bound 130 -> 131 (2026-09-22, #4068): structural::test_shared_quantities_4068.py — the AST derivation guard that
+        # Upper bound 131 -> 132 (2026-09-23, #4075): structural::test_training_load.py, the TRIMP-exponent sweep, PROVEN
+        # (ARMED 1/1) via the harness. PRIOR: Upper bound 130 -> 131 (2026-09-22, #4068): structural::test_shared_quantities_4068.py — the AST derivation guard that
         # weekly walking hours and the loss rate reach every named critic/tool (get_benchmark included) through mcp.shared_quantities
         # and that nothing else builds the walking layer — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked mcp/_census_probe_4068.py calling walking_volume.build; baseline 24 passed | mutated 1 failed ::
@@ -899,12 +900,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # planner and chat commit gate each name it) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
-        # Upper bound 132 -> 133 (2026-09-23, #3597): structural::test_obligation_carriers_3597.py — the residue-registry
+        # 132 -> 133 (2026-09-23, #4075 on top of #4107): structural::test_training_load.py, PROVEN (ARMED 1/1).
+        # Upper bound 133 -> 134 (2026-09-23, #3597, re-merged on top of #4075's 133): structural::test_obligation_carriers_3597.py — the residue-registry
         # derivation guard (every `*_RESIDUE` binding and tests/*_baseline.json registered with carrier + condition + expiry +
         # shrink consumer) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: a git-added
         # tests/_census_probe_3597.py binding PROBE_RESIDUE; baseline 32 passed | mutated 1 failed ::
         # test_the_live_residue_registry_meets_its_contract | reverted 32 passed). Unproven stays; one entrant.
-        <= 133
+        <= 134
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

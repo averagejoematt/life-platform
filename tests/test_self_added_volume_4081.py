@@ -6,6 +6,11 @@ THE DEFECT (#4081)
   never looked — while cycle 17's Hevy record showed 4 sets performed against 3 prescribed on
   most movements, week after week, against a subtract-only program.
 
+  #4111 (2026-09-23, owner ruling) amended the tripwire's ACTION only: it no longer reads the
+  signal as an anxiety tell, no longer enforces subtract-only, and no longer asks about mood —
+  it is an end-of-week report. This file still pins the COMPUTATION (`evaluate`'s state and
+  set-level evidence), which #4111 does not touch.
+
 WHAT IS PINNED HERE
   * FIRE — two consecutive complete Mon–Sun weeks above the committed routine's sets trips the
     row, and the row carries the set-level evidence (day, movement, prescribed → performed).
@@ -146,7 +151,7 @@ def test_the_redline_is_marked_evaluated_and_leaves_the_unevaluated_list():
 def test_two_complete_weeks_above_the_prescription_trip_the_row():
     row = _row(_block(_fire_rows()))
     assert row["state"] == "tripped"
-    assert row["action_if_tripped"].startswith("read as an anxiety tell")
+    assert row["action_if_tripped"].startswith("an end-of-week report")
     ev = row["evidence"]
     assert ev["run_weeks"] == 2 and ev["threshold_weeks"] == THRESHOLD
     weeks = {w["week_start"]: w for w in ev["weeks"]}
