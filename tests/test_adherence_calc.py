@@ -485,3 +485,33 @@ def test_movement_with_no_resolvable_title_still_stays_unprescribed():
     movement = result["movements"][0]
     assert movement["intensity"]["status"] == "unprescribed"
     assert movement["intensity"]["ceiling_rpe"] is None
+
+
+def test_a_tmpl_movement_the_catalog_knows_by_template_id_gets_the_default_and_its_muscle():
+    """LIVE SPECIMEN (2026-09-23, deployed c1e902a9): the 09-22 legs session keyed its
+    movements `tmpl:<id>`, and 7 of 9 read `status: unprescribed, basis: null` with
+    `per_muscle: {unknown: 100}` — the #4108 catalog holds these templates by NAME with the id
+    as `hevy_template_id_hint`, and the resolver only looked the catalog up by movement_key.
+    `tmpl:75A4F6C4` is Leg Extension (Machine) in the shipped catalog."""
+    ir = RoutineSpec(
+        routine_id="r-tmpl-hint",
+        target_date="2026-09-22",
+        archetype="legs",
+        exercises=[ExerciseBlock(movement_key="tmpl:75A4F6C4", sets=[Set(), Set(), Set()])],
+    )
+    performed = {"exercises": [{"exercise_template_id": "75A4F6C4", "sets": _sets(8.0, 9.0, 9.5)}]}
+    result = calculate_adherence(ir, performed)
+
+    movement = result["movements"][0]
+    assert movement["intensity"]["basis"] == "program_default:accessory", movement
+    assert movement["intensity"]["ceiling_rpe"] == 9.0
+    assert movement["intensity"]["sets_over_ceiling"] == 1
+    assert result["per_muscle"] == {"quadriceps": 100.0}, result["per_muscle"]
+
+
+def test_the_template_id_lookup_is_exact_and_case_insensitive():
+    catalog = {"movements": {"leg_extension_machine": {"title": "Leg Extension (Machine)", "hevy_template_id_hint": "75A4F6C4"}}}
+    assert adherence_calc._catalog_entry_for("tmpl:75a4f6c4", catalog)["title"] == "Leg Extension (Machine)"
+    assert adherence_calc._catalog_entry_for("tmpl:75A4F6C", catalog) == {}  # a prefix is not a match
+    assert adherence_calc._catalog_entry_for("leg_extension_machine", catalog)["title"] == "Leg Extension (Machine)"
+    assert adherence_calc._catalog_entry_for("unknown_key", catalog) == {}

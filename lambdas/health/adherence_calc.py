@@ -216,6 +216,22 @@ _ACCESSORY_DEFAULT_RPE: float = RIR_RPE_ANCHOR - min(EXPOSURES["accessory"]["rir
 _ANCHOR_DEFAULT_RPE: float = float(max(EXPOSURES["heavy"]["top_rpe"]))  # the tightest numeric ceiling EXPOSURES names
 
 
+def _catalog_entry_for(movement_key: str, catalog: dict[str, Any]) -> dict[str, Any]:
+    """The catalog entry for one IR movement_key — by key, or for the ADR-069 `tmpl:<id>` form
+    by the entry whose `hevy_template_id_hint` IS that id (#4073, live 2026-09-23).
+
+    Chat-authored routines key their movements `tmpl:<id>`, and since #4108 the catalog holds
+    the whole Hevy history keyed by name with the template id as a hint. A by-key lookup alone
+    therefore missed 7 of 9 movements on the 09-22 legs session — no default ceiling, and
+    `per_muscle: {unknown: 100}`. Case-insensitive: Hevy ids appear in both cases."""
+    movements = catalog.get("movements", {}) or {}
+    entry = movements.get(movement_key)
+    if entry or not (movement_key or "").startswith("tmpl:"):
+        return entry or {}
+    tid = movement_key[len("tmpl:") :].upper()
+    return next((e for e in movements.values() if str(e.get("hevy_template_id_hint") or "").upper() == tid), {})
+
+
 def _movement_title_for_classification(movement_key: str, catalog: dict[str, Any], alias_titles: dict[str, str]) -> str:
     """The Hevy-catalog title for one movement_key, for `program_structure.classify_movement`
     — which matches against TITLE substrings ("bench press", "pulldown") and would silently
@@ -225,7 +241,7 @@ def _movement_title_for_classification(movement_key: str, catalog: dict[str, Any
     catalog entry of its own — the exact case the #3929 alias specimen is) falls back to the
     alias registry's OWN `titles` map, keyed by the plain template id — the same file already
     read for aliasing, not a second title source (#4073)."""
-    entry = (catalog.get("movements", {}) or {}).get(movement_key) or {}
+    entry = _catalog_entry_for(movement_key, catalog)
     if entry.get("title"):
         return str(entry["title"])
     if movement_key and movement_key.startswith("tmpl:"):
@@ -426,7 +442,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "intensity": intensity,
             }
         )
-        muscle = catalog["movements"].get(p["movement_key"], {}).get("primary_muscle", "unknown")
+        muscle = _catalog_entry_for(p["movement_key"], catalog).get("primary_muscle", "unknown")
         per_muscle_programmed[muscle] = per_muscle_programmed.get(muscle, 0) + p["sets"]
         per_muscle_performed[muscle] = per_muscle_performed.get(muscle, 0) + performed_sets
 
