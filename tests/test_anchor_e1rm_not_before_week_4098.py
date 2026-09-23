@@ -178,8 +178,15 @@ def _draft():
 
 
 def _muscle_packet(week: int, trend: dict[str, Any]) -> dict[str, Any]:
+    """A CORE-anchor row (#4112's tier gate) — this file exercises the redline mechanics
+    (ramp gate, engine/critic agreement), not the tier split; test_plan_critics_3752.py and
+    test_the_critic_never_escalates_an_accessory_drop_4112 below hold the tier gate itself."""
     return critics.build_muscle_defense_packet(
-        _draft(), anchor_trends={0: trend}, protein_days_missed_7d=0, protein_days_measured_7d=7, program_week=week
+        _draft(),
+        anchor_trends={0: {**trend, "anchor_family": "bench"}},
+        protein_days_missed_7d=0,
+        protein_days_measured_7d=7,
+        program_week=week,
     )
 
 
@@ -198,6 +205,39 @@ def test_the_critic_and_the_engine_agree_on_every_trend():
         engine = _anchor_state(_week_start(7), trend)["state"] == "tripped"
         critic = any(f["severity"] == "change" for f in _muscle_packet(7, trend)["flags"] if f["metric"] == "anchor_drop_pct[0]")
         assert engine == critic, sets
+
+
+# ── #4112: the tier gate — only a CORE anchor can reach change/veto ──────────
+def test_the_critic_never_escalates_an_accessory_drop_4112():
+    """The exact numbers that trip a CORE anchor (armed week, past threshold, enough sessions
+    below) produce only `info` when the row carries no `anchor_family` — the owner ruling
+    ("B more ancillary tracked") applied to the per-exercise critic, not just the engine's
+    `_worst_anchor` filter (#4069) which only ever fed the tripwire a core row to begin with.
+
+    MUTATION CONTROL: dropping the `is_core` gate in `critics_muscle_defense.build_muscle_defense_packet`
+    (i.e. `tripped = plan_engine.anchor_drop_tripped(...)` unconditionally) makes this red —
+    the severity would read `change`.
+    """
+    trend = tp._anchor_trend(_sessions([(75, 5)] * 6 + [(45, 8)] * 3), _week_start(7))
+    assert "anchor_family" not in trend  # `_anchor_trend` never sets it; `_gather_draft_evidence` does, only for core rows
+    packet = critics.build_muscle_defense_packet(
+        _draft(), anchor_trends={0: trend}, protein_days_missed_7d=0, protein_days_measured_7d=7, program_week=7
+    )
+    rows = [f for f in packet["flags"] if f["metric"] == "anchor_drop_pct[0]"]
+    assert [f["severity"] for f in rows] == ["info"]
+    assert "accessory" in rows[0]["reason"] and "never a change or veto" in rows[0]["reason"]
+    assert packet["numbers"]["anchor_is_core_anchor[0]"] is False
+    # the positive control: the SAME trend, marked a core anchor, DOES escalate (proves the
+    # negative result above is the gate, not a broken fixture)
+    core = critics.build_muscle_defense_packet(
+        _draft(),
+        anchor_trends={0: {**trend, "anchor_family": "hinge"}},
+        protein_days_missed_7d=0,
+        protein_days_measured_7d=7,
+        program_week=7,
+    )
+    core_rows = [f for f in core["flags"] if f["metric"] == "anchor_drop_pct[0]"]
+    assert [f["severity"] for f in core_rows] == ["change"]
 
 
 def _drop_writers(src: str) -> list[tuple[str, int]]:
@@ -241,7 +281,9 @@ def test_one_computation_ast_guard():
     APPLIED in exactly one — the engine row, the tools_plan trend and the critic only read them."""
     engine_src = (REPO / "lambdas/training/plan_engine.py").read_text()
     plan_src = (REPO / "mcp/tools_plan.py").read_text()
-    critic_src = (REPO / "lambdas/coach/critics.py").read_text()
+    # #4112: build_muscle_defense_packet moved to this cohesive sibling when critics.py hit
+    # its size ceiling — the re-export in critics.py carries no logic, so this guard reads it.
+    critic_src = (REPO / "lambdas/coach/critics_muscle_defense.py").read_text()
 
     assert {f for f, _ in _drop_writers(engine_src)} == {"anchor_e1rm_trend"}
     assert _drop_writers(plan_src) == [] and _drop_writers(critic_src) == []

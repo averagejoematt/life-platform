@@ -841,6 +841,12 @@ from sentinel_cadence import check_sentinel_cadence  # noqa: E402,F401
 # Lambda@Edge replica groups nobody hand-set). Declared side = cdk/stacks/constants.py.
 from sentinel_log_retention import check_log_retention  # noqa: E402,F401
 
+# ── 14. producer census dead-man (#4034) ──────────────────────────────────────
+# Own module: every Lambda that can write a deploy/emf_namespace_ledger.py namespace,
+# graded on AWS/Lambda Invocations against its cadence — the EMF ledger, not the CDK
+# schedule list, is the population. Read that module's docstring for the windows.
+from sentinel_producer_census import check_producer_census  # noqa: E402,F401
+
 CODEQL_ALERT_BUDGET = 0
 
 # The one-time fix for a scope-gapped code-scanning read (#2578), carried in the
@@ -1033,6 +1039,7 @@ def run_sweep():
         "raw_replication": check_raw_replication(),
         "sentinel_cadence": check_sentinel_cadence(),
         "log_retention": check_log_retention(),
+        "producer_census": check_producer_census(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -1079,6 +1086,7 @@ def _summary(status, checks):
         ("raw_replication", "raw/ cross-region backup not verified"),
         ("sentinel_cadence", "sentinel cadence gap — a missed/stale weekly drift-log record"),
         ("log_retention", "security-tier log retention diverges from docs/DATA_GOVERNANCE.md"),
+        ("producer_census", "producer(s) silent past their stale window (#4034 census)"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -1148,7 +1156,7 @@ def print_summary(record):
                 detail = f" — {c.get('detail', '')}"
             elif name == "raw_replication":
                 detail = f" — {c.get('detail', '')}"
-            elif name in ("sentinel_cadence", "log_retention"):
+            elif name in ("sentinel_cadence", "log_retention", "producer_census"):
                 detail = f" — {c.get('detail', '')}"
         elif st == "pending":
             detail = _pending_detail(c)

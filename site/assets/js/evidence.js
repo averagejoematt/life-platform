@@ -255,7 +255,16 @@ async function renderCenter({ scrollToTop = false } = {}) {
   const main = $("[data-main]");
   main.querySelector("[data-crumb]").innerHTML = `${esc(DOOR)} / ${esc(t.slug)}`;
   { const _ti = main.querySelector("[data-title]"); _ti.innerHTML = domainIcon(t.slug, { cls: "dom-ico dom-ico-lead" }) + esc(t.title); }
-  main.querySelector("[data-blurb]").textContent = t.blurb;
+  // #4035: an unconditional overwrite here discarded the server's already-glossed
+  // topic-lede (v4_glossary.py wraps its first-appearance terms in `<abbr
+  // class="gloss">` at build time) on EVERY render, including the initial page
+  // load — the newcomer's actual first screen. Only touch the DOM when the topic
+  // actually changed (flattened text differs from the incoming plain blurb); a
+  // same-topic render — first paint, or a re-select of the current slug — leaves
+  // the server-rendered markup (and its gloss wraps) untouched. A genuine client-
+  // side topic switch still gets plain text — no client-side glossing, by design
+  // (see v4_glossary.py's module docstring on the declared JSON-tile residual).
+  { const be = main.querySelector("[data-blurb]"); if (be.textContent.trim() !== String(t.blurb || "").trim()) be.textContent = t.blurb; }
   const ro = main.querySelector("[data-readout]");
   const deeper = main.querySelector("[data-deeper]");
   { const staleToc = main.querySelector(".stoc"); if (staleToc) staleToc.remove(); } // #1015 — never carry a TOC across topics

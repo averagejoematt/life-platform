@@ -131,10 +131,26 @@ def evaluate_issue(issue: Issue, open_children: tuple = ()) -> list:
             findings.append(Finding("no-outcome-verdict", issue.number, "no comment carries the ADR-099 `**Outcome:**` verdict"))
 
     # The closing verdict = the LAST verdict-shaped comment (a correction supersedes).
+    #
+    # #3597: the residual leg reads the WHOLE close-time narrative, not only the verdict line's
+    # comment. #2643's close put its "**Fast-follow, not done here:** whoop and habitify" in the
+    # `**Shipped**` evidence comment posted beside the verdict, so a verdict-only scan passed it
+    # and the fast-follow went unticketed until #3504 re-found it. The close-time narrative is
+    # the closing verdict plus every human comment posted from `grace` before `closedAt` on —
+    # working notes from before the close are not a closing statement and stay out.
     if verdicts:
         _t, body = verdicts[-1]
-        for block in cc.unhomed_residuals(body):
-            findings.append(Finding("unhomed-residual", issue.number, f"names a residual with no home: {block.splitlines()[0][:100]!r}"))
+        close_window = issue.closed_at - timedelta(minutes=cc.POST_CLOSE_GRACE_MINUTES)
+        narrative = [body] + [b for (t, _login, b) in human if t >= close_window and b is not body]
+        seen: set = set()
+        for text in narrative:
+            for block in cc.unhomed_residuals(text):
+                if block in seen:
+                    continue
+                seen.add(block)
+                findings.append(
+                    Finding("unhomed-residual", issue.number, f"names a residual with no home: {block.splitlines()[0][:100]!r}")
+                )
 
     # #3595: an instrument closes on its first non-degraded live output, never on the merge.
     # The class is the label (a sweep sees labels, never a diff); the proof is structural.

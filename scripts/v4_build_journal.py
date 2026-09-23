@@ -27,8 +27,15 @@ published surface (lambdas/privacy_guard) — a blocked-vice / real-name leak ab
 the build before anything is written.
 
 Chrome (doors nav, footer, loop-forward close) is emitted from the single source
-scripts/v4_chrome.py, so the page lands already-normalized and v4_apply_chrome.py
-(run last in the deploy) is a no-op on it.
+scripts/v4_chrome.py, and the page is written through v4_apply_chrome.write_page()
+(#3721's sanctioned single writer) — which ALSO runs the glossary first-appearance
+pass (#4035) — so the committed page lands already fully normalized and
+v4_apply_chrome.py (run last in the deploy) is a no-op on it. Before #4035 this
+generator wrote raw `out_path.write_text(...)`, bypassing write_page entirely; any
+essay whose body used a registered glossary term drifted against the next
+`v4_apply_chrome.py --check` the moment the generator re-ran (#4035, found via a
+full-suite pytest-xdist run: tests/test_build_journal_1566.py's own
+test_write_then_check_is_clean regenerates this page for real).
 
 stdlib only; run from the repo root:
     python3 scripts/v4_build_journal.py                 # dry-run (default) — prints, writes nothing
@@ -41,6 +48,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import re
 import sys
 from datetime import datetime
@@ -51,6 +59,7 @@ _REPO = _HERE.parent
 sys.path.insert(0, str(_HERE))
 sys.path.insert(0, str(_REPO / "lambdas"))
 
+import v4_apply_chrome as _apply_chrome  # noqa: E402  — #3721/#4035: the sanctioned single writer + glossary pass
 import v4_chrome  # noqa: E402  — the single-source doors nav / footer / loop-forward
 from privacy import privacy_guard  # noqa: E402  — the fail-closed publish gate (ADR-104)
 
@@ -412,7 +421,14 @@ def build(write: bool, check: bool) -> int:
     for post in posts:
         slug = slug_for(post)
         out_path = ESSAYS_DIR / slug / "index.html"
-        html_text = render(post)
+        raw_html = render(post)
+        # #4035: compare/write the CHROME+GLOSSARY-NORMALIZED text, never raw render()
+        # output — write_page() (the #3721 sanctioned single writer) is what actually
+        # lands on disk, and it also runs the glossary first-appearance pass, so a
+        # staleness check against raw_html alone is stale by construction the moment
+        # an essay body uses a registered term.
+        rel = os.path.relpath(out_path, _apply_chrome.SITE_ROOT)
+        html_text, *_ = _apply_chrome.rewrite(raw_html, self_path=rel)
         current = out_path.read_text(encoding="utf-8") if out_path.exists() else None
         changed = current != html_text
 
@@ -421,8 +437,7 @@ def build(write: bool, check: bool) -> int:
                 stale.append(str(out_path.relative_to(_REPO)))
             continue
         if write:
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(html_text, encoding="utf-8")
+            _apply_chrome.write_page(out_path, raw_html)
             print(f"  ✅ wrote {out_path.relative_to(_REPO)} ({len(html_text)} bytes)")
         else:
             state = "would UPDATE" if changed else "up to date"

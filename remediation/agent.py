@@ -34,6 +34,7 @@ from datetime import datetime, timezone, timedelta
 import boto3
 
 import drift_report
+import signal_identity
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 MODE_PARAM = "/life-platform/remediation-mode"
@@ -48,11 +49,45 @@ MODEL_PATH = os.path.join(ROOT, "model", "platform_model.json")
 # SECURITY_TIER_LOG_FUNCTIONS precedent) so the stack and every sweep read ONE list.
 sys.path.insert(0, os.path.join(ROOT, "cdk"))
 try:
-    from stacks.constants import is_by_construction_flag  # noqa: E402
+    from stacks.constants import ALARM_TYPE_SUPPRESSOR, alarm_type, is_by_construction_flag, suppression_holds  # noqa: E402,F401
 except Exception:  # pragma: no cover — a checkout without cdk/ must not kill triage
+    ALARM_TYPE_SUPPRESSOR = "suppressor"
 
     def is_by_construction_flag(_name):  # type: ignore[misc]
         return False
+
+    def alarm_type(_name):  # type: ignore[misc]
+        return "incident"
+
+    def suppression_holds(_name, _transitioned, _now):  # type: ignore[misc]
+        return False
+
+
+def _suppressed(alarm, now):
+    """#4034: exclude by TYPE and WINDOW — never by a name written in this sweep, and
+    never past the member's declared window (that is when the dead-man below fires)."""
+    return suppression_holds(alarm.get("name", ""), alarm.get("transitioned") or alarm.get("updated"), now)
+
+
+def suppressor_overdue_item(alarm, now):
+    """The #4034 suppressor dead-man's needs-human line, or None. A suppressor red past
+    its declared window is withholding its composite's page with nobody told — the one
+    state the #3503 exclusion used to hide."""
+    name = alarm.get("name", "")
+    if alarm_type(name) != ALARM_TYPE_SUPPRESSOR or _suppressed(alarm, now):
+        return None
+    from stacks.constants import SUPPRESSOR_REGISTRY, suppressor_red_hours
+
+    row = SUPPRESSOR_REGISTRY.get(name, {})
+    hours = suppressor_red_hours(name, alarm.get("transitioned") or alarm.get("updated"), now)
+    red = _fmt_age(hours) if hours is not None else "an UNREADABLE duration"
+    return {
+        "issue": f"Suppressor '{name}' has been in ALARM for {red}, past its declared {row.get('window_hours')}h window (#4034) "
+        f"— while it is red it withholds the page of {', '.join(row.get('composites', ()))}.",
+        "action": f"Check its end condition: {row.get('end_condition', '?')} If the window really ended, the gauge is stuck — "
+        "fix the emitter; if a new window legitimately began, say so here. Never widen the window to clear this line.",
+        "signal": {"check": name, "state_ts": alarm.get("transitioned") or alarm.get("updated"), "kind": "alarm"},
+    }
 
 
 _ssm = boto3.client("ssm", region_name=REGION)
@@ -110,6 +145,7 @@ def stale_mode_escalation():
         "`auto` was retired 2026-08-30 (#2833) — the agent has no self-merge path in any mode, so this run proceeded as shadow.",
         "action": f"Reset it so the parameter says what the pipeline does: aws ssm put-parameter --name {MODE_PARAM} "
         "--value shadow --type String --overwrite --region us-west-2",
+        "signal": {"check": f"remediation-mode:{_stale_mode}", "state_ts": "", "kind": "check"},
     }
 
 
@@ -218,8 +254,8 @@ def ack_ratchet_escalations(signals, ledger, now=None):
     out = []
     for a in signals.get("alarms", []) or []:
         name = a.get("name", "")
-        if a.get("by_construction") or is_by_construction_flag(name):
-            # #3503: this ratchet exists to ask "is the stored conclusion still true?".
+        if _suppressed(a, now_dt) or suppressor_overdue_item(a, now_dt):
+            # #3503 / #4034: this ratchet exists to ask "is the stored conclusion still true?".
             # For a by-construction gauge the answer is permanently "it is red on purpose",
             # so the ratchet only manufactured renewals — 7 of them on the genesis gauge.
             continue
@@ -239,6 +275,7 @@ def ack_ratchet_escalations(signals, ledger, now=None):
                     "renews forever is a mute button, not an acknowledgement — and a wrong conclusion renews just as "
                     "silently as a right one (the 2026-07-28 'duplicate, covered by source-specific alarms' ack was "
                     "false for three sources and was still being renewed a week later).",
+                    "signal": {"check": f"{name}#ack-ratchet", "state_ts": a.get("transitioned") or a.get("updated"), "kind": "alarm"},
                     "action": f"Re-verify the stored conclusion for '{name}' against current reality — do not re-ack it "
                     "unchanged. Either fix the underlying condition, file/point at a tracking issue and add the alarm to "
                     "docs/alarm_citations.json, or retire the alarm. This escalation repeats every run until the alarm "
@@ -410,8 +447,12 @@ def aged_alarm_escalations(signals, now=None, audience=None):
     for a in signals.get("alarms", []) or []:
         if a.get("acked"):
             continue
-        if a.get("by_construction") or is_by_construction_flag(a.get("name", "")):
+        if _suppressed(a, now_dt):
             continue  # #3503: a gauge whose ALARM state is its designed normal is not an aged incident
+        overdue = suppressor_overdue_item(a, now_dt)
+        if overdue:
+            out.append((a.get("name", "?"), overdue))  # #4034: the suppressor dead-man
+            continue
         age = _alarm_age_hours(a, now_dt)
         name = a.get("name", "?")
         is_reader = audience.get(name) == "reader"
@@ -432,7 +473,9 @@ def aged_alarm_escalations(signals, now=None, audience=None):
                     f"(> {threshold}h aging threshold) — an aged, unresolved sensor whose only "
                     f"consumer is the daily alert digest (#1204).{reader_note}",
                     "action": f"Investigate and resolve '{name}', or ack it if the state is expected. "
-                    "This aging escalation repeats each run until the alarm clears or is acknowledged.",
+                    "This aging escalation is sent ONCE per ALARM episode and then carried, with its renewal count, "
+                    "until the alarm clears or is acknowledged (#4034).",
+                    "signal": {"check": name, "state_ts": a.get("transitioned") or a.get("updated"), "kind": "alarm"},
                 },
             )
         )
@@ -497,7 +540,7 @@ def stale_secret_signals(now=None, sm_client=None):
                 continue
             age_days = (now_dt - last_changed.replace(tzinfo=timezone.utc)).days
             if age_days > MANUAL_ROTATION_STALE_DAYS:
-                out.append({"name": name, "age_days": age_days})
+                out.append({"name": name, "age_days": age_days, "last_changed": last_changed.isoformat()})
         except Exception as e:
             print(f"[warn] describe_secret {name}: {e}")
     return out
@@ -529,8 +572,9 @@ def stale_secret_escalations(signals, now=None):
                     "raw daily SNS (#1329 evidence: 12+ consecutive unactioned days); now routed here as a "
                     "persistent tracked item instead.",
                     "action": f"Rotate {name} per docs/SECRETS_ROTATION.md{rotate_hint}. Rotation is human-only "
-                    "(gate:owner) — this line recurs every curated Mon/Wed/Fri run until the secret's "
-                    "LastChangedDate advances.",
+                    "(gate:owner) — this line is carried on every curated Mon/Wed/Fri run, with its renewal count, "
+                    "until the secret's LastChangedDate advances (#4034).",
+                    "signal": {"check": f"secret:{name}", "state_ts": s.get("last_changed", ""), "kind": "secret"},
                 },
             )
         )
@@ -589,12 +633,17 @@ def gather_signals(event_payload):
                     "metric": a.get("MetricName"),
                     "namespace": a.get("Namespace"),
                     "updated": str(a.get("StateUpdatedTimestamp", "")),
+                    # #4034: the episode start — a suppressor's window is measured from here.
+                    "transitioned": str(a.get("StateTransitionedTimestamp", "") or a.get("StateUpdatedTimestamp", "")),
                     # A composite has no MetricName/Namespace; label it so triage does not
                     # read the two Nones as a broken metric alarm.
                     "composite": "AlarmRule" in a,
                     # #3503: a gauge whose ALARM state IS its designed normal. Labelled, not
                     # triaged — the agent acked the genesis-window gauge 7 times as an incident.
-                    "by_construction": is_by_construction_flag(name),
+                    "by_construction": _suppressed(
+                        {"name": name, "transitioned": str(a.get("StateTransitionedTimestamp", "") or a.get("StateUpdatedTimestamp", ""))},
+                        datetime.now(timezone.utc),
+                    ),
                 }
             )
     except Exception as e:
@@ -879,11 +928,17 @@ def email_report(report, mode):
         f"<p><b>Mode:</b> {mode} · {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}</p>"
         + block("✅ Auto-fixed", af, lambda i: f"{i.get('summary','')} — {i.get('pr','')}")
         + block("🔀 PRs awaiting you", prs, lambda i: f"{i.get('summary','')} — {i.get('pr','')}")
-        + block("👤 Needs you", nh, lambda i: f"<b>{i.get('issue','')}</b>: {i.get('action','')}")
+        + block("👤 Needs you", nh, lambda i: f"<b>{i.get('issue','')}</b>: {i.get('action','')} <code>{i.get('signal_id', '')}</code>")
+        # #4034: a line whose state has not moved is carried, never re-sent as new.
+        + block(
+            "↻ Still open — not re-sent (state unchanged since first sent, #4034)",
+            report.get("carried", []),
+            lambda i: f"<code>{i.get('signal_id', '')}</code> — first sent {i.get('first_seen', '?')}, carried {i.get('renewals', 0)}x",
+        )
         + block("· Stale / ignored", stale, lambda i: str(i.get("summary", i)))
         # #396: honest partial-run accounting — signals the turn budget didn't reach.
         + block("⏳ Not triaged this run", unt, lambda i: f"{i.get('kind','')}: {i.get('id','')}")
-        + ("<p><i>No actionable signals.</i></p>" if not (af or prs or nh or unt) else "")
+        + ("<p><i>No actionable signals.</i></p>" if not (af or prs or nh or unt or report.get("carried")) else "")
         # Weekly drift sentinel status — always rendered when a record exists so a clean
         # week reports explicitly clean (never silent about infra drift). AC4 of #394.
         + drift_report.status_html(_drift_record, cfn_client=_cfn)
@@ -899,6 +954,52 @@ def email_report(report, mode):
         print(f"report emailed: {subj}")
     except Exception as e:
         print(f"[warn] SES send: {e}")
+
+
+def _citations_and_predicate():
+    """docs/alarm_citations.json + the #4034 'looked after it went red' predicate, from the
+    checkout this workflow runs in. Fail-soft to (no citations) — nothing reads as acted-on."""
+    try:
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        from alarm_citation_age import post_dates  # noqa: PLC0415
+
+        with open(os.path.join(ROOT, "docs", "alarm_citations.json"), encoding="utf-8") as fh:
+            citations = json.load(fh)
+        return (citations if isinstance(citations, dict) else {}), post_dates
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] alarm citations unreadable for acted-on marking: {e}")
+        return {}, (lambda *_a: False)
+
+
+def apply_signal_identity(report, signals, now=None, s3=None):
+    """#4034: give every needs-human line a stable signal id, merge the run into
+    remediation-log/signal_ledger.json, and carry (never re-send) a line whose state has not
+    moved. Runs on EVERY run — the clean path too — because the merger's own timestamp is
+    the dead-man's input. Fail-soft on the write: a ledger failure becomes a needs-human
+    line, it never blocks the email."""
+    now = now or datetime.now(timezone.utc)
+    s3 = s3 or _s3
+    try:
+        prior, _ = signal_identity.load(s3, LOG_BUCKET)
+        dead = signal_identity.merger_deadman_item(prior, now)
+        if dead:
+            report.setdefault("needs_human", []).append(dead)
+        citations, post_dates = _citations_and_predicate()
+        acted = signal_identity.acted_on_checks(signals, citations, post_dates)
+        observations = signal_identity.observations_for(report, signals, acted)
+        ledger, new_ids, _renewed = signal_identity.save(s3, LOG_BUCKET, observations, now)
+        signal_identity.partition(report, ledger, new_ids)
+    except Exception as e:  # noqa: BLE001
+        print(f"[warn] signal ledger (#4034): {e}")
+        report.setdefault("needs_human", []).append(
+            {
+                "issue": f"The needs-human signal ledger could not be merged this run ({type(e).__name__}: {e}) — every line "
+                "below was sent without an identity record (#4034).",
+                "action": f"Read s3://{LOG_BUCKET}/{signal_identity.SIGNAL_LEDGER_KEY} and the run log; nothing was overwritten "
+                "(a read failure refuses to write).",
+            }
+        )
+    return report
 
 
 def audit_log(report, signals, mode):
@@ -934,6 +1035,7 @@ def main():
         stale = stale_mode_escalation()
         if stale:
             report = {"needs_human": [stale]}
+        report = apply_signal_identity(report, signals)
         email_report(report, mode)
         return 0
     # #396: annotate signals already triaged on a recent run before prompting.
@@ -998,6 +1100,9 @@ def main():
     except Exception as e:
         print(f"[warn] write report file: {e}")
     update_ack_ledger(ledger, report, signals)
+    # #4034: AFTER the ack ledger (which reads every needs-human line, carried or not) and
+    # BEFORE the audit/email, so both record the ids and the carried/new split.
+    report = apply_signal_identity(report, signals)
     audit_log(report, signals, mode)
     # One curated email per run, always from here — the merge-gate step that used to
     # send it in `auto` was retired with the mode (#2833).

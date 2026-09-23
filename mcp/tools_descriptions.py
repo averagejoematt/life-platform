@@ -694,7 +694,9 @@ GET_CAPTURE_QUEUES_DESCRIPTION = (
     "deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, "
     "mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, "
     "and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a "
-    "dark source proposes nothing, skipping records nothing. Each section fails soft "
+    "dark source proposes nothing, skipping records nothing. (8) pending_writes — #4078: writes an "
+    "earlier chat QUEUED for Matthew's approval (manage_pending_writes), each with age_days and an "
+    "overdue flag past 3 days; unlike the rest, name these once and ask approve or discard. Each section fails soft "
     "independently: a broken sub-query never blocks the others, it just reports "
     "{status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, "
     "journal interview, speak-to-the-coaches, open check-in) instead of calling the "
@@ -713,6 +715,32 @@ LOG_COACH_CORRECTION_DESCRIPTION = (
     "or out-of-range number is REPORTED (with how many items the week's pack has), never silently "
     "dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows."
 )
+
+# #4078: moved out of `mcp/registry.py` to pay for `manage_pending_writes` under the #1665
+# ceiling (2,128 of 2,130 logical lines) — the #3891/#4036 idiom: the parameter table moves, the
+# schema NAME stays inline in the registry, and the catalog resolves this by name (byte-identical).
+LOG_COACH_CORRECTION_INPUT = {
+    "type": "object",
+    "properties": {
+        "item_number": {
+            "type": "integer",
+            "description": "The pack item number to correct (the #N from this week's review-pack email).",
+        },
+        "correction": {
+            "type": "string",
+            "description": "What was wrong and what it should say — Matthew's correction, stored verbatim.",
+        },
+        "error_class": {
+            "type": "string",
+            "description": (
+                "Optional error-class override. One of: stale-baseline, ungrounded-behavioral, "
+                "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other. "
+                "Unrecognized values are stored as 'other' (original label preserved), never rejected."
+            ),
+        },
+    },
+    "required": ["item_number", "correction"],
+}
 
 DESCRIBE_PLATFORM_SURFACES_DESCRIPTION = (
     "THE INDEX — call this FIRST whenever you are about to say the platform does not hold something. Lists every "

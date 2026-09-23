@@ -47,6 +47,11 @@ def _floor_indexes(monkeypatch):
     history = {TPL: [{"date": "2026-09-21", "top_weight_kg": HEVY_140_KG, "sets": [{"weight_kg": HEVY_140_KG, "reps": 5}]}]}
     weights = {"2026-09-21": 316.0, "2026-09-23": 315.4, TARGET: 315.2}
     monkeypatch.setattr(gate, "_load_indexes", lambda: (history, weights, None), raising=True)
+    # These fixtures judge the #3927 best-load floor path (pre-block-1, or the program inactive).
+    # Under v0.3 the floor and its back-off come from `load_ramp.v03_floor` (#4107/#4115), a
+    # different derivation with its own tests; pin the rule off so this module keeps testing
+    # the rep-scheme seam it was written for.
+    monkeypatch.setattr(gate, "v03_load_rule", lambda target_date: None, raising=True)
 
 
 def _routine(sets_lb, notes="RPE 7-8 top set."):

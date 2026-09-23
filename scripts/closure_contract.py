@@ -58,7 +58,15 @@ ARMING POSTURE (ADR-108 / #1872 discipline: flip on a measurement, never the cal
   for it whatever the ambient mode says, so `CLOSURE_CONTRACT_MODE=warn` cannot disarm it.
   A code whose false positive is a REOPENED issue does not need a 25-merge flip bar, and
   what warn-mode bought was four instruments reading CLOSED while dead (INT-1 49 days,
-  G-3 28, OBS-1 30+, CPO-2 21 runs). The other six requirements are unchanged.
+  G-3 28, OBS-1 30+, CPO-2 21 runs).
+
+  A SECOND code joined on 2026-09-23: `unhomed-residual` (#3597, the forensic RCA's class 7
+  — a deferral with no carrier). Flipped on a measurement (32 findings over 271 closures since
+  the cycle-17 genesis, see `BLOCK_CODES`); its cue vocabulary now includes the obligation
+  words owned by `scripts/obligation_carriers.py` (`revisit`, `fast-follow`, `owner decides`),
+  and `closure_sweep.evaluate_issue` reads the whole close-time narrative, not only the
+  verdict's comment. Its false positive is an edited closing comment. The other requirements
+  are unchanged.
 
 USAGE
   python3 scripts/closure_contract.py --render   # the docs/CONVENTIONS.md block, verbatim
@@ -88,6 +96,19 @@ def _residual_queue_module():
     return mod
 
 
+def _obligation_carriers_module():
+    """scripts/obligation_carriers.py — the one home of the obligation vocabulary (#3597)."""
+    name = "_obligation_carriers_3597"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parent / "obligation_carriers.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[name]
+
+
 _RQ = _residual_queue_module()
 ISSUE_REF = _RQ.ISSUE_REF  # `#NNNN` — imported, not copied
 NOT_WORK_TAG = _RQ.NOT_WORK_TAG  # `not-work —` (hyphen / en-dash / em-dash) — imported, not copied
@@ -106,7 +127,17 @@ FLIP_BAR = {
 # Codes armed BLOCK from day one, independent of DEFAULT_MODE and of the env override
 # (#3595). See the docstring: the flip bar governs the six rules whose false positive is
 # noise; it does not govern the one rule whose false positive is a reopened issue.
-BLOCK_CODES = frozenset({"no-live-proof"})
+#
+# 2026-09-23 (#3597): `unhomed-residual` joins, per the issue's own shape ("the closure
+# contract's `residual-homed` code flips to block"). Measured at flip time, read-only, over
+# every issue closed since the cycle-17 genesis: `closure_sweep.py --since 2026-09-06` on
+# 2026-09-23 scanned 271 closures → 21 `unhomed-residual` findings reading the verdict comment
+# only, 32 once the leg reads the whole close-time narrative (the #2643 shape — its fast-follow
+# sat in the evidence comment beside the verdict). BLOCK fires in the wrap's `--session`
+# window (today's closes), never retroactively. Its false positive costs an EDIT to a
+# closing comment (add the `#N` or the `not-work —` tag), not a reopen — and warn-mode is
+# exactly how #2877's "fast-follow, not done here" went unticketed until a review re-found it.
+BLOCK_CODES = frozenset({"no-live-proof", "unhomed-residual"})
 
 
 def mode() -> str:
@@ -396,9 +427,15 @@ REOPEN_PHRASE_RE = re.compile("|".join(re.escape(p) for p in REOPEN_PHRASES), re
 
 # A residual is NAMED lexically (there is no structure for "the thing I did not do"); its
 # DISPOSITION is checked structurally (ISSUE_REF / NOT_WORK_TAG on the same line or bullet).
+#
+# #3597: the OBLIGATION vocabulary (`revisit`, `fast-follow`, `owner decides`, a deferral to
+# later/step N) is composed in from `scripts/obligation_carriers.py` — the one home of that
+# grammar, shared with the ADR/PROPORTIONALITY/alarm-citation rule — never re-typed here.
+# #2877's closing-time "Fast-follow, not done here" for whoop/habitify is the specimen.
 RESIDUAL_CUE_RE = re.compile(
     r"\b(residual|left open|leaves? open|remains? (?:open|untouched|unfixed)|not (?:done|satisfied|shipped|observed)|"
-    r"unsatisfied|unmet|deferred|follow-?up|out of (?:this )?(?:scope|lane)|still needs|not mine to do)\b",
+    r"unsatisfied|unmet|deferred|follow-?up|out of (?:this )?(?:scope|lane)|still needs|not mine to do)\b|"
+    + _obligation_carriers_module().OBLIGATION_CUE_PATTERN,
     re.I,
 )
 # A cue negated just before it names the ABSENCE of a residual ("none deferred", "no follow-up").
@@ -790,7 +827,7 @@ def render_conventions_block() -> str:
     lines.append(
         "A close is valid when ALL of these hold (registry: `scripts/closure_contract.py`; "
         f"posture: **{DEFAULT_MODE}** — see the flip bar in the registry docstring — except "
-        f"{blocked}, armed **block** from day one and not disarmable by the env override):"
+        f"{blocked}, armed **block** whatever the posture and not disarmable by the env override):"
     )
     lines.append("")
     for i, r in enumerate(CLOSURE_CONTRACT, 1):
