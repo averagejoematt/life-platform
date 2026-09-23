@@ -32,6 +32,11 @@ from pathlib import Path
 
 import pytest
 
+# #3025: this file rewrites the REAL mcp/registry.py for the subprocess case below and is
+# registered in tests/test_suite_parallel_safety_3025.py::IN_TREE_WRITERS — serial, never
+# alongside an rglob sweep under `pytest -n auto`.
+pytestmark = pytest.mark.serial
+
 _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "deploy"))
 import doc_drift_verdict as _verdict  # noqa: E402
