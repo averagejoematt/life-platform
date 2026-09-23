@@ -236,6 +236,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
+        # #3528: AST/positional sweep of scripts/ + deploy/ for every `git push` caller — a NEW
+        # pusher that skips `ci_gate_commands` is a repo-shape change that must red on the PR
+        # that adds it, not sit invisible until the next direct push lands untested.
+        "test_ci_stand_ins_derive.py",
         "test_shared_quantities_4068.py",  # #4068: rglob — only mcp.shared_quantities builds the walking layer / reports the loss rate
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
         "test_reconcile_tombstone_cycle_4008.py",  # #4008: the opening-cycle tombstone re-stamp planner — pure, mutation-guarded, reuses check 22's predicate
