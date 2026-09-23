@@ -160,6 +160,14 @@ RULINGS: tuple[Ruling, ...] = (
         "'no committed twin' invariant covers it the day someone commits one.",
         producer="lambdas/training/hevy_template_cache.py:CACHE_KEY",
     ),
+    Ruling(
+        "config/coaching/routine_specs/*/*.json",
+        RUNTIME_GENERATED,
+        "#4079: S3-only, one object per committed routine, written by `manage_hevy_routine commit` "
+        "(mcp/routine_spec_ledger.py:save_routine_spec) and by deploy/backfill_routine_specs.py for routines "
+        "committed before it existed. Owner-private; nothing under this prefix is ever committed to the repo.",
+        producer="mcp/routine_spec_ledger.py:SPEC_KEY_FAMILY",
+    ),
     # ── repo_generated: a repo-side script writes the file into the tree ──
     Ruling(
         "config/strava_activity_type_census.json",

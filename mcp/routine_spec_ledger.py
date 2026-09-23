@@ -52,6 +52,9 @@ from typing import Any
 logger = logging.getLogger("routine_spec_ledger")
 
 SPEC_PREFIX = "config/coaching/routine_specs"
+# The runtime-written family this module owns — ruled `runtime_generated` in
+# deploy/config_ownership_audit.py and derived identically by config_twin_registry's writer scan.
+SPEC_KEY_FAMILY = "config/coaching/routine_specs/*/*.json"
 
 _S3_CLIENT = None
 

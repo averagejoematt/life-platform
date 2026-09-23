@@ -147,3 +147,12 @@ def test_the_written_key_is_spec_key_and_the_registry_classifies_it(archetype):
         ledger.save_routine_spec(ir)
     assert put.call_args.kwargs["Key"] == ledger.spec_key(archetype, ir.routine_id)
     assert put.call_args.kwargs["Key"].startswith(ledger.SPEC_PREFIX + "/")
+
+
+def test_every_spec_key_is_in_the_ruled_runtime_family():
+    """The family is what config_ownership_audit rules runtime_generated; a key outside it would
+    be an unruled config/ write (the #3785 class)."""
+    import fnmatch
+
+    for archetype in ("push", "legs", None):
+        assert fnmatch.fnmatch(ledger.spec_key(archetype, "abc123"), ledger.SPEC_KEY_FAMILY)
