@@ -44,6 +44,10 @@ FOLDER_BY_ARCHETYPE = {
     "upper": "Upper",
     "engine": "Engine",
     "full_body": "Full Body",
+    # #4064: v0.3's week grid and block calendar name the archetype `full`; without this
+    # row every v0.3 session was filed into a folder titled "Full" (arch.title()), beside
+    # the "Full Body" folder this map already named. Must equal program_structure.HEVY_FOLDER.
+    "full": "Full Body",
     "conditioning": "Engine",
 }
 

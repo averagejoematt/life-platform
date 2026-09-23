@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import experiment.phase_filter as _phase_filter  # #4061: the derived phase decision (module ref, so it stays patchable)
 from boto3.dynamodb.conditions import Key
 
 # ── Serialisation ──
@@ -270,8 +271,10 @@ import re
 
 _SAFE_SOURCE = re.compile(r"^[a-zA-Z0-9_]+$")
 
-# ADR-058: phase filter — hides phase=pilot records by default. Records without
-# a phase attribute (genome, profile, config, board) pass through.
+# ADR-058: phase filter — hides phase=pilot records. Applied to an EXPERIMENT_SCOPED
+# source by default (the decision is derived per source since #4061 — see query_source)
+# or whenever a caller passes include_pilot=False. Records without a phase attribute
+# (genome, profile, config, board) pass through.
 _PHASE_FILTER_EXPRESSION = "(#phase = :phase_experiment OR attribute_not_exists(#phase))"
 _PHASE_FILTER_NAMES = {"#phase": "phase"}
 _PHASE_FILTER_VALUES = {":phase_experiment": "experiment"}
@@ -292,11 +295,40 @@ def _apply_phase_filter(kwargs: dict, include_pilot: bool = False) -> dict:
     return out
 
 
-def query_source(source, start_date, end_date, lean=False, include_pilot=False):
-    """Query DynamoDB by source + date range with full pagination. ADR-058: phase=pilot hidden by default."""
+def _resolve_include_pilot(source, include_pilot):
+    """The phase decision for one read: an explicit bool wins, `None` DERIVES it (#4061).
+
+    `None` asks the taxonomy — `phase_filter.source_reads_cross_phase(source)` (#2109) — so
+    a RAW_TIMESERIES / CROSS_PHASE / SYSTEM_STATE partition reads across every phase
+    (bounded by the caller's DATE window, never by the phase tag) and an EXPERIMENT_SCOPED
+    one keeps the ADR-058 filter. That helper is fail-soft and conservative: an unknown or
+    unclassifiable source keeps the filter. Returns `(include_pilot, derived)`.
+    """
+    if include_pilot is None:
+        return bool(_phase_filter.source_reads_cross_phase(source)), True
+    return bool(include_pilot), False
+
+
+def query_source(source, start_date, end_date, lean=False, include_pilot=None):
+    """Query DynamoDB by source + date range with full pagination.
+
+    #4061: the phase decision is DERIVED at this chokepoint. `include_pilot=None` (the
+    default) asks the source's taxonomy class, so no call site has to opt a raw timeseries
+    back in — before this, 46 MCP read sites took the old `include_pilot=False` default
+    and every RAW_TIMESERIES read (Strava's 230 pre-genesis days 2024-09-15..2025-05-10,
+    all `phase=pilot`) was truncated at the current genesis. An EXPERIMENT_SCOPED source
+    (computed_metrics, habit_scores, ...) still gets the ADR-058 filter. An explicit
+    `include_pilot=True/False` wins and behaves exactly as before.
+
+    A derived read also drops superseded rows (`tombstone=true`) — the item-level rule
+    `phase_filter.singleton_visible` encodes for key reads, and the one #4030 needed the
+    moment the filter came off `SOURCE#hevy` (421 legacy daily aggregates superseded in
+    place, every date also covered by a per-workout row). An explicit bool does not.
+    """
     if not source or not _SAFE_SOURCE.match(source):
         logger.warning(f"query_source: rejected invalid source name: {source!r}")
         return []
+    include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
     kwargs = _apply_phase_filter(
         {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~")},
@@ -311,14 +343,21 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=False):
             break
         kwargs["ExclusiveStartKey"] = last_key
         logger.info(f"query_source paginating {source}: {len(items)} items so far")
+    if derived:
+        items = [i for i in items if not i.get("tombstone")]
     raw = decimal_to_float(items)
     if lean:
         return [{k: v for k, v in item.items() if k not in _LEAN_STRIP} for item in raw]
     return raw
 
 
-def parallel_query_sources(sources, start_date, end_date, lean=False, include_pilot=False):
-    """Query multiple DynamoDB sources concurrently."""
+def parallel_query_sources(sources, start_date, end_date, lean=False, include_pilot=None):
+    """Query multiple DynamoDB sources concurrently.
+
+    `include_pilot=None` (default) derives the phase decision PER SOURCE (#4061) — a mixed
+    list that holds one experiment-scoped partition must not widen that one. An explicit
+    bool applies to the whole fan-out, as before.
+    """
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 5)) as pool:
         future_to_src = {pool.submit(query_source, src, start_date, end_date, lean, include_pilot): src for src in sources}
@@ -332,78 +371,29 @@ def parallel_query_sources(sources, start_date, end_date, lean=False, include_pi
     return results
 
 
-def query_source_range(source, start_date, end_date, include_pilot=False):
-    """Alias for query_source used by some tools."""
+def query_source_range(source, start_date, end_date, include_pilot=None):
+    """Alias for query_source used by some tools (same derived default, #4061)."""
     return query_source(source, start_date, end_date, include_pilot=include_pilot)
 
 
-# ── #4032: the ONE read path for a source whose class says "read every phase" ────────
+# ── #4032 → #4061: the cross-phase read path is now the DEFAULT ─────────────────────
 #
-# `query_source` defaults `include_pilot=False`, i.e. the ADR-058 phase filter, and the
-# restart tagger stamps every pre-genesis row `phase=pilot` (ADR-077). For an
-# EXPERIMENT_SCOPED partition that is exactly right — the reset tombstones that data on
-# purpose. For a RAW_TIMESERIES partition it is a silent truncation: the body's timeseries
-# does not reset when the experiment does, the caller's DATE window is what bounds recency
-# (#2079/#2080/#2081/#2089), and a trailing 30-day window therefore collapses to the
-# CYCLE'S AGE on the morning after every genesis.
-#
-# `phase_filter.source_reads_cross_phase` (#2109) is the taxonomy-derived answer to that
-# question and the only sanctioned way to ask it. These helpers exist so a caller never
-# re-derives it inline and no second read path can drift from this one: #4030's
-# `tools_strength._read_hevy_all_phases` delegates here, and so do the energy-budget reads
-# in `tools_health._get_energy_expenditure` and `tools_nutrition` (#4032).
+# #4032 added the two helpers below so a RAW_TIMESERIES read could opt out of the ADR-058
+# filter one call site at a time; #4030/#4031/#4032 migrated three tools that way, and the
+# other 46 sites kept the truncating default. #4061 moved the derivation into
+# `query_source` itself (the chokepoint), so both helpers are now thin aliases for the
+# derived default. They stay because their call sites name the intent, and
+# `tests/test_mcp_query_source_derived_phase_4061.py` guards the SET of call sites.
 
 
 def query_source_cross_phase(source, start_date, end_date, lean=False):
-    """`query_source` with `include_pilot` DERIVED from the source's taxonomy class (#4032).
-
-    Two differences from `query_source(source, start, end)`:
-
-    1. **The phase decision is derived, never asserted.** `include_pilot` comes from
-       `phase_filter.source_reads_cross_phase(source)`, so a RAW_TIMESERIES /
-       CROSS_PHASE / SYSTEM_STATE partition is read across every phase and an
-       EXPERIMENT_SCOPED one keeps the ADR-058 filter. That helper is fail-soft and
-       conservative by design: an unknown or unclassifiable source keeps the filter.
-       If the taxonomy ever reclassifies a source, every call site here follows it.
-
-    2. **Superseded rows stay out.** Rows carrying `tombstone=true` are dropped — the
-       item-level rule `phase_filter.singleton_visible` already encodes for key reads.
-       This matters the moment the filter comes off: `SOURCE#hevy` holds 421 legacy
-       daily aggregates superseded in place on 2026-05-26, every one of whose dates is
-       also covered by a per-workout row, and `normalize_hevy_items` parses BOTH shapes
-       (#4030). Lifting the filter without this double-counts every pre-2025-11-08
-       session.
-
-    The caller's `[start_date, end_date]` is untouched — the window, not the phase tag,
-    is what bounds recency.
-    """
-    from experiment.phase_filter import source_reads_cross_phase
-
-    cross_phase = source_reads_cross_phase(source)
-    rows = query_source(source, start_date, end_date, lean=lean, include_pilot=cross_phase) or []
-    return [r for r in rows if not r.get("tombstone")]
+    """`query_source` with the phase decision derived from the taxonomy (#4032, alias since #4061)."""
+    return query_source(source, start_date, end_date, lean=lean, include_pilot=None) or []
 
 
 def parallel_query_sources_cross_phase(sources, start_date, end_date, lean=False):
-    """`parallel_query_sources`, but each source's phase decision is its own (#4032).
-
-    `parallel_query_sources` takes ONE `include_pilot` for the whole fan-out, which is the
-    wrong shape for a mixed list — `["whoop", "habitify", "strava", "hevy"]` are all
-    raw_timeseries today, but a list that later also held an experiment-scoped partition
-    must not widen that one. Deriving per source is what makes the right answer survive a
-    list edit.
-    """
-    results = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 5)) as pool:
-        future_to_src = {pool.submit(query_source_cross_phase, src, start_date, end_date, lean): src for src in sources}
-        for future in concurrent.futures.as_completed(future_to_src):
-            src = future_to_src[future]
-            try:
-                results[src] = future.result()
-            except Exception as e:
-                logger.warning(f"parallel_query_sources_cross_phase failed for {src}: {e}")
-                results[src] = []
-    return results
+    """`parallel_query_sources` with a per-source derived phase decision (#4032, alias since #4061)."""
+    return parallel_query_sources(sources, start_date, end_date, lean=lean, include_pilot=None)
 
 
 def phases_of(items) -> list:

@@ -609,17 +609,17 @@ def test_partition_classes_are_what_the_taxonomy_says():
     assert phase_taxonomy.classify(LABS_PK, "DATE#2026-05-01") == phase_taxonomy.CROSS_PHASE
 
 
-def test_dashboard_apple_health_read_carries_the_phase_filter(ddb):
-    """apple_health is RAW_TIMESERIES: rows are kept forever and never tombstoned,
-    so the default filter (`phase = experiment OR attribute_not_exists(phase)`) is
-    transparent today. Pinned because if the tagger ever starts stamping raw
-    partitions, this is the exact query that would start hiding real sensor days.
+def test_dashboard_apple_health_read_is_not_phase_filtered(ddb):
+    """apple_health is RAW_TIMESERIES: rows are kept forever and genesis-ANCHORED on read
+    (the caller's DATE window bounds recency), never hidden. Since #4061 query_source
+    DERIVES the phase decision from the taxonomy, so this read carries no ADR-058 filter —
+    the tagger DOES stamp raw partitions `phase=pilot` at a reset (Strava's 230
+    pre-genesis days), which is exactly how the old default started hiding sensor days.
     """
     t = ddb({AH_PK: [_glucose_day("2026-05-01", 100)]})
     tc.tool_get_cgm({"view": "dashboard", "start_date": "2026-05-01", "end_date": "2026-05-01"})
     call = next(c for c in t.query_calls if _pk_of(c) == AH_PK)
-    assert "attribute_not_exists(#phase)" in call["FilterExpression"]
-    assert call["ExpressionAttributeValues"][":phase_experiment"] == "experiment"
+    assert "#phase" not in str(call.get("FilterExpression") or "")
 
 
 def test_fasting_lab_read_is_not_phase_filtered(ddb, s3):
