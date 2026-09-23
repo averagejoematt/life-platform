@@ -889,7 +889,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # carrying the pre-#4071 loop shape; baseline 63 passed | mutated 1 failed :: test_no_second_per_muscle_set_computation_in_mcp_or_training
         # | reverted 63 passed). MEASURED by id-set diff: lane {proven 130, unproven 540, not-applicable 6, attempted-unproven 5} vs a
         # disposable `git archive origin/main` export at 24996c6c2 {129, 540, 6, 5} — exactly one entrant, none leaves.
-        # Upper bound 130 -> 131 (2026-09-22, #4068): structural::test_shared_quantities_4068.py — the AST derivation guard that
+        # Upper bound 131 -> 132 (2026-09-23, #4075): structural::test_training_load.py, the TRIMP-exponent sweep, PROVEN
+        # (ARMED 1/1) via the harness. PRIOR: Upper bound 130 -> 131 (2026-09-22, #4068): structural::test_shared_quantities_4068.py — the AST derivation guard that
         # weekly walking hours and the loss rate reach every named critic/tool (get_benchmark included) through mcp.shared_quantities
         # and that nothing else builds the walking layer — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked mcp/_census_probe_4068.py calling walking_volume.build; baseline 24 passed | mutated 1 failed ::
@@ -899,12 +900,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # planner and chat commit gate each name it) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
-        # Upper bound 132 -> 133 (2026-09-23, #3528): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
+        # 132 -> 133 (2026-09-23, #4075 on top of #4107): structural::test_training_load.py, PROVEN (ARMED 1/1).
+        # 133 -> 134 (2026-09-23, #3528, on top of #4075): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
         # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
         # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
-        # -> 2 passed). Unproven stays. Same PR, 133 -> 137: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
+        # -> 2 passed). Unproven stays. Same PR, 134 -> 138: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
         # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
-        <= 137
+        <= 138
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
