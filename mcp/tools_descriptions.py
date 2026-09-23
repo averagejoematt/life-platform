@@ -183,7 +183,11 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
     "change <field> to <value> / veto with the metric and number it argued from. Changes are APPLIED to the "
     "draft and re-checked; a veto BLOCKS commit; the verdicts ride in the Hevy notes and the training coach "
     "thread. Order: plan_next_session → manage_hevy_routine draft_custom → plan_next_session(routine_id) → "
-    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning."
+    "dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning. "
+    "OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with "
+    "veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other "
+    "critic's changes still apply, and the override is recorded on the routine and in the corrections ledger. "
+    "Never skip stage 2 to get past a veto."
 )
 
 GET_EXERCISE_HISTORY_DESCRIPTION = (

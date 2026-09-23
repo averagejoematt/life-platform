@@ -25,6 +25,13 @@ the revised draft is re-checked deterministically; the verdicts are stored on th
 (`inputs_snapshot["critics"]`), where `manage_hevy_routine` reads them: a veto blocks the
 commit and the verdicts ride into the Hevy notes. A thread row goes to the training coach.
 
+THE OWNER OVERRIDE — `plan_next_session(routine_id=..., veto_override={critic, owner_words})`
+(#4076). A veto used to leave two exits: redraft, or skip stage 2 — and skipping stage 2
+also threw away every other critic's change. The override re-runs stage 2 as normal and then
+marks ONLY the named critic's veto overridden, with his words verbatim, after writing them
+to the corrections ledger (the `log_coach_correction` write path). Every other critic's
+change is applied exactly as without it; another critic's veto still blocks.
+
 The model calls are tier-gated by `budget_guard` (feature `plan_critics`). When paused,
 the deterministic layer still runs and every verdict says the model did not — a routine is
 never reported as red-teamed by a model that was not consulted.
@@ -317,6 +324,20 @@ def tool_plan_next_session(args):
 
     from training import plan_engine
 
+    # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
+    # never a stage-2 run that silently ignored it and left the veto standing unexplained.
+    overrides: list[dict[str, Any]] = []
+    if args.get("veto_override") not in (None, [], {}):
+        from coach.critic_overrides import parse_overrides
+
+        from mcp.utils import mcp_error
+
+        if not routine_id:
+            return mcp_error("veto_override needs routine_id — it overrides a stage-2 veto on that routine", error_code="MISSING_ARG")
+        overrides, err = parse_overrides(args.get("veto_override"))
+        if err:
+            return mcp_error(err, error_code="INVALID_ARG")
+
     # Each reader is the SAME tool a chat turn would have called — the point is not new
     # data, it is that the call set is fixed instead of improvised per conversation.
     from mcp.tools_benchmark import tool_get_benchmark
@@ -466,11 +487,14 @@ def tool_plan_next_session(args):
             protein_measured,
             target_date,
             dismissals,
+            overrides=overrides,
         )
         out["how_to_use"] = (
             "Stage 2 ran. Read `critics.verdicts` — each names the metric and number it argued from. A `veto` blocks "
-            "commit: redraft and run stage 2 again. `change` verdicts are already applied to the draft (see "
-            "`critics.changes`); dry_run shows the revised body. Then commit — the verdicts ride in the Hevy notes."
+            "commit: redraft and run stage 2 again, or — if Matthew overrules that one critic — run stage 2 again with "
+            "veto_override={critic, owner_words} carrying his words verbatim (#4076); every other critic's changes still "
+            "apply. `change` verdicts are already applied to the draft (see `critics.changes`); dry_run shows the revised "
+            "body. Then commit — the verdicts, and any override, ride in the Hevy notes."
         )
     return out
 
@@ -619,8 +643,9 @@ def _run_stage_2(
     protein_measured,
     target_date: str,
     dismissals: list[dict[str, Any]] | None = None,
+    overrides: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    from coach import critics
+    from coach import critic_overrides, critics
     from training.routine_repo import put_versioned
 
     from mcp.tools_hevy_routine import _validate_ir_for_hevy
@@ -678,21 +703,36 @@ def _run_stage_2(
 
         invoke = _invoke
     verdicts = critics.run_critics(packets, draft, invoke=invoke, model_allowed=allowed, model_paused_reason=paused)
+    ran_at = datetime.now(timezone.utc).isoformat()
+    # #4076: the owner's override marks ONLY the named critic's veto; it runs before the
+    # changes so the record is complete, and it moves no change — `apply_changes` below sees
+    # every other critic's verdict exactly as the critics returned it.
+    override_records = critic_overrides.apply_overrides(
+        verdicts,
+        overrides or [],
+        at=ran_at,
+        routine_id=getattr(ir, "routine_id", None),
+        target_date=target_date,
+        record_correction=_record_override_correction,
+    )
     changes = critics.apply_changes(ir, verdicts)
-    rc = critics.recheck(ir, build)
+    overridden = {v["critic"] for v in verdicts if critics.is_overridden(v)}
+    rc = critics.recheck(ir, build, overridden=overridden)
     precheck = _validate_ir_for_hevy(ir)
     rc["hevy_precheck_errors"] = precheck["errors"]
     rc["passed"] = bool(rc["passed"] and not precheck["errors"])
     record = {
         "engine": critics.CRITICS_VERSION,
-        "ran_at": datetime.now(timezone.utc).isoformat(),
+        "ran_at": ran_at,
         "target_date": target_date,
         "model_ran": allowed,
         "model_paused_reason": paused,
         "verdicts": verdicts,
         "changes": changes,
         "recheck": rc,
-        "veto": any(v.get("verdict") == "veto" for v in verdicts),
+        "veto": bool(critics.standing_vetoes(verdicts)),
+        # #4076: every override asked for on this run, applied or not, with his words verbatim.
+        "owner_overrides": override_records,
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
         # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
         "draft_exercises": draft_exercises,
@@ -713,12 +753,31 @@ def _run_stage_2(
     out["routine_version"] = ir.version
     out["thread"] = _write_thread(ir, pacific_today())
     out["notes_preview"] = critics.notes_block(ir)
-    out["next"] = (
-        "VETO — redraft (manage_hevy_routine draft_custom), then run stage 2 again; commit will refuse until no veto stands."
-        if record["veto"]
-        else "no veto — manage_hevy_routine dry_run shows the revised body, then commit."
-    )
+    if record["veto"]:
+        out["next"] = (
+            "VETO — redraft (manage_hevy_routine draft_custom), then run stage 2 again; commit will refuse until no veto "
+            "stands. If Matthew overrules one critic, re-run with veto_override={critic, owner_words} (#4076)."
+        )
+    elif overridden:
+        out["next"] = (
+            f"no standing veto — {', '.join(sorted(overridden))} OVERRIDDEN by the owner (his words are on the record); "
+            "every other critic's changes are applied. manage_hevy_routine dry_run shows the revised body, then commit."
+        )
+    else:
+        out["next"] = "no veto — manage_hevy_routine dry_run shows the revised body, then commit."
     return out
+
+
+def _record_override_correction(item_ref: dict[str, Any], owner_words: str, error_class: str) -> str:
+    """#4076: the owner's override words into the corrections ledger — the SAME write the
+    `log_coach_correction` tool makes (`coach_corrections.write_correction`, cycle-stamped
+    via `coach_checkin.read_cycle`), naming the vetoing critic and signal in `item_ref`.
+    Raises on a DDB error: `critics.apply_overrides` then refuses the override."""
+    from coach import coach_checkin, coach_corrections
+
+    from mcp.config import table
+
+    return coach_corrections.write_correction(table, item_ref, owner_words, error_class, cycle=coach_checkin.read_cycle())
 
 
 _BLOCK_MARK = "RED TEAM ("

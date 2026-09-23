@@ -36,6 +36,12 @@ A veto blocks the Hevy commit (`veto_reason`). A change is APPLIED to the draft
 (`apply_changes`) and the revised draft is re-checked deterministically (`recheck`) before
 anyone reads a verdict off it.
 
+THE OWNER OVERRIDE (#4076)
+
+The owner may overrule ONE vetoing critic in his own words (`coach.critic_overrides`). The
+verdict stays `veto` on the record and carries `owner_override`; `standing_vetoes` /
+`veto_reason` stop counting it; every other verdict, veto or change, is untouched.
+
 WHERE THE REDLINES COME FROM
 
 Two sources, and the provenance rides on every flag:
@@ -60,7 +66,7 @@ from typing import Any, Callable
 
 from training import owner_redlines, training_context_registry
 
-CRITICS_VERSION = "critics@1.1.0"  # #4036: the joints packet reads the owner-dismissal layer
+CRITICS_VERSION = "critics@1.2.0"  # #4076: an owner override of ONE vetoing critic, recorded verbatim
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
@@ -916,16 +922,28 @@ def _clone(s: Any) -> Any:
     return copy.deepcopy(s)
 
 
-def recheck(ir: Any, rebuild_packets: Callable[[dict[str, Any]], dict[str, dict[str, Any]]]) -> dict[str, Any]:
+def recheck(
+    ir: Any,
+    rebuild_packets: Callable[[dict[str, Any]], dict[str, dict[str, Any]]],
+    *,
+    overridden: Any = (),
+) -> dict[str, Any]:
     """Re-run the DETERMINISTIC layer over the revised draft with the same evidence.
 
     `rebuild_packets(draft_summary)` is the caller's packet builder over the already-fetched
-    evidence — no model, no I/O. Passes only when no packet still carries a violation."""
+    evidence — no model, no I/O. Passes only when no packet still carries a violation that
+    the owner has not overridden (#4076). An overridden critic's remaining veto is still
+    LISTED, marked `owner_overridden`, never dropped from the record."""
     draft = draft_summary(ir)
     packets = rebuild_packets(draft)
-    remaining = [deterministic_verdict(p) | {"critic": cid} for cid, p in packets.items() if p.get("violations")]
+    over = set(overridden or ())
+    remaining = [
+        deterministic_verdict(p) | {"critic": cid} | ({"owner_overridden": True} if cid in over else {})
+        for cid, p in packets.items()
+        if p.get("violations")
+    ]
     return {
-        "passed": not remaining,
+        "passed": not [r for r in remaining if not r.get("owner_overridden")],
         "remaining_vetoes": remaining,
         "total_sets": draft["total_sets"],
         "exercise_count": len(draft["exercises"]),
@@ -933,10 +951,22 @@ def recheck(ir: Any, rebuild_packets: Callable[[dict[str, Any]], dict[str, dict[
 
 
 # ── what rides on the routine ─────────────────────────────────────────────────────────
+def is_overridden(v: dict[str, Any]) -> bool:
+    """True when the owner overrode THIS verdict's veto (#4076). Only a veto can be."""
+    return v.get("verdict") == "veto" and bool(v.get("owner_override"))
+
+
+def standing_vetoes(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The vetoes that still block: every `veto` the owner has not overridden."""
+    return [v for v in verdicts or [] if v.get("verdict") == "veto" and not is_overridden(v)]
+
+
 def veto_reason(ir: Any) -> str | None:
-    """The reason a commit must refuse, or None. Read from the stored verdicts only."""
+    """The reason a commit must refuse, or None. Read from the stored verdicts only.
+
+    An owner-overridden veto (#4076) does not refuse; every other veto still does."""
     rec = ((getattr(ir, "inputs_snapshot", None) or {}).get("critics")) or {}
-    vetoes = [v for v in rec.get("verdicts", []) if v.get("verdict") == "veto"]
+    vetoes = standing_vetoes(rec.get("verdicts", []))
     if not vetoes:
         return None
     return "; ".join(f"{v['critic']}: {v.get('reason')}" for v in vetoes)
@@ -960,7 +990,7 @@ def commit_status(ir: Any) -> str:
         return NOT_RED_TEAMED
     paused = " (model paused — deterministic layer only)" if rec.get("model_ran") is False else ""
     return f"{rec.get('engine', CRITICS_VERSION)}{paused}: " + ", ".join(
-        f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" for v in verdicts
+        f"{_SHORT.get(v['critic'], v['critic'])} {v['verdict']}" + (" (owner-overridden)" if is_overridden(v) else "") for v in verdicts
     )
 
 
@@ -976,10 +1006,15 @@ def notes_block(ir: Any) -> str:
         prov = f" [{v['provenance']}]" if v.get("provenance") else ""
         paused = " (model paused)" if isinstance(v.get("model"), dict) and v["model"].get("paused") else ""
         reason = (v.get("reason") or "").replace("\n", " ")
-        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {v['verdict'].upper()}{paused}:{num}{prov} {reason}"[:300])
+        over = " OVERRIDDEN BY OWNER" if is_overridden(v) else ""
+        lines.append(f"- {_SHORT.get(v['critic'], v['critic'])} {v['verdict'].upper()}{over}{paused}:{num}{prov} {reason}"[:300])
     applied = [c for c in rec.get("changes", []) if c.get("applied")]
     if applied:
         lines.append("applied: " + "; ".join(f"{c['field']} -> {c['to']}" for c in applied))
+    for o in rec.get("owner_overrides") or []:
+        if o.get("applied"):
+            words = " ".join(str(o.get("owner_words") or "").split())
+            lines.append(f"owner override of {_SHORT.get(o['critic'], o['critic'])} ({str(o.get('at') or '')[:10]}): \"{words}\""[:300])
     return "\n".join(lines)
 
 
@@ -1017,7 +1052,14 @@ def thread_entry(ir: Any, *, today: str) -> dict[str, Any]:
         "generation_context": "plan_critics",
         "position_summary": f"Red team on routine {getattr(ir, 'routine_id', '?')} for {getattr(ir, 'target_date', '?')}: {summary}",
         "predictions": [],
-        "surprises": [v.get("reason") for v in verdicts if v.get("verdict") == "veto"],
+        "surprises": [v.get("reason") for v in standing_vetoes(verdicts)],
+        # #4076 — an overridden veto is not a surprise the coach carries forward; the owner's
+        # words are, verbatim, beside the critic and signal he overrode.
+        "owner_overrides": [
+            {"critic": o["critic"], "signal": o.get("signal"), "owner_words": o.get("owner_words"), "at": o.get("at")}
+            for o in rec.get("owner_overrides") or []
+            if o.get("applied")
+        ],
         "stance_changes": [
             f"{v['critic']}: {v.get('field')} -> {v.get('to')}" for v in verdicts if v.get("verdict") == "change" and v.get("field")
         ],
@@ -1030,6 +1072,7 @@ def thread_entry(ir: Any, *, today: str) -> dict[str, Any]:
                 "metric": v.get("metric"),
                 "value": v.get("value"),
                 "provenance": v.get("provenance"),
+                "owner_overridden": is_overridden(v),
             }
             for v in verdicts
         ],
