@@ -36,8 +36,6 @@ import unittest.mock
 from contextlib import ExitStack
 from unittest.mock import patch
 
-import pytest
-
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -157,12 +155,12 @@ def test_exposure_numbers_match_the_redline_rep_scheme_prose():
     )
 
 
-def test_the_program_summary_carries_the_calendar_and_six_anchor_sets_per_pattern():
+def test_the_program_summary_carries_the_calendar_and_the_anchor_sets_per_pattern():
     summary = program_structure.summary()
     assert summary["block_calendar"]["block_1_start"] == "2026-09-24"
-    assert summary["weekly_anchor_sets"] == {p: 6 for p in program_structure.ANCHORS}
-    lo, hi = owner_redlines.REDLINES["lifting_sessions_per_wk"]["sets_per_muscle_wk"]
-    assert all(lo <= n <= hi for n in summary["weekly_anchor_sets"].values())
+    # #4090: vertical pull runs 2 sets per exposure so BACK (row + pulldown) sits inside 6–10;
+    # the per-MUSCLE ranges are held in tests/test_v03_load_ramp_4090.py, not per pattern
+    assert summary["weekly_anchor_sets"] == {**{p: 6 for p in program_structure.ANCHORS}, "vertical_pull": 4}
 
 
 def test_sessions_fit_the_ceiling_and_the_week_totals_sit_in_the_redline_band():
@@ -212,9 +210,11 @@ def test_generator_builds_the_heavy_full_body_session_on_2026_09_24():
         "machine_row",
         "lat_pulldown",
         "leg_curl",
-        "db_lateral_raise",
+        "cable_tricep_pushdown",
+        "db_curl",
     ]
-    assert [len(b.sets) for b in ideal.exercises] == [3, 3, 3, 3, 2, 2]
+    # #4090: pulldown 2 sets (back 10, not 12); the lateral raise gave way to an arm pair (delts 6, not 8)
+    assert [len(b.sets) for b in ideal.exercises] == [3, 3, 3, 2, 2, 2, 2]
     assert ideal.exercises[0].sets[0].rep_range_start == 4 and ideal.exercises[0].sets[0].rep_range_end == 6
     assert ideal.inputs_snapshot["calendar"]["week"] == 1
     assert ideal.inputs_snapshot["session_prescription"]["hevy_folder"] == "Full Body"
@@ -228,7 +228,7 @@ def test_mutation_control_the_weekday_grid_alone_makes_2026_09_24_a_walk():
     assert routines[0].archetype == "aerobic", "without the calendar, Thursday is the grid's walk — the defect #4064 names"
 
 
-def test_generator_back_offs_sit_10_percent_under_the_floored_top_set():
+def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     lb = 0.45359237
     history = {"C7973E0E": [{"date": "2026-09-20", "top_weight_kg": 200 * lb, "sets": [{"weight_kg": 200 * lb, "reps": 8}]}]}
     weights = {"2026-09-20": 316.0, "2026-09-24": 315.0}
@@ -236,7 +236,9 @@ def test_generator_back_offs_sit_10_percent_under_the_floored_top_set():
         ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-24"))[0]
     leg_press = ideal.exercises[0]
     top = leg_press.sets[0].weight_kg
-    assert top == pytest.approx(200 * lb)
+    # #4090: week 1 of the v0.3 entry ramp — 60 % of the anchor. #4107: this anchor (09-20)
+    # is 4 d before block 1, inside the 28 d detraining age, so it takes NO discount
+    assert top == 54.5  # ceil-to-0.5 kg of 200 lb x 0.60 = 54.43 kg
     assert [s.weight_kg for s in leg_press.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     # the note leads with history (ADR-068's one best line), then the §3 prescription
@@ -246,8 +248,8 @@ def test_generator_back_offs_sit_10_percent_under_the_floored_top_set():
 def test_generator_deload_week_holds_loads_and_cuts_sets():
     ideal = _generate("2026-10-28")[0]
     assert "DELOAD" in ideal.title
-    assert sum(len(b.sets) for b in ideal.exercises) == 11
-    assert any("deload: sets 16 -> 11" in r for r in ideal.rationale)
+    assert sum(len(b.sets) for b in ideal.exercises) == 12
+    assert any("deload: sets 17 -> 12" in r for r in ideal.rationale)
 
 
 def test_red_recovery_drops_accessories_not_anchors():
@@ -323,6 +325,7 @@ def _stage1_patches():
         patch("mcp.tools_plan._rotation_window", return_value=None),
         patch("mcp.tools_plan._pain_dismissals", return_value=[]),
         patch("mcp.tools_plan._nutrition_critics_block", return_value={"verdicts": []}),
+        patch("mcp.tools_plan._load_anchor_indexes", return_value=({}, {})),
         patch("training.training_notes.training_notes_health", side_effect=RuntimeError("offline")),
         patch("ai.bedrock_client.invoke", side_effect=AssertionError("no model in stage 1")),
     ]
@@ -350,5 +353,5 @@ def test_plan_next_session_2026_09_24_through_the_mcp_handler_proposes_full_body
         ("row", "heavy", "machine_row"),
         ("vertical_pull", "moderate", "lat_pulldown"),
     ]
-    assert rx["total_sets"] == 16
+    assert rx["total_sets"] == 17
     assert "constraint_block.session" in out["how_to_use"]

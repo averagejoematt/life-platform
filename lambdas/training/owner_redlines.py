@@ -361,7 +361,12 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "load_anchoring": {
         "value": "bodyweight-band-matched history, discounted for detraining",
-        "detraining_discount_pct": [10, 15],
+        # #4107 owner ruling 2026-09-23: the discount is 10 % — the band collapses to its
+        # shallow end, so the ramp (which reads the deep end) and the blueprint-historian
+        # critic (which reports the band) read one number. The 2026-09-08 statement stays below.
+        "detraining_discount_pct": [10, 10],
+        "detraining_discount_provenance": "owner ruling 2026-09-23 (#4107): 10 %, not the lane's conservative 15 %",
+        "detraining_discount_pct_stated_2026_09_08": [10, 15],
         "entry_pct_of_band_best": [85, 90],
         "trap_bar_until_lb": 275,
         "provenance": "owner",
@@ -547,7 +552,7 @@ REDLINES: dict[str, dict[str, Any]] = {
 # logging counts, but that is a different module: `evaluated_by_engine` is a plan_engine
 # claim and stays False there.
 TRIPWIRES: list[dict[str, Any]] = [
-    # ── the v1 five — computed by plan_engine today ──────────────────────────
+    # ── the v1 five — computed by plan_engine today (self_added_volume joined them in #4081) ──
     {
         "id": "anchor_lift_strength_drop",
         "signal": "rolling 3-session e1RM median vs the 6-session baseline on the four core anchors (bench, row, squat, hinge)",
@@ -860,10 +865,21 @@ TRIPWIRES: list[dict[str, Any]] = [
         "id": "self_added_volume",
         "signal": "training above the prescription two weeks running",
         "threshold_weeks": 2,
+        "definition_engine": (
+            "a Mon–Sun Pacific week is above the prescription when, across its sessions matched to a committed routine, the sets "
+            "performed on prescribed movements exceed the sets prescribed for them (net) — the per-movement counts are "
+            "`health.adherence_calc`'s, stored on each Hevy row at ingest; fires when the two most recent COMPLETE weeks are both above"
+        ),
         "provenance": "owner-history",
         "action": "read as an anxiety tell, not enthusiasm; subtract-only enforced and mood asked about by name",
-        "evaluated_by_engine": False,
-        "note": "Lived experience: 'the 21-hour week is not his strength, it is his hiding place.' Read by `health.nutrition_critics`; not by plan_engine.",
+        "evaluated_by_engine": True,
+        "note": (
+            "Lived experience: 'the 21-hour week is not his strength, it is his hiding place.' Evaluated by plan_engine since #4081 "
+            "(`training.self_added_volume`) from adherence's per-movement programmed-vs-performed set counts — every logged set on both "
+            "sides, warm-ups included, as adherence counts them; an exercise the routine did not name (`adherence.extra`) is evidence, "
+            "not counted volume, because a swap and a treadmill block look the same by template id. `health.nutrition_critics` reads "
+            "the same run length."
+        ),
     },
     {
         "id": "volume_ceiling",
@@ -890,7 +906,7 @@ TRIPWIRES: list[dict[str, Any]] = [
 
 
 def engine_evaluated_tripwires() -> list[dict[str, Any]]:
-    """The tripwires plan_engine computes today (the v1 five)."""
+    """The tripwires plan_engine computes today (the v1 five + self_added_volume, #4081)."""
     return [t for t in TRIPWIRES if t.get("evaluated_by_engine", True)]
 
 
