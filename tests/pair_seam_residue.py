@@ -434,6 +434,25 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "2026-09-21",
         _WHOOP_HISTORY_READ_REASON,
     ),
+    # #4051 (2026-09-22): stage-1 plan_next_session's pain-flag evidence set became the
+    # movements PERFORMED in the trailing 28 days (it was a draft routine's exercise list,
+    # which is empty before a draft exists — so a flagged, owner-dismissed site read
+    # "clear"). That read is what joins tools_plan to the hevy partition.
+    "hevy::mcp/tools_plan.py::read": (
+        "2026-09-22",
+        "#4051: tools_plan does NOT parse the hevy wire shape. `_performed_movements` reads through "
+        "`tools_strength._read_hevy_all_phases` (itself already a residue seam, and the ONE sanctioned cross-phase "
+        "Hevy read) and `strength_helpers.normalize_hevy_items`, the shared normaliser that gives every field an "
+        "explicit default; it then touches only `date`, `exercises[].template_id` and `exercises[].name`. VERIFIED, "
+        "not assumed: a writer-side shape drift makes the normaliser yield blocks with an empty template_id/name, "
+        "which `_performed_movements` counts as `blocks_without_template_id` and drops — collapsing the evidence set "
+        "to zero movements. That is the EMPTY-EVIDENCE path #4051 exists to make loud: the scope reports "
+        "`status: none` and the `pain_flag_named_site` row reads `unknown` with `evidence: none — <reason>`, with "
+        "the count of dropped blocks named in the payload. So the two sides cannot disagree SILENTLY — a drift turns "
+        "the tripwire off BY NAME, it can never turn it green. Pinned by "
+        "tests/test_stage1_pain_evidence_4051.py::TestTheEmptyPath::test_no_session_in_the_window_reads_unknown_with_evidence_none "
+        "and by test_mutation_control_break_the_derivation_and_the_planted_flag_disappears.",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]

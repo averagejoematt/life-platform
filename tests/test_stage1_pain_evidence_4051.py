@@ -259,6 +259,19 @@ class _FakeTable:
         return {"Items": rows}
 
 
+@pytest.fixture(autouse=True)
+def frozen_handler_clock(monkeypatch):
+    """#2376: freeze the handler's own clock to the fixture constant, never a second literal.
+
+    `tool_plan_next_session` derives `target_date` from `pacific_today()` when the caller
+    names none, and `tools_training_notes._resolve_template_id` windows off `pacific_now()`.
+    Every date below is a real calendar day from the 2026-09-22 live read, so the clock is
+    frozen to TODAY itself — repeating the date here is exactly how this class drifts back
+    into a time bomb.
+    """
+    monkeypatch.setattr(tp, "pacific_today", lambda: TODAY)
+
+
 @pytest.fixture
 def wired(monkeypatch):
     fake = _FakeTable(_rows())
