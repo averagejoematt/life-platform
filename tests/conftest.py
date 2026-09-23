@@ -839,6 +839,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # as test_glossary_4035.py above: a new rate-rendering file is exactly a PR's own
         # diff, and site/** auto-deploys on merge.
         "test_rate_n_contract_4035.py",
+        # #4063: greps every tracked file for a contact-shaped address (the named human's
+        # identity lives ONLY in the private S3 config). Pure repo shape: a PR that adds the
+        # contact to this PUBLIC tree must red on itself, before the merge publishes it.
+        "test_named_human_contact_4063.py",
     }
 )
 
