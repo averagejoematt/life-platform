@@ -725,10 +725,20 @@ def stated_frequencies(reason: str) -> list:
 #         cdk_alarm_names()'s docstring). Omit the 4th element when the reason cites a
 #         human/process control instead of an alarm (e.g. "noticed by its reader") —
 #         there is nothing there to structurally verify.
+#   ("producer-census", "YYYY-MM-DD", "reason"[, "cited_control"])
+#       — #4034: the Lambda's SILENCE is detected by the producer census
+#         (deploy/sentinel_producer_census.py, riding the drift sentinel Mon/Wed/Fri):
+#         AWS/Lambda Invocations graded against the cadence resolved below. Same shape
+#         and the same date/reason/cadence-claim checks as an exemption — the reason
+#         still says why no DEDICATED absence alarm exists — but the death is no longer
+#         accepted, it is measured. test_census_rows_are_census_members() asserts the
+#         census actually grades each one; test_no_exemption_is_census_gradable() is why
+#         EXEMPT can only fall.
 
 ALARM = "alarm"
 LIVENESS = "ingest-liveness"
 EXEMPT = "exempt"
+CENSUS = "producer-census"
 
 COVERAGE = {
     # ── Ingestion crons — ER-01 sweep (pipeline-health-check {check_ingest_liveness}
@@ -826,7 +836,7 @@ COVERAGE = {
         "life-platform-delete-user-data-errors",
     ),
     "activity-enrichment": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Additive enrichment of already-stored Strava records; a dead cron degrades detail, never freshness/correctness "
         "(the strava source itself is ER-01 liveness-checked). #3161: corrected — 'ingestion error aggregate' never "
@@ -836,7 +846,7 @@ COVERAGE = {
         "life-platform-ingestion-dlq-messages",
     ),
     "journal-enrichment": (
-        EXEMPT,
+        CENSUS,
         "2026-07-26",
         "Additive enrichment of already-ingested Notion journal records (notion source is ER-01 liveness-checked); "
         "absence degrades detail only. #3161: corrected — 'ingestion error aggregate' never existed; failures route to "
@@ -848,7 +858,7 @@ COVERAGE = {
         "life-platform-ingestion-dlq-messages",
     ),
     "social-enrichment": (
-        EXEMPT,
+        CENSUS,
         "2026-07-22",
         "#1671 (epic #1668): additive enrichment of already-ingested inbound-social posts (writes enriched_* back in place, no "
         "new source partition). A dead cron degrades coach-signal detail only, never data freshness/correctness; the youtube "
@@ -856,79 +866,79 @@ COVERAGE = {
         "aggregate' never existed; failures route to the shared ingestion DLQ, alarmed by life-platform-ingestion-dlq-messages.",
         "life-platform-ingestion-dlq-messages",
     ),
-    "acwr-compute": (EXEMPT, "2026-07-19", "Derived layer: ACWR training-load ratios recomputed daily from liveness-checked sources."),
+    "acwr-compute": (CENSUS, "2026-07-19", "Derived layer: ACWR training-load ratios recomputed daily from liveness-checked sources."),
     "anomaly-detector": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: anomaly flags over already-liveness-checked metrics; absence = no new flags.",
     ),
-    "circadian-compliance": (EXEMPT, "2026-07-19", "Derived layer: circadian scoring over liveness-checked sleep data, staleness dated."),
-    "failure-pattern-compute": (EXEMPT, "2026-07-19", "Derived layer: weekly pattern mining; a missed week leaves prior patterns dated."),
+    "circadian-compliance": (CENSUS, "2026-07-19", "Derived layer: circadian scoring over liveness-checked sleep data, staleness dated."),
+    "failure-pattern-compute": (CENSUS, "2026-07-19", "Derived layer: weekly pattern mining; a missed week leaves prior patterns dated."),
     "forecast-engine": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: daily forecasts; a stalled forecast→grading pipeline is independently caught by grading-stalled "
         "(DaysSinceLastDecided, treat_missing=BREACHING) within its 14-day window.",
     ),
     "hypothesis-engine": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: weekly hypothesis refresh; consumers render the prior week's set with dates.",
     ),
     "weekly-correlation-compute": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: weekly correlation matrix; a missed week reads as dated staleness.",
     ),
     "personal-baselines-compute": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: monthly baseline refresh; consumers keep the prior month's baselines.",
     ),
     "scenario-explorer": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: daily what-if scenarios; absence leaves yesterday's scenarios dated on-site.",
     ),
     "episode-detect": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: weekly cut/regain episode benchmarking (BENCH-1); prior episodes remain valid.",
     ),
     "challenge-generator": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Derived layer: weekly reader challenge; a missed week is visible on the site's challenge surface.",
     ),
     "ai-expert-analyzer": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Budget-pause class AI narrative (expert board analysis); absence is a sanctioned tier state.",
     ),
     "coach-daily-reflection": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Budget-pause class AI narrative (coach reflections); absence is a sanctioned tier state.",
     ),
-    "coach-memoir": (EXEMPT, "2026-07-19", "Budget-pause class AI narrative (long-horizon memoir); absence is a sanctioned tier state."),
-    "field-notes-generate": (EXEMPT, "2026-07-19", "Budget-pause class AI narrative (field notes); absence is a sanctioned tier state."),
+    "coach-memoir": (CENSUS, "2026-07-19", "Budget-pause class AI narrative (long-horizon memoir); absence is a sanctioned tier state."),
+    "field-notes-generate": (CENSUS, "2026-07-19", "Budget-pause class AI narrative (field notes); absence is a sanctioned tier state."),
     "inter-coach-dialogue": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Budget-pause class AI narrative (weekly coach dialogue); absence is a sanctioned tier state.",
     ),
     "journal-analyzer": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Budget-pause class AI enrichment (nightly journal sweep); absence is a sanctioned tier state.",
     ),
     "state-of-matthew": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Budget-pause class AI narrative — explicitly paused at tier 2 (ADR-125); the site renders an honest dated stamp when stale.",
     ),
     "voice-fidelity-harness": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Monthly blind voice-fidelity eval harness (portfolio class, ADR-103); a missed run is a missed eval datapoint, "
         'not a data-path failure. #3506 CORRECTED this clause: it opened "Weekly eval harness" and this Lambda is not '
@@ -937,18 +947,18 @@ COVERAGE = {
         "cadence assertion (which reads quantified forms only).",
     ),
     "coach-history-summarizer": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Context compaction only; a missed run means coaches read slightly longer raw history — no correctness impact.",
     ),
     "weekly-digest": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Operator email on a weekly rhythm; a missing Sunday issue is noticed by its reader (Matthew).",
     ),
-    "monthly-digest": (EXEMPT, "2026-07-19", "Operator email on a monthly rhythm; a missing first-Monday issue is noticed by its reader."),
+    "monthly-digest": (CENSUS, "2026-07-19", "Operator email on a monthly rhythm; a missing first-Monday issue is noticed by its reader."),
     "milestone-digest": (
-        EXEMPT,
+        CENSUS,
         "2026-07-26",
         "#1623: sends are rare by design (>=10-14 day ledger cooldown) and most daily runs are honest no-ops (quiet/disarmed), "
         "so an absence alarm cannot distinguish 'dead cron' from 'nothing to celebrate'. #3161: corrected — this Lambda uses "
@@ -963,17 +973,17 @@ COVERAGE = {
         "metric so a quiet day is a datapoint of 0, not an absence — not an Invocations alarm.",
         "life-platform-ingestion-dlq-messages",
     ),
-    "nutrition-review": (EXEMPT, "2026-07-19", "Operator email (Saturday nutrition review); a missing issue is noticed by its reader."),
-    "monday-compass": (EXEMPT, "2026-07-19", "Operator email (Monday week-plan); a missing issue is noticed by its reader same-morning."),
+    "nutrition-review": (CENSUS, "2026-07-19", "Operator email (Saturday nutrition review); a missing issue is noticed by its reader."),
+    "monday-compass": (CENSUS, "2026-07-19", "Operator email (Monday week-plan); a missing issue is noticed by its reader same-morning."),
     "ai-review-pack": (
-        EXEMPT,
+        CENSUS,
         "2026-07-20",
         "Operator email (weekly AI editorial review pack, #1442); a missing Sunday issue is noticed by its reader (Matthew). "
         "It only curates the already-alarmed D2 archive — a read-only digest whose absence carries no data-path risk.",
     ),
-    "evening-nudge": (EXEMPT, "2026-07-19", "Operator email (daily evening nudge); a missing nudge is noticed by its reader that evening."),
+    "evening-nudge": (CENSUS, "2026-07-19", "Operator email (daily evening nudge); a missing nudge is noticed by its reader that evening."),
     "coach-nudge": (
-        EXEMPT,
+        CENSUS,
         "2026-07-25",
         "Proactive coach nudge (#1382): most hourly ticks legitimately send nothing (deterministic triggers + 1/day cap), "
         "so no-invocation alarms would be noise at the send layer; the observatory proactivity card surfaces sent/graded "
@@ -1008,13 +1018,13 @@ COVERAGE = {
     # declares `telegram-webhook-errors` (Errors Sum >= 1 / 5 min, notBreaching, digest)
     # in place of the former TODO. Still not a ledger row — no `schedule=`, so absence
     # is not this file's question; error coverage is the CDK declaration's.
-    "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
+    "weekly-plate": (CENSUS, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
     # #2820: the stale "Operator email" rationale predated #1951 lifting this to a
     # real subscriber send (2026-08-03). Same one-metric delivery dead-man as the
     # chronicle sender.
     "weekly-signal": (ALARM, "weekly-signal-delivery-heartbeat"),
     "partner-weekly-email": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Accountability email to Matthew's partner on a weekly rhythm; absence is humanly noticed by both parties.",
     ),
@@ -1027,7 +1037,7 @@ COVERAGE = {
         "daily freshness/liveness/interior-gap alarms independently cover the data it audits.",
     ),
     "life-platform-traffic-digest": (
-        EXEMPT,
+        CENSUS,
         "2026-08-29",
         "#2835: the Monday ops-pack email (traffic + green report + subscriber funnel + the folded reconciliation and "
         "pip-audit sections); a missing issue is noticed by its reader (Matthew) same-morning — the operator-email class.",
@@ -1072,38 +1082,38 @@ COVERAGE = {
     # delivery: whichever leg dies, no installment reaches subscribers, and the
     # delivery dead-man pages at the promise boundary.
     "wednesday-chronicle": (
-        EXEMPT,
+        CENSUS,
         "2026-08-21",
         "#2820: generation leg — a dead/failed generation means no published installment, so chronicle-email-sender emits "
         "ChronicleSent=0 and chronicle-delivery-heartbeat pages within the week. Crash mode separately reaches the DLQ digest.",
     ),
     "chronicle-approve": (
-        EXEMPT,
+        CENSUS,
         "2026-08-21",
         "#2820: approval/auto-publish sweep leg — a dead sweep leaves the draft unpublished, so no delivery datapoint lands and "
         "chronicle-delivery-heartbeat pages at the weekly promise boundary; delivery-side coverage, not invocation-side.",
     ),
     "chronicle-email-sender": (ALARM, "chronicle-delivery-heartbeat"),
     "between-chronicle": (
-        EXEMPT,
+        CENSUS,
         "2026-08-21",
         "#2820: subscriber-facing mid-gap note, but explicitly cadence POLISH, not the every-Wednesday promise — the promise "
         "carries the delivery dead-man; a deliberate pause here is separately visible via its #1951 kill-switch-skip alarm.",
     ),
     "coach-panel-podcast": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Weekly Panel episode whose generation is deliberately hold/budget-gated (SS-02) — absent output is a sanctioned state; "
         "a missing episode is visible on the site and in the operator's week.",
     ),
     "dashboard-refresh": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Evening top-up writer of dashboard/matthew/data.json whose daily anchor writer is daily-metrics-compute (alarmed via "
         "compute-outputs-missing); the artifact's 4h freshness is FAIL-gated nightly by qa_smoke → qa-smoke-failures.",
     ),
     "site-stats-refresh": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "4x-daily intraday vitals top-up of generated/public_stats.json; the daily anchor refresh rides the alarmed daily-brief "
         "pipeline, so absence = intraday staleness only on public vitals.",
@@ -1121,7 +1131,7 @@ COVERAGE = {
     # instead — `life-platform-og-image-errors` in web_stack.py, wired via
     # web_alarms.add_web_alarms(), replicating this exact per-Lambda-error-alarm pattern.
     "og-image-generator": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Cosmetic share-card regeneration; stale PNGs degrade sharing polish only. Terminal failures → DLQ digest (#809/ADR-116) "
         "+ its own per-Lambda error alarm, ingestion-error-og-image-generator (error_alarm defaults True here — this Lambda is "
@@ -1143,13 +1153,13 @@ COVERAGE = {
     # honestly declines to draw a card still invokes and still emits a datapoint.
     "recap-card-generator": (ALARM, "recap-card-no-invocations-24h"),
     "hevy-restamp": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "FAILS OPEN by design (#417/TR-05): a missed or failed run leaves the last pushed routine "
         "fully usable; never adds/removes a branch.",
     ),
     "reading-recall-sweep": (
-        EXEMPT,
+        CENSUS,
         "2026-07-19",
         "Recall-due sweep (ADR-097); a dead sweep delays recall prompts, which the reading queue flow makes visible in normal use.",
     ),
@@ -1159,7 +1169,7 @@ COVERAGE = {
         "Day-2 bridge email for new subscribers — low volume; a dead cron delays onboarding sends until noticed. Error-mode is alarmed.",
     ),
     "youtube-social-ingestion": (
-        EXEMPT,
+        CENSUS,
         "2026-07-21",
         "#1669 (epic #1668): inbound-social YouTube source is registry-resident and DORMANT until the owner provisions the "
         "life-platform/youtube channel_id — active_api:False, no secret yet, so it fetches nothing and writes no INGEST_HEALTH "
@@ -1167,7 +1177,7 @@ COVERAGE = {
         "is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'youtube').",
     ),
     "bluesky-social-ingestion": (
-        EXEMPT,
+        CENSUS,
         "2026-08-05",
         "#1676 (epic #1668): inbound-social Bluesky source is registry-resident and DORMANT until the owner provisions the "
         "life-platform/bluesky handle — active_api:False, no secret yet, so it fetches nothing and writes no INGEST_HEALTH "
@@ -1175,7 +1185,7 @@ COVERAGE = {
         "is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'bluesky').",
     ),
     "mastodon-social-ingestion": (
-        EXEMPT,
+        CENSUS,
         "2026-08-05",
         "#1676 (epic #1668): inbound-social Mastodon source is registry-resident and DORMANT until the owner provisions the "
         "life-platform/mastodon instance/handle — active_api:False, no secret yet, so it fetches nothing and writes no "
@@ -1319,7 +1329,7 @@ def test_exemptions_are_dated_and_reasoned():
         elif entry[0] == LIVENESS:
             if len(entry) != 2:
                 problems.append(f"  {fn}: liveness entry must be ('ingest-liveness', source)")
-        elif entry[0] == EXEMPT:
+        elif entry[0] in (EXEMPT, CENSUS):
             if len(entry) not in (3, 4):
                 problems.append(f"  {fn}: exemption must be ('exempt', 'YYYY-MM-DD', reason) or (..., cited_control)")
                 continue
@@ -1463,19 +1473,28 @@ def test_cadence_resolver_population_floor():
 # or convert an existing exemption to pay for the new one. Raising this number is
 # not a sanctioned move; that is the whole point of a ratchet (see #3853 — never
 # lower a ratchet, and never raise a numerator).
-EXEMPT_CEILING = 51
+#
+# #4034 (2026-09-23): 51 -> 5. Not by re-labelling — by MEASURING. 46 of the 51 exempt
+# Lambdas are producers in deploy/emf_namespace_ledger.py with a readable cadence, so the
+# producer census now grades their silence and their rows are CENSUS. The 5 left are the
+# scheduled/SES Lambdas that write no ledger namespace (delete-user-data,
+# data-reconciliation, pip-audit, subscriber-onboarding) or have no gradable cadence
+# (insight-email-parser, SES-only). test_no_exemption_is_census_gradable() makes the
+# number structural rather than a ratchet someone remembers to tighten: an EXEMPT row
+# the census CAN grade reds.
+EXEMPT_CEILING = 5
 
 
 def coverage_census() -> dict:
     """{kind: count} over every enumerated Lambda, plus 'total' and 'uncovered'."""
     found = {**scheduled_lambdas(), **ses_triggered_lambdas()}
-    census = {ALARM: 0, LIVENESS: 0, EXEMPT: 0}
+    census = {ALARM: 0, LIVENESS: 0, EXEMPT: 0, CENSUS: 0}
     for fn in found:
         entry = COVERAGE.get(fn)
         if entry:
             census[entry[0]] = census.get(entry[0], 0) + 1
     census["total"] = len(found)
-    census["uncovered"] = len(found) - sum(census[k] for k in (ALARM, LIVENESS, EXEMPT))
+    census["uncovered"] = len(found) - sum(census[k] for k in (ALARM, LIVENESS, EXEMPT, CENSUS))
     return census
 
 
@@ -1495,6 +1514,40 @@ def test_exempt_count_only_shrinks():
         )
 
 
+def _census_windows():
+    sys.path.insert(0, os.path.join(ROOT, "deploy"))
+    import sentinel_producer_census as pc  # noqa: PLC0415 — deploy/ is a flat module dir
+
+    return pc, pc.member_windows(pc.census_population(), pc.scheduled_cadences())
+
+
+def test_census_rows_are_census_members():
+    """#4034: a CENSUS row is a claim that the producer census grades this Lambda's
+    silence. Verify it, like an ALARM row's alarm is verified to exist."""
+    pc, windows = _census_windows()
+    bad = [
+        f"  {fn}: census class {windows.get(fn, {}).get('class', 'NOT A MEMBER')!r}"
+        for fn, entry in sorted(COVERAGE.items())
+        if entry[0] == CENSUS and windows.get(fn, {}).get("class") != "scheduled"
+    ]
+    assert not bad, (
+        "COVERAGE claims producer-census coverage for Lambdas the census does not grade on a cadence "
+        "(not a ledger producer, or on-demand/paused/unreadable) — give each a real signal:\n" + "\n".join(bad)
+    )
+
+
+def test_no_exemption_is_census_gradable():
+    """#4034: the EXEMPT fraction goes to zero by construction, not by ratchet. An
+    exemption accepts a silent death; if the census can MEASURE that silence, accepting
+    it is no longer an honest choice."""
+    pc, windows = _census_windows()
+    gradable = sorted(fn for fn, entry in COVERAGE.items() if entry[0] == EXEMPT and windows.get(fn, {}).get("class") == "scheduled")
+    assert not gradable, (
+        "EXEMPT rows for Lambdas the producer census already grades — convert each to "
+        "('producer-census', date, reason) so the silence is measured, not waived:\n  " + "\n  ".join(gradable)
+    )
+
+
 def test_exemption_cited_controls_reference_real_alarms():
     """#3161: an exemption's 4th tuple element (cited_control) names a SPECIFIC
     compensating alarm the reason leans on for error-mode coverage. This asserts that
@@ -1508,7 +1561,7 @@ def test_exemption_cited_controls_reference_real_alarms():
     names = cdk_alarm_names()
     bad = []
     for fn, entry in sorted(COVERAGE.items()):
-        if entry[0] == EXEMPT and len(entry) == 4:
+        if entry[0] in (EXEMPT, CENSUS) and len(entry) == 4:
             control = entry[3]
             if control not in names:
                 bad.append(f"  {fn} → cites compensating control {control!r} which is not a real alarm cdk/stacks/*.py creates")
@@ -1532,7 +1585,8 @@ if __name__ == "__main__":
     # #3506: EXEMPT is the ratchet numerator — printed explicitly so the number
     # this file is held to is the number it reports, not one derived elsewhere.
     print(
-        f"LIVENESS {census[LIVENESS]} / ALARM {census[ALARM]} / EXEMPT {census[EXEMPT]} of {census['total']}  (EXEMPT {pct:.1f}%, ceiling {EXEMPT_CEILING})"
+        f"LIVENESS {census[LIVENESS]} / ALARM {census[ALARM]} / CENSUS {census[CENSUS]} / EXEMPT {census[EXEMPT]} of {census['total']}"
+        f"  (EXEMPT {pct:.1f}%, ceiling {EXEMPT_CEILING})"
     )
     for channel, entry in sorted(NON_SCHEDULED_EMITTERS.items()):
         print(f"non-scheduled emitter: {channel:60s} {entry[0]:6s} {entry[1]}")
@@ -1542,7 +1596,7 @@ if __name__ == "__main__":
     cadences = scheduled_lambda_cadences()
     print("\nexemptions carrying an UNQUANTIFIED cadence word (reported, not asserted — read these by hand):")
     for fn, entry in sorted(COVERAGE.items()):
-        if entry[0] != EXEMPT or stated_frequencies(entry[2]):
+        if entry[0] not in (EXEMPT, CENSUS) or stated_frequencies(entry[2]):
             continue
         words = bare_cadence_adverbs(entry[2])
         if not words:

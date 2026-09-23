@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-23
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-23 | **Total tools:** 84
+**Version:** v8.6.0 | **Last updated:** 2026-09-23 | **Total tools:** 85
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 84 Tools — by module
+## All 85 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -53,6 +53,7 @@
 | `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
+| `mcp/tools_pending_writes.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
 | `mcp/tools_platform.py` | 3 |
 | `mcp/tools_platform_state.py` | 1 |
@@ -267,13 +268,19 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_capture_queues` | — | #1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — this call is read-only and fast). (2) habit_reflection — missed-needing-why / completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), not the note text. (4) evening_intake — logged tonight? + dose-response arming progress (#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. (6) freshness_flags — stale sources only, name + days_dark. (7) suggested_rituals — #1578: deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a dark source proposes nothing, skipping records nothing. Each section fails soft independently: a broken sub-query never blocks the others, it just reports {status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, journal interview, speak-to-the-coaches, open check-in) instead of calling the underlying tools separately. Skip-without-penalty framing — nothing here is a nag. |
+| `get_capture_queues` | — | #1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — this call is read-only and fast). (2) habit_reflection — missed-needing-why / completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), not the note text. (4) evening_intake — logged tonight? + dose-response arming progress (#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. (6) freshness_flags — stale sources only, name + days_dark. (7) suggested_rituals — #1578: deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a dark source proposes nothing, skipping records nothing. (8) pending_writes — #4078: writes an earlier chat QUEUED for Matthew's approval (manage_pending_writes), each with age_days and an overdue flag past 3 days; unlike the rest, name these once and ask approve or discard. Each section fails soft independently: a broken sub-query never blocks the others, it just reports {status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, journal interview, speak-to-the-coaches, open check-in) instead of calling the underlying tools separately. Skip-without-penalty framing — nothing here is a nag. |
 
 ### mcp.tools_coach_corrections (`mcp/tools_coach_corrections.py`)
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_coach_correction` | item_number=, signal=, coach=, surface=, correction, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. |
+
+### mcp.tools_pending_writes (`mcp/tools_pending_writes.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `manage_pending_writes` | action, target_tool=, target_args=, summary=, context=, pending_id=, reason=, include_resolved= | #4078: the PERSISTED queue for writes that wait on Matthew's approval. Whenever you would tell him a write is 'queued', 'pending approval', 'staged' or 'saved for later', call action='enqueue' FIRST and only say it is queued if the call returned a pending_id — a queue that exists only in this conversation is lost when the chat ends (09-08, 09-18, 09-20 and 09-21 all ended that way). enqueue: target_tool (any registered WRITE tool, e.g. log_decision, write_platform_memory, manage_sick_days), target_args (the exact arguments that tool takes — validated against its schema now, so a queued item can always be performed), summary (one line he will recognise), optional context. An identical pending item is returned instead of duplicated. list: the open items with age_days (get_capture_queues also surfaces them at session start). approve: pending_id — PERFORMS the write through the target tool and marks it approved; if the target errors the item stays pending with the error. discard: pending_id (+ optional reason) — drops it; the row is kept as the record that it was refused. Only approve or discard on his explicit say-so. An item open more than 3 days is flagged overdue and warned on nightly. |
 
 ### mcp.tools_surfaces (`mcp/tools_surfaces.py`)
 

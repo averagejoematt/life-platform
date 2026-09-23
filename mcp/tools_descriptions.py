@@ -700,7 +700,9 @@ GET_CAPTURE_QUEUES_DESCRIPTION = (
     "deterministic checkpoint proposals (cycle milestone, weight band crossed, journal gone dark, "
     "mood slide, readiness cliff, experiment midpoint), each with its rule, the data that fired it, "
     "and a stable episode_key so it shows once per episode; pure code decides every one (no LLM), a "
-    "dark source proposes nothing, skipping records nothing. Each section fails soft "
+    "dark source proposes nothing, skipping records nothing. (8) pending_writes — #4078: writes an "
+    "earlier chat QUEUED for Matthew's approval (manage_pending_writes), each with age_days and an "
+    "overdue flag past 3 days; unlike the rest, name these once and ask approve or discard. Each section fails soft "
     "independently: a broken sub-query never blocks the others, it just reports "
     "{status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, "
     "journal interview, speak-to-the-coaches, open check-in) instead of calling the "
@@ -726,6 +728,28 @@ LOG_COACH_CORRECTION_DESCRIPTION = (
     "path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal "
     "so that ranking can attribute it."
 )
+
+# #4078: moved out of `mcp/registry.py` to pay for `manage_pending_writes` under the #1665
+# ceiling (2,128 of 2,130 logical lines) — the #3891/#4036 idiom: the parameter table moves, the
+# schema NAME stays inline in the registry, and the catalog resolves this by name (byte-identical).
+LOG_COACH_CORRECTION_INPUT = {
+    "type": "object",
+    "properties": {
+        "item_number": {"type": "integer", "description": "Path 1 (#1690): the pack #N. One of item_number/signal."},
+        "signal": {"type": "string", "description": "Path 2 (#4083): live-session override — the metric/flag id."},
+        "coach": {"type": "string", "description": "Path 2 only. Optional bare coach id; omitted = surface-wide."},
+        "surface": {"type": "string", "description": "Path 2 only. Optional; defaults to 'chat_coaching'."},
+        "correction": {"type": "string", "description": "What was wrong and what it should say, verbatim."},
+        "error_class": {
+            "type": "string",
+            "description": (
+                "Optional error-class override: stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, "
+                "framing, checkable-metric, hedged-safe, defense-held, other. Unrecognized -> 'other', never rejected."
+            ),
+        },
+    },
+    "required": ["correction"],
+}
 
 DESCRIBE_PLATFORM_SURFACES_DESCRIPTION = (
     "THE INDEX — call this FIRST whenever you are about to say the platform does not hold something. Lists every "

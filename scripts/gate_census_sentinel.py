@@ -77,6 +77,7 @@ _SENTINEL_SIBLINGS = (
     "sentinel_cadence",
     "sentinel_events",
     "sentinel_log_retention",
+    "sentinel_producer_census",
 )
 
 

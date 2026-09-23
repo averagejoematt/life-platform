@@ -321,7 +321,10 @@ def test_live_registry_never_run_entries_do_not_report_ok():
     if never and not overdue:
         assert rc == oc.EXIT_NEVER_RUN, "a never-run ritual must make the dead-man exit 3"
     if not never and not overdue:
-        assert rc == oc.EXIT_CLEAN
+        # #3603/#3597 added two later, lower-precedence legs (stale carry-forward, expired
+        # carrier); this test owns the never-run implication only, so it asserts that
+        # neither of ITS exit codes fires rather than pinning a date-dependent clean.
+        assert rc not in (oc.EXIT_OVERDUE, oc.EXIT_NEVER_RUN)
 
 
 def test_hold_moves_the_clock_but_never_the_never_run_verdict(tmp_path):

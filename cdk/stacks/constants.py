@@ -96,26 +96,115 @@ def security_tier_log_group_names() -> dict[str, str]:
 # `alarm_name=` literal in `cdk/stacks/monitoring_stack.py`, so a rename or a deletion
 # in the stack reds the registry instead of silently orphaning it. Adding a name here
 # is a deliberate act with a reason and a date — an alarm is an incident by default.
+#
+# #4034 — THIS IS THE SUPPRESSOR REGISTRY, and a suppressor is a TYPE with a WINDOW.
+# A member is an alarm whose ALARM state gates a composite (typically as a NOT() term,
+# so while it is red a real page is withheld). #3503 taught the sweeps to stop reading
+# it as an incident; that left the opposite hole — a suppressor stuck red forever
+# withholds its composite's page forever, and the exclusion hid exactly that. So every
+# member now carries:
+#   * `type`           — ALARM_TYPE_SUPPRESSOR. The sweeps exclude by TYPE via
+#                        `suppression_holds()`, never by a name written in the sweep
+#                        (tests/test_suppressor_registry_4034.py forbids a member's
+#                        literal name in any sweep source).
+#   * `composites`     — every composite whose ALARM_RULE consumes it (contract-tested
+#                        against the CDK alarm_rule AST, both directions: a NOT() term
+#                        on an unregistered alarm reds too).
+#   * `window_hours` + `end_condition` — how long red is its designed normal, and what
+#                        ends it. Past the window the member is NOT excluded: both sweeps
+#                        escalate it as a suppressor overdue (the dead-man).
+ALARM_TYPE_SUPPRESSOR = "suppressor"
+ALARM_TYPE_INCIDENT = "incident"
+
 BY_CONSTRUCTION_FLAG_ALARMS = {
     "token-alarm-genesis-window-active": {
+        "type": ALARM_TYPE_SUPPRESSOR,
         "reason": (
             "a gauge, not a failure: ALARM == 'the daily-token ceiling is inside its post-reset "
-            "genesis window', the sole purpose of which is to be the NOT() term in the "
-            "ai-tokens-platform-daily-total-urgent composite and the AND term in the "
-            "-genesis-window composite. It is red for the whole window by design."
+            "genesis window', the sole purpose of which is to be the NOT() term in the two "
+            "-urgent composites and the AND term in the two -genesis-window composites. It is "
+            "red for the whole window by design."
         ),
         "since": "2026-09-05",
+        # #4034 found this tuple naming 2 of the 4 composites that consume the gauge — the
+        # ai-daily-spend-high pair (monitoring_token_alarms.py) was never listed. The
+        # contract test now derives the consumer set from the alarm_rule AST.
         "composites": (
             "ai-tokens-platform-daily-total-urgent",
             "ai-tokens-platform-daily-total-genesis-window",
+            "ai-daily-spend-high-urgent",
+            "ai-daily-spend-high-genesis-window",
+        ),
+        # lambdas/common/token_alarm_window.py stamps genesis-WINDOW_DAYS_BEFORE ..
+        # genesis+WINDOW_DAYS_AFTER in Pacific days (1 + 7 + the genesis day = 9 days =
+        # 216h), plus one daily evaluation of slack for the gauge's own period. The
+        # contract test re-derives the floor from that module, so widening the stamped
+        # window without widening this one reds.
+        "window_hours": 240,
+        "end_condition": (
+            "the stamped window (common/token_alarm_window.window_for_genesis) passes its end "
+            "day; cost-governor then publishes TokenAlarmGenesisWindowActive=0 and the gauge "
+            "returns to OK on its next evaluation. No further resets are planned (ADR-077 "
+            "amendment 2026-09-21), so any ALARM episode on this gauge is now a new stamp or a stuck gauge."
         ),
     },
 }
 
+# The same object under the name #4034 gives it; the #3503 name stays for its callers.
+SUPPRESSOR_REGISTRY = BY_CONSTRUCTION_FLAG_ALARMS
+
+
+def alarm_type(alarm_name: str) -> str:
+    """ALARM_TYPE_SUPPRESSOR for a registry member, else ALARM_TYPE_INCIDENT."""
+    entry = BY_CONSTRUCTION_FLAG_ALARMS.get(alarm_name)
+    return entry.get("type", ALARM_TYPE_SUPPRESSOR) if entry else ALARM_TYPE_INCIDENT
+
 
 def is_by_construction_flag(alarm_name: str) -> bool:
-    """True when an ALARM state on this alarm is its designed normal, not an incident."""
-    return alarm_name in BY_CONSTRUCTION_FLAG_ALARMS
+    """True when an ALARM state on this alarm is its designed normal, not an incident.
+
+    Type membership only — it says nothing about the WINDOW. A sweep deciding whether
+    to exclude an alarm RIGHT NOW must call `suppression_holds()` instead (#4034)."""
+    return alarm_type(alarm_name) == ALARM_TYPE_SUPPRESSOR
+
+
+def _parse_iso(ts):
+    from datetime import datetime, timezone
+
+    if not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def suppressor_red_hours(alarm_name: str, transitioned, now) -> float | None:
+    """Hours a suppressor has been in its current ALARM episode; None if unknowable."""
+    dt = _parse_iso(transitioned)
+    if dt is None or now is None:
+        return None
+    return (now - dt).total_seconds() / 3600.0
+
+
+def suppressor_overdue(alarm_name: str, transitioned, now) -> bool:
+    """True when a SUPPRESSOR has been red longer than its declared window — the #4034
+    dead-man. FAIL-CLOSED: an unreadable episode start counts as overdue, because the
+    cost of a false escalation is one needs-human line and the cost of a false hold is
+    a composite page withheld with nobody told."""
+    if alarm_type(alarm_name) != ALARM_TYPE_SUPPRESSOR:
+        return False
+    hours = suppressor_red_hours(alarm_name, transitioned, now)
+    if hours is None:
+        return True
+    return hours > float(BY_CONSTRUCTION_FLAG_ALARMS[alarm_name]["window_hours"])
+
+
+def suppression_holds(alarm_name: str, transitioned, now) -> bool:
+    """True when a sweep may exclude this ALARM-state alarm: it is of TYPE suppressor
+    AND still inside its declared window. The only sanctioned exclusion test (#4034)."""
+    return alarm_type(alarm_name) == ALARM_TYPE_SUPPRESSOR and not suppressor_overdue(alarm_name, transitioned, now)
 
 
 # ── DIL-027: the isolated backup of the irreplaceable zone ────────────────────

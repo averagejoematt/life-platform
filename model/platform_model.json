@@ -930,7 +930,7 @@
   "cost_surface": {
     "ai_features": 19,
     "alarms": 132,
-    "emf_namespaces": 31,
+    "emf_namespaces": 32,
     "schedules": 90,
     "secrets": 30
   },
@@ -1143,6 +1143,20 @@
       "lambda": null,
       "module": "lambdas/coach/intake_response.py",
       "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/named_human_contact.py",
+      "partition": "travel",
+      "via": "local-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/pending_writes.py",
+      "partition": "pending_writes",
       "via": "pk"
     },
     {
@@ -7309,23 +7323,23 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 707,
+      "edges": 709,
       "lambdas": 106,
-      "mcp_tool_modules": 32,
-      "mcp_tools": 84,
-      "partitions": 109,
+      "mcp_tool_modules": 33,
+      "mcp_tools": 85,
+      "partitions": 111,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 15,
+      "privacy_sources_owner_only": 17,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 82,
       "schedules": 90
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 349,
-        "sites_resolved": 879,
-        "sites_total": 1228
+        "sites_dynamic": 354,
+        "sites_resolved": 881,
+        "sites_total": 1235
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7741,6 +7755,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "named_human_contact": {
+      "class": "system_state",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "notion": {
       "category": "Inputs",
       "class": "raw_timeseries",
@@ -7758,6 +7777,11 @@
       "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "pending_writes": {
+      "class": "system_state",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "personal_baselines": {
       "class": "system_state",
@@ -8068,7 +8092,9 @@
       "labs": "owner_published",
       "macrofactor": "owner_only",
       "measurements": "owner_published",
+      "named_human_contact": "owner_only",
       "notion": "owner_only",
+      "pending_writes": "owner_only",
       "private_intake": "owner_only",
       "progress_photos": "owner_only",
       "reading": "owner_only",

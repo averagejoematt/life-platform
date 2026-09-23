@@ -507,6 +507,29 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-08-30",
     },
+    "sentinel::deploy/sentinel_producer_census.py::check_producer_census": {
+        "gate_name": "check_producer_census",
+        "command": "python3 -m pytest tests/test_producer_census_4034.py -q",
+        "mutation": (
+            "(a) the REAL derived population (every Lambda whose handler import closure reaches a "
+            "deploy/emf_namespace_ledger.py emitter, 95 on 2026-09-23) read through a GetMetricData fake built to the "
+            "wire shape (Label == function, newest-first Timestamps/Values), with ONE member (daily-brief) given no "
+            "datapoints; plus pure plants of a producer last seen past its window, a producer never seen in the "
+            "lookback, and a FIRST_DUE member whose due date + window has passed. (b) get_metric_data raising "
+            "AccessDenied, and a population with zero gradable members."
+        ),
+        "observed": (
+            "exit 0 with (a) status='drift' naming exactly the planted silent member with its window, reaching "
+            "drift_report.as_signal's flagging map; the all-invoked baseline over the same real population reports "
+            "'clean' with >=70 graded. (b) both -> status='error' ('census measured NOTHING'), never 'clean'."
+        ),
+        "scope": (
+            "Rides the drift sentinel's Mon/Wed/Fri run, so a producer is caught within one sentinel interval of "
+            "crossing its window (2 periods + a daily bucket, floored at 48h) — a census, not a real-time alarm. "
+            "ON_DEMAND members are reported unmeasured, never graded. " + _ERROR_IS_NOT_A_SIGNAL
+        ),
+        "proved_on": "2026-09-23",
+    },
 }
 
 
@@ -1247,6 +1270,113 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
             "registry-scoping #3567 itself argues for."
         ),
         "proved_on": "2026-09-06",
+    },
+    # #3528: the git-push-caller enumeration. Arrives proven by a real mutation of the one
+    # live link it guards (agent_commit.sh -> direct_push_gate.py -> ci_gate_commands), plus
+    # its own planted-pusher negative controls, which run on every invocation.
+    "structural::test_ci_stand_ins_derive.py": {
+        "gate_name": "test_ci_stand_ins_derive.py",
+        "command": (
+            "python3 -m pytest tests/test_ci_stand_ins_derive.py -q -p no:cacheprovider " "-k 'imports_ci_gate_commands or derives_through'"
+        ),
+        "mutation": (
+            "deploy/direct_push_gate.py's `from ci_gate_commands import DOCS_CI_WORKFLOW, ci_gate_commands, "
+            "glob_matches` rewritten to import only DOCS_CI_WORKFLOW + glob_matches (and bind "
+            "`ci_gate_commands = None`), i.e. the direct-push stand-in stops deriving from the workflow — "
+            "the exact shape of a pusher that hand-types its gate list."
+        ),
+        "observed": (
+            "MUTATED: 2 failed — test_every_git_push_caller_imports_ci_gate_commands with "
+            "\"['deploy/agent_commit.sh'] run `git push` without deriving a CI stand-in from "
+            'ci_gate_commands(workflow) (#3528)", and test_agent_commit_derives_through_the_direct_push_gate '
+            "(derives_its_stand_in(..., 'deploy/agent_commit.sh') is False). REVERTED: 2 passed. Both "
+            "watched 2026-09-23. The file's two NEGATIVE_CONTROL tests (a planted .py and a planted .sh "
+            "pusher with a hand-typed gate list, each named by undeclared_pushers) re-prove the "
+            "detector on every run."
+        ),
+        "scope": (
+            "Detection is textual/AST: a push reached indirectly (a shell variable holding `git`, "
+            "`bash -c` strings, `gh api .../git/refs`, a composite action) is not seen, and only "
+            "scripts/ + deploy/ are scanned (the ci-cd.yml reconcile job pushes from YAML). A .sh "
+            "pusher counts as deriving when it references ANY .py that imports ci_gate_commands."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    # #3528: the direct-push landing path. Its two modules and the enumeration test's exemption
+    # registry entered the census once committed (they were untracked on the first census run, so
+    # only the structural test showed then — the reset stand-in's own pytest leg, run in a throwaway
+    # clone, is what surfaced these four). Each is proven by a watched mutation.
+    "guard::deploy/direct_push_gate.py": {
+        "gate_name": "deploy/direct_push_gate.py",
+        "command": (
+            "python3 -m pytest tests/test_agent_commit_push_3528.py tests/test_ci_stand_ins_derive.py -q "
+            "-p no:cacheprovider -k 'refused_naming_the_path or test_classification'"
+        ),
+        "mutation": (
+            "classify()'s `(docs if any(glob_matches(g, p) for g in DOCS_CLASS) else code).append(p)` replaced "
+            "by `docs.append(p)` — every path ruled docs-class, i.e. the refusal can never fire."
+        ),
+        "observed": (
+            "MUTATED: 9 failed, 5 passed — test_a_code_push_to_main_is_refused_naming_the_path (the real "
+            "agent_commit.sh --push against a fixture repo + local bare origin) and the 8 code-class "
+            "test_classification cases. REVERTED: 14 passed. Both watched 2026-09-23. Live, in a throwaway "
+            "clone of this branch with a local bare origin: a one-line lambdas/common/constants.py change "
+            "via `agent_commit.sh --push` on main exited 1 naming the path; the same change on a branch pushed."
+        ),
+        "scope": (
+            "Client-side only: a bare `git push origin main` is not routed through it (ADR-148's bypass actor is "
+            "the owner's account). The docs-only stand-in is a superset of Docs CI, not of CI/CD's Unit Tests."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    "guard::scripts/ci_gate_commands.py": {
+        "gate_name": "scripts/ci_gate_commands.py",
+        "command": (
+            "python3 -m pytest tests/test_ci_stand_ins_derive.py tests/test_restart_verify_gates_3477.py -q " "-p no:cacheprovider -k empty"
+        ),
+        "mutation": "ci_gate_commands()'s `if not cmds: raise RuntimeError(...ZERO gates...)` changed to `if False:`.",
+        "observed": (
+            "MUTATED: 2 failed, 3 passed — test_the_derivation_raises_on_an_empty_or_missing_workflow and "
+            "test_restart_verify_gates_3477::test_an_empty_derivation_raises_rather_than_reporting_a_clean_sweep "
+            "(the delegate inherits the dead-man). REVERTED: 5 passed. Both watched 2026-09-23."
+        ),
+        "scope": (
+            "The line parser sees single-line `run: python3 …` steps only; `run: |` blocks are enumerated by "
+            "multiline_python_steps() and must be declared by the consumer (MULTILINE_RUN_EXEMPT)."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    "registry::tests/test_ci_stand_ins_derive.py::PUSHER_EXEMPT::deploy/merge_train.sh": {
+        "gate_name": "PUSHER_EXEMPT[deploy/merge_train.sh]",
+        "command": "python3 -m pytest tests/test_ci_stand_ins_derive.py -q -p no:cacheprovider -k imports_ci_gate_commands",
+        "mutation": "the `deploy/merge_train.sh` entry deleted from PUSHER_EXEMPT (the leased PR-branch force-push).",
+        "observed": (
+            "MUTATED: 1 failed — test_every_git_push_caller_imports_ci_gate_commands: \"['deploy/merge_train.sh'] run `git push` "
+            'without deriving a CI stand-in from ci_gate_commands(workflow) (#3528)". REVERTED: 30 passed. Both '
+            "watched 2026-09-23. test_every_exemption_is_a_live_pusher_that_never_targets_main is the stale-entry "
+            "direction (an exemption for a file that stopped pushing reds)."
+        ),
+        "scope": (
+            "The never-main half is a textual check (no `refs/heads/main`, `:main` or `origin main` in the file); "
+            "a push target assembled at runtime from a variable is not seen."
+        ),
+        "proved_on": "2026-09-23",
+    },
+    "registry::tests/test_ci_stand_ins_derive.py::PUSHER_EXEMPT::scripts/archive_handover.py": {
+        "gate_name": "PUSHER_EXEMPT[scripts/archive_handover.py]",
+        "command": "python3 -m pytest tests/test_ci_stand_ins_derive.py -q -p no:cacheprovider -k imports_ci_gate_commands",
+        "mutation": "the `scripts/archive_handover.py` entry deleted from PUSHER_EXEMPT (the session-archive branch push).",
+        "observed": (
+            "MUTATED: 1 failed — test_every_git_push_caller_imports_ci_gate_commands: \"['scripts/archive_handover.py'] run `git push` "
+            'without deriving a CI stand-in from ci_gate_commands(workflow) (#3528)". REVERTED: 30 passed. Both '
+            "watched 2026-09-23. test_every_exemption_is_a_live_pusher_that_never_targets_main is the stale-entry "
+            "direction (an exemption for a file that stopped pushing reds)."
+        ),
+        "scope": (
+            "The never-main half is a textual check (no `refs/heads/main`, `:main` or `origin main` in the file); "
+            "a push target assembled at runtime from a variable is not seen."
+        ),
+        "proved_on": "2026-09-23",
     },
     # #3804: the guard entered the census the moment it was committed (639 -> 640, both
     # `discover_gate_census_count()` and a bare `scripts/gate_census.py` run — confirmed
@@ -2128,5 +2258,142 @@ GUARD_PROOFS.update(
             ),
             "proved_on": "2026-09-20",
         }
+    }
+)
+
+
+# ── #4035: the newcomer glossary's GLOSS_ALLOWLIST + GLOSS_EXEMPT_PAGES entries ────────
+#
+# Each entry proved in BOTH directions by
+# tests/test_glossary_4035.py::test_each_allowlist_entry_is_load_bearing_and_not_blanket /
+# ::test_each_exempt_page_entry_is_load_bearing_and_not_blanket, against the REAL
+# production regex/constants (v4_glossary.ACRONYM_RE, .GLOSS_ALLOWLIST, .scan_content_text)
+# over synthetic input — offline, no dependency on whether the term/page currently appears
+# live (an allowlist entry that appears nowhere on today's site would otherwise be
+# unprovable by a live-tree scan alone, and would wrongly read as decoration).
+#
+# (a) LOAD-BEARING: the entry removed from a COPY of the registry; the real gate logic
+#     must now flag the exact thing the entry used to excuse.
+# (b) NOT A BLANKET EXEMPTION: with the full registry intact, a DIFFERENT off-list
+#     token/page is still caught — the entry excuses only itself.
+#
+# Building this proof entry-by-entry FOUND a real defect: three single-letter roman
+# numerals (I, V, X) were allowlisted but v4_glossary.ACRONYM_RE's own `\b[A-Z]{2,6}\b`
+# floor can never match a 1-character token, so those three entries were declared-unwired
+# by construction — the exact class this census exists to catch, one layer up from the
+# gate they sat beside. Removed 2026-09-23 (scripts/v4_glossary.py); the 51/2 counts below
+# are what remained, and every one of them fired for real under this proof.
+
+_GLOSS_COMMAND = (
+    "python3 -m pytest tests/test_glossary_4035.py::test_each_allowlist_entry_is_load_bearing_and_not_blanket "
+    "tests/test_glossary_4035.py::test_each_exempt_page_entry_is_load_bearing_and_not_blanket -q   "
+    "# 53 parametrised cases (51 allowlist + 2 exempt pages), 2026-09-23: 53 passed in 0.92s"
+)
+
+_GLOSS_ALLOWLIST_ENTRIES = (
+    "AI",
+    "AM",
+    "AND",
+    "API",
+    "AWS",
+    "BLUNT",
+    "BRIEF",
+    "CDK",
+    "CI",
+    "CLAUDE",
+    "CRM",
+    "CSV",
+    "DAILY",
+    "DATE",
+    "DDB",
+    "DRAWN",
+    "EMA",
+    "FALSE",
+    "FIRST",
+    "FIXED",
+    "FROZEN",
+    "GET",
+    "HR",
+    "IAM",
+    "II",
+    "III",
+    "IP",
+    "IV",
+    "IX",
+    "JS",
+    "LAST",
+    "MIT",
+    "NOT",
+    "NOTE",
+    "ONE",
+    "ONLY",
+    "POLICY",
+    "PR",
+    "QA",
+    "README",
+    "SCOPE",
+    "SES",
+    "SHA",
+    "SHIPS",
+    "SOURCE",
+    "UTC",
+    "VI",
+    "VII",
+    "VIII",
+    "WARM",
+    "YEAR",
+)
+
+_GLOSS_SKIPPED_PAGE_ENTRIES = ("/method/mirror/", "/method/registry/")
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::scripts/v4_glossary.py::GLOSS_ALLOWLIST::{term}": {
+            "gate_name": f"GLOSS_ALLOWLIST[{term}]",
+            "command": _GLOSS_COMMAND,
+            "mutation": (
+                f"(a) `{term}` removed from a copy of GLOSS_ALLOWLIST — the real ACRONYM_RE match on "
+                f"'{term} appears in prose.' is then checked against the reduced set. "
+                f"(b) `{term}` left in the full allowlist, alongside the off-list plant 'ZQXVK' in the "
+                "same synthetic prose."
+            ),
+            "observed": (
+                f"(a) exit 1 (assertion) if this were the shipped gate's live scan — reproduced instead as a "
+                f"direct check: ACRONYM_RE matches '{term}', and with `{term}` removed from the allowlist copy "
+                f"it lands in the offender set exactly as test_no_unregistered_acronym_coinage's own offender "
+                f"loop would report. (b) with `{term}` present, only 'ZQXVK' lands in the offender set — "
+                f"`{term}`'s exemption does not swallow it. Watched 2026-09-23, "
+                "PASSED[" + term + "] in the 53-case parametrised run above."
+            ),
+            "scope": "",
+            "proved_on": "2026-09-23",
+        }
+        for term in _GLOSS_ALLOWLIST_ENTRIES
+    }
+)
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::scripts/v4_glossary.py::GLOSS_EXEMPT_PAGES::{page}": {
+            "gate_name": f"GLOSS_EXEMPT_PAGES[{page}]",
+            "command": _GLOSS_COMMAND,
+            "mutation": (
+                f"(a) `{page}` removed from a copy of GLOSS_EXEMPT_PAGES, monkeypatched onto the real module; "
+                "v4_glossary.scan_content_text() is called on that page path with fixed synthetic prose ('RMSSD "
+                "lives here, already defined inline.'). (b) the full exempt set restored, a DIFFERENT page path "
+                "(/data/vitals/) scanned with the same prose."
+            ),
+            "observed": (
+                f"(a) exit 1 (assertion) if this were the shipped gate's live scan — reproduced instead as a "
+                f"direct check: scan_content_text('{page}') returns the full prose text (non-empty) once its own "
+                "exempt entry is removed from the copy — it is no longer skipped, so a live page would now be "
+                "scanned by gate (b) and could fail it. (b) with the full set restored, /data/vitals/ (not "
+                "exempt) still returns non-empty prose — the entry excuses only its own page, never a blanket "
+                f"pass. Watched 2026-09-23, PASSED[{page}] in the 53-case parametrised run above."
+            ),
+            "scope": "",
+            "proved_on": "2026-09-23",
+        }
+        for page in _GLOSS_SKIPPED_PAGE_ENTRIES
     }
 )

@@ -399,7 +399,7 @@ def test_the_alarm_sweeps_consult_the_by_construction_registry():
     for rel in ("remediation/agent.py", "scripts/check_alarm_citations.py"):
         with open(os.path.join(_REPO, rel), encoding="utf-8") as fh:
             src = fh.read()
-        assert "is_by_construction_flag" in src, f"{rel} does not consult the by-construction flag registry (#3503)"
+        assert "suppression_holds" in src, f"{rel} does not consult the suppressor registry by type + window (#3503/#4034)"
 
 
 def test_a_by_construction_gauge_is_not_escalated_as_an_aged_alarm():
@@ -412,7 +412,11 @@ def test_a_by_construction_gauge_is_not_escalated_as_an_aged_alarm():
     import agent  # noqa: PLC0415
 
     now = datetime(2026, 9, 5, 12, 0, tzinfo=timezone.utc)
-    old = (now - timedelta(days=30)).isoformat()
+    # #4034: the gauge is held only INSIDE its declared window (240h), so the control ages
+    # both alarms 8 days — past the 72h aging bar, inside the suppressor window. Past the
+    # window the gauge IS escalated, by the suppressor dead-man
+    # (tests/test_suppressor_registry_4034.py owns that half).
+    old = (now - timedelta(days=8)).isoformat()
     gauge = {"name": "token-alarm-genesis-window-active", "updated": old}
     ordinary = {"name": "some-real-failure", "updated": old}
 
