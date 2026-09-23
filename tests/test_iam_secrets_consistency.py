@@ -83,7 +83,7 @@ KNOWN_SECRETS = [
     "life-platform/todoist",  # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
     "life-platform/hevy",  # ADR-060 / SPEC_HEVY §2.4: api_key (+ vestigial webhook_secret) for hevy-backfill. Created 2026-05-25; hevy-webhook FunctionURL retired 2026-07-06 (#756).
     "life-platform/hevy-write",  # ADR-066 (2026-05-31): write-capable Hevy key for hevy-routine-cron + MCP manage_hevy_routine. Separate from read per Yael bundling rule.
-    "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): fine-grained PAT for remediation-dispatcher Lambda → GitHub repository_dispatch. Rotates ~2026-08-27.
+    "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): fine-grained PAT for remediation-dispatcher Lambda → GitHub repository_dispatch. Rotates ~2026-08-27. #4022 (2026-09-23): also read by qa-smoke's closure_probe_qa leg (env-gated, same PAT, comment+close only).
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens, dedicated (was sha256(anthropic-api-key)).
     "life-platform/google-tts",  # 2026-06-14: Google Cloud Chirp 3: HD API key for the podcasts (chronicle-podcast + coach-panel-podcast). Created as a prerequisite.
     "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (wednesday-chronicle + coach-panel-podcast). Created with the editorial-image feature.

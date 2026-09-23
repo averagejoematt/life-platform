@@ -236,8 +236,9 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
         ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-24"))[0]
     leg_press = ideal.exercises[0]
     top = leg_press.sets[0].weight_kg
-    # #4090: week 1 of the v0.3 entry ramp — 60 % of the anchor after the 15 % discount
-    assert top == 46.5  # ceil-to-0.5 kg of 200 lb x 0.85 x 0.60 = 46.27 kg
+    # #4090: week 1 of the v0.3 entry ramp — 60 % of the anchor. #4107: this anchor (09-20)
+    # is 4 d before block 1, inside the 28 d detraining age, so it takes NO discount
+    assert top == 54.5  # ceil-to-0.5 kg of 200 lb x 0.60 = 54.43 kg
     assert [s.weight_kg for s in leg_press.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     # the note leads with history (ADR-068's one best line), then the §3 prescription
