@@ -2,8 +2,6 @@
 Strength training tools: exercise history, PRs, volume, progress, frequency, standards.
 """
 
-from datetime import datetime, timedelta
-
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import logger, table
@@ -84,95 +82,70 @@ def _searched_block(exercise_name: str, template_id: str, start_date: str, end_d
 # (measured live 2026-09-21: num_periods_analyzed 1394.3, Chest 72 sets -> 0.1/wk). The
 # all-time default is right for `get_exercise_history` (a RECORD) and wrong here.
 # 28 days = four whole weeks, the RP mesocycle unit the landmarks are defined over; the
-# month view takes 90 days ≈ 2.96 months for the same reason.
+# month view takes 90 days ≈ 2.96 months for the same reason. #4071: these are INCLUSIVE
+# day counts — the default week window is end-27..end, exactly 28 days, exactly 4.0 weeks.
 _DEFAULT_LOOKBACK_DAYS = {"week": 28, "month": 90}
+
+# #4071: every answer also carries these two trailing windows, ending on `end_date`, read
+# from the same partition read — the planner's 28-day rate and the 7-day "this week" read.
+_TRAILING_WINDOWS = (7, 28)
+
+
+def _item_day(item: dict) -> str:
+    """The day key a Hevy partition row names (`date`, else the DATE# sort key)."""
+    return str(item.get("date") or str(item.get("sk") or "")[5:15])[:10]
 
 
 def tool_get_muscle_volume(args):
-    """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks — cross-phase (#4031).
+    """Weekly WORKING sets per muscle vs MEV/MAV/MRV landmarks — cross-phase (#4031), counted right (#4071).
 
-    Two read defects fixed here, both found by #4030's consumer audit and both measured
-    read-only against live DynamoDB on 2026-09-21. Neither touches the prescription logic:
-    `volume_status`, `classify_exercise` and `_VOLUME_LANDMARKS` are untouched. What changes
-    is what gets COUNTED and what it is divided BY — which does move the verdict, and that
-    is the point of the issue.
+    The counting is `training.muscle_volume.working_sets_by_muscle` — THE one per-muscle
+    computation (derivation guard: tests/test_muscle_volume_working_sets_4071.py). #4071 fixed
+    four defects there and here, measured against live Hevy 2026-09-15..09-21:
+      * a set credited every muscle in its keyword row at 1.0 (Quads == Hamstrings == 10);
+        now one primary per set, a secondary only where the taxonomy names it, at 0.5;
+      * warm-ups counted (the live set type is `type`, the normalizer read `set_type`);
+      * keyword collisions ("Seated Leg Curl" -> Biceps);
+      * `(end - start).days` over an inclusive window: 7 days read as 0.857 weeks.
 
-    1. **The phase filter comes off.** This read `query_source_range("hevy", …)` — an alias
-       for `query_source(..., include_pilot=False)`, the ADR-058 filter — over a partition
-       `phase_taxonomy` classifies `raw_timeseries`, i.e. cross-phase by design. Every
-       pre-genesis row is stamped `phase=pilot` by the restart tagger, so every trailing
-       window silently truncated to the CYCLE'S AGE: a 30-day window 15 days after genesis
-       counted 15 days of work and divided by 4.3 weeks. Measured, 30d (2026-08-22..09-21):
-       Chest 72 -> 84 sets, Triceps 87 -> 99, Shoulders 56 -> 66. The error is a function of
-       days-since-genesis, so it is smallest exactly when anyone looks for it and TOTAL on
-       day 1 of a cycle. The bypass is derived from `source_reads_cross_phase("hevy")` via
-       `_read_hevy_all_phases` (#4030), never hard-coded here, and that helper also drops the
-       421 superseded `tombstone=true` legacy daily aggregates so nothing is double-counted.
+    #4031 (kept): the read is cross-phase by the taxonomy's own ruling, minus the superseded
+    legacy generation, via `_read_hevy_all_phases`.
 
-    2. **The default window is a rate window.** See `_DEFAULT_LOOKBACK_DAYS`.
-
-    The answer echoes what it actually did in `searched`: the window, whether that window
-    was the caller's or the default, and the phases read.
+    The answer echoes what it did in `searched` (window, whose window, phases read) and `method`.
     """
-    end_date = args.get("end_date", pacific_now().date().isoformat())
+    from training.muscle_volume import METHOD, MUSCLES, window_days, window_start, window_weeks, working_sets_by_muscle
+
+    end_date = args.get("end_date") or pacific_now().date().isoformat()
     period = args.get("period", "week")  # "week" or "month"
     # Same "anything not 'week' is a month" rule the period label and divisor below use —
     # the enum itself is validated at the handler boundary (#2660).
-    lookback_days = _DEFAULT_LOOKBACK_DAYS["week" if period == "week" else "month"]
+    period_label = "week" if period == "week" else "month"
+    lookback_days = _DEFAULT_LOOKBACK_DAYS[period_label]
 
     caller_start = args.get("start_date")
-    if caller_start:
-        start_date = caller_start
-    else:
-        start_date = (datetime.fromisoformat(end_date) - timedelta(days=lookback_days)).date().isoformat()
+    start_date = caller_start or window_start(end_date, lookback_days)
+    total_days = window_days(start_date, end_date)  # inclusive whole days; raises on an inverted window
+    num_periods = window_weeks(start_date, end_date) if period_label == "week" else total_days / 30.44
 
-    # #4031: cross-phase by the taxonomy's own ruling, minus the superseded legacy generation.
-    items, phases_read = _read_hevy_all_phases(start_date, end_date)
+    # ONE read covers the analysis window AND both trailing windows.
+    read_start = min(start_date, window_start(end_date, max(_TRAILING_WINDOWS)))
+    items, _phases_of_read = _read_hevy_all_phases(read_start, end_date)
+    workouts = normalize_hevy_items(items)
 
-    start_dt = datetime.fromisoformat(start_date)
-    end_dt = datetime.fromisoformat(end_date)
-    total_days = max((end_dt - start_dt).days, 1)
-    num_periods = total_days / 7 if period == "week" else total_days / 30.44
+    counted = working_sets_by_muscle(workouts, start_date, end_date)
 
-    muscle_sets: dict[str, int] = {}
-    muscle_volume: dict[str, float] = {}
-    push_sets = pull_sets = leg_sets = core_sets = 0
-    aggregated_dates: list[str] = []  # B2a: workout dates actually folded in
-
-    # #110: normalize_hevy_items handles both schemas.
-    for workout in normalize_hevy_items(items):
-        wd = (workout.get("date") or "")[:10]
-        if wd:
-            aggregated_dates.append(wd)
-        for ex in workout["exercises"]:
-            name = ex["name"]
-            cls = classify_exercise(name, ex.get("template_id"))  # #3770: id override wins over name
-            normal_sets = [s for s in ex["sets"] if s["set_type"] != "warmup"]
-            n = len(normal_sets)
-            vol = sum(s["weight_lbs"] * s["reps"] for s in normal_sets)
-            for m in cls["muscle_groups"]:
-                muscle_sets[m] = muscle_sets.get(m, 0) + n
-                muscle_volume[m] = muscle_volume.get(m, 0.0) + vol
-            pattern = cls["movement_pattern"]
-            if pattern == "Push":
-                push_sets += n
-            elif pattern == "Pull":
-                pull_sets += n
-            elif pattern == "Legs":
-                leg_sets += n
-            elif pattern == "Core":
-                core_sets += n
-
-    period_label = "week" if period == "week" else "month"
     volume_report = {}
-    for muscle in sorted(muscle_sets):
-        total_sets = muscle_sets[muscle]
-        avg = total_sets / num_periods if num_periods > 0 else 0
+    for muscle in MUSCLES:
+        row = counted["muscles"].get(muscle) or {"direct_sets": 0, "secondary_sets": 0.0, "total_sets": 0.0, "volume_lbs": 0.0}
+        avg = row["total_sets"] / num_periods if num_periods > 0 else 0
         lm = _VOLUME_LANDMARKS.get(muscle, _VOLUME_LANDMARKS["Other"])
         volume_report[muscle] = {
-            "total_sets": total_sets,
+            "total_sets": row["total_sets"],
+            "direct_sets": row["direct_sets"],
+            "secondary_sets": row["secondary_sets"],
             f"avg_sets_per_{period_label}": round(avg, 1),
-            "total_volume_lbs": round(muscle_volume.get(muscle, 0), 0),
+            # Primary-attributed tonnage only, so no set's load is counted twice.
+            "total_volume_lbs": row["volume_lbs"],
             "volume_landmark_status": volume_status(muscle, avg),
             "landmarks": {
                 "MV": lm["MV"],
@@ -182,10 +155,35 @@ def tool_get_muscle_volume(args):
             },
         }
 
+    trailing = {}
+    for days in _TRAILING_WINDOWS:
+        w_start = window_start(end_date, days)
+        w = working_sets_by_muscle(workouts, w_start, end_date)
+        weeks = days / 7
+        trailing[f"{days}d"] = {
+            "start": w_start,
+            "end": end_date,
+            "days": days,
+            "weeks": weeks,
+            "muscles": {
+                m: {
+                    "total_sets": (w["muscles"].get(m) or {}).get("total_sets", 0.0),
+                    "direct_sets": (w["muscles"].get(m) or {}).get("direct_sets", 0),
+                    "sets_per_week": round((w["muscles"].get(m) or {}).get("total_sets", 0.0) / weeks, 1),
+                }
+                for m in MUSCLES
+            },
+            "warmup_sets_excluded": w["warmup_sets_excluded"],
+        }
+
+    ps = counted["pattern_sets"]
+    push_sets, pull_sets, leg_sets, core_sets = ps.get("Push", 0), ps.get("Pull", 0), ps.get("Legs", 0), ps.get("Core", 0)
     push_pull_ratio = round(push_sets / pull_sets, 2) if pull_sets > 0 else None
 
     # B2a: completeness — did we fold in the latest ingested Hevy session? A read
     # that silently trails the high-water mark poisons night-before authoring.
+    # #4071: every in-window workout DATE counts here (a cardio-only day is still a session read).
+    aggregated_dates = [str(w.get("date") or "")[:10] for w in workouts if start_date <= str(w.get("date") or "")[:10] <= end_date]
     latest_ingested = None
     try:
         from boto3.dynamodb.conditions import Key as _HWKey
@@ -203,21 +201,34 @@ def tool_get_muscle_volume(args):
         logger.warning("muscle_volume completeness high-water query failed: %s", _e)
     completeness = assess_volume_completeness(aggregated_dates, latest_ingested, end_date, start_date)
 
+    # `searched` describes the ANALYSIS window (its workouts, its phases); the wider partition
+    # read that also feeds `trailing_windows` is named separately in `read_window`.
+    in_window = [it for it in items if start_date <= _item_day(it) <= end_date]
     searched = {
-        **_searched_block("", "", start_date, end_date, items, phases_read),
+        **_searched_block("", "", start_date, end_date, in_window, phases_of(in_window)),
         # #4031: which window this rate is actually over, and whose window it was. A
         # divisor the caller did not choose must never be invisible in the answer.
         "window_source": ("caller" if caller_start else f"default trailing {lookback_days}d ({period_label} view)"),
         "default_lookback_days": lookback_days,
+        "read_window": {"start": read_start, "end": end_date},
     }
 
     return {
         "date_range": {"start": start_date, "end": end_date},
         "analysis_period": period_label,
+        "window_days": total_days,
         "num_periods_analyzed": round(num_periods, 1),
+        "method": METHOD,
         "searched": searched,
         "completeness": completeness,
         "muscle_volume": volume_report,
+        "trailing_windows": trailing,
+        "warmup_sets_excluded": counted["warmup_sets_excluded"],
+        "working_sets_counted": counted["working_sets_counted"],
+        "non_resistance_excluded": counted["non_resistance"],
+        # Movements this taxonomy does not know: their sets are in NO muscle's count. Named, never
+        # folded into an "Other" row a reader would skim past.
+        "unattributed": counted["unattributed"],
         "movement_balance": {
             "push_sets": push_sets,
             "pull_sets": pull_sets,
