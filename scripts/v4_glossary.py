@@ -140,14 +140,17 @@ ACRONYM_RE = re.compile(r"\b[A-Z]{2,6}\b")
 # (including the JSON tile-registry blobs — see module docstring), inline SVG (icon/sigil
 # marks carry no prose text), and the three shared chrome partials `v4_apply_chrome.py`
 # already owns verbatim. DOTALL so a block spanning multiple lines matches as one region.
+# Closing tags allow trailing whitespace (`</script >` is a valid end tag — CodeQL
+# py/bad-tag-filter on PR #4128; a payload written that way would otherwise leak into the
+# "prose" the acronym gate scans).
 EXCLUDE_RE = re.compile(
-    r"<head\b.*?</head>"
-    r'|<nav class="doors".*?</nav>'
-    r'|<footer class="site-foot".*?</footer>'
-    r'|<aside class="loop-forward".*?</aside>'
-    r"|<script\b.*?</script>"
-    r"|<style\b.*?</style>"
-    r"|<svg\b.*?</svg>",
+    r"<head\b.*?</head\s*>"
+    r'|<nav class="doors".*?</nav\s*>'
+    r'|<footer class="site-foot".*?</footer\s*>'
+    r'|<aside class="loop-forward".*?</aside\s*>'
+    r"|<script\b.*?</script\s*>"
+    r"|<style\b.*?</style\s*>"
+    r"|<svg\b.*?</svg\s*>",
     re.DOTALL | re.IGNORECASE,
 )
 
