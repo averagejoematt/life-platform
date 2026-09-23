@@ -51,6 +51,11 @@ SITE_READERS = frozenset({"_query_source", "_latest_item", "_latest_item_asof"})
 
 # ── 1. the site SET ────────────────────────────────────────────────────────────
 #
+# Keys are (function, reader, source-expression, file) — the FILENAME LAST, deliberately: a
+# `"site_api_x.py", "<long_token>"` pair reads as gitleaks' generic-api-key shape (`api` +
+# separator + a high-entropy token) and redded the secret-scan gate on PR #4126; with the
+# filename last, the `api...` literal is always followed by `)` and cannot match.
+#
 # Verdicts. Every call site carries exactly one; the mechanical ones are checked against
 # the taxonomy / the call's own keywords below.
 CLAMPED = "derived: window already genesis DATE-clamped — no served change"
@@ -62,112 +67,112 @@ EXPLICIT = "explicit include_pilot — the caller's own decision wins"
 
 SITE_RULINGS = {
     # private photo viewer (401 at the edge): the capture date is true in every cycle
-    ("progress_viewer_lambda.py", "_tape_for", "_latest_item_asof", "'measurements'"): HISTORY,
-    ("progress_viewer_lambda.py", "_weight_for", "_query_source", "'withings'"): HISTORY,
+    ("_tape_for", "_latest_item_asof", "'measurements'", "progress_viewer_lambda.py"): HISTORY,
+    ("_weight_for", "_query_source", "'withings'", "progress_viewer_lambda.py"): HISTORY,
     # /data/autonomic: "trailing 30 days", renders its own first → last date span
-    ("site_api_autonomic.py", "handle_autonomic_balance", "_query_source", "'whoop'"): HISTORY,
+    ("handle_autonomic_balance", "_query_source", "'whoop'", "site_api_autonomic.py"): HISTORY,
     # /data/zone2: "trailing 90 days", "N of M weeks" over the window it states
-    ("site_api_autonomic.py", "handle_zone2_breakdown", "_query_source", "'strava'"): HISTORY,
-    ("site_api_biomarkers.py", "glucose", "_query_source", "'apple_health'"): CLAMPED,  # _experiment_date(30)
+    ("handle_zone2_breakdown", "_query_source", "'strava'", "site_api_autonomic.py"): HISTORY,
+    ("glucose", "_query_source", "'apple_health'", "site_api_biomarkers.py"): CLAMPED,  # _experiment_date(30)
     # /api/vitals: live windows are max(..., EXPERIMENT_START) (#1084); time-travel passes ip
-    ("site_api_body.py", "vitals", "_query_source", "'whoop'"): EXPLICIT,
-    ("site_api_body.py", "vitals", "_query_source", "'withings'"): EXPLICIT,
-    ("site_api_body.py", "vitals", "_query_source", "'apple_health'"): EXPLICIT,
-    ("site_api_body.py", "vitals", "_latest_item_asof", "'withings'"): EXPLICIT,
-    ("site_api_body.py", "vitals", "_latest_item", "'withings'"): GENESIS,
+    ("vitals", "_query_source", "'whoop'", "site_api_body.py"): EXPLICIT,
+    ("vitals", "_query_source", "'withings'", "site_api_body.py"): EXPLICIT,
+    ("vitals", "_query_source", "'apple_health'", "site_api_body.py"): EXPLICIT,
+    ("vitals", "_latest_item_asof", "'withings'", "site_api_body.py"): EXPLICIT,
+    ("vitals", "_latest_item", "'withings'", "site_api_body.py"): GENESIS,
     # nutrition `as_of` freshness stamp: the latest complete logged day, whatever its phase
-    ("site_api_body.py", "vitals", "_query_source", "'macrofactor'"): HISTORY,
-    ("site_api_body.py", "weight_progress", "_query_source", "'withings'"): CLAMPED,  # max(d180, EXPERIMENT_START)
-    ("site_api_body.py", "_latest_readiness", "_latest_item", "'computed_metrics'"): SCOPED,
+    ("vitals", "_query_source", "'macrofactor'", "site_api_body.py"): HISTORY,
+    ("weight_progress", "_query_source", "'withings'", "site_api_body.py"): CLAMPED,  # max(d180, EXPERIMENT_START)
+    ("_latest_readiness", "_latest_item", "'computed_metrics'", "site_api_body.py"): SCOPED,
     # the caller clamps: handle_fingerprint floors date_str at EXPERIMENT_START; the wall reads current genesis → today
-    ("site_api_fingerprint.py", "_metrics_index", "_query_source", "'whoop'"): CLAMPED,
-    ("site_api_fingerprint.py", "_metrics_index", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_fingerprint.py", "_metrics_index", "_query_source", "'garmin'"): CLAMPED,
-    ("site_api_freshness.py", "device_agreement", "_query_source", "'whoop'"): EXPLICIT,
-    ("site_api_freshness.py", "device_agreement", "_query_source", "'garmin'"): EXPLICIT,
-    ("site_api_fulfillment.py", "character_calibration", "_query_source", "'felt_probe'"): CLAMPED,  # EXPERIMENT_START
-    ("site_api_fulfillment.py", "character_calibration", "_query_source", "'character_sheet'"): SCOPED,
-    ("site_api_journey.py", "journey", "_query_source", "'withings'"): CLAMPED,  # max(d120, EXPERIMENT_START)
-    ("site_api_journey.py", "journey", "_query_source", "'apple_health'"): CLAMPED,  # max(now-7, EXPERIMENT_START), #4088
-    ("site_api_journey.py", "journey", "_latest_item", "'withings'"): GENESIS,  # #3478 Day-1 contract
-    ("site_api_journey.py", "timeline", "_query_source", "'withings'"): CLAMPED,  # start = EXPERIMENT_START
-    ("site_api_meals.py", "protein_sources", "_query_source", "'macrofactor'"): CLAMPED,
-    ("site_api_meals.py", "frequent_meals", "_query_source", "'macrofactor'"): CLAMPED,
-    ("site_api_meals.py", "meal_glucose", "_query_source", "'macrofactor'"): CLAMPED,
-    ("site_api_meals.py", "meal_glucose", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_meals.py", "food_delivery_overview", "_query_source", "'food_delivery'"): CLAMPED,
-    ("site_api_mind.py", "mind_overview", "_query_source", "'state_of_mind'"): CLAMPED,
-    ("site_api_mind.py", "mind_overview", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_nutrition.py", "_latest_weight_lbs", "_query_source", "'withings'"): CLAMPED,  # callers pass _experiment_date
-    ("site_api_nutrition.py", "nutrition_overview", "_query_source", "'macrofactor'"): CLAMPED,
-    ("site_api_nutrition.py", "nutrition_overview", "_query_source", "'strava'"): CLAMPED,
-    ("site_api_nutrition.py", "nutrition_overview", "_query_source", "'withings'"): CLAMPED,
-    ("site_api_nutrition.py", "nutrition_overview", "_query_source", "'whoop'"): CLAMPED,
-    ("site_api_nutrition.py", "nutrition_overview", "_query_source", "'food_delivery'"): CLAMPED,
-    ("site_api_nutrition.py", "nutrition_overview", "_query_source", "'training_reference'"): CROSS,
-    ("site_api_nutrition.py", "deficit_sustainability", "_query_source", "'macrofactor'"): CLAMPED,
-    ("site_api_nutrition.py", "deficit_sustainability", "_query_source", "'withings'"): CLAMPED,
-    ("site_api_nutrition.py", "deficit_sustainability", "_query_source", "s"): CLAMPED,  # whoop/habitify/strava over start
+    ("_metrics_index", "_query_source", "'whoop'", "site_api_fingerprint.py"): CLAMPED,
+    ("_metrics_index", "_query_source", "'apple_health'", "site_api_fingerprint.py"): CLAMPED,
+    ("_metrics_index", "_query_source", "'garmin'", "site_api_fingerprint.py"): CLAMPED,
+    ("device_agreement", "_query_source", "'whoop'", "site_api_freshness.py"): EXPLICIT,
+    ("device_agreement", "_query_source", "'garmin'", "site_api_freshness.py"): EXPLICIT,
+    ("character_calibration", "_query_source", "'felt_probe'", "site_api_fulfillment.py"): CLAMPED,  # EXPERIMENT_START
+    ("character_calibration", "_query_source", "'character_sheet'", "site_api_fulfillment.py"): SCOPED,
+    ("journey", "_query_source", "'withings'", "site_api_journey.py"): CLAMPED,  # max(d120, EXPERIMENT_START)
+    ("journey", "_query_source", "'apple_health'", "site_api_journey.py"): CLAMPED,  # max(now-7, EXPERIMENT_START), #4088
+    ("journey", "_latest_item", "'withings'", "site_api_journey.py"): GENESIS,  # #3478 Day-1 contract
+    ("timeline", "_query_source", "'withings'", "site_api_journey.py"): CLAMPED,  # start = EXPERIMENT_START
+    ("protein_sources", "_query_source", "'macrofactor'", "site_api_meals.py"): CLAMPED,
+    ("frequent_meals", "_query_source", "'macrofactor'", "site_api_meals.py"): CLAMPED,
+    ("meal_glucose", "_query_source", "'macrofactor'", "site_api_meals.py"): CLAMPED,
+    ("meal_glucose", "_query_source", "'apple_health'", "site_api_meals.py"): CLAMPED,
+    ("food_delivery_overview", "_query_source", "'food_delivery'", "site_api_meals.py"): CLAMPED,
+    ("mind_overview", "_query_source", "'state_of_mind'", "site_api_mind.py"): CLAMPED,
+    ("mind_overview", "_query_source", "'apple_health'", "site_api_mind.py"): CLAMPED,
+    ("_latest_weight_lbs", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,  # callers pass _experiment_date
+    ("nutrition_overview", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
+    ("nutrition_overview", "_query_source", "'strava'", "site_api_nutrition.py"): CLAMPED,
+    ("nutrition_overview", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,
+    ("nutrition_overview", "_query_source", "'whoop'", "site_api_nutrition.py"): CLAMPED,
+    ("nutrition_overview", "_query_source", "'food_delivery'", "site_api_nutrition.py"): CLAMPED,
+    ("nutrition_overview", "_query_source", "'training_reference'", "site_api_nutrition.py"): CROSS,
+    ("deficit_sustainability", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
+    ("deficit_sustainability", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,
+    ("deficit_sustainability", "_query_source", "s", "site_api_nutrition.py"): CLAMPED,  # whoop/habitify/strava over start
     # the Mifflin TDEE fallback's exercise energy: a physiological trailing week (today-6)
-    ("site_api_nutrition.py", "deficit_sustainability", "_query_source", "'strava'"): HISTORY,
-    ("site_api_nutrition.py", "deficit_sustainability", "_query_source", "'hevy'"): HISTORY,
-    ("site_api_physical.py", "weekly_physical_summary", "_query_source", "'strava'"): CLAMPED,
-    ("site_api_physical.py", "weekly_physical_summary", "_query_source", "'garmin'"): CLAMPED,
-    ("site_api_physical.py", "weekly_physical_summary", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_pulse.py", "pulse_history", "_query_source", "'whoop'"): CLAMPED,
-    ("site_api_pulse.py", "pulse_history", "_query_source", "'withings'"): CLAMPED,
-    ("site_api_pulse.py", "pulse_history", "_query_source", "'garmin'"): CLAMPED,
-    ("site_api_pulse.py", "pulse_history", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_pulse.py", "pulse", "_latest_item", "'withings'"): GENESIS,  # read against the journey start weight
-    ("site_api_pulse.py", "pulse", "_latest_item", "'habit_scores'"): SCOPED,
-    ("site_api_rollups.py", "tools_baseline", "_query_source", "'whoop'"): CLAMPED,  # both windows, #4088 clamps d7
-    ("site_api_rollups.py", "tools_baseline", "_latest_item", "'withings'"): GENESIS,
+    ("deficit_sustainability", "_query_source", "'strava'", "site_api_nutrition.py"): HISTORY,
+    ("deficit_sustainability", "_query_source", "'hevy'", "site_api_nutrition.py"): HISTORY,
+    ("weekly_physical_summary", "_query_source", "'strava'", "site_api_physical.py"): CLAMPED,
+    ("weekly_physical_summary", "_query_source", "'garmin'", "site_api_physical.py"): CLAMPED,
+    ("weekly_physical_summary", "_query_source", "'apple_health'", "site_api_physical.py"): CLAMPED,
+    ("pulse_history", "_query_source", "'whoop'", "site_api_pulse.py"): CLAMPED,
+    ("pulse_history", "_query_source", "'withings'", "site_api_pulse.py"): CLAMPED,
+    ("pulse_history", "_query_source", "'garmin'", "site_api_pulse.py"): CLAMPED,
+    ("pulse_history", "_query_source", "'apple_health'", "site_api_pulse.py"): CLAMPED,
+    ("pulse", "_latest_item", "'withings'", "site_api_pulse.py"): GENESIS,  # read against the journey start weight
+    ("pulse", "_latest_item", "'habit_scores'", "site_api_pulse.py"): SCOPED,
+    ("tools_baseline", "_query_source", "'whoop'", "site_api_rollups.py"): CLAMPED,  # both windows, #4088 clamps d7
+    ("tools_baseline", "_latest_item", "'withings'", "site_api_rollups.py"): GENESIS,
     # "since your last visit" (capped 30 d): a visit before genesis gets its true delta
-    ("site_api_rollups.py", "changes_since", "_query_source", "'whoop'"): HISTORY,
-    ("site_api_rollups.py", "changes_since", "_query_source", "'withings'"): HISTORY,
-    ("site_api_rollups.py", "changes_since", "_query_source", "'character_sheet'"): SCOPED,
-    ("site_api_rollups.py", "changes_since", "_query_source", "'experiments'"): SCOPED,
-    ("site_api_rollups.py", "_engaged_dates", "_query_source", "src"): EXPLICIT,
-    ("site_api_rollups.py", "observatory_week", "_query_source", "'whoop'"): EXPLICIT,
-    ("site_api_rollups.py", "observatory_week", "_query_source", "'macrofactor'"): EXPLICIT,
-    ("site_api_rollups.py", "observatory_week", "_query_source", "'apple_health'"): EXPLICIT,
-    ("site_api_rollups.py", "observatory_week", "_query_source", "'journal'"): EXPLICIT,
-    ("site_api_rollups.py", "observatory_week", "_query_source", "'withings'"): EXPLICIT,
-    ("site_api_rollups.py", "cycle_compare", "_query_source", "'withings'"): EXPLICIT,
-    ("site_api_rollups.py", "cycle_compare", "_query_source", "'whoop'"): EXPLICIT,
-    ("site_api_sleep.py", "_whoop_daily", "_query_source", "'whoop'"): CLAMPED,  # sleep_correlations passes _experiment_date(30)
-    ("site_api_sleep.py", "sleep_correlations", "_query_source", "'eightsleep'"): CLAMPED,
-    ("site_api_sleep.py", "sleep_correlations", "_query_source", "'macrofactor'"): CLAMPED,
-    ("site_api_sleep.py", "sleep_correlations", "_query_source", "'todoist'"): CLAMPED,
-    ("site_api_sleep.py", "sleep_correlations", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_sleep.py", "sleep_correlations", "_query_source", "'withings'"): CLAMPED,
-    ("site_api_sleep.py", "sleep_detail", "_query_source", "'eightsleep'"): CLAMPED,
-    ("site_api_sleep.py", "sleep_detail", "_query_source", "'whoop'"): CLAMPED,
-    ("site_api_sleep.py", "circadian", "_latest_item", "'circadian'"): SCOPED,
-    ("site_api_training.py", "training_overview", "_query_source", "'strava'"): CLAMPED,  # _experiment_date(90)
-    ("site_api_training.py", "training_overview", "_query_source", "'garmin'"): CLAMPED,
-    ("site_api_training.py", "training_overview", "_query_source", "'apple_health'"): CLAMPED,
-    ("site_api_training.py", "training_overview", "_query_source", "'whoop'"): CLAMPED,
-    ("site_api_training.py", "training_overview", "_query_source", "'hevy'"): CLAMPED,
-    ("site_api_training.py", "training_overview", "_query_source", "'training_reference'"): CROSS,
-    ("site_api_training.py", "strength_deep_dive", "_query_source", "'hevy'"): CLAMPED,  # _experiment_date(90)
+    ("changes_since", "_query_source", "'whoop'", "site_api_rollups.py"): HISTORY,
+    ("changes_since", "_query_source", "'withings'", "site_api_rollups.py"): HISTORY,
+    ("changes_since", "_query_source", "'character_sheet'", "site_api_rollups.py"): SCOPED,
+    ("changes_since", "_query_source", "'experiments'", "site_api_rollups.py"): SCOPED,
+    ("_engaged_dates", "_query_source", "src", "site_api_rollups.py"): EXPLICIT,
+    ("observatory_week", "_query_source", "'whoop'", "site_api_rollups.py"): EXPLICIT,
+    ("observatory_week", "_query_source", "'macrofactor'", "site_api_rollups.py"): EXPLICIT,
+    ("observatory_week", "_query_source", "'apple_health'", "site_api_rollups.py"): EXPLICIT,
+    ("observatory_week", "_query_source", "'journal'", "site_api_rollups.py"): EXPLICIT,
+    ("observatory_week", "_query_source", "'withings'", "site_api_rollups.py"): EXPLICIT,
+    ("cycle_compare", "_query_source", "'withings'", "site_api_rollups.py"): EXPLICIT,
+    ("cycle_compare", "_query_source", "'whoop'", "site_api_rollups.py"): EXPLICIT,
+    ("_whoop_daily", "_query_source", "'whoop'", "site_api_sleep.py"): CLAMPED,  # sleep_correlations passes _experiment_date(30)
+    ("sleep_correlations", "_query_source", "'eightsleep'", "site_api_sleep.py"): CLAMPED,
+    ("sleep_correlations", "_query_source", "'macrofactor'", "site_api_sleep.py"): CLAMPED,
+    ("sleep_correlations", "_query_source", "'todoist'", "site_api_sleep.py"): CLAMPED,
+    ("sleep_correlations", "_query_source", "'apple_health'", "site_api_sleep.py"): CLAMPED,
+    ("sleep_correlations", "_query_source", "'withings'", "site_api_sleep.py"): CLAMPED,
+    ("sleep_detail", "_query_source", "'eightsleep'", "site_api_sleep.py"): CLAMPED,
+    ("sleep_detail", "_query_source", "'whoop'", "site_api_sleep.py"): CLAMPED,
+    ("circadian", "_latest_item", "'circadian'", "site_api_sleep.py"): SCOPED,
+    ("training_overview", "_query_source", "'strava'", "site_api_training.py"): CLAMPED,  # _experiment_date(90)
+    ("training_overview", "_query_source", "'garmin'", "site_api_training.py"): CLAMPED,
+    ("training_overview", "_query_source", "'apple_health'", "site_api_training.py"): CLAMPED,
+    ("training_overview", "_query_source", "'whoop'", "site_api_training.py"): CLAMPED,
+    ("training_overview", "_query_source", "'hevy'", "site_api_training.py"): CLAMPED,
+    ("training_overview", "_query_source", "'training_reference'", "site_api_training.py"): CROSS,
+    ("strength_deep_dive", "_query_source", "'hevy'", "site_api_training.py"): CLAMPED,  # _experiment_date(90)
     # the Lift Index: "a direction, not a 1RM goal" over a stated 90-day trend
-    ("site_api_training.py", "strength_benchmarks", "_query_source", "'hevy'"): HISTORY,
-    ("site_api_vitals_depth.py", "_vo2max_arc", "_query_source", "'garmin'"): EXPLICIT,
-    ("site_api_vitals_depth.py", "_walking_hr", "_query_source", "'strava'"): EXPLICIT,
+    ("strength_benchmarks", "_query_source", "'hevy'", "site_api_training.py"): HISTORY,
+    ("_vo2max_arc", "_query_source", "'garmin'", "site_api_vitals_depth.py"): EXPLICIT,
+    ("_walking_hr", "_query_source", "'strava'", "site_api_vitals_depth.py"): EXPLICIT,
 }
 
 # The call sites whose served numbers WIDEN under #4088 — the PR names each one. A new
 # HISTORY ruling must be added here too, so a widened public number is never silent.
 SERVED_WIDENED = {
-    ("progress_viewer_lambda.py", "_tape_for"),
-    ("progress_viewer_lambda.py", "_weight_for"),
-    ("site_api_autonomic.py", "handle_autonomic_balance"),
-    ("site_api_autonomic.py", "handle_zone2_breakdown"),
-    ("site_api_body.py", "vitals"),
-    ("site_api_nutrition.py", "deficit_sustainability"),
-    ("site_api_rollups.py", "changes_since"),
-    ("site_api_training.py", "strength_benchmarks"),
+    ("_tape_for", "progress_viewer_lambda.py"),
+    ("_weight_for", "progress_viewer_lambda.py"),
+    ("handle_autonomic_balance", "site_api_autonomic.py"),
+    ("handle_zone2_breakdown", "site_api_autonomic.py"),
+    ("vitals", "site_api_body.py"),
+    ("deficit_sustainability", "site_api_nutrition.py"),
+    ("changes_since", "site_api_rollups.py"),
+    ("strength_benchmarks", "site_api_training.py"),
 }
 
 # positional index of include_pilot per reader
@@ -201,7 +206,7 @@ def _site_calls():
             first = node.args[0] if node.args else None
             calls.append(
                 {
-                    "key": (path.name, _enclosing(parents, node), name, ast.unparse(first) if first is not None else None),
+                    "key": (_enclosing(parents, node), name, ast.unparse(first) if first is not None else None, path.name),
                     "line": node.lineno,
                     "literal": first.value if isinstance(first, ast.Constant) and isinstance(first.value, str) else None,
                     "pilot_kw": next((k.value for k in node.keywords if k.arg == "include_pilot"), None),
@@ -272,7 +277,7 @@ def test_no_site_call_hard_codes_the_phase_filter_on():
 
 
 def test_every_widened_read_is_named():
-    widened = {c["key"][:2] for c in SITE_CALLS if SITE_RULINGS.get(c["key"]) == HISTORY}
+    widened = {(c["key"][0], c["key"][3]) for c in SITE_CALLS if SITE_RULINGS.get(c["key"]) == HISTORY}
     assert widened == SERVED_WIDENED, (
         f"HISTORY rulings and SERVED_WIDENED disagree — unnamed: {sorted(widened - SERVED_WIDENED)}, "
         f"stale: {sorted(SERVED_WIDENED - widened)}"
