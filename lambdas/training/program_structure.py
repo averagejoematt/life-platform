@@ -52,21 +52,24 @@ WHAT THIS FILE REFUSES TO DO
 
 It does not restate the rate target, the protein floor, the walking floor or the load
 rules. Those are `owner_redlines.REDLINES` and there is one home for each. What it DOES do
-is name, in `summary()["conflicts"]`, where this program contradicts something already
-stated — and a program that quietly overrode a stated redline would be the worst possible
-outcome of this issue. Under v3 the lifting-frequency conflict is gone by computation, not
-by deletion (three or four days against a 3–4 redline); the barbell-anchors-vs-skill-ceiling
-conflict is likewise resolved by computation for the bench anchor — the owner ruled
-2026-09-23 (#4080, option B) that the four core anchor pattern families (squat, hinge,
-bench, row) are EXEMPT from the interim `skill_ceiling` of 2
-(`ANCHOR_SKILL_CEILING_RULING`); accessories and every non-exempt pattern stay capped,
-and `conflicts()` still reports the family-by-family state rather than asserting it.
+is name, in `summary()["conflicts"]` (computed by `program_conflicts.conflicts()`), where
+this program contradicts something already stated — and a program that quietly overrode a
+stated redline would be the worst possible outcome of this issue. Under v3 the
+lifting-frequency conflict is gone by computation, not by deletion (three or four days
+against a 3–4 redline); the barbell-anchors-vs-skill-ceiling conflict is likewise resolved
+for the bench anchor — the owner ruled 2026-09-23 (#4080, option B) that the four core
+anchor pattern families (squat, hinge, bench, row) are EXEMPT from the interim
+`skill_ceiling` of 2 (`program_conflicts.ANCHOR_SKILL_CEILING_RULING`); accessories and
+every non-exempt pattern stay capped, and `program_conflicts.conflicts()` still reports the
+family-by-family state rather than asserting it.
 """
 
 from __future__ import annotations
 
 import datetime as _dt
-from typing import Any, Iterable
+from typing import Any
+
+from training import program_conflicts
 
 ACTIVE = True
 """True since 2026-09-21: the owner approved v0.3 (#3753/#3755, gate:owner satisfied)."""
@@ -115,10 +118,9 @@ SPLIT_DECISION: dict[str, Any] = {
 #
 # `hevy_title_hints` are lower-cased substrings matched against the exercise NAME on the
 # performed Hevy record — that is the only identifier the wire carries (the DDB hevy row's
-# `exercises[].name`). Catalog keys are listed where a curated movement exists; several
-# anchor members have NO catalog entry today (the safety-bar / high-bar squat, the trap-bar
-# deadlift) and that gap is reported by `catalog_gaps()` rather than left for someone to
-# discover at the rack. The generator selects by `primary_muscle`, so `primary_muscles`
+# `exercises[].name`). Catalog keys name curated movements; a key the catalog does not
+# carry is reported by `program_conflicts.catalog_gaps()` rather than left for someone to
+# discover at the rack (since #4108/#4124 every anchor key exists — the gap map is empty). The generator selects by `primary_muscle`, so `primary_muscles`
 # here is how a pattern becomes REACHABLE on a given day (see `anchor_reachability()`).
 _FREQ_NOTE = (
     "2x/wk per pattern is the red team's minimum-effective-dose frequency (S&C coach, 2026-09-22; Bickel 2011) at 6–10 hard "
@@ -138,10 +140,10 @@ ANCHORS: dict[str, dict[str, Any]] = {
         "provenance": "owner",
         "stated": "2026-09-21",
         "note": (
-            "v0.3 anchor. The safety-bar and high-bar squat have no catalog entry today — `catalog_gaps()` reports them; the "
-            "generator reaches this pattern via `leg_press` (tier 1) and `goblet_squat` (tier 2). Once either is catalogued at "
-            "tier 3, the squat anchor is EXEMPT from the skill_ceiling of 2 (owner ruling 2026-09-23, #4080) — see "
-            "`ANCHOR_SKILL_CEILING_RULING`."
+            "v0.3 anchor. §3's safety-bar / high-bar squat are not in his Hevy history, so the #4108 catalog carries neither; "
+            "the barbell squat (tier 3) resolves first because the squat anchor is EXEMPT from the skill_ceiling of 2 (owner "
+            "ruling 2026-09-23, #4080 — `program_conflicts.ANCHOR_SKILL_CEILING_RULING`). `leg_press` (tier 1) and "
+            "`goblet_squat` (tier 2) stay listed as the fallbacks a non-exempt ceiling (the Minimum Viable Session) reaches."
         ),
     },
     "hinge": {
@@ -156,10 +158,9 @@ ANCHORS: dict[str, dict[str, Any]] = {
         "stated": "2026-09-21",
         "note": (
             "v0.3 anchor. `owner_redlines.REDLINES['load_anchoring']['trap_bar_until_lb']` is the one home for the 275 gate — the "
-            "250–289 conventional pull in his record was set at 260-lb geometry. The trap bar has no catalog entry today (reported by "
-            "`catalog_gaps()`); the generator reaches the pattern via `machine_hip_thrust` / `leg_curl`. The performed record shows "
-            "'Romanian Deadlift (Barbell)' with no curated movement behind it either. Once a tier-3 member is catalogued, the hinge "
-            "anchor is EXEMPT from the skill_ceiling of 2 (owner ruling 2026-09-23, #4080) — see `ANCHOR_SKILL_CEILING_RULING`."
+            "250–289 conventional pull in his record was set at 260-lb geometry. `deadlift_trap_bar` (tier 3) resolves first because "
+            "the hinge anchor is EXEMPT from the skill_ceiling of 2 (owner ruling 2026-09-23, #4080 — "
+            "`program_conflicts.ANCHOR_SKILL_CEILING_RULING`); `machine_hip_thrust` / `leg_curl` stay listed as the fallbacks."
         ),
     },
     "bench": {
@@ -172,7 +173,7 @@ ANCHORS: dict[str, dict[str, Any]] = {
         "stated": "2026-09-21",
         "note": (
             "v0.3 anchor. `barbell_bench_press` is skill_tier 3; the bench anchor is EXEMPT from the week grid's skill_ceiling of "
-            "2 (owner ruling 2026-09-23, #4080) — see `ANCHOR_SKILL_CEILING_RULING` and `conflicts()`."
+            "2 (owner ruling 2026-09-23, #4080) — see `program_conflicts.ANCHOR_SKILL_CEILING_RULING` and `.conflicts()`."
         ),
     },
     "row": {
@@ -343,8 +344,8 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
         "provenance": "unchanged",
         "note": (
             "Still 2 for accessories and every non-exempt pattern. The four core anchor pattern families (squat, hinge, bench, "
-            "row) are EXEMPT from it (owner ruling 2026-09-23, #4080, option B) — see `ANCHOR_SKILL_CEILING_RULING` below and "
-            "`conflicts()`."
+            "row) are EXEMPT from it (owner ruling 2026-09-23, #4080, option B) — see "
+            "`program_conflicts.ANCHOR_SKILL_CEILING_RULING` and `program_conflicts.conflicts()`."
         ),
     },
     "floor_session_minutes": {
@@ -363,35 +364,6 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
             "defect, not the fix."
         ),
     },
-}
-
-
-# ── the anchor skill-ceiling exemption (owner ruling 2026-09-23, #4080) ──────
-# The issue asked which way to resolve the barbell-anchors-vs-skill-ceiling conflict named
-# above: exempt anchors, raise the ceiling, or keep the machine/DB fallback (leg press at
-# 316 lb). The owner chose OPTION B — exempt the four core anchor pattern FAMILIES, not the
-# ceiling itself. `skill_ceiling` (2) is UNCHANGED for accessories and every other pattern
-# (overhead press, vertical pull); this is a narrow, named carve-out, not a raise, which is
-# why it is its own dict next to `skill_ceiling` rather than a second copy of that key.
-ANCHOR_SKILL_CEILING_RULING: dict[str, Any] = {
-    "exempt_families": ("squat", "hinge", "bench", "row"),
-    "effective_ceiling": 3,
-    "provenance": "owner",
-    "stated": "2026-09-23",
-    "decision": "option B",
-    "issue": "#4080",
-    "note": (
-        "Owner ruling 2026-09-23 ~05:45 PT (#4080, option B): the four core anchor pattern families — squat, hinge, bench, row — "
-        "are EXEMPT from the interim `skill_ceiling` of 2 (config/training_week.json's note: 'until the Sports Medicine seat is "
-        "fully staffed'). A tier-3 barbell member of one of these families is reachable by `_resolve_movement` once it exists in "
-        "the catalog (today only `barbell_bench_press` does — #4108 is building the rest of the catalog, including a barbell "
-        "squat). `effective_ceiling` (3) is the highest real skill_tier the catalog uses today, not an unlimited ceiling: a "
-        "movement whose `skill_tier` is unset still falls back to `_resolve_movement`'s 99 sentinel and stays excluded. "
-        "Accessories and every non-exempt pattern (overhead press, vertical pull) are UNCHANGED — `skill_ceiling` itself was not "
-        "raised. The Minimum Viable Session floor (`full_body_session.full_body_routines`, skill_ceiling=1, anchors-only) opts "
-        "OUT of this exemption deliberately: that ceiling is a separate design choice (the tired-day session stays machine/DB-only "
-        "regardless of family), not an instance of the interim Sports-Medicine ceiling this ruling targets."
-    ),
 }
 
 
@@ -433,7 +405,7 @@ def week_grid() -> dict[str, Any]:
             "Saturday is the OPTIONAL fourth session (`optional: True`, gate: two consecutive green recovery days). The generator flags it in the title and rationale; it does not gate it.",
             "session_set_ceiling 25 -> 18 and session_minutes_ceiling 75 -> 70 are v0.3 §3 (12–18 sets, 55–70 min); the weekly cap of 22 is the unchanged fail-safe and never binds here.",
             "The generator selects by muscle, not by pattern: a `back` budget reaches row OR vertical pull. See program_structure.anchor_reachability() for what the grid can and cannot guarantee.",
-            "RESOLVED against redlines v3 (approved 2026-09-21): 3–4 lifting days sits inside owner_redlines.REDLINES['lifting_sessions_per_wk'] (3–4); `conflicts()` computes it rather than asserting it.",
+            "RESOLVED against redlines v3 (approved 2026-09-21): 3–4 lifting days sits inside owner_redlines.REDLINES['lifting_sessions_per_wk'] (3–4); `program_conflicts.conflicts()` computes it rather than asserting it.",
         ],
     }
 
@@ -727,17 +699,18 @@ def _resolve_movement(
     is resolving one anchor's `catalog_keys`; `None` for an accessory, which never qualifies
     for the exemption below regardless of `allow_anchor_exemption`.
 
-    When `family` is one of `ANCHOR_SKILL_CEILING_RULING["exempt_families"]` AND
-    `allow_anchor_exemption` is True, THIS resolution uses `ANCHOR_SKILL_CEILING_RULING
-    ["effective_ceiling"]` instead of `skill_ceiling` (owner ruling 2026-09-23, #4080,
+    When `family` is one of `program_conflicts.ANCHOR_SKILL_CEILING_RULING["exempt_families"]`
+    AND `allow_anchor_exemption` is True, THIS resolution uses that ruling's
+    `effective_ceiling` instead of `skill_ceiling` (owner ruling 2026-09-23, #4080,
     option B) — every other pattern and every accessory still uses `skill_ceiling` unchanged.
     `allow_anchor_exemption=False` is how a deliberately-lower ceiling (the Minimum Viable
     Session's skill_ceiling=1) opts OUT of the exemption rather than being silently raised.
     """
     if catalog_movements is None:
         return None, "movement catalog not read — the pattern is prescribed, the movement is unresolved"
-    exempt = allow_anchor_exemption and family is not None and family in ANCHOR_SKILL_CEILING_RULING["exempt_families"]
-    ceiling = max(int(skill_ceiling), int(ANCHOR_SKILL_CEILING_RULING["effective_ceiling"])) if exempt else skill_ceiling
+    ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
+    exempt = allow_anchor_exemption and family is not None and family in ruling["exempt_families"]
+    ceiling = max(int(skill_ceiling), int(ruling["effective_ceiling"])) if exempt else skill_ceiling
     skipped: list[str] = []
     for k in keys:
         m = catalog_movements.get(k)
@@ -909,82 +882,6 @@ def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int 
         g: {"sets": sum(by_muscle.get(m, 0) for m in spec["primary_muscles"]), "range": list(lift[spec["range_key"]])}
         for g, spec in REDLINE_MUSCLE_GROUPS.items()
     }
-
-
-# ── the conflicts this program has not resolved ──────────────────────────────
-# Named here rather than discovered later. `summary()` carries them into every constraint
-# block, so a plan built on this program cannot be built on a silent override.
-def conflicts() -> list[dict[str, Any]]:
-    """Where v0.3 contradicts something already stated. Computed against owner_redlines."""
-    from training import owner_redlines
-
-    lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
-    lift_days = len(lifting_days())
-    required_days = len([k for k in lifting_days() if not _SCHEDULE[k].get("optional")])
-    out: list[dict[str, Any]] = []
-    if lift_days > lifting["high"] or required_days < lifting["low"]:
-        out.append(
-            {
-                "id": "lifting_frequency_vs_redline",
-                "program_says": f"{required_days} required + {lift_days - required_days} optional lifting days/wk ({SPLIT})",
-                "redline_says": f"{lifting['low']}-{lifting['high']} lifting sessions/wk ({lifting['provenance']}, stated {lifting['stated']})",
-                "resolved": False,
-                "note": "The program's lifting days fall outside the redline's band. The engine must not pick a side silently.",
-            }
-        )
-    tier3 = [k for k, v in ANCHORS.items() if any(c == "barbell_bench_press" for c in v["catalog_keys"])]
-    if tier3:
-        exempt_families = set(ANCHOR_SKILL_CEILING_RULING["exempt_families"])
-        still_blocked = sorted(k for k in tier3 if k not in exempt_families)
-        resolved = not still_blocked
-        entry: dict[str, Any] = {
-            "id": "barbell_anchors_vs_skill_ceiling",
-            "program_says": "the bench anchor names the barbell bench press among its members",
-            "redline_says": "week grid skill_ceiling=2 excludes barbell tier-3 movements until the Sports Medicine seat is staffed",
-            "resolved": resolved,
-            "note": (
-                (
-                    "RESOLVED by owner ruling 2026-09-23 (#4080, option B): the bench anchor is one of the four core anchor "
-                    "pattern families ANCHOR_SKILL_CEILING_RULING exempts from skill_ceiling, so `barbell_bench_press` "
-                    "(skill_tier 3) is reachable by the generator today. Accessories and every non-exempt pattern still stay "
-                    "capped at skill_ceiling=2; the ceiling itself was not raised."
-                )
-                if resolved
-                else (
-                    "The generator CANNOT select a tier-3 barbell movement for "
-                    f"{', '.join(still_blocked)} while skill_ceiling is 2, so that family resolves to the "
-                    "dumbbell/machine members of the pattern today. That is a real substitution and it is stated rather than "
-                    "hidden. Raising the ceiling for a non-exempt family is a separate owner decision."
-                )
-            ),
-        }
-        if resolved:
-            entry["resolved_on"] = ANCHOR_SKILL_CEILING_RULING["stated"]
-            entry["resolution_source"] = (
-                f"owner ruling recorded on {ANCHOR_SKILL_CEILING_RULING['issue']} ({ANCHOR_SKILL_CEILING_RULING['decision']})"
-            )
-        out.append(entry)
-    return out
-
-
-def catalog_gaps(catalog_movement_keys: Iterable[str]) -> dict[str, list[str]]:
-    """Anchor/accessory keys named here that the movement catalog does not carry.
-
-    Injected, not loaded: this module does no I/O (the catalog is a config the caller
-    already read). A gap means the generator cannot select that movement — the program
-    names a lift the engine has no way to prescribe.
-    """
-    known = set(catalog_movement_keys)
-    gaps: dict[str, list[str]] = {}
-    for name, anchor in ANCHORS.items():
-        missing = [k for k in anchor["catalog_keys"] if k not in known]
-        if missing:
-            gaps[f"anchor:{name}"] = missing
-    for day, pool in ACCESSORY_POOL.items():
-        missing = [k for k in pool if k not in known]
-        if missing:
-            gaps[f"accessory:{day}"] = missing
-    return gaps
 
 
 # ── the computed check: is the accessory layer holding still? ────────────────
@@ -1229,8 +1126,8 @@ def summary() -> dict[str, Any]:
         "weekly_anchor_sets": weekly_sets_by_pattern(),
         "day_shape": DAY_SHAPE,
         "week_grid_provenance": WEEK_GRID_PROVENANCE,
-        "anchor_skill_ceiling_exemption": ANCHOR_SKILL_CEILING_RULING,
-        "conflicts": conflicts(),
+        "anchor_skill_ceiling_exemption": program_conflicts.ANCHOR_SKILL_CEILING_RULING,
+        "conflicts": program_conflicts.conflicts(),
         "population_derived_numbers": [
             f"{name}.frequency_per_week" for name, a in ANCHORS.items() if a["frequency_per_week"]["provenance"] == "population-derived"
         ]

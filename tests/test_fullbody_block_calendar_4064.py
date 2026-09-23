@@ -139,7 +139,16 @@ def test_heavy_exposure_is_a_top_set_plus_two_back_offs():
     assert [s["kind"] for s in squat["sets"]] == ["top", "back_off", "back_off"]
     assert squat["sets"][0]["reps"] == [4, 6] and squat["sets"][0]["rpe"] == [7, 8]
     assert all(s["pct_of_top"] == 90 for s in squat["sets"][1:])
-    assert squat["movement_key"] == "leg_press"
+    # #4080: `_resolve_movement` takes the FIRST listed key the ceiling admits. The squat's first
+    # key is `squat_barbell` (skill_tier 3); the squat family is exempt (owner option B), so its
+    # effective ceiling is max(2, 3) = 3 and the barbell squat resolves — not the tier-1 leg press.
+    assert program_structure.ANCHORS["squat"]["catalog_keys"][0] == "squat_barbell"
+    assert CATALOG["movements"]["squat_barbell"]["skill_tier"] == 3
+    assert squat["movement_key"] == "squat_barbell"
+    # mutation control: without the exemption the same ceiling of 2 skips tiers 3 (barbell, front
+    # squat) and falls through to the first tier <= 2 member, the leg press — the 09-24 main shape
+    rx2 = program_structure.session_prescription_for_role("heavy", catalog_movements=CATALOG["movements"], anchor_exempt=False)
+    assert next(e for e in rx2["exposures"] if e["pattern"] == "squat")["movement_key"] == "leg_press"
 
 
 def test_exposure_numbers_match_the_redline_rep_scheme_prose():
@@ -204,10 +213,12 @@ def test_generator_builds_the_heavy_full_body_session_on_2026_09_24():
     ideal, floor = _generate("2026-09-24")
     assert ideal.archetype == "full" and ideal.variant == "ideal"
     assert ideal.title.startswith("Full Body HEAVY — W1")
-    # #4080: bench is one of the four core anchor families exempt from skill_ceiling (owner
-    # ruling 2026-09-23) — the heavy bench exposure now resolves to the tier-3 barbell press.
+    # #4080: squat and bench are core anchor families exempt from skill_ceiling (owner ruling
+    # 2026-09-23), so each resolves to its FIRST listed key even at tier 3 — the barbell squat
+    # and the barbell bench. Row stays `machine_row`: it is the row's first key (tier 1), the
+    # row family has no tier-3 member to reach. Vertical pull is not exempt and is tier 1 anyway.
     assert [b.movement_key for b in ideal.exercises] == [
-        "leg_press",
+        "squat_barbell",
         "barbell_bench_press",
         "machine_row",
         "lat_pulldown",
@@ -222,6 +233,10 @@ def test_generator_builds_the_heavy_full_body_session_on_2026_09_24():
     assert ideal.inputs_snapshot["session_prescription"]["hevy_folder"] == "Full Body"
     # the Minimum Viable Session: anchors only, top set + one back-off
     assert floor.variant == "floor" and [len(b.sets) for b in floor.exercises] == [2, 2, 2, 2]
+    # ...resolved at skill_ceiling 1 with the exemption OFF (anchor_exempt=False): each anchor's
+    # first tier-1 key — leg press (squat_barbell/front_squat tier 3, goblet tier 2 skipped),
+    # machine chest press (barbell 3, DB 2 skipped), machine row, pulldown. No bar on a tired day.
+    assert [b.movement_key for b in floor.exercises] == ["leg_press", "machine_chest_press", "machine_row", "lat_pulldown"]
 
 
 def test_mutation_control_the_weekday_grid_alone_makes_2026_09_24_a_walk():
@@ -232,19 +247,25 @@ def test_mutation_control_the_weekday_grid_alone_makes_2026_09_24_a_walk():
 
 def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     lb = 0.45359237
-    history = {"C7973E0E": [{"date": "2026-09-20", "top_weight_kg": 200 * lb, "sets": [{"weight_kg": 200 * lb, "reps": 8}]}]}
+    # #4080: the heavy squat is `squat_barbell` now, so the history is keyed by ITS template id
+    # (the floor looks the anchor up by `hevy_template_id_hint`, D04AC939), not the leg press's
+    tid = CATALOG["movements"]["squat_barbell"]["hevy_template_id_hint"]
+    history = {tid: [{"date": "2026-09-20", "top_weight_kg": 200 * lb, "sets": [{"weight_kg": 200 * lb, "reps": 8}]}]}
     weights = {"2026-09-20": 316.0, "2026-09-24": 315.0}
     with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
         ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-24"))[0]
-    leg_press = ideal.exercises[0]
-    top = leg_press.sets[0].weight_kg
+    squat = ideal.exercises[0]
+    assert squat.movement_key == "squat_barbell"
+    top = squat.sets[0].weight_kg
     # #4090: week 1 of the v0.3 entry ramp — 60 % of the anchor. #4107: this anchor (09-20)
-    # is 4 d before block 1, inside the 28 d detraining age, so it takes NO discount
+    # is 4 d before block 1, inside the 28 d detraining age, so it takes NO discount. 316 and
+    # 315 lb share band 310–319, so the in-band anchor answers (no fallback). The 85 % e1RM cap
+    # (200 x (1 + 8/30) x 0.85 = 215 lb) does not bind.
     assert top == 54.5  # ceil-to-0.5 kg of 200 lb x 0.60 = 54.43 kg
-    assert [s.weight_kg for s in leg_press.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+    assert [s.weight_kg for s in squat.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     # the note leads with history (ADR-068's one best line), then the §3 prescription
-    assert "HEAVY: 1 top set of 4–6 @ RPE 7–8" in leg_press.notes
+    assert "HEAVY: 1 top set of 4–6 @ RPE 7–8" in squat.notes
 
 
 def test_generator_deload_week_holds_loads_and_cuts_sets():
@@ -256,7 +277,9 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
 
 def test_red_recovery_drops_accessories_not_anchors():
     ideal = _generate("2026-09-24", recovery_tier="red")[0]
-    assert [b.movement_key for b in ideal.exercises] == ["leg_press", "barbell_bench_press", "machine_row", "lat_pulldown"]
+    # the heavy day's four anchors exactly as resolved on green (#4080: barbell squat + bench);
+    # only the three accessories go
+    assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "barbell_bench_press", "machine_row", "lat_pulldown"]
 
 
 def test_hevy_folder_for_full_is_the_program_folder():
@@ -350,7 +373,9 @@ def test_plan_next_session_2026_09_24_through_the_mcp_handler_proposes_full_body
     rx = session["prescription"]
     assert rx["hevy_folder"] == "Full Body"
     assert [(e["pattern"], e["intensity"], e["movement_key"]) for e in rx["exposures"] if e["kind"] == "anchor"] == [
-        ("squat", "heavy", "leg_press"),
+        # #4080: the planner resolves through the same `session_prescription_for_role`, so the
+        # exempt squat/bench families serve their first (tier-3 barbell) keys here too
+        ("squat", "heavy", "squat_barbell"),
         ("bench", "heavy", "barbell_bench_press"),
         ("row", "heavy", "machine_row"),
         ("vertical_pull", "moderate", "lat_pulldown"),

@@ -11,9 +11,12 @@ floor, and an anchor set THIS cycle (pulldown, 09-20) was discounted as if detra
 
 What these tests hold:
 
-  1. FALLBACK — leg press with 0 in-band / 5 out-of-band sessions gets a week-1 load at
-     60–65 % of the discounted NEAREST-band anchor, and the row names it (`anchor_band`,
+  1. FALLBACK — the heavy squat with 0 in-band / 4 out-of-band sessions gets a week-1 load
+     at 60–65 % of the discounted NEAREST-band anchor, and the row names it (`anchor_band`,
      `anchor_date`, `fallback: nearest_band`). Mutation control: no fallback -> unloaded.
+     (#4080: owner option B exempts the squat/hinge/bench/row families from skill_ceiling 2,
+     so the 09-24 heavy squat is `squat_barbell` — its first key — not the leg press #4107
+     was written against. The fallback rule is movement-agnostic; only the fixture moved.)
   2. NEAREST, not most-evidenced — a nearer band with one session beats a farther band
      with 25 (resolve_band's walking-volume pass must not rank load anchors).
   3. THE DISCOUNT HAS AN AGE — 28 d before block 1 or older: discounted; younger: not.
@@ -22,7 +25,9 @@ What these tests hold:
      a draft_custom routine at the generator's loads commits, one under them refuses;
      and by AST nothing but `load_ramp.v03_floor` calls the ramp or the fallback.
   5. THE PLANNER — `plan_next_session target_date=2026-09-24` through the MCP handler
-     carries loads on squat / bench / row with `fallback: nearest_band`.
+     carries loads on squat / row with `fallback: nearest_band`. The heavy bench is the
+     barbell bench, which carries no `hevy_template_id_hint` (ADR-069), so the load path
+     reports `no_template_id` for it rather than a load — pinned in test_v03_load_ramp_4090.
 """
 
 from __future__ import annotations
@@ -51,8 +56,12 @@ from training import load_ramp, program_structure, routine_generator  # noqa: E4
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
 MOVEMENTS = CATALOG["movements"]
 LB = 0.45359237
-TID = {k: MOVEMENTS[k]["hevy_template_id_hint"] for k in ("leg_press", "db_bench_press_flat", "machine_row", "lat_pulldown")}
-HEAVY = ("leg_press", "db_bench_press_flat", "machine_row")
+TID = {
+    k: MOVEMENTS[k]["hevy_template_id_hint"] for k in ("squat_barbell", "leg_press", "db_bench_press_flat", "machine_row", "lat_pulldown")
+}
+# #4080: the 09-24 heavy anchors the load path can load (both carry a template id). The third,
+# `barbell_bench_press`, has no `hevy_template_id_hint` (ADR-069) — never loaded from history.
+HEAVY = ("squat_barbell", "machine_row")
 
 # The live 2026-09-23 shape (#4107's table): leg press 0 in band / 5 elsewhere, DB bench's
 # nearest band one session at 300–309 with more sessions further down, machine row one
@@ -76,6 +85,15 @@ def _s(day: str, lb: float, reps: int = 8) -> dict:
 
 
 HISTORY = {
+    # #4080: the barbell squat, 0 sessions in today's 310–319 band and 4 elsewhere — bands
+    # 240–249 (05-29-23 @ 245 lb bw), 270–279 (11-03-24 @ 275), 260–269 (10-01-25 @ 265 and
+    # 11-05-25 @ 264). The NEAREST to 310–319 is 270–279 (40 lb), whose best is 265 lb.
+    TID["squat_barbell"]: [
+        _s("2023-05-29", 185, 5),
+        _s("2024-11-03", 265, 5),
+        _s("2025-10-01", 245, 5),
+        _s("2025-11-05", 255, 5),
+    ],
     TID["leg_press"]: [
         _s("2022-08-31", 270),
         _s("2023-05-29", 180),
@@ -88,6 +106,7 @@ HISTORY = {
     TID["lat_pulldown"]: [_s("2026-09-20", 140, 10)],
 }
 NEAREST = {
+    "squat_barbell": ("270-279", "2024-11-03", 265),
     "leg_press": ("260-269", "2025-11-05", 320),
     "db_bench_press_flat": ("300-309", "2024-09-15", 40),
     "machine_row": ("190-199", "2025-05-18", 130),
@@ -104,18 +123,21 @@ def _block(ideal, key):
 
 
 # ── 1. the fallback ─────────────────────────────────────────────────────────
-def test_leg_press_with_no_in_band_history_gets_a_week_1_load_from_the_nearest_band():
+def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nearest_band():
     ideal = _generate()[0]
-    row = ideal.inputs_snapshot["load_floors"]["movements"]["leg_press"]
+    assert _block(ideal, "squat_barbell").rationale_tag == "anchor:squat:heavy"
+    row = ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]
     assert row["fallback"] == "nearest_band"
-    assert row["anchor_band"] == "260-269" and row["anchor_date"] == "2025-11-05"
-    assert row["fallback_detail"]["current_band_counts"] == {"sessions_in_band": 0, "sessions_other_band": 5, "sessions_unweighed": 0}
+    # 270–279 is 40 lb from 310–319; 260–269 is 50 and 240–249 is 70 — nearest wins
+    assert row["anchor_band"] == "270-279" and row["anchor_date"] == "2024-11-03"
+    assert row["fallback_detail"]["current_band_counts"] == {"sessions_in_band": 0, "sessions_other_band": 4, "sessions_unweighed": 0}
     assert row["fallback_detail"]["band_requested"] == "310-319"
-    top = _block(ideal, "leg_press").sets[0].weight_kg
-    discounted = 320 * LB * 0.90
+    top = _block(ideal, "squat_barbell").sets[0].weight_kg
+    # 2024-11-03 is > 28 d before block 1, so the 10 % detraining discount applies; week 1 = 60 %
+    discounted = 265 * LB * 0.90
     assert 0.60 <= top / discounted <= 0.65, top / discounted
     assert row["ramp"]["discount_pct"] == 10 and row["ramp"]["ramp_pct"] == 60
-    assert "nearest band you have lifted in: 260-269" in _block(ideal, "leg_press").notes
+    assert "nearest band you have lifted in: 270-279" in _block(ideal, "squat_barbell").notes
 
 
 def test_every_heavy_anchor_of_2026_09_24_is_loaded_from_its_nearest_band():
@@ -146,7 +168,7 @@ def test_an_in_band_anchor_is_not_a_fallback():
 def test_no_history_anywhere_is_still_an_absence_not_a_guess():
     ideal = _generate(history={})[0]
     assert all(s.weight_kg is None for b in ideal.exercises for s in b.sets)
-    assert ideal.inputs_snapshot["load_floors"]["movements"]["leg_press"]["status"] == "no_history"
+    assert ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]["status"] == "no_history"
 
 
 # ── 2. nearest, not most-evidenced ──────────────────────────────────────────
@@ -237,7 +259,7 @@ def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads():
     rows = gate["load_floors"]["movements"]
     assert gate["load_floors"]["load_rule"]["week"] == 1
     gen = ideal.inputs_snapshot["load_floors"]["movements"]
-    for key in ("leg_press", "db_bench_press_flat", "machine_row", "lat_pulldown"):
+    for key in ("squat_barbell", "barbell_bench_press", "machine_row", "lat_pulldown"):
         for f in ("floor_kg", "anchor_band", "anchor_date", "fallback"):
             assert rows[key][f] == gen[key][f], (key, f)
 
@@ -246,10 +268,10 @@ def test_the_chat_gate_refuses_a_top_set_under_the_ramped_load():
     from mcp.hevy_prescription_gate import prescription_gate
 
     ideal = _generate()[0]
-    _block(ideal, "leg_press").sets[0].weight_kg -= 5
+    _block(ideal, "squat_barbell").sets[0].weight_kg -= 5
     gate = prescription_gate(_as_custom(ideal), movements=MOVEMENTS, history_index=HISTORY, weight_index=WEIGHTS)
     assert gate["verdict"] == "refuse"
-    assert {v["where"] for v in gate["audit"]["violations"]} == {"leg_press"}
+    assert {v["where"] for v in gate["audit"]["violations"]} == {"squat_barbell"}
 
 
 def test_mutation_control_the_100_percent_floor_refuses_the_generator_own_loads():
@@ -314,7 +336,7 @@ def test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback():
 
 
 # ── 5. the planner ──────────────────────────────────────────────────────────
-def test_plan_next_session_2026_09_24_loads_squat_bench_row_from_the_nearest_band():
+def test_plan_next_session_2026_09_24_loads_squat_and_row_from_the_nearest_band():
     from mcp import handler as h
     from tests.test_fullbody_block_calendar_4064 import _stage1_patches
 
@@ -328,6 +350,7 @@ def test_plan_next_session_2026_09_24_loads_squat_bench_row_from_the_nearest_ban
     session = json.loads(resp["content"][0]["text"])["constraint_block"]["session"]
     ideal = _generate()[0]
     by_key = {e["movement_key"]: e["load"] for e in session["prescription"]["exposures"]}
+    assert set(HEAVY) <= set(by_key)
     for key in HEAVY:
         load = by_key[key]
         assert load["fallback"] == "nearest_band" and load["anchor_band"] == NEAREST[key][0], key

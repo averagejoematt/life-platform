@@ -49,7 +49,7 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
 
-from training import plan_engine, program_seam, program_structure  # noqa: E402
+from training import plan_engine, program_conflicts, program_seam, program_structure  # noqa: E402
 
 CONFIG = REPO / "config"
 HEVY_FIXTURE = REPO / "tests" / "fixtures" / "walking_volume_3930" / "hevy_2026-09-13_19.json"
@@ -120,7 +120,7 @@ def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
     from the exempt set and the conflict reports unresolved again."""
     from training import owner_redlines
 
-    conflicts = program_structure.conflicts()
+    conflicts = program_conflicts.conflicts()
     ids = {c["id"] for c in conflicts}
     by_id = {c["id"]: c for c in conflicts}
     assert "lifting_frequency_vs_redline" not in ids
@@ -130,12 +130,12 @@ def test_conflicts_with_the_owners_redlines_are_named_not_hidden():
     assert bench_conflict["resolved_on"] == "2026-09-23"
     assert bench_conflict["resolution_source"] == "owner ruling recorded on #4080 (option B)"
     with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 2, "high": 3}):
-        assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
+        assert "lifting_frequency_vs_redline" in {c["id"] for c in program_conflicts.conflicts()}
     with unittest.mock.patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"], {"low": 5, "high": 6}):
-        assert "lifting_frequency_vs_redline" in {c["id"] for c in program_structure.conflicts()}
+        assert "lifting_frequency_vs_redline" in {c["id"] for c in program_conflicts.conflicts()}
     # mutation control: without the exemption, the bench conflict is unresolved again
-    with unittest.mock.patch.dict(program_structure.ANCHOR_SKILL_CEILING_RULING, {"exempt_families": ("squat", "hinge", "row")}):
-        unresolved = {c["id"]: c for c in program_structure.conflicts()}["barbell_anchors_vs_skill_ceiling"]
+    with unittest.mock.patch.dict(program_conflicts.ANCHOR_SKILL_CEILING_RULING, {"exempt_families": ("squat", "hinge", "row")}):
+        unresolved = {c["id"]: c for c in program_conflicts.conflicts()}["barbell_anchors_vs_skill_ceiling"]
         assert unresolved["resolved"] is False
         assert "resolved_on" not in unresolved
 
@@ -199,7 +199,10 @@ def test_the_trap_bar_gate_and_the_load_hold_rule_have_one_home_each():
 
     hinge = program_structure.ANCHORS["hinge"]
     assert hinge["conventional_pull_gate_lb"] == owner_redlines.REDLINES["load_anchoring"]["trap_bar_until_lb"] == 275
-    assert "trap bar" in hinge["pattern"].lower() and "trap_bar_deadlift" in hinge["catalog_keys"]
+    # #4080: the trap bar is the hinge's FIRST key, under the #4108 catalog's spelling — first,
+    # because `_resolve_movement` returns the first listed key the ceiling admits and the hinge
+    # family is exempt from skill_ceiling 2, so the tier-3 trap bar is what the generator serves.
+    assert "trap bar" in hinge["pattern"].lower() and hinge["catalog_keys"][0] == "deadlift_trap_bar"
     lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     assert lifting["load_rule"].startswith("hold")
     assert lifting["load_entry"]["then"] == "hold" and lifting["load_entry"]["max_pct_of_band_e1rm_until_week_8"] == 85
@@ -260,18 +263,21 @@ def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
 
 
 def test_catalog_gaps_names_anchor_members_the_generator_cannot_select():
+    """#4080: since the #4108 catalog (#4124, whole Hevy history) and the anchor keys renamed to
+    its spelling, every key the program names EXISTS — the live gap map is `{}`. That is now a
+    measured fact, so it is asserted; the report path stays live via the mutation control
+    (a key the catalog does not carry must be REPORTED, under its anchor)."""
     catalog = json.loads((CONFIG / "movement_catalog.json").read_text())["movements"]
-    gaps = program_structure.catalog_gaps(catalog.keys())
-    # No assertion that the gap set is empty — it is not, and pretending otherwise is the
-    # lie. The contract is that every named key either EXISTS or is REPORTED.
+    gaps = program_conflicts.catalog_gaps(catalog.keys())
     named = {k for a in program_structure.ANCHORS.values() for k in a["catalog_keys"]}
     named |= {k for pool in program_structure.ACCESSORY_POOL.values() for k in pool}
     reported = {k for keys in gaps.values() for k in keys}
     assert reported <= named
     assert all(k in catalog for k in named - reported)
-    # v0.3 names lifts the catalog does not carry — they must be REPORTED, by anchor
-    assert "trap_bar_deadlift" in gaps["anchor:hinge"]
-    assert {"safety_bar_squat", "high_bar_back_squat"} <= set(gaps["anchor:squat"])
+    assert gaps == {}, f"a program key the catalog does not carry is a lift the generator can never prescribe: {gaps}"
+    # mutation control: drop the barbell squat and the trap bar from the catalog → both REPORTED, by anchor
+    mutated = program_conflicts.catalog_gaps(set(catalog) - {"squat_barbell", "deadlift_trap_bar"})
+    assert mutated == {"anchor:squat": ["squat_barbell"], "anchor:hinge": ["deadlift_trap_bar"]}
 
 
 # ── 3. the seam, with its mutation control ───────────────────────────────────
