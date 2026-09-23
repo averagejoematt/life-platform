@@ -899,7 +899,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # planner and chat commit gate each name it) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
-        <= 132
+        # Upper bound 132 -> 133 (2026-09-23, #3528): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
+        # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
+        # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
+        # -> 2 passed). Unproven stays; one entrant.
+        <= 133
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

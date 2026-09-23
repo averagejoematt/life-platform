@@ -32,7 +32,22 @@
 # stable.
 #
 # Usage:
-#   bash deploy/agent_commit.sh "<commit message>" <path> [<path> ...]
+#   bash deploy/agent_commit.sh [--push] "<commit message>" <path> [<path> ...]
+#
+# --push (#3528) — ONE landing path for code. After committing, push the current
+# branch to origin under the same name. On a lane branch that is all it does. On
+# `main` it first runs deploy/direct_push_gate.py over everything the push would
+# carry (origin/main..HEAD plus what is staged), BEFORE committing:
+#   • any CODE path (outside direct_push_gate.DOCS_CLASS) is REFUSED, named —
+#     code lands through a PR, where pr-checks.yml's premerge lane already runs;
+#   • a docs-only push runs the Docs-CI gates DERIVED from docs-ci.yml by
+#     scripts/ci_gate_commands.py — never a hand copy — and is refused on any red;
+#   • RESTART_PIPELINE=1 is the reset pipeline's one sanctioned code push: the
+#     same gates plus the derived artifact-reader pytest leg (#3529); an empty
+#     derivation is UNEVALUABLE and refused (exit 2), never a pass.
+# The refusal is client-side and honest about it: ADR-148's ruleset bypass actor
+# is the owner's account, so a bare `git push origin main` is not stopped here.
+# This closes the path every session and lane actually uses.
 #
 # A DIRECTORY argument covers the files under it (#2897). If a changed doc-literal
 # file is not covered by any argument, the script REFUSES and names it rather than
@@ -56,7 +71,9 @@
 # unresolved merge conflict (UU) exists, a named path is a doc-sync literal
 # file (or the generated counter module, which has no override), a changed
 # doc-literal file is unnamed, a named path is neither on disk nor
-# tracked-and-deleted, or black/ruff reject the staged Python.
+# tracked-and-deleted, black/ruff reject the staged Python, or — with --push on
+# main — deploy/direct_push_gate.py refuses the push (#3528: a code path, a red
+# derived Docs-CI gate, or an UNEVALUABLE derivation).
 # EVERY refusal exits nonzero and prints a terminal "REFUSED" line (#2464) — a
 # success is exit 0 plus the "✅ committed N path(s)" line, nothing else is.
 set -uo pipefail
@@ -77,8 +94,14 @@ refuse() {
 ROOT="$(git rev-parse --show-toplevel)" || exit 1
 cd "${ROOT}" || exit 1
 
+PUSH=0
+if [ "${1:-}" = "--push" ]; then
+  PUSH=1
+  shift
+fi
+
 if [ "$#" -lt 2 ]; then
-  echo "[agent-commit] ❌ usage: bash deploy/agent_commit.sh \"<message>\" <path> [<path> ...]" >&2
+  echo "[agent-commit] ❌ usage: bash deploy/agent_commit.sh [--push] \"<message>\" <path> [<path> ...]" >&2
   refuse 2
 fi
 
@@ -426,10 +449,49 @@ if [ -n "${STAGED_PY}" ]; then
   echo "[agent-commit] ✓ black $(pinned_formatter_version black) + ruff $(pinned_formatter_version ruff) clean"
 fi
 
+# ── --push: ONE landing path for code (#3528) ─────────────────────────────────
+# Decided BEFORE the commit so a refusal still means "nothing was committed" —
+# the funnel's contract (#2464). The gate grades everything the push would carry:
+# every commit in ${BASE_REF}..HEAD plus the index about to become one.
+# `main` is named, not derived from origin/HEAD, and there is no env override: an
+# override would be the bypass this block exists to remove.
+PROTECTED_BRANCH="main"
+BRANCH=""
+if [ "${PUSH}" = "1" ]; then
+  BRANCH="$(git symbolic-ref --short -q HEAD || true)"
+  if [ -z "${BRANCH}" ]; then
+    echo "[agent-commit] ❌ --push on a DETACHED HEAD — there is no branch to push. Switch to a branch first." >&2
+    refuse 1
+  fi
+  if [ "${BRANCH}" = "${PROTECTED_BRANCH}" ]; then
+    echo "[agent-commit] ▶ --push to ${PROTECTED_BRANCH}: running the direct-push gate (#3528)"
+    python3 "${ROOT}/deploy/direct_push_gate.py" --staged --base "${BASE_REF}"
+    _gate_rc=$?
+    if [ "${_gate_rc}" -ne 0 ]; then
+      echo "[agent-commit] ❌ the direct-push gate refused this push to ${PROTECTED_BRANCH} (exit ${_gate_rc}) — see above." >&2
+      refuse "${_gate_rc}"
+    fi
+  fi
+fi
+
 # --no-verify is deliberate: the gate above replaces the hook's useful half, and
 # skipping the hook is the entire point (it would re-stage the doc literals).
 git commit --no-verify -m "${MSG}" || refuse 1
 
 echo "[agent-commit] ✅ committed $(printf '%s\n' "${STAGED}" | wc -l | tr -d ' ') path(s)"
-echo "[agent-commit]    next: git push -u origin \$(git branch --show-current)"
-exit 0
+if [ "${PUSH}" != "1" ]; then
+  echo "[agent-commit]    next: git push -u origin \$(git branch --show-current)"
+  exit 0
+fi
+
+# The explicit refspec pushes THIS branch to its own name, whatever upstream it
+# tracks — a lane branch cut from origin/main must never push to main by default.
+if git push -u origin "HEAD:refs/heads/${BRANCH}"; then
+  echo "[agent-commit] ✅ pushed ${BRANCH} → origin/${BRANCH}"
+  exit 0
+fi
+# Not the refusal funnel: the commit DID land locally, so "nothing was committed"
+# would be a lie. Distinct exit code and wording.
+echo "[agent-commit] ⚠ COMMITTED BUT NOT PUSHED — git push to origin/${BRANCH} failed (exit 3)." >&2
+echo "[agent-commit]    The commit is on the local ${BRANCH}; fix the remote problem and push it by hand." >&2
+exit 3

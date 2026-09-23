@@ -1248,6 +1248,37 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    # #3528: the git-push-caller enumeration. Arrives proven by a real mutation of the one
+    # live link it guards (agent_commit.sh -> direct_push_gate.py -> ci_gate_commands), plus
+    # its own planted-pusher negative controls, which run on every invocation.
+    "structural::test_ci_stand_ins_derive.py": {
+        "gate_name": "test_ci_stand_ins_derive.py",
+        "command": (
+            "python3 -m pytest tests/test_ci_stand_ins_derive.py -q -p no:cacheprovider " "-k 'imports_ci_gate_commands or derives_through'"
+        ),
+        "mutation": (
+            "deploy/direct_push_gate.py's `from ci_gate_commands import DOCS_CI_WORKFLOW, ci_gate_commands, "
+            "glob_matches` rewritten to import only DOCS_CI_WORKFLOW + glob_matches (and bind "
+            "`ci_gate_commands = None`), i.e. the direct-push stand-in stops deriving from the workflow — "
+            "the exact shape of a pusher that hand-types its gate list."
+        ),
+        "observed": (
+            "MUTATED: 2 failed — test_every_git_push_caller_imports_ci_gate_commands with "
+            "\"['deploy/agent_commit.sh'] run `git push` without deriving a CI stand-in from "
+            'ci_gate_commands(workflow) (#3528)", and test_agent_commit_derives_through_the_direct_push_gate '
+            "(derives_its_stand_in(..., 'deploy/agent_commit.sh') is False). REVERTED: 2 passed. Both "
+            "watched 2026-09-23. The file's two NEGATIVE_CONTROL tests (a planted .py and a planted .sh "
+            "pusher with a hand-typed gate list, each named by undeclared_pushers) re-prove the "
+            "detector on every run."
+        ),
+        "scope": (
+            "Detection is textual/AST: a push reached indirectly (a shell variable holding `git`, "
+            "`bash -c` strings, `gh api .../git/refs`, a composite action) is not seen, and only "
+            "scripts/ + deploy/ are scanned (the ci-cd.yml reconcile job pushes from YAML). A .sh "
+            "pusher counts as deriving when it references ANY .py that imports ci_gate_commands."
+        ),
+        "proved_on": "2026-09-23",
+    },
     # #3804: the guard entered the census the moment it was committed (639 -> 640, both
     # `discover_gate_census_count()` and a bare `scripts/gate_census.py` run — confirmed
     # to be the SAME derivation, not two disagreeing ones; see the PR thread). The
