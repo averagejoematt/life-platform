@@ -433,8 +433,9 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
     read an empty ledger forever and look armed while doing nothing.
 
     #4063: + s3:GetObject on the ONE private object naming the named human
-    (`config/coaching/named_human.json`) — the contact-path leg reads it only when a
-    rung is due, and fails closed without it. Object-scoped, never `config/coaching/*`:
+    (`config/coaching/named_human.json`) — the contact-path leg reads it only once the
+    owner has been quiet >= 3 days (never on an ordinary night), and fails closed
+    without it. The object also carries the `armed` switch (owner act, no deploy). Object-scoped, never `config/coaching/*`:
     this role also holds ses:SendEmail, so it may read who to mail and nothing else of
     the owner's private coaching home. The leg's episode row reuses the existing
     PutItem above; its SES send reuses the existing SES statement (the From is the

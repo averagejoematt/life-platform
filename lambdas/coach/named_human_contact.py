@@ -29,6 +29,9 @@ yesterday reads 0), because nutrition in particular lands end-of-day.
     three), because this one reaches a person outside the system.
   * N = 28 for the second — the owner's own stated "four weeks of no use".
 
+Both are the DEFAULTS; the private config's optional ``thresholds`` block may move them
+inside fixed bounds (below). Nothing moves them silently.
+
 A logged ``travel`` day inside the trailing 7 is a PLANNED pause and holds the first
 email (the engagement_core planned-pause precedent). It never holds the four-week
 email: four weeks of no use is the owner's trigger unconditionally. Sick days do NOT
@@ -45,19 +48,46 @@ twice in a fortnight. State lives in ONE DynamoDB row,
 ``experiment.phase_taxonomy``, owner-only (Tier 2) in ``privacy.field_tiers``. It holds
 dates and modes only; the contact's identity is NEVER written to it.
 
-THE CONTACT. Read at runtime from the PRIVATE object
-``s3://<bucket>/config/coaching/named_human.json`` (``name``, ``contact.email``,
-``status``) and only once a rung is actually due. Fail closed: an absent/unreadable
-object, ``status != "DESIGNATED"``, or a malformed name/email sends nothing. The name
-and address are never logged, never stored, and never appear in this repo — tests use a
-fake on a reserved ``.invalid`` domain.
+THE PRIVATE CONFIG (the ONLY home of the contact — never this repo). Read at runtime
+from ``s3://<bucket>/config/coaching/named_human.json`` and only once the owner has
+been quiet for at least ``QUIET_DAYS_FLOOR`` days, so an ordinary night never touches
+the identity. The exact shape the owner writes (placeholders, not values)::
 
-ARMING. ``CONTACT_PATH_ARMED`` (env, default off). Unarmed, the exact body the contact
-would receive is rendered to the OWNER's inbox instead, with a preview banner — the
-owner's approval step before the first real send. Arming is an owner act: set
-``CONTACT_PATH_ARMED=true`` on the ``evening-nudge`` function in
-``cdk/stacks/email_stack.py`` and deploy LifePlatformEmail. A preview does not consume
-the armed send: arming mid-episode still sends the real email once.
+    {
+      "status": "DESIGNATED",                 # anything else → inert
+      "name": "<the contact's name>",         # first word is the greeting; no digits
+      "contact": {"email": "<address>"},
+      "armed": false,                         # JSON true (exactly) → mail the contact
+      "thresholds": {                         # OPTIONAL — defaults shown
+        "quiet_days": 7,                      # rung 1; bounded [3, 21]
+        "four_week_days": 28,                 # rung 2; bounded [quiet_days + 7, 56]
+        "cooldown_days": 14                   # bounded [7, 60]
+      },
+      "mood_tripwire": false                  # OPTIONAL — see below; never honoured
+    }
+
+Other keys (e.g. the owner's own ``owner_stated_triggers`` prose record) are ignored.
+Fail closed: an absent/unreadable object, ``status != "DESIGNATED"``, a malformed
+name/email, or an out-of-bounds/non-integer threshold sends nothing (a malformed
+threshold rejects the WHOLE config rather than silently falling back — a typo must be
+loud, never a surprise send at an unexpected day count). The name and address are
+never logged, never stored, and never appear in this repo — tests use a synthetic
+in-memory config on a reserved ``.invalid`` domain. If the object is absent on a night
+a rung WOULD have been due (at the default thresholds), the leg logs
+``CONTACT_LEG_FAILED_TOKEN`` — the path is designated but not wired, and that is loud.
+
+THE MOOD TRIPWIRE. v0.3 §9 names one; the owner ruled it OUT of this path on #4063
+(2026-09-23, option A — disengagement only, so there is no PHQ-9 / item-9 route). No
+mood signal is read here. A ``"mood_tripwire": true`` in the config is NOT honoured:
+the leg logs that it is ignored under ruling A and carries on with disengagement only.
+Building one is a new owner ruling (and a clinical-resources-first route), not a flag.
+
+ARMING = ``"armed": true`` in the private config — an owner act with no deploy. Until
+then (the default, and on any non-``true`` value) the path is a DRY RUN: the exact body
+the contact would receive is rendered to the OWNER's inbox instead (the same
+``EMAIL_RECIPIENT`` the evening nudge already mails), with a preview banner — the
+owner's approval step before the first real send. A preview does not consume the armed
+send: arming mid-episode still sends the real email once.
 
 NO HEALTH DATA. The rendered body is a fixed template: that he has gone quiet on the
 platform (in words — "about a week" / "about four weeks"), a nudge to check in, and
@@ -87,9 +117,15 @@ QUIET_DAYS = ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS  # rung 1 — 7 lag-ad
 FOUR_WEEK_DAYS = 28  # rung 2 — the owner's "four weeks of no use"
 QUIET_COOLDOWN_DAYS = 14  # min spacing between two first-rung emails across episodes
 TRAVEL_HOLD_DAYS = QUIET_DAYS  # a travel log in the trailing week holds rung 1 only
-# How far back a channel is searched for its last logged day. Past the four-week line
-# with margin; a channel with nothing in the window reads as "quiet >= LOOKBACK".
-LOOKBACK_DAYS = 35
+# The private config may override the three thresholds, inside these bounds only.
+QUIET_DAYS_FLOOR = 3  # below this the config is never even read
+QUIET_DAYS_CEIL = 21
+FOUR_WEEK_MIN_GAP = 7  # rung 2 sits at least a week past rung 1
+FOUR_WEEK_DAYS_CEIL = 56
+COOLDOWN_DAYS_BOUNDS = (7, 60)
+# How far back a channel is searched for its last logged day. Past the largest allowed
+# four-week line with margin; nothing in the window reads as "quiet >= LOOKBACK".
+LOOKBACK_DAYS = 63
 
 RUNG_QUIET = "quiet"
 RUNG_FOUR_WEEK = "four_week"
@@ -151,11 +187,11 @@ _PII_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _DIGIT_RE = re.compile(r"\d")
 
 
-# ── Env ─────────────────────────────────────────────────────────────────────────────
-def is_armed(env: Optional[Mapping[str, str]] = None) -> bool:
-    """True only for an explicit truthy CONTACT_PATH_ARMED. Absent/anything else → off."""
-    value = (env if env is not None else os.environ).get("CONTACT_PATH_ARMED", "")
-    return str(value).strip().lower() in ("1", "true", "yes", "on")
+DEFAULT_THRESHOLDS: dict[str, int] = {
+    "quiet_days": QUIET_DAYS,
+    "four_week_days": FOUR_WEEK_DAYS,
+    "cooldown_days": QUIET_COOLDOWN_DAYS,
+}
 
 
 # ── Pure: the quiet computation ─────────────────────────────────────────────────────
@@ -207,13 +243,19 @@ def decide(
     state: Optional[Mapping[str, Any]],
     armed: bool,
     travel_days: frozenset[str] = frozenset(),
+    thresholds: Optional[Mapping[str, int]] = None,
 ) -> dict[str, Any]:
     """Pure decision: which rung (if any) to send tonight, and the next state row.
+
+    `thresholds` ({quiet_days, four_week_days, cooldown_days}) defaults to the ruled
+    DEFAULT_THRESHOLDS; the caller passes the validated private-config values.
 
     Returns {"send": rung|None, "reason": str, "quiet_days": int|None, "mode": str,
     "state": dict} — `state` is what to persist (identity-free) if the send succeeds.
     """
     mode = MODE_ARMED if armed else MODE_PREVIEW
+    th = {**DEFAULT_THRESHOLDS, **dict(thresholds or {})}
+    quiet_line, four_week_line, cooldown = th["quiet_days"], th["four_week_days"], th["cooldown_days"]
     prev = dict(state or {})
     quiet = quiet_days_since(anchor, today)
     anchor_key = anchor or "none"
@@ -239,12 +281,12 @@ def decide(
                 new_state[key] = episode[key]
     out["state"] = new_state
 
-    if quiet < QUIET_DAYS:
+    if quiet < quiet_line:
         out["reason"] = "not_quiet"
         return out
 
     four_week_blocked = _mode_blocks(episode.get(f"{RUNG_FOUR_WEEK}_mode"), mode)
-    if quiet >= FOUR_WEEK_DAYS:
+    if quiet >= four_week_line:
         if four_week_blocked:
             out["reason"] = "four_week_already_sent"
             return out
@@ -259,12 +301,12 @@ def decide(
     if t is None:  # unreachable: quiet is not None ⇒ today parsed
         out["reason"] = "unparseable_dates"
         return out
-    hold_from = t - timedelta(days=TRAVEL_HOLD_DAYS)
+    hold_from = t - timedelta(days=min(TRAVEL_HOLD_DAYS, quiet_line))
     if any((d := _to_date(x)) is not None and hold_from <= d <= t for x in travel_days):
         out["reason"] = "planned_pause_travel"
         return out
     last_sent = _to_date(prev.get("last_quiet_sent_on"))
-    if last_sent is not None and _mode_blocks(prev.get("last_quiet_sent_mode"), mode) and (t - last_sent).days < QUIET_COOLDOWN_DAYS:
+    if last_sent is not None and _mode_blocks(prev.get("last_quiet_sent_mode"), mode) and (t - last_sent).days < cooldown:
         out["reason"] = "cooldown"
         return out
     out["send"] = RUNG_QUIET
@@ -308,6 +350,59 @@ def parse_contact(raw: Any) -> Optional[dict[str, str]]:
     if not isinstance(email, str) or not _EMAIL_RE.match(email.strip()):
         return None
     return {"name": name.strip(), "email": email.strip()}
+
+
+def _strict_int(value: Any) -> Optional[int]:
+    """An int that is really an int (JSON `7`), never a bool, float or string."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def parse_thresholds(raw: Any) -> Optional[dict[str, int]]:
+    """The validated thresholds (defaults for absent keys), or None if ANY value is bad.
+
+    An absent/`null` `thresholds` block means the ruled defaults. A present one must be
+    an object whose keys are known and whose values are in-bounds integers — otherwise
+    the whole config fails closed (see the module docstring for why a typo is loud).
+    """
+    if raw is None:
+        return dict(DEFAULT_THRESHOLDS)
+    if not isinstance(raw, Mapping) or set(raw) - set(DEFAULT_THRESHOLDS):
+        return None
+    out = dict(DEFAULT_THRESHOLDS)
+    for key in DEFAULT_THRESHOLDS:
+        if key in raw:
+            value = _strict_int(raw[key])
+            if value is None:
+                return None
+            out[key] = value
+    lo_cd, hi_cd = COOLDOWN_DAYS_BOUNDS
+    if not QUIET_DAYS_FLOOR <= out["quiet_days"] <= QUIET_DAYS_CEIL:
+        return None
+    if not out["quiet_days"] + FOUR_WEEK_MIN_GAP <= out["four_week_days"] <= FOUR_WEEK_DAYS_CEIL:
+        return None
+    if not lo_cd <= out["cooldown_days"] <= hi_cd:
+        return None
+    return out
+
+
+def parse_config(raw: Any) -> Optional[dict[str, Any]]:
+    """{"contact", "armed", "thresholds", "mood_tripwire_requested"} or None (fail closed).
+
+    `armed` is True ONLY for a JSON `true` — "true", 1, "yes" all read as unarmed, so the
+    dry-run default cannot be flipped by a near-miss. Never raises, never echoes.
+    """
+    contact = parse_contact(raw)
+    if contact is None:
+        return None
+    thresholds = parse_thresholds(raw.get("thresholds"))
+    if thresholds is None:
+        return None
+    return {
+        "contact": contact,
+        "armed": raw.get("armed") is True,
+        "thresholds": thresholds,
+        "mood_tripwire_requested": raw.get("mood_tripwire") is True,
+    }
 
 
 # ── Pure: the rendered email ────────────────────────────────────────────────────────
@@ -372,8 +467,8 @@ def render_email(rung: str, contact_name: str, *, armed: bool) -> dict[str, str]
     if not armed:
         banner = (
             "PREVIEW — the named-human contact path is NOT ARMED. Nothing was sent to your contact. "
-            "Below is exactly what they would have received. To arm it: set CONTACT_PATH_ARMED=true "
-            "on evening-nudge in cdk/stacks/email_stack.py and deploy LifePlatformEmail."
+            'Below is exactly what they would have received. To arm it: set "armed": true in '
+            "config/coaching/named_human.json (no deploy needed)."
         )
         subject = f"[Preview, not sent] {subject}"
         text = f"{banner}\n\n---\n\n{text}"
@@ -450,13 +545,21 @@ def save_state(table: Any, user_id: str, state: Mapping[str, Any]) -> None:
     table.put_item(Item=item)
 
 
-def load_contact(s3_client: Any, bucket: str) -> Optional[dict[str, str]]:
-    """The designated contact, or None (fail closed on ANY error). Never logs the payload."""
+CONFIG_UNAVAILABLE = "unavailable"  # absent, unreadable or not JSON (S3 cannot tell absent from denied without ListBucket)
+CONFIG_INVALID = "invalid"  # readable JSON that fails parse_config
+
+
+def load_config(s3_client: Any, bucket: str) -> tuple[Optional[dict[str, Any]], str]:
+    """(parsed config, "") or (None, CONFIG_UNAVAILABLE|CONFIG_INVALID). Fail closed on ANY
+    error; the payload, and the exception text (which can echo a key or a body), are never
+    logged or returned."""
     try:
         body = s3_client.get_object(Bucket=bucket, Key=CONFIG_KEY)["Body"].read()
-        return parse_contact(json.loads(body))
+        raw = json.loads(body)
     except Exception:
-        return None
+        return None, CONFIG_UNAVAILABLE
+    cfg = parse_config(raw)
+    return (cfg, "") if cfg is not None else (None, CONFIG_INVALID)
 
 
 def newest_row_day(table: Any, user_id: str) -> Optional[str]:
@@ -501,16 +604,15 @@ def run_leg(
     log: Callable[[str], None],
     s3_client_factory: Optional[Callable[[], Any]] = None,
     bucket: Optional[str] = None,
-    env: Optional[Mapping[str, str]] = None,
 ) -> dict[str, Any]:
     """Evaluate tonight's rung and (maybe) send. Identity-free result, safe to log.
 
     `event_dry_run` (an operator's `{"dry_run": true}` invoke) sends nothing and writes
-    nothing. Unarmed, the email goes to `owner_recipient` as a preview. The contact's
-    name/address never reach `log` or the returned dict.
+    nothing. Unless the private config says `"armed": true`, the email goes to
+    `owner_recipient` as a preview. The contact's name/address never reach `log` or the
+    returned dict.
     """
-    armed = is_armed(env)
-    result: dict[str, Any] = {"armed": armed, "sent": False, "rung": None, "reason": ""}
+    result: dict[str, Any] = {"armed": False, "sent": False, "rung": None, "reason": ""}
     try:
         channels = channel_last_logged(table, user_id, today)
         anchor = last_platform_use(channels)
@@ -527,21 +629,45 @@ def run_leg(
         log(f"[contact] {CONTACT_LEG_FAILED_TOKEN} signal read failed ({type(e).__name__}) — no send")
         return result
 
-    decision = decide(today=today, anchor=anchor, state=state, armed=armed, travel_days=trips)
+    quiet = quiet_days_since(anchor, today)
+    result["quiet_days"] = quiet
+    if quiet is None or quiet < QUIET_DAYS_FLOOR:
+        # The ordinary night: not quiet under ANY allowed threshold, so the identity is
+        # never read.
+        result["reason"] = "unparseable_dates" if quiet is None else "not_quiet"
+        log(f"[contact] quiet_days={quiet} decision={result['reason']} — config not read")
+        return result
+
+    cfg, cfg_problem = load_config(
+        s3_client_factory() if s3_client_factory is not None else _default_s3_client(),
+        bucket or os.environ.get("S3_BUCKET", "matthew-life-platform"),
+    )
+    if cfg is None:
+        # Would a rung be due at the ruled defaults? Then the gap is loud; otherwise the
+        # un-wired path is merely inert tonight.
+        would = decide(today=today, anchor=anchor, state=state, armed=False, travel_days=trips)
+        result["reason"] = f"config_{cfg_problem}"
+        if would["send"] or cfg_problem == CONFIG_INVALID:
+            log(
+                f"[contact] {CONTACT_LEG_FAILED_TOKEN} private config {cfg_problem} "
+                f"(quiet_days={quiet}, default-rung-due={would['send']}) — fail closed, no send"
+            )
+        else:
+            log(f"[contact] quiet_days={quiet} private config {cfg_problem} — inert, no rung due at the defaults")
+        return result
+
+    armed = cfg["armed"]
+    result["armed"] = armed
+    if cfg["mood_tripwire_requested"]:
+        log("[contact] mood_tripwire requested in config — IGNORED: owner ruling A (#4063, 2026-09-23) is disengagement only")
+
+    decision = decide(today=today, anchor=anchor, state=state, armed=armed, travel_days=trips, thresholds=cfg["thresholds"])
     result.update({"rung": decision["send"], "reason": decision["reason"], "quiet_days": decision["quiet_days"]})
     log(f"[contact] quiet_days={decision['quiet_days']} decision={decision['reason']} rung={decision['send']} armed={armed}")
     if not decision["send"]:
         return result
 
-    contact = load_contact(
-        s3_client_factory() if s3_client_factory is not None else _default_s3_client(),
-        bucket or os.environ.get("S3_BUCKET", "matthew-life-platform"),
-    )
-    if contact is None:
-        result["reason"] = "contact_unavailable"
-        log(f"[contact] {CONTACT_LEG_FAILED_TOKEN} contact config absent, unreadable or not DESIGNATED — fail closed, no send")
-        return result
-
+    contact = cfg["contact"]
     try:
         email = render_email(decision["send"], contact["name"], armed=armed)
     except ValueError:
