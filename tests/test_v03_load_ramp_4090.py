@@ -125,18 +125,18 @@ def test_week_1_heavy_top_sets_land_at_60_to_65_percent_of_the_discounted_anchor
     assert any("entry ramp, week 1 = 60%" in r for r in ideal.rationale)
 
 
-def test_the_barbell_bench_heavy_anchor_has_no_template_id_so_it_is_unloaded_not_guessed():
-    """#4080 residual, pinned so it cannot go unnoticed: the exempt bench family resolves to
-    `barbell_bench_press` (first key, tier 3), and that catalog entry deliberately carries no
-    `hevy_template_id_hint` (ADR-069 — resolved by title at commit). The generator's load path
-    keys history by the hint, so the floor is `no_template_id` and no set is loaded. When the
-    load path learns title resolution this test reds and must be re-derived."""
-    assert "hevy_template_id_hint" not in MOVEMENTS[UNLOADABLE_HEAVY]
+def test_the_barbell_bench_heavy_anchor_is_loaded_through_its_verified_template_hint():
+    """#4080: the exempt bench family resolves to `barbell_bench_press` (first key, tier 3). Its
+    catalog entry now carries the live-verified hint 79D0BB3A, so the generator's load path finds
+    its history and ramps it like every other heavy anchor; ADR-069's title resolution still runs
+    at commit. Mutation control: without the hint the floor reads `no_template_id` and no set is
+    loaded, which is exactly the regression this pins."""
+    assert MOVEMENTS[UNLOADABLE_HEAVY].get("hevy_template_id_hint") == "79D0BB3A"
     ideal = _generate("2026-09-24")[0]
     block = next(b for b in ideal.exercises if b.movement_key == UNLOADABLE_HEAVY)
     assert block.rationale_tag == "anchor:bench:heavy"
-    assert all(s.weight_kg is None for s in block.sets)
-    assert ideal.inputs_snapshot["load_floors"]["movements"][UNLOADABLE_HEAVY]["status"] == "no_template_id"
+    status = ideal.inputs_snapshot["load_floors"]["movements"][UNLOADABLE_HEAVY]["status"]
+    assert status != "no_template_id"
 
 
 def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_the_ramp():

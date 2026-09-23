@@ -411,7 +411,7 @@
     },
     "barbell_bench_press": {
       "title": "Bench Press (Barbell)",
-      "_resolves_by_title": "No hevy_template_id_hint on purpose (ADR-069): resolved against the live Hevy template list by exact title at dry_run/commit, then cached. A wrong title fails loudly rather than mis-mapping.",
+      "_resolves_by_title": "Hint added 2026-09-23 (#4080): 79D0BB3A verified live against the Hevy partition — every 'Bench Press (Barbell)' set this cycle sits under it (7 sessions 2026-05-29..09-19). The load floor keys history by the hint; ADR-069's exact-title resolution still runs at dry_run/commit, so a hint/title disagreement still fails loudly rather than mis-mapping.",
       "primary_muscle": "chest",
       "secondary_muscles": [
         "triceps",
@@ -429,7 +429,8 @@
       "sessions": 123,
       "first_done": "2021-04-12",
       "last_done": "2026-09-23",
-      "anchor_family": "bench"
+      "anchor_family": "bench",
+      "hevy_template_id_hint": "79D0BB3A"
     },
     "db_shoulder_press": {
       "title": "Shoulder Press (Dumbbell)",
