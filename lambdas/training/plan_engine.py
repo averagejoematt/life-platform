@@ -121,6 +121,7 @@ ENGINE_INPUTS = (
     "weight_stall_days",
     "adherence_on_plan",
     "hevy_workouts_rotation_window",
+    "training_memory_constraints",
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -592,6 +593,7 @@ def constraint_block(
     rotation_window_start: str | None = None,
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
+    training_memory_constraints: list[dict[str, Any]] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
@@ -621,6 +623,7 @@ def constraint_block(
             "weight_stall_days": weight_stall_days,
             "adherence_on_plan": adherence_on_plan,
             "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
+            "training_memory_constraints": training_memory_constraints,
         },
         input_status,
     )
@@ -753,6 +756,13 @@ def constraint_block(
         # in the bundle).
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
+        # #4077: the SAME kind of standing constraint (RDL gate, toe flag, back flag), but
+        # from `write_platform_memory(category='training')` — a chat write, no deploy — not
+        # the code registry above. Read here from `mcp.tools_plan` alongside it, never merged
+        # into it: the code registry is owner-gate-reviewed (`CONFIRMED_BY_OWNER`), a chat
+        # write is not, and collapsing the two would silently launder an unreviewed write
+        # into a reviewed list.
+        "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064 — WHAT the program schedules on this date: the block calendar's answer
         # (block 1 starts Thu 2026-09-24, then Mon/Wed/Fri, deload every 6th week) and, on a
         # lifting day, the §3 session — anchors at heavy/moderate with their sets and reps,

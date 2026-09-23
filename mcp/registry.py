@@ -2100,24 +2100,20 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "item_number": {
-                        "type": "integer",
-                        "description": "The pack item number to correct (the #N from this week's review-pack email).",
-                    },
-                    "correction": {
-                        "type": "string",
-                        "description": "What was wrong and what it should say — Matthew's correction, stored verbatim.",
-                    },
+                    "item_number": {"type": "integer", "description": "Path 1 (#1690): the pack #N. One of item_number/signal."},
+                    "signal": {"type": "string", "description": "Path 2 (#4083): live-session override — the metric/flag id."},
+                    "coach": {"type": "string", "description": "Path 2 only. Optional bare coach id; omitted = surface-wide."},
+                    "surface": {"type": "string", "description": "Path 2 only. Optional; defaults to 'chat_coaching'."},
+                    "correction": {"type": "string", "description": "What was wrong and what it should say, verbatim."},
                     "error_class": {
                         "type": "string",
                         "description": (
-                            "Optional error-class override. One of: stale-baseline, ungrounded-behavioral, "
-                            "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other. "
-                            "Unrecognized values are stored as 'other' (original label preserved), never rejected."
+                            "Optional error-class override: stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, "
+                            "framing, checkable-metric, hedged-safe, defense-held, other. Unrecognized -> 'other', never rejected."
                         ),
                     },
                 },
-                "required": ["item_number", "correction"],
+                "required": ["correction"],
             },
         },
     },
