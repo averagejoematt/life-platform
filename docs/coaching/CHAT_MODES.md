@@ -124,6 +124,8 @@ individual tools (`get_coach_checkin_queue`, `get_habit_reflection_queue`,
 depth — e.g. `get_coach_checkin_queue` when a fresh question should be *generated*; the
 opener deliberately never triggers generation.
 
+**A write that waits on approval is QUEUED, never announced (`#4078`).** When a mode would say a write is "queued pending approval", it calls `manage_pending_writes action=enqueue` first and says "queued" only once that returned a `pending_id` — four sessions (09-08, 09-18, 09-20, 09-21) ended announcing writes that no queue held. Open items come back in `get_capture_queues`' `pending_writes` section at the next opener; approve performs the write through its own tool, discard drops it, and the nightly qa-smoke warns on any item open past 3 days.
+
 **The evening is ONE flow (`#1484`).** The journal-interview *evening* variant is the
 unified evening ritual, bridging what used to be four separately-skippable surfaces:
 interview → Notion write → the one-tap drinks count (always offered when

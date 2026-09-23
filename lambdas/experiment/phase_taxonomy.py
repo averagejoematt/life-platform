@@ -495,6 +495,13 @@ SOURCE_CLASS: dict[str, str] = {
     # moderation (site_api_social) — audience state like VOTES#/CHALLENGE_FOLLOWS, kept across resets.
     "email_digest": SYSTEM_STATE,  # #951: between-chronicle digest change-marker
     # (between_chronicle_lambda, STATE#between_chronicle) — pure dedup state.
+    # #4078: chat writes queued for Matthew's approval (`coach/pending_writes.py`, PENDING#<ts>-<hash>).
+    # Ruled SYSTEM_STATE before the first row exists: the queue is a workflow buffer, not a fact about
+    # the experiment — an approved item's payload lands in its TARGET partition under that partition's
+    # own class. An open item is an owner decision outstanding and must survive a reset untouched and
+    # unfiltered (the same reasoning as experiment_suggestions above); SYSTEM_STATE is the class the
+    # phase machinery ignores entirely. Resolved rows self-expire via `ttl`; open rows never do.
+    "pending_writes": SYSTEM_STATE,
 }
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;
