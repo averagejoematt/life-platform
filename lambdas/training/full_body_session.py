@@ -8,7 +8,9 @@ floor, the notes and the ceilings are the SAME code on both paths.
 
 `program_structure.session_prescription_for_role` is the §3 session as data; this turns it
 into IR. Everything the muscle-budget path guarantees still holds here — the load floor
-(#3927) is the last thing to touch a WORKING or TOP set's load, the ceilings are asserted,
+(#3927) is the last thing to touch a WORKING or TOP set's load, re-based onto v0.3 §3's
+entry ramp (`load_ramp`, #4090: the week's share of the discounted band anchor, never
+100 % of the band best), the ceilings are asserted,
 the notes quote the same history — with one addition §3 names explicitly: a heavy
 exposure's back-offs sit at −10 % of the top set. That is the one sanctioned set below the
 floor, and every one is written into the rationale, never applied silently.
@@ -16,9 +18,10 @@ floor, and every one is written into the rationale, never applied silently.
 
 from __future__ import annotations
 
+import functools
 from typing import Any
 
-from training import program_structure, routine_generator as _rg
+from training import load_ramp, program_structure, routine_generator as _rg
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
     GeneratorInputs,
@@ -97,10 +100,17 @@ def _blocks_from_prescription(
     return blocks, used, unresolved
 
 
-def _apply_back_offs(blocks: list[ExerciseBlock], used: list[dict[str, Any]], rationale: list[str]) -> list[str]:
+def _apply_back_offs(
+    blocks: list[ExerciseBlock], used: list[dict[str, Any]], rationale: list[str], floors: dict[str, Any] | None = None
+) -> list[str]:
     """Set every back-off to −10 % of its top set (rounded DOWN to 0.5 kg). Runs AFTER the
-    floor, which stamps the top set; a top set with no load leaves its back-offs unloaded."""
+    floor, which stamps the top set; a top set with no load leaves its back-offs unloaded.
+
+    #4090: the back-off load is recorded as `back_off_floor_kg` on the movement's audit row,
+    so the commit gate checks each back-off against ITS floor rather than the top set's —
+    without it every §3 heavy exposure read as a subtract-only violation at commit."""
     lines: list[str] = []
+    movements = (floors or {}).get("movements") or {}
     for block, e in zip(blocks, used):
         kinds = [sp["kind"] for sp in e["sets"]]
         if "top" not in kinds:
@@ -109,9 +119,12 @@ def _apply_back_offs(blocks: list[ExerciseBlock], used: list[dict[str, Any]], ra
         top = block.sets[kinds.index("top")].weight_kg
         if not top or pct is None:
             continue
+        back_off_kg = _floor_half_kg(float(top) * pct / 100.0)
         for s_obj, sp in zip(block.sets, e["sets"]):
             if sp["kind"] == "back_off":
-                s_obj.weight_kg = _floor_half_kg(float(top) * pct / 100.0)
+                s_obj.weight_kg = back_off_kg
+        if block.movement_key in movements:
+            movements[block.movement_key]["back_off_floor_kg"] = back_off_kg
         line = (
             f"{block.movement_key}: back-offs at {pct}% of the {_fmt_load(float(top))} top set "
             "(§3 — the one sanctioned set below the floor)"
@@ -172,6 +185,15 @@ def full_body_routines(
         rationale.append(f"UNRESOLVED — {line}")
 
     history_index, weight_index, _cardio, _whoop = note_indexes
+    # #4090: v0.3 §3's entry ramp — the week's share of the discounted band anchor, never 100 %
+    # of the band best. A day with no calendar week (before block 1) ramps as week 1.
+    ramp_week = int(day_entry.get("week") or 1)
+    ramp_p = load_ramp.params()
+    rationale.append(
+        f"loads: v0.3 §3 entry ramp, week {ramp_week} = {load_ramp.ramp_pct(ramp_week, ramp_p)}% of the band anchor after the "
+        f"{ramp_p['discount_pct']}% detraining discount on anchors >= {load_ramp.DETRAINING_ANCHOR_AGE_DAYS} d older than block 1 "
+        f"(cap {ramp_p['cap_pct']}% of band e1RM; no in-band history -> the nearest band he has lifted in); back-offs −10 % of the top set"
+    )
     load_floors = _enforce_load_floors(
         blocks,
         catalog,
@@ -181,8 +203,10 @@ def full_body_routines(
         days_since_last_workout=inputs.days_since_last_workout,
         layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
         rationale=rationale,
+        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),  # #4107: the ONE v0.3 load path
     )
-    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale)
+    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
+    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],

@@ -268,6 +268,96 @@ def window_start(end_date: str, days: int) -> str:
     return shift_day_key(end_date, -(days - 1))
 
 
+#: #4095: moved here from `mcp/strength_helpers.py` (which re-exports it for backward
+#: compatibility) so `lambdas/web/site_api_training.py` can normalize raw Hevy DDB items
+#: without importing `mcp/` — the site-api bundle only stages `lambdas/` + `config/`
+#: (`deploy/build_bundle.py::stage_tree`); `mcp/` is staged ONLY into the MCP bundle
+#: (`stage_mcp`). `working_sets_by_muscle` below consumes exactly this shape.
+_KG_TO_LBS = 2.20462
+
+
+def normalize_hevy_items(hevy_items: list) -> list[dict]:
+    """Returns a flat, schema-agnostic list of workouts.
+
+    The Hevy partition has lived in two shapes:
+      Old (≤ 2026-05): one DDB item per day, sk = DATE#YYYY-MM-DD,
+        item['data']['workouts'][n].exercises[n].sets[n].weight_lbs.
+      New (≥ 2026-05): one DDB item per workout, sk = DATE#YYYY-MM-DD#WORKOUT#<uuid>,
+        exercises at top level, set weights in weight_kg (Hevy's native unit).
+
+    All readers downstream want: a flat list of workouts, each with
+    {date, workout_name, exercises:[{name, sets:[{set_type, weight_lbs, reps}]}]}.
+    Weights normalized to lbs; we keep weight_kg as well for any caller that
+    wants it.
+
+    Burned in 2026-05-30: tool_get_workout_frequency was filtering on
+    item['data']['workouts'], which never matched the new shape — every
+    new-shape workout was invisible to the read tools.
+    """
+
+    def _set(s: dict) -> dict:
+        w_kg = s.get("weight_kg")
+        w_lbs = s.get("weight_lbs")
+        if w_kg is not None and w_lbs is None:
+            w_lbs = float(w_kg) * _KG_TO_LBS
+        elif w_lbs is not None and w_kg is None:
+            w_kg = float(w_lbs) / _KG_TO_LBS
+        out = {
+            # #4071: the live per-workout rows carry the type as `type`; only the legacy daily
+            # aggregates used `set_type`. Reading `set_type` alone defaulted every live warm-up
+            # to "normal", so every warm-up filter downstream had nothing to drop.
+            "set_type": s.get("set_type") or s.get("type") or "normal",
+            "weight_lbs": float(w_lbs or 0),
+            "weight_kg": float(w_kg or 0),
+            "reps": int(s.get("reps") or 0),
+        }
+        # #3766: RPE carried through, additively. The normalizer used to drop it, so every
+        # consumer downstream could say how heavy a set was and none could say how hard it
+        # felt — the distinction `get_exercise_history` exists to serve. Absent stays absent
+        # (None, never 0): most of the 2024 corpus predates RPE logging (ADR-104).
+        rpe = s.get("rpe")
+        out["rpe"] = float(rpe) if rpe not in (None, "") else None
+        return out
+
+    def _exercise(ex: dict) -> dict:
+        return {
+            "name": ex.get("name") or ex.get("exercise_name") or "",
+            # #3766: the stable Hevy template id and the freeform note, both additive. The
+            # id is what lets a caller ask by template rather than by a fuzzy name; the note
+            # is the raw text the derived signal layer is built FROM, and stays sovereign.
+            "template_id": str(ex.get("template_id") or ""),
+            "notes": (ex.get("notes") or "").strip(),
+            "sets": [_set(s) for s in (ex.get("sets") or [])],
+        }
+
+    out = []
+    for item in hevy_items:
+        sk = item.get("sk", "")
+        # New per-workout shape: sk contains #WORKOUT#, exercises at top.
+        if "#WORKOUT#" in sk and item.get("exercises") is not None:
+            date_str = item.get("date") or (sk.split("DATE#", 1)[1].split("#", 1)[0] if "DATE#" in sk else "")
+            out.append(
+                {
+                    "date": date_str,
+                    "workout_name": item.get("workout_name") or item.get("title") or "",
+                    "exercises": [_exercise(ex) for ex in item.get("exercises", [])],
+                }
+            )
+            continue
+        # Legacy per-day shape: workouts nested under data.workouts (or top-level workouts).
+        date_str = item.get("date") or sk[5:15]
+        workouts = item.get("data", {}).get("workouts") or item.get("workouts") or []
+        for w in workouts:
+            out.append(
+                {
+                    "date": date_str,
+                    "workout_name": w.get("name") or w.get("workout_name") or "",
+                    "exercises": [_exercise(ex) for ex in (w.get("exercises") or [])],
+                }
+            )
+    return out
+
+
 def working_sets_by_muscle(
     workouts: Iterable[dict[str, Any]], start_date: str | None = None, end_date: str | None = None
 ) -> dict[str, Any]:

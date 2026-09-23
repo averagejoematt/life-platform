@@ -98,7 +98,7 @@ KNOWN_SECRETS = {
     "life-platform/site-api-ai-key",
     "life-platform/eightsleep-client",
     "life-platform/hevy",  # ADR-060 / SPEC_HEVY (2026-05-25)
-    "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): remediation dispatcher PAT
+    "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): remediation dispatcher PAT; #4022 also read by qa-smoke's closure_probe_qa leg
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): dedicated HMAC signing key for subscriber tokens
     "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (editorial_image.py)
     "life-platform/youtube",  # #1669 (epic #1668): inbound-social YouTube channel id (key `channel_id`); keyless RSS, owner-provisioned
