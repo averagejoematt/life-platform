@@ -308,6 +308,20 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
     return sum(1 for r in rows if float(r["protein_g"]) < floor_g), len(rows)
 
 
+def _catalog_and_ceiling() -> tuple[dict[str, Any] | None, int]:
+    """(movement catalog `movements` dict or None, the week grid's skill ceiling) — #4064."""
+    try:
+        from training.program_seam import resolve_week_grid
+        from training.routine_generator import _load_json
+
+        catalog = (_load_json("movement_catalog.json") or {}).get("movements")
+        ceiling = int(resolve_week_grid(_load_json).week.get("skill_ceiling", 2))
+        return (catalog if isinstance(catalog, dict) else None), ceiling
+    except Exception as e:  # noqa: BLE001 — a missing catalog degrades the session to patterns, never fails the plan
+        logger.warning(f"movement catalog unreadable for plan_next_session: {e}")
+        return None, 2
+
+
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
     four critics over disjoint evidence, verdicts stored on the draft (#3752)."""
@@ -400,8 +414,15 @@ def tool_plan_next_session(args):
     # can COMPUTE whether the accessory layer is holding still (v0.3: fixed for the block) instead of assuming the pool.
     rotation_start, rotation_rows = _safe(_rotation_window, target_date) or (None, None)
 
+    # #4064: the movement catalog, so the block's `session` names MOVEMENTS, not only patterns.
+    # Read through the generator's own loader (local config, then S3) — the same catalog the
+    # draft will be built from. A read that raises leaves the session pattern-level and says so.
+    catalog_movements, skill_ceiling = _catalog_and_ceiling()
+
     block = plan_engine.constraint_block(
         date=target_date,
+        catalog_movements=catalog_movements,
+        skill_ceiling=skill_ceiling,
         weight_lb=weight,
         walk_hr_wk_now=(walk_layer or {}).get("total_hr"),
         # Key names verified against each tool's live return shape rather than assumed —
@@ -440,7 +461,8 @@ def tool_plan_next_session(args):
         "constraint_block": block,
         "protein_days_measured_7d": protein_measured,
         "how_to_use": (
-            "Stage 1 is the deterministic constraint block: draft against it, then say plainly which constraint "
+            "Stage 1 is the deterministic constraint block. `constraint_block.session` is the session the program "
+            "schedules on this date (block calendar + v0.3 §3 prescription) — start from it. Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
             "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
             "WITH routine_id — stage 2, the red team (#3752). A routine that skipped stage 2 is NOT red-teamed and "
