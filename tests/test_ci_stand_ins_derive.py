@@ -326,7 +326,7 @@ def test_the_docs_stand_in_carries_no_pytest_leg():
 
 
 def test_the_pr_template_names_the_premerge_lane_not_targeted_pytest():
-    text = (REPO / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
+    text = (REPO / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
     assert "Targeted `pytest` for what I touched passes locally" not in text
     assert "premerge" in text and "pr-checks.yml" in text
     assert "agent_commit.sh --push" in text
