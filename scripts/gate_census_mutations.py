@@ -539,7 +539,28 @@ _UNDECLARED_UTC_DAY_WRITER_PY = (
     '    return {"start": f"{date_str}T00:00:00.000' + 'Z", "end": f"{next_day}T00:00:00.000' + 'Z"}\n'
 )
 
+# A tool computing weekly walking hours by building the layer itself instead of reading
+# mcp.shared_quantities — the #4068 class (three readers, three windows, two answers).
+_PRIVATE_WALKING_LAYER_PY = (
+    '"""probe."""\n\n'
+    "from training import walking_volume\n\n\n"
+    "def probe(start, end):\n"
+    "    return walking_volume.build(window_start=start, window_end=end, strava_items=[], hevy_workouts=[])\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_shared_quantities_4068.py": MutationSpec(
+        gate_id="structural::test_shared_quantities_4068.py",
+        target="tests/test_shared_quantities_4068.py",
+        detects=(
+            "an MCP tool building the walking-volume layer itself rather than reading "
+            "mcp.shared_quantities — the #4068 class: plan_next_session, the adherence critic and "
+            "get_benchmark each chose their own window and sources and reported 12.82 / 15.82 h and "
+            "a 2.7x gap for one week"
+        ),
+        plants=(("mcp/_census_probe_4068.py", _PRIVATE_WALKING_LAYER_PY),),
+        track=False,  # the guard rglobs mcp/ + lambdas/ on disk, so an untracked module is in scope
+    ),
     "structural::test_nutrition_critics_3754.py": MutationSpec(
         gate_id="structural::test_nutrition_critics_3754.py",
         target="tests/test_nutrition_critics_3754.py",
@@ -1000,6 +1021,19 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_shared_quantities_4068.py": _proof(
+        "structural::test_shared_quantities_4068.py",
+        "ARMED 1/1 — baseline: 24 passed in 4.05s | mutated: 1 failed, 23 passed in 4.15s :: "
+        "test_only_the_shared_module_builds_the_walking_layer | reverted: 24 passed in 3.83s",
+        "mcp/**/*.py + lambdas/**/*.py on disk (rglob), each parsed with `ast` for a call `walking_volume.build(...)` / "
+        "`wv.build(...)` outside mcp/shared_quantities.py and lambdas/training/walking_volume.py, and for any "
+        "`<x>.weight_trend_lb_per_wk(...)` call outside the four ruled TDEE back-solve sites. The named-call-site half "
+        "(CALL_SITES) is a positive check that each listed function still references its shared_quantities name. "
+        "Invisible: a reader that re-implements the window or the estimator with neither of those two calls (an inline "
+        "Strava moving-time sum, a hand-rolled slope) — the named-site list is what catches those, and only for the "
+        "sites it names; a NEW surface reporting either quantity has to be added to CALL_SITES by its author.",
+        proved_on="2026-09-22",
+    ),
     "structural::test_nutrition_critics_3754.py": _proof(
         "structural::test_nutrition_critics_3754.py",
         "ARMED 1/1 — baseline: 62 passed in 1.71s | mutated: 1 failed, 61 passed in 1.70s :: "

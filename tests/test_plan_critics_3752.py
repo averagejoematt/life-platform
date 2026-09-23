@@ -69,6 +69,7 @@ def _packets(
     tripwires=None,
     reference=None,
     consecutive=1,
+    active=1,
     layer="ok",
     lifts_7d=2,
     walking=None,
@@ -91,7 +92,8 @@ def _packets(
             d,
             pain_by_idx=pain if pain is not None else {0: {"pain_flag_any": False}, 1: {"pain_flag_any": False}},
             days_since_by_idx=days_since if days_since is not None else {0: 3, 1: 5},
-            consecutive_days=consecutive,
+            active_day_streak=active,
+            loaded_lifting_streak=consecutive,
             pain_layer_status=layer,
         ),
         "rate_advocate": c.build_rate_advocate_packet(
@@ -177,7 +179,7 @@ def test_positive_control_a_pain_flag_on_a_drafted_movement_draws_the_joints_vet
     severity "change" instead of `violations` → verdict becomes change and this reds."""
     d = c.draft_summary(_ir())
     P = _packets(d, pain={0: {"pain_flag_any": True, "pain_dates": ["2026-09-12"]}, 1: {"pain_flag_any": False}})
-    for invoke in (None, _model("approve", "consecutive_training_days")):
+    for invoke in (None, _model("approve", "loaded_lifting_streak")):
         vs = c.run_critics(P, d, invoke=invoke, model_allowed=invoke is not None, model_paused_reason="tier 3")
         j = next(v for v in vs if v["critic"] == "joints_tendons")
         assert j["verdict"] == "veto", j

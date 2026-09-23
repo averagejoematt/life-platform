@@ -1,0 +1,100 @@
+[
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-08-16",
+  "date": "2026-08-16",
+  "weight_lbs": 321.01,
+  "phase": "pilot"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-08-24",
+  "date": "2026-08-24",
+  "weight_lbs": 326.24,
+  "phase": "pilot"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-01",
+  "date": "2026-09-01",
+  "weight_lbs": 328.13,
+  "phase": "pilot"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-03",
+  "date": "2026-09-03",
+  "weight_lbs": 324.64,
+  "phase": "pilot"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-05",
+  "date": "2026-09-05",
+  "weight_lbs": 326.2,
+  "phase": "pilot"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-06",
+  "date": "2026-09-06",
+  "weight_lbs": 327.34,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-12",
+  "date": "2026-09-12",
+  "weight_lbs": 319.68,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-15",
+  "date": "2026-09-15",
+  "weight_lbs": 318.91,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-17",
+  "date": "2026-09-17",
+  "weight_lbs": 317.31,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-18",
+  "date": "2026-09-18",
+  "weight_lbs": 315.13,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-19",
+  "date": "2026-09-19",
+  "weight_lbs": 315.63,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-20",
+  "date": "2026-09-20",
+  "weight_lbs": 316.92,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-21",
+  "date": "2026-09-21",
+  "weight_lbs": 315.84,
+  "phase": "experiment"
+ },
+ {
+  "pk": "USER#matthew#SOURCE#withings",
+  "sk": "DATE#2026-09-22",
+  "date": "2026-09-22",
+  "weight_lbs": 314.97,
+  "phase": "experiment"
+ }
+]

@@ -601,18 +601,31 @@ def test_lifting_day_flags_count_a_lift_and_not_a_treadmill_only_session():
     assert nci.lifting_day_flags(None, KEYS) is None
 
 
-def test_withings_trend_reuses_the_tdee_endpoint_derivation_and_splits_the_weeks():
-    from health import tdee as tdee_core
-
-    rows = [{"date": k, "weight_lbs": 320 - 0.4 * i} for i, k in enumerate(KEYS)]
-    t = nci.withings_trend(rows, KEYS)
+def test_withings_trend_reads_the_shared_loss_rate_and_splits_the_weeks():
+    """#4068: the trend is THE loss rate (`mcp.shared_quantities`) — least-squares over the
+    14 days, water weeks 1-2 excluded — not the TDEE check's first-vs-last endpoint. A
+    pre-genesis window (no water weeks in it) exercises the estimator on its own."""
+    keys = nci.day_keys("2026-08-20")
+    rows = [{"date": k, "weight_lbs": 320 - 0.4 * i} for i, k in enumerate(keys)]
+    t = nci.withings_trend(rows, keys)
     assert t["weight_lb"] == pytest.approx(320 - 0.4 * 13)
-    assert t["weight_trend_lb_wk"] == tdee_core.weight_trend_lb_per_wk(rows)[0] == pytest.approx(-2.8, abs=0.01)
+    assert t["weight_trend_lb_wk"] == pytest.approx(-2.8, abs=0.01)
+    assert t["loss_rate"]["rate_lb_wk"] == pytest.approx(2.8, abs=0.01)
     assert t["weighin_count"] == 14 and t["weighin_span_days"] == 13 and t["rate_provisional"] is False
     assert t["weekly_loss_rates_lb_wk"] == [2.8, 2.8]
-    thin = nci.withings_trend(rows[-3:], KEYS)
+    thin = nci.withings_trend(rows[-3:], keys)
     assert thin["rate_provisional"] is True and thin["weekly_loss_rates_lb_wk"] == [2.8]
-    assert nci.withings_trend(None, KEYS)["weight_lb"] is None
+    assert nci.withings_trend(None, keys)["weight_lb"] is None
+
+
+def test_withings_trend_excludes_the_water_weeks():
+    """Mutation control: drop the water floor in `loss_rate_from_rows` — the 14 days ending
+    09-20 then read the whole of weeks 1-2 and a rate appears."""
+    rows = [{"date": k, "weight_lbs": 330 - 0.9 * i} for i, k in enumerate(KEYS)]
+    t = nci.withings_trend(rows, KEYS)
+    assert t["loss_rate"]["water_weeks_excluded_through"] == "2026-09-19"
+    assert t["loss_rate"]["window"]["start"] == "2026-09-20" and t["loss_rate"]["n_weighins"] == 1
+    assert t["weight_trend_lb_wk"] is None and t["loss_rate"]["rate_lb_wk"] is None
 
 
 def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_read(monkeypatch):

@@ -177,37 +177,21 @@ def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]
 
 
 def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
-    """The derived walking-volume layer for the trailing 7 days: Strava UNION Hevy (#3930).
+    """The derived walking-volume layer for the week BEFORE `end_date`'s session (#3930, #4068).
 
-    Was Strava-only, and that single-source read is what reported 5.09 hr/wk — "the largest
-    gap on the board" — for a week carrying 8.33 hr of treadmill and cycling duration logged
-    INSIDE Hevy sessions. A floor stated in hours must be measured in hours from every source
-    that produces them; `training.walking_volume` is the union and the per-source breakdown.
+    A union of Strava and Hevy cardio blocks (#3930), de-duplicated in time across devices and
+    against Hevy sessions, over the 7 COMPLETED days before the session — all of it defined
+    ONCE in `mcp.shared_quantities`, which the nutrition critics and `get_benchmark` read too.
+    The window used to END on the target day: a plan for 09-23 read 09-17..09-23 on 09-22 and
+    reported 12.82 h beside the adherence critic's 15.82 h for the same week (#4068).
 
-    Hours, not miles and not steps: the blueprint's floor is stated in hours per week, and
-    converting from either needs an assumption this module would be inventing.
-
-    Reads both partitions DIRECTLY rather than through `get_workouts`: that tool's
-    `_slim_workout` projection drops `exercises`, which is where the cardio blocks live, and
-    the per-workout detail tool costs a five-year scan each. A source that RAISES is passed
-    to the layer as None — unreadable, never zero.
+    Hours, not miles and not steps: the blueprint's floor is stated in hours per week.
     """
     from common.pacific_time import shift_day_key
-    from training import walking_volume
 
-    from mcp.core import query_source_range
+    from mcp import shared_quantities
 
-    start = shift_day_key(end_date, -6)
-    if start == end_date:  # unparseable day key — shift_day_key returns it unchanged
-        return None
-    # `query_source` always returns a list, so None here means the read RAISED — the one
-    # case the layer must not read as "he did nothing".
-    return walking_volume.build(
-        window_start=start,
-        window_end=end_date,
-        strava_items=_safe(query_source_range, "strava", start, end_date),
-        hevy_workouts=_safe(query_source_range, "hevy", start, end_date),
-    )
+    return shared_quantities.walking_layer(shift_day_key(end_date, -1))
 
 
 def _pain_dismissals() -> list[dict[str, Any]]:
@@ -750,8 +734,7 @@ def _nutrition_critics_block() -> dict[str, Any]:
 # ── stage 2 evidence: the SAME readers a chat turn would call, gathered per draft lift ──
 def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict[str, Any]:
     """Per-draft-exercise evidence for the critics: anchor-lift trend, pain flags, days since.
-    Plus the streak and lifting-session count from the performed Hevy record."""
-    from mcp.recovery_authoring import _consecutive_days
+    Plus the two streaks (#4067) and the lifting-session count from the performed record."""
     from mcp.tools_strength import tool_get_exercise_history
     from mcp.tools_training_notes import tool_get_exercise_notes
 
@@ -786,7 +769,7 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         exercises.append(row)
 
     dates = _safe(_workout_dates, _minus_days(target_date, BLOCK_LOOKBACK_DAYS), target_date)
-    consecutive = _consecutive_days(dates, target_date) if dates is not None else None
+    streaks = _safe(_training_streaks, target_date) or {"active_day_streak": None, "loaded_lifting_streak": None}
     week_start = _minus_days(target_date, 7)
     lifting_7d = len({d for d in dates if week_start <= d < target_date}) if dates is not None else None
     weeks_in_block = _weeks_in_block(dates, target_date) if dates is not None else None
@@ -799,11 +782,39 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         layer_status = next(s for s in statuses if s in ("dark", "unknown"))
     return {
         "exercises": exercises,
-        "consecutive_days": consecutive,
+        # #4067: two streaks. `loaded_lifting_streak` is the one the rest-day ask keys on.
+        "active_day_streak": streaks.get("active_day_streak"),
+        "loaded_lifting_streak": streaks.get("loaded_lifting_streak"),
+        "streaks": streaks,
         "lifting_sessions_7d": lifting_7d,
         "weeks_in_block": weeks_in_block,
         "pain_layer_status": layer_status,
     }
+
+
+def _training_streaks(target_date: str) -> dict[str, Any]:
+    """{active_day_streak, loaded_lifting_streak, …} before `target_date` (#4067).
+
+    Hevy through `tools_strength._read_hevy_all_phases` — the ONE sanctioned Hevy read path
+    (cross-phase by the taxonomy, tombstoned legacy aggregates out) — because the LOAD is in
+    the sets, which `get_workouts`' slim projection drops. Strava only widens the ACTIVE
+    streak. A Hevy read that raises propagates (the caller's `_safe` makes both streaks
+    unknown); a Strava read that raises leaves the active streak a declared floor."""
+    from training import training_streaks
+
+    from mcp.core import query_source_range
+    from mcp.strength_helpers import normalize_hevy_items
+    from mcp.tools_strength import _read_hevy_all_phases
+
+    start = _minus_days(target_date, BLOCK_LOOKBACK_DAYS)
+    end = _minus_days(target_date, 1)
+    items, _phases = _read_hevy_all_phases(start, end)
+    hevy = normalize_hevy_items(items)
+    strava = _safe(query_source_range, "strava", start, end)
+    out = training_streaks.streaks(hevy, strava, target_date, window_start=start)
+    out["window"] = {"start": start, "end": end}
+    out["rest_ask_at_loaded_streak"] = training_streaks.REST_ASK_AT_STREAK
+    return out
 
 
 def _weeks_in_block(dates: list[str], target_date: str, min_per_week: int = 2, max_weeks: int = 8) -> int:
@@ -835,6 +846,16 @@ def _workout_dates(start: str, end: str) -> list[str]:
 
     res = tool_get_workouts({"start_date": start, "end_date": end, "source": "hevy", "limit": 500}) or {}
     return sorted({(w.get("date") or "")[:10] for w in res.get("workouts") or [] if w.get("date")})
+
+
+def _loss_rate_of(reference: dict[str, Any] | None) -> tuple[float | None, bool | None]:
+    """(rate lb/wk, provisional) from the reference's `loss_rate` block (#4068). A reference
+    without the block (inapplicable, or an older payload) yields its bare rate, provisional
+    unknown."""
+    block = (reference or {}).get("loss_rate")
+    if isinstance(block, dict):
+        return block.get("rate_lb_wk"), block.get("provisional")
+    return (reference or {}).get("current_rate_lb_wk"), None
 
 
 def _anchor_trend(sessions: list[dict[str, Any]], target_date: str) -> dict[str, Any]:
@@ -962,7 +983,8 @@ def _run_stage_2(
                 draft,
                 pain_by_idx={i: e for i, e in by_idx.items() if "pain_flag_any" in e},
                 days_since_by_idx={i: e.get("days_since") for i, e in by_idx.items()},
-                consecutive_days=evidence.get("consecutive_days"),
+                active_day_streak=evidence.get("active_day_streak"),
+                loaded_lifting_streak=evidence.get("loaded_lifting_streak"),
                 pain_layer_status=evidence.get("pain_layer_status"),
                 dismissals=dismissals,  # #4036 — the owner's own override of a flag instance
             ),
@@ -971,7 +993,10 @@ def _run_stage_2(
                 tripwires=block.get("tripwires"),
                 walking=block.get("walking"),
                 rate_target=block.get("rate_target"),
-                current_rate_lb_wk=(reference or {}).get("current_rate_lb_wk"),
+                # #4068: THE loss rate (mcp.shared_quantities via get_benchmark's `loss_rate`
+                # block) — the number the deficit critic reads, provisional flag included.
+                current_rate_lb_wk=_loss_rate_of(reference)[0],
+                rate_provisional=_loss_rate_of(reference)[1],
                 lifting_sessions_7d=evidence.get("lifting_sessions_7d"),
             ),
             "blueprint_historian": critics.build_historian_packet(

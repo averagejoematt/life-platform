@@ -889,7 +889,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # carrying the pre-#4071 loop shape; baseline 63 passed | mutated 1 failed :: test_no_second_per_muscle_set_computation_in_mcp_or_training
         # | reverted 63 passed). MEASURED by id-set diff: lane {proven 130, unproven 540, not-applicable 6, attempted-unproven 5} vs a
         # disposable `git archive origin/main` export at 24996c6c2 {129, 540, 6, 5} — exactly one entrant, none leaves.
-        <= 130
+        # Upper bound 130 -> 131 (2026-09-22, #4068): structural::test_shared_quantities_4068.py — the AST derivation guard that
+        # weekly walking hours and the loss rate reach every named critic/tool (get_benchmark included) through mcp.shared_quantities
+        # and that nothing else builds the walking layer — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
+        # ARMED 1/1: an untracked mcp/_census_probe_4068.py calling walking_volume.build; baseline 24 passed | mutated 1 failed ::
+        # test_only_the_shared_module_builds_the_walking_layer | reverted 24 passed). Unproven stays 540; exactly one entrant.
+        <= 131
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
