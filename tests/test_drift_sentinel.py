@@ -308,7 +308,15 @@ def _patch_all(
     cadence=None,
     events=None,
     log_retention=None,
+    producer_census=None,
 ):
+    # #4034: the producer census dead-man. Patched like every other AWS-touching check
+    # so the sweep-shape tests stay offline.
+    monkeypatch.setattr(
+        ds,
+        "check_producer_census",
+        lambda *a, **k: producer_census or {"status": "clean", "members": 95, "graded": 84, "silent": [], "detail": "84/95"},
+    )
     # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
     # other AWS-touching check so the sweep-shape tests stay offline.
     monkeypatch.setattr(ds, "check_raw_replication", lambda *a, **k: raw_replication or {"status": "clean", "objects_confirmed": 2})

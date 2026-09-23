@@ -507,6 +507,29 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-08-30",
     },
+    "sentinel::deploy/sentinel_producer_census.py::check_producer_census": {
+        "gate_name": "check_producer_census",
+        "command": "python3 -m pytest tests/test_producer_census_4034.py -q",
+        "mutation": (
+            "(a) the REAL derived population (every Lambda whose handler import closure reaches a "
+            "deploy/emf_namespace_ledger.py emitter, 95 on 2026-09-23) read through a GetMetricData fake built to the "
+            "wire shape (Label == function, newest-first Timestamps/Values), with ONE member (daily-brief) given no "
+            "datapoints; plus pure plants of a producer last seen past its window, a producer never seen in the "
+            "lookback, and a FIRST_DUE member whose due date + window has passed. (b) get_metric_data raising "
+            "AccessDenied, and a population with zero gradable members."
+        ),
+        "observed": (
+            "exit 0 with (a) status='drift' naming exactly the planted silent member with its window, reaching "
+            "drift_report.as_signal's flagging map; the all-invoked baseline over the same real population reports "
+            "'clean' with >=70 graded. (b) both -> status='error' ('census measured NOTHING'), never 'clean'."
+        ),
+        "scope": (
+            "Rides the drift sentinel's Mon/Wed/Fri run, so a producer is caught within one sentinel interval of "
+            "crossing its window (2 periods + a daily bucket, floored at 48h) — a census, not a real-time alarm. "
+            "ON_DEMAND members are reported unmeasured, never graded. " + _ERROR_IS_NOT_A_SIGNAL
+        ),
+        "proved_on": "2026-09-23",
+    },
 }
 
 
