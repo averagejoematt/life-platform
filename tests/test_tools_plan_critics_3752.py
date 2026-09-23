@@ -127,7 +127,30 @@ def _walk_layer(total_hr):
     )
 
 
-def _stage2_patches(ir, evidence, *, invoke, allowed=(True, None), stored=None, thread=None):
+def _performed_evidence(rows=None):
+    """#4051: the stage-1 performed-movement evidence set, stubbed at its reader.
+
+    Built from the same shape the real `_gather_performed_evidence` returns, including the
+    scope — `plan_engine` reads `status`/`movements_considered` to decide whether `clear` is
+    even reachable, so a stub without a scope would make every block here read `unknown`.
+    """
+    rows = rows if rows is not None else [{"label": "Squat (Barbell)", "template_id": "1", "days_since": 3, "pain_flag_any": False}]
+    return {
+        "exercises": rows,
+        "scope": {
+            "status": "read" if rows else "none",
+            "source": "hevy",
+            "window": {"start": "2026-08-23", "end": "2026-09-20", "days": 28},
+            "phases_read": ["experiment", "pilot"],
+            "movements_considered": len(rows),
+            "movements_flagged": sum(1 for r in rows if r.get("pain_flag_any")),
+            "note_layer_status": "ok",
+            "reason": f"{len(rows)} movement(s) performed in the window were checked against the derived note layer",
+        },
+    }
+
+
+def _stage2_patches(ir, evidence, *, invoke, allowed=(True, None), stored=None, thread=None, performed=None):
     """Offline patch set for a stage-2 run. `stored` collects put_versioned calls."""
     stored = stored if stored is not None else []
     thread = thread if thread is not None else []
@@ -139,6 +162,8 @@ def _stage2_patches(ir, evidence, *, invoke, allowed=(True, None), stored=None, 
         patch("mcp.tools_plan._walking_volume_last_7d", return_value=_walk_layer(1.1)),
         patch("mcp.tools_plan._protein_days_7d", return_value=(1, 7)),
         patch("mcp.tools_plan._gather_draft_evidence", return_value=evidence),
+        # #4051: stage 1's own evidence set now runs on every call, draft or not.
+        patch("mcp.tools_plan._gather_performed_evidence", return_value=performed or _performed_evidence()),
         patch("mcp.tools_plan._model_allowed", return_value=allowed),
         patch(
             "mcp.tools_plan._write_thread",

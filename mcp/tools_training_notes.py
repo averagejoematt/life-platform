@@ -13,6 +13,7 @@ confirm or dismiss before loading that movement" — and until #4036 only the fi
 existed anywhere. See the block at the end of this file.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 from boto3.dynamodb.conditions import Key
@@ -60,44 +61,22 @@ def _resolve_template_id(exercise: str, lookback_days: int) -> tuple[str | None,
     return best or (None, None)
 
 
-def tool_get_exercise_notes(args):
-    """Per-exercise note timeline (the arc) + signals + pain flags — and, on `action`, the
-    OWNER-ONLY dismissal of one of those flags (#4036, see the block at the end of this file).
+def _query_note_rows(template_id: str, start: str) -> list:
+    """The derived note rows for ONE exercise template, from `DATE#<start>` forward.
 
-    The write lives on this tool rather than on one of its own (which is what #4036's design
-    note reached for first) because minting a tool moves `mcp_tools`, a generated count that
-    lives ONLY in `lambdas/web/platform_counts.py` and that no branch may carry (#3101/#3984)
-    — the stale-number gate would red this PR on six doc headers the reconcile job owns. The
-    issue's acceptance sanctions "a new action on an existing owner tool", and this is the
-    tool that owns the pain-flag surface: its own `note` is the sentence the action answers.
-    `action` defaults to `read`, so every existing caller is unchanged."""
-    args = args or {}
-    action = str(args.get("action") or "read").strip().lower()
-    if action == "dismiss":
-        return _dismiss_pain_flag(args)
-    if action in ("dismissals", "list_dismissals"):
-        return _list_dismissals()
-    if action != "read":
-        return {"error": f"Unknown action '{action}'.", "valid_actions": ["read", "dismiss", "dismissals"]}
-    exercise = args.get("exercise") or args.get("template_id") or ""
-    lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)
-    if not exercise:
-        return {"error": "Provide 'exercise' (name) or 'template_id'."}
+    Split out of `tool_get_exercise_notes` (#4051) so the per-movement read and the
+    many-movement read below share ONE query and ONE parse. A second reader of this
+    partition with its own key construction is the must-agree seam (#2847) that lets two
+    surfaces disagree about the same flag — which is exactly the defect #4051 names.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{template_id}") & Key("sk").gte(f"DATE#{start}"),
+    )
+    return [decimal_to_float(it) for it in resp.get("Items", [])]
 
-    template_id, matched = _resolve_template_id(exercise, lookback_days)
-    if not template_id:
-        return {"error": f"No exercise matching {exercise!r} found in the last {lookback_days}d of workouts.", "exercise": exercise}
 
-    start = (pacific_now().date() - timedelta(days=lookback_days)).isoformat()
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{template_id}")
-            & Key("sk").gte(f"DATE#{start}"),
-        )
-    except Exception as e:
-        return {"error": f"query failed: {e}", "template_id": template_id}
-
-    rows = [decimal_to_float(it) for it in resp.get("Items", [])]
+def _notes_timeline(rows: list) -> tuple[list, list, object]:
+    """(timeline, pain_dates, latest_progression) from raw note rows. No I/O."""
     # Corrections win on read (sk …#CORRECTION) and survive recompute.
     corrections = {r["sk"].replace("#CORRECTION", ""): r for r in rows if r.get("sk", "").endswith("#CORRECTION")}
     # #3918: the head key is one per (workout, template, OCCURRENCE), so a workout that
@@ -112,9 +91,9 @@ def tool_get_exercise_notes(args):
         for occ, row in sorted(dedupe_head_rows(grouped[base]).items()):
             ordered.append((occ, row))
 
-    timeline = []
+    timeline: list = []
     latest_progression = None
-    pain_dates = []
+    pain_dates: list = []
     for occurrence, r in ordered:
         # A correction written against the pre-migration key still applies to the record
         # it corrected — it is found by the head's `migrated_from_sk`.
@@ -148,6 +127,88 @@ def tool_get_exercise_notes(args):
         for s in signals:
             if s.get("class") == "progression" and s.get("value"):
                 latest_progression = s["value"]
+    return timeline, pain_dates, latest_progression
+
+
+def pain_flags_for_templates(template_ids, start: str, max_workers: int = 8) -> dict:
+    """The pain-flag record for MANY exercise templates at once — the stage-1 read (#4051).
+
+    `plan_next_session` needs every flag the layer holds for the movements he actually
+    PERFORMED in the lookback, and that set is ~27 templates on a live 28-day window.
+    Calling `tool_get_exercise_notes` once per template would re-run `training_notes_health`
+    27 times for one answer; this reads the SAME partition through the SAME parse
+    (`_query_note_rows` + `_notes_timeline`) and leaves the layer's health to the caller,
+    who states it ONCE beside the flags.
+
+    Returns `{template_id: {"pain_flag_any", "pain_dates", "sessions_with_notes"}}`, or
+    `{"error": ...}` for a template whose read RAISED — an unreadable template is reported,
+    never folded into the clean ones (#3767).
+
+    **`pain_flag_any` is NOT nulled on a degraded/dark layer here**, and that is deliberate:
+    `pain_flag` on a degraded row is the DETERMINISTIC pass's own verdict (the lexicon hit),
+    written before the semantic pass was even attempted. The layer's health qualifies the
+    ABSENCE of flags — it cannot un-say a flag that is on the record. Today's live layer is
+    `degraded` (`cap_exceeded x24`, the Haiku monthly cap), and the 2026-09-13 Romanian
+    Deadlift flag is one of those degraded rows: withholding it would be the #3768 failure
+    pointed the other way.
+    """
+    ids = [str(t) for t in (template_ids or []) if str(t or "").strip()]
+    out: dict = {}
+    if not ids:
+        return out
+
+    def _one(tid: str) -> tuple[str, dict]:
+        try:
+            timeline, pain_dates, _ = _notes_timeline(_query_note_rows(tid, start))
+        except Exception as e:  # noqa: BLE001
+            return tid, {"error": f"{type(e).__name__}: {e}"}
+        return tid, {
+            "pain_flag_any": bool(pain_dates),
+            "pain_dates": [str(d)[:10] for d in pain_dates if d],
+            "sessions_with_notes": len(timeline),
+        }
+
+    with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(ids)))) as pool:
+        for tid, res in pool.map(_one, ids):
+            out[tid] = res
+    return out
+
+
+def tool_get_exercise_notes(args):
+    """Per-exercise note timeline (the arc) + signals + pain flags — and, on `action`, the
+    OWNER-ONLY dismissal of one of those flags (#4036, see the block at the end of this file).
+
+    The write lives on this tool rather than on one of its own (which is what #4036's design
+    note reached for first) because minting a tool moves `mcp_tools`, a generated count that
+    lives ONLY in `lambdas/web/platform_counts.py` and that no branch may carry (#3101/#3984)
+    — the stale-number gate would red this PR on six doc headers the reconcile job owns. The
+    issue's acceptance sanctions "a new action on an existing owner tool", and this is the
+    tool that owns the pain-flag surface: its own `note` is the sentence the action answers.
+    `action` defaults to `read`, so every existing caller is unchanged."""
+    args = args or {}
+    action = str(args.get("action") or "read").strip().lower()
+    if action == "dismiss":
+        return _dismiss_pain_flag(args)
+    if action in ("dismissals", "list_dismissals"):
+        return _list_dismissals()
+    if action != "read":
+        return {"error": f"Unknown action '{action}'.", "valid_actions": ["read", "dismiss", "dismissals"]}
+    exercise = args.get("exercise") or args.get("template_id") or ""
+    lookback_days = int(args.get("lookback_days") or PREFLIGHT_LOOKBACK_DAYS)
+    if not exercise:
+        return {"error": "Provide 'exercise' (name) or 'template_id'."}
+
+    template_id, matched = _resolve_template_id(exercise, lookback_days)
+    if not template_id:
+        return {"error": f"No exercise matching {exercise!r} found in the last {lookback_days}d of workouts.", "exercise": exercise}
+
+    start = (pacific_now().date() - timedelta(days=lookback_days)).isoformat()
+    try:
+        rows = _query_note_rows(template_id, start)
+    except Exception as e:
+        return {"error": f"query failed: {e}", "template_id": template_id}
+
+    timeline, pain_dates, latest_progression = _notes_timeline(rows)
 
     # #3767: say whether the layer could be read at all, BEFORE reporting counts from it.
     # The health function has existed since this layer shipped and its docstring says "hook
