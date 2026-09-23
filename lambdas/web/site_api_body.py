@@ -171,7 +171,9 @@ def vitals(date: str | None = None, *, _g) -> dict:
     # window. The old code inspected only the single latest apple_health item —
     # usually a steps record — so the Apple fallback engaged same-day only.
     # Time-travel: the latest weigh-in on-or-before the anchor (else the live latest).
-    withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings")
+    # #4088: the LIVE read carries the same genesis DATE clamp as d7/d30 above (#1084), so a
+    # prior-cycle weigh-in is excluded by its date, not by a phase tag on a raw series.
+    withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings", since=EXPERIMENT_START)
     try:
         _ah_start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
         if not ip:
