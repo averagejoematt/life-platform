@@ -15,6 +15,8 @@ import json
 import os
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -98,7 +100,11 @@ def test_save_routine_spec_writes_to_the_expected_key_with_the_stubbed_client():
     assert out["key"] == "config/coaching/routine_specs/push/r-4079.json"
     put.assert_called_once()
     _, kwargs = put.call_args
-    assert kwargs["Bucket"] == "test-bucket"
+    # The CONFIGURED bucket, read at call time — `mcp.config` may have been imported by an
+    # earlier test under a different S3_BUCKET env, so a literal here is order-dependent.
+    from mcp.config import S3_BUCKET
+
+    assert kwargs["Bucket"] == S3_BUCKET
     assert kwargs["Key"] == "config/coaching/routine_specs/push/r-4079.json"
     assert kwargs["ContentType"] == "application/json"
     body = json.loads(kwargs["Body"])
@@ -128,3 +134,16 @@ def test_save_routine_spec_uses_created_by_cron_for_generator_authored_routines(
     body = json.loads(put.call_args.kwargs["Body"])
     assert body["session_role"] == "cron"
     assert out["saved"] is True
+
+
+@pytest.mark.parametrize("archetype", ["push", "legs", None])
+def test_the_written_key_is_spec_key_and_the_registry_classifies_it(archetype):
+    """The put_object key is spelled as a literal f-string so deploy/config_twin_registry.py can
+    resolve it to a runtime-written family; it must stay byte-equal to `spec_key` and SPEC_PREFIX."""
+    ir = _ir()
+    ir.archetype = archetype
+    put = MagicMock()
+    with patch.object(ledger, "_spec_s3", return_value=MagicMock(put_object=put)):
+        ledger.save_routine_spec(ir)
+    assert put.call_args.kwargs["Key"] == ledger.spec_key(archetype, ir.routine_id)
+    assert put.call_args.kwargs["Key"].startswith(ledger.SPEC_PREFIX + "/")

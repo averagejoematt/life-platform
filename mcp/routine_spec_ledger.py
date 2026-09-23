@@ -145,7 +145,10 @@ def save_routine_spec(ir: Any, *, committed_at: str | None = None) -> dict[str, 
 
         _spec_s3().put_object(
             Bucket=S3_BUCKET,
-            Key=key,
+            # Spelled as a literal f-string (== spec_key; pinned by a test) so
+            # deploy/config_twin_registry.py resolves this write to the runtime family
+            # `config/coaching/routine_specs/*/*.json` — no repo twin may shadow it.
+            Key=f"config/coaching/routine_specs/{ir.archetype or 'unclassified'}/{ir.routine_id}.json",
             Body=json.dumps(spec, sort_keys=True),
             ContentType="application/json",
         )
