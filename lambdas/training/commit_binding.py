@@ -1,4 +1,4 @@
-"""hevy_commit_binding.py — a commit is bound to the routine the stage-2 red team verdicted (#4066).
+"""commit_binding.py — a commit is bound to the routine the stage-2 red team verdicted (#4066).
 
 THE INCIDENT (2026-09-22, read off DynamoDB). Three Legs routines were drafted for 09-22.
 `21bffbdc…` went through stage 2 (four critics, 03:27:27Z) and was committed at 03:27:50Z;
@@ -27,6 +27,9 @@ DELETED ROUTINES (#4066 comment, owner item 12). On 2026-09-22 03:27:02Z a commi
 routine — HTTP 404", naming neither id nor the cause. `deleted_routine_error` turns a 404 on
 the update branch into `HEVY_ROUTINE_DELETED`, naming the platform routine_id AND the Hevy id.
 (Read live 2026-09-23: GET /v1/routines/<deleted id> → 404 {"error":"Routine not found"}.)
+
+WHY training/ AND NOT mcp/: the MCP tool layer owns only the error ENVELOPE, which the caller
+passes in as `err` (`mcp.utils.mcp_error`); the binding itself is plain routine-IR logic.
 """
 
 from __future__ import annotations
@@ -128,10 +131,9 @@ def check(ir: Any, lister: Any = None) -> dict[str, Any]:
     return {"bound": True, "reason": None, "message": f"bound — stage-2 verdict v{b.get('version')} hash {now[:12]} matches (#4066)"}
 
 
-def preflight(ir: Any, args: dict[str, Any], lister: Any = None) -> tuple[dict[str, Any] | None, str, list[str]]:
-    """(refusal mcp_error | None, status line for the result, warnings). Stamps an override."""
-    from mcp.utils import mcp_error
-
+def preflight(ir: Any, args: dict[str, Any], err: Any, lister: Any = None) -> tuple[dict[str, Any] | None, str, list[str]]:
+    """(refusal | None, status line for the result, warnings). Stamps an override. `err` is the
+    caller's error-envelope builder (message, error_code=..., detail=...)."""
     verdict = check(ir, lister)
     if verdict["bound"]:
         return None, verdict["message"], []
@@ -139,7 +141,7 @@ def preflight(ir: Any, args: dict[str, Any], lister: Any = None) -> tuple[dict[s
     reason = str(args.get(REASON_ARG) or "").strip()
     if not override:
         return (
-            mcp_error(
+            err(
                 f"Refusing to commit — not the red-teamed routine (#4066): {verdict['message']} Run plan_next_session with "
                 f"routine_id={ir.routine_id} (stage 2) and commit what it verdicts, or pass {OVERRIDE_ARG}=true with "
                 f"{REASON_ARG} in the owner's words.",
@@ -150,20 +152,18 @@ def preflight(ir: Any, args: dict[str, Any], lister: Any = None) -> tuple[dict[s
             [],
         )
     if not reason:
-        return mcp_error(f"{OVERRIDE_ARG}=true requires a non-empty {REASON_ARG} (#4066).", error_code="MISSING_ARG"), "", []
+        return err(f"{OVERRIDE_ARG}=true requires a non-empty {REASON_ARG} (#4066).", error_code="MISSING_ARG"), "", []
     stamp = {"overridden": True, "reason": reason, "binding_reason": verdict["reason"], "at": datetime.now(timezone.utc).isoformat()}
     ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "redteam_binding": stamp}
     warn = f"OWNER OVERRIDE (#4066): committed WITHOUT a matching stage-2 verdict — {verdict['message']} Reason: {reason!r}"
     return None, warn, [warn]
 
 
-def deleted_routine_error(status: int, body_text: str, ir: Any, took_update_branch: bool) -> dict[str, Any] | None:
+def deleted_routine_error(status: int, body_text: str, ir: Any, took_update_branch: bool, err: Any) -> dict[str, Any] | None:
     """A 404 on the update branch means Hevy no longer holds the routine — say so, naming both ids."""
     if status != 404 or not took_update_branch:
         return None
-    from mcp.utils import mcp_error
-
-    return mcp_error(
+    return err(
         f"Refusing to report success — routine_id={ir.routine_id} points at Hevy routine {ir.hevy_routine_id}, which Hevy "
         f"no longer holds (HTTP 404: {body_text[:200] or 'empty body'}) — it was deleted in the app. Nothing was written. "
         "Draft a new routine (draft_custom), red-team it (plan_next_session with routine_id), then commit that.",

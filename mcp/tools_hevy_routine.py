@@ -41,10 +41,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
+from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 
 # #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
 # module for the same reason — this file sits at the ratchet's ceiling.
-from mcp import hevy_commit_binding as commit_binding
 from mcp.hevy_prescription_gate import SUBTRACT_ONLY_ERROR_CODE, prescription_gate, refusal_message, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
@@ -981,7 +981,7 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     if gate_refusal:
         return mcp_error(gate_refusal, error_code=SUBTRACT_ONLY_ERROR_CODE, detail=gate["audit"]["violations"])
     # #4066: the commit must be the routine stage 2 verdicted, unchanged since — or an explicit owner override.
-    binding_refusal, binding_line, binding_warnings = commit_binding.preflight(ir, args)
+    binding_refusal, binding_line, binding_warnings = commit_binding.preflight(ir, args, mcp_error)
     if binding_refusal:
         return binding_refusal
     warnings += binding_warnings
@@ -1096,8 +1096,8 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
         except Exception:  # noqa: BLE001
             body_text = ""
         logger.warning("[hevy commit] %s rejected routine %s — body: %s", e.code, routine_id, body_text[:1000])
-        gone = commit_binding.deleted_routine_error(e.code, body_text, ir, bool(ir.hevy_routine_id))  # #4066: name the deleted id
-        if gone:
+        # #4066: a 404 on the update branch is a routine deleted in the app — name both ids.
+        if gone := commit_binding.deleted_routine_error(e.code, body_text, ir, bool(ir.hevy_routine_id), mcp_error):
             return gone
         return mcp_error(
             f"Hevy rejected the routine — HTTP {e.code}. Response body: {body_text[:1000] or '(empty)'}",

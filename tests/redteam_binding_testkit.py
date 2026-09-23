@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp.hevy_commit_binding import binding_for
+from training.commit_binding import binding_for
 
 
 def bind(ir: Any) -> Any:

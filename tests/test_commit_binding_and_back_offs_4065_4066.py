@@ -24,10 +24,10 @@ from contextlib import ExitStack
 from unittest.mock import patch
 
 import pytest
-from training import owner_redlines, rep_scheme
+from training import commit_binding as binding, owner_redlines, rep_scheme
 from training.routine_ir import ExerciseBlock, RoutineSpec, deserialize, serialize
 
-from mcp import hevy_commit_binding as binding, hevy_prescription_gate as gate, tools_hevy_routine as t
+from mcp import hevy_prescription_gate as gate, tools_hevy_routine as t
 from tests.redteam_binding_testkit import bind
 from tests.test_tools_plan_critics_3752 import _commit_patches, _evidence, _ir, _run
 
