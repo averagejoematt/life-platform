@@ -870,7 +870,8 @@ def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):
     the tool's own declared `date` argument landing on a date with strength
     history reached it. Now `classify_exercise` is imported properly and the
     call both survives AND actually classifies the exercise into muscle_recovery
-    (Bench Press -> Chest/Triceps/Shoulders), rather than merely not crashing."""
+    (Bench Press -> Chest + Triceps since #4071: one primary muscle and the secondaries the
+    taxonomy names — the old keyword row also credited Shoulders), rather than merely not crashing."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[],
@@ -886,8 +887,8 @@ def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert "muscle_recovery" in out
-    assert set(out["muscle_recovery"]) == {"Chest", "Triceps", "Shoulders"}
-    for mg in ("Chest", "Triceps", "Shoulders"):
+    assert set(out["muscle_recovery"]) == {"Chest", "Triceps"}
+    for mg in ("Chest", "Triceps"):
         assert out["muscle_recovery"][mg]["last_trained"] == _d(-2)
 
 

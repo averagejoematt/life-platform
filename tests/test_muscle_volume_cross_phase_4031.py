@@ -66,7 +66,7 @@ import mcp.core as core  # noqa: E402
 import mcp.tools_strength as ts  # noqa: E402
 
 PK = "USER#matthew#SOURCE#hevy"
-BENCH_TID = "79D0BD87"  # Bench Press (Barbell) -> Chest + Triceps + Shoulders, pattern Push
+BENCH_TID = "79D0BD87"  # Bench Press (Barbell) -> Chest (primary) + Triceps 0.5 (#4071), pattern Push
 
 _TODAY = ts.pacific_now().date()
 _EXPERIMENT_DATE = (_TODAY - timedelta(days=3)).isoformat()  # current cycle
@@ -239,8 +239,10 @@ def test_the_default_window_is_a_rate_window_not_all_time(wired):
     """Live before this fix: num_periods_analyzed 1394.3, every muscle "below maintenance"."""
     out = ts.tool_get_muscle_volume({})
 
-    assert out["date_range"]["start"] == (_TODAY - timedelta(days=28)).isoformat()
+    # #4071: 28 INCLUSIVE days — today-27..today — is exactly 4.0 weeks.
+    assert out["date_range"]["start"] == (_TODAY - timedelta(days=27)).isoformat()
     assert out["date_range"]["end"] == _TODAY.isoformat()
+    assert out["window_days"] == 28
     assert out["num_periods_analyzed"] == 4.0
     assert out["searched"]["window_source"] == "default trailing 28d (week view)"
     assert out["searched"]["default_lookback_days"] == 28
@@ -253,7 +255,7 @@ def test_the_month_view_defaults_to_its_own_rate_window(wired):
     out = ts.tool_get_muscle_volume({"period": "month"})
 
     assert out["analysis_period"] == "month"
-    assert out["date_range"]["start"] == (_TODAY - timedelta(days=90)).isoformat()
+    assert out["date_range"]["start"] == (_TODAY - timedelta(days=89)).isoformat()  # 90 inclusive days (#4071)
     assert out["searched"]["default_lookback_days"] == 90
     assert out["num_periods_analyzed"] == round(90 / 30.44, 1)
     assert "avg_sets_per_month" in _chest(out)
@@ -284,7 +286,7 @@ def test_the_answer_names_the_window_and_the_phases_it_searched(wired):
     out = ts.tool_get_muscle_volume({})
     searched = out["searched"]
 
-    assert searched["window"] == {"start": (_TODAY - timedelta(days=28)).isoformat(), "end": _TODAY.isoformat()}
+    assert searched["window"] == {"start": (_TODAY - timedelta(days=27)).isoformat(), "end": _TODAY.isoformat()}
     assert searched["phases"] == ["experiment", "pilot"]
     assert searched["workouts_read"] == 2
     assert "raw_timeseries" in searched["phase_filter"]

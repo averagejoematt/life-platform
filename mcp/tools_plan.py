@@ -347,7 +347,12 @@ def tool_plan_next_session(args):
 
     readiness = _safe(tool_get_readiness_score, {"date": target_date}) or {}
     acwr = _safe(tool_get_acwr_status, {}) or {}
-    volume = _safe(tool_get_muscle_volume, {"start_date": _minus_days(target_date, 28), "end_date": target_date}) or {}
+    # #4071: the 28 COMPLETED days before the session — target-28..target-1 inclusive, exactly
+    # 4.0 weeks. It was target-28..target (29 days, divided as 28/7 by the old exclusive
+    # arithmetic) over counts that credited every muscle in a keyword row at 1.0 and counted
+    # warm-ups. The per-muscle numbers are `training.muscle_volume.working_sets_by_muscle`'s,
+    # through the tool — this module computes none of its own (derivation guard, #4071).
+    volume = _safe(tool_get_muscle_volume, {"start_date": _minus_days(target_date, 28), "end_date": _minus_days(target_date, 1)}) or {}
     protein_missed, protein_measured = _safe(_protein_days_7d, target_date) or (None, None)
 
     # The pain tripwire reads the derived note layer; its STATUS decides whether silence
