@@ -420,11 +420,15 @@ def test_micronutrients_errors_on_an_empty_range_and_echoes_the_window(monkeypat
     assert out["start_date"] == "2026-05-01" and out["end_date"] == "2026-05-03"
 
 
-def test_micronutrients_hides_a_pilot_phase_macrofactor_row(monkeypatch):
-    """ADR-058 — query_source's phase filter runs on every partition, so a row
-    tombstoned by a cycle reset cannot re-enter a current-cycle average."""
+def test_micronutrients_reads_macrofactor_across_phases_but_drops_superseded_rows(monkeypatch):
+    """#4061 — macrofactor is RAW_TIMESERIES, so the phase decision query_source DERIVES
+    for it is "read every phase": a `phase=pilot` day inside the window counts (the DATE
+    window, not the phase tag, bounds recency). A superseded row (`tombstone=true`) still
+    cannot re-enter the average. Under the pre-#4061 default the pilot day vanished and
+    days_logged read 2."""
     rows = micro_rows(total_fiber_g=40)
-    rows.append(mf("2026-05-02", total_fiber_g=0.5, phase="pilot"))
+    rows[0]["phase"] = "pilot"  # a pre-genesis day, still inside the caller's window
+    rows.append(mf("2026-05-02", total_fiber_g=0.5, phase="pilot", tombstone=True))
     install(monkeypatch, rows)
     out = tn.tool_get_nutrition(MICRO_ARGS)
     assert out["by_category"]["Macros"][0]["average"] == 40.0
