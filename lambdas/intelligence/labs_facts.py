@@ -139,7 +139,7 @@ def labs_prompt_block(data: Dict[str, Any]) -> str:
             draw_age = f" — {age_days} days ago, ALREADY DRAWN AND RESULTED"
     except (ValueError, TypeError):
         pass
-    return f"""
+    frame = f"""
 IMPORTANT: Lab data spans Matthew's full history, not just the current experiment.
 The data shows {data.get('total_draws', 0)} total blood draws, with the most recent
 on {draw_date}{draw_age}. Do NOT describe this as "draws during the
@@ -154,6 +154,41 @@ in the data above. When draws exist, flagged_count of 0 means every extracted
 biomarker was in range — an unremarkable panel, never a data failure. If
 extraction_incomplete appears, name it as a platform extraction gap on real draws,
 not as missing labs.
+"""
+    return frame + owner_draw_plan_block()
+
+
+def owner_draw_plan_block() -> str:
+    """The owner's standing lab plan, as the model must read it (#4134).
+
+    The frame above says every listed draw is in the PAST, and on 2026-09-23 the labs coach
+    still wrote "Schedule the draw … so the 48-hour window is protected" — it read "the next
+    draw" as something already in motion, because nothing told it none is. The owner ruled on
+    2026-09-22 (#4052) that the fresh baseline is WAIVED: no draw is booked, the last panel is
+    the week-0 reference, and the next planned measurement is a DXA scan. That ruling has one
+    home, `training.owner_redlines.REDLINES["medical_cover"]`; this renders it, never a copy.
+
+    Unreadable or un-waived redlines render nothing — the past-tense frame still applies, and
+    the coach quality gate (`health.labs_draw_claims`) refuses an arranged draw either way.
+    """
+    try:
+        from training.owner_redlines import REDLINES
+
+        cover = REDLINES["medical_cover"]
+        week0 = cover["week0_reference"]
+        scan = week0["next_scan"]
+        waived = str(cover["baseline_status"]).upper().startswith("WAIVED")
+        labs_date = week0["labs"]["date"]
+    except Exception:  # noqa: BLE001 — a missing ruling renders no sentence, never a guess
+        return ""
+    if not waived:
+        return ""
+    return f"""OWNER'S LAB PLAN ({week0.get("ruling", "owner ruling")}): NO lab draw is booked,
+scheduled or being arranged. The {labs_date} panel is the week-0 reference for this experiment.
+The next planned measurement is the week-{scan.get("week")} DXA scan (~{scan.get("approx_date")}), a
+body-composition scan, not a blood draw. Do not tell Matthew to schedule, book or arrange a
+draw, or to protect a window for one. If you believe a new panel is warranted, say so as a
+recommendation for him to decide about "the next panel" — never as a step already under way.
 """
 
 
