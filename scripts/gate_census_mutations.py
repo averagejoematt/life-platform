@@ -217,6 +217,20 @@ _SECOND_WEEK_GRID_READER_PY = (
     '    return (_load_json("training_week.json") or {}).get("session_set_ceiling")\n'
 )
 
+# #4071: a SECOND per-muscle set computation — the pre-#4071 loop shape (every muscle a
+# classifier names gets the exercise's full set count), in a new lambdas/training/ module.
+_SECOND_MUSCLE_VOLUME_PY = (
+    '"""probe."""\n\n'
+    "from training.muscle_volume import attribute_exercise\n\n\n"
+    "def probe(workouts):\n"
+    "    out = {}\n"
+    "    for w in workouts:\n"
+    "        for ex in w['exercises']:\n"
+    "            a = attribute_exercise(ex['name'])\n"
+    "            out[a['primary']] = out.get(a['primary'], 0) + len(ex['sets'])\n"
+    "    return out\n"
+)
+
 # These carry a secret NAME, never a secret value (Secrets-Manager-only, per CLAUDE.md).
 # The identifiers deliberately say `ID` rather than `SECRET`: ruff's flake8-bandit S105
 # rules on the TARGET NAME, and `_..._SECRET_PY = "<string>"` reads to it as a hardcoded
@@ -916,6 +930,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/training/_census_probe_3755.py", _SECOND_WEEK_GRID_READER_PY),),
         track=False,  # the gate walks lambdas/ + mcp/ on disk (os.walk), so an untracked module is in scope
     ),
+    "structural::test_muscle_volume_working_sets_4071.py": MutationSpec(
+        gate_id="structural::test_muscle_volume_working_sets_4071.py",
+        target="tests/test_muscle_volume_working_sets_4071.py",
+        detects=(
+            "a SECOND per-muscle set computation beside training.muscle_volume.working_sets_by_muscle — a function "
+            "that attributes an exercise to a muscle and counts its sets itself. That is the split #4071 closed: "
+            "get_muscle_volume, the planner and volume_ceiling reading one number while a second counter "
+            "(the pre-#4071 every-muscle-gets-every-set loop) feeds another consumer"
+        ),
+        plants=(("lambdas/training/_census_probe_4071.py", _SECOND_MUSCLE_VOLUME_PY),),
+        track=False,  # the guard rglobs mcp/ + lambdas/training/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1521,6 +1547,23 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "prove the served grid is the right one, which is what the week_grid()-vs-JSON key-parity test and the "
         "ACTIVE mutation control cover instead.",
         proved_on="2026-09-20",
+    ),
+    "structural::test_muscle_volume_working_sets_4071.py": _proof(
+        "structural::test_muscle_volume_working_sets_4071.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 63 passed in 1.15s | mutated: 1 failed, 62 passed in 1.26s "
+        ":: tests/test_muscle_volume_working_sets_4071.py::test_no_second_per_muscle_set_computation_in_mcp_or_training | "
+        "reverted: 63 passed in 1.11s",
+        "Covers the SET: every .py under mcp/ and lambdas/training/ on disk (rglob, so an untracked module is in scope), "
+        "each parsed with `ast`; a function is a per-muscle set computation when its body both CALLS a muscle-attribution "
+        "function (attribute_exercise / classify_exercise / muscle_override_for / _classify_muscles) and reads a `sets` "
+        "key or attribute. Two reasoned allowlist rows: THE computation, and tools_strength._summarize_exercise_sessions "
+        "(one movement's series, labelled with its muscles — never a per-muscle total). The guard also asserts it still "
+        "SEES the canonical function, so an empty sweep cannot pass, and carries an in-file must-fail control on the "
+        "pre-#4071 loop shape. STILL INVISIBLE, stated: lambdas/web/site_api_training._compute_muscle_volume (outside "
+        "the declared scope — the public site's own counter, a named follow-up), a counter that attributes muscles "
+        "through a function name not on the list, and one split across two functions (attribution in one, set "
+        "counting in another).",
+        proved_on="2026-09-22",
     ),
 }
 
