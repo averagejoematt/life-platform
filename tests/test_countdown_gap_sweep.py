@@ -83,7 +83,7 @@ def test_write_after_wipe_is_caught_as_escapee():
 
 def test_end_to_end_sweep_catches_the_simulated_write():
     escapee = {"pk": COACH_PK, "sk": "THREAD#topic-x", "status": "open", "created_at": IN_WINDOW.isoformat()}
-    res = sweep.run_sweep(FakeTable([_wipe_evidence_row(), escapee]), current_cycle=CYCLE)
+    res = sweep.run_sweep(FakeTable([_wipe_evidence_row(), escapee]), current_cycle=CYCLE, served_keys=set())
     assert res["totals"][sweep.ESCAPEE] == 1
     assert (wipe.COACH_PARTITIONS[0][1], COACH_PK, "THREAD#topic-x", IN_WINDOW.isoformat()) in [tuple(e) for e in res["escapees"]]
     # window was DERIVED from the wipe's own tombstoned_at evidence
@@ -93,7 +93,11 @@ def test_end_to_end_sweep_catches_the_simulated_write():
 
 def test_sweep_without_wipe_evidence_fails_loud():
     with pytest.raises(sweep.SweepError):
-        sweep.run_sweep(FakeTable([{"pk": COACH_PK, "sk": "THREAD#x", "created_at": IN_WINDOW.isoformat()}]), current_cycle=CYCLE)
+        sweep.run_sweep(
+            FakeTable([{"pk": COACH_PK, "sk": "THREAD#x", "created_at": IN_WINDOW.isoformat()}]),
+            current_cycle=CYCLE,
+            served_keys=set(),
+        )
 
 
 # ── both windowing tiers + the flag contract (the driver's ~28-row undercount) ─
@@ -108,7 +112,7 @@ def test_sk_embedded_iso_timestamp_windows_without_any_attribute():
 def test_no_timestamp_anywhere_is_flagged_never_skipped():
     row = {"pk": COACH_PK, "sk": "COMPRESSED#history"}
     assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.FLAG_UNDATABLE
-    res = sweep.run_sweep(FakeTable([_wipe_evidence_row(), row]), current_cycle=CYCLE)
+    res = sweep.run_sweep(FakeTable([_wipe_evidence_row(), row]), current_cycle=CYCLE, served_keys=set())
     assert (wipe.COACH_PARTITIONS[0][1], COACH_PK, "COMPRESSED#history", sweep.FLAG_UNDATABLE) in [tuple(f) for f in res["flagged"]]
 
 
@@ -332,3 +336,128 @@ def test_the_stamp_reader_only_answers_for_its_own_genesis(monkeypatch, tmp_path
     assert sweep.current_prereg_sha_for("2001-01-01") is None
     monkeypatch.setattr(gps, "STAMP_PATH", tmp_path / "missing.json")
     assert sweep.current_prereg_sha_for(GENESIS) is None
+
+
+# ── #4055: the served-manifest lead-in exemption ────────────────────────────
+#
+# A reset re-dates a carried-forward chronicle lead-in by writing a new `date`
+# ATTRIBUTE and leaving its `sk` alone (#3650) — so the row's `sk` can predate
+# the wipe by months while it is the CURRENT, served post. Before this
+# exemption existed, `reconcile_countdown_gap.py --apply` tombstoned exactly
+# such a row (`DATE#2026-09-05`, "The Plan, On the Record") on 2026-09-22,
+# breaking two nightly dead-men 14h later. These tests plant the same shape.
+
+SERVED_LEAD_IN_SK = "DATE#2026-07-21"  # the live #4040/#4055 specimen's own sk
+
+
+def _served_lead_in_row():
+    """Shaped to be classified an escapee by EVERY OTHER sanctioned_reason() rule: no
+    redated_from_sk, no reset_seed marker, no pre_registration, and a write timestamp
+    inside the countdown window — only the served-manifest exemption can save it."""
+    return {
+        "pk": CHRONICLE_PK,
+        "sk": SERVED_LEAD_IN_SK,
+        "title": "The Night Before Everything",
+        "date": WIPE_TS.date().isoformat(),  # reset re-dated the ATTRIBUTE; sk untouched
+        "created_at": IN_WINDOW.isoformat(),  # write-dated inside [wipe, genesis)
+    }
+
+
+def test_a_served_lead_in_is_sanctioned_not_an_escapee():
+    """Fixture: a served lead-in dated inside the countdown gap is SANCTIONED."""
+    row = _served_lead_in_row()
+    served = {(CHRONICLE_PK, SERVED_LEAD_IN_SK)}
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE, served_keys=served) == sweep.SANCTIONED
+    reason = sweep.sanctioned_reason(row, GENESIS, CYCLE, served_keys=served)
+    assert reason is not None and "served journal manifest" in reason
+
+
+def test_mutation_control_removing_the_exemption_the_row_reappears_as_an_escapee():
+    """MUTATION CONTROL (#4055 acceptance box 3): the identical row, with the exemption
+    removed, reads ESCAPEE — proving the SANCTIONED result above is the served-manifest
+    check doing work, not some other rule silently covering the same row."""
+    row = _served_lead_in_row()
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE, served_keys=set()) == sweep.ESCAPEE
+    assert sweep.classify_item(row, "all", WIPE_TS, BOUNDARY, GENESIS, CYCLE) == sweep.ESCAPEE  # default = unexempted
+    assert sweep.sanctioned_reason(row, GENESIS, CYCLE, served_keys=set()) is None
+
+
+def test_run_sweep_end_to_end_never_lists_a_served_lead_in_as_an_escapee():
+    """The tool surface both check 14 and reconcile_countdown_gap.py read: with the
+    served key passed, the row lands in `sanctioned` (audited, never mutated) and NOT
+    in `escapees` (what reconcile_countdown_gap.py --apply would stamp)."""
+    row = _served_lead_in_row()
+    served = {(CHRONICLE_PK, SERVED_LEAD_IN_SK)}
+    res = sweep.run_sweep(FakeTable([_wipe_evidence_row(), row]), current_cycle=CYCLE, served_keys=served)
+    assert res["totals"].get(sweep.ESCAPEE, 0) == 0
+    assert not any(pk == CHRONICLE_PK and sk == SERVED_LEAD_IN_SK for _l, pk, sk, _v in res["escapees"])
+    sanctioned_hit = [(pk, sk, why) for _l, pk, sk, why in res["sanctioned"] if pk == CHRONICLE_PK and sk == SERVED_LEAD_IN_SK]
+    assert len(sanctioned_hit) == 1
+    assert "served journal manifest" in sanctioned_hit[0][2]
+
+
+def test_run_sweep_without_the_served_key_the_same_row_is_an_escapee():
+    """The other half of the mutation control, at the run_sweep surface reconcile_
+    countdown_gap.py and restart_verify check 14 both consume."""
+    row = _served_lead_in_row()
+    res = sweep.run_sweep(FakeTable([_wipe_evidence_row(), row]), current_cycle=CYCLE, served_keys=set())
+    assert res["totals"].get(sweep.ESCAPEE, 0) == 1
+    assert any(pk == CHRONICLE_PK and sk == SERVED_LEAD_IN_SK for _l, pk, sk, _v in res["escapees"])
+
+
+class _ServedManifestFakeTable(FakeTable):
+    """Extends FakeTable's sweep-shaped `query` (pk [+ begins_with sk]) so the SAME fake
+    also answers `chronicle_manifest_qa._chronicle_rows`'s boto3.dynamodb.conditions
+    Key-based partition query (no ExpressionAttributeValues) — used only by the
+    auto-derivation test below, to prove `run_sweep`'s default exemption really is the
+    manifest dead-man's OWN `served_chronicle_keys`, not a second hand-rolled matcher."""
+
+    def query(self, **kwargs):
+        if "ExpressionAttributeValues" in kwargs:
+            return super().query(**kwargs)
+        return {"Items": [i for i in self.items if i["pk"] == CHRONICLE_PK and str(i.get("sk", "")).startswith("DATE#")]}
+
+
+class _FakeManifestS3:
+    def __init__(self, posts):
+        import json
+
+        self._body = json.dumps({"posts": posts}).encode()
+
+    def get_object(self, Bucket, Key):
+        return {"Body": type("B", (), {"read": lambda s: self._body})()}
+
+
+def test_run_sweep_auto_derives_the_served_exemption_via_the_manifest_qa_matcher(monkeypatch):
+    """No `served_keys` passed at all (the shape both real callers use): `run_sweep`
+    derives the exemption itself from `chronicle_manifest_qa.served_chronicle_keys` —
+    proving it is ONE derivation, never a second hand list, per the #4055 acceptance."""
+    import boto3
+
+    row = _served_lead_in_row()
+    fake_s3 = _FakeManifestS3([{"date": row["date"], "title": row["title"]}])
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: fake_s3)
+
+    table = _ServedManifestFakeTable([_wipe_evidence_row(), row])
+    res = sweep.run_sweep(table, current_cycle=CYCLE)  # served_keys defaults to None -> auto-derived
+    assert res["served_keys"] == {(CHRONICLE_PK, SERVED_LEAD_IN_SK)}
+    assert res["totals"].get(sweep.ESCAPEE, 0) == 0
+    assert any(pk == CHRONICLE_PK and sk == SERVED_LEAD_IN_SK for _l, pk, sk, _why in res["sanctioned"])
+
+
+def test_run_sweep_auto_derivation_degrades_to_no_exemption_on_an_unreadable_manifest(monkeypatch):
+    """An unreadable manifest/partition exempts nothing — MORE conservative, never less
+    (the row shows up loudly as an escapee rather than silently vanishing)."""
+    import boto3
+
+    row = _served_lead_in_row()
+
+    class _BrokenS3:
+        def get_object(self, Bucket, Key):
+            raise RuntimeError("no object")
+
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: _BrokenS3())
+    table = _ServedManifestFakeTable([_wipe_evidence_row(), row])
+    res = sweep.run_sweep(table, current_cycle=CYCLE)
+    assert res["served_keys"] == set()
+    assert res["totals"].get(sweep.ESCAPEE, 0) == 1
