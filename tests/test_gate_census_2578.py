@@ -901,7 +901,39 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
         # 132 -> 133 (2026-09-23, #4075 on top of #4107): structural::test_training_load.py, PROVEN (ARMED 1/1).
-        <= 133
+        # Upper bound 133 -> 134 (2026-09-23, #4063, re-merged on top of #4075's 133): structural::test_named_human_contact_4063.py — the named-human contact
+        # path's no-health-data body contract + the tracked-tree grep for a contact-shaped address — arrives PROVEN via a hand
+        # Proof in scripts/gate_census.PROVEN_CAN_FAIL (a digit planted in the body: 10 failed / 74 passed; a contact address
+        # appended to a tracked doc: 1 failed / 83 passed; baseline and reverted 84 passed). Unproven stays 540; one entrant.
+        # Upper bound 134 -> 135 (2026-09-23, #3597, re-merged on top of #4063's 134): structural::test_obligation_carriers_3597.py — the residue-registry
+        # derivation guard (every `*_RESIDUE` binding and tests/*_baseline.json registered with carrier + condition + expiry +
+        # shrink consumer) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: a git-added
+        # tests/_census_probe_3597.py binding PROBE_RESIDUE; baseline 32 passed | mutated 1 failed ::
+        # test_the_live_residue_registry_meets_its_contract | reverted 32 passed). Unproven stays; one entrant.
+        # 135 -> 136 (2026-09-23, #3528, re-merged on top of #3597's 135): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
+        # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
+        # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
+        # -> 2 passed). Unproven stays. Same PR, 136 -> 140: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
+        # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
+        # Upper bound 140 -> 141 (2026-09-23, #4034, re-merged on top of #3528's 140): sentinel::deploy/sentinel_producer_census.py::check_producer_census — the producer
+        # census dead-man, both halves proved in tests/test_producer_census_4034.py (a planted silent producer over the REAL
+        # derived population -> drift; a denied Invocations read -> error). Unproven stays; one entrant.
+        # Upper bound 141 -> 196 (2026-09-23, #4035, re-merged on top of #4034's 141): 55 new proofs. Two structural gates
+        # (`structural::test_glossary_4035.py`, `structural::test_rate_n_contract_4035.py`) arrive PROVEN via the
+        # re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 2/2: baseline 9 passed | mutated 2 failed ::
+        # test_apply_chrome_check_is_green_for_glossary, test_no_unregistered_acronym_coinage | reverted 9 passed;
+        # baseline 2 passed | mutated 1 failed :: test_any_rate_consumer_also_shows_its_n | reverted 2 passed). The
+        # other 53 are scripts/v4_glossary.py's GLOSS_ALLOWLIST (51) and GLOSS_EXEMPT_PAGES (2) entries, each
+        # proved BOTH directions (load-bearing + not-a-blanket-exemption) against the REAL production regex/
+        # constants over synthetic input — tests/test_glossary_4035.py::test_each_allowlist_entry_is_load_bearing_
+        # and_not_blanket / ::test_each_exempt_page_entry_is_load_bearing_and_not_blanket, 53 parametrised cases,
+        # 53 passed in 0.92s. Building the per-entry proof found three DEAD allowlist entries (single-letter roman
+        # numerals I/V/X, which can never match ACRONYM_RE's own {2,6} floor) and removed them — zero live effect.
+        # MEASURED by id-set diff against a real `git clone` of origin/main at 44828dbf8 (which already carries
+        # #4034's own +1): lane {proven 196, unproven 540, not-applicable 6, attempted-unproven 5} vs main {141,
+        # 540, 6, 5} — exactly the 55 `structural::test_glossary_4035.py` / `structural::test_rate_n_contract_4035.py`
+        # / `registry::scripts/v4_glossary.py::GLOSS_ALLOWLIST::*` / `::GLOSS_EXEMPT_PAGES::*` ids enter, none leaves.
+        <= 196
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

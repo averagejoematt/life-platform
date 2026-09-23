@@ -297,6 +297,17 @@ ALLOWED_ABSENT = (
         "same reach as site-deploy.yml's deploy-site/rollback-site-on-failure jobs — capture_api_schemas -> accuracy_audit's "
         "lazy `import visual_qa` (screenshot sanity scan); the --endpoints live arm fetches JSON payloads only and never screenshots",
     ),
+    # ── the HAE ingress check imports drift_sentinel for ONE function; #4034's producer
+    # census leg (registered in drift_sentinel) lazily reads the heartbeat ledger module,
+    # which imports pytest at its top. The ingress check never runs the sweep.
+    (
+        "hae-webhook-ingress-drift.yml",
+        "drift",
+        "deploy/check_hae_webhook_ingress_drift.py",
+        "pytest",
+        "reached only via drift_sentinel -> sentinel_producer_census.scheduled_cadences()'s lazy `import test_heartbeat_completeness`; "
+        "the ingress check imports drift_sentinel.check_hae_webhook_ingress alone and never calls run_sweep/check_producer_census",
+    ),
 )
 
 
