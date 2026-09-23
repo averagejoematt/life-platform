@@ -1,0 +1,15 @@
+{
+  "_comment": "The platform's committed term registry (#4035, re-filed from #3618). Each key is matched EXACT-CASE with a word boundary in visible page prose (script/style/nav/footer/loop-forward/head/svg regions are never scanned) and its FIRST appearance per page is wrapped in <abbr class=\"gloss\" title=\"...\">. scripts/v4_glossary.py is the applier; scripts/v4_apply_chrome.py is the writer; tests/test_glossary_4035.py is the two-sided gate. Seeded from the reddit_newcomer panel's own flagged terms (docs/reviews/FORENSIC_RCA_2026-09-05.md Part 4, reader ROW1) plus a live content scan (grep -c '<abbr' == 0 everywhere before this).",
+  "terms": {
+    "HRV": "Heart rate variability — the millisecond-level variation between heartbeats; a higher number usually signals a better-recovered autonomic nervous system.",
+    "DEXA": "Dual-energy X-ray absorptiometry — the periodic full-body scan behind the body-composition numbers (fat mass, lean mass, bone density).",
+    "CGM": "Continuous glucose monitor — a worn sensor that reads blood glucose every few minutes instead of one fingerstick at a time.",
+    "REM": "Rapid eye movement — the sleep stage associated with dreaming and memory consolidation, one of the stages sleep trackers report.",
+    "ADR": "Architecture decision record — a dated, numbered document explaining why the platform's engine is built a certain way.",
+    "LLM": "Large language model — the AI model class (Claude, via AWS Bedrock) behind the platform's coaching narratives and this glossary's own build.",
+    "MCP": "Model Context Protocol — the interface that lets an AI assistant query this platform's own data directly, tool by tool.",
+    "XP": "Experience points — the character sheet's leveling currency, earned from real daily pillar scores, not from playing a game.",
+    "FDR": "False discovery rate — the statistical correction applied so a batch of correlation tests isn't overstated by chance.",
+    "Brier": "Brier score — a 0 (perfect) to 1 (worst) grade for how well a forecast's stated probability matched what actually happened."
+  }
+}
