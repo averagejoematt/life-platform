@@ -309,6 +309,24 @@ def _resolve_include_pilot(source, include_pilot):
     return bool(include_pilot), False
 
 
+def _resolve_include_pilot_key(pk, sk_prefix="", include_pilot=None):
+    """`_resolve_include_pilot` for a DIRECT `_apply_phase_filter` caller that knows its key,
+    not a bare source (#4088) — e.g. `USER#matthew` + `SOURCE#intelligence_quality#…`.
+
+    `None` asks `phase_taxonomy.classify(pk, sk)`: anything but EXPERIMENT_SCOPED reads
+    across every phase. Fail-soft and conservative, like `source_reads_cross_phase`: an
+    unclassifiable key keeps the filter. Returns `(include_pilot, derived)`.
+    """
+    if include_pilot is not None:
+        return bool(include_pilot), False
+    try:
+        from experiment import phase_taxonomy
+
+        return phase_taxonomy.classify(pk, sk_prefix) != phase_taxonomy.EXPERIMENT_SCOPED, True
+    except Exception:  # noqa: BLE001 — unclassifiable: keep the current-cycle filter
+        return False, True
+
+
 def query_source(source, start_date, end_date, lean=False, include_pilot=None):
     """Query DynamoDB by source + date range with full pagination.
 

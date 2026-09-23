@@ -665,11 +665,14 @@ def quality_table(monkeypatch):
     return _install
 
 
-def test_intelligence_quality_queries_the_profile_partition_with_the_phase_filter(quality_table):
+def test_intelligence_quality_queries_the_profile_partition_with_the_derived_phase_decision(quality_table):
+    """#4088: `SOURCE#intelligence_quality#` is SYSTEM_STATE — the phase machinery ignores it
+    (live census 2026-09-23: 912 rows, none phase-tagged) — so the derived decision reads it
+    unfiltered rather than applying the ADR-058 filter unconditionally."""
     t = quality_table()
     td.tool_get_intelligence_quality({"days": 7})
     (kwargs,) = t.calls
-    assert kwargs["FilterExpression"] == PHASE_EXPR
+    assert "FilterExpression" not in kwargs
     assert "KeyConditionExpression" in kwargs
 
 

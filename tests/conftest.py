@@ -404,6 +404,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # a PR that refreshes the census must red on itself if the refreshed set is no
         # longer covered, not on whoever merges next.
         "test_restart_wipe_coverage.py",
+        # #4108: reads `config/movement_catalog.json`, which `deploy/build_movement_catalog.py`
+        # regenerates from the Hevy history — a PR that lands a rebuilt catalog must red on
+        # itself (a fixture entry gone, a tier rule broken), not on whoever merges next.
+        # Picked up by `reset_artifact_test_files()`; named here in the same PR (PR #4124).
+        "test_movement_catalog_4108.py",
         "test_restart_verify_gates_3477.py",
         "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
@@ -825,6 +830,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # `/progress-photos/` is introduced by a PR's own diff, and once merged it is a
         # crawler-visible link to Matthew's body photographs that nothing else would notice.
         "test_progress_viewer_privacy_3760.py",
+        # #4063: greps every tracked file for a contact-shaped address (the named human's
+        # identity lives ONLY in the private S3 config). Pure repo shape: a PR that adds the
+        # contact to this PUBLIC tree must red on itself, before the merge publishes it.
+        "test_named_human_contact_4063.py",
     }
 )
 

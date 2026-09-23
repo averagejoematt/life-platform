@@ -48,6 +48,25 @@ regexTarget = "match"
 regexes = ['''AIzaSyA17Uwy37irVEQSwz6PIyX3wnkHrDBeleA''']
 paths = ['''docs/DECISIONS\.md''']
 
+[[allowlists]]
+# #4088 — found 2026-09-23 by the secret-scan gate on PR #4126
+# (https://github.com/averagejoematt/life-platform/actions/runs/35888631389): two
+# generic-api-key findings at commit 806b227bd, tests/test_site_api_derived_phase_4088.py
+# lines 70 and 166 — both the tuple `("site_api_autonomic.py", "handle_zone2_breakdown", ...)`.
+# Not a credential: `handle_zone2_breakdown` is the name of the /api/zone2 handler in
+# lambdas/web/site_api_autonomic.py, and the rule fired because the `api` inside the module
+# name `site_api_autonomic` sits one `", "` before a 22-char token above the entropy floor.
+# gitleaks is not installed locally; the finding's file/line/commit were read from that
+# CI log (the secret is REDACTED there) and the line content from `git show 806b227bd`. The
+# test file was reshaped in the follow-up commit (filename LAST in each key tuple, so
+# the `api...` literal is followed by `)` and cannot match); this entry exists only
+# because the gate scans the PR commit RANGE, which still carries 806b227bd.
+description = "tests/test_site_api_derived_phase_4088.py — the handler name handle_zone2_breakdown in a (file, function) ruling tuple, matched as generic-api-key via the `api` in `site_api_autonomic.py` (#4088). A function name, not a credential."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''handle_zone2_breakdown''']
+paths = ['''tests/test_site_api_derived_phase_4088\.py''']
+
 # ── #3620 — the platform's OWN bearer shapes ─────────────────────────────────
 # GitHub's validity checks and non-provider patterns are not offered on a
 # user-owned repo (#3606 item 3), so gitleaks' default ruleset is the whole

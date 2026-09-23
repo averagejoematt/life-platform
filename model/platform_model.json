@@ -5460,6 +5460,13 @@
     {
       "direction": "unknown",
       "lambda": "life-platform-mcp",
+      "module": "mcp/tools_data.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_decisions.py",
       "partition": "decisions",
       "via": "pk"
@@ -7302,7 +7309,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 706,
+      "edges": 707,
       "lambdas": 106,
       "mcp_tool_modules": 32,
       "mcp_tools": 84,
@@ -7317,8 +7324,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 349,
-        "sites_resolved": 878,
-        "sites_total": 1227
+        "sites_resolved": 879,
+        "sites_total": 1228
       },
       "schedule_resolution": {
         "dynamic": 0,
