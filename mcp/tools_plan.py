@@ -370,6 +370,25 @@ def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | 
     return start, query_source_range("hevy", start, end_date)
 
 
+def _prescription_window(end_date: str) -> list[dict[str, Any]] | None:
+    """Hevy rows for the self_added_volume tripwire's window (#4081): the Monday three whole
+    weeks before `end_date`'s week, through `end_date`.
+
+    Direct partition read for the same reason as `_rotation_window`: each row carries the
+    `adherence` block `health.adherence_calc` stored at ingest (per-movement programmed vs
+    performed sets against the COMMITTED routine), which `get_workouts`'s slim projection
+    drops. None only for an unparseable date; a raise propagates to `_read` (#4072).
+    """
+    from training import self_added_volume
+
+    from mcp.core import query_source_range
+
+    start = self_added_volume.window_start(end_date)
+    if start is None:
+        return None
+    return query_source_range("hevy", start, end_date)
+
+
 def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -> None:
     """Put the per-source breakdown on the block's walking read, beside the total (#3930).
 
@@ -638,6 +657,16 @@ def tool_plan_next_session(args):
     elif rotation_rows == []:
         status["hevy_workouts_rotation_window"] = st(ABSENT, "no Hevy session in the rotation window")
 
+    # #4081: the self_added_volume tripwire's rows — every Hevy session since the Monday three
+    # whole weeks back, each with its stored programmed-vs-performed adherence counts.
+    prescription_rows, status["hevy_workouts_prescription_window"] = _read(
+        "hevy_workouts_prescription_window", _prescription_window, target_date
+    )
+    if prescription_rows is None and status["hevy_workouts_prescription_window"]["state"] != READ_FAILED:
+        status["hevy_workouts_prescription_window"] = st(ABSENT, "the prescription window could not be derived from the target date")
+    elif prescription_rows == []:
+        status["hevy_workouts_prescription_window"] = st(ABSENT, "no Hevy session in the prescription window")
+
     # #4064: the movement catalog, so the block's `session` names MOVEMENTS, not only patterns.
     # Read through the generator's own loader (local config, then S3) — the same catalog the
     # draft will be built from. A read that raises leaves the session pattern-level and says so.
@@ -678,6 +707,7 @@ def tool_plan_next_session(args):
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,
         rotation_window_start=rotation_start,
+        hevy_workouts_prescription_window=prescription_rows,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)

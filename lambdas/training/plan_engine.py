@@ -83,10 +83,10 @@ from typing import Any, Callable
 
 from health import deficit_disclosures
 
-from training import owner_redlines, program_structure, training_context_registry
+from training import owner_redlines, program_structure, self_added_volume, training_context_registry
 
 ENGINE_VERSION = (
-    "plan-engine@1.4.0"  # #4072: every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
+    "plan-engine@1.5.0"  # #4081: self_added_volume evaluated from adherence's per-movement set counts (1.4.0 #4072: input read states)
 )
 
 # ── #4072: the read state of every engine input ──────────────────────────────────────
@@ -120,6 +120,7 @@ ENGINE_INPUTS = (
     "weight_stall_days",
     "adherence_on_plan",
     "hevy_workouts_rotation_window",
+    "hevy_workouts_prescription_window",
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -127,6 +128,7 @@ _TRIPWIRE_INPUT = {
     "anchor_lift_strength_drop": "anchor_lift_drop_pct",
     "weight_stall_with_adherence": "weight_stall_days",
     "pain_flag_named_site": "pain_evidence_scope",
+    "self_added_volume": "hevy_workouts_prescription_window",
 }
 
 
@@ -212,6 +214,8 @@ def _tripwire_states(
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
     input_states: dict[str, dict[str, Any]] | None = None,
+    prescription_rows: list[dict[str, Any]] | None = None,
+    date: str | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -418,6 +422,30 @@ def _tripwire_states(
             )
         )
 
+    # #4081 — self_added_volume: training above the prescription two weeks running, from the
+    # per-movement programmed/performed set counts `health.adherence_calc` stored on each Hevy
+    # row against the routine that was COMMITTED for it. `training.self_added_volume` reads
+    # those counts; it counts nothing of its own. The row carries every week's set-level
+    # evidence (which movement, which day, prescribed → performed), so `tripped` and `clear`
+    # are both auditable without leaving the block.
+    # TODO(#4098): honour a `not_before_week` on this row once #4098's week-gate reader has
+    # merged — the v0.3 row carries none today, so there is nothing to gate yet.
+    t = by_id["self_added_volume"]
+    if prescription_rows is None or not date:
+        out.append(_missing("self_added_volume", "no Hevy rows were supplied for the prescription window"))
+    else:
+        ev = self_added_volume.evaluate(prescription_rows, date, int(t["threshold_weeks"]))
+        row = _row("self_added_volume", ev["state"], ev.get("observed"), ev.get("detail") or "")
+        row["evidence"] = {
+            "rule": ev["rule"],
+            "threshold_weeks": ev["threshold_weeks"],
+            "run_weeks": ev.get("run_weeks"),
+            "window": {"start": ev.get("window_start"), "end": ev.get("window_end")},
+            "weeks": ev["weeks"],
+            "counts_from": "health.adherence_calc (adherence.movements on each Hevy row: programmed_sets vs performed_sets)",
+        }
+        out.append(row)
+
     return out
 
 
@@ -474,6 +502,7 @@ def constraint_block(
     adherence_on_plan: bool | None = None,
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
     rotation_window_start: str | None = None,
+    hevy_workouts_prescription_window: list[dict[str, Any]] | None = None,
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
     input_status: dict[str, dict[str, Any]] | None = None,
@@ -505,6 +534,7 @@ def constraint_block(
             "weight_stall_days": weight_stall_days,
             "adherence_on_plan": adherence_on_plan,
             "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
+            "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
         },
         input_status,
     )
@@ -594,6 +624,8 @@ def constraint_block(
         pain_dismissals=pain_dismissals,
         pain_evidence_scope=pain_evidence_scope,
         input_states=states,
+        prescription_rows=hevy_workouts_prescription_window,
+        date=date,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]

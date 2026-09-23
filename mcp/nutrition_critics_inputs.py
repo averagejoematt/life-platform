@@ -147,6 +147,25 @@ def _metabolic_severity(end_date: str) -> str | None:
     return (ma.get("metabolic_adaptation") or {}).get("severity")
 
 
+def _above_prescription_weeks(end_date: str) -> tuple[int | None, bool]:
+    """(the self_added_volume run length, whether the read RAISED) — #4081.
+
+    The SAME evaluation plan_engine's tripwire row reads (`training.self_added_volume` over the
+    per-movement set counts `health.adherence_calc` stored on each Hevy row), so the critic and
+    the engine cannot disagree. The run is None when the read raised or the verdict is
+    `unknown` (no session, or no assessable week) — the critic names None as unknown.
+    """
+    from training import owner_redlines, self_added_volume
+
+    start = self_added_volume.window_start(end_date)
+    rows = _safe(query_source, "hevy", start, end_date) if start else None
+    if rows is None:
+        return None, bool(start)
+    t = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")
+    ev = self_added_volume.evaluate(rows, end_date, int(t["threshold_weeks"]))
+    return (ev.get("run_weeks") if ev.get("state") in ("tripped", "clear") else None), False
+
+
 def already_logged(days: int = DECISIONS_LOOKBACK_DAYS) -> list[dict[str, Any]] | None:
     from mcp.tools_decisions import tool_get_decisions
 
@@ -185,6 +204,9 @@ def resolve(
     sev = _metabolic_severity(end_date) if include_metabolic else None
     if include_metabolic and sev is None:
         unresolved["metabolic_adaptation"] = "IC-29 returned an error or could not be read (thin data reads the same as an outage here)"
+    above_weeks, above_raised = _above_prescription_weeks(end_date)
+    if above_raised:
+        unresolved["self_added_volume"] = "the Hevy prescription-window read raised"
     inputs: dict[str, Any] = {
         "window_end": end_date,
         "intake_kcal_by_day": intake,
@@ -198,7 +220,8 @@ def resolve(
         "degraded_count": degraded_count,
         "metabolic_adaptation_severity": sev,
         "metabolic_adaptation_flag": (sev in nutrition_critics.IC29_FLAG_SEVERITIES) if sev is not None else None,
-        "training_above_prescription_weeks": None,  # no platform read exists yet — the critic names it unknown
+        # #4081: the run of complete weeks above the committed routine's sets (None → the critic names it unknown)
+        "training_above_prescription_weeks": above_weeks,
         "estimated_maintenance_kcal": estimated_maintenance_kcal,
     }
     return {"inputs": inputs, "unresolved": unresolved}
