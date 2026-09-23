@@ -49,6 +49,7 @@ from typing import Any
 from common.pacific_time import pacific_today
 
 from mcp.core import LAYER_UNKNOWN
+from mcp.plan_helpers import _catalog_and_ceiling, _minus_days, _resolver, _union_evidence_rows  # noqa: F401  (#4081/#4105 size fix)
 
 logger = logging.getLogger("tools_plan")
 
@@ -336,27 +337,6 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
     return {"exercises": considered, "scope": scope}
 
 
-def _union_evidence_rows(performed: list[dict[str, Any]], draft: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Performed movements UNION the draft's, keyed by template id (#4051).
-
-    The draft row wins where it has something to say — it carries the anchor-lift trend the
-    performed set does not compute — but it never overwrites a performed value with an
-    absent one, which is how a dark per-movement read (`pain_flag_any: None`) used to erase
-    a flag the batch read found.
-    """
-    out: dict[str, dict[str, Any]] = {}
-    for r in performed or []:
-        out[str(r.get("template_id") or r.get("label") or "")] = dict(r)
-    for r in draft or []:
-        key = str(r.get("template_id") or r.get("label") or "")
-        merged = dict(out.get(key) or {})
-        for k, v in r.items():
-            if v not in (None, [], "", {}) or k not in merged:
-                merged[k] = v
-        out[key] = merged
-    return list(out.values())
-
-
 def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | None]:
     """(window start, Hevy rows) for the program's trailing accessory-rotation window (#3755).
 
@@ -449,20 +429,6 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
     if not rows:
         return None, None
     return sum(1 for r in rows if float(r["protein_g"]) < floor_g), len(rows)
-
-
-def _catalog_and_ceiling() -> tuple[dict[str, Any] | None, int]:
-    """(movement catalog `movements` dict or None, the week grid's skill ceiling) — #4064."""
-    try:
-        from training.program_seam import resolve_week_grid
-        from training.routine_generator import _load_json
-
-        catalog = (_load_json("movement_catalog.json") or {}).get("movements")
-        ceiling = int(resolve_week_grid(_load_json).week.get("skill_ceiling", 2))
-        return (catalog if isinstance(catalog, dict) else None), ceiling
-    except Exception as e:  # noqa: BLE001 — a missing catalog degrades the session to patterns, never fails the plan
-        logger.warning(f"movement catalog unreadable for plan_next_session: {e}")
-        return None, 2
 
 
 def tool_plan_next_session(args):
@@ -883,12 +849,6 @@ def _weeks_in_block(dates: list[str], target_date: str, min_per_week: int = 2, m
     return weeks
 
 
-def _resolver():
-    from mcp.tools_hevy_routine import _make_resolver
-
-    return _make_resolver()
-
-
 def _workout_dates(start: str, end: str) -> list[str]:
     """Performed lifting days, read through `get_workouts` — the SAME tool a chat turn calls.
 
@@ -1279,15 +1239,3 @@ def _muscle_sets(volume: dict[str, Any]) -> dict[str, Any]:
         elif isinstance(row, (int, float)):
             out[muscle] = row
     return out
-
-
-def _minus_days(date_str: str, days: int) -> str:
-    """#3751: day-key arithmetic belongs to the Pacific frame, not to this module.
-
-    Was a local `date.fromisoformat(...) - timedelta(...)`, which is the idiom #3609's
-    registry exists to inventory. `shift_day_key` is that operation, named once, with
-    the same return-it-unchanged fallback this function already had.
-    """
-    from common.pacific_time import shift_day_key
-
-    return shift_day_key(date_str, -days)
