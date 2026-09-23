@@ -207,7 +207,11 @@ GET_EXERCISE_HISTORY_DESCRIPTION = (
     "'bench press' matches both 'Bench Press (Barbell)' and 'Bench Press (Incline Dumbbell)' — different "
     "movements, never folded into one series. When a fuzzy name resolves to more than one template_id, "
     "this returns `ambiguous: true` with a `candidates` list and one `results` summary per movement "
-    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly."
+    "instead of a merged 1RM trend; pass `template_id` to skip the ambiguity check and pin one directly. "
+    "Identity (#4069): sets are selected by template id only — a name is first resolved to the template "
+    "ids whose logged titles contain it (`searched.name_resolved_to`), and a confirmed Hevy alias pair "
+    "(`config/hevy_template_aliases.json`, #3929) is one movement; every series names what it was built "
+    "from in `matched_templates`."
 )
 
 GET_MUSCLE_VOLUME_DESCRIPTION = (
