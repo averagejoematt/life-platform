@@ -160,12 +160,20 @@ def build_muscle_defense_packet(
     anchor_trends: dict[int, dict[str, Any]] | None,
     protein_days_missed_7d: int | None,
     protein_days_measured_7d: int | None,
+    program_week: int | None,
 ) -> dict[str, Any]:
     """Strength trend on the draft's anchor lifts + protein against the owner's floor.
 
-    `anchor_trends` is keyed by draft exercise idx: {last_top_lbs, trailing_best_lbs,
-    drop_pct, sessions_below, n_sessions}. Missing → unknown, never clear.
+    `anchor_trends` is keyed by draft exercise idx: {last_top_lbs, drop_pct, sessions_below,
+    recent_median_e1rm_lb, baseline_median_e1rm_lb, n_sessions} — built by
+    `plan_engine.anchor_e1rm_trend`, the SAME rolling e1RM median the engine's tripwire reads
+    (#4098). Whether a trend trips is `plan_engine.anchor_drop_tripped`, and whether the
+    tripwire is armed at all is `plan_engine.not_before_week_gate` over `program_week` (the
+    block calendar's week — required, so no caller arms it by omission). This packet computes
+    no drop of its own. Missing → unknown, never clear.
     """
+    from training import plan_engine
+
     by_id = {t["id"]: t for t in owner_redlines.TRIPWIRES}
     drop_t = by_id["anchor_lift_strength_drop"]
     prot_t = by_id["protein_floor_missed"]
@@ -199,6 +207,8 @@ def build_muscle_defense_packet(
                 provenance=prot_t["provenance"],
             )
         )
+    gate = plan_engine.not_before_week_gate(drop_t, program_week)
+    numbers["program_week"] = program_week
     for ex in draft["exercises"]:
         tr = (anchor_trends or {}).get(ex["idx"])
         k = f"anchor_drop_pct[{ex['idx']}]"
@@ -208,17 +218,30 @@ def build_muscle_defense_packet(
             continue
         numbers[k] = tr["drop_pct"]
         numbers[f"anchor_sessions_below[{ex['idx']}]"] = tr.get("sessions_below")
-        numbers[f"anchor_trailing_best_lbs[{ex['idx']}]"] = tr.get("trailing_best_lbs")
+        numbers[f"anchor_baseline_median_e1rm_lb[{ex['idx']}]"] = tr.get("baseline_median_e1rm_lb")
+        numbers[f"anchor_recent_median_e1rm_lb[{ex['idx']}]"] = tr.get("recent_median_e1rm_lb")
         numbers[f"anchor_last_top_lbs[{ex['idx']}]"] = tr.get("last_top_lbs")
-        tripped = tr["drop_pct"] >= drop_t["threshold_pct"] and (tr.get("sessions_below") or 0) >= drop_t["consecutive_sessions"]
-        if tripped:
+        tripped = plan_engine.anchor_drop_tripped(tr["drop_pct"], tr.get("sessions_below"))
+        if gate and tr["drop_pct"] > 0:
+            # #4098: the ramp weeks. A detraining return is not a strength loss, so the drop is
+            # REPORTED (with the gate named) and never becomes a change.
+            flags.append(
+                _flag(
+                    k,
+                    "info",
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline — anchor_lift_strength_drop is {gate}",
+                    provenance=drop_t["provenance"],
+                )
+            )
+        elif tripped:
             hold_to = tr.get("last_top_lbs")
             over = ex.get("top_weight_lbs") is not None and hold_to is not None and ex["top_weight_lbs"] > hold_to
             flags.append(
                 _flag(
                     k,
                     "change",
-                    f"{ex['label']}: -{tr['drop_pct']:.1f}% vs trailing best across {tr.get('sessions_below')} session(s) — {drop_t['action']} "
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline, {tr.get('sessions_below')} session(s) below "
+                    f"— {drop_t['action']} "
                     f"[{drop_t['threshold_pct']}%/{drop_t['consecutive_sessions']}-session threshold is {drop_t['provenance']}, not his variance]",
                     provenance=drop_t["provenance"],
                     field=f"exercises[{ex['idx']}].weight_lbs" if over else None,
@@ -230,7 +253,7 @@ def build_muscle_defense_packet(
                 _flag(
                     k,
                     "info",
-                    f"{ex['label']}: -{tr['drop_pct']:.1f}% vs trailing best ({tr.get('n_sessions')} sessions)",
+                    f"{ex['label']}: -{tr['drop_pct']:.1f}% rolling e1RM median vs its baseline ({tr.get('n_sessions')} sessions)",
                     provenance=drop_t["provenance"],
                 )
             )
@@ -420,8 +443,12 @@ def build_rate_advocate_packet(
     # #4072: a tripwire whose input read FAILED is as unreadable as an absent one — the
     # advocate may not argue for more volume past either.
     unknown_tw = [t["id"] for t in tw if t.get("state") in ("unknown", "read_failed")]
+    # #4098: a tripwire held by its own `not_before_week` is neither clear nor tripped — it is
+    # counted and named, so "all clear" never silently means "all the ones that are armed".
+    inactive = [t["id"] for t in tw if t.get("state") == "not_yet_active"]
     numbers: dict[str, Any] = {
         "tripwires_clear": len(clear),
+        "tripwires_not_yet_active": len(inactive),
         "tripwires_tripped": len(tripped),
         "tripwires_unreadable": len(unknown_tw),
         "walking_gap_hr_wk": (walking or {}).get("gap_hr_wk"),
@@ -445,7 +472,8 @@ def build_rate_advocate_packet(
             _flag(
                 "tripwires_clear",
                 "info",
-                f"all {len(clear)} tripwires clear — nothing in the data argues for holding back",
+                f"all {len(clear)} armed tripwires clear — nothing in the data argues for holding back"
+                + (f" ({len(inactive)} not yet active: {', '.join(inactive)})" if inactive else ""),
                 provenance="owner",
             )
         )
