@@ -219,31 +219,40 @@ def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
     monkeypatch.setattr(exercise_history, "load_bodyweight_index", lambda **kw: {})
     monkeypatch.setattr(exercise_history, "load_whoop_workout_index", lambda **kw: {})
 
-    def _gen(day):
+    def _gen(day, done=None):
         return rg.generate_routines(
             rg.GeneratorInputs(
-                target_date=day, volume_7d={}, recovery_tier="green", acwr_flag="safe", z2_minutes_7d=240.0, days_since_last_workout=1
+                target_date=day,
+                volume_7d={},
+                recovery_tier="green",
+                acwr_flag="safe",
+                z2_minutes_7d=240.0,
+                days_since_last_workout=1,
+                block_workouts=done if done is not None else [],
             )
         )
 
-    # #4064: from block 1 (Thu 2026-09-24) the block calendar answers, and a v0.3 role is
-    # built as a §3 session (anchor patterns at heavy/moderate), not a muscle-budget one.
-    # Mon 2026-09-28 is week 1's third session: heavy-moderate.
-    monday = _gen("2026-09-28")[0]
-    assert monday.archetype == "full" and monday.variant == "ideal"
-    assert 12 <= sum(len(e.sets) for e in monday.exercises) <= 18
-    assert any(r.startswith("week grid source=module") for r in monday.rationale)
-    assert any("session_role=heavy_moderate" in r for r in monday.rationale)
-    assert "block calendar: week 1, block 1" in monday.rationale
-    patterns = {e.rationale_tag.split(":")[1] for e in monday.exercises if e.rationale_tag.startswith("anchor:")}
+    def _lift(day):
+        return {"date": day, "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]}
+
+    # #4110 (was #4064's block calendar): from the block start (Thu 2026-09-24) the session
+    # SEQUENCE answers, and a v0.3 role is built as a §3 session (anchor patterns at
+    # heavy/moderate), not a muscle-budget one. Two sessions done -> week 1's third: heavy-moderate.
+    third = _gen("2026-09-28", [_lift("2026-09-24"), _lift("2026-09-26")])[0]
+    assert third.archetype == "full" and third.variant == "ideal"
+    assert 12 <= sum(len(e.sets) for e in third.exercises) <= 18
+    assert any(r.startswith("week grid source=module") for r in third.rationale)
+    assert any("session_role=heavy_moderate" in r for r in third.rationale)
+    assert any(r.startswith("session sequence: week 1 · session 3 of 3 · heavy-moderate, block 1") for r in third.rationale)
+    patterns = {e.rationale_tag.split(":")[1] for e in third.exercises if e.rationale_tag.startswith("anchor:")}
     assert patterns == {"hinge", "overhead_press", "bench", "row"}
-    # before block 1 the weekday grid answers — a Monday is still the grid's heavy day
+    # before the block start the weekday grid answers — a Monday is still the grid's heavy day
     pre_block = _gen("2026-09-21")[0]
     assert pre_block.archetype == "full" and any("session_role=heavy;" in r for r in pre_block.rationale)
-    saturday = _gen("2026-10-03")[0]
-    assert saturday.title.endswith("(optional)") and any(r.startswith("OPTIONAL session") for r in saturday.rationale)
+    # on/after the block start there is no weekday walk or optional Saturday: a Tuesday with
+    # nothing completed still serves the next undone session (a walk POSTPONES, #4110)
     tuesday = _gen("2026-09-29")[0]
-    assert tuesday.archetype == "aerobic" and not tuesday.exercises
+    assert tuesday.archetype == "full" and tuesday.title.startswith("Full Body HEAVY — W1")
 
 
 def test_catalog_gaps_names_anchor_members_the_generator_cannot_select():
@@ -415,7 +424,16 @@ def test_a_fixed_accessory_set_across_two_weeks_is_ok_and_an_addition_is_drift()
     drift = program_structure.accessory_rotation(window_start="2026-09-06", window_end="2026-09-19", hevy_workouts=drift_rows)
     assert drift["ok"] is False and drift["state"] == "drifting"
     assert drift["added_in_trailing_7d"] == ["preacher curl (machine)"]
-    assert any("block calendar" in h for h in drift["honesty"])
+    assert any("session sequence was not read" in h for h in drift["honesty"])
+    # #4110: the boundary is the day a block's first session was COMPLETED, read from the sequence
+    opened = program_structure.accessory_rotation(
+        window_start="2026-09-06", window_end="2026-09-19", hevy_workouts=drift_rows, block_boundaries=["2026-09-15"]
+    )
+    assert any("opened a new block on 2026-09-15" in h and "legitimate" in h for h in opened["honesty"])
+    none_inside = program_structure.accessory_rotation(
+        window_start="2026-09-06", window_end="2026-09-19", hevy_workouts=drift_rows, block_boundaries=["2026-11-05"]
+    )
+    assert any("opened no new block inside it" in h for h in none_inside["honesty"])
 
 
 def test_rotation_window_is_respected():

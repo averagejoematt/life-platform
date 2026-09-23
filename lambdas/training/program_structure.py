@@ -230,9 +230,10 @@ ROTATION_RULE: dict[str, Any] = {
     "note": (
         "The RULE is the red team's (S&C coach, 2026-09-22; approved by the owner 2026-09-21) and replaces v0.2's platform-proposed "
         "14-day no-repeat rotation. The 14-day measurement WINDOW is still the platform's choice — two passes of the week, so a fixed "
-        "set shows each accessory on two days and an addition shows as a movement the first week did not carry. Since #4064 the "
-        "block calendar (`BLOCK_CALENDAR`) records the boundaries; an addition is still reported as drift, and the honesty line names "
-        "a boundary that falls inside the window, where the addition is legitimate."
+        "set shows each accessory on two days and an addition shows as a movement the first week did not carry. Since #4110 the "
+        "session sequence (`SESSION_SEQUENCE`) records the boundaries — a block opens on the day its first session is COMPLETED; an "
+        "addition is still reported as drift, and the honesty line names a boundary that falls inside the window, where the addition "
+        "is legitimate."
     ),
 }
 
@@ -492,7 +493,7 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
 }
 
 DELOAD_RULE: dict[str, Any] = {
-    "rule": "every 6th week of the calendar: −30 % sets (rounded to whole sets, accessories and back-offs first), loads held",
+    "rule": "every 6th PROGRAM week (3 completed sessions each, #4110): −30 % sets (rounded to whole sets, accessories and back-offs first), loads held",
     "provenance": "owner",
     "one_home": "owner_redlines.REDLINES['lifting_sessions_per_wk']['deload']",
 }
@@ -504,36 +505,33 @@ def _deload_cfg() -> dict[str, Any]:
     return dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"])
 
 
-# ── the BLOCK CALENDAR (#4064) ───────────────────────────────────────────────
-# Owner, 2026-09-22 (#4064): block 1 starts Thursday 2026-09-24 — Thu 09-24, Sat 09-26,
-# Mon 09-28 — and then runs Mon/Wed/Fri. The session SEQUENCE is continuous: after the
-# opening three, the next Mon/Wed/Fri day is Wed 09-30, so every program week from week 2
-# is Wed → Fri → Mon (heavy → moderate → heavy-moderate) and no session is skipped or
-# doubled at the seam. A program week is three consecutive sessions; it runs from its first
-# session to the day before the next week's first session (week 1: Thu 09-24 .. Tue 09-29;
-# week 2: Wed 09-30 .. Tue 10-06). Deload every 6th week, from `owner_redlines` (one home).
+# ── the SESSION SEQUENCE (#4110, replacing #4064's weekday calendar) ───────────
+# Owner, 2026-09-22 (#4064): block 1 starts Thursday 2026-09-24. Owner, 2026-09-23 (#4110):
+# "more just focusing on planned sequence and not forgetting next if I audible a change" — so
+# the sessions are an ORDER, not dates. heavy -> moderate -> heavy-moderate, then the next
+# week's; the position advances only on a completed LOADED Hevy session (a walk or an Engine
+# day postpones a session, never skips it). Three completed sessions are one program week;
+# deload every 6th program week, from `owner_redlines` (one home). The arithmetic and the
+# rulings live in `training.session_sequence`; this dict is the one definition it reads.
 #
-# The weekday grid above (`_SCHEDULE`) still answers for any date BEFORE block 1 — and it is
-# what the JSON-era v0.2 path never sees at all: this calendar is consulted only when the
-# program is ACTIVE and the seam serves the module grid.
-BLOCK_CALENDAR: dict[str, Any] = {
-    "block_1_start": "2026-09-24",
-    "opening_sessions": ["2026-09-24", "2026-09-26", "2026-09-28"],
-    "steady_weekdays": [0, 2, 4],  # Mon / Wed / Fri, 0 = Monday
+# The weekday grid (`_SCHEDULE`) still answers for any date BEFORE the block start — and the
+# JSON-era v0.2 path never sees the sequence at all: it is consulted only when the program
+# is ACTIVE and the seam serves the module grid.
+SESSION_SEQUENCE: dict[str, Any] = {
+    "block_start": "2026-09-24",
     "session_roles": ["heavy", "moderate", "heavy_moderate"],
     "sessions_per_week": 3,
     "weeks_per_block": 6,
-    "optional_fourth_weekday": 5,  # Saturday, weeks >= 2, never in a deload week
+    "advances_on": "a loaded Hevy session (training_streaks.is_loaded_session), one per Pacific day, dated on/after block_start",
     "provenance": "owner",
-    "stated": "2026-09-22",
-    "issue": "#4064",
+    "stated": "2026-09-23",
+    "issue": "#4110",
     "note": (
-        "Dates are the owner's (#4064). Reading 'then Mon/Wed/Fri' as the CONTINUOUS sequence (Wed 09-30 follows Mon 09-28) rather "
-        "than restarting on Mon 10-05 is the platform's reading — the alternative leaves a 7-day gap after week 1."
+        "The block start is the owner's (#4064); the sequence is the owner's (#4110). The weekday calendar #4064 shipped is "
+        "retired, not kept as a display suggestion — two answers to 'what is next' was the defect."
     ),
 }
 
-_WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 _ROLE_LABEL = {"heavy": "HEAVY", "moderate": "MODERATE", "heavy_moderate": "HEAVY-MODERATE", "optional_fourth": "OPTIONAL 4th"}
 
 
@@ -544,96 +542,6 @@ def _day(day: str):
     if parsed is None:
         raise ValueError(f"not a YYYY-MM-DD day key: {day!r}")
     return parsed
-
-
-def _session_dates(until: str | None = None, n_sessions: int | None = None) -> list[str]:
-    """The calendar's session dates in order — every one on or before `until`, or the first
-    `n_sessions`. Exactly one of the two bounds must be given."""
-    if (until is None) == (n_sessions is None):
-        raise ValueError("_session_dates needs exactly one of until / n_sessions")
-    cal = BLOCK_CALENDAR
-    out = list(cal["opening_sessions"])
-    stop = _day(until) if until else None
-    cursor = _day(out[-1])
-    steady = set(cal["steady_weekdays"])
-    while True:
-        if n_sessions is not None and len(out) >= n_sessions:
-            return out[:n_sessions]
-        if stop is not None and cursor >= stop:
-            return [d for d in out if _day(d) <= stop]
-        cursor = cursor + _dt.timedelta(days=1)
-        if cursor.weekday() in steady:
-            out.append(cursor.isoformat())
-
-
-def block_calendar(weeks: int = 13) -> list[dict[str, Any]]:
-    """The first `weeks` program weeks: dates, roles, block number and deload flag.
-
-    Pure arithmetic over `BLOCK_CALENDAR` and the redline's deload period — no I/O, no
-    stored rows, so the calendar can never disagree with the program module it came from.
-    """
-    per = BLOCK_CALENDAR["sessions_per_week"]
-    roles = BLOCK_CALENDAR["session_roles"]
-    every = int(_deload_cfg()["every_nth_week"])
-    dates = _session_dates(n_sessions=weeks * per + 1)
-    out: list[dict[str, Any]] = []
-    for w in range(weeks):
-        wk = w + 1
-        sess = dates[w * per : (w + 1) * per]
-        out.append(
-            {
-                "week": wk,
-                "block": (wk - 1) // BLOCK_CALENDAR["weeks_per_block"] + 1,
-                "deload": wk % every == 0,
-                "starts": sess[0],
-                "ends": (_day(dates[(w + 1) * per]) - _dt.timedelta(days=1)).isoformat(),
-                "sessions": [
-                    {"date": d, "weekday": _WEEKDAY_NAMES[_day(d).weekday()], "session_role": roles[i]} for i, d in enumerate(sess)
-                ],
-            }
-        )
-    return out
-
-
-def calendar_entry(day: str) -> dict[str, Any] | None:
-    """The schedule entry the block calendar assigns to `day`, or None before block 1.
-
-    Same shape as a `week_grid()['schedule']` entry (archetype / label / session_role /
-    optional) plus `week`, `block`, `deload` and `source: "block_calendar"`, so the
-    generator reads it exactly where it used to read the weekday grid.
-    """
-    target = _day(day)
-    if target < _day(BLOCK_CALENDAR["block_1_start"]):
-        return None
-    per = BLOCK_CALENDAR["sessions_per_week"]
-    roles = BLOCK_CALENDAR["session_roles"]
-    every = int(_deload_cfg()["every_nth_week"])
-    dates = _session_dates(until=day)
-    # the session index of the last session on or before `day`
-    idx = len(dates) - 1
-    week = idx // per + 1
-    block = (week - 1) // BLOCK_CALENDAR["weeks_per_block"] + 1
-    deload = week % every == 0
-    base = {"week": week, "block": block, "deload": deload, "source": "block_calendar"}
-    wd = _WEEKDAY_NAMES[target.weekday()]
-    if dates and dates[-1] == day:
-        role = roles[idx % per]
-        return {
-            **base,
-            "archetype": "full",
-            "session_role": role,
-            "label": f"{wd} full-body {_ROLE_LABEL[role]} — week {week}, block {block}" + (" (DELOAD)" if deload else ""),
-        }
-    if week >= 2 and not deload and target.weekday() == BLOCK_CALENDAR["optional_fourth_weekday"]:
-        return {
-            **base,
-            "archetype": "full",
-            "session_role": "optional_fourth",
-            "optional": True,
-            "gate": _SCHEDULE["5"]["gate"],
-            "label": f"{wd} OPTIONAL 4th full-body (only after two green recovery days) — week {week}",
-        }
-    return {**base, "archetype": "aerobic", "label": f"{wd} walk — week {week}, block {block}" + (" (DELOAD week)" if deload else "")}
 
 
 def _deload_trim(exposures: list[dict[str, Any]], pct: int) -> dict[str, Any]:
@@ -759,20 +667,29 @@ def session_prescription_for_role(
     }
 
 
-def planned_session(day: str, *, catalog_movements: dict[str, Any] | None = None, skill_ceiling: int = 2) -> dict[str, Any]:
-    """What the program schedules on `day`: the calendar entry, and — on a lifting day — the
-    §3 session. Before block 1 the weekday grid answers, and the result says which did.
+def planned_session(
+    day: str,
+    *,
+    block_workouts: list[dict[str, Any]] | None = None,
+    catalog_movements: dict[str, Any] | None = None,
+    skill_ceiling: int = 2,
+) -> dict[str, Any]:
+    """What the program serves on `day`: the next UNDONE session of the sequence (#4110), and
+    its §3 prescription. Before the block start the weekday grid answers, and the result says
+    which did. `block_workouts` is the Hevy record since the block start (None = not read).
 
     Only meaningful when the program is ACTIVE; the caller (`plan_engine`) reports the
     JSON grid instead when it is not.
     """
-    entry = calendar_entry(day)
+    from training import session_sequence
+
+    entry = session_sequence.next_session(day, block_workouts)
     if entry is None:
         grid = dict(_SCHEDULE[str(_day(day).weekday())])
         entry = {
             **grid,
             "source": "week_grid",
-            "note": f"before block 1 ({BLOCK_CALENDAR['block_1_start']}) — the weekday grid answers",
+            "note": f"before the block start ({SESSION_SEQUENCE['block_start']}) — the weekday grid answers",
         }
     out: dict[str, Any] = {"date": day, "program_version": PROGRAM_VERSION, **entry}
     role = entry.get("session_role")
@@ -786,7 +703,7 @@ def planned_session(day: str, *, catalog_movements: dict[str, Any] | None = None
 def weekly_sets_by_pattern() -> dict[str, int]:
     """Anchor sets per pattern over the three REQUIRED roles (optional fourth excluded)."""
     out: dict[str, int] = {}
-    for role in BLOCK_CALENDAR["session_roles"]:
+    for role in SESSION_SEQUENCE["session_roles"]:
         for e in session_prescription_for_role(role)["exposures"]:
             if e["kind"] == "anchor":
                 out[e["pattern"]] = out.get(e["pattern"], 0) + len(e["sets"])
@@ -814,7 +731,7 @@ def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int 
 
     lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     by_muscle: dict[str, int] = {}
-    for role in BLOCK_CALENDAR["session_roles"]:
+    for role in SESSION_SEQUENCE["session_roles"]:
         rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
         for e in rx["exposures"]:
             muscle = (catalog_movements.get(e.get("movement_key") or "") or {}).get("primary_muscle") or "unresolved"
@@ -941,21 +858,19 @@ def _shift_day(day: str, delta_days: int) -> str:
     return (parsed + _dt.timedelta(days=delta_days)).isoformat()
 
 
-def _boundary_honesty(window_start: str, window_end: str) -> str:
-    """The honesty line about block boundaries, read from the block calendar (#4064)."""
+def _boundary_honesty(window_start: str, window_end: str, block_boundaries: list[str] | None) -> str:
+    """The honesty line about block boundaries — the days a block's first session was COMPLETED
+    (`session_sequence.block_boundaries`, #4110). None = the sequence was not read."""
     lead = f"the {ROTATION_RULE['window_days']}-day window is {ROTATION_RULE['window_provenance']}"
-    try:
-        weeks = block_calendar(weeks=60)
-    except ValueError:
-        weeks = []
-    starts = [w["starts"] for w in weeks if w["week"] > 1 and (w["week"] - 1) % BLOCK_CALENDAR["weeks_per_block"] == 0]
-    inside = [d for d in starts if window_start < d <= window_end]
+    if block_boundaries is None:
+        return f"{lead}; the session sequence was not read, so a block boundary inside it is unknown and an addition is reported as drift"
+    inside = [d for d in block_boundaries if window_start < d <= window_end]
     if inside:
         return (
-            f"{lead}; the block calendar puts a block boundary on {inside[0]} inside it, so an accessory added from that day "
+            f"{lead}; the session sequence opened a new block on {inside[0]} inside it, so an accessory added from that day "
             "is legitimate, not drift"
         )
-    return f"{lead}; the block calendar puts no block boundary inside it, so an addition here is drift"
+    return f"{lead}; the session sequence opened no new block inside it, so an addition here is drift"
 
 
 def accessory_rotation(
@@ -963,6 +878,7 @@ def accessory_rotation(
     window_start: str,
     window_end: str,
     hevy_workouts: list[dict[str, Any]] | None,
+    block_boundaries: list[str] | None = None,
 ) -> dict[str, Any]:
     """The accessory layer over a trailing window, computed from the Hevy record.
 
@@ -1086,7 +1002,7 @@ def accessory_rotation(
                     if ACTIVE
                     else f"the accessory rule is PROPOSED ({ISSUE}, gate:owner) — this is a measurement of what happened, not a compliance verdict against an approved program"
                 ),
-                _boundary_honesty(window_start, window_end),
+                _boundary_honesty(window_start, window_end, block_boundaries),
                 (
                     "anchor repeats are EXEMPT by design (progressive overload) — they are reported separately under anchors_trained"
                     if anchor_days
@@ -1120,8 +1036,8 @@ def summary() -> dict[str, Any]:
         "lifting_days": lifting_days(),
         "accessory_pool": ACCESSORY_POOL,
         "rotation_rule": ROTATION_RULE,
-        # #4064: the calendar the sessions are placed on, and the weekly anchor dose it produces
-        "block_calendar": BLOCK_CALENDAR,
+        # #4110: the session sequence (order, not weekdays), and the weekly anchor dose it produces
+        "session_sequence": SESSION_SEQUENCE,
         "session_distribution": SESSION_DISTRIBUTION_PROVENANCE,
         "weekly_anchor_sets": weekly_sets_by_pattern(),
         "day_shape": DAY_SHAPE,

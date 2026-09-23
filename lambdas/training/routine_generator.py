@@ -90,6 +90,7 @@ class GeneratorInputs:
         days_since_last_workout: int = 1,
         history_last_dates: dict[str, str] | None = None,  # movement_key -> last YYYY-MM-DD
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
+        block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the v0.3 block start; None = read it here
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -99,6 +100,7 @@ class GeneratorInputs:
         self.days_since_last_workout = days_since_last_workout
         self.history_last_dates = history_last_dates or {}
         self.add_load_enabled = add_load_enabled
+        self.block_workouts = block_workouts
 
 
 def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
@@ -106,24 +108,46 @@ def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
     return week_cfg["schedule"][str(dow)]["archetype"]
 
 
-def _schedule_entry_for_date(target_date: str, week_cfg: dict[str, Any], source: str | None = None) -> dict[str, Any]:
+def _schedule_entry_for_date(
+    target_date: str, week_cfg: dict[str, Any], source: str | None = None, block_workouts: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """The whole schedule entry for the day. #3755 v0.3: the module grid carries two keys the
     JSON grid never had — `session_role` (heavy / moderate / heavy_moderate / optional_fourth)
     and `optional` (the fourth full-body day, gated on two green recovery days). They ride on
     the rationale and the title so the flag reaches the pushed routine; nothing is gated on
     them here — the program reports, the owner decides.
 
-    #4064: when the seam served the MODULE grid (`source == "module"`, i.e. the program is
-    ACTIVE), the block calendar answers first — block 1 starts on a Thursday and then runs
-    Mon/Wed/Fri, which no weekday grid can express. Before block 1 the calendar returns None
-    and the weekday grid answers, as it always has. The JSON grid (v0.2 / any inactive
-    program) never consults the calendar."""
-    if source == "module":
-        cal = program_structure.calendar_entry(target_date)
-        if cal is not None:
-            return cal
+    #4110 (replacing #4064's weekday calendar): when the seam served the MODULE grid
+    (`source == "module"`, i.e. the program is ACTIVE), the session SEQUENCE answers first —
+    the next undone session, which advances only on a completed loaded Hevy session, so a walk
+    on a lifting day postpones the session instead of skipping it. Before the block start it
+    returns None and the weekday grid answers, as it always has. If the Hevy record could not
+    be read, the weekday grid answers AND the entry says the sequence was unreadable — never a
+    silent session 1. The JSON grid (v0.2 / any inactive program) never consults the sequence."""
     dow = date.fromisoformat(target_date).weekday()
+    if source == "module":
+        from training import session_sequence
+
+        seq = session_sequence.next_session(target_date, block_workouts)
+        if seq is not None and seq.get("source") == "session_sequence":
+            return seq
+        if seq is not None:
+            return {**dict(week_cfg["schedule"].get(str(dow)) or {}), "sequence_unreadable": seq["note"]}
     return dict(week_cfg["schedule"].get(str(dow)) or {})
+
+
+def _block_workouts_for(inputs: GeneratorInputs) -> list[dict[str, Any]] | None:
+    """The Hevy record since the v0.3 block start (#4110): the caller's, else one DDB read.
+    A failed read is None (the sequence position is then unknown, and the entry says so)."""
+    if inputs.block_workouts is not None:
+        return inputs.block_workouts
+    from training import session_sequence
+
+    try:
+        return session_sequence.load_block_workouts(inputs.target_date)
+    except Exception as e:  # noqa: BLE001 — reported on the entry, never a silent session 1
+        logger.warning(f"session sequence read failed (the next session is unknown): {e}")
+        return None
 
 
 def _trim_budgets_to_ceiling(budgets: dict[str, int], ceiling: int) -> dict[str, int]:
@@ -785,7 +809,8 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     resolved_week = resolve_week_grid(_load_json)
     week_cfg = resolved_week.week
 
-    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source)
+    block_workouts = _block_workouts_for(inputs) if resolved_week.source == "module" else None
+    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source, block_workouts)
     archetype = day_entry.get("archetype") or _archetype_for_date(inputs.target_date, week_cfg)
     targets = week_cfg["archetype_targets"].get(archetype, [])
     if archetype in ("rest", "aerobic", "mobility"):
@@ -793,7 +818,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
     if archetype == "full" and day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
         # #4064 — a v0.3 role is a §3 session (anchors at heavy/moderate, fixed accessories,
-        # deload on the calendar), not a muscle-budget session with a role label on it.
+        # deload every 6th program week), not a muscle-budget session with a role label on it.
         from training.full_body_session import full_body_routines
 
         return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets)
@@ -1093,8 +1118,8 @@ def _non_lifting_pair(
     day_entry: dict[str, Any] | None = None,
 ) -> list[RoutineSpec]:
     rationale = [f"non-lifting day: archetype={archetype}"]
-    if day_entry and day_entry.get("source") == "block_calendar":
-        rationale.append(f"block calendar: {day_entry.get('label')}")
+    if day_entry and day_entry.get("sequence_unreadable"):
+        rationale.append(f"session sequence UNREADABLE — {day_entry['sequence_unreadable']}; the weekday grid answered")
     ideal = RoutineSpec(
         routine_id=_new_routine_id(inputs.target_date, archetype, "ideal"),
         target_date=inputs.target_date,

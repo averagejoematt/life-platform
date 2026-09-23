@@ -379,6 +379,23 @@ def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | 
     return start, query_source_range("hevy", start, end_date)
 
 
+def _block_workouts(target_date: str) -> list[dict[str, Any]]:
+    """Every Hevy row from the v0.3 block start to the day before `target_date` (#4110) — the
+    record the session sequence advances on. Read through `tools_strength._read_hevy_all_phases`,
+    the ONE sanctioned Hevy read path (#4030/#4032). Before the block start there is nothing to
+    read and the answer is an empty list; a raise propagates to `_read` as `read_failed`."""
+    from training import session_sequence
+
+    from mcp.tools_strength import _read_hevy_all_phases
+
+    start = session_sequence.block_start()
+    end = _minus_days(target_date, 1)
+    if end < start:
+        return []
+    items, _phases = _read_hevy_all_phases(start, end)
+    return items
+
+
 def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -> None:
     """Put the per-source breakdown on the block's walking read, beside the total (#3930).
 
@@ -652,6 +669,12 @@ def tool_plan_next_session(args):
     # draft will be built from. A read that raises leaves the session pattern-level and says so.
     catalog_movements, skill_ceiling = _catalog_and_ceiling()
 
+    # #4110: the session and the program week follow the COMPLETED sessions since the block
+    # start, not the weekday — so the Hevy record since then is an engine input of its own.
+    block_workouts, status["block_workouts"] = _read("block_workouts", _block_workouts, target_date)
+    if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
+        status["block_workouts"] = st(ABSENT, "no Hevy session since the v0.3 block start")
+
     block = plan_engine.constraint_block(
         date=target_date,
         catalog_movements=catalog_movements,
@@ -687,6 +710,7 @@ def tool_plan_next_session(args):
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,
         rotation_window_start=rotation_start,
+        block_workouts=block_workouts,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
@@ -697,8 +721,9 @@ def tool_plan_next_session(args):
         "constraint_block": block,
         "protein_days_measured_7d": protein_measured,
         "how_to_use": (
-            "Stage 1 is the deterministic constraint block. `constraint_block.session` is the session the program "
-            "schedules on this date (block calendar + v0.3 §3 prescription) — start from it. Draft against the block, then say plainly which constraint "
+            "Stage 1 is the deterministic constraint block. `constraint_block.session` is the NEXT UNDONE session "
+            "of the v0.3 sequence (its position, and the completed session that advanced it, #4110) with its §3 prescription — "
+            "start from it. Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
             "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
             "WITH routine_id — stage 2, the red team (#3752). A routine that skipped stage 2 is NOT red-teamed and "

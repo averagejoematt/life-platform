@@ -85,9 +85,8 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, training_context_registry
 
-ENGINE_VERSION = (
-    "plan-engine@1.5.0"  # #4098: `not_before_week` is enforced from the block calendar; the anchor drop is a rolling e1RM median
-)
+ENGINE_VERSION = "plan-engine@1.6.0"  # #4110: the session and the program week follow the completed-session SEQUENCE, not weekdays
+# plan-engine@1.5.0 (#4098): `not_before_week` is enforced from the program week; the anchor drop is a rolling e1RM median
 # plan-engine@1.4.0 (#4072): every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
 
 # ── #4072: the read state of every engine input ──────────────────────────────────────
@@ -121,6 +120,7 @@ ENGINE_INPUTS = (
     "weight_stall_days",
     "adherence_on_plan",
     "hevy_workouts_rotation_window",
+    "block_workouts",
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -237,15 +237,23 @@ def anchor_drop_tripped(drop_pct: float | None, sessions_below: int | None) -> b
 # ── `not_before_week`: a redline that is not armed yet (#4098) ───────────────
 # `anchor_lift_strength_drop` declares `not_before_week: 6` ("the ramp is still under 85 % of
 # band e1RM"). Before #4098 nothing read it: the tripwire was live in the ramp weeks, comparing
-# a detraining return with a best from before the break. The week is the v0.3 block calendar's
-# (`program_structure.calendar_entry`, #4064); before block 1 it is week 0.
-def program_week(day: str) -> int | None:
-    """The block calendar's program week for `day` — 0 before block 1, None for an unreadable day key."""
+# a detraining return with a best from before the break. The week is the v0.3 session
+# sequence's (`session_sequence.program_week`, #4110): completed loaded sessions // 3, + 1.
+def program_week(day: str, block_workouts: list[dict[str, Any]] | None = None) -> int | None:
+    """THE program week for `day` — 0 before the block start, None when the Hevy record since the
+    block start was not read (an unknown week never arms a gated tripwire) or the day key is bad."""
+    from training import session_sequence
+
+    return session_sequence.program_week(day, block_workouts)
+
+
+def _block_boundaries(block_workouts: list[dict[str, Any]] | None, day: str) -> list[str] | None:
+    from training import session_sequence
+
     try:
-        entry = program_structure.calendar_entry(day)
+        return session_sequence.block_boundaries(block_workouts, day)
     except ValueError:
         return None
-    return int(entry["week"]) if entry else 0
 
 
 def not_before_week_gate(tripwire: dict[str, Any], week: int | None) -> str | None:
@@ -338,7 +346,7 @@ def _tripwire_states(
     block will not say which one it was. Every row carries its input's `input_state`.
 
     #4098: every tripwire that declares `not_before_week` reads `not_yet_active (week N < M)`
-    until the block calendar's `week` reaches M — whatever its input says, which rides along
+    until the session sequence's `week` reaches M — whatever its input says, which rides along
     as `state_if_active` so the gate never hides the number.
     """
     input_states = input_states or {}
@@ -537,11 +545,13 @@ def _tripwire_states(
     return out
 
 
-def _scheduled_session(day: str, catalog_movements: dict[str, Any] | None, skill_ceiling: int) -> dict[str, Any]:
-    """The session the program schedules on `day` (#4064). Pure.
+def _scheduled_session(
+    day: str, catalog_movements: dict[str, Any] | None, skill_ceiling: int, block_workouts: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """The session the program serves on `day` (#4064, #4110). Pure.
 
-    ACTIVE program: `program_structure.planned_session` — the block calendar, then the §3
-    prescription. Inactive: the engine runs on the JSON grid, which this pure function
+    ACTIVE program: `program_structure.planned_session` — the next undone session of the
+    sequence (it advances only on a completed loaded Hevy session), then the §3 prescription. Inactive: the engine runs on the JSON grid, which this pure function
     cannot read, so it says that rather than inventing a session.
     """
     if not program_structure.ACTIVE:
@@ -555,7 +565,9 @@ def _scheduled_session(day: str, catalog_movements: dict[str, Any] | None, skill
             ),
         }
     try:
-        out = program_structure.planned_session(day, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+        out = program_structure.planned_session(
+            day, block_workouts=block_workouts, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling
+        )
     except ValueError as e:
         return {"date": day, "source": "unreadable", "archetype": None, "note": str(e)}
     if catalog_movements is None and out.get("prescription"):
@@ -565,7 +577,7 @@ def _scheduled_session(day: str, catalog_movements: dict[str, Any] | None, skill
         out["weekly_sets_by_muscle"] = program_structure.weekly_sets_by_muscle(catalog_movements or {}, skill_ceiling)
     out["how_to_draft"] = (
         "manage_hevy_routine action=draft target_date=" + day + " builds exactly this session (the generator reads the same "
-        "calendar and prescription); draft_custom only for a deliberate departure"
+        "session sequence and prescription); draft_custom only for a deliberate departure"
     )
     return out
 
@@ -595,6 +607,7 @@ def constraint_block(
     rotation_window_start: str | None = None,
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
+    block_workouts: list[dict[str, Any]] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
@@ -606,6 +619,10 @@ def constraint_block(
     `input_status` (#4072) is the caller's statement of HOW each value was obtained —
     `measured` / `absent` / `read_failed` (+ error class) / `not_read`. It is reported per
     input on `inputs`, and it is what lets a None read `read_failed` instead of `unknown`.
+
+    `block_workouts` (#4110) is the Hevy record since the v0.3 block start. The served session
+    and the program week are derived from it — the completed loaded sessions — so a None
+    (not read) leaves both unknown rather than defaulting to session 1.
     """
     states = resolve_input_states(
         {
@@ -624,6 +641,7 @@ def constraint_block(
             "weight_stall_days": weight_stall_days,
             "adherence_on_plan": adherence_on_plan,
             "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
+            "block_workouts": block_workouts,
         },
         input_status,
     )
@@ -700,8 +718,8 @@ def constraint_block(
             "no weight-matched reference was retrieved — do not substitute the current band, which is the period he is trying to escape"
         ]
 
-    # #4098: the block calendar's week decides which redlines are armed (`not_before_week`).
-    week = program_week(date)
+    # #4098/#4110: the sequence's program week decides which redlines are armed (`not_before_week`).
+    week = program_week(date, block_workouts)
 
     tripwires = _tripwire_states(
         protein_days_missed_7d=protein_days_missed_7d,
@@ -737,9 +755,10 @@ def constraint_block(
         window_start=rotation_window_start or date,
         window_end=date,
         hevy_workouts=hevy_workouts_rotation_window,
+        block_boundaries=_block_boundaries(block_workouts, date),
     )
 
-    session = _scheduled_session(date, catalog_movements, skill_ceiling)
+    session = _scheduled_session(date, catalog_movements, skill_ceiling, block_workouts)
 
     return {
         "engine_version": ENGINE_VERSION,
@@ -756,9 +775,9 @@ def constraint_block(
         # in the bundle).
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
-        # #4064 — WHAT the program schedules on this date: the block calendar's answer
-        # (block 1 starts Thu 2026-09-24, then Mon/Wed/Fri, deload every 6th week) and, on a
-        # lifting day, the §3 session — anchors at heavy/moderate with their sets and reps,
+        # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
+        # sequence (heavy -> moderate -> heavy-moderate from 2026-09-24; it advances only on a
+        # completed loaded Hevy session; deload every 6th program week) and the §3 session — anchors at heavy/moderate with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
@@ -778,7 +797,7 @@ def constraint_block(
         "failed_read_tripwires": failed_tripwires,
         # #4072: every input's read state — measured / absent / read_failed (+ error) / not_read.
         "inputs": states,
-        # #4098 — the block calendar's week, and the tripwires its `not_before_week` holds off.
+        # #4098/#4110 — the sequence's program week, and the tripwires its `not_before_week` holds off.
         "program_week": week,
         "not_yet_active_tripwires": not_yet_active,
         # #4051 — WHAT the pain tripwire looked at: the movements PERFORMED in the trailing

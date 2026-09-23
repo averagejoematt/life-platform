@@ -156,8 +156,18 @@ def full_body_routines(
         f"week grid source={resolved_week.source} ({resolved_week.detail})",
         f"archetype=full; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
-    if day_entry.get("source") == "block_calendar":
-        rationale.append(f"block calendar: week {day_entry['week']}, block {day_entry['block']}" + (" — DELOAD" if deload else ""))
+    if day_entry.get("source") == "session_sequence":
+        adv = day_entry.get("advanced_by")
+        rationale.append(
+            f"session sequence: {day_entry['position_label']}, block {day_entry['block']}"
+            + (
+                f"; advanced by {adv['date']} {adv.get('title') or ''} ({adv['was']})".rstrip()
+                if adv
+                else "; the first session of the block"
+            )
+        )
+    elif day_entry.get("sequence_unreadable"):
+        rationale.append(f"session sequence UNREADABLE — {day_entry['sequence_unreadable']}; weekday grid: {day_entry.get('label')}")
     else:
         rationale.append(f"weekday grid: {day_entry.get('label')}")
     if deload and rx.get("deload_trim"):
@@ -185,7 +195,8 @@ def full_body_routines(
 
     history_index, weight_index, _cardio, _whoop = note_indexes
     # #4090: v0.3 §3's entry ramp — the week's share of the discounted band anchor, never 100 %
-    # of the band best. A day with no calendar week (before block 1) ramps as week 1.
+    # of the band best. The week is the session sequence's (#4110 — completed sessions, not
+    # calendar weeks); a day with no program week (before the block start) ramps as week 1.
     ramp_week = int(day_entry.get("week") or 1)
     ramp_p = load_ramp.params()
     rationale.append(
@@ -227,7 +238,11 @@ def full_body_routines(
     title = f"Full Body {label}{week_tag}" + (" DELOAD" if deload else "") + f" — {inputs.target_date}"
     if day_entry.get("optional"):
         title += " (optional)"
-    calendar_snapshot = {k: day_entry.get(k) for k in ("source", "week", "block", "deload", "label", "session_role")}
+    calendar_snapshot = {
+        k: day_entry.get(k)
+        for k in ("source", "week", "block", "deload", "label", "session_role", "session_in_week", "sequence_index", "position_label")
+    }
+    calendar_snapshot["advanced_by"] = day_entry.get("advanced_by")
     ideal = RoutineSpec(
         routine_id=_new_routine_id(inputs.target_date, "full", "ideal"),
         target_date=inputs.target_date,

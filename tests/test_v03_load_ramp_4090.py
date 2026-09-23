@@ -67,8 +67,23 @@ HEAVY_ANCHORS = ("leg_press", "db_bench_press_flat", "machine_row")
 
 
 def _generate(day: str, history=HISTORY, weights=WEIGHTS, **kw):
+    kw.setdefault("block_workouts", [])  # #4110: no session completed — the sequence serves week 1 · session 1
     with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, **kw))
+
+
+def _done(n: int) -> list[dict]:
+    """`n` completed loaded sessions from the v0.3 block start, one a day (#4110)."""
+    from common.pacific_time import shift_day_key
+
+    return [
+        {
+            "date": shift_day_key("2026-09-24", i),
+            "source_workout_id": f"w{i}",
+            "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}],
+        }
+        for i in range(n)
+    ]
 
 
 def _top(ideal, key):
@@ -133,7 +148,7 @@ def test_moderate_anchors_ride_the_same_ramp():
 
 # ── 3. week 9 ────────────────────────────────────────────────────────────────
 def test_week_9_is_capped_at_85_percent():
-    ideal = _generate("2026-11-18")[0]
+    ideal = _generate("2026-11-18", block_workouts=_done(24))[0]  # #4110: week 9 = 24 completed sessions
     assert ideal.inputs_snapshot["calendar"]["week"] == 9 and "HEAVY" in ideal.title
     for key in HEAVY_ANCHORS:
         top = _top(ideal, key)
@@ -191,7 +206,9 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
         assert lo <= row["sets"] <= hi, (group, row)
     assert week["back"]["sets"] == 10 and week["delts"]["sets"] == 6
     # the summed total still sits in §3's 50–65
-    total = sum(program_structure.session_prescription_for_role(r)["total_sets"] for r in program_structure.BLOCK_CALENDAR["session_roles"])
+    total = sum(
+        program_structure.session_prescription_for_role(r)["total_sets"] for r in program_structure.SESSION_SEQUENCE["session_roles"]
+    )
     lo, hi = lift["total_hard_sets_wk"]
     assert lo <= total <= hi, total
 

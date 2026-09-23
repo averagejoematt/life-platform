@@ -6,8 +6,8 @@ THE ISSUE (#4098)
   identity half. Three defects were left, and these tests hold each one:
 
   1. `not_before_week: 6` on `anchor_lift_strength_drop` was declared and read by nothing. The
-     engine now enforces EVERY declared `not_before_week` from the v0.3 block calendar's week
-     (#4064) — the set-level test below walks the redlines module for every declaration and
+     engine now enforces EVERY declared `not_before_week` from the v0.3 program week (since
+     #4110 the session sequence's — completed sessions / 3, not the calendar) — the set-level test below walks the redlines module for every declaration and
      proves each has a reader, so a new one cannot land unread.
   2. The trend compared top WEIGHT with reps thrown away. It is now v3's rolling 3-session e1RM
      median against the 6-session baseline, per template identity, over the session's own
@@ -46,7 +46,23 @@ DB_SP = ("878CD1D0", "Shoulder Press (Dumbbell)")
 
 
 def _week_start(week: int) -> str:
-    return program_structure.block_calendar(weeks=week)[week - 1]["starts"]
+    """The first day of program `week` when he lifts every day from the block start (#4110: the
+    week follows COMPLETED sessions — 3 per week — not the calendar)."""
+    from common.pacific_time import shift_day_key
+
+    return shift_day_key(program_structure.SESSION_SEQUENCE["block_start"], 3 * (week - 1))
+
+
+def _block_rows(date: str) -> list[dict[str, Any]]:
+    """One loaded Hevy session a day from the block start to the day before `date`."""
+    from common.pacific_time import shift_day_key
+
+    start = program_structure.SESSION_SEQUENCE["block_start"]
+    rows, d = [], start
+    while d < date:
+        rows.append({"date": d, "source_workout_id": d, "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]})
+        d = shift_day_key(d, 1)
+    return rows
 
 
 def _sessions(sets: list[tuple[float, int]], tid_name=DB_SP) -> list[dict[str, Any]]:
@@ -68,7 +84,9 @@ def _anchor_state(date: str, trend: dict[str, Any]) -> dict[str, Any]:
     """The tools_plan chain: a drafted CORE-anchor row → `_worst_anchor` → the engine's tripwire row."""
     evidence = {"exercises": [{"idx": 0, "label": DB_SP[1], "anchor_family": "bench", **trend}]}
     pct, sessions = tp._worst_anchor(evidence)
-    block = plan_engine.constraint_block(date=date, anchor_lift_drop_pct=pct, anchor_lift_drop_sessions=sessions)
+    block = plan_engine.constraint_block(
+        date=date, anchor_lift_drop_pct=pct, anchor_lift_drop_sessions=sessions, block_workouts=_block_rows(date)
+    )
     return next(t for t in block["tripwires"] if t["id"] == "anchor_lift_strength_drop")
 
 
@@ -100,21 +118,21 @@ def test_the_declaration_set_is_not_empty():
 def test_every_declared_not_before_week_is_enforced_by_the_engine(path, decl):
     """Derivation guard: a `not_before_week` anywhere in the redlines module must be on an
     engine-evaluated tripwire, and the engine must hold that row `not_yet_active` below it and
-    release it at it — read from the block calendar's week, never a hand-typed date."""
+    release it at it — read from the session sequence's week (#4110), never a hand-typed date."""
     assert path.startswith("TRIPWIRES["), f"{path} declares not_before_week but is not a tripwire — nothing can read it"
     engine_ids = {t["id"] for t in owner_redlines.engine_evaluated_tripwires()}
     assert decl["id"] in engine_ids, f"{decl['id']} declares not_before_week but plan_engine does not evaluate it"
     m = int(decl["not_before_week"])
     assert m >= 2, "a gate at week 1 would be vacuous — pick the week it actually arms"
 
-    before = plan_engine.constraint_block(date=_week_start(m - 1))
+    before = plan_engine.constraint_block(date=_week_start(m - 1), block_workouts=_block_rows(_week_start(m - 1)))
     row = next(t for t in before["tripwires"] if t["id"] == decl["id"])
     assert before["program_week"] == m - 1
     assert row["state"] == "not_yet_active" and row["detail"].startswith(f"not_yet_active (week {m - 1} < {m})")
     assert decl["id"] in before["not_yet_active_tripwires"]
     assert any("not yet active" in line for line in before["honesty"])
 
-    at = plan_engine.constraint_block(date=_week_start(m))
+    at = plan_engine.constraint_block(date=_week_start(m), block_workouts=_block_rows(_week_start(m)))
     row = next(t for t in at["tripwires"] if t["id"] == decl["id"])
     assert at["program_week"] == m and row["state"] != "not_yet_active"
 
