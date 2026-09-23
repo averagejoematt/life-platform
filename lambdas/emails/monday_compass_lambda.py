@@ -40,7 +40,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #4088: derived per source
 from training import training_load  # shared TSS-like load model (layer module, #490) — basis_note
 
 _logger_std = logging.getLogger()
@@ -160,7 +160,19 @@ def fetch_profile():
     return _shared_fetch_profile(table, USER_ID)
 
 
-def query_source(source, start_date, end_date):
+def _resolve_include_pilot(source, include_pilot):
+    """#4088: an explicit bool wins; `None` derives the phase decision from the source's
+    taxonomy class (#2109) — a raw series (`whoop`, `day_grade`) reads across every phase
+    inside the caller's date window, an EXPERIMENT_SCOPED one (`character_sheet`,
+    `habit_scores`, `computed_metrics`) keeps the ADR-058 filter. Returns
+    `(include_pilot, derived)`."""
+    if include_pilot is None:
+        return bool(source_reads_cross_phase(source)), True
+    return bool(include_pilot), False
+
+
+def query_source(source, start_date, end_date, include_pilot=None):
+    include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     items = []
     kwargs = {
@@ -168,16 +180,17 @@ def query_source(source, start_date, end_date):
         "ExpressionAttributeValues": {":pk": pk, ":s": f"DATE#{start_date}", ":e": f"DATE#{end_date}"},
     }
     while True:
-        resp = table.query(**with_phase_filter(kwargs))
-        items.extend([d2f(i) for i in resp.get("Items", [])])
+        resp = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
+        items.extend([d2f(i) for i in resp.get("Items", []) if not (derived and i.get("tombstone"))])
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     return sorted(items, key=lambda x: x.get("date", ""))
 
 
-def query_source_latest(source):
-    """Get the most recent record for a source."""
+def query_source_latest(source, include_pilot=None):
+    """Get the most recent record for a source (phase decision derived per source, #4088)."""
+    include_pilot, _derived = _resolve_include_pilot(source, include_pilot)
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     resp = table.query(
         **with_phase_filter(
@@ -186,7 +199,8 @@ def query_source_latest(source):
                 "ExpressionAttributeValues": {":pk": pk},
                 "ScanIndexForward": False,
                 "Limit": 1,
-            }
+            },
+            include_pilot=include_pilot,
         )
     )
     items = resp.get("Items", [])

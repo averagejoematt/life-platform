@@ -550,6 +550,10 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
     bedrock_client/retry_utils. Granted by hand here per the #1440 IAM check;
     without it the emit fails AccessDenied, fail-soft, same failure class #1196
     guards against for directly-wired emitters.
+
+    #4022: + secretsmanager:GetSecretValue on life-platform/github-dispatch-token and
+    s3:PutObject on remediation-log/closure-probe/* — arms the close-on-first-live-output
+    leg's GitHub write path (report-only without this grant; see closure_probe_qa.py).
     """
     return [
         _bedrock_statement(),
@@ -669,6 +673,25 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
             resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ),
+        # #4022: close-on-first-live-output leg (operational.closure_probe_qa). Reuses the
+        # remediation dispatcher's scoped GitHub identity (ADR-064) rather than minting a
+        # second PAT. `describe-secret` on life-platform/github-dispatch-token shows
+        # KmsKeyId=null (the AWS-managed aws/secretsmanager key, not the platform CMK) —
+        # no separate kms:Decrypt grant is needed here; the pre-existing "KMS" statement
+        # above (kms:Decrypt + GenerateDataKey on KMS_KEY_ARN) is for the DDB table's CMK
+        # and is unrelated to this secret.
+        iam.PolicyStatement(
+            sid="SecretsGetClosureProbeToken",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/github-dispatch-token")],
+        ),
+        # #4022: the audit line the leg writes BEFORE every close (audit-first —
+        # no audit object, no comment, no close).
+        iam.PolicyStatement(
+            sid="S3WriteClosureProbeAudit",
+            actions=["s3:PutObject"],
+            resources=_s3("remediation-log/closure-probe/*"),
         ),
     ]
 

@@ -18,6 +18,7 @@ floor, and every one is written into the rationale, never applied silently.
 
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 from training import load_ramp, program_structure, routine_generator as _rg
@@ -190,7 +191,8 @@ def full_body_routines(
     ramp_p = load_ramp.params()
     rationale.append(
         f"loads: v0.3 §3 entry ramp, week {ramp_week} = {load_ramp.ramp_pct(ramp_week, ramp_p)}% of the band anchor after the "
-        f"{ramp_p['discount_pct']}% detraining discount (cap {ramp_p['cap_pct']}% of band e1RM); back-offs −10 % of the top set"
+        f"{ramp_p['discount_pct']}% detraining discount on anchors >= {load_ramp.DETRAINING_ANCHOR_AGE_DAYS} d older than block 1 "
+        f"(cap {ramp_p['cap_pct']}% of band e1RM; no in-band history -> the nearest band he has lifted in); back-offs −10 % of the top set"
     )
     load_floors = _enforce_load_floors(
         blocks,
@@ -201,7 +203,7 @@ def full_body_routines(
         days_since_last_workout=inputs.days_since_last_workout,
         layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
         rationale=rationale,
-        floor_transform=lambda f: load_ramp.ramp_floor(f, ramp_week),
+        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),  # #4107: the ONE v0.3 load path
     )
     load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
     load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)

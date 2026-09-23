@@ -126,7 +126,8 @@ def tools_baseline(*, _g) -> dict:
     baseline_end = (datetime.strptime(EXPERIMENT_START, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Current: last 7 days
-    d7 = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
+    # #4088: genesis DATE clamp — "current vs the experiment's first week" is this experiment's frame.
+    d7 = max((datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     baseline_whoop = _query_source("whoop", EXPERIMENT_START, baseline_end)
     current_whoop = _query_source("whoop", d7, today)
@@ -160,7 +161,7 @@ def tools_baseline(*, _g) -> dict:
     _p = _get_profile()
     baseline["weight_lbs"] = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
-    latest_withings = _latest_item("withings")
+    latest_withings = _latest_item("withings", since=EXPERIMENT_START)  # #4088: genesis DATE clamp (vs the experiment baseline)
     current["weight_lbs"] = round(float(latest_withings["weight_lbs"])) if latest_withings and latest_withings.get("weight_lbs") else None
 
     return _ok(

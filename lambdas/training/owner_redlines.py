@@ -55,7 +55,7 @@ from typing import Any
 ACTIVE = True
 """True since 2026-09-21: the owner reviewed and approved v0.3 (#3753, gate:owner satisfied)."""
 
-REDLINES_VERSION = "3.0"
+REDLINES_VERSION = "3.1"
 """v3 (2026-09-22 UTC / approved 2026-09-21 PT): six independent personas — transformation coach,
 obesity-medicine physician, performance nutritionist, S&C coach, lived experience, and a blueprint
 historian arguing only from his own 2024–25 data — ran blind on one evidence packet compiled from
@@ -63,7 +63,11 @@ the platform's own partitions (238 weigh-ins, 329 Hevy rows, 272 Strava days, a 
 Eight Sleep, both DEXAs, the trough labs, the current 28-day block, and an energy-balance model
 calibrated on that record). The record is `RED_TEAM_RECORD`; the plan is `TRAINING_PROGRAM_v0.3.md`
 in the same owner-private home. Approved by the owner 2026-09-21 (#3753): from that date the values
-below are his instruction to the coach."""
+below are his instruction to the coach.
+
+v3.1 (2026-09-23, #4111): the owner overruled the `self_added_volume` tripwire's action — it no
+longer reads training above prescription as an anxiety tell, enforces subtract-only, or asks about
+mood; it is now an end-of-week report only. Nothing else in v3 changed."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3.md"
@@ -112,7 +116,7 @@ CHANGELOG_V2_TO_V3: list[str] = [
     "the Minimum Viable Week, the mood firewall, band-matched load anchoring with the detraining discount",
 ]
 
-LAST_REVIEWED_BY_OWNER: str | None = "2026-09-22"
+LAST_REVIEWED_BY_OWNER: str | None = "2026-09-23"
 """ISO date the owner last read this file. None means never."""
 
 
@@ -361,7 +365,12 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "load_anchoring": {
         "value": "bodyweight-band-matched history, discounted for detraining",
-        "detraining_discount_pct": [10, 15],
+        # #4107 owner ruling 2026-09-23: the discount is 10 % — the band collapses to its
+        # shallow end, so the ramp (which reads the deep end) and the blueprint-historian
+        # critic (which reports the band) read one number. The 2026-09-08 statement stays below.
+        "detraining_discount_pct": [10, 10],
+        "detraining_discount_provenance": "owner ruling 2026-09-23 (#4107): 10 %, not the lane's conservative 15 %",
+        "detraining_discount_pct_stated_2026_09_08": [10, 15],
         "entry_pct_of_band_best": [85, 90],
         "trap_bar_until_lb": 275,
         "provenance": "owner",
@@ -547,7 +556,7 @@ REDLINES: dict[str, dict[str, Any]] = {
 # logging counts, but that is a different module: `evaluated_by_engine` is a plan_engine
 # claim and stays False there.
 TRIPWIRES: list[dict[str, Any]] = [
-    # ── the v1 five — computed by plan_engine today ──────────────────────────
+    # ── the v1 five — computed by plan_engine today (self_added_volume joined them in #4081) ──
     {
         "id": "anchor_lift_strength_drop",
         "signal": "rolling 3-session e1RM median vs the 6-session baseline on the four core anchors (bench, row, squat, hinge)",
@@ -860,10 +869,27 @@ TRIPWIRES: list[dict[str, Any]] = [
         "id": "self_added_volume",
         "signal": "training above the prescription two weeks running",
         "threshold_weeks": 2,
+        "definition_engine": (
+            "a Mon–Sun Pacific week is above the prescription when, across its sessions matched to a committed routine, the sets "
+            "performed on prescribed movements exceed the sets prescribed for them (net) — the per-movement counts are "
+            "`health.adherence_calc`'s, stored on each Hevy row at ingest; fires when the two most recent COMPLETE weeks are both above"
+        ),
         "provenance": "owner-history",
-        "action": "read as an anxiety tell, not enthusiasm; subtract-only enforced and mood asked about by name",
-        "evaluated_by_engine": False,
-        "note": "Lived experience: 'the 21-hour week is not his strength, it is his hiding place.' Read by `health.nutrition_critics`; not by plan_engine.",
+        "tripwire_class": "report_only",
+        "action": (
+            "an end-of-week report: the week's total sets added beyond the prescription, by movement, day and RPE, and the net — "
+            "no veto, no subtract-only flag, no mood question"
+        ),
+        "evaluated_by_engine": True,
+        "note": (
+            "Amended 2026-09-23 by owner ruling (#4111): 'Just give me an end of week report or update — I don't think this is "
+            "anxiety, it's me wanting to do more.' The original wording (red team 2026-09-22) read the same signal as an anxiety "
+            "tell and enforced subtract-only with a mood question by name — the owner overruled that reading of his own behaviour. "
+            "Evaluated by plan_engine since #4081 (`training.self_added_volume`) from adherence's per-movement programmed-vs-performed "
+            "set counts — every logged set on both sides, warm-ups included, as adherence counts them; an exercise the routine did not "
+            "name (`adherence.extra`) is evidence, not counted volume, because a swap and a treadmill block look the same by template "
+            "id. `health.nutrition_critics` reads the same run length and reports it as information, never as a change or a veto."
+        ),
     },
     {
         "id": "volume_ceiling",
@@ -890,7 +916,7 @@ TRIPWIRES: list[dict[str, Any]] = [
 
 
 def engine_evaluated_tripwires() -> list[dict[str, Any]]:
-    """The tripwires plan_engine computes today (the v1 five)."""
+    """The tripwires plan_engine computes today (the v1 five + self_added_volume, #4081)."""
     return [t for t in TRIPWIRES if t.get("evaluated_by_engine", True)]
 
 

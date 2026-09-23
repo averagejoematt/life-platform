@@ -506,6 +506,13 @@ class OperationalStack(Stack):
                 "EMAIL_SENDER": "awsdev@mattsusername.com",
                 # SEC-02 (#780): MCP_FUNCTION_URL discovered at runtime (mcp_url.resolve_mcp_url) — not committed.
                 "MCP_SECRET_NAME": "life-platform/mcp-api-key",
+                # #4022: arms the close-on-first-live-output leg's GitHub write path. The
+                # leg (operational.closure_probe_qa) reads this env var by name and does NOT
+                # attempt the secretsmanager read at all when it's unset — setting it here
+                # and granting the matching secretsmanager:GetSecretValue below must land in
+                # the SAME deploy, or the first scheduled run logs an AccessDenied and lights
+                # the #3563 swallowed-denial alarm for a gap this comment already declares.
+                "CLOSURE_PROBE_TOKEN_SECRET": "life-platform/github-dispatch-token",
             },
             custom_policies=rp.operational_qa_smoke(),
             # #498: qa tiers derive from source_registry (shared layer). Without the

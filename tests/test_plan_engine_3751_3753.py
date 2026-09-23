@@ -194,8 +194,8 @@ def test_approved_redlines_are_reported_active_not_proposed():
     assert block["redlines"]["active"] is True
     assert not any("redlines are PROPOSED" in line for line in block["honesty"])
     assert any("NOT evaluated by this" in line for line in block["honesty"])
-    assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-22"
-    assert owner_redlines.REDLINES_VERSION == "3.0"
+    assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-23"
+    assert owner_redlines.REDLINES_VERSION == "3.1"
 
 
 def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
@@ -206,7 +206,7 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
     assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
     assert "2026-09-21" in owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"]
-    assert summ["active"] is True and summ["version"] == "3.0" and summ["last_reviewed_by_owner"] == "2026-09-22"
+    assert summ["active"] is True and summ["version"] == "3.1" and summ["last_reviewed_by_owner"] == "2026-09-23"
     assert summ["plan"].endswith("TRAINING_PROGRAM_v0.3.md") and summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
     assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 4.0 and rate["schedule_step_above_lb"] == 295
@@ -346,14 +346,16 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
         "volume_ceiling",
         "medical_stop_lines",
         "mood_declared",
-        "self_added_volume",
     } <= unevaluated
+    # #4081: self_added_volume is computed by the engine now (from adherence's set counts).
+    assert "self_added_volume" not in unevaluated
     assert [t["id"] for t in owner_redlines.engine_evaluated_tripwires()] == [
         "anchor_lift_strength_drop",
         "protein_floor_missed",
         "readiness_floor",
         "pain_flag_named_site",
         "weight_stall_with_adherence",
+        "self_added_volume",
     ]
     for t in owner_redlines.TRIPWIRES:
         assert t.get("provenance") in ("owner", "owner-history", "population-derived"), t["id"]
