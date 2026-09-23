@@ -241,6 +241,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # that adds it, not sit invisible until the next direct push lands untested.
         "test_ci_stand_ins_derive.py",
         "test_shared_quantities_4068.py",  # #4068: rglob — only mcp.shared_quantities builds the walking layer / reports the loss rate
+        "test_obligation_carriers_3597.py",  # #3597: git ls-files + AST — a new `*_RESIDUE` ledger / tests/*_baseline.json must register a carrier + expiry
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
         "test_reconcile_tombstone_cycle_4008.py",  # #4008: the opening-cycle tombstone re-stamp planner — pure, mutation-guarded, reuses check 22's predicate
         # #3688: source sweep of lambdas/ mcp/ scripts/ deploy/ cdk/ + the three QA

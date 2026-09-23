@@ -905,12 +905,17 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # path's no-health-data body contract + the tracked-tree grep for a contact-shaped address — arrives PROVEN via a hand
         # Proof in scripts/gate_census.PROVEN_CAN_FAIL (a digit planted in the body: 10 failed / 74 passed; a contact address
         # appended to a tracked doc: 1 failed / 83 passed; baseline and reverted 84 passed). Unproven stays 540; one entrant.
-        # 134 -> 135 (2026-09-23, #3528, re-merged on top of #4063's 134): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
+        # Upper bound 134 -> 135 (2026-09-23, #3597, re-merged on top of #4063's 134): structural::test_obligation_carriers_3597.py — the residue-registry
+        # derivation guard (every `*_RESIDUE` binding and tests/*_baseline.json registered with carrier + condition + expiry +
+        # shrink consumer) — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: a git-added
+        # tests/_census_probe_3597.py binding PROBE_RESIDUE; baseline 32 passed | mutated 1 failed ::
+        # test_the_live_residue_registry_meets_its_contract | reverted 32 passed). Unproven stays; one entrant.
+        # 135 -> 136 (2026-09-23, #3528, re-merged on top of #3597's 135): structural::test_ci_stand_ins_derive.py — the git-push-caller enumeration
         # (every scripts/ + deploy/ pusher derives its CI stand-in from ci_gate_commands) — arrives PROVEN by a GUARD_PROOFS record
         # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
-        # -> 2 passed). Unproven stays. Same PR, 135 -> 139: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
+        # -> 2 passed). Unproven stays. Same PR, 136 -> 140: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
         # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
-        <= 139
+        <= 140
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
