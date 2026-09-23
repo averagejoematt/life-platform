@@ -1020,6 +1020,11 @@ _GENERATION_GET_ITEM_EXEMPT: dict = {
         "coach/coach_sim_scoreboard.py",
         "LIMITATIONS_SK",
     ): "COACHSIM#scoreboard/LIMITATIONS — the known-limitations + cadence row; CROSS_PHASE, never tombstoned",
+    (
+        "coach/named_human_contact.py",
+        "STATE_SK",
+    ): "#4063: named_human_contact STATE#current is SYSTEM_STATE (ADR-077) — never phase-tagged or tombstoned; "
+    "a reset must NOT hide it, or the contact would be re-mailed for a quiet stretch they were already told about",
 }
 
 

@@ -94,7 +94,7 @@
   <main id="gyc">
     <div class="page-hero">
       <p class="ph-kicker label">the method &middot; the open artifact</p>
-      <h1 class="ph-title">Grade your own LLM coach</h1>
+      <h1 class="ph-title">Grade your own <abbr class="gloss" title="Large language model — the AI model class (Claude, via AWS Bedrock) behind the platform&#x27;s coaching narratives and this glossary&#x27;s own build.">LLM</abbr> coach</h1>
       <p class="ph-promise">Every wearable now ships an AI coach, and every one of them tells you what will happen. None of them publishes whether it was right. This page is the scorer that does &mdash; the <em>same</em> one that grades my eight coaches in public, running here in your browser. Paste what your coach predicted and what actually happened, and find out whether its confidence was ever worth anything.</p>
       <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/cockpit/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
     </div>
@@ -122,7 +122,7 @@
 
       <section class="rd-sec">
         <h2 class="rd-h">What the numbers mean</h2>
-        <p class="rd-prose"><strong>Brier score</strong> is the mean squared error of the stated probabilities: <code>mean((p &minus; y)&sup2;)</code>. Zero is perfect. <strong>0.25 is the always-say-50% baseline</strong> &mdash; the score you get by refusing to commit. Lower is better.</p>
+        <p class="rd-prose"><strong><abbr class="gloss" title="Brier score — a 0 (perfect) to 1 (worst) grade for how well a forecast&#x27;s stated probability matched what actually happened.">Brier</abbr> score</strong> is the mean squared error of the stated probabilities: <code>mean((p &minus; y)&sup2;)</code>. Zero is perfect. <strong>0.25 is the always-say-50% baseline</strong> &mdash; the score you get by refusing to commit. Lower is better.</p>
         <p class="rd-prose"><strong>Skill versus the base rate</strong> is the honest question underneath: does the stated confidence beat simply guessing the observed average every single time? A coach that predicts "you'll sleep badly" on a week where you slept badly 80% of the time has a great hit rate and no skill at all. Negative skill means it did <em>worse</em> than that trivial baseline.</p>
         <p class="rd-prose"><strong>The reliability curve</strong> asks whether 80% actually means 80%. Each dot is a confidence band, sized by how many calls landed in it; on the diagonal is honest, below it is over-confident.</p>
         <p class="rd-prose"><strong>Calibrated and skilled are different claims, and the second gates the first.</strong> A forecaster whose confidences line up but whose skill is at or below zero reads <em>not yet skillful</em> here &mdash; reliability is never allowed to dress up a forecaster that lost to the base rate. Fewer than five resolved calls and the tool says <em>insufficient data</em> rather than inventing a verdict.</p>

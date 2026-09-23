@@ -149,10 +149,13 @@ ROOT = Path(__file__).resolve().parent.parent
 # SECURITY_TIER_LOG_FUNCTIONS precedent) so the stack and every sweep read ONE list.
 sys.path.insert(0, str(ROOT / "cdk"))
 try:
-    from stacks.constants import is_by_construction_flag
+    from stacks.constants import is_by_construction_flag, suppression_holds  # noqa: F401
 except Exception:  # pragma: no cover — a checkout without cdk/ must not crash the gate
 
     def is_by_construction_flag(_name):  # type: ignore[misc]
+        return False
+
+    def suppression_holds(_name, _transitioned, _now):  # type: ignore[misc]
         return False
 
 
@@ -811,8 +814,14 @@ def fetch_alarms():
             "transitioned": str(a.get("StateTransitionedTimestamp", "") or a.get("StateUpdatedTimestamp", "")),
             "composite": "AlarmRule" in a,
             # #3503: a gauge whose ALARM state IS its designed normal (registry:
-            # cdk/stacks/constants.BY_CONSTRUCTION_FLAG_ALARMS). Not an uncited incident.
-            "by_construction": is_by_construction_flag(a.get("AlarmName", "?")),
+            # cdk/stacks/constants.BY_CONSTRUCTION_FLAG_ALARMS). Not an uncited incident —
+            # #4034: by TYPE and only INSIDE its declared window; past it, it is graded
+            # like any other red (the suppressor dead-man).
+            "by_construction": suppression_holds(
+                a.get("AlarmName", "?"),
+                str(a.get("StateTransitionedTimestamp", "") or a.get("StateUpdatedTimestamp", "")),
+                datetime.now(timezone.utc),
+            ),
         }
         for a in list(resp.get("MetricAlarms", [])) + list(resp.get("CompositeAlarms", []))
     ]
@@ -1115,6 +1124,11 @@ def main():
         flapped_retired=flapped_retired,
         undeclared=undeclared,
     )
+    # #4034: the 72h AGE predicate — its own module (scripts/alarm_citation_age.py).
+    from alarm_citation_age import aged_unrefreshed_citations, render_lines
+
+    aged_lines = [] if err else render_lines(aged_unrefreshed_citations(alarms, citations))
+    code, message = (1, "\n".join(aged_lines) + ("\n" + message if code else "")) if aged_lines else (code, message)
     print(message)
     if code == 0:
         return 0

@@ -470,6 +470,11 @@ SOURCE_CLASS: dict[str, str] = {
     "hevy_id_map": SYSTEM_STATE,
     "routine_index": SYSTEM_STATE,
     "email_log": SYSTEM_STATE,  # ADR-077 dec E: immutable sent-mail archive, GA on read
+    "named_human_contact": SYSTEM_STATE,  # #4063: the named-human contact path's episode de-dup /
+    # cooldown row (one STATE#current: episode anchor date, per-rung sent-on + mode). Pure send
+    # bookkeeping like email_log — it must SURVIVE a reset, because wiping it mid-episode would
+    # re-mail the contact for a stretch they were already told about. Identity-free by contract
+    # (the contact lives only in the private S3 config); owner-only in privacy.field_tiers.
     "google_calendar": SYSTEM_STATE,  # dead: no writer (ADR-077 finding 7)
     "composite_scores": SYSTEM_STATE,  # dead: ADR-025 removed partition
     "sleep_unified": SYSTEM_STATE,  # dead: #487/ADR-113 retired the reconciler — no writer, no
