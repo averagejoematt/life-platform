@@ -66,6 +66,34 @@ def _referenced_names(code):
     return names
 
 
+_LITERAL_TYPES = (bool, int, float, complex, str, bytes, type(None))
+
+
+def _value_repr(value):
+    """The fingerprint input for a module-level value a method reads by name.
+
+    A LITERAL (numbers, strings, and containers of them) is the method's constant and hashes by
+    value — that is the #3449 point. A RUNTIME object (a boto3 `table`, a client) is not a
+    constant: its repr carries the environment (`Table(name='life-platform')` vs `'test-table'`),
+    so hashing it made the drift gate depend on which test set TABLE_NAME first — measured
+    2026-09-23, `test_fingerprints_match_source` failed after test_character_sheet_lambda.py and
+    passed alone. It contributes its name and TYPE instead, which still moves if the binding does.
+    """
+
+    def literal(v):
+        if isinstance(v, _LITERAL_TYPES):
+            return True
+        if isinstance(v, (tuple, list, set, frozenset)):
+            return all(literal(x) for x in v)
+        if isinstance(v, dict):
+            return all(literal(k) and literal(x) for k, x in v.items())
+        return False
+
+    if literal(value):
+        return repr(value)
+    return f"<{type(value).__module__}.{type(value).__qualname__}>"
+
+
 def _closure_sources(fn, visited=None):
     """Deterministic list of source-like strings for everything `fn` can reach
     in its OWN defining module (see the module docstring for the exact scope).
@@ -109,7 +137,7 @@ def _closure_sources(fn, visited=None):
             elif not inspect.ismodule(value) and not inspect.isclass(value) and not inspect.isfunction(value):
                 # A module-level constant this function reads by name (e.g.
                 # `_Z_CRIT`, checked with `confidence not in _Z_CRIT`).
-                parts.append(f"{name}={value!r}")
+                parts.append(f"{name}={_value_repr(value)}")
     return parts
 
 
@@ -608,7 +636,10 @@ REGISTRY = {
         # `include_pilot` pass-through so the commitment grader can read a window that
         # predates the current genesis, and `_get_source_data`'s cache slot is now
         # derived by `source_cache_key`. Neither touches the verdict.
-        "56173fb1224f",
+        # Re-recorded 2026-09-23: NO source change. The fingerprint itself changed how it
+        # hashes a module-level runtime object (`table`) — by type, not by its env-bearing
+        # repr — so this entry's value no longer depends on TABLE_NAME (see `_value_repr`).
+        "b7bbc762c7fe",
         min_n=9,
         used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),

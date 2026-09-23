@@ -199,3 +199,20 @@ class TestGenerator:
     def test_esc_prevents_injection(self):
         build = importlib.import_module("v4_build_methods")
         assert "<script>" not in build.esc("<script>alert(1)</script>")
+
+
+def test_fingerprints_do_not_depend_on_the_environment(monkeypatch):
+    """2026-09-23: `_get_ewma_trend` reads a module-level boto3 `table`, and its repr carried
+    TABLE_NAME — so the drift gate passed alone and failed after any test that imported the
+    module under another table name. A runtime object now hashes by type (`_value_repr`)."""
+    from experiment import methods_registry as m
+
+    class _Table:
+        def __init__(self, name):
+            self.name = name
+
+        def __repr__(self):
+            return f"Table(name={self.name!r})"
+
+    assert m._value_repr(_Table("life-platform")) == m._value_repr(_Table("test-table"))
+    assert m._value_repr((1, "a", {"k": 2.0})) == repr((1, "a", {"k": 2.0}))  # literals still hash by value
