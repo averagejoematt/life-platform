@@ -440,7 +440,9 @@ def build_rate_advocate_packet(
     tw = tripwires or []
     clear = [t["id"] for t in tw if t.get("state") == "clear"]
     tripped = [t["id"] for t in tw if t.get("state") == "tripped"]
-    unknown_tw = [t["id"] for t in tw if t.get("state") == "unknown"]
+    # #4072: a tripwire whose input read FAILED is as unreadable as an absent one — the
+    # advocate may not argue for more volume past either.
+    unknown_tw = [t["id"] for t in tw if t.get("state") in ("unknown", "read_failed")]
     # #4098: a tripwire held by its own `not_before_week` is neither clear nor tripped — it is
     # counted and named, so "all clear" never silently means "all the ones that are armed".
     inactive = [t["id"] for t in tw if t.get("state") == "not_yet_active"]

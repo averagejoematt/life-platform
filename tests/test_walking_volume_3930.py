@@ -257,7 +257,9 @@ def test_a_raising_partition_read_degrades_to_unknown_and_never_to_zero():
         st.enter_context(patch("mcp.core.query_source_range", side_effect=RuntimeError("DDB down")))
         out = tp.tool_plan_next_session({"target_date": WINDOW_END})
     walking = out["constraint_block"]["walking"]
-    assert walking["state"] == "unknown"
+    # #4072: both sources raised, so the read FAILED — reported as such, never as unknown or zero.
+    assert walking["state"] == "read_failed"
+    assert "gap_hr_wk" not in walking
     assert walking["sources"]["strava"]["status"] == "unreadable"
 
 

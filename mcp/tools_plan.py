@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
@@ -69,6 +70,110 @@ def _safe(fn, *a, **kw):
         return fn(*a, **kw)
     except Exception:  # noqa: BLE001
         return None
+
+
+# A tool's `{"error": ...}` that means "the window is empty", not "the read broke" (#4072).
+_NO_DATA_ERROR = re.compile(r"\bno\b[^.]{0,40}\b(data|records?|rows?|entries)\b", re.IGNORECASE)
+
+
+class InputShapeError(Exception):
+    """A reader returned, but with none of the keys it is known to carry (#4072).
+
+    This is the 2026-09-15..18 defect's class: `get_readiness_score` returned
+    `readiness_score` while the planner read `score`/`recovery_score`, so a fresh source
+    read `unknown`. A succeeded read with the wrong shape is a FAILED read, not an absent one.
+    """
+
+
+def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
+    """(value, input status) — `_safe`, but the failure is KEPT (#4072).
+
+    A raise is `read_failed` with its error class; a tool's own `{"error": ...}` return is
+    `read_failed` (`ToolError`) with the value dropped, because an error dict is not data.
+    Success is reported `measured`; the caller downgrades to `absent` when the value it
+    extracts is empty, since only the caller knows which key the answer lives under.
+    """
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
+
+    try:
+        value = fn(*a, **kw)
+    except Exception as e:  # noqa: BLE001 — reported in the block, never swallowed (#4072)
+        logger.warning("plan_next_session input %s read failed: %s", name, e)
+        return None, input_status(READ_FAILED, error=error_label(e))
+    if isinstance(value, dict) and value.get("error") and len(value) <= 3:
+        msg = str(value.get("error"))
+        if _NO_DATA_ERROR.search(msg):
+            # the tool's own words for an empty window ("No MacroFactor data") — an absence
+            return None, input_status(ABSENT, f"the tool reported no data: {msg[:160]}")
+        return None, input_status(READ_FAILED, error=f"ToolError: {msg[:180]}")
+    return value, input_status(MEASURED)
+
+
+def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]:
+    """(consecutive days below the readiness_floor threshold, input status) — from Whoop (#4072).
+
+    WHY THIS EXISTS: before #4072 NOTHING supplied `readiness_low_streak_days`. Stage 1 never
+    passed it, so the `readiness_floor` row read `unknown — "no recovery series"` on every
+    call, on every day, with the Whoop partition fresh (live read 2026-09-22: daily
+    `recovery_score` rows 2026-08-25..2026-09-22, no gap). The detail was a claim about the
+    data that the engine had never checked.
+
+    The tripwire's signal is Whoop recovery (owner_redlines, v3), so this reads the whoop
+    partition directly, cross-phase (`query_source_cross_phase` — whoop is a raw timeseries,
+    and a 14-day window from mid-September reaches the pre-genesis `phase=pilot` rows the
+    default filter hides). Only the DAILY rows count (`sk == DATE#<day>`) — the same
+    partition carries `DATE#<day>#WORKOUT#<id>` rows with no recovery score.
+
+    The streak is counted back from the LATEST measured day; a calendar day with no row
+    breaks it (an unmeasured day is not a low day). v3 names a 7-day MEAN < 50; the engine
+    computes the simpler consecutive-days proxy, as `owner_redlines` already says.
+    """
+    from common.digest_utils import filter_day_rows
+    from training import owner_redlines
+    from training.plan_engine import ABSENT, MEASURED, input_status
+
+    from mcp.core import query_source_cross_phase
+
+    t = next(x for x in owner_redlines.TRIPWIRES if x["id"] == "readiness_floor")
+    threshold = float(t["threshold"])
+    start = _minus_days(target_date, STREAK_LOOKBACK_DAYS)
+    rows = query_source_cross_phase("whoop", start, target_date) or []
+    daily = filter_day_rows(rows)  # the #3442 predicate: drops DATE#<day>#WORKOUT#<id> sub-records
+    by_day: dict[str, float] = {}
+    for r in daily:
+        if r.get("recovery_score") is None:
+            continue
+        try:
+            by_day[str(r["sk"])[len("DATE#") :]] = float(r["recovery_score"])
+        except (TypeError, ValueError):
+            continue
+    window = {"start": start, "end": target_date, "days": STREAK_LOOKBACK_DAYS}
+    if daily and not by_day:
+        # Daily rows exist and none carries a usable `recovery_score`: the writer's shape moved
+        # (#2847 seam — whoop_lambda writes, this reads). That is a FAILED read, never an absent one.
+        raise InputShapeError(
+            f"{len(daily)} Whoop daily row(s) in {start}..{target_date} and none carries a numeric recovery_score "
+            f"(keys: {sorted(daily[-1])[:12]})"
+        )
+    if not by_day:
+        return None, input_status(
+            ABSENT, f"no Whoop daily recovery_score row in {start}..{target_date}", source="whoop", window=window, n_days=0
+        )
+    latest = max(by_day)
+    streak, day = 0, latest
+    while day in by_day and by_day[day] < threshold:
+        streak += 1
+        day = _minus_days(day, 1)
+    return streak, input_status(
+        MEASURED,
+        f"{len(by_day)} Whoop recovery day(s) read; latest {latest} = {by_day[latest]:g}; streak counted back from {latest}",
+        source="whoop",
+        window=window,
+        n_days=len(by_day),
+        latest_day=latest,
+        threshold=threshold,
+        phases_read=sorted({str(r.get("phase") or "unstamped") for r in daily}),
+    )
 
 
 def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
@@ -261,7 +366,8 @@ def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | 
     start = shift_day_key(end_date, -(window_days - 1))
     if start == end_date:  # unparseable day key — shift_day_key returns it unchanged
         return None, None
-    return start, _safe(query_source_range, "hevy", start, end_date)
+    # #4072: a raise propagates to `_read` at the call site, which records its error class.
+    return start, query_source_range("hevy", start, end_date)
 
 
 def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -> None:
@@ -306,9 +412,16 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
 
     floor_g = owner_redlines.REDLINES["protein_floor_g"]["value"]
     res = tool_get_nutrition({"view": "summary", "start_date": _minus_days(end_date, 6), "end_date": end_date}) or {}
+    if isinstance(res, dict) and res.get("error"):
+        if _NO_DATA_ERROR.search(str(res.get("error"))):
+            return None, None  # "No MacroFactor data" is an empty window, not a broken read
+        raise RuntimeError(f"get_nutrition returned an error: {str(res.get('error'))[:160]}")
     # LIVE SHAPE (2026-09-20): the summary view returns `daily_breakdown`, not `daily_rows`. The
     # first deployed stage-2 run read the wrong key and reported protein UNKNOWN on a week with
     # six logged days — the #3767 class this module's own comment claims to have checked.
+    if res and "daily_breakdown" not in res and "daily_rows" not in res:
+        # #4072: a non-empty return with neither key is a shape change, not an empty week.
+        raise InputShapeError(f"get_nutrition summary carried neither daily_breakdown nor daily_rows (keys: {sorted(res)[:12]})")
     rows = [r for r in (res.get("daily_breakdown") or res.get("daily_rows") or []) if r.get("protein_g") is not None]
     if not rows:
         return None, None
@@ -371,29 +484,84 @@ def tool_plan_next_session(args):
                 f"routine_id={routine_id} not found — draft it first (manage_hevy_routine draft_custom)", error_code="NOT_FOUND"
             )
 
-    reference = _safe(tool_get_benchmark, {"view": "prescription", "date": target_date})
+    # #4072: every reader reports HOW it came back — measured / absent / read_failed (with the
+    # error class) — so a None the engine receives is never ambiguous. Before this, `_safe`
+    # turned a raise into None and the engine printed `unknown`, the word it also uses for an
+    # empty window; on 2026-09-15..18 that is what the owner was shown with every source fresh.
+    status: dict[str, dict[str, Any]] = {}
+    ABSENT, READ_FAILED, NOT_READ = plan_engine.ABSENT, plan_engine.READ_FAILED, plan_engine.NOT_READ
+    st = plan_engine.input_status
+
+    reference, status["reference"] = _read("reference", tool_get_benchmark, {"view": "prescription", "date": target_date})
     if isinstance(reference, dict) and reference.get("applicable") is False:
         # An inapplicable reference is not a reference. Carry the reason, drop the shape.
+        status["reference"] = st(ABSENT, f"no applicable weight-matched reference: {reference.get('reason')}")
         reference = {"proven_target": None, "_inapplicable_reason": reference.get("reason")}
 
     weight = None
     if isinstance(reference, dict):
         weight = reference.get("current_weight")
+    status["weight_lb"] = (
+        dict(status["reference"])
+        if status["reference"]["state"] == READ_FAILED
+        else (
+            st(plan_engine.MEASURED, "from the benchmark prescription")
+            if weight is not None
+            else st(ABSENT, "the benchmark carried no current_weight")
+        )
+    )
 
-    readiness = _safe(tool_get_readiness_score, {"date": target_date}) or {}
-    acwr = _safe(tool_get_acwr_status, {}) or {}
+    readiness, status["recovery_tier"] = _read("recovery_tier", tool_get_readiness_score, {"date": target_date})
+    readiness = readiness or {}
+    recovery_tier = _recovery_tier(readiness)
+    if recovery_tier is None and status["recovery_tier"]["state"] != READ_FAILED:
+        status["recovery_tier"] = (
+            st(ABSENT, "get_readiness_score returned no score for the day")
+            if (not readiness or any(k in readiness for k in _READINESS_SCORE_KEYS))
+            else st(
+                READ_FAILED,
+                error=f"InputShapeError: get_readiness_score carried none of {list(_READINESS_SCORE_KEYS)} (keys: {sorted(readiness)[:12]})",
+            )
+        )
+
+    acwr, status["acwr_flag"] = _read("acwr_flag", tool_get_acwr_status, {})
+    acwr = acwr or {}
+    acwr_flag = acwr.get("zone") or acwr.get("alert_reason")
+    if acwr_flag is None and status["acwr_flag"]["state"] != READ_FAILED:
+        status["acwr_flag"] = st(ABSENT, "get_acwr_status returned no zone")
+
     # #4071: the 28 COMPLETED days before the session — target-28..target-1 inclusive, exactly
-    # 4.0 weeks. It was target-28..target (29 days, divided as 28/7 by the old exclusive
-    # arithmetic) over counts that credited every muscle in a keyword row at 1.0 and counted
-    # warm-ups. The per-muscle numbers are `training.muscle_volume.working_sets_by_muscle`'s,
+    # 4.0 weeks. The per-muscle numbers are `training.muscle_volume.working_sets_by_muscle`'s,
     # through the tool — this module computes none of its own (derivation guard, #4071).
-    volume = _safe(tool_get_muscle_volume, {"start_date": _minus_days(target_date, 28), "end_date": _minus_days(target_date, 1)}) or {}
-    protein_missed, protein_measured = _safe(_protein_days_7d, target_date) or (None, None)
+    volume, status["muscle_volume"] = _read(
+        "muscle_volume", tool_get_muscle_volume, {"start_date": _minus_days(target_date, 28), "end_date": _minus_days(target_date, 1)}
+    )
+    volume = volume or {}
+    muscle_sets = _muscle_sets(volume)
+    if not muscle_sets and status["muscle_volume"]["state"] != READ_FAILED:
+        status["muscle_volume"] = (
+            st(ABSENT, "no lifting volume in the trailing 28 days")
+            if (not volume or any(k in volume for k in _VOLUME_TABLE_KEYS))
+            else st(
+                READ_FAILED,
+                error=f"InputShapeError: get_muscle_volume carried none of {list(_VOLUME_TABLE_KEYS)} (keys: {sorted(volume)[:12]})",
+            )
+        )
+
+    protein_pair, status["protein_days_missed_7d"] = _read("protein_days_missed_7d", _protein_days_7d, target_date)
+    protein_missed, protein_measured = protein_pair or (None, None)
+    if protein_missed is None and status["protein_days_missed_7d"]["state"] != READ_FAILED:
+        status["protein_days_missed_7d"] = st(ABSENT, "no MacroFactor day with protein logged in the trailing 7 days")
+
+    # #4072: the readiness_floor tripwire's input. Nothing supplied it before this change.
+    streak_pair, streak_status = _read("readiness_low_streak_days", _readiness_low_streak, target_date)
+    readiness_streak, status["readiness_low_streak_days"] = streak_pair if streak_pair else (None, streak_status)
 
     # The pain tripwire reads the derived note layer; its STATUS decides whether silence
     # means anything (#3767/#3768). Absent a per-movement query here, the layer's own
     # health is the honest input, and `unknown` is the honest default.
     layer_status = LAYER_UNKNOWN
+    status["pain_layer_status"] = st(plan_engine.MEASURED)
     try:
         from training.training_notes import training_notes_health
 
@@ -401,44 +569,74 @@ def tool_plan_next_session(args):
         from mcp.core import derived_layer_status
 
         layer_status = derived_layer_status(training_notes_health(table))[0]
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        status["pain_layer_status"] = st(READ_FAILED, error=plan_engine.error_label(e))
 
-    # #4036: the owner-dismissal layer, read beside the flag layer. `_safe` yields None when
-    # the read RAISES — which is NOT an empty list: the engine must never read an unreadable
-    # dismissal store as "he has dismissed nothing".
-    dismissals = _safe(_pain_dismissals)
+    # #4036: the owner-dismissal layer, read beside the flag layer. A raise yields None, which
+    # is NOT an empty list: the engine must never read an unreadable dismissal store as "he
+    # has dismissed nothing".
+    dismissals, status["pain_dismissals"] = _read("pain_dismissals", _pain_dismissals)
+    if dismissals == [] and status["pain_dismissals"]["state"] != READ_FAILED:
+        status["pain_dismissals"] = st(ABSENT, "no owner dismissal on file")
 
     evidence = _gather_draft_evidence(ir, target_date, layer_status) if ir is not None else None
     worst = _worst_anchor(evidence) if evidence else (None, None)
+    if evidence is None:
+        status["anchor_lift_drop_pct"] = st(NOT_READ, "stage 1 without a draft reads no anchor-lift trend — pass routine_id")
+    elif worst[0] is None:
+        status["anchor_lift_drop_pct"] = st(ABSENT, "no drafted lift has enough history for a band-matched comparison")
+    else:
+        status["anchor_lift_drop_pct"] = st(plan_engine.MEASURED)
+    for name in ("weight_stall_days", "adherence_on_plan"):
+        status[name] = st(NOT_READ, "no reader is wired for this input yet — the weight_stall_with_adherence tripwire cannot evaluate")
 
     # #4051: the evidence set stage 1 never had — every movement PERFORMED in the trailing
     # window, with the note layer's flags for each. Gathered on EVERY call (a draft's
     # exercise list cannot show a flag on a lift the draft omits) and UNIONED with the
-    # draft's rows below. `_safe` yields None when the Hevy read RAISES, and an unread
-    # partition is reported as unreadable — never as "he performed nothing".
-    performed = _safe(_gather_performed_evidence, target_date, layer_status)
+    # draft's rows below. A raise is reported `read_failed` with its error class (#4072) —
+    # never as "he performed nothing", and never as a bare unknown.
+    performed, performed_status = _read("pain_evidence_scope", _gather_performed_evidence, target_date, layer_status)
     pain_scope = (performed or {}).get("scope") or {
-        "status": "unreadable",
+        "status": READ_FAILED if performed_status["state"] == READ_FAILED else "none",
         "source": "hevy",
         "movements_considered": None,
         "note_layer_status": layer_status,
+        "error": performed_status.get("error"),
         "reason": (
             f"the Hevy partition could not be read for {_minus_days(target_date, PAIN_LOOKBACK_DAYS)}..{target_date} — "
             "the performed-movement set is unknown, not empty"
+            if performed_status["state"] == READ_FAILED
+            else "the performed-movement reader returned no scope"
         ),
     }
+    if performed_status["state"] == READ_FAILED:
+        status["pain_evidence_scope"] = performed_status
+    elif pain_scope.get("status") == "read":
+        status["pain_evidence_scope"] = st(plan_engine.MEASURED, pain_scope.get("reason"))
+    else:
+        status["pain_evidence_scope"] = st(ABSENT, pain_scope.get("reason"))
     rows = _union_evidence_rows((performed or {}).get("exercises") or [], (evidence or {}).get("exercises") or [])
     flagged = [r for r in rows if r.get("pain_flag_any")]
 
     # #3930: the walking read is a UNION layer (Strava + Hevy treadmill/cycling blocks), not a
     # Strava-only number. The engine takes the total in hours — the floor's own unit — and the
     # per-source breakdown is merged onto the block below so no reader has to trust the total.
-    walk_layer = _safe(_walking_volume_last_7d, target_date)
+    walk_layer, status["walk_hr_wk_now"] = _read("walk_hr_wk_now", _walking_volume_last_7d, target_date)
+    if status["walk_hr_wk_now"]["state"] != READ_FAILED and (walk_layer or {}).get("total_hr") is None:
+        srcs = (walk_layer or {}).get("by_source") or {}
+        if srcs and all((b or {}).get("status") == "unreadable" for b in srcs.values()):
+            status["walk_hr_wk_now"] = st(READ_FAILED, error="SourceReadError: neither Strava nor Hevy could be read for the window")
+        else:
+            status["walk_hr_wk_now"] = st(ABSENT, "no walking/treadmill/cycling duration recorded in the trailing 7 days")
 
     # #3755: the performed Hevy record over the program's rotation window, so the engine
     # can COMPUTE whether the accessory layer is holding still (v0.3: fixed for the block) instead of assuming the pool.
-    rotation_start, rotation_rows = _safe(_rotation_window, target_date) or (None, None)
+    rotation_pair, status["hevy_workouts_rotation_window"] = _read("hevy_workouts_rotation_window", _rotation_window, target_date)
+    rotation_start, rotation_rows = rotation_pair or (None, None)
+    if rotation_rows is None and status["hevy_workouts_rotation_window"]["state"] != READ_FAILED:
+        status["hevy_workouts_rotation_window"] = st(ABSENT, "the rotation window could not be derived from the target date")
+    elif rotation_rows == []:
+        status["hevy_workouts_rotation_window"] = st(ABSENT, "no Hevy session in the rotation window")
 
     # #4064: the movement catalog, so the block's `session` names MOVEMENTS, not only patterns.
     # Read through the generator's own loader (local config, then S3) — the same catalog the
@@ -454,18 +652,19 @@ def tool_plan_next_session(args):
         # Key names verified against each tool's live return shape rather than assumed —
         # a planner reading a key that does not exist degrades to "unknown" silently,
         # which is the #3767 failure wearing different clothes.
-        recovery_tier=_recovery_tier(readiness),
+        recovery_tier=recovery_tier,
         # LIVE SHAPES (2026-09-20, read off the deployed tools, not assumed): get_acwr_status
         # carries the flag as `zone` (`alert` is a bool that is False when safe, so `alert or
         # interpretation` returned the METHODOLOGY PROSE as the flag); get_muscle_volume keys its
         # per-muscle table as `muscle_volume`, each row with `total_sets` / `avg_sets_per_week`.
-        acwr_flag=(acwr.get("zone") or acwr.get("alert_reason")),
-        muscle_volume=_muscle_sets(volume),
+        acwr_flag=acwr_flag,
+        muscle_volume=muscle_sets,
         # #4051: performed UNION drafted, so the day with no draft is no longer the day with
         # no movements — `days_since_movement` is non-empty whenever a session is in the window.
         days_since_movement={r["label"]: r["days_since"] for r in rows if r.get("days_since") is not None},
         reference=reference if isinstance(reference, dict) else None,
         protein_days_missed_7d=protein_missed,
+        readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],
         pain_flag_sites=[r["label"] for r in flagged],
@@ -479,6 +678,7 @@ def tool_plan_next_session(args):
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,
         rotation_window_start=rotation_start,
+        input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
 
@@ -931,6 +1131,12 @@ def _write_thread(ir: Any, today: str) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001 — reported in the result, never swallowed (#3670 class)
         logger.warning("critics thread write failed: %s", e)
         return {"written": False, "sk": item["sk"], "error": f"{type(e).__name__}: {e}"[:200]}
+
+
+# #4072: the keys each reader is KNOWN to carry its answer under. A non-empty return with none
+# of them is a shape change — reported `read_failed (InputShapeError)`, never `absent`.
+_READINESS_SCORE_KEYS = ("readiness_score", "score", "recovery_score")
+_VOLUME_TABLE_KEYS = ("muscle_volume", "muscle_sets", "by_muscle")
 
 
 def _recovery_tier(readiness: dict) -> str | None:
