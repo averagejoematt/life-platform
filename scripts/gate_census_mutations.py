@@ -574,6 +574,17 @@ _UNGLOSSED_ACRONYM_HTML = (
 _RATE_WITH_NO_N_JS = "export function probe(j) { return `trend ${j.weekly_rate_lbs} lb/wk`; }\n"
 
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_obligation_carriers_3597.py": MutationSpec(
+        gate_id="structural::test_obligation_carriers_3597.py",
+        target="tests/test_obligation_carriers_3597.py",
+        detects=(
+            "a NEW residue ledger (a module-level `*_RESIDUE` binding) landing with no RESIDUE_LEDGERS "
+            "registration — no carrier, no condition, no expiry: the forensic RCA's class 7, a waiver "
+            "that outlives its condition because nothing owns its date (#3597)"
+        ),
+        plants=(("tests/_census_probe_3597.py", '# probe\nPROBE_RESIDUE = {"x": "2026-09-23"}\n'),),
+        track=True,  # discovery reads the TRACKED set (git ls-files), so the plant is git-added
+    ),
     "structural::test_shared_quantities_4068.py": MutationSpec(
         gate_id="structural::test_shared_quantities_4068.py",
         target="tests/test_shared_quantities_4068.py",
@@ -1091,6 +1102,20 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_obligation_carriers_3597.py": _proof(
+        "structural::test_obligation_carriers_3597.py",
+        "ARMED 1/1 — baseline: 32 passed in 13.80s | mutated: 1 failed, 31 passed in 13.49s :: "
+        "test_the_live_residue_registry_meets_its_contract | reverted: 32 passed in 13.45s",
+        "Residue discovery reads module-level `*_RESIDUE` bindings (ast, module body only) in the TRACKED .py set under "
+        "tests/ scripts/ lambdas/ deploy/ mcp/ cdk/, plus data files matching tests/*_baseline.json and "
+        "tests/*residue*.json. Invisible: a debt ledger named anything else (`*_ALLOWLIST`, `*_EXEMPT`, `*_WAIVER` — "
+        "133 such bindings, mostly constants, classified under #4122), an untracked module, and a ledger nested "
+        "inside a function. The obligation half is a cue-nominated, structurally-homed rule over four named surfaces "
+        "(DECISIONS, PROPORTIONALITY, alarm_citations.json, the heartbeat COVERAGE exemptions); an obligation phrased "
+        "outside the cue vocabulary, or on any other surface, is not seen. Expiry itself is probed by the daily "
+        "operating-calendar sweep, never by this file.",
+        proved_on="2026-09-23",
+    ),
     "structural::test_shared_quantities_4068.py": _proof(
         "structural::test_shared_quantities_4068.py",
         "ARMED 1/1 — baseline: 24 passed in 4.05s | mutated: 1 failed, 23 passed in 4.15s :: "
