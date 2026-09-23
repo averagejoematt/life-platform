@@ -43,7 +43,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 import mcp.tools_plan as tp  # noqa: E402
 import mcp.tools_strength as ts  # noqa: E402
-from mcp.strength_helpers import exercise_identity, extract_hevy_sessions, resolve_exercise_templates  # noqa: E402
+from mcp.strength_helpers import estimate_1rm, exercise_identity, extract_hevy_sessions, resolve_exercise_templates  # noqa: E402
 
 LB = 1 / 2.2046226218
 
@@ -167,7 +167,9 @@ def test_the_substring_never_gates_a_set_directly():
 
 
 # ── the anchor trend: variant switch vs a real drop ──────────────────────────
-def _sessions(tid_name, tops, start_day=1):
+def _sessions(tid_name, tops, start_day=1, reps=5):
+    # #4098: the trend is a rolling e1RM median, so every session carries the `best_1rm` the
+    # history tool computes (Epley, `strength_helpers.estimate_1rm`) beside its top weight.
     return [
         {
             "date": f"2026-08-{start_day + i:02d}",
@@ -175,6 +177,7 @@ def _sessions(tid_name, tops, start_day=1):
             "identity": tid_name[0],
             "exercise_name": tid_name[1],
             "best_weight": float(w),
+            "best_1rm": estimate_1rm(float(w), reps),
         }
         for i, w in enumerate(tops)
     ]
@@ -182,30 +185,32 @@ def _sessions(tid_name, tops, start_day=1):
 
 def test_a_variant_switch_does_not_register_as_a_drop():
     """Machine shoulder press at 100 lb, then dumbbell at 45: the DB series is compared with itself."""
-    mixed = _sessions(MACHINE_SP, [100, 100, 100]) + _sessions(DB_SP, [45, 45, 45], start_day=10)
-    tr = tp._anchor_trend(mixed, "2026-08-20", 5.0)
+    mixed = _sessions(MACHINE_SP, [100] * 9) + _sessions(DB_SP, [45] * 9, start_day=10)
+    tr = tp._anchor_trend(mixed, "2026-08-20")
     assert tr["identity"] == "878CD1D0"
-    assert tr["excluded_other_identity_sessions"] == 3
+    assert tr["excluded_other_identity_sessions"] == 9
     assert tr["drop_pct"] == 0.0 and tr["sessions_below"] == 0
-    assert tr["trailing_best_lbs"] == 45.0
+    assert tr["last_top_lbs"] == 45.0
 
 
 def test_a_real_same_variant_drop_still_trips():
-    """MUTATION CONTROL: same identity, 75 -> 45 across the last two sessions — must read as a drop."""
-    tr = tp._anchor_trend(_sessions(DB_SP, [75, 75, 75, 45, 45]), "2026-08-20", 5.0)
-    assert tr["drop_pct"] == pytest.approx(40.0) and tr["sessions_below"] == 2
+    """MUTATION CONTROL: same identity, 75 -> 45 at the same reps across the last three sessions — must read as a drop."""
+    tr = tp._anchor_trend(_sessions(DB_SP, [75] * 6 + [45] * 3), "2026-08-20")
+    assert tr["drop_pct"] == pytest.approx(40.0) and tr["sessions_below"] == 3
     assert "excluded_other_identity_sessions" not in tr
 
 
 def test_the_variant_switch_through_the_tool_path(monkeypatch):
-    """End to end over the wire shape: the draft's DB shoulder press reads only DB history."""
+    """End to end over the wire shape: the draft's DB shoulder press reads only DB history — and three
+    sessions cannot support the rolling median, so the trend is unknown, never a small drop (#4098)."""
     items = [_row(f"2026-08-{d:02d}", f"m{d}", [_ex(*MACHINE_SP, 100)]) for d in (1, 3, 5)] + [
         _row(f"2026-09-{d:02d}", f"d{d}", [_ex(*DB_SP, 45)]) for d in (7, 11, 14)
     ]
     monkeypatch.setattr(ts, "query_source_cross_phase", lambda *_a, **_k: items)
     hist = ts.tool_get_exercise_history({"template_id": "878CD1D0", "start_date": "2026-03-01", "end_date": "2026-09-20"})
-    tr = tp._anchor_trend(hist["sessions"], "2026-09-20", 5.0)
-    assert hist["n_sessions"] == 3 and tr["drop_pct"] == 0.0
+    tr = tp._anchor_trend(hist["sessions"], "2026-09-20")
+    assert hist["n_sessions"] == 3 and tr["n_sessions"] == 3
+    assert "drop_pct" not in tr and "needs 9" in tr["insufficient"]
 
 
 # ── the engine reads the four core anchors only ──────────────────────────────

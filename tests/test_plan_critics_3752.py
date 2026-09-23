@@ -74,6 +74,7 @@ def _packets(
     lifts_7d=2,
     walking=None,
     weeks_in_block=0,
+    program_week=7,  # #4098: past `not_before_week`, so the anchor-drop tripwire is armed
 ):
     return {
         "muscle_defense": c.build_muscle_defense_packet(
@@ -81,10 +82,11 @@ def _packets(
             anchor_trends=(
                 trends
                 if trends is not None
-                else {0: {"drop_pct": 0.0, "sessions_below": 0, "trailing_best_lbs": 180.0, "last_top_lbs": 180.0, "n_sessions": 5}}
+                else {0: {"drop_pct": 0.0, "sessions_below": 0, "baseline_median_e1rm_lb": 210.0, "last_top_lbs": 180.0, "n_sessions": 5}}
             ),
             protein_days_missed_7d=protein,
             protein_days_measured_7d=7,
+            program_week=program_week,
         ),
         "joints_tendons": c.build_joints_packet(
             d,
@@ -229,7 +231,7 @@ def test_a_tripped_owner_tripwire_is_a_change_not_a_veto_while_3753_is_unsigned(
     P = _packets(
         d,
         protein=3,
-        trends={0: {"drop_pct": 12.0, "sessions_below": 2, "trailing_best_lbs": 200.0, "last_top_lbs": 170.0, "n_sessions": 6}},
+        trends={0: {"drop_pct": 12.0, "sessions_below": 2, "baseline_median_e1rm_lb": 233.3, "last_top_lbs": 170.0, "n_sessions": 6}},
     )
     m = next(v for v in c.run_critics(P, d, invoke=None, model_allowed=False) if v["critic"] == "muscle_defense")
     assert m["verdict"] == "change"

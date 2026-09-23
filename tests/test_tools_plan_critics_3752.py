@@ -69,7 +69,7 @@ def _evidence(pain0=False, drop=0.0, days0=3, weeks_in_block=0):
                 "anchor_family": "squat",
                 "days_since": days0,
                 "last_top_lbs": 176.0,
-                "trailing_best_lbs": 180.0,
+                "baseline_median_e1rm_lb": 210.0,
                 "drop_pct": drop,
                 "sessions_below": 2 if drop >= 10 else 0,
                 "n_sessions": 6,
@@ -220,7 +220,12 @@ def test_stage_2_stores_the_verdicts_as_a_new_version_and_writes_the_thread_row(
     assert out["critics"]["recheck"]["passed"] is True
     # stage 2 also fed the constraint block what stage 1 alone could not read
     tw = {t_["id"]: t_["state"] for t_ in out["constraint_block"]["tripwires"]}
-    assert tw["protein_floor_missed"] == "clear" and tw["anchor_lift_strength_drop"] == "clear" and tw["pain_flag_named_site"] == "clear"
+    assert tw["protein_floor_missed"] == "clear" and tw["pain_flag_named_site"] == "clear"
+    # #4098: 2026-09-20 is before block 1 (week 0), so the anchor tripwire is held by its own
+    # `not_before_week` — the input stage 2 fed it still rides along as `state_if_active`.
+    anchor = next(t_ for t_ in out["constraint_block"]["tripwires"] if t_["id"] == "anchor_lift_strength_drop")
+    assert anchor["state"] == "not_yet_active" and anchor["state_if_active"] == "clear"
+    assert anchor["detail"].startswith("not_yet_active (week 0 < 6)")
     assert "Stage 2 ran" in out["how_to_use"]
 
 

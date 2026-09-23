@@ -212,7 +212,9 @@ def _all_packets(joints):
     joints critic's is an approval by construction."""
     d = _draft()
     return {
-        "muscle_defense": c.build_muscle_defense_packet(d, anchor_trends=None, protein_days_missed_7d=0, protein_days_measured_7d=7),
+        "muscle_defense": c.build_muscle_defense_packet(
+            d, anchor_trends=None, protein_days_missed_7d=0, protein_days_measured_7d=7, program_week=7
+        ),
         "joints_tendons": joints,
         "rate_advocate": c.build_rate_advocate_packet(
             d, tripwires=[], walking=None, rate_target=None, current_rate_lb_wk=None, lifting_sessions_7d=2

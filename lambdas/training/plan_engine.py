@@ -86,8 +86,9 @@ from health import deficit_disclosures
 from training import owner_redlines, program_structure, training_context_registry
 
 ENGINE_VERSION = (
-    "plan-engine@1.4.0"  # #4072: every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
+    "plan-engine@1.5.0"  # #4098: `not_before_week` is enforced from the block calendar; the anchor drop is a rolling e1RM median
 )
+# plan-engine@1.4.0 (#4072): every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
 
 # ── #4072: the read state of every engine input ──────────────────────────────────────
 # `measured`   — the reader ran and returned a usable value.
@@ -171,6 +172,98 @@ def resolve_input_states(values: dict[str, Any], stated: dict[str, dict[str, Any
     return out
 
 
+# ── the anchor-lift trend: ONE computation (#4098) ───────────────────────────
+# v3's definition (`owner_redlines.TRIPWIRES` → `anchor_lift_strength_drop.definition_v3`): a
+# rolling 3-session e1RM median against the 6-session baseline before it, per template
+# identity. Before #4098 the engine compared the latest TOP WEIGHT with the trailing best
+# weight, reps ignored — 75 lb × 5 on 2026-05-30 against 45 lb × 8 on 2026-09-19, one
+# template (`878CD1D0`), read as "-40 %". The e1RM here is the session's `best_1rm` exactly as
+# `mcp.strength_helpers.extract_hevy_sessions` computes it (Epley, warm-ups excluded) — this
+# module adds no formula of its own. The per-exercise muscle-defense critic reads the SAME two
+# functions below (`tests/test_anchor_e1rm_not_before_week_4098.py` holds that by AST).
+E1RM_RECENT_SESSIONS = 3
+E1RM_BASELINE_SESSIONS = 6
+
+
+def _anchor_tripwire() -> dict[str, Any]:
+    return next(t for t in owner_redlines.TRIPWIRES if t["id"] == "anchor_lift_strength_drop")
+
+
+def anchor_e1rm_trend(e1rms_lb: list[float | None]) -> dict[str, Any]:
+    """The rolling-median comparison over ONE identity's e1RM series (oldest first). Pure.
+
+    Sessions with no e1RM (a bodyweight lift, reps outside the formula's gate) are skipped and
+    counted. Fewer than `E1RM_RECENT_SESSIONS + E1RM_BASELINE_SESSIONS` usable sessions yields
+    NO `drop_pct` — a comparison the series cannot support is unknown, never a small drop.
+    """
+    t = _anchor_tripwire()
+    threshold = float(t["threshold_pct"])
+    vals = [float(v) for v in e1rms_lb if v is not None and float(v) > 0]
+    need = E1RM_RECENT_SESSIONS + E1RM_BASELINE_SESSIONS
+    out: dict[str, Any] = {
+        "metric": "e1rm_rolling_median",
+        "window_sessions": {"recent": E1RM_RECENT_SESSIONS, "baseline": E1RM_BASELINE_SESSIONS},
+        "n_sessions_e1rm": len(vals),
+    }
+    if len(vals) < len(e1rms_lb):
+        out["sessions_without_e1rm"] = len(e1rms_lb) - len(vals)
+    if len(vals) < need:
+        out["insufficient"] = (
+            f"{len(vals)} session(s) with an e1RM on this template — the rolling {E1RM_RECENT_SESSIONS}-session median against the "
+            f"{E1RM_BASELINE_SESSIONS}-session baseline needs {need}"
+        )
+        return out
+    from statistics import median
+
+    recent = vals[-E1RM_RECENT_SESSIONS:]
+    baseline = vals[-need:-E1RM_RECENT_SESSIONS]
+    r_med = float(median(recent))
+    b_med = float(median(baseline))
+    out["recent_median_e1rm_lb"] = round(r_med, 1)
+    out["baseline_median_e1rm_lb"] = round(b_med, 1)
+    out["drop_pct"] = round(max(0.0, (b_med - r_med) / b_med * 100.0), 1) if b_med else None
+    out["sessions_below"] = sum(1 for v in recent if v < b_med * (1 - threshold / 100.0))
+    return out
+
+
+def anchor_drop_tripped(drop_pct: float | None, sessions_below: int | None) -> bool:
+    """The redline's own threshold over a trend from `anchor_e1rm_trend` — the one place it is applied."""
+    if drop_pct is None:
+        return False
+    t = _anchor_tripwire()
+    return float(drop_pct) >= float(t["threshold_pct"]) and int(sessions_below or 0) >= int(t["consecutive_sessions"])
+
+
+# ── `not_before_week`: a redline that is not armed yet (#4098) ───────────────
+# `anchor_lift_strength_drop` declares `not_before_week: 6` ("the ramp is still under 85 % of
+# band e1RM"). Before #4098 nothing read it: the tripwire was live in the ramp weeks, comparing
+# a detraining return with a best from before the break. The week is the v0.3 block calendar's
+# (`program_structure.calendar_entry`, #4064); before block 1 it is week 0.
+def program_week(day: str) -> int | None:
+    """The block calendar's program week for `day` — 0 before block 1, None for an unreadable day key."""
+    try:
+        entry = program_structure.calendar_entry(day)
+    except ValueError:
+        return None
+    return int(entry["week"]) if entry else 0
+
+
+def not_before_week_gate(tripwire: dict[str, Any], week: int | None) -> str | None:
+    """None when the tripwire is armed; otherwise the `not_yet_active (week N < M)` reason.
+
+    The ONLY reader of `not_before_week` — the engine (`_tripwire_states`) and the
+    muscle-defense critic both call it. An unknown week never arms a gated tripwire.
+    """
+    m = tripwire.get("not_before_week")
+    if m is None:
+        return None
+    if week is None:
+        return f"not_yet_active (week unknown < {int(m)})"
+    if week < int(m):
+        return f"not_yet_active (week {week} < {int(m)})"
+    return None
+
+
 def _evidence_scope_read(scope: dict[str, Any] | None) -> bool:
     """Did the caller actually examine anything? (#4051)
 
@@ -212,6 +305,7 @@ def _tripwire_states(
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
     input_states: dict[str, dict[str, Any]] | None = None,
+    week: int | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -242,6 +336,10 @@ def _tripwire_states(
     owner was told recovery, volume and protein were "unknown" while every source was fresh,
     and a reader cannot act on the difference between "no data" and "the read broke" if the
     block will not say which one it was. Every row carries its input's `input_state`.
+
+    #4098: every tripwire that declares `not_before_week` reads `not_yet_active (week N < M)`
+    until the block calendar's `week` reaches M — whatever its input says, which rides along
+    as `state_if_active` so the gate never hides the number.
     """
     input_states = input_states or {}
     by_id = {t["id"]: t for t in owner_redlines.engine_evaluated_tripwires()}  # the v2 additions are named, not computed
@@ -251,7 +349,7 @@ def _tripwire_states(
         t = by_id[tid]
         row = {
             "id": tid,
-            "state": state,  # tripped | clear | unknown | dismissed_by_owner (#4036)
+            "state": state,  # tripped | clear | unknown | dismissed_by_owner (#4036) | not_yet_active (#4098, set below)
             "observed": observed,
             "signal": t["signal"],
             "action_if_tripped": t["action"],
@@ -297,14 +395,21 @@ def _tripwire_states(
 
     t = by_id["anchor_lift_strength_drop"]
     if anchor_lift_drop_pct is None or anchor_lift_drop_sessions is None:
-        out.append(_missing("anchor_lift_strength_drop", "no band-matched anchor-lift comparison available"))
+        out.append(
+            _missing(
+                "anchor_lift_strength_drop",
+                f"no core-anchor e1RM comparison available (the rolling {E1RM_RECENT_SESSIONS}-session median needs "
+                f"{E1RM_RECENT_SESSIONS + E1RM_BASELINE_SESSIONS} sessions on one template)",
+            )
+        )
     else:
-        tripped = anchor_lift_drop_pct >= t["threshold_pct"] and anchor_lift_drop_sessions >= t["consecutive_sessions"]
+        tripped = anchor_drop_tripped(anchor_lift_drop_pct, anchor_lift_drop_sessions)
         out.append(
             _row(
                 "anchor_lift_strength_drop",
                 "tripped" if tripped else "clear",
-                f"-{anchor_lift_drop_pct:.1f}% across {anchor_lift_drop_sessions} session(s)",
+                f"-{anchor_lift_drop_pct:.1f}% rolling e1RM median, {anchor_lift_drop_sessions} of the last "
+                f"{E1RM_RECENT_SESSIONS} session(s) below threshold",
             )
         )
 
@@ -417,6 +522,17 @@ def _tripwire_states(
                 "weight_stall_with_adherence", "tripped" if tripped else "clear", f"{weight_stall_days}d stall, on-plan={adherence_on_plan}"
             )
         )
+
+    # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
+    # never per-tripwire, so a new declaration is read the day it is written.
+    for row in out:
+        reason = not_before_week_gate(by_id[row["id"]], week)
+        if reason:
+            row["state_if_active"] = row["state"]
+            row["state"] = "not_yet_active"
+            row["not_before_week"] = by_id[row["id"]]["not_before_week"]
+            row["program_week"] = week
+            row["detail"] = reason + (f" — {row['detail']}" if row.get("detail") else "")
 
     return out
 
@@ -581,6 +697,9 @@ def constraint_block(
             "no weight-matched reference was retrieved — do not substitute the current band, which is the period he is trying to escape"
         ]
 
+    # #4098: the block calendar's week decides which redlines are armed (`not_before_week`).
+    week = program_week(date)
+
     tripwires = _tripwire_states(
         protein_days_missed_7d=protein_days_missed_7d,
         readiness_low_streak_days=readiness_low_streak_days,
@@ -594,10 +713,12 @@ def constraint_block(
         pain_dismissals=pain_dismissals,
         pain_evidence_scope=pain_evidence_scope,
         input_states=states,
+        week=week,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
     failed_tripwires = [t["id"] for t in tripwires if t["state"] == READ_FAILED]
+    not_yet_active = [t["id"] for t in tripwires if t["state"] == "not_yet_active"]
     # #4036: every dismissal in play, named on the block — a reader never has to dig into
     # the tripwire row to find out that a human overrode a safety flag.
     dismissals_in_play = [d for t in tripwires for d in (t.get("dismissals") or [])]
@@ -654,6 +775,9 @@ def constraint_block(
         "failed_read_tripwires": failed_tripwires,
         # #4072: every input's read state — measured / absent / read_failed (+ error) / not_read.
         "inputs": states,
+        # #4098 — the block calendar's week, and the tripwires its `not_before_week` holds off.
+        "program_week": week,
+        "not_yet_active_tripwires": not_yet_active,
         # #4051 — WHAT the pain tripwire looked at: the movements PERFORMED in the trailing
         # window, the window, the phases read, the note layer's status. A reader can tell an
         # examined-and-clean row from an empty one without leaving the block.
@@ -691,6 +815,13 @@ def constraint_block(
                     else None
                 ),
                 f"{len(unknown)} tripwire(s) could not be evaluated: {', '.join(unknown)}" if unknown else None,
+                (
+                    f"{len(not_yet_active)} tripwire(s) are not yet active in program week {week}: "
+                    + ", ".join(not_yet_active)
+                    + " — held off by their own not_before_week, not cleared (#4098)"
+                    if not_yet_active
+                    else None
+                ),
                 # #4072: a failed read is named as FAILED, with its error class — never folded
                 # into "could not be evaluated", which a reader takes to mean "no data".
                 (
