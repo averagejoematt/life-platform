@@ -61,20 +61,6 @@ def _resolve_template_id(exercise: str, lookback_days: int) -> tuple[str | None,
     return best or (None, None)
 
 
-def _query_note_rows(template_id: str, start: str) -> list:
-    """The derived note rows for ONE exercise template, from `DATE#<start>` forward.
-
-    Split out of `tool_get_exercise_notes` (#4051) so the per-movement read and the
-    many-movement read below share ONE query and ONE parse. A second reader of this
-    partition with its own key construction is the must-agree seam (#2847) that lets two
-    surfaces disagree about the same flag — which is exactly the defect #4051 names.
-    """
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{template_id}") & Key("sk").gte(f"DATE#{start}"),
-    )
-    return [decimal_to_float(it) for it in resp.get("Items", [])]
-
-
 def _notes_timeline(rows: list) -> tuple[list, list, object]:
     """(timeline, pain_dates, latest_progression) from raw note rows. No I/O."""
     # Corrections win on read (sk …#CORRECTION) and survive recompute.
@@ -130,19 +116,22 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
     return timeline, pain_dates, latest_progression
 
 
-def pain_flags_for_templates(template_ids, start: str, max_workers: int = 8) -> dict:
+def pain_flags_for_templates(template_ids, start: str, layer_status: str, max_workers: int = 8) -> dict:
     """The pain-flag record for MANY exercise templates at once — the stage-1 read (#4051).
 
     `plan_next_session` needs every flag the layer holds for the movements he actually
     PERFORMED in the lookback, and that set is ~27 templates on a live 28-day window.
     Calling `tool_get_exercise_notes` once per template would re-run `training_notes_health`
-    27 times for one answer; this reads the SAME partition through the SAME parse
-    (`_query_note_rows` + `_notes_timeline`) and leaves the layer's health to the caller,
-    who states it ONCE beside the flags.
+    27 times for one answer — and that health function is itself ~28 queries. So the status
+    is INJECTED: the caller resolves it once (`mcp.core.derived_layer_status`) and this
+    read stamps it on every entry it returns, which is the #3769 contract — no count from
+    this layer travels without the layer's own status beside it — satisfied without a
+    second identical health sweep inside the same call. The parse is `_notes_timeline`, the
+    same one `tool_get_exercise_notes` uses, over a key spelled from the same `NOTES_SOURCE`.
 
-    Returns `{template_id: {"pain_flag_any", "pain_dates", "sessions_with_notes"}}`, or
-    `{"error": ...}` for a template whose read RAISED — an unreadable template is reported,
-    never folded into the clean ones (#3767).
+    Returns `{template_id: {"pain_flag_any", "pain_dates", "sessions_with_notes",
+    "layer_status"}}`, or `{"error": ..., "layer_status": ...}` for a template whose read
+    RAISED — an unreadable template is reported, never folded into the clean ones (#3767).
 
     **`pain_flag_any` is NOT nulled on a degraded/dark layer here**, and that is deliberate:
     `pain_flag` on a degraded row is the DETERMINISTIC pass's own verdict (the lexicon hit),
@@ -150,7 +139,7 @@ def pain_flags_for_templates(template_ids, start: str, max_workers: int = 8) -> 
     ABSENCE of flags — it cannot un-say a flag that is on the record. Today's live layer is
     `degraded` (`cap_exceeded x24`, the Haiku monthly cap), and the 2026-09-13 Romanian
     Deadlift flag is one of those degraded rows: withholding it would be the #3768 failure
-    pointed the other way.
+    pointed the other way. The status rides along so a reader can tell the two apart.
     """
     ids = [str(t) for t in (template_ids or []) if str(t or "").strip()]
     out: dict = {}
@@ -159,13 +148,21 @@ def pain_flags_for_templates(template_ids, start: str, max_workers: int = 8) -> 
 
     def _one(tid: str) -> tuple[str, dict]:
         try:
-            timeline, pain_dates, _ = _notes_timeline(_query_note_rows(tid, start))
+            # The key is spelled at the query site, not behind a helper: both the #2845 model
+            # and the #3769 derived-reader guard resolve the partition from the reading
+            # FUNCTION, so hiding it behind an accessor makes a real read invisible to both.
+            # Its twin is in `tool_get_exercise_notes`; `NOTES_SOURCE` is the one name.
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{tid}") & Key("sk").gte(f"DATE#{start}"),
+            )
+            timeline, pain_dates, _ = _notes_timeline([decimal_to_float(it) for it in resp.get("Items", [])])
         except Exception as e:  # noqa: BLE001
-            return tid, {"error": f"{type(e).__name__}: {e}"}
+            return tid, {"error": f"{type(e).__name__}: {e}", "layer_status": layer_status}
         return tid, {
             "pain_flag_any": bool(pain_dates),
             "pain_dates": [str(d)[:10] for d in pain_dates if d],
             "sessions_with_notes": len(timeline),
+            "layer_status": layer_status,
         }
 
     with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(ids)))) as pool:
@@ -204,11 +201,17 @@ def tool_get_exercise_notes(args):
 
     start = (pacific_now().date() - timedelta(days=lookback_days)).isoformat()
     try:
-        rows = _query_note_rows(template_id, start)
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{template_id}")
+            & Key("sk").gte(f"DATE#{start}"),
+        )
     except Exception as e:
         return {"error": f"query failed: {e}", "template_id": template_id}
 
-    timeline, pain_dates, latest_progression = _notes_timeline(rows)
+    # The parse is shared with `pain_flags_for_templates` (#4051) — corrections, the #3918
+    # occurrence keys and the legacy-row dedupe live in ONE place, so the two readers of
+    # this partition cannot disagree about what a row says.
+    timeline, pain_dates, latest_progression = _notes_timeline([decimal_to_float(it) for it in resp.get("Items", [])])
 
     # #3767: say whether the layer could be read at all, BEFORE reporting counts from it.
     # The health function has existed since this layer shipped and its docstring says "hook

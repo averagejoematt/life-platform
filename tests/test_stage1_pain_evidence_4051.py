@@ -502,18 +502,31 @@ class TestTheDegradedLayer:
 # 5. the batch note read
 # ══════════════════════════════════════════════════════════════════════════════
 class TestTheBatchNoteRead:
-    def test_it_returns_the_flag_and_its_dates_per_template(self, wired):
-        got = tn.pain_flags_for_templates([RDL_TID, LAT_TID, PRESS_TID], "2026-08-25")
-        assert got[RDL_TID] == {"pain_flag_any": True, "pain_dates": [FLAG_NOTE_DATE], "sessions_with_notes": 1}
+    def test_it_returns_the_flag_its_dates_and_the_layer_status_per_template(self, wired):
+        got = tn.pain_flags_for_templates([RDL_TID, LAT_TID, PRESS_TID], "2026-08-25", "degraded")
+        assert got[RDL_TID] == {
+            "pain_flag_any": True,
+            "pain_dates": [FLAG_NOTE_DATE],
+            "sessions_with_notes": 1,
+            "layer_status": "degraded",
+        }
         assert got[LAT_TID]["pain_flag_any"] is False
-        assert got[PRESS_TID] == {"pain_flag_any": False, "pain_dates": [], "sessions_with_notes": 0}
+        assert got[PRESS_TID] == {"pain_flag_any": False, "pain_dates": [], "sessions_with_notes": 0, "layer_status": "degraded"}
+
+    def test_every_entry_carries_the_layer_status_beside_its_count(self):
+        """#3769: no count from a derived layer travels without the layer's own status.
+        Mutation control: drop the `layer_status` key from the returned dicts and this reds
+        — a caller could then report `sessions_with_notes: 0` off a dark layer."""
+        src = (REPO / "mcp" / "tools_training_notes.py").read_text()
+        assert '"layer_status": layer_status' in src
 
     def test_a_template_whose_read_raises_is_reported_not_folded_into_the_clean_ones(self, monkeypatch):
         fake = _FakeTable(_rows(), raise_on_pk=f"EXERCISE#{LAT_TID}")
         monkeypatch.setattr(tn, "table", fake)
-        got = tn.pain_flags_for_templates([RDL_TID, LAT_TID], "2026-08-25")
+        got = tn.pain_flags_for_templates([RDL_TID, LAT_TID], "2026-08-25", "degraded")
         assert got[RDL_TID]["pain_flag_any"] is True
         assert "error" in got[LAT_TID] and got[LAT_TID].get("pain_flag_any") is None
+        assert got[LAT_TID]["layer_status"] == "degraded", "an unreadable template still says which layer it failed on"
 
     def test_an_unreadable_movement_is_counted_in_the_scope(self, monkeypatch):
         fake = _FakeTable(_rows(), raise_on_pk=f"EXERCISE#{LAT_TID}")

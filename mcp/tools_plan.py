@@ -171,7 +171,9 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
     rows, phases, start, orphans = _performed_movements(target_date)
     considered = rows[:PERFORMED_MOVEMENT_CAP]
     truncated = len(rows) - len(considered)
-    flags = pain_flags_for_templates([r["template_id"] for r in considered], start)
+    # #3769: the layer's status is resolved ONCE by the caller and rides on every entry the
+    # batch read returns — no count from a derived layer travels without its status.
+    flags = pain_flags_for_templates([r["template_id"] for r in considered], start, layer_status)
     unreadable = 0
     for r in considered:
         f = flags.get(r["template_id"]) or {}
