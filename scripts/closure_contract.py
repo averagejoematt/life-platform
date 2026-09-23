@@ -476,6 +476,46 @@ def rehearsal_proof_accepted(labels) -> bool:
     return INSTRUMENT_LABEL in labels and REHEARSAL_LABEL in labels
 
 
+# ── the PROOF PROBE (#4022): the live read an instrument issue closes on ─────────────────
+# The grammar lives in ONE place — `lambdas/operational/proof_probe.py` — because its
+# consumer is a Lambda (the qa-smoke nightly leg `closure_probe_qa`), and nothing under
+# scripts/ is ever staged into a Lambda bundle. This registry loads that file by path and
+# re-exports it, so the hygiene linter and any session parse a `## Proof probe` block with
+# the byte-identical parser the nightly closes on. Never re-typed here.
+def _proof_probe_module():
+    path = ROOT / "lambdas" / "operational" / "proof_probe.py"
+    spec = importlib.util.spec_from_file_location("_proof_probe_4022", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules.setdefault("_proof_probe_4022", mod)  # dataclasses resolve their module by name
+    spec.loader.exec_module(mod)
+    return mod
+
+
+PROOF_PROBE = _proof_probe_module()
+
+
+def parse_proof_probe(body: str):
+    """The issue body's `## Proof probe` block (None when absent; `.errors` when malformed)."""
+    return PROOF_PROBE.parse_block(body or "")
+
+
+def proof_probe_problem(body: str, labels) -> str | None:
+    """None when the issue needs no probe or declares a valid one; else the advisory text.
+
+    Scope: open `closure:live-proof` issues WITHOUT the rehearsal opt-in — a rehearsal-only
+    path (the owner's no-further-resets ruling) has no live output for a probe to read."""
+    labels = set(labels or ())
+    if INSTRUMENT_LABEL not in labels or REHEARSAL_LABEL in labels:
+        return None
+    block = parse_proof_probe(body)
+    if block is None:
+        return "no `## Proof probe` section — the nightly leg cannot close it on its first live output (#4022)"
+    if not block.valid:
+        return "`## Proof probe` does not parse: " + "; ".join(block.errors)
+    return None
+
+
 # The DERIVED leg's vocabulary — what makes a changed file an instrument, by AST.
 INSTRUMENT_WRITE_CALLS = ("put_item", "update_item", "delete_item", "put_object", "publish", "send_email", "send_raw_email")
 INSTRUMENT_EMF_CALLS = ("put_metric_data", "emit_skip_metric")
