@@ -158,10 +158,14 @@ _DYNAMIC_REFERENCES: dict[str, str] = {
     "secret:lambdas.web.site_api_common._cached_secret": "secret id is a parameter of the shared cache wrapper (#3760 made it reachable)",
     "secret:mcp.core.get_api_key": "id from env (MCP_API_KEY_SECRET)",
     # #4022: deliberately env-driven, NOT a literal — the qa-smoke closure-probe leg reads its
-    # GitHub write credential only when CLOSURE_PROBE_TOKEN_SECRET is set, so it makes NO secret
-    # read (and logs no denial for the #3563 alarm) until the CDK change that sets the env var
-    # AND grants GetSecretValue on life-platform/github-dispatch-token lands in the same deploy.
-    "secret:lambdas.operational.closure_probe_qa.load_token": "id from env (CLOSURE_PROBE_TOKEN_SECRET) — unset until its grant ships (#4022)",
+    # GitHub write credential only when CLOSURE_PROBE_TOKEN_SECRET is set. The CDK change that
+    # sets the env var AND grants GetSecretValue on life-platform/github-dispatch-token has now
+    # shipped (both in the same deploy — operational_stack.py's QaSmoke environment +
+    # role_policies_operational.py's operational_qa_smoke() SecretsGetClosureProbeToken
+    # statement), so the read is live. This entry stays in _DYNAMIC_REFERENCES regardless —
+    # the secret id is still resolved from an env var at runtime, not a literal, so no static
+    # grant check is possible either way.
+    "secret:lambdas.operational.closure_probe_qa.load_token": "id from env (CLOSURE_PROBE_TOKEN_SECRET) — grant shipped #4022, id stays dynamic",
     "secret:lambdas.operational.key_rotator_lambda.create_secret": "rotation Lambda — the id IS the event payload",
     "secret:lambdas.operational.key_rotator_lambda.test_secret": "rotation Lambda — the id IS the event payload",
     "ssm:lambdas.operational.hevy_restamp_lambda._ssm_get": "param name is the wrapper's argument",

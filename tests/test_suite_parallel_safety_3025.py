@@ -73,6 +73,11 @@ PR_CHECKS_WORKFLOW = os.path.join(REPO, ".github", "workflows", "pr-checks.yml")
 # entry must carry `@pytest.mark.serial`; `test_every_registered_writer_is_marked_serial`
 # is what makes that true rather than intended.
 IN_TREE_WRITERS = {
+    "tests/test_mcp_tool_count_pending_reconcile_4123.py": (
+        "rewrites the REAL mcp/registry.py (one synthetic tool prepended to TOOLS, restored in `finally`) "
+        "to drive the pre-merge tool-count test as a subprocess against the checkout — the 84-vs-85 "
+        "case is only reproducible when the registry the test AST-parses is the checkout's own (#4123)."
+    ),
     "tests/test_branch_never_carries_platform_counts_3984.py": (
         "rewrites the REAL lambdas/web/platform_counts.py (a bumped `lambdas`, a deleted `test_count` line) "
         "to prove the literal gate tolerates bot-owned drift off main and still reds a broken counter — "

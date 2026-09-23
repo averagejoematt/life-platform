@@ -5467,6 +5467,13 @@
     {
       "direction": "unknown",
       "lambda": "life-platform-mcp",
+      "module": "mcp/tools_data.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_decisions.py",
       "partition": "decisions",
       "via": "pk"
