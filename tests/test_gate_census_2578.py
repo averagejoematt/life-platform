@@ -915,7 +915,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # in scripts/gate_census_proofs.py (mutated: direct_push_gate.py stops importing ci_gate_commands -> 2 failed; reverted
         # -> 2 passed). Unproven stays. Same PR, 136 -> 140: guard::deploy/direct_push_gate.py, guard::scripts/ci_gate_commands.py
         # and the two PUSHER_EXEMPT registry entries, each proven by a watched mutation (records in gate_census_proofs.py).
-        <= 140
+        # Upper bound 140 -> 141 (2026-09-23, #4034, re-merged on top of #3528's 140): sentinel::deploy/sentinel_producer_census.py::check_producer_census — the producer
+        # census dead-man, both halves proved in tests/test_producer_census_4034.py (a planted silent producer over the REAL
+        # derived population -> drift; a denied Invocations read -> error). Unproven stays; one entrant.
+        <= 141
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
