@@ -829,6 +829,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # `/progress-photos/` is introduced by a PR's own diff, and once merged it is a
         # crawler-visible link to Matthew's body photographs that nothing else would notice.
         "test_progress_viewer_privacy_3760.py",
+        # #4063: greps every tracked file for a contact-shaped address (the named human's
+        # identity lives ONLY in the private S3 config). Pure repo shape: a PR that adds the
+        # contact to this PUBLIC tree must red on itself, before the merge publishes it.
+        "test_named_human_contact_4063.py",
     }
 )
 

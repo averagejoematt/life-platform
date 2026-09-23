@@ -216,6 +216,10 @@ SOURCE_TIERS: dict[str, int] = {
     # the same posture as progress_photos). No public projection and no aggregate carve-out:
     # the only readers are the owner-facing planning surfaces.
     "training_constraints": TIER_OWNER_ONLY,
+    # #4063: the named-human contact path's episode state — WHEN the owner went quiet and
+    # whether/when a third party was told. Identity-free, but a disengagement record is a
+    # behavioural fact about him. Declared before the first row exists (ADR-154 ordering).
+    "named_human_contact": TIER_OWNER_ONLY,
     "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
 }
 

@@ -901,10 +901,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
         # 132 -> 133 (2026-09-23, #4075 on top of #4107): structural::test_training_load.py, PROVEN (ARMED 1/1).
-        # 133 -> 134 (2026-09-23, #4034, on top of #4075): sentinel::deploy/sentinel_producer_census.py::check_producer_census — the producer
+        # Upper bound 133 -> 134 (2026-09-23, #4063, re-merged on top of #4075's 133): structural::test_named_human_contact_4063.py — the named-human contact
+        # path's no-health-data body contract + the tracked-tree grep for a contact-shaped address — arrives PROVEN via a hand
+        # Proof in scripts/gate_census.PROVEN_CAN_FAIL (a digit planted in the body: 10 failed / 74 passed; a contact address
+        # appended to a tracked doc: 1 failed / 83 passed; baseline and reverted 84 passed). Unproven stays 540; one entrant.
+        # Upper bound 134 -> 135 (2026-09-23, #4034, re-merged on top of #4063's 134): sentinel::deploy/sentinel_producer_census.py::check_producer_census — the producer
         # census dead-man, both halves proved in tests/test_producer_census_4034.py (a planted silent producer over the REAL
         # derived population -> drift; a denied Invocations read -> error). Unproven stays; one entrant.
-        <= 134
+        <= 135
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

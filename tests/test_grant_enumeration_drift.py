@@ -179,6 +179,10 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "config/content_filter.json": "ER-06 / #2370: this repo is PUBLIC and the blocked-content vocabulary is "
     "the most private string set on the platform. The runtime object is owner-provisioned out of band; "
     "`config/content_filter.example.json` is the tracked shape. Deliberately NOT a repo twin.",
+    "config/coaching/named_human.json": "#4063: the ONE named human's identity and contact address — owner-written "
+    "out of band into the private coaching home and never in this PUBLIC repo (the contact-path test greps the tree "
+    "for the field shape). The tracked shape is `coach.named_human_contact`'s module docstring. Deliberately NOT a "
+    "repo twin, and no example JSON under config/ either.",
 }
 
 #: The derived content-filter/privacy-guard consumer set → its watch surface.
