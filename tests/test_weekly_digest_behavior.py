@@ -1762,12 +1762,14 @@ class TestGatherAll:
         data, _ = wd.gather_all()
         pks = [q["ExpressionAttributeValues"][":pk"] for q in table.queries if ":s" in (q.get("ExpressionAttributeValues") or {})]
         assert pks.count("USER#matthew#SOURCE#hevy") == 1, "self_added_volume must reuse hevy_full, not issue a second query"
-        threshold = next(t for t in wd.owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")["threshold_weeks"]
+        threshold = next(
+            t for t in __import__("training.owner_redlines", fromlist=["TRIPWIRES"]).TRIPWIRES if t["id"] == "self_added_volume"
+        )["threshold_weeks"]
         expected = saw_mod.evaluate([row], W1_END, threshold)
         assert data["self_added_volume"] == expected
 
     def test_self_added_volume_tripwire_is_report_only_not_a_veto(self):
-        tw = next(t for t in wd.owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")
+        tw = next(t for t in __import__("training.owner_redlines", fromlist=["TRIPWIRES"]).TRIPWIRES if t["id"] == "self_added_volume")
         assert tw.get("tripwire_class") == "report_only"
         assert tw["action"].startswith("an end-of-week report") and "no veto" in tw["action"]
         assert "anxiety" not in tw["action"] and "enforced" not in tw["action"]
