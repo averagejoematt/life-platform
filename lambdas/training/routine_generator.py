@@ -32,7 +32,7 @@ import logging
 import os
 import random
 from datetime import date
-from typing import Any
+from typing import Any, Callable
 
 from common.repo_config import config_dir
 
@@ -347,6 +347,10 @@ def render_floor_cue(floor: dict[str, Any]) -> str:
     """
     if not floor or floor.get("status") != "ok" or not floor.get("floor_kg"):
         return ""
+    if floor.get("ramp"):  # #4090: a v0.3 entry-ramp load names the ramp, not a best-load floor
+        from training.load_ramp import render_ramp_cue
+
+        return render_ramp_cue(floor)
     basis = floor.get("basis") or {}
     reps = "/".join(str(r) for r in (basis.get("reps") or []))
     got = f"{_fmt_load(float(basis.get('weight_kg') or 0))}"
@@ -592,8 +596,13 @@ def _enforce_load_floors(
     days_since_last_workout: int | None,
     layoff_days: int,
     rationale: list[str],
+    floor_transform: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Derive and APPLY the prescription floor for every block. Returns the audit dict.
+
+    `floor_transform` (#4090) re-bases each derived floor before it is applied — the v0.3
+    path passes `load_ramp.ramp_floor`, so its sessions prescribe the §3 entry ramp while
+    every other path keeps the #3927 best-load floor unchanged.
 
     This is acceptance box 1's enforcement point: one place where a prescribed load is
     compared against what he has already done at this bodyweight, and raised if it is
@@ -631,6 +640,8 @@ def _enforce_load_floors(
             layoff_days=layoff_days,
             as_of=target_date,
         )
+        if floor_transform is not None:
+            floor = floor_transform(floor)
         corrections = apply_prescription_floor(block.sets, floor)
         cue = render_floor_cue(floor)
         if cue:
@@ -643,6 +654,7 @@ def _enforce_load_floors(
             "basis": floor.get("basis"),
             "discount_pct": floor.get("discount_pct"),
             "layoff_reason": floor.get("layoff_reason"),
+            "ramp": floor.get("ramp"),
             "corrections": corrections,
         }
         if corrections:

@@ -331,15 +331,19 @@ def audit_prescription(exercises, routine_notes="", floors=None):
         for hit in find_conditional_up(_field(ex, "notes", "")):
             violations.append({"kind": "conditional_up", "where": key, **hit})
         floor = (floors or {}).get(key) or {}
-        floor_kg = floor.get("floor_kg")
-        if not floor_kg:
+        top_floor_kg = floor.get("floor_kg")
+        if not top_floor_kg:
             continue
+        # #4090: a §3 heavy exposure is [top, back-off, back-off]; the generator records the
+        # back-offs' own floor (−10 % of the top set) and only sets after the first answer to it.
+        back_off_floor_kg = floor.get("back_off_floor_kg")
         for i, s in enumerate(_sets_of(ex)):
             if str(_field(s, "type", "normal") or "normal").lower() == "warmup":
                 continue
             w = _field(s, "weight_kg")
             if w is None:
                 continue
+            floor_kg = back_off_floor_kg if (back_off_floor_kg and i > 0) else top_floor_kg
             if float(w) < float(floor_kg) - 1e-6:
                 violations.append(
                     {

@@ -448,10 +448,12 @@ EXPOSURES: dict[str, dict[str, Any]] = {
 SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "heavy": {
         "anchors": [["squat", "heavy"], ["bench", "heavy"], ["row", "heavy"], ["vertical_pull", "moderate"]],
-        "accessories": ["leg_curl", "db_lateral_raise"],
+        "anchor_sets": {"vertical_pull": 2},
+        "accessories": ["leg_curl", "cable_tricep_pushdown", "db_curl"],
     },
     "moderate": {
         "anchors": [["hinge", "moderate"], ["overhead_press", "moderate"], ["vertical_pull", "moderate"], ["squat", "moderate"]],
+        "anchor_sets": {"vertical_pull": 2},
         "accessories": ["cable_tricep_pushdown", "db_curl", "calf_raise_machine"],
     },
     "heavy_moderate": {
@@ -468,7 +470,13 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
 The three required roles train every pattern exactly twice (held by a test); the optional
 fourth is anchors-only at moderate intensity and is EXTRA — it is never counted toward the
 2x/wk, so skipping it costs nothing the program depends on. Accessories come from
-`ACCESSORY_POOL['full']`, fixed per role for the block (`ROTATION_RULE`)."""
+`ACCESSORY_POOL['full']`, fixed per role for the block (`ROTATION_RULE`).
+
+`anchor_sets` (#4090) overrides a MODERATE exposure's set count for one pattern. Vertical
+pull runs 2 sets, not 3: row + pulldown at 3 each put back at 12 hard sets/wk against the
+redline's 6–10. The lateral raise left the heavy day for the same reason (delts 8 vs 4–6 —
+the overhead press already gives them 6); an arm pair took its place, which keeps the week
+at 50 sets and puts arms at 4 each. `weekly_sets_by_muscle` is the sum a test holds."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     "provenance": "platform-proposed",
@@ -477,8 +485,9 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     "note": (
         "§3 fixes the ROLES (heavy / moderate / heavy-moderate), the 2x/wk per anchor and the rep scheme; it does not say which "
         "anchor lands on which day. This placement puts squat and hinge heavy on different days, gives each role four anchor "
-        "exposures (12 anchor sets) plus 2–3 accessories at 2 sets (16–18 sets, inside the 18-set ceiling), and totals 50 hard "
-        "sets/wk — the floor of §3's 50–65. Vertical pull is never heavy (pulldowns rarely are). Nobody has ratified the placement."
+        "exposures plus 2–3 accessories at 2 sets (16–17 sets, inside the 18-set ceiling), and totals 50 hard "
+        "sets/wk — the floor of §3's 50–65. Vertical pull is never heavy (pulldowns rarely are) and runs 2 sets per exposure so "
+        "back sits at 10, the top of the 6–10 redline (#4090). Nobody has ratified the placement."
     ),
 }
 
@@ -701,7 +710,8 @@ def session_prescription_for_role(
                 for _ in range(spec["back_off_sets"])
             ]
         else:
-            sets = [{"kind": "working", "reps": list(spec["reps"])} for _ in range(spec["sets"])]
+            n_sets = int((tmpl.get("anchor_sets") or {}).get(pattern, spec["sets"]))
+            sets = [{"kind": "working", "reps": list(spec["reps"])} for _ in range(n_sets)]
         exposures.append(
             {
                 "kind": "anchor",
@@ -781,6 +791,38 @@ def weekly_sets_by_pattern() -> dict[str, int]:
             if e["kind"] == "anchor":
                 out[e["pattern"]] = out.get(e["pattern"], 0) + len(e["sets"])
     return out
+
+
+REDLINE_MUSCLE_GROUPS: dict[str, dict[str, Any]] = {
+    "quads": {"primary_muscles": ["quadriceps"], "range_key": "sets_per_muscle_wk"},
+    "hams_glutes": {"primary_muscles": ["hamstrings", "glutes"], "range_key": "sets_per_muscle_wk"},
+    "chest": {"primary_muscles": ["chest"], "range_key": "sets_per_muscle_wk"},
+    "back": {"primary_muscles": ["back"], "range_key": "sets_per_muscle_wk"},
+    "delts": {"primary_muscles": ["shoulders"], "range_key": "sets_per_muscle_wk_small"},
+    "biceps": {"primary_muscles": ["biceps"], "range_key": "sets_per_muscle_wk_small"},
+    "triceps": {"primary_muscles": ["triceps"], "range_key": "sets_per_muscle_wk_small"},
+}
+"""§3's per-muscle set ranges, keyed to the catalog's `primary_muscle` (#4090): 6–10 for quads,
+hams/glutes, chest, back; 4–6 for delts and arms. Counted as DIRECT sets (the movement's
+primary muscle) — §3's 'mostly indirect' is the pressing and pulling on top of these."""
+
+
+def weekly_sets_by_muscle(catalog_movements: dict[str, Any], skill_ceiling: int = 2) -> dict[str, dict[str, Any]]:
+    """Hard sets per redline muscle group over the three REQUIRED roles, with the range each
+    must sit in (`owner_redlines`). The optional fourth is excluded, as in the 2x/wk count."""
+    from training import owner_redlines
+
+    lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
+    by_muscle: dict[str, int] = {}
+    for role in BLOCK_CALENDAR["session_roles"]:
+        rx = session_prescription_for_role(role, catalog_movements=catalog_movements, skill_ceiling=skill_ceiling)
+        for e in rx["exposures"]:
+            muscle = (catalog_movements.get(e.get("movement_key") or "") or {}).get("primary_muscle") or "unresolved"
+            by_muscle[muscle] = by_muscle.get(muscle, 0) + len(e["sets"])
+    return {
+        g: {"sets": sum(by_muscle.get(m, 0) for m in spec["primary_muscles"]), "range": list(lift[spec["range_key"]])}
+        for g, spec in REDLINE_MUSCLE_GROUPS.items()
+    }
 
 
 # ── the conflicts this program has not resolved ──────────────────────────────
