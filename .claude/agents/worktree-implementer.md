@@ -95,6 +95,26 @@ write surface is your own worktree and your own branch.
 6. **Verify quality before the PR:** `black` (line-length 140 via pyproject) on changed
    Python — never on `.json` files (black corrupts JSON) — then `flake8`, then the
    targeted pytest for what you touched. Re-run tests after ANY post-test formatting.
+6a. **Run the structural pre-merge gates locally before you push** — every one of the seven
+   lanes on 2026-09-23 redded the required 17-minute job on at least one of these, and each
+   red cost a full CI round trip that a 90-second local run would have saved:
+   `python3 -m pytest tests/test_premerge_extra_files_derivation_2372.py tests/test_gate_census_lane_3000.py tests/test_gate_census_2578.py tests/test_suite_parallel_safety_3025.py tests/test_restart_verify_gates_3477.py tests/test_schema_families_census.py tests/test_singleton_tombstone_guards.py tests/test_obligation_carriers_3597.py -q`.
+   What each one names and how to satisfy it: (#2372) a new test that sweeps the tree
+   (os.walk / rglob / git ls-files) must be listed in `tests/conftest.py`
+   `_PREMERGE_EXTRA_FILES` with a one-line reason; (#3000/#2578) every new gate needs a
+   verdict in `scripts/gate_census.py` — PROVEN_CAN_FAIL with the mutation you actually ran,
+   or ATTEMPTED_UNPROVEN — or a not-applicable reason; NEVER raise
+   `BASELINE_UNPROVEN_GATES`, and state your `BASELINE_TOTAL_GATES` / proven-bound entrant
+   counts in the PR body because concurrent lanes bump the same two lines and the driver
+   stacks them at merge; (#3025) a test that writes inside the checkout is registered in
+   `IN_TREE_WRITERS` and marked `pytestmark = pytest.mark.serial`; (#3477) a test reading a
+   regenerated artifact under `deploy/generated/**` or `config/` joins
+   `_PREMERGE_EXTRA_FILES`; (schema census) a new `phase_taxonomy.SOURCE_CLASS` entry gets
+   a `docs/SCHEMA.md` row; (tombstone guard) a `get_item` in a generation path is guarded
+   by `singleton_visible` or exempted with a reason; (#3597) a new Load-bearing
+   `docs/PROPORTIONALITY.md` row carries `demote_by:` or `demote_when:`. A parametrized
+   per-page test counts as one gate PER PARAMETER in the census — collapse it to one test
+   that iterates and reports every offender.
 6b. **If your issue carries `review:*` or `incident*` labels (#3594):** it names a class,
    not just the specimen you're fixing. Re-run the issue's own `## Set` enumeration query
    before you write the PR body, and paste the member list (not just the count) into the
