@@ -299,12 +299,29 @@ def test_walking_down_less_than_thirty_percent_is_info():
     assert f["severity"] == "info" and p["numbers"]["walking_wow_pct"] == -20.0
 
 
-def test_self_added_volume_two_weeks_is_a_change_and_absent_is_unknown():
+def test_self_added_volume_two_weeks_is_info_not_a_change_and_absent_is_unknown():
+    """#4111 (owner ruling 2026-09-23): `self_added_volume` is `report_only` — two weeks above
+    the prescription is reported for the end-of-week report, never a `change` and never routed
+    to `subtract_only`. Acceptance fixture: two weeks above -> no change flag, report present."""
+    assert TW["self_added_volume"].get("tripwire_class") == "report_only"
     p = nc.build_adherence_packet(_inputs(training_above_prescription_weeks=TW["self_added_volume"]["threshold_weeks"]))
     (f,) = _flags(p, "training_above_prescription_weeks")
-    assert f["severity"] == "change" and "anxiety tell" in f["reason"]
+    assert f["severity"] == "info"
+    assert f["field"] is None and f["to"] is None, "report_only must never route to subtract_only"
+    assert "anxiety tell" not in f["reason"] and "mood asked" not in f["reason"]
+    assert "end-of-week report" in f["reason"]
+    assert not [c for c in _flags(p, "training_above_prescription_weeks") if c["severity"] == "change"]
     p2 = nc.build_adherence_packet(_inputs(training_above_prescription_weeks=None))
     assert "training_above_prescription_weeks" in p2["unknown"] and not _flags(p2, "training_above_prescription_weeks")
+
+
+def test_self_added_volume_report_only_never_reaches_a_change_verdict():
+    """The packet-level verdict (`coach.critics.deterministic_verdict`) filters on
+    `severity == "change"` — an `info` flag must never surface as a change/veto."""
+    inputs = _inputs(training_above_prescription_weeks=TW["self_added_volume"]["threshold_weeks"] + 3)
+    res = nc.run(inputs)
+    v = _verdict(res, "adherence")
+    assert v["verdict"] != "change", "self_added_volume alone must never trip the adherence critic's verdict"
 
 
 # ── 6. PROPOSED vs ACTIVE — both branches, the current value not pinned ─────────
