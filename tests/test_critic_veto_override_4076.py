@@ -143,7 +143,7 @@ def _total_sets(ir):
 def test_veto_plus_override_keeps_the_joints_cap_and_records_the_override_on_the_committed_routine():
     """Mutation controls: (a) in `veto_reason`, count overridden vetoes again (`standing_vetoes`
     -> every veto) -> the commit refuses CRITIC_VETO and this reds; (b) drop the
-    `critics.apply_overrides(...)` call in `_run_stage_2` -> no override record and this reds;
+    `critic_overrides.apply_overrides(...)` call in `_run_stage_2` -> no override record and this reds;
     (c) skip `apply_changes` when an override is present -> total sets stay 20 and this reds."""
     ir = _routine()
     out, ledger = _run(ir, override={"critic": "blueprint_historian", "owner_words": WORDS})
@@ -284,3 +284,19 @@ def test_the_thread_row_carries_the_override_and_drops_it_from_surprises():
     ]
     hist = next(e for e in row["learning_log"] if e["critic"] == "blueprint_historian")
     assert hist["verdict"] == "veto" and hist["owner_overridden"] is True
+
+
+def test_the_ledger_write_is_the_log_coach_correction_path():
+    """`_record_override_correction` writes through `coach_corrections.write_correction` — the
+    same function `log_coach_correction` calls — cycle-stamped the same way. Mutation control:
+    point it at any other writer -> no CORRECTION# row lands on the ledger partition and this reds."""
+    from coach import coach_checkin, coach_corrections
+    from fakes import FakeDdbTable
+
+    table = FakeDdbTable()
+    ref = {"surface": "plan_critics", "coach": "training_coach", "critic": "blueprint_historian", "signal": "band_top_lbs[0]"}
+    with patch("mcp.config.table", table), patch.object(coach_checkin, "read_cycle", return_value=17):
+        sk = tp._record_override_correction(ref, WORDS, "other")
+    [row] = table.puts
+    assert row["pk"] == coach_corrections.PK and row["sk"] == sk and sk.startswith("CORRECTION#")
+    assert row["correction_text"] == WORDS and row["item_ref"]["critic"] == "blueprint_historian" and row["cycle"] == 17
