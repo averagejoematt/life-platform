@@ -747,6 +747,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # invisible at runtime — the generator would plan a PPL week while another caller
         # graded a session against the old grid, with nothing red anywhere.
         "test_program_structure_3755.py",
+        # #4071: an AST sweep of mcp/ + lambdas/training/ asserting that
+        # training.muscle_volume.working_sets_by_muscle is the ONE per-muscle set
+        # computation. Pure repo shape, and pre-merge for the reason the defect was
+        # invisible: a second counter feeding one consumer while the planner reads another
+        # number reds nothing at runtime.
+        "test_muscle_volume_working_sets_4071.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own

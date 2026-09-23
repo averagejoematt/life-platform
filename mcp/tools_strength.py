@@ -113,7 +113,7 @@ def tool_get_muscle_volume(args):
 
     The answer echoes what it did in `searched` (window, whose window, phases read) and `method`.
     """
-    from training.muscle_volume import METHOD, MUSCLES, window_days, window_start, working_sets_by_muscle
+    from training.muscle_volume import METHOD, MUSCLES, window_days, window_start, window_weeks, working_sets_by_muscle
 
     end_date = args.get("end_date") or pacific_now().date().isoformat()
     period = args.get("period", "week")  # "week" or "month"
@@ -125,7 +125,7 @@ def tool_get_muscle_volume(args):
     caller_start = args.get("start_date")
     start_date = caller_start or window_start(end_date, lookback_days)
     total_days = window_days(start_date, end_date)  # inclusive whole days; raises on an inverted window
-    num_periods = total_days / 7 if period_label == "week" else total_days / 30.44
+    num_periods = window_weeks(start_date, end_date) if period_label == "week" else total_days / 30.44
 
     # ONE read covers the analysis window AND both trailing windows.
     read_start = min(start_date, window_start(end_date, max(_TRAILING_WINDOWS)))
