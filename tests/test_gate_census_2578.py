@@ -901,7 +901,21 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4107.py calling ramp_floor; baseline 24 passed | mutated 1 failed ::
         # test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback | reverted 24 passed). Unproven stays; one entrant.
         # 132 -> 133 (2026-09-23, #4075 on top of #4107): structural::test_training_load.py, PROVEN (ARMED 1/1).
-        <= 133
+        # Upper bound 133 -> 188 (2026-09-23, #4035): 55 new proofs. Two structural gates
+        # (`structural::test_glossary_4035.py`, `structural::test_rate_n_contract_4035.py`) arrive PROVEN via the
+        # re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 2/2: baseline 9 passed | mutated 2 failed ::
+        # test_apply_chrome_check_is_green_for_glossary, test_no_unregistered_acronym_coinage | reverted 9 passed;
+        # baseline 2 passed | mutated 1 failed :: test_any_rate_consumer_also_shows_its_n | reverted 2 passed). The
+        # other 53 are scripts/v4_glossary.py's GLOSS_ALLOWLIST (51) and GLOSS_EXEMPT_PAGES (2) entries, each
+        # proved BOTH directions (load-bearing + not-a-blanket-exemption) against the REAL production regex/
+        # constants over synthetic input — tests/test_glossary_4035.py::test_each_allowlist_entry_is_load_bearing_
+        # and_not_blanket / ::test_each_exempt_page_entry_is_load_bearing_and_not_blanket, 53 parametrised cases,
+        # 53 passed in 0.92s. Building the per-entry proof found three DEAD allowlist entries (single-letter roman
+        # numerals I/V/X, which can never match ACRONYM_RE's own {2,6} floor) and removed them — zero live effect.
+        # MEASURED by id-set diff against a real `git clone` of origin/main at b29349e27: lane {proven 188,
+        # unproven 540, not-applicable 6, attempted-unproven 5} vs main {133, 540, 6, 5} — exactly the 55 named
+        # ids enter, none leaves.
+        <= 188
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

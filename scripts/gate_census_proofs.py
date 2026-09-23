@@ -2254,10 +2254,12 @@ REGISTRY_PROOFS.update(
                 "(/data/vitals/) scanned with the same prose."
             ),
             "observed": (
-                f"(a) scan_content_text('{page}') returns the full prose text (non-empty) once its own exempt "
-                "entry is removed — it is no longer skipped. (b) with the full set restored, /data/vitals/ (not "
-                "exempt) still returns non-empty prose — the entry excuses only its own page. Watched 2026-09-23, "
-                f"PASSED[{page}] in the 53-case parametrised run above."
+                f"(a) exit 1 (assertion) if this were the shipped gate's live scan — reproduced instead as a "
+                f"direct check: scan_content_text('{page}') returns the full prose text (non-empty) once its own "
+                "exempt entry is removed from the copy — it is no longer skipped, so a live page would now be "
+                "scanned by gate (b) and could fail it. (b) with the full set restored, /data/vitals/ (not "
+                "exempt) still returns non-empty prose — the entry excuses only its own page, never a blanket "
+                f"pass. Watched 2026-09-23, PASSED[{page}] in the 53-case parametrised run above."
             ),
             "scope": "",
             "proved_on": "2026-09-23",
