@@ -106,12 +106,22 @@ def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
     return week_cfg["schedule"][str(dow)]["archetype"]
 
 
-def _schedule_entry_for_date(target_date: str, week_cfg: dict[str, Any]) -> dict[str, Any]:
+def _schedule_entry_for_date(target_date: str, week_cfg: dict[str, Any], source: str | None = None) -> dict[str, Any]:
     """The whole schedule entry for the day. #3755 v0.3: the module grid carries two keys the
     JSON grid never had — `session_role` (heavy / moderate / heavy_moderate / optional_fourth)
     and `optional` (the fourth full-body day, gated on two green recovery days). They ride on
     the rationale and the title so the flag reaches the pushed routine; nothing is gated on
-    them here — the program reports, the owner decides."""
+    them here — the program reports, the owner decides.
+
+    #4064: when the seam served the MODULE grid (`source == "module"`, i.e. the program is
+    ACTIVE), the block calendar answers first — block 1 starts on a Thursday and then runs
+    Mon/Wed/Fri, which no weekday grid can express. Before block 1 the calendar returns None
+    and the weekday grid answers, as it always has. The JSON grid (v0.2 / any inactive
+    program) never consults the calendar."""
+    if source == "module":
+        cal = program_structure.calendar_entry(target_date)
+        if cal is not None:
+            return cal
     dow = date.fromisoformat(target_date).weekday()
     return dict(week_cfg["schedule"].get(str(dow)) or {})
 
@@ -691,48 +701,14 @@ def _build_inputs_snapshot(inputs: GeneratorInputs, landmarks: dict[str, Any], c
     }
 
 
-def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
-    """Returns 1-3 RoutineSpec IR records (ideal, floor, optional re-entry).
+def _load_note_indexes(
+    week_cfg: dict[str, Any], notes_mode: str
+) -> tuple[dict[str, list], dict[str, float], dict[str, list], dict[str, list]]:
+    """(history, bodyweight, cardio, whoop) indexes for the exercise notes and the load floors.
 
-    The caller persists, compiles, and pushes. This function is pure (apart from
-    config reads) — no DDB, no Hevy.
+    Lifted out of `generate_routines` unchanged (#4064) so the §3 full-body path reads the
+    SAME history the muscle-budget path does — two loaders would be two answers.
     """
-    landmarks = _load_json("training_landmarks.json")
-    catalog = _load_json("movement_catalog.json")
-    # #3755 — ONE seam decides whether the week grid comes from the live JSON or from
-    # `program_structure.week_grid()`. `mcp.tools_hevy_routine` reads the same function,
-    # so the generator and the session-ceiling warning can never grade against two
-    # different weeks. The seam names its source; the rationale records it.
-    resolved_week = resolve_week_grid(_load_json)
-    week_cfg = resolved_week.week
-
-    archetype = _archetype_for_date(inputs.target_date, week_cfg)
-    targets = week_cfg["archetype_targets"].get(archetype, [])
-    if archetype in ("rest", "aerobic", "mobility"):
-        # Non-lifting day — return a minimal placeholder ideal + floor.
-        return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog)
-
-    autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
-    z2_ok = _portfolio_guard(inputs.z2_minutes_7d, week_cfg.get("z2_floor_minutes", 90))
-    rationale: list[str] = []
-    rationale.append(f"week grid source={resolved_week.source} ({resolved_week.detail})")
-    rationale.append(f"archetype={archetype}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})")
-    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg)
-    if day_entry.get("session_role"):
-        rationale.append(f"session_role={day_entry['session_role']}")
-    if day_entry.get("optional"):
-        rationale.append(f"OPTIONAL session — {day_entry.get('gate') or 'not required this week'}")
-    if not z2_ok:
-        rationale.append(f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {week_cfg['z2_floor_minutes']}; portfolio guard active")
-
-    skill_ceiling = week_cfg.get("skill_ceiling", 2)
-    notes_mode = week_cfg.get("exercise_notes_mode", "one_best_line")
-    rng = _seeded_random(inputs.target_date, "ideal")
-    budget_used: dict[str, int] = {}
-    exercises: list[ExerciseBlock] = []
-
-    # ADR-068: pre-load exercise history once per generation. Pure data;
-    # downstream renderers can quote but cannot invent.
     history_index: dict[str, list] = {}
     weight_index: dict[str, float] = {}
     cardio_index: dict[str, list] = {}
@@ -778,6 +754,59 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
             whoop_index = load_whoop_workout_index()
         except Exception as e:
             logger.warning(f"whoop workout index load failed (cardio cue loses HR-at-level): {e}")
+
+    return history_index, weight_index, cardio_index, whoop_index
+
+
+def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
+    """Returns 1-3 RoutineSpec IR records (ideal, floor, optional re-entry).
+
+    The caller persists, compiles, and pushes. This function is pure (apart from
+    config reads) — no DDB, no Hevy.
+    """
+    landmarks = _load_json("training_landmarks.json")
+    catalog = _load_json("movement_catalog.json")
+    # #3755 — ONE seam decides whether the week grid comes from the live JSON or from
+    # `program_structure.week_grid()`. `mcp.tools_hevy_routine` reads the same function,
+    # so the generator and the session-ceiling warning can never grade against two
+    # different weeks. The seam names its source; the rationale records it.
+    resolved_week = resolve_week_grid(_load_json)
+    week_cfg = resolved_week.week
+
+    day_entry = _schedule_entry_for_date(inputs.target_date, week_cfg, resolved_week.source)
+    archetype = day_entry.get("archetype") or _archetype_for_date(inputs.target_date, week_cfg)
+    targets = week_cfg["archetype_targets"].get(archetype, [])
+    if archetype in ("rest", "aerobic", "mobility"):
+        # Non-lifting day — return a minimal placeholder ideal + floor.
+        return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
+    if archetype == "full" and day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
+        # #4064 — a v0.3 role is a §3 session (anchors at heavy/moderate, fixed accessories,
+        # deload on the calendar), not a muscle-budget session with a role label on it.
+        from training.full_body_session import full_body_routines
+
+        return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets)
+
+    autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
+    z2_ok = _portfolio_guard(inputs.z2_minutes_7d, week_cfg.get("z2_floor_minutes", 90))
+    rationale: list[str] = []
+    rationale.append(f"week grid source={resolved_week.source} ({resolved_week.detail})")
+    rationale.append(f"archetype={archetype}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})")
+    if day_entry.get("session_role"):
+        rationale.append(f"session_role={day_entry['session_role']}")
+    if day_entry.get("optional"):
+        rationale.append(f"OPTIONAL session — {day_entry.get('gate') or 'not required this week'}")
+    if not z2_ok:
+        rationale.append(f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {week_cfg['z2_floor_minutes']}; portfolio guard active")
+
+    skill_ceiling = week_cfg.get("skill_ceiling", 2)
+    notes_mode = week_cfg.get("exercise_notes_mode", "one_best_line")
+    rng = _seeded_random(inputs.target_date, "ideal")
+    budget_used: dict[str, int] = {}
+    exercises: list[ExerciseBlock] = []
+
+    # ADR-068: pre-load exercise history once per generation. Pure data;
+    # downstream renderers can quote but cannot invent.
+    history_index, weight_index, cardio_index, whoop_index = _load_note_indexes(week_cfg, notes_mode)
 
     budgets: dict[str, int] = {}
     for muscle in targets:
@@ -1049,7 +1078,11 @@ def _non_lifting_pair(
     week_cfg: dict[str, Any],
     landmarks: dict[str, Any],
     catalog: dict[str, Any],
+    day_entry: dict[str, Any] | None = None,
 ) -> list[RoutineSpec]:
+    rationale = [f"non-lifting day: archetype={archetype}"]
+    if day_entry and day_entry.get("source") == "block_calendar":
+        rationale.append(f"block calendar: {day_entry.get('label')}")
     ideal = RoutineSpec(
         routine_id=_new_routine_id(inputs.target_date, archetype, "ideal"),
         target_date=inputs.target_date,
@@ -1069,7 +1102,7 @@ def _non_lifting_pair(
         exercises=[],
         budget_used={},
         inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog),
-        rationale=[f"non-lifting day: archetype={archetype}"],
+        rationale=rationale,
         caps={"total_sets": 0, "session_minutes": 60},
     )
     return [ideal]

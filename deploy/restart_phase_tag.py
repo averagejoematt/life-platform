@@ -91,8 +91,15 @@ def taxonomy_class(item: dict) -> str:
 def extract_date(item: dict) -> str | None:
     """Return YYYY-MM-DD for the item's date dimension, or None.
 
-    Order: explicit `date` attr → date substring in sk → first known timestamp attr.
+    Order: `phase_taxonomy.provenance_date()` FIRST (#4059 — a dispute-docket verdict or a
+    coach thread whose own `date`/sk carries an outcome or content-reference date rather
+    than its creation/opening instant; returns None for every other shape, so this is a
+    no-op override outside those two families) → explicit `date` attr → date substring in
+    sk → first known timestamp attr.
     """
+    provenance = taxonomy.provenance_date(item)
+    if provenance:
+        return provenance
     explicit = item.get("date")
     if isinstance(explicit, str) and ISO_DATE_RE.match(explicit):
         return explicit[:10]

@@ -239,6 +239,7 @@ def test_dry_run_never_writes(monkeypatch):
     monkeypatch.setattr(sweep.boto3, "resource", lambda *a, **kw: type("R", (), {"Table": lambda s, n: _RecordingTable()})())
     monkeypatch.setattr(sweep.boto3, "client", lambda *a, **kw: _FakeS3([]))
     monkeypatch.setattr(sweep, "SCOPED_SOURCES", ("anomalies",))
+    monkeypatch.setattr(sweep, "coach_partitions", lambda: [])  # #4059: isolate the SOURCE# surface this test targets
     monkeypatch.setattr(sys, "argv", ["phase_stamp_sweep.py"])
     rc = sweep.main()
     assert rc == 0
@@ -259,10 +260,61 @@ def test_apply_writes_the_pilot_phase(monkeypatch):
     monkeypatch.setattr(sweep.boto3, "resource", lambda *a, **kw: type("R", (), {"Table": lambda s, n: _RecordingTable()})())
     monkeypatch.setattr(sweep.boto3, "client", lambda *a, **kw: _FakeS3([]))
     monkeypatch.setattr(sweep, "SCOPED_SOURCES", ("anomalies",))
+    monkeypatch.setattr(sweep, "coach_partitions", lambda: [])  # #4059: isolate the SOURCE# surface this test targets
     monkeypatch.setattr(sys, "argv", ["phase_stamp_sweep.py", "--apply"])
     rc = sweep.main()
     assert rc == 0
     assert written == {"Key": {"pk": ANOMALIES_PK, "sk": "DATE#2026-09-05"}, "phase": "pilot"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #4059 — the corrector's surface now also reaches COACH# partitions
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_coach_surface_is_the_operational_roster():
+    """`coach_partitions()` derives from the same roster the wipe's COACH_PARTITIONS
+    registry-coverage check uses — not a hand list that can silently fall behind it."""
+    from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+    sweep = _load_sweep()
+    assert sweep.coach_partitions() == [f"COACH#{c}" for c in OPERATIONAL_COACH_IDS]
+    assert any(pk.startswith("COACH#") for pk in sweep.coach_partitions())
+
+
+def test_apply_corrects_a_mis_stamped_docket_prediction_on_the_coach_surface(monkeypatch):
+    """The #4040 live shape itself: a dispute-docket verdict opened before genesis, graded
+    after it, sitting on a COACH# pk this corrector used to never Query."""
+    sweep = _load_sweep()
+    written = {}
+    coach_pk = "COACH#explorer_coach"
+    docket_row = {
+        "pk": coach_pk,
+        "sk": "PREDICTION#docket-explorer_coach__nutrition_coach-calories-caloric-variance-interpretation-2026-08-03",
+        "created_at": "2026-08-03T17:41:16+00:00",
+        "outcome_date": "2026-09-07",
+        "resolved_at": "2026-09-07T09:12:00+00:00",
+        "cycle": 17,
+        "phase": "experiment",
+    }
+
+    class _RecordingTable:
+        def query(self, **kwargs):
+            pk = kwargs["KeyConditionExpression"].get_expression()["values"][1]
+            return {"Items": [docket_row] if pk == coach_pk else []}
+
+        def update_item(self, **kwargs):
+            written["Key"] = kwargs["Key"]
+            written["phase"] = kwargs["ExpressionAttributeValues"][":p"]
+
+    monkeypatch.setattr(sweep.boto3, "resource", lambda *a, **kw: type("R", (), {"Table": lambda s, n: _RecordingTable()})())
+    monkeypatch.setattr(sweep.boto3, "client", lambda *a, **kw: _FakeS3([]))
+    monkeypatch.setattr(sweep, "SCOPED_SOURCES", ())
+    monkeypatch.setattr(sweep, "coach_partitions", lambda: [coach_pk])
+    monkeypatch.setattr(sys, "argv", ["phase_stamp_sweep.py", "--apply"])
+    rc = sweep.main()
+    assert rc == 0
+    assert written == {"Key": {"pk": coach_pk, "sk": docket_row["sk"]}, "phase": "pilot"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

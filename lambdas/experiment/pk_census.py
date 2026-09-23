@@ -195,13 +195,23 @@ def scoped_partitions_from_snapshot(snapshot: dict) -> dict:
 # dry run, 2026-09-22; a read-only table-wide scan the same day found it on NO other
 # CROSS_PHASE family). The projection is now the whole of PROVENANCE_ATTRS — a test pins it.
 PROVENANCE_PROJECTION = {
-    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb, #tat, #treason",
+    # #3915: `#tat` (tombstoned_at) is on the projection so the census sees the 1,506
+    # calibration rows carrying it.
+    # #4059: `#created`/`#opened` feed `phase_taxonomy.provenance_date()` — without them
+    # in the projection, the COACH#*/PREDICTION#docket-* and SOURCE#coach_thread pain-flag
+    # shapes have no way to be dated correctly by a projected scan (check 21, the nightly
+    # leg): `created_at`/`opened_date` simply aren't in the payload to read. Two more
+    # attribute names on an already-cheap projection (Scan bills on bytes SCANNED, not
+    # projected — see COST above).
+    "ProjectionExpression": "pk, sk, #phase, #cycle, #tomb, #tat, #treason, #created, #opened",
     "ExpressionAttributeNames": {
         "#phase": "phase",
         "#cycle": "cycle",
         "#tomb": "tombstone",
         "#tat": "tombstoned_at",
         "#treason": "tombstoned_reason",
+        "#created": "created_at",
+        "#opened": "opened_date",
     },
 }
 
@@ -235,9 +245,16 @@ _ROW_DATE_RE = re.compile(r"(20\d\d-\d\d-\d\d)")
 
 
 def row_date(item: dict) -> str | None:
-    """YYYY-MM-DD for a row's own date dimension, or None: an explicit `date` attr, else the
-    first date in the sk. Mirrors deploy/restart_phase_tag.extract_date's order without
-    importing deploy/ (never staged into the bundle). An undated row is NOT guessed at."""
+    """YYYY-MM-DD for a row's own date dimension, or None: `phase_taxonomy.provenance_date()`
+    FIRST (#4059 — a dispute-docket verdict or coach-thread pain row whose `date`/sk carries
+    an outcome or content-reference date rather than its own creation/opening instant; a
+    no-op for every other shape), else an explicit `date` attr, else the first date in the
+    sk. Mirrors deploy/restart_phase_tag.extract_date's order without importing deploy/
+    (never staged into the bundle) — `phase_taxonomy` IS staged, so the shape-gated override
+    is shared rather than re-derived. An undated row is NOT guessed at."""
+    provenance = taxonomy.provenance_date(item)
+    if provenance:
+        return provenance
     explicit = item.get("date")
     if isinstance(explicit, str) and _ROW_DATE_RE.match(explicit):
         return explicit[:10]

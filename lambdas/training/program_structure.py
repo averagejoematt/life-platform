@@ -61,6 +61,7 @@ conflict stays, because `skill_ceiling` 2 still blocks the tier-3 barbell bench.
 
 from __future__ import annotations
 
+import datetime as _dt
 from typing import Any, Iterable
 
 ACTIVE = True
@@ -229,9 +230,9 @@ ROTATION_RULE: dict[str, Any] = {
     "note": (
         "The RULE is the red team's (S&C coach, 2026-09-22; approved by the owner 2026-09-21) and replaces v0.2's platform-proposed "
         "14-day no-repeat rotation. The 14-day measurement WINDOW is still the platform's choice — two passes of the week, so a fixed "
-        "set shows each accessory on two days and an addition shows as a movement the first week did not carry. The engine cannot see "
-        "block boundaries (no block calendar is recorded), so an addition inside the window is reported as drift and the honesty line "
-        "says a block boundary would make it legitimate."
+        "set shows each accessory on two days and an addition shows as a movement the first week did not carry. Since #4064 the "
+        "block calendar (`BLOCK_CALENDAR`) records the boundaries; an addition is still reported as drift, and the honesty line names "
+        "a boundary that falls inside the window, where the addition is legitimate."
     ),
 }
 
@@ -410,6 +411,378 @@ def anchor_reachability() -> dict[str, dict[str, Any]]:
     return out
 
 
+# ── the full-body SESSION: what §3 prescribes on each role (#4064) ───────────
+# Before #4064 the week grid carried `session_role` and the generator only printed it in
+# the rationale: a v0.3 "heavy" day was built by the v0.1 muscle-budget selector (every
+# landmark muscle at MEV//2, trimmed to the ceiling), with no top set, no back-offs, no
+# heavy/moderate rep ranges and no fixed accessories. The role was a label on a session
+# §3 did not describe. This is the machine-readable half of §3's session: which anchor
+# patterns each role trains, at which intensity, and which accessories ride with it.
+#
+# The DISTRIBUTION below (which anchor lands on which role, heavy or moderate) is the
+# platform's choice under three constraints §3 does state — each pattern 2x/wk, a heavy /
+# moderate / heavy-moderate week, and squat and hinge never heavy on the same day — so it
+# is labelled `platform-proposed` and `SESSION_DISTRIBUTION_PROVENANCE` says so wherever
+# the plan is read.
+HEVY_FOLDER = "Full Body"
+"""The Hevy routine folder v0.3 sessions are filed in. `mcp.hevy_routine_commit_report.
+FOLDER_BY_ARCHETYPE['full']` must name the same string (held by a test); the folder is
+found-or-created at the first commit (`ensure_folder`), never created ahead of time."""
+
+EXPOSURES: dict[str, dict[str, Any]] = {
+    "heavy": {
+        "top_sets": 1,
+        "reps": [4, 6],
+        "top_rpe": [7, 8],
+        "back_off_sets": 2,
+        "back_off_pct": -10,
+        "rest_seconds": 180,
+        "cue": "HEAVY: 1 top set of 4–6 @ RPE 7–8, then 2 back-offs at −10 % of the top set.",
+    },
+    "moderate": {"sets": 3, "reps": [6, 10], "rest_seconds": 120, "cue": "MODERATE: 3 sets of 6–10, leave 2–3 in the tank."},
+    "accessory": {"sets": 2, "reps": [8, 15], "rir": [1, 2], "rest_seconds": 90, "cue": "ACCESSORY: 2 sets of 8–15 at RIR 1–2."},
+}
+"""v0.3 §3's rep scheme as numbers. The one PROSE home is `owner_redlines.REDLINES
+['lifting_sessions_per_wk']['rep_scheme']`; a test holds every number here to that string."""
+
+SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
+    "heavy": {
+        "anchors": [["squat", "heavy"], ["bench", "heavy"], ["row", "heavy"], ["vertical_pull", "moderate"]],
+        "accessories": ["leg_curl", "db_lateral_raise"],
+    },
+    "moderate": {
+        "anchors": [["hinge", "moderate"], ["overhead_press", "moderate"], ["vertical_pull", "moderate"], ["squat", "moderate"]],
+        "accessories": ["cable_tricep_pushdown", "db_curl", "calf_raise_machine"],
+    },
+    "heavy_moderate": {
+        "anchors": [["hinge", "heavy"], ["overhead_press", "heavy"], ["bench", "moderate"], ["row", "moderate"]],
+        "accessories": ["machine_crunch", "cable_chest_fly"],
+    },
+    "optional_fourth": {
+        "anchors": [["squat", "moderate"], ["bench", "moderate"], ["row", "moderate"], ["vertical_pull", "moderate"]],
+        "accessories": [],
+    },
+}
+"""Per role: the anchor exposures (pattern, intensity) and the block-fixed accessories.
+
+The three required roles train every pattern exactly twice (held by a test); the optional
+fourth is anchors-only at moderate intensity and is EXTRA — it is never counted toward the
+2x/wk, so skipping it costs nothing the program depends on. Accessories come from
+`ACCESSORY_POOL['full']`, fixed per role for the block (`ROTATION_RULE`)."""
+
+SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
+    "provenance": "platform-proposed",
+    "stated": "2026-09-22",
+    "issue": "#4064",
+    "note": (
+        "§3 fixes the ROLES (heavy / moderate / heavy-moderate), the 2x/wk per anchor and the rep scheme; it does not say which "
+        "anchor lands on which day. This placement puts squat and hinge heavy on different days, gives each role four anchor "
+        "exposures (12 anchor sets) plus 2–3 accessories at 2 sets (16–18 sets, inside the 18-set ceiling), and totals 50 hard "
+        "sets/wk — the floor of §3's 50–65. Vertical pull is never heavy (pulldowns rarely are). Nobody has ratified the placement."
+    ),
+}
+
+DELOAD_RULE: dict[str, Any] = {
+    "rule": "every 6th week of the calendar: −30 % sets (rounded to whole sets, accessories and back-offs first), loads held",
+    "provenance": "owner",
+    "one_home": "owner_redlines.REDLINES['lifting_sessions_per_wk']['deload']",
+}
+
+
+def _deload_cfg() -> dict[str, Any]:
+    from training import owner_redlines
+
+    return dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"])
+
+
+# ── the BLOCK CALENDAR (#4064) ───────────────────────────────────────────────
+# Owner, 2026-09-22 (#4064): block 1 starts Thursday 2026-09-24 — Thu 09-24, Sat 09-26,
+# Mon 09-28 — and then runs Mon/Wed/Fri. The session SEQUENCE is continuous: after the
+# opening three, the next Mon/Wed/Fri day is Wed 09-30, so every program week from week 2
+# is Wed → Fri → Mon (heavy → moderate → heavy-moderate) and no session is skipped or
+# doubled at the seam. A program week is three consecutive sessions; it runs from its first
+# session to the day before the next week's first session (week 1: Thu 09-24 .. Tue 09-29;
+# week 2: Wed 09-30 .. Tue 10-06). Deload every 6th week, from `owner_redlines` (one home).
+#
+# The weekday grid above (`_SCHEDULE`) still answers for any date BEFORE block 1 — and it is
+# what the JSON-era v0.2 path never sees at all: this calendar is consulted only when the
+# program is ACTIVE and the seam serves the module grid.
+BLOCK_CALENDAR: dict[str, Any] = {
+    "block_1_start": "2026-09-24",
+    "opening_sessions": ["2026-09-24", "2026-09-26", "2026-09-28"],
+    "steady_weekdays": [0, 2, 4],  # Mon / Wed / Fri, 0 = Monday
+    "session_roles": ["heavy", "moderate", "heavy_moderate"],
+    "sessions_per_week": 3,
+    "weeks_per_block": 6,
+    "optional_fourth_weekday": 5,  # Saturday, weeks >= 2, never in a deload week
+    "provenance": "owner",
+    "stated": "2026-09-22",
+    "issue": "#4064",
+    "note": (
+        "Dates are the owner's (#4064). Reading 'then Mon/Wed/Fri' as the CONTINUOUS sequence (Wed 09-30 follows Mon 09-28) rather "
+        "than restarting on Mon 10-05 is the platform's reading — the alternative leaves a 7-day gap after week 1."
+    ),
+}
+
+_WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_ROLE_LABEL = {"heavy": "HEAVY", "moderate": "MODERATE", "heavy_moderate": "HEAVY-MODERATE", "optional_fourth": "OPTIONAL 4th"}
+
+
+def _day(day: str):
+    from common.pacific_time import parse_day_key
+
+    parsed = parse_day_key(day)
+    if parsed is None:
+        raise ValueError(f"not a YYYY-MM-DD day key: {day!r}")
+    return parsed
+
+
+def _session_dates(until: str | None = None, n_sessions: int | None = None) -> list[str]:
+    """The calendar's session dates in order — every one on or before `until`, or the first
+    `n_sessions`. Exactly one of the two bounds must be given."""
+    if (until is None) == (n_sessions is None):
+        raise ValueError("_session_dates needs exactly one of until / n_sessions")
+    cal = BLOCK_CALENDAR
+    out = list(cal["opening_sessions"])
+    stop = _day(until) if until else None
+    cursor = _day(out[-1])
+    steady = set(cal["steady_weekdays"])
+    while True:
+        if n_sessions is not None and len(out) >= n_sessions:
+            return out[:n_sessions]
+        if stop is not None and cursor >= stop:
+            return [d for d in out if _day(d) <= stop]
+        cursor = cursor + _dt.timedelta(days=1)
+        if cursor.weekday() in steady:
+            out.append(cursor.isoformat())
+
+
+def block_calendar(weeks: int = 13) -> list[dict[str, Any]]:
+    """The first `weeks` program weeks: dates, roles, block number and deload flag.
+
+    Pure arithmetic over `BLOCK_CALENDAR` and the redline's deload period — no I/O, no
+    stored rows, so the calendar can never disagree with the program module it came from.
+    """
+    per = BLOCK_CALENDAR["sessions_per_week"]
+    roles = BLOCK_CALENDAR["session_roles"]
+    every = int(_deload_cfg()["every_nth_week"])
+    dates = _session_dates(n_sessions=weeks * per + 1)
+    out: list[dict[str, Any]] = []
+    for w in range(weeks):
+        wk = w + 1
+        sess = dates[w * per : (w + 1) * per]
+        out.append(
+            {
+                "week": wk,
+                "block": (wk - 1) // BLOCK_CALENDAR["weeks_per_block"] + 1,
+                "deload": wk % every == 0,
+                "starts": sess[0],
+                "ends": (_day(dates[(w + 1) * per]) - _dt.timedelta(days=1)).isoformat(),
+                "sessions": [
+                    {"date": d, "weekday": _WEEKDAY_NAMES[_day(d).weekday()], "session_role": roles[i]} for i, d in enumerate(sess)
+                ],
+            }
+        )
+    return out
+
+
+def calendar_entry(day: str) -> dict[str, Any] | None:
+    """The schedule entry the block calendar assigns to `day`, or None before block 1.
+
+    Same shape as a `week_grid()['schedule']` entry (archetype / label / session_role /
+    optional) plus `week`, `block`, `deload` and `source: "block_calendar"`, so the
+    generator reads it exactly where it used to read the weekday grid.
+    """
+    target = _day(day)
+    if target < _day(BLOCK_CALENDAR["block_1_start"]):
+        return None
+    per = BLOCK_CALENDAR["sessions_per_week"]
+    roles = BLOCK_CALENDAR["session_roles"]
+    every = int(_deload_cfg()["every_nth_week"])
+    dates = _session_dates(until=day)
+    # the session index of the last session on or before `day`
+    idx = len(dates) - 1
+    week = idx // per + 1
+    block = (week - 1) // BLOCK_CALENDAR["weeks_per_block"] + 1
+    deload = week % every == 0
+    base = {"week": week, "block": block, "deload": deload, "source": "block_calendar"}
+    wd = _WEEKDAY_NAMES[target.weekday()]
+    if dates and dates[-1] == day:
+        role = roles[idx % per]
+        return {
+            **base,
+            "archetype": "full",
+            "session_role": role,
+            "label": f"{wd} full-body {_ROLE_LABEL[role]} — week {week}, block {block}" + (" (DELOAD)" if deload else ""),
+        }
+    if week >= 2 and not deload and target.weekday() == BLOCK_CALENDAR["optional_fourth_weekday"]:
+        return {
+            **base,
+            "archetype": "full",
+            "session_role": "optional_fourth",
+            "optional": True,
+            "gate": _SCHEDULE["5"]["gate"],
+            "label": f"{wd} OPTIONAL 4th full-body (only after two green recovery days) — week {week}",
+        }
+    return {**base, "archetype": "aerobic", "label": f"{wd} walk — week {week}, block {block}" + (" (DELOAD week)" if deload else "")}
+
+
+def _deload_trim(exposures: list[dict[str, Any]], pct: int) -> dict[str, Any]:
+    """Remove |pct| % of the session's sets (rounded), IN PLACE; loads are never touched.
+
+    Round-robin, one set per pass: accessories first, then moderate anchors, then heavy
+    back-offs. A top set is never removed and no exposure drops below one set — so the
+    deload keeps every anchor in the session and every top set at its load.
+    """
+    before = sum(len(e["sets"]) for e in exposures)
+    target = before - int(round(before * abs(pct) / 100.0))
+    order = [e for e in exposures if e["kind"] == "accessory"]
+    order += [e for e in exposures if e["kind"] == "anchor" and e["intensity"] == "moderate"][::-1]
+    order += [e for e in exposures if e["kind"] == "anchor" and e["intensity"] == "heavy"][::-1]
+    total = before
+    progressed = True
+    while total > target and progressed:
+        progressed = False
+        for e in order:
+            if total <= target:
+                break
+            removable = [i for i, s in enumerate(e["sets"]) if s["kind"] != "top"]
+            if len(e["sets"]) > 1 and removable:
+                e["sets"].pop(removable[-1])
+                total -= 1
+                progressed = True
+    return {"sets_before": before, "sets_after": total, "pct": pct, "loads": "held"}
+
+
+def _resolve_movement(keys: list[str], catalog_movements: dict[str, Any] | None, skill_ceiling: int, taken: set[str]):
+    """The first catalog key of a pattern the generator may prescribe, in the listed order."""
+    if catalog_movements is None:
+        return None, "movement catalog not read — the pattern is prescribed, the movement is unresolved"
+    skipped: list[str] = []
+    for k in keys:
+        m = catalog_movements.get(k)
+        if m is None:
+            skipped.append(f"{k} (not in catalog)")
+            continue
+        if int(m.get("skill_tier", 99)) > skill_ceiling:
+            skipped.append(f"{k} (skill_tier {m.get('skill_tier')} > ceiling {skill_ceiling})")
+            continue
+        if k in taken:
+            skipped.append(f"{k} (already in this session)")
+            continue
+        return k, ("skipped: " + ", ".join(skipped)) if skipped else None
+    return None, "no reachable member: " + ", ".join(skipped)
+
+
+def session_prescription_for_role(
+    role: str,
+    *,
+    deload: bool = False,
+    catalog_movements: dict[str, Any] | None = None,
+    skill_ceiling: int = 2,
+) -> dict[str, Any]:
+    """§3's session for one role, as data: exposures, sets (top / back_off / working), reps.
+
+    Pure. `catalog_movements` (the movement catalog's `movements` dict) resolves each
+    pattern to the first member the generator may prescribe; without it the movements are
+    `None` and the result says so rather than guessing.
+    """
+    tmpl = SESSION_TEMPLATES[role]
+    taken: set[str] = set()
+    exposures: list[dict[str, Any]] = []
+    for pattern, intensity in tmpl["anchors"]:
+        spec = EXPOSURES[intensity]
+        key, why = _resolve_movement(ANCHORS[pattern]["catalog_keys"], catalog_movements, skill_ceiling, taken)
+        if key:
+            taken.add(key)
+        if intensity == "heavy":
+            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(spec["top_rpe"])}] + [
+                {"kind": "back_off", "reps": list(spec["reps"]), "pct_of_top": 100 + spec["back_off_pct"]}
+                for _ in range(spec["back_off_sets"])
+            ]
+        else:
+            sets = [{"kind": "working", "reps": list(spec["reps"])} for _ in range(spec["sets"])]
+        exposures.append(
+            {
+                "kind": "anchor",
+                "pattern": pattern,
+                "intensity": intensity,
+                "movement_key": key,
+                "resolution_note": why,
+                "sets": sets,
+                "rest_seconds": spec["rest_seconds"],
+                "cue": spec["cue"],
+            }
+        )
+    acc = EXPOSURES["accessory"]
+    for k in tmpl["accessories"]:
+        # an accessory is named by its catalog key already; without the catalog it is still
+        # prescribable by that key, it just has not been checked against the skill ceiling
+        key, why = _resolve_movement([k], catalog_movements, skill_ceiling, taken) if catalog_movements is not None else (k, None)
+        if key:
+            taken.add(key)
+        exposures.append(
+            {
+                "kind": "accessory",
+                "pattern": None,
+                "intensity": "accessory",
+                "movement_key": key,
+                "resolution_note": why,
+                "sets": [{"kind": "working", "reps": list(acc["reps"])} for _ in range(acc["sets"])],
+                "rest_seconds": acc["rest_seconds"],
+                "cue": acc["cue"],
+            }
+        )
+    deload_info = None
+    if deload:
+        deload_info = _deload_trim(exposures, int(_deload_cfg()["sets_pct"]))
+    return {
+        "archetype": "full",
+        "session_role": role,
+        "role_label": _ROLE_LABEL[role],
+        "deload": deload,
+        "deload_trim": deload_info,
+        "exposures": exposures,
+        "total_sets": sum(len(e["sets"]) for e in exposures),
+        "hevy_folder": HEVY_FOLDER,
+        "distribution": SESSION_DISTRIBUTION_PROVENANCE,
+    }
+
+
+def planned_session(day: str, *, catalog_movements: dict[str, Any] | None = None, skill_ceiling: int = 2) -> dict[str, Any]:
+    """What the program schedules on `day`: the calendar entry, and — on a lifting day — the
+    §3 session. Before block 1 the weekday grid answers, and the result says which did.
+
+    Only meaningful when the program is ACTIVE; the caller (`plan_engine`) reports the
+    JSON grid instead when it is not.
+    """
+    entry = calendar_entry(day)
+    if entry is None:
+        grid = dict(_SCHEDULE[str(_day(day).weekday())])
+        entry = {
+            **grid,
+            "source": "week_grid",
+            "note": f"before block 1 ({BLOCK_CALENDAR['block_1_start']}) — the weekday grid answers",
+        }
+    out: dict[str, Any] = {"date": day, "program_version": PROGRAM_VERSION, **entry}
+    role = entry.get("session_role")
+    if entry.get("archetype") == "full" and role in SESSION_TEMPLATES:
+        out["prescription"] = session_prescription_for_role(
+            role, deload=bool(entry.get("deload")), catalog_movements=catalog_movements, skill_ceiling=skill_ceiling
+        )
+    return out
+
+
+def weekly_sets_by_pattern() -> dict[str, int]:
+    """Anchor sets per pattern over the three REQUIRED roles (optional fourth excluded)."""
+    out: dict[str, int] = {}
+    for role in BLOCK_CALENDAR["session_roles"]:
+        for e in session_prescription_for_role(role)["exposures"]:
+            if e["kind"] == "anchor":
+                out[e["pattern"]] = out.get(e["pattern"], 0) + len(e["sets"])
+    return out
+
+
 # ── the conflicts this program has not resolved ──────────────────────────────
 # Named here rather than discovered later. `summary()` carries them into every constraint
 # block, so a plan built on this program cannot be built on a silent override.
@@ -518,14 +891,29 @@ def classify_movement(name: str) -> str:
 def _shift_day(day: str, delta_days: int) -> str:
     """Shift a DATE# day key by whole days — through THE calendar-day parse (#3609: the ISO-parse
     registry is shrink-only, so a day key is never parsed with `date.fromisoformat` here)."""
-    import datetime as _dt
-
     from common.pacific_time import parse_day_key
 
     parsed = parse_day_key(day)
     if parsed is None:
         raise ValueError(f"not a YYYY-MM-DD day key: {day!r}")
     return (parsed + _dt.timedelta(days=delta_days)).isoformat()
+
+
+def _boundary_honesty(window_start: str, window_end: str) -> str:
+    """The honesty line about block boundaries, read from the block calendar (#4064)."""
+    lead = f"the {ROTATION_RULE['window_days']}-day window is {ROTATION_RULE['window_provenance']}"
+    try:
+        weeks = block_calendar(weeks=60)
+    except ValueError:
+        weeks = []
+    starts = [w["starts"] for w in weeks if w["week"] > 1 and (w["week"] - 1) % BLOCK_CALENDAR["weeks_per_block"] == 0]
+    inside = [d for d in starts if window_start < d <= window_end]
+    if inside:
+        return (
+            f"{lead}; the block calendar puts a block boundary on {inside[0]} inside it, so an accessory added from that day "
+            "is legitimate, not drift"
+        )
+    return f"{lead}; the block calendar puts no block boundary inside it, so an addition here is drift"
 
 
 def accessory_rotation(
@@ -656,10 +1044,7 @@ def accessory_rotation(
                     if ACTIVE
                     else f"the accessory rule is PROPOSED ({ISSUE}, gate:owner) — this is a measurement of what happened, not a compliance verdict against an approved program"
                 ),
-                (
-                    f"the {ROTATION_RULE['window_days']}-day window is {ROTATION_RULE['window_provenance']}: the engine has no block calendar, "
-                    "so an addition at a genuine block boundary reads as drift here"
-                ),
+                _boundary_honesty(window_start, window_end),
                 (
                     "anchor repeats are EXEMPT by design (progressive overload) — they are reported separately under anchors_trained"
                     if anchor_days
@@ -693,6 +1078,10 @@ def summary() -> dict[str, Any]:
         "lifting_days": lifting_days(),
         "accessory_pool": ACCESSORY_POOL,
         "rotation_rule": ROTATION_RULE,
+        # #4064: the calendar the sessions are placed on, and the weekly anchor dose it produces
+        "block_calendar": BLOCK_CALENDAR,
+        "session_distribution": SESSION_DISTRIBUTION_PROVENANCE,
+        "weekly_anchor_sets": weekly_sets_by_pattern(),
         "day_shape": DAY_SHAPE,
         "week_grid_provenance": WEEK_GRID_PROVENANCE,
         "conflicts": conflicts(),
