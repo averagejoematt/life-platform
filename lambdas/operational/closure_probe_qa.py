@@ -48,6 +48,7 @@ never gate ci-cd's rollback. The leg never raises (every failure is a reported W
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.parse
@@ -56,6 +57,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from operational import proof_probe as pp
+
+try:
+    from common.platform_logger import get_logger
+
+    logger = get_logger("qa-smoke")
+except ImportError:
+    logger = logging.getLogger("qa-smoke")
 
 REPO = os.environ.get("CLOSURE_PROBE_REPO", "averagejoematt/life-platform")
 TOKEN_SECRET_ENV = "CLOSURE_PROBE_TOKEN_SECRET"  # noqa: S105 — an env-var NAME, not a secret
@@ -143,7 +151,7 @@ def load_token(secrets_client_factory: Callable[[], Any]) -> Optional[str]:
 
         return get_secret(secret_id, secrets_client_factory()).strip() or None
     except Exception as e:  # noqa: BLE001 — a missing credential degrades to report-only, it never raises
-        print(f"[QA] closure-probe: write credential unreadable ({type(e).__name__}) — report-only this run")
+        logger.warning(f"[QA] closure-probe: write credential unreadable ({type(e).__name__}) — report-only this run")
         return None
 
 
@@ -366,7 +374,7 @@ def _run(c, checks, table, s3, bucket, site_base_url, event, dry_run, github, cl
             continue
         ok, detail = close_issue(gh, s3, bucket, n, comment, now)
         buckets["closed" if ok else "close_failed"].append(f"#{n} {detail}")
-        print(f"[QA] closure-probe #{n}: {detail}")
+        logger.info(f"[QA] closure-probe #{n}: {detail}")
     summary = (
         f"{len(issues)} open `{pp.INSTRUMENT_LABEL}` issue(s): closed {len(buckets['closed'])}"
         + (f" ({', '.join(s.split(' ', 1)[0] for s in buckets['closed'])})" if buckets["closed"] else "")
