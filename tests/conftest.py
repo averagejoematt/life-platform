@@ -403,6 +403,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # a PR that refreshes the census must red on itself if the refreshed set is no
         # longer covered, not on whoever merges next.
         "test_restart_wipe_coverage.py",
+        # #4108: reads `config/movement_catalog.json`, which `deploy/build_movement_catalog.py`
+        # regenerates from the Hevy history — a PR that lands a rebuilt catalog must red on
+        # itself (a fixture entry gone, a tier rule broken), not on whoever merges next.
+        # Picked up by `reset_artifact_test_files()`; named here in the same PR (PR #4124).
+        "test_movement_catalog_4108.py",
         "test_restart_verify_gates_3477.py",
         "test_v4_redirects_function.py",
         # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
@@ -758,6 +763,9 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # (generator + chat gate). Pure repo shape: a second load path is exactly a PR's
         # own diff, so it must red pre-merge.
         "test_v03_nearest_band_anchor_4107.py",
+        # #4075: an rglob sweep of lambdas/ + mcp/ keeping the TRIMP exponent in one module. Pure
+        # repo shape — a second copy is exactly a PR's own diff.
+        "test_training_load.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own

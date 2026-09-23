@@ -38,6 +38,7 @@ from common.repo_config import config_dir
 
 from training import program_structure  # #3755: the program as data (anchors, accessory pool)
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
+from training.movement_catalog import generator_eligible  # #4108: the ONE auto-programming rule
 from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
@@ -444,7 +445,9 @@ def _select_movements_for_muscle(
     candidates = [
         (k, v)
         for k, v in catalog["movements"].items()
-        if v.get("primary_muscle") == muscle and v.get("skill_tier", 99) <= skill_ceiling and k not in chosen_so_far
+        # #4108: the skill ceiling AND the prescribable-shape rule (reviewed, or carries a rep
+        # range) — one predicate in training.movement_catalog, no frequency gate (owner ruling C).
+        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling) and k not in chosen_so_far
     ]
     if not candidates:
         return []

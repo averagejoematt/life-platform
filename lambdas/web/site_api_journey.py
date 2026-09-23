@@ -102,7 +102,9 @@ def journey(*, _g) -> dict:
 
     if not weight_series:
         # G-4: Fall back to last known weight — never return 503 for missing recent data.
-        withings_latest = _latest_item("withings")
+        # #4088: the journey is THIS experiment's — the fallback is genesis DATE-clamped
+        # (#3478: Day 1 before the first weigh-in reports no weigh-in), not phase-filtered.
+        withings_latest = _latest_item("withings", since=EXPERIMENT_START)
         if withings_latest and withings_latest.get("weight_lbs") is not None:
             last_date = withings_latest.get("sk", "").replace("DATE#", "") or withings_latest.get("date", today)
             weight_series = [(last_date, float(withings_latest["weight_lbs"]))]
@@ -120,7 +122,8 @@ def journey(*, _g) -> dict:
     # #491/M-6: the shared resolution can find a NEWER Apple Health weigh-in
     # (travel scale) than the Withings series — same helper as vitals/character.
     try:
-        _ah_start = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
+        # #4088: genesis DATE clamp — the same "this experiment" frame as the withings series above.
+        _ah_start = max((datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
         _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
         # #3478: against a SYNTHETIC anchor the `>` test is wrong twice over — the
         # anchor is the genesis date, so a real Day-1 weigh-in dated ON genesis

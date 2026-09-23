@@ -1021,6 +1021,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("site/assets/js/_census_probe_4035_rate.js", _RATE_WITH_NO_N_JS),),
         track=False,  # the gate rglobs site/assets/js/ on disk, so an untracked module is in scope
     ),
+    "structural::test_training_load.py": MutationSpec(
+        gate_id="structural::test_training_load.py",
+        target="tests/test_training_load.py",
+        detects=(
+            "a SECOND copy of the Banister TRIMP exponent (`exp(1.92 …`) outside training/training_load.py — a load "
+            "model beside the one #4075 made TSB, readiness and the energy input share"
+        ),
+        plants=(
+            ("lambdas/training/_census_probe_4075.py", "import math\n\n\ndef trimp(hrr):\n    return hrr * 0.64 * math.exp(1.92 * hrr)\n"),
+        ),
+        track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1698,6 +1710,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "reds by filename. STILL INVISIBLE, stated: a file that renders the rate through a shared "
         "helper/import rather than the literal field name, and lost_lbs-only consumers (a raw signed "
         "delta, not a computed rate — out of scope by the test's own docstring).",
+        proved_on="2026-09-23",
+    ),
+    "structural::test_training_load.py": _proof(
+        "structural::test_training_load.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 24 passed in 0.20s | mutated: 1 failed, 23 passed in 0.22s "
+        ":: tests/test_training_load.py::test_no_second_trimp_implementation_in_the_training_or_compute_paths | "
+        "reverted: 24 passed in 0.19s",
+        "Covers the SET: every .py under lambdas/ and mcp/ on disk (rglob, so an untracked module is in scope), grepped "
+        "for the Banister exponent `exp(1.92`; two allowlisted homes (training/training_load.py, and the legacy "
+        "mcp/helpers load model #4075 names as the next consolidation). STILL INVISIBLE, stated: a TRIMP written with a "
+        "different constant spelling (e.g. `math.e ** (1.92*x)` or a named constant), and any load model that is not "
+        "TRIMP-shaped at all.",
         proved_on="2026-09-23",
     ),
 }

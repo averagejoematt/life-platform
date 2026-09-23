@@ -340,9 +340,10 @@ def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any], walk: "_L
         return None
     nlow = name.lower()
 
-    # 2. curated catalog, exact title
+    # 2. curated catalog, exact title — #4108: reviewed entries only; a Hevy-history entry's
+    #    title is an index title, and step 3 resolves it to the same template id
     for k, v in catalog.items():
-        if (v.get("title") or "").strip().lower() == nlow:
+        if v.get("reviewed", True) and (v.get("title") or "").strip().lower() == nlow:
             return k
 
     # 3. full Hevy index, exact normalized title
@@ -356,8 +357,12 @@ def _resolve_movement_key(ex: dict[str, Any], catalog: dict[str, Any], walk: "_L
     if fuzzy_id:
         return "tmpl:" + fuzzy_id
 
-    # 5. loose contains within the curated catalog only (small + trusted)
+    # 5. loose contains within the curated catalog only (small + trusted). #4108: the catalog also
+    #    carries every Hevy-history exercise (`reviewed: false`); a substring match over ~540
+    #    titles is a guess, so this step still reads ONLY the reviewed entries.
     for k, v in catalog.items():
+        if not v.get("reviewed", True):
+            continue
         title = (v.get("title") or "").strip().lower()
         if title and (nlow in title or title in nlow):
             return k
