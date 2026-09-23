@@ -438,7 +438,7 @@ def tool_plan_next_session(args):
     target_date = args.get("target_date") or pacific_today()
     routine_id = args.get("routine_id")
 
-    from training import plan_engine
+    from training import accessory_strength_trend, plan_engine
 
     # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
     # never a stage-2 run that silently ignored it and left the veto standing unexplained.
@@ -681,6 +681,9 @@ def tool_plan_next_session(args):
     )
     _merge_walking_volume(block, walk_layer)
     _attach_session_loads(block, target_date, catalog_movements)
+    # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
+    # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
+    accessory_strength_trend.attach(block, evidence)
 
     out: dict[str, Any] = {
         "target_date": target_date,
