@@ -2130,3 +2130,138 @@ GUARD_PROOFS.update(
         }
     }
 )
+
+
+# ── #4035: the newcomer glossary's GLOSS_ALLOWLIST + GLOSS_EXEMPT_PAGES entries ────────
+#
+# Each entry proved in BOTH directions by
+# tests/test_glossary_4035.py::test_each_allowlist_entry_is_load_bearing_and_not_blanket /
+# ::test_each_exempt_page_entry_is_load_bearing_and_not_blanket, against the REAL
+# production regex/constants (v4_glossary.ACRONYM_RE, .GLOSS_ALLOWLIST, .scan_content_text)
+# over synthetic input — offline, no dependency on whether the term/page currently appears
+# live (an allowlist entry that appears nowhere on today's site would otherwise be
+# unprovable by a live-tree scan alone, and would wrongly read as decoration).
+#
+# (a) LOAD-BEARING: the entry removed from a COPY of the registry; the real gate logic
+#     must now flag the exact thing the entry used to excuse.
+# (b) NOT A BLANKET EXEMPTION: with the full registry intact, a DIFFERENT off-list
+#     token/page is still caught — the entry excuses only itself.
+#
+# Building this proof entry-by-entry FOUND a real defect: three single-letter roman
+# numerals (I, V, X) were allowlisted but v4_glossary.ACRONYM_RE's own `\b[A-Z]{2,6}\b`
+# floor can never match a 1-character token, so those three entries were declared-unwired
+# by construction — the exact class this census exists to catch, one layer up from the
+# gate they sat beside. Removed 2026-09-23 (scripts/v4_glossary.py); the 51/2 counts below
+# are what remained, and every one of them fired for real under this proof.
+
+_GLOSS_COMMAND = (
+    "python3 -m pytest tests/test_glossary_4035.py::test_each_allowlist_entry_is_load_bearing_and_not_blanket "
+    "tests/test_glossary_4035.py::test_each_exempt_page_entry_is_load_bearing_and_not_blanket -q   "
+    "# 53 parametrised cases (51 allowlist + 2 exempt pages), 2026-09-23: 53 passed in 0.92s"
+)
+
+_GLOSS_ALLOWLIST_ENTRIES = (
+    "AI",
+    "AM",
+    "AND",
+    "API",
+    "AWS",
+    "BLUNT",
+    "BRIEF",
+    "CDK",
+    "CI",
+    "CLAUDE",
+    "CRM",
+    "CSV",
+    "DAILY",
+    "DATE",
+    "DDB",
+    "DRAWN",
+    "EMA",
+    "FALSE",
+    "FIRST",
+    "FIXED",
+    "FROZEN",
+    "GET",
+    "HR",
+    "IAM",
+    "II",
+    "III",
+    "IP",
+    "IV",
+    "IX",
+    "JS",
+    "LAST",
+    "MIT",
+    "NOT",
+    "NOTE",
+    "ONE",
+    "ONLY",
+    "POLICY",
+    "PR",
+    "QA",
+    "README",
+    "SCOPE",
+    "SES",
+    "SHA",
+    "SHIPS",
+    "SOURCE",
+    "UTC",
+    "VI",
+    "VII",
+    "VIII",
+    "WARM",
+    "YEAR",
+)
+
+_GLOSS_SKIPPED_PAGE_ENTRIES = ("/method/mirror/", "/method/registry/")
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::scripts/v4_glossary.py::GLOSS_ALLOWLIST::{term}": {
+            "gate_name": f"GLOSS_ALLOWLIST[{term}]",
+            "command": _GLOSS_COMMAND,
+            "mutation": (
+                f"(a) `{term}` removed from a copy of GLOSS_ALLOWLIST — the real ACRONYM_RE match on "
+                f"'{term} appears in prose.' is then checked against the reduced set. "
+                f"(b) `{term}` left in the full allowlist, alongside the off-list plant 'ZQXVK' in the "
+                "same synthetic prose."
+            ),
+            "observed": (
+                f"(a) exit 1 (assertion) if this were the shipped gate's live scan — reproduced instead as a "
+                f"direct check: ACRONYM_RE matches '{term}', and with `{term}` removed from the allowlist copy "
+                f"it lands in the offender set exactly as test_no_unregistered_acronym_coinage's own offender "
+                f"loop would report. (b) with `{term}` present, only 'ZQXVK' lands in the offender set — "
+                f"`{term}`'s exemption does not swallow it. Watched 2026-09-23, "
+                "PASSED[" + term + "] in the 53-case parametrised run above."
+            ),
+            "scope": "",
+            "proved_on": "2026-09-23",
+        }
+        for term in _GLOSS_ALLOWLIST_ENTRIES
+    }
+)
+
+REGISTRY_PROOFS.update(
+    {
+        f"registry::scripts/v4_glossary.py::GLOSS_EXEMPT_PAGES::{page}": {
+            "gate_name": f"GLOSS_EXEMPT_PAGES[{page}]",
+            "command": _GLOSS_COMMAND,
+            "mutation": (
+                f"(a) `{page}` removed from a copy of GLOSS_EXEMPT_PAGES, monkeypatched onto the real module; "
+                "v4_glossary.scan_content_text() is called on that page path with fixed synthetic prose ('RMSSD "
+                "lives here, already defined inline.'). (b) the full exempt set restored, a DIFFERENT page path "
+                "(/data/vitals/) scanned with the same prose."
+            ),
+            "observed": (
+                f"(a) scan_content_text('{page}') returns the full prose text (non-empty) once its own exempt "
+                "entry is removed — it is no longer skipped. (b) with the full set restored, /data/vitals/ (not "
+                "exempt) still returns non-empty prose — the entry excuses only its own page. Watched 2026-09-23, "
+                f"PASSED[{page}] in the 53-case parametrised run above."
+            ),
+            "scope": "",
+            "proved_on": "2026-09-23",
+        }
+        for page in _GLOSS_SKIPPED_PAGE_ENTRIES
+    }
+)

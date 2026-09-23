@@ -26,6 +26,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 
@@ -109,6 +111,58 @@ def test_no_unregistered_acronym_coinage():
         "entry to v4_glossary.GLOSS_ALLOWLIST:\n"
         + "\n".join(f"  {tok}: {', '.join(sorted(pages))}" for tok, pages in sorted(offenders.items()))
     )
+
+
+# ── registry entries as gates (#3536/gate_census): each GLOSS_ALLOWLIST / GLOSS_EXEMPT_
+# PAGES entry is proved BOTH directions — (a) LOAD-BEARING: remove the entry and the real
+# gate (b) logic must catch a regression it would otherwise silently pass; (b) NOT A
+# BLANKET EXEMPTION: with the entry present, a DIFFERENT off-list token/page is still
+# caught. Exercises the ACTUAL production regex/constants against synthetic input, never
+# a re-implementation — the same proof shape tests/gate_census_proofs.py's
+# PROMPT_LITERAL_ALLOWLIST / RECEDE_TEXT_RULES entries use. Offline, no live-page
+# dependency: an allowlist entry that currently appears nowhere on the real site would
+# otherwise be unprovable by a live-tree scan alone.
+_OFF_LIST_PLANT = "ZQXVK"  # never a registered term, never an allowlist entry, matches ACRONYM_RE
+
+
+@pytest.mark.parametrize("term", sorted(v4_glossary.GLOSS_ALLOWLIST))
+def test_each_allowlist_entry_is_load_bearing_and_not_blanket(term):
+    terms = set(v4_glossary.load_glossary())
+    assert term not in terms, f"{term} is both a registered term AND an allowlist entry — the allowlist entry is dead weight"
+    assert _OFF_LIST_PLANT not in terms and _OFF_LIST_PLANT not in v4_glossary.GLOSS_ALLOWLIST
+
+    # (a) LOAD-BEARING: remove this ONE entry from a copy of the allowlist; the real
+    # ACRONYM_RE must still match the term, and the gate's own offender predicate
+    # (mirrors test_no_unregistered_acronym_coinage's loop body exactly) must now flag it.
+    found = [m.group(0) for m in v4_glossary.ACRONYM_RE.finditer(f"{term} appears in prose.")]
+    assert term in found, f"{term} does not match ACRONYM_RE — the allowlist entry can never fire"
+    allowlist_without = v4_glossary.GLOSS_ALLOWLIST - {term}
+    offenders_without = [t for t in found if t not in terms and t not in allowlist_without]
+    assert offenders_without == [term], f"removing {term} from GLOSS_ALLOWLIST did not red — dead entry"
+
+    # (b) NOT A BLANKET EXEMPTION: with the FULL allowlist intact (this entry present),
+    # a different off-list token in the SAME prose is still caught — the entry excuses
+    # only itself, not every acronym on the page.
+    found_both = [m.group(0) for m in v4_glossary.ACRONYM_RE.finditer(f"{term} and {_OFF_LIST_PLANT} both appear here.")]
+    offenders_with_full = [t for t in found_both if t not in terms and t not in v4_glossary.GLOSS_ALLOWLIST]
+    assert offenders_with_full == [_OFF_LIST_PLANT], f"{term}'s allowlist entry swallowed an unrelated off-list token"
+
+
+@pytest.mark.parametrize("page_path", sorted(v4_glossary.GLOSS_EXEMPT_PAGES))
+def test_each_exempt_page_entry_is_load_bearing_and_not_blanket(monkeypatch, page_path):
+    html = "<p>RMSSD lives here, already defined inline.</p>"
+
+    # (a) LOAD-BEARING: remove this ONE entry from a copy of GLOSS_EXEMPT_PAGES; the
+    # real scan_content_text() must now SCAN the page instead of skipping it.
+    remaining = v4_glossary.GLOSS_EXEMPT_PAGES - {page_path}
+    monkeypatch.setattr(v4_glossary, "GLOSS_EXEMPT_PAGES", remaining)
+    scanned = v4_glossary.scan_content_text(html, page_path=page_path)
+    assert scanned != "", f"{page_path} is still exempt after its own GLOSS_EXEMPT_PAGES entry was removed — dead entry"
+    monkeypatch.undo()
+
+    # (b) NOT A BLANKET EXEMPTION: with the full exempt set restored, a DIFFERENT,
+    # non-exempt page path is still scanned normally.
+    assert v4_glossary.scan_content_text(html, page_path="/data/vitals/") != ""
 
 
 # ── Unit coverage: the applier in isolation, off the live site tree ────────────────

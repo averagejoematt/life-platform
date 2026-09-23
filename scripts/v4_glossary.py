@@ -54,7 +54,13 @@ GLOSS_EXEMPT_PAGES = frozenset({"/method/registry/", "/method/mirror/"})
 
 # Gate-(b) allowlist — tokens the ALL-CAPS acronym heuristic below would otherwise catch
 # that are NOT platform jargon a newcomer needs explained. Three grounds, each real:
-#   (1) roman numerals — chapter/part numbers ("Chapter II"), not acronyms at all.
+#   (1) roman numerals, 2+ CHARACTERS ONLY — chapter/part numbers ("Chapter II"), not
+#       acronyms at all. Single-letter I/V/X are never listed here: ACRONYM_RE's own
+#       `{2,6}` floor cannot match a 1-character token, so an entry for one would be
+#       decoration the heuristic could never reach — found and removed 2026-09-23 while
+#       proving this allowlist load-bearing entry-by-entry (#3536/gate_census): each was
+#       "declared-unwired" by construction, the exact defect class this census exists
+#       to catch, one layer up from the gate it was sitting beside.
 #   (2) plain English words rendered ALL-CAPS for prose emphasis (a `<strong>` or a
 #       sentence-initial capital caught by the same \b[A-Z]{2,6}\b heuristic that finds
 #       real acronyms) — verified against the live non-legacy sweep, 2026-09-23.
@@ -71,17 +77,14 @@ GLOSS_ALLOWLIST = frozenset(
         # registering it would force-gloss the FIRST word of most pages, hurting rather
         # than helping a newcomer's legibility (30+ pages, verified live 2026-09-23).
         "AI",
-        # roman numerals (chapter/part numbers)
-        "I",
+        # roman numerals (chapter/part numbers), 2+ characters only — see the header note
         "II",
         "III",
         "IV",
-        "V",
         "VI",
         "VII",
         "VIII",
         "IX",
-        "X",
         # emphasis-caps / sentence-caps plain English, verified live 2026-09-23
         "NOT",
         "ONLY",

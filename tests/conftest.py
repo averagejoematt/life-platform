@@ -821,6 +821,16 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # `/progress-photos/` is introduced by a PR's own diff, and once merged it is a
         # crawler-visible link to Matthew's body photographs that nothing else would notice.
         "test_progress_viewer_privacy_3760.py",
+        # #4035: rglob sweep of site/**/*.html (+ site/assets/js/) — the two-sided glossary
+        # gate. Its covered population (which pages carry a registered term, which acronyms
+        # appear un-glossed) changes with every page a PR adds or edits, and site/** merges
+        # auto-deploy (#750) — a reader sees the drift before any post-merge lane would.
+        "test_glossary_4035.py",
+        # #4035 box 3: rglob sweep of site/assets/js/**/*.js + non-legacy site/**/index.html
+        # for any consumer of weekly_rate_lbs — the rate-shows-its-n contract. Same reasoning
+        # as test_glossary_4035.py above: a new rate-rendering file is exactly a PR's own
+        # diff, and site/** auto-deploys on merge.
+        "test_rate_n_contract_4035.py",
     }
 )
 
