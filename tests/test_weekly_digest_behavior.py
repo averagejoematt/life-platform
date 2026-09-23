@@ -64,6 +64,7 @@ try:
     from emails import weekly_digest_lambda as wd  # same module identity as tests/test_weekly_digest_gate_telemetry.py
     from experiment.phase_filter import PHASE_FILTER_EXPRESSION
     from health import character_engine, scoring_engine
+    from training import self_added_volume as saw_mod  # #4111: the end-of-week report's own computation
 except ImportError as _e:  # pragma: no cover — only when the bundle layout changes
     _import_err = _e
     wd = None  # type: ignore
@@ -305,6 +306,31 @@ def rec(source, date_str, **fields):
 def as_range(source, by_date):
     """{date: record} exactly as `query_range` hands it back (already d2f'd)."""
     return {d: rec(source, d, **f) for d, f in by_date.items()}
+
+
+def hevy_adherence_row(day, movements, extra=None, status="matched"):
+    """One Hevy row shaped for `training.self_added_volume.evaluate` (#4111): `movements` =
+    (movement_key, programmed_sets, performed_sets, max_rpe|None)."""
+    adherence = {"status": status, "workout_pacific_date": day}
+    if status == "matched":
+        adherence["movements"] = [
+            {
+                "movement_key": key,
+                "programmed_sets": prog,
+                "performed_sets": perf,
+                "intensity": {"max_rpe": rpe} if rpe is not None else {},
+            }
+            for key, prog, perf, rpe in movements
+        ]
+        adherence["extra"] = extra or []
+    return {
+        "pk": "USER#matthew#SOURCE#hevy",
+        "sk": f"DATE#{day}#WORKOUT#w-{day}",
+        "date": day,
+        "title": f"Session {day}",
+        "exercises": [{"name": key, "template_id": key} for key, *_ in movements],
+        "adherence": adherence,
+    }
 
 
 def profile_row(**fields):
@@ -1723,6 +1749,29 @@ class TestGatherAll:
         pks = [q["ExpressionAttributeValues"][":pk"] for q in table.queries if ":s" in (q.get("ExpressionAttributeValues") or {})]
         assert pks.count("USER#matthew#SOURCE#whoop") == 1
 
+    # ── #4111: self_added_volume becomes an end-of-week report ────────────────
+    def test_self_added_volume_is_the_same_computation_plan_engine_reads_and_costs_no_second_query(self, table, monkeypatch):
+        """`gather_all` must call `training.self_added_volume.evaluate` over the SAME `hevy_full`
+        window it already queries — never a second Hevy read, and never a hand-rolled count."""
+        monkeypatch.setattr(wd, "boto3", FakeBoto3(FakeS3({})))
+        table.add(profile_row())
+        # A complete Mon–Sun week inside the lookback window, above prescription on one movement.
+        added_day = (datetime.strptime(W1_START, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
+        row = hevy_adherence_row(added_day, [("barbell_squat", 3, 4, 8.5)])
+        table.add(row)
+        data, _ = wd.gather_all()
+        pks = [q["ExpressionAttributeValues"][":pk"] for q in table.queries if ":s" in (q.get("ExpressionAttributeValues") or {})]
+        assert pks.count("USER#matthew#SOURCE#hevy") == 1, "self_added_volume must reuse hevy_full, not issue a second query"
+        threshold = next(t for t in wd.owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")["threshold_weeks"]
+        expected = saw_mod.evaluate([row], W1_END, threshold)
+        assert data["self_added_volume"] == expected
+
+    def test_self_added_volume_tripwire_is_report_only_not_a_veto(self):
+        tw = next(t for t in wd.owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")
+        assert tw.get("tripwire_class") == "report_only"
+        assert tw["action"].startswith("an end-of-week report") and "no veto" in tw["action"]
+        assert "anxiety" not in tw["action"] and "enforced" not in tw["action"]
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # The Board prompt
@@ -2155,6 +2204,30 @@ class TestBuildHtmlNumbers:
         html = wd.build_html(digest_data(this={"mf_workouts": mfw}), BOARD_TEXT, profile_row())
         assert "24,500 lbs, 42 sets" in html
         assert "Push A" in html
+
+    def test_the_added_beyond_plan_line_reports_the_last_complete_week_never_a_veto(self):
+        """#4111: `self_added_volume` renders as information — the added sets by movement,
+        day and RPE — never a subtract-only instruction or a mood question."""
+        row = hevy_adherence_row("2026-07-30", [("barbell_squat", 3, 4, 8.5)])
+        saw_ev = saw_mod.evaluate([row], W1_END, 2)
+        html = wd.build_html(digest_data(self_added_volume=saw_ev), BOARD_TEXT, profile_row())
+        assert "Added Beyond Plan" in html
+        assert "1 set(s) added" in html
+        assert "barbell_squat" in html and "3 → 4 sets" in html and "RPE 8.5" in html
+        assert "subtract" not in html.lower() and "mood" not in html.lower() and "anxiety" not in html.lower()
+
+    def test_no_self_added_volume_data_renders_no_added_beyond_plan_line(self):
+        html = wd.build_html(digest_data(), BOARD_TEXT, profile_row())
+        assert "Added Beyond Plan" not in html
+
+    def test_a_complete_week_at_or_below_prescription_still_reports_zero_added(self):
+        """The report is standing, not alert-gated: a week with no excess still reports it,
+        as zero — never silently omitted (ADR-104 honest-numbers semantics)."""
+        row = hevy_adherence_row("2026-07-30", [("barbell_squat", 3, 3, 8.5)])
+        saw_ev = saw_mod.evaluate([row], W1_END, 2)
+        html = wd.build_html(digest_data(self_added_volume=saw_ev), BOARD_TEXT, profile_row())
+        assert "Added Beyond Plan" in html
+        assert "0 set(s) added (+0 net)" in html
 
     def test_the_habits_section_lists_each_mvp_habit_with_its_own_rate(self):
         hab = {

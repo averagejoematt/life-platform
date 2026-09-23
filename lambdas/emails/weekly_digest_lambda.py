@@ -56,6 +56,7 @@ from common.digest_utils import (
 from common.pacific_time import PACIFIC, pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
+from training import owner_redlines, self_added_volume  # #4111: the end-of-week self_added_volume report
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -522,6 +523,15 @@ def gather_all():
     hevy_prior = [r for r in hevy_full if w2_start <= (r.get("date") or "") <= w2_end]
     logger.info(f"  hevy: {len(hevy_this)} this week, {len(hevy_prior)} prior")
 
+    # #4111: self_added_volume — the end-of-week report (owner ruling 2026-09-23), from the
+    # SAME `training.self_added_volume.evaluate` the plan_engine tripwire row reads — one
+    # computation, no second count. `hevy_full` already covers the window it needs: its
+    # worst-case start (`window_start(w1_end)`, a Sunday `w1_end`) lands exactly on `w4_start`,
+    # so this reuses the query above rather than issuing a second one. `report_only` (#4111) —
+    # never a veto, never a mood question; the coach's own end-of-week reading of it.
+    _saw_threshold = int(next(t for t in owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")["threshold_weeks"])
+    self_added_volume_report = self_added_volume.evaluate(hevy_full, w1_end, _saw_threshold)
+
     # Journal entries
     journal_this = query_journal_range(w1_start, w1_end)
     journal_prior = query_journal_range(w2_start, w2_end)
@@ -651,6 +661,7 @@ def gather_all():
         "character_sheet": character_sheet,
         "character_sheet_prior": character_sheet_prior,
         "acwr_data": acwr_data,  # BS-09
+        "self_added_volume": self_added_volume_report,  # #4111: end-of-week report, report_only
         "mcp_mutations_line": get_mcp_mutations_digest_line(w1_start, w1_end),  # #753
         # #2221: the delivery-free streak line. PRIVATE-by-default — the reader itself
         # checks nutrition_delivery_public() before it touches the partition (#2233), so
@@ -1207,6 +1218,27 @@ def build_html(data, commentary, profile):
         tr_rows += row("Total Volume", f'{fmt_num(mfw["total_volume_lbs"])} lbs, {mfw["total_sets"]} sets', highlight=True)
         for w in mfw.get("workouts", [])[:4]:
             tr_rows += row(f'↳ {w["date"]} {w["name"]}', f'{w["exercises"]} exercises · {fmt_num(w["volume_lbs"])} lbs')
+
+    # #4111: self_added_volume — end-of-week report, report_only (owner ruling 2026-09-23).
+    # The most recent COMPLETE Mon–Sun week from the same evaluation plan_engine's tripwire
+    # row reads; never a veto, never a mood question. Reports EVERY complete week that had a
+    # matched session, added sets or none — "give me an end of week report" is a standing
+    # report, not an alert gated on exceeding the prescription.
+    saw = data.get("self_added_volume")
+    if saw and saw.get("weeks"):
+        saw_wk = next((wk for wk in reversed(saw["weeks"]) if wk.get("complete")), None)
+        if saw_wk and saw_wk.get("sessions_matched"):
+            tr_rows += row(
+                "Added Beyond Plan",
+                f'{saw_wk["added_sets"]} set(s) added ({saw_wk["net_sets"]:+d} net) — week of {saw_wk["week_start"]}',
+                highlight=bool(saw_wk["added_sets"]),
+            )
+            for a in saw_wk.get("added", [])[:8]:
+                rpe = f' @ RPE {a["max_rpe"]}' if a.get("max_rpe") is not None else ""
+                tr_rows += row(
+                    f'↳ {_esc(a["date"])} {_esc(a["movement"])}',
+                    f'{a["programmed_sets"]} → {a["performed_sets"]} sets{rpe}',
+                )
     training_section = section("Training", "🏃", tbl(tr_rows)) if tr_rows else ""
 
     # ── Banister ──
