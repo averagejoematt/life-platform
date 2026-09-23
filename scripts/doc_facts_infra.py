@@ -141,6 +141,9 @@ def rate_schedule_hits(files, schedule_map: dict, exempt) -> list[str]:
         return []
     name_res = {n: re.compile(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])") for n in schedule_map}
     hits = []
+    # #4135: a hit needs a quoted `rate(` or an "every N <unit>" claim ON the line; a line with
+    # neither substring cannot produce one, so skip it before running ~90 name regexes over it.
+    # Exact, not a heuristic: both hit branches read only RATE_RE / _INTERVAL_CLAIM_RE matches.
     for path in files:
         try:
             rel = path.relative_to(ROOT)
@@ -151,6 +154,8 @@ def rate_schedule_hits(files, schedule_map: dict, exempt) -> list[str]:
         except OSError:
             continue
         for lineno, line in enumerate(lines, 1):
+            if "rate(" not in line and "every" not in line.lower():
+                continue
             if exempt(line):
                 continue
             named = [n for n, rx in name_res.items() if rx.search(line)]
@@ -456,6 +461,10 @@ def alarm_route_hits(files, routing: dict, exempt) -> list[str]:
     if not digest:
         return []
     name_res = {n: re.compile(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])") for n in digest}
+    # #4135: ONE alternation with the same guards matches a line iff some per-name regex does
+    # (alternation tries every branch at every position), so it is an exact prefilter; the
+    # per-name loop below then runs only on the few lines that name a digest alarm at all.
+    any_name = re.compile(r"(?<![\w-])(?:" + "|".join(re.escape(n) for n in sorted(digest, key=len, reverse=True)) + r")(?![\w-])")
     hits = []
     for path in files:
         try:
@@ -467,6 +476,8 @@ def alarm_route_hits(files, routing: dict, exempt) -> list[str]:
         except OSError:
             continue
         for i, line in enumerate(lines):
+            if not any_name.search(line):
+                continue
             for name, rx in name_res.items():
                 if not rx.search(line):
                     continue
