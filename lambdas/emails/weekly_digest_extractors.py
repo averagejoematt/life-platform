@@ -662,3 +662,19 @@ def ex_nutrition_last_log_absence(table, user_id, genesis, today, logger):
     except ValueError:
         return {}
     return {"last_log": last, "days_ago": days_ago}
+
+
+# Moved from weekly_digest_lambda.py (#4111): the digest was FULL at its #1665 baseline.
+def compute_sleep_debt(whoop_dict, target_hrs=7.5):
+    """Compute 7-day sleep debt from Whoop records (SOT for sleep duration v2.55.0)."""
+    if not whoop_dict:
+        return None
+    durs = []
+    for r in whoop_dict.values():
+        d = safe_float(r, "sleep_duration_hours")
+        if d is not None:
+            durs.append(d)
+    if not durs:
+        return None
+    debt = round(max(0, (target_hrs * len(durs)) - sum(durs)), 1)
+    return {"debt_hrs": debt, "nights": len(durs), "avg_hrs": avg(durs), "target_hrs": target_hrs}

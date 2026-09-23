@@ -71,7 +71,7 @@ def test_handle_journey_queries_and_reports_the_pt_day_not_utc(monkeypatch):
         return []
 
     monkeypatch.setattr(vitals, "_query_source", fake_qs)
-    monkeypatch.setattr(vitals, "_latest_item", lambda source, include_pilot=False: None)
+    monkeypatch.setattr(vitals, "_latest_item", lambda source, include_pilot=None, **_kw: None)
     monkeypatch.setattr(vitals, "_get_profile", lambda: {})
     monkeypatch.setattr(vitals, "EXPERIMENT_START", "2026-06-01")
 
