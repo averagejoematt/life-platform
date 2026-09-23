@@ -37,7 +37,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    84  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    85  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
@@ -57,6 +57,10 @@ EXPECTED_MAX_TOOLS = (
     # joined source: an oversized list is the selection problem the #395 prune existed to
     # solve. Its lines were paid for by extracting the selection prose to
     # mcp/tools_descriptions.py, which dropped registry.py 2453 -> 2106 logical lines.
+    # +1 (#4078): manage_pending_writes — chat said "queued pending approval" on four
+    # sessions (09-08/18/20/21) and no queue existed, so the writes died with the chat.
+    # ONE tool with four actions (enqueue/list/approve/discard), not four tools; its
+    # registry lines were paid by moving log_coach_correction's parameter table out.
 )
 
 

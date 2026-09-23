@@ -217,6 +217,10 @@ SOURCE_TIERS: dict[str, int] = {
     # the only readers are the owner-facing planning surfaces.
     "training_constraints": TIER_OWNER_ONLY,
     "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
+    # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
+    # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
+    # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.
+    "pending_writes": TIER_OWNER_ONLY,
 }
 
 

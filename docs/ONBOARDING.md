@@ -11,7 +11,7 @@
 
 ## What Is This Platform?
 
-A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 84 MCP tools so Claude can answer natural-language health questions against real data.
+A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 85 MCP tools so Claude can answer natural-language health questions against real data.
 
 The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
