@@ -13,7 +13,9 @@ The override is the narrow door instead:
     commit result line.
 
 The fixture is the 09-22 shape: the historian vetoes (a model escalation on a flagged
-metric), the joints critic cuts the session 20 -> 16. Mutation controls are named per test.
+metric), the joints critic cuts the session 20 -> 14 — the owner's signed −30 % deload, computed
+in code since #4149 (the fake model still asks for 16; its number is never applied). Mutation
+controls are named per test.
 """
 
 from __future__ import annotations
@@ -156,8 +158,8 @@ def test_veto_plus_override_keeps_the_joints_cap_and_records_the_override_on_the
     assert "OVERRIDDEN by the owner" in crit["next"]
 
     # every OTHER critic's change still applied — the joints set cap
-    assert {"critic": "joints_tendons", "field": "session.total_sets", "to": 16, "applied": True, "why": None} in crit["changes"]
-    assert _total_sets(ir) == 16 and crit["recheck"]["total_sets"] == 16
+    assert {"critic": "joints_tendons", "field": "session.total_sets", "to": 14, "applied": True, "why": None} in crit["changes"]
+    assert _total_sets(ir) == 14 and crit["recheck"]["total_sets"] == 14
     # and ONLY the historian's objection is lifted: its own field (the squat load) is not applied
     assert all(s.weight_kg == pytest.approx(200.0 * KG, abs=0.01) for s in ir.exercises[0].sets)
 
@@ -178,7 +180,7 @@ def test_veto_plus_override_keeps_the_joints_cap_and_records_the_override_on_the
     assert "historian veto (owner-overridden)" in res["critics"]
     assert "joints/tendons change" in res["critics"]
     body = created[0]["routine"]
-    assert sum(len(e["sets"]) for e in body["exercises"]) == 16, "the cap reached Hevy"
+    assert sum(len(e["sets"]) for e in body["exercises"]) == 14, "the cap reached Hevy"
     notes = body["exercises"][0]["notes"]
     assert "- historian VETO OVERRIDDEN BY OWNER" in notes
     assert "owner override of historian (" in notes and "I benched and squatted this load on Friday" in notes
@@ -196,7 +198,7 @@ def test_no_override_the_veto_holds_and_the_commit_refuses():
     crit = out["critics"]
     assert crit["veto"] is True and crit["owner_overrides"] == [] and ledger == []
     assert crit["next"].startswith("VETO") and "veto_override" in crit["next"]
-    assert _total_sets(ir) == 16
+    assert _total_sets(ir) == 14
     res, created = _commit(ir)
     assert "CRITIC_VETO" in json.dumps(res) and created == []
 

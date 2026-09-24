@@ -334,11 +334,13 @@ def test_the_advocate_may_add_sets_when_every_tripwire_is_clear_and_never_vetoes
     assert any(f["metric"] == "tripwires_clear" for f in P["rate_advocate"]["flags"])
     vs = c.run_critics(P, d, invoke=_model("veto", "tripwires_clear", field="session.total_sets", to=8), model_allowed=True)
     a = next(v for v in vs if v["critic"] == "rate_advocate")
-    assert a["verdict"] == "change" and a["field"] == "session.total_sets" and a["to"] == 8
+    # #4149: the model asked for 8; the change applied is the code quantum (5 + ADVOCATE_ADD_SETS)
+    assert a["verdict"] == "change" and a["field"] == "session.total_sets" and a["to"] == 5 + c.ADVOCATE_ADD_SETS
+    assert "never applied" in a["model_numbers_not_applied"]
     ir = _ir()
     rec = c.apply_changes(ir, vs)
-    assert rec == [{"critic": "rate_advocate", "field": "session.total_sets", "to": 8, "applied": True, "why": None}]
-    assert sum(len(e.sets) for e in ir.exercises) == 8
+    assert rec == [{"critic": "rate_advocate", "field": "session.total_sets", "to": 6, "applied": True, "why": None}]
+    assert sum(len(e.sets) for e in ir.exercises) == 6
 
 
 def test_the_advocate_addition_is_bounded():

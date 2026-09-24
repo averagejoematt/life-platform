@@ -50,7 +50,7 @@ from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
 
 from mcp.core import LAYER_UNKNOWN
-from mcp.plan_helpers import _catalog_and_ceiling, _minus_days, _resolver, _union_evidence_rows  # noqa: F401  (#4081/#4105 size fix)
+from mcp.plan_helpers import _catalog_and_ceiling, _days_between, _minus_days, _resolver, _union_evidence_rows  # noqa: F401 (#4149)
 
 logger = logging.getLogger("tools_plan")
 
@@ -985,13 +985,6 @@ def _worst_anchor(evidence: dict[str, Any]) -> tuple[float | None, int | None]:
     return w["drop_pct"], w.get("sessions_below")
 
 
-def _days_between(a: str | None, b: str) -> int | None:
-    try:
-        return (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(str(a)[:10], "%Y-%m-%d")).days
-    except (TypeError, ValueError):
-        return None
-
-
 # ── stage 2: the red team ────────────────────────────────────────────────────────────
 def _run_stage_2(
     ir: Any,
@@ -1007,6 +1000,7 @@ def _run_stage_2(
     from coach import critic_overrides, critics
     from training.routine_repo import put_versioned
 
+    from mcp.hevy_prescription_gate import critic_set_floors
     from mcp.tools_hevy_routine import _validate_ir_for_hevy
 
     by_idx = {e["idx"]: e for e in evidence["exercises"]}
@@ -1079,7 +1073,7 @@ def _run_stage_2(
         target_date=target_date,
         record_correction=_record_override_correction,
     )
-    changes = critics.apply_changes(ir, verdicts)
+    changes = critics.apply_changes(ir, verdicts, set_floors=critic_set_floors(ir))  # #4149: held to the commit gate's floor
     overridden = {v["critic"] for v in verdicts if critics.is_overridden(v)}
     rc = critics.recheck(ir, build, overridden=overridden)
     precheck = _validate_ir_for_hevy(ir)
