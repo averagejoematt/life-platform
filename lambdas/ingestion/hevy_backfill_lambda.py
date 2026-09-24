@@ -92,7 +92,7 @@ def _derive_training_notes(rec: dict) -> None:
         from training import training_notes as tn
         from training.training_notes_llm import make_llm_fn
 
-        llm_fn = make_llm_fn(_table)
+        llm_fn = make_llm_fn(_table, lane="live")  # #4151: the on-ingest path owns the live lane
         res = tn.write_workout_notes(_table, rec["date"], rec.get("workout_uid", ""), exercises, llm_fn=llm_fn)
         for it in res.get("items", []):
             if it.get("pain_flag"):
@@ -243,7 +243,9 @@ def reextract_training_notes(days: int) -> dict:
     resp = _table.query(
         KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#{SOURCE}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"),
     )
-    llm_fn = make_llm_fn(_table)
+    # #4151: a sweep charges the BULK lane's monthly counter, never the live one — the
+    # 2026-09-19 historical pass spent the shared month and every new session degraded.
+    llm_fn = make_llm_fn(_table, lane="bulk")
     workouts = 0
     records = 0
     wrote = 0

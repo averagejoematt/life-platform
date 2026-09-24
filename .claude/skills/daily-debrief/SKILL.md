@@ -56,11 +56,11 @@ plan as red-teamed unless stage 2 ran on the routine you are committing.
 
 `get_coach_session_packet(target_date=<the session being coached>)` — tomorrow's date when
 authoring. It returns, in one read, what a debrief used to re-verify over 10+ calls: working
-sets per muscle (7d + 28d completed days), the last session of each type and each v0.3
+sets per muscle (7d + 28d completed days), the last session of each type and each v0.4
 session role with every set and note, MacroFactor kcal + protein over 7 days with the
 protein-floor count, weekly walking hours (the one #4105 definition), the loss rate, the
-active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.3
-block position. Every field is `measured` / `absent` / `read_failed` and names its canonical
+active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.4
+sequence position (`session_sequence.next_session`: position_label, week, role, advanced_by — #4110). Every field is `measured` / `absent` / `read_failed` and names its canonical
 source; nothing in it is a second computation.
 
 - Quote it. Re-pull a field only when it is `absent`/`read_failed` or Matthew disputes it —

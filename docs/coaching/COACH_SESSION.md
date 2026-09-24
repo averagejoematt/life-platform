@@ -42,10 +42,11 @@ to push back. Never give me the generic answer or tell me what I want to hear.
 0b. THE PACKET — call `get_coach_session_packet` (target_date = the session we are coaching)
    BEFORE any other data tool (#4082). One call returns what these sessions used to spend 10+
    calls re-verifying: working sets per muscle (7d + 28d completed days), the last session of
-   each type and each v0.3 session role with every set and every note, MacroFactor kcal +
+   each type and each v0.4 session role with every set and every note, MacroFactor kcal +
    protein over 7 days with the protein-floor count, weekly walking hours (THE one definition,
    #4105), the loss rate, the active-day and loaded-lifting streaks, readiness + the
-   readiness-floor streak, and the v0.3 block position. Each field is `measured`, `absent`
+   readiness-floor streak, and the v0.4 sequence position (the next undone session, from
+   `session_sequence.next_session`, #4110). Each field is `measured`, `absent`
    (read, nothing there) or `read_failed` (the read broke — the error class is named), and
    names the canonical function it came from — nothing in it is a second computation.
    - QUOTE its numbers. Do not re-pull a `measured` field "to confirm" — re-pulling through a

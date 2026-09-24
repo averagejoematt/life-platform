@@ -1,12 +1,15 @@
-"""full_body_session.py — v0.3 §3's full-body session as IR (#4064).
+"""full_body_session.py — the program's session for one role, as IR (#4064; v0.4 #4147).
 
-`routine_generator.generate_routines` hands a day here when the schedule entry is a v0.3
-role (`program_structure.SESSION_TEMPLATES`: heavy / moderate / heavy_moderate /
-optional_fourth). Split out of `routine_generator` so neither module crosses the 1000-line
-ceiling (#1665); it reuses the generator's helpers rather than copying them, so the load
-floor, the notes and the ceilings are the SAME code on both paths.
+The module name is v0.3's (full body, superseded 2026-09-24); it now builds whatever the ACTIVE
+program's role is — under v0.4, upper_heavy / lower_heavy / upper_volume / lower_volume, with
+archetype `upper` / `lower` and the Upper / Lower Hevy folders.
 
-`program_structure.session_prescription_for_role` is the §3 session as data; this turns it
+`routine_generator.generate_routines` hands a day here when the schedule entry carries a
+program role (`program_structure.SESSION_TEMPLATES`). Split out of `routine_generator` so
+neither module crosses the 1000-line ceiling (#1665); it reuses the generator's helpers rather
+than copying them, so the load floor, the notes and the ceilings are the SAME code on both paths.
+
+`program_structure.session_prescription_for_role` is the session as data; this turns it
 into IR. Everything the muscle-budget path guarantees still holds here — the load floor
 (#3927) is the last thing to touch a WORKING or TOP set's load, re-based onto v0.3 §3's
 entry ramp (`load_ramp`, #4090: the week's share of the discounted band anchor, never
@@ -143,10 +146,11 @@ def full_body_routines(
     resolved_week: Any,
     targets: list[str],
 ) -> list[RoutineSpec]:
-    """The v0.3 §3 session for `day_entry['session_role']` — ideal + Minimum Viable Session
+    """The program session for `day_entry['session_role']` — ideal + Minimum Viable Session
     floor (+ re-entry after a layoff). Pure apart from the same config/history reads as the
     muscle-budget path."""
     role = day_entry["session_role"]
+    archetype = program_structure.SESSION_TEMPLATES[role]["archetype"]
     deload = bool(day_entry.get("deload"))
     skill_ceiling = int(week_cfg.get("skill_ceiling", 2))
     rx = program_structure.session_prescription_for_role(
@@ -155,10 +159,18 @@ def full_body_routines(
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     rationale: list[str] = [
         f"week grid source={resolved_week.source} ({resolved_week.detail})",
-        f"archetype=full; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
+        f"archetype={archetype}; program=v{program_structure.PROGRAM_VERSION}; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
-    if day_entry.get("source") == "block_calendar":
-        rationale.append(f"block calendar: week {day_entry['week']}, block {day_entry['block']}" + (" — DELOAD" if deload else ""))
+    if day_entry.get("source") == "session_sequence":
+        adv = day_entry.get("advanced_by")
+        rationale.append(
+            f"session sequence: {day_entry['position_label']}, block {day_entry['block']}"
+            + (
+                f"; advanced by {adv['date']} {adv.get('title') or ''} ({adv['was']})".rstrip()
+                if adv
+                else "; the first session of the program"
+            )
+        )
     else:
         rationale.append(f"weekday grid: {day_entry.get('label')}")
     if deload and rx.get("deload_trim"):
@@ -186,7 +198,8 @@ def full_body_routines(
 
     history_index, weight_index, _cardio, _whoop = note_indexes
     # #4090: v0.3 §3's entry ramp — the week's share of the discounted band anchor, never 100 %
-    # of the band best. A day with no calendar week (before block 1) ramps as week 1.
+    # of the band best. The week is the session sequence's (#4110 — completed sessions, not
+    # calendar weeks); a day with no program week (before the block start) ramps as week 1.
     ramp_week = int(day_entry.get("week") or 1)
     ramp_p = load_ramp.params()
     rationale.append(
@@ -226,14 +239,18 @@ def full_body_routines(
 
     label = rx["role_label"]
     week_tag = f" — W{day_entry['week']}" if day_entry.get("week") else ""
-    title = f"Full Body {label}{week_tag}" + (" DELOAD" if deload else "") + f" — {inputs.target_date}"
+    title = f"{label}{week_tag}" + (" DELOAD" if deload else "") + f" — {inputs.target_date}"  # e.g. "LOWER-HEAVY — W1 — 2026-09-25"
     if day_entry.get("optional"):
         title += " (optional)"
-    calendar_snapshot = {k: day_entry.get(k) for k in ("source", "week", "block", "deload", "label", "session_role")}
+    calendar_snapshot = {
+        k: day_entry.get(k)
+        for k in ("source", "week", "block", "deload", "label", "session_role", "session_in_week", "sequence_index", "position_label")
+    }
+    calendar_snapshot["advanced_by"] = day_entry.get("advanced_by")
     ideal = RoutineSpec(
-        routine_id=_new_routine_id(inputs.target_date, "full", "ideal"),
+        routine_id=_new_routine_id(inputs.target_date, archetype, "ideal"),
         target_date=inputs.target_date,
-        archetype="full",
+        archetype=archetype,
         variant="ideal",
         title=title,
         notes="\n".join(rationale[:6]),
@@ -263,12 +280,12 @@ def full_body_routines(
     mvs_blocks, _mvs_used, _ = _blocks_from_prescription(mvs_rx, catalog, None, "off", anchors_only=True, top_plus_one=True)
     floor_cap = int(week_cfg.get("floor_session_set_count", 6)) + 2
     floor = RoutineSpec(
-        routine_id=_new_routine_id(inputs.target_date, "full", "floor"),
+        routine_id=_new_routine_id(inputs.target_date, archetype, "floor"),
         target_date=inputs.target_date,
-        archetype="full",
+        archetype=archetype,
         variant="floor",
         title=f"Floor — {inputs.target_date}",
-        notes="Minimum Viable Session (v0.3 §3): anchors only, top set + one back-off, ~25 min.",
+        notes="Minimum Viable Session (§3): anchors only, top set + one back-off, ~25 min.",
         version=1,
         created_at=_now_iso(),
         created_by="cron",
@@ -278,7 +295,7 @@ def full_body_routines(
         exercises=mvs_blocks,
         budget_used={b.movement_key: len(b.sets) for b in mvs_blocks},
         inputs_snapshot={"variant": "floor", "target_minutes": week_cfg.get("floor_session_minutes", 25), "session_role": role},
-        rationale=["Minimum Viable Session — anchors only, top set + one back-off (v0.3 §3)."],
+        rationale=["Minimum Viable Session — anchors only, top set + one back-off (§3)."],
         caps={
             "total_sets": max(floor_cap, sum(len(b.sets) for b in mvs_blocks)),
             "session_minutes": week_cfg.get("floor_session_minutes", 25) + 5,
@@ -287,5 +304,5 @@ def full_body_routines(
     ideal.sibling_routine_id = floor.routine_id
     result = [ideal, floor]
     if inputs.days_since_last_workout >= week_cfg.get("re_entry_days_threshold", 7):
-        result.append(_make_re_entry(inputs, "full", targets, catalog, week_cfg, ideal.routine_id))
+        result.append(_make_re_entry(inputs, archetype, targets, catalog, week_cfg, ideal.routine_id))
     return result

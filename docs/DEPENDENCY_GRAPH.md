@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-709 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+710 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -179,7 +179,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
 | `habitify` | — | ai_expert_analyzer_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py |
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
-| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, daily_metrics_compute_lambda.py, recap_data.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
+| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, daily_metrics_compute_lambda.py, recap_data.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
 | `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, hypothesis_engine_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
 | `ingest_liveness` | pipeline_health_check_lambda.py | — |
@@ -501,7 +501,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1235 total · 881 resolved · 354 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1240 total · 885 resolved · 355 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

@@ -5,6 +5,7 @@ module-size ceiling (tests/test_module_size_guard.py) after #4104 + #4105 landed
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -61,3 +62,12 @@ def _minus_days(date_str: str, days: int) -> str:
     from common.pacific_time import shift_day_key
 
     return shift_day_key(date_str, -days)
+
+
+def _days_between(a: str | None, b: str) -> int | None:
+    """Whole days from `a` to `b` (YYYY-MM-DD); None when `a` is absent or unparseable.
+    Moved from mcp/tools_plan.py under the #1665 size ratchet (#4149); re-exported there."""
+    try:
+        return (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(str(a)[:10], "%Y-%m-%d")).days
+    except (TypeError, ValueError):
+        return None

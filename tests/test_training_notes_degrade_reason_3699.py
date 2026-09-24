@@ -266,7 +266,7 @@ def test_a_cap_breach_does_not_count_a_call_it_never_made(monkeypatch):
     """NEGATIVE CONTROL for the bump above: CapExceeded raises before any spend."""
     monkeypatch.setattr("ai.bedrock_client.invoke", _fake_invoke("[]"))
     t = _FakeTable()
-    t.put_item({"pk": tnl._USAGE_PK, "sk": f"MONTH#{tnl._month()}", "calls": 300})
+    t.put_item({"pk": tnl._USAGE_PK, "sk": tnl.usage_sk(), "calls": 300})
     fn = tnl.make_llm_fn(t, monthly_cap=300)
     with pytest.raises(tnl.CapExceeded):
         fn("a brand new note never seen", TAXONOMY)

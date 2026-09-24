@@ -24,8 +24,9 @@ import the counting / estimating primitives themselves):
   last_session_by_type     the ONE sanctioned Hevy read (`tools_strength._read_hevy_all_phases`,
                            #4030/#4032), normalised by `training.muscle_volume.normalize_hevy_items`,
                            typed by `training.routine_title.resolve_archetype` (the performed-type
-                           resolver the routine counters use) and the v0.3 block calendar
-                           (`program_structure.calendar_entry`), loaded-or-not by
+                           resolver the routine counters use), its program role from the v0.4
+                           session sequence (`session_sequence.completed_sessions` + `position`,
+                           #4110), loaded-or-not by
                            `training_streaks.is_loaded_session` (#4067).
   nutrition_7d             `get_nutrition` view=summary over plan_next_session's protein window,
                            and `tools_plan._protein_days_7d` for the days-below-floor count.
@@ -35,7 +36,8 @@ import the counting / estimating primitives themselves):
   streaks                  `tools_plan._training_streaks` -> `training_streaks.streaks` (#4067).
   readiness                `get_readiness_score`, tiered by `tools_plan._recovery_tier`.
   readiness_low_streak     `tools_plan._readiness_low_streak` (Whoop, #4072).
-  block_position           `program_structure.calendar_entry` + `plan_engine.program_week` (#4064).
+  block_position           `session_sequence.next_session` + `session_sequence.program_week` (#4110/#4147),
+                           over the planner's block read `plan_hevy_windows._block_workouts`.
 
 READ STATES (#4072's vocabulary, `plan_engine.input_status`)
 
@@ -50,7 +52,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 
 PACKET_VERSION = "coach-session-packet@1.0.0"
-# Long enough that each performed type is found once a block is running (a v0.3 role recurs
+# Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
 # The routine index's nearest-preceding-routine fallback needs rows from before the window.
@@ -60,7 +62,7 @@ SOURCES: dict[str, str] = {
     "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window",
     "last_session_by_type": (
         "tools_strength._read_hevy_all_phases + training.muscle_volume.normalize_hevy_items; type = "
-        "training.routine_title.resolve_archetype, role = program_structure.calendar_entry, loaded = training_streaks.is_loaded_session"
+        "training.routine_title.resolve_archetype, role = session_sequence.completed_sessions/position (#4110), loaded = training_streaks.is_loaded_session"
     ),
     "nutrition_7d": "get_nutrition view=summary + tools_plan._protein_days_7d (plan_next_session's protein window)",
     "walking_hours_7d": "tools_plan._walking_volume_last_7d -> mcp.shared_quantities.walking_layer (#4068/#4105)",
@@ -68,7 +70,7 @@ SOURCES: dict[str, str] = {
     "streaks": "tools_plan._training_streaks -> training.training_streaks.streaks (#4067)",
     "readiness": "get_readiness_score, tier by tools_plan._recovery_tier",
     "readiness_low_streak": "tools_plan._readiness_low_streak (Whoop recovery, #4072)",
-    "block_position": "training.program_structure.calendar_entry + training.plan_engine.program_week (#4064)",
+    "block_position": "training.session_sequence.next_session + program_week over plan_hevy_windows._block_workouts (#4110/#4147)",
 }
 
 # Model-facing prose + schema live beside the tool (the #4078 manage_pending_writes precedent), so
@@ -76,10 +78,10 @@ SOURCES: dict[str, str] = {
 COACH_PACKET_DESCRIPTION = (
     "CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat "
     "otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the "
-    "last session of each type (and each v0.3 session role) with every set and every note, MacroFactor kcal + "
+    "last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + "
     "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), the loss "
-    "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.3 "
-    "block position. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
+    "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.4 "
+    "sequence position (the next undone session, #4110). Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
     "error class) — a failed read is never an empty week — and names the canonical function it came from; "
     "nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. "
     "It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block."
@@ -154,9 +156,28 @@ def _session_row(item: dict[str, Any], archetype: str | None, role: str | None) 
     }
 
 
+def _sequence_positions(target_date: str) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """{day: the program position the session sequence credited to that day's session}, through
+    `target_date` inclusive — `session_sequence.completed_sessions` + `position` (#4110), over the
+    planner's own block read (`plan_hevy_windows._block_workouts`). The role is the SEQUENCE's,
+    never a weekday calendar's (v0.3's lives in `training.program_v03`, SUPERSEDED)."""
+    from training import session_sequence
+    from training.plan_engine import error_label
+
+    from mcp.plan_hevy_windows import _block_workouts
+
+    after = shift_day_key(target_date, 1)
+    try:
+        rows = _block_workouts(after)
+        done = session_sequence.completed_sessions(rows, after)
+    except Exception as e:  # noqa: BLE001 — roles go unassigned and say why; the sessions still read
+        return {}, {"state": "read_failed", "error": error_label(e)}
+    out = {c["date"]: {**session_sequence.position(c["sequence_index"]), "workout_id": c.get("workout_id")} for c in done}
+    return out, {"state": "measured", "block_start": session_sequence.block_start(), "sessions_credited": len(done)}
+
+
 def _last_sessions(target_date: str) -> dict[str, Any]:
     """The newest performed session of each type, with every set and every note."""
-    from training import program_structure
     from training.routine_title import _load_routine_index, resolve_archetype
 
     from mcp.tools_strength import _read_hevy_all_phases
@@ -181,19 +202,22 @@ def _last_sessions(target_date: str) -> dict[str, Any]:
         from training.plan_engine import error_label
 
         index, index_state = [], {"state": "read_failed", "error": error_label(e)}
+    positions, sequence_state = _sequence_positions(target_date)
     by_type: dict[str, dict[str, Any]] = {}
     by_role: dict[str, dict[str, Any]] = {}
     for it in workouts:
         day = str(it.get("date") or "")[:10]
-        try:
-            cal = program_structure.calendar_entry(day)
-        except ValueError:
-            cal = None
-        role = (cal or {}).get("session_role")
+        pos = positions.get(day)
+        # The ONE loaded session the sequence credited for that day — a second log that day, or an
+        # unloaded one, is not a program session and claims no role.
+        credited = pos is not None and pos.get("workout_id") in (None, it.get("source_workout_id") or it.get("workout_id"))
+        role = pos["session_role"] if credited else None
         archetype = resolve_archetype(it, index) or "unresolved"
         if archetype in by_type and (not role or role in by_role):
             continue
         row = _session_row(it, archetype, role)
+        if credited:
+            row["sequence_position"] = pos["position_label"]
         by_type.setdefault(archetype, row)
         if role:
             by_role.setdefault(role, row)
@@ -202,6 +226,7 @@ def _last_sessions(target_date: str) -> dict[str, Any]:
         "sessions_read": len(workouts),
         "phases_read": phases,
         "routine_index": index_state,
+        "session_sequence": sequence_state,
         "by_archetype": by_type,
         "by_session_role": by_role,
     }
@@ -331,27 +356,25 @@ def _readiness_low_streak(target_date: str) -> tuple[Any, dict[str, Any]]:
 
 
 def _block_position(target_date: str) -> tuple[Any, dict[str, Any]]:
-    from training import plan_engine, program_structure
+    """Where the program is: `session_sequence.next_session` over the planner's own block read
+    (#4110/#4147 — v0.4 served IN ORDER). Passed through whole: position_label, week, role,
+    advanced_by. A failed Hevy read raises -> `_wrap` -> read_failed (never session 1)."""
+    from training import plan_engine, program_structure, session_sequence
+
+    from mcp.plan_hevy_windows import _block_workouts
 
     if not program_structure.ACTIVE:
-        return None, _st(plan_engine.ABSENT, f"TRAINING_PROGRAM v{program_structure.PROGRAM_VERSION} is not active — no block calendar")
-    entry = program_structure.calendar_entry(target_date)  # ValueError on a bad key -> read_failed via _read
-    nxt = None
-    for k in range(1, 15):
-        day = shift_day_key(target_date, k)
-        e = program_structure.calendar_entry(day)
-        if e and e.get("archetype") == "full" and not e.get("optional"):
-            nxt = {"date": day, **e}
-            break
+        return None, _st(plan_engine.ABSENT, f"TRAINING_PROGRAM v{program_structure.PROGRAM_VERSION} is not active — no session sequence")
+    rows = _block_workouts(target_date)
+    entry = session_sequence.next_session(target_date, rows)
     value = {
-        "program_version": program_structure.PROGRAM_VERSION,
-        "program_week": plan_engine.program_week(target_date),
-        "block_1_start": program_structure.BLOCK_CALENDAR["block_1_start"],
-        "target_date_entry": entry,
-        "next_lifting_session": nxt,
+        "program_version": program_structure.SESSION_SEQUENCE.get("program_version"),
+        "block_start": session_sequence.block_start(),
+        "program_week": session_sequence.program_week(target_date, rows),
+        "next_session": entry,
     }
     if entry is None:
-        value["note"] = f"{target_date} is before block 1 ({program_structure.BLOCK_CALENDAR['block_1_start']}) — week 0"
+        value["note"] = f"{target_date} is before the block start ({session_sequence.block_start()}) — week 0"
     return value, _st(plan_engine.MEASURED)
 
 

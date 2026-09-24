@@ -35,9 +35,15 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "lambdas"))
 
+from common.pacific_time import shift_day_key  # noqa: E402
 from training import owner_redlines, plan_engine, training_context_registry  # noqa: E402
 
-WEEK_7 = "2026-11-04"  # #4098: program week 7 on the v0.3 block calendar (#4064)
+WEEK_7 = "2026-11-04"  # #4098: a date in program week 7, given WEEK_7_ROWS (#4110: the week follows completed sessions)
+# 6 program weeks of completed loaded sessions from the block start, one a day (#4147 v0.4: 4 a week -> 24)
+WEEK_7_ROWS = [
+    {"date": shift_day_key("2026-09-24", i), "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]}
+    for i in range(24)
+]
 
 _FULL = dict(
     date="2026-09-14",
@@ -105,7 +111,14 @@ def test_absent_walking_volume_is_unknown_not_zero():
 def test_a_tripwire_with_no_input_is_unknown():
     block = plan_engine.constraint_block(
         # #4098: a program week past `not_before_week`, so the anchor tripwire reads its input rather than the gate
-        **{**_FULL, "date": WEEK_7, "protein_days_missed_7d": None, "readiness_low_streak_days": None, "anchor_lift_drop_pct": None}
+        **{
+            **_FULL,
+            "date": WEEK_7,
+            "block_workouts": WEEK_7_ROWS,
+            "protein_days_missed_7d": None,
+            "readiness_low_streak_days": None,
+            "anchor_lift_drop_pct": None,
+        }
     )
     states = {t["id"]: t["state"] for t in block["tripwires"]}
     assert states["protein_floor_missed"] == "unknown"
@@ -120,7 +133,8 @@ def test_tripwires_can_actually_trip():
     block = plan_engine.constraint_block(
         **{
             **_FULL,
-            "date": WEEK_7,  # #4098: armed — before week 6 the anchor tripwire is not_yet_active
+            "date": WEEK_7,
+            "block_workouts": WEEK_7_ROWS,  # #4098: armed — before week 6 the anchor tripwire is not_yet_active
             "protein_days_missed_7d": 4,
             "readiness_low_streak_days": 5,  # v3: 7-day mean < 50 read over 5–7 days; the engine's proxy is the streak
             "anchor_lift_drop_pct": 12.0,
@@ -132,7 +146,7 @@ def test_tripwires_can_actually_trip():
 
 def test_tripwires_can_actually_clear():
     """The other half of the control — a guard that always fires is noise."""
-    block = plan_engine.constraint_block(**{**_FULL, "date": WEEK_7})
+    block = plan_engine.constraint_block(**{**_FULL, "date": WEEK_7, "block_workouts": WEEK_7_ROWS})
     assert block["tripped"] == []
     assert {t["state"] for t in block["tripwires"]} <= {"clear", "unknown"}
 
@@ -195,7 +209,7 @@ def test_approved_redlines_are_reported_active_not_proposed():
     assert not any("redlines are PROPOSED" in line for line in block["honesty"])
     assert any("NOT evaluated by this" in line for line in block["honesty"])
     assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-23"
-    assert owner_redlines.REDLINES_VERSION == "3.1"
+    assert owner_redlines.REDLINES_VERSION == "3.2"  # #4147: v0.4 moved sets_per_muscle_wk and the volume ceiling with it
 
 
 def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
@@ -206,8 +220,10 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
     assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
     assert "2026-09-21" in owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"]
-    assert summ["active"] is True and summ["version"] == "3.1" and summ["last_reviewed_by_owner"] == "2026-09-23"
-    assert summ["plan"].endswith("TRAINING_PROGRAM_v0.3.md") and summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
+    assert summ["active"] is True and summ["version"] == "3.2" and summ["last_reviewed_by_owner"] == "2026-09-23"
+    # #4147: the plan is v0.4 (owner-private, written by the driver); v0.3's prose stays as PLAN_V0_3
+    assert summ["plan"].endswith("TRAINING_PROGRAM_v0.4.md") and owner_redlines.PLAN_V0_3.endswith("TRAINING_PROGRAM_v0.3.md")
+    assert summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")
     rate = owner_redlines.rate_target_lb_per_wk(316.9)
     assert rate["target_lb_wk"] == 3.5 and rate["cap_lb_wk"] == 4.0 and rate["schedule_step_above_lb"] == 295
     assert owner_redlines.rate_target_lb_per_wk(250.0)["target_lb_wk"] == 2.75
@@ -294,7 +310,8 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
     )
     assert w["front_load_weeks"] == [3, 12] and w["hr_ceiling_bpm"] == 105 and w["permanent"] is True
     lift = R["lifting_sessions_per_wk"]
-    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (3, 4, [6, 10], [55, 70])
+    # #4147 v0.4 (owner 2026-09-23): ~10 hard sets/muscle/wk -> [8, 12]; everything else in the block is unchanged
+    assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (3, 4, [8, 12], [55, 70])
     assert R["run_gate_lb"]["value"] == 240 and "12 h walking" in R["run_gate_lb"]["gate"]
     m = R["medical_cover"]
     assert m["dxa_every_weeks"] == 8 and m["baseline_within_weeks"] == 2 and m["ursodiol"]["trend_threshold_lb_wk"] == 3.0
@@ -382,7 +399,12 @@ def test_v3_updated_thresholds_on_the_kept_tripwires():
         and tw["logging_dark"]["threshold_days_of_7"] == 2
         and tw["logging_dark"]["threshold_days_of_14"] == 4
     )
-    assert tw["volume_ceiling"]["threshold"]["sets_per_muscle_wk"] == 10
+    # #4147: the ceiling IS the band's top, derived — it moved 10 -> 12 with v0.4's band
+    assert (
+        tw["volume_ceiling"]["threshold"]["sets_per_muscle_wk"]
+        == owner_redlines.REDLINES["lifting_sessions_per_wk"]["sets_per_muscle_wk"][1]
+        == 12
+    )
     assert tw["walking_collapse"]["threshold_pct"] == 30 and tw["walking_collapse"]["provenance"] == "owner-history"
     assert tw["intake_floor_breached"]["threshold_days"] == 2 and tw["protein_floor_missed"]["threshold_days"] == 3
     assert "PHQ-9 ≥ 10" in tw["mood_declared"]["signal"]

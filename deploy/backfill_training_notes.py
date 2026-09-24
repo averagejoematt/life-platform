@@ -243,15 +243,16 @@ def only_note_workouts(workouts, target) -> list:
 
 
 def bounded_cap(table, extra_calls: int) -> int:
-    """The monthly cap for THIS run: the live count plus exactly `extra_calls`.
+    """The monthly cap for THIS run: the bulk lane's current count plus exactly `extra_calls`.
 
     The September cap (300) is reached, so a plain `make_llm_fn` degrades the one note
     the owner approved re-extracting to deterministic-only. Raising the cap by N above
     the CURRENT count bounds the spend to N calls whatever the cap's state — never a
-    blanket lift."""
+    blanket lift. #4151: the count is the BULK lane's — this script is a sweep and never
+    charges (or reads) the live on-ingest lane."""
     from training.training_notes_llm import monthly_calls
 
-    return monthly_calls(table) + int(extra_calls)
+    return monthly_calls(table, lane="bulk") + int(extra_calls)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -668,11 +669,12 @@ def main():
         if len(workouts) != 1:
             raise SystemExit(f"--only-note {args.only_note}: expected exactly ONE noted exercise-session, found {len(workouts)} workout(s)")
         cap = bounded_cap(table, args.allow_calls) if args.apply else None
-        llm_fn = make_llm_fn(table, monthly_cap=cap) if args.apply else None
+        llm_fn = make_llm_fn(table, monthly_cap=cap, lane="bulk") if args.apply else None
         print(f"ONLY-NOTE {args.only_note}: 1 exercise-session; model cap for this run = {cap} (live count + {args.allow_calls})")
     else:
         workouts = _noted_workouts(table, args.since)
-        llm_fn = make_llm_fn(table) if args.apply else None  # dry-run: deterministic-only, no model spend
+        # #4151: a sweep charges the bulk lane, so it can never spend the live path's month.
+        llm_fn = make_llm_fn(table, lane="bulk") if args.apply else None  # dry-run: deterministic-only, no model spend
 
     total_records = total_pain = total_workouts = 0
     total_wrote = total_skipped = total_versioned = 0

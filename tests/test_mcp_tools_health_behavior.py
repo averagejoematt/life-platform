@@ -780,6 +780,32 @@ def test_readiness_labels_a_duration_proxy_training_load_as_such(monkeypatch):
     assert "duration-proxy basis" in raw["load_basis_note"]
 
 
+def test_a_worked_set_driven_load_is_never_called_heart_rate_4075(monkeypatch):
+    """#4075 4A review. Under the worked-set model a non-proxy window can be driven by
+    Hevy worked-set time. The note used to say "heart-rate basis" for anything that was
+    neither a duration proxy nor power, so {confidence: worked_set, proxy_share: 0}
+    read as HR. The sentence is now derived from the basis shares. Mutation control: the
+    pre-review `conf != "power"` branch fails the first assertion block."""
+    basis = {"confidence": "worked_set", "proxy_share": 0.0, "hr_share": 0.0, "worked_set_share": 1.0}
+    install(monkeypatch, [whoop_full(TODAY), cmetrics(TODAY, tsb=4, tsb_load_basis=basis)])
+    note = th.tool_get_readiness_score({})["components"]["training_form"]["raw"]["load_basis_note"]
+    assert note.startswith("Hevy worked-set time basis") and "heart-rate" not in note and "100% Hevy worked-set time" in note
+
+    mixed = {"confidence": "mixed", "proxy_share": 0.3, "hr_share": 0.2, "worked_set_share": 0.5}
+    install(monkeypatch, [whoop_full(TODAY), cmetrics(TODAY, tsb=4, tsb_load_basis=mixed)])
+    note = th.tool_get_readiness_score({})["components"]["training_form"]["raw"]["load_basis_note"]
+    assert note.startswith("Hevy worked-set time basis") and "50%" in note and "20% heart rate" in note
+
+    hr = {"confidence": "hr", "proxy_share": 0.0, "hr_share": 1.0, "worked_set_share": 0.0}
+    install(monkeypatch, [whoop_full(TODAY), cmetrics(TODAY, tsb=4, tsb_load_basis=hr)])
+    note = th.tool_get_readiness_score({})["components"]["training_form"]["raw"]["load_basis_note"]
+    assert note.startswith("heart rate basis") and "worked-set" not in note
+
+    power = {"confidence": "power", "proxy_share": 0.0}
+    install(monkeypatch, [whoop_full(TODAY), cmetrics(TODAY, tsb=4, tsb_load_basis=power)])
+    assert "load_basis_note" not in th.tool_get_readiness_score({})["components"]["training_form"]["raw"]
+
+
 def test_readiness_falls_back_to_live_whoop_when_the_computed_metrics_read_fails(monkeypatch):
     """A DynamoDB failure on the pre-computed partition must degrade to the live
     calculation, not take the whole answer down."""

@@ -128,13 +128,13 @@ def test_a_raising_reader_is_read_failed_with_its_error_class_and_the_rest_still
 
 def test_block_position_raise_is_read_failed_not_a_packet_error(stub_readers, monkeypatch):
     """Mutation: remove `_wrap` — a reader that raises outside `_read` escapes the tool."""
-    from training import program_structure
+    from training import session_sequence
 
-    def bad(day):
-        raise ValueError("calendar unreadable")
+    def bad(day, workouts):
+        raise ValueError("sequence unreadable")
 
-    monkeypatch.setattr(program_structure, "calendar_entry", bad)
-    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    monkeypatch.setattr(session_sequence, "next_session", bad)
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-26"})
     assert out["fields"]["block_position"]["state"] == "read_failed"
     assert "ValueError" in out["fields"]["block_position"]["error"]
 
@@ -260,19 +260,37 @@ def test_last_session_by_type_is_the_newest_with_sets_and_notes(stub_readers):
     assert full["exercises"] and all("sets" in e and "notes" in e for e in full["exercises"])
     assert value["sessions_read"] == len(rows)
     assert value["routine_index"] == {"state": "measured"}
-    # 2026-09-08..22 precede block 1 (2026-09-24): no v0.3 role is claimed for them
+    # 2026-09-08..22 precede the v0.4 block start (2026-09-24): no sequence role is claimed for them
     assert value["by_session_role"] == {}
 
 
-def test_last_session_by_role_on_the_block_calendar(stub_readers, monkeypatch):
-    """Mutation: key the role off the weekday grid instead of the block calendar."""
+def _block_rows() -> list[dict]:
+    """Two LOADED lifts after the v0.4 block start (the live-projected fixture row, re-dated) and
+    one unloaded day between them — the walk/Engine day that must never advance the sequence."""
+    base = _hevy_rows()[0]
+    lift1 = dict(base, sk="DATE#2026-09-25#WORKOUT#u1", date="2026-09-25", workout_uid="hevy:u1", source_workout_id="u1")
+    walk = dict(base, sk="DATE#2026-09-26#WORKOUT#w1", date="2026-09-26", workout_uid="hevy:w1", source_workout_id="w1")
+    walk["exercises"] = [{"name": "Treadmill", "sets": [{"type": "normal", "duration_sec": 1800}]}]
+    lift2 = dict(base, sk="DATE#2026-09-27#WORKOUT#u2", date="2026-09-27", workout_uid="hevy:u2", source_workout_id="u2")
+    return [lift1, walk, lift2]
+
+
+def test_last_session_by_role_comes_from_the_session_sequence(stub_readers, monkeypatch):
+    """Mutation: key the role off a weekday calendar (v0.3's `calendar_entry`) instead of the
+    order-based sequence — under v0.4 the role is the position of the LOADED session, whatever the day."""
+    from training import session_sequence
+
     from mcp import tools_strength
 
-    row = dict(_hevy_rows()[0])
-    row.update(sk="DATE#2026-09-24#WORKOUT#u1", date="2026-09-24", workout_uid="hevy:u1")
-    monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: ([row], ["experiment"]))
-    value = pkt._last_sessions("2026-09-25")
-    assert value["by_session_role"]["heavy"]["workout_uid"] == "hevy:u1"
+    rows = _block_rows()
+    monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: (rows, ["experiment"]))
+    value = pkt._last_sessions("2026-09-27")
+    done = session_sequence.completed_sessions(rows, "2026-09-28")
+    expect = {session_sequence.position(c["sequence_index"])["session_role"]: c["workout_id"] for c in done}
+    assert {r: row["workout_uid"].split(":")[1] for r, row in value["by_session_role"].items()} == expect
+    assert value["by_session_role"]["lower_heavy"]["workout_uid"] == "hevy:u1"  # first_role
+    assert value["by_session_role"]["upper_volume"]["workout_uid"] == "hevy:u2"  # the walk did not advance it
+    assert value["session_sequence"]["state"] == "measured"
 
 
 def test_routine_index_failure_leaves_sessions_read_and_says_why(stub_readers, monkeypatch):
@@ -294,20 +312,38 @@ def test_no_hevy_session_is_absent(stub_readers, monkeypatch):
     assert pkt._last_sessions_field("2026-09-23")[1]["state"] == "absent"
 
 
-# ── block position ─────────────────────────────────────────────────────────────────────
-def test_block_position_before_block_1_is_week_0_with_the_first_session_next():
+# ── block position: THE session sequence, passed through ───────────────────────────────
+def test_block_position_is_next_session_for_the_same_date_and_record(stub_readers, monkeypatch):
+    """Mutation: compute the position any other way — v0.3's `calendar_entry` / weekday
+    `program_week` again, or a re-derived role — and this equality reds."""
+    from training import session_sequence
+
+    from mcp import tools_strength
+
+    rows = _block_rows()
+    monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: ([r for r in rows if s <= r["date"] <= e], ["experiment"]))
+    for day in ("2026-09-25", "2026-09-26", "2026-09-28", "2026-10-01"):
+        value, status = pkt._block_position(day)
+        block = [r for r in rows if r["date"] < day]
+        assert status["state"] == "measured"
+        assert value["next_session"] == session_sequence.next_session(day, block), day
+        assert value["program_week"] == session_sequence.program_week(day, block)
+    value, _ = pkt._block_position("2026-09-28")
+    nxt = value["next_session"]
+    assert nxt["session_role"] == "lower_volume" and nxt["advanced_by"]["date"] == "2026-09-27"
+    assert {"position_label", "week", "session_role", "advanced_by"} <= set(nxt)
+
+
+def test_block_position_never_reads_the_superseded_calendar():
+    """Mutation: import program_v03 / call calendar_entry from the packet."""
+    src = (ROOT / "mcp" / "tools_coach_packet.py").read_text()
+    assert "calendar_entry" not in src and "program_v03" not in src.replace("`training.program_v03`, SUPERSEDED", "")
+
+
+def test_block_position_before_the_block_start_is_week_0():
     value, status = pkt._block_position("2026-09-23")
     assert status["state"] == "measured"
-    assert value["program_week"] == 0 and value["target_date_entry"] is None
-    assert value["next_lifting_session"]["date"] == "2026-09-24"
-    assert value["next_lifting_session"]["session_role"] == "heavy"
-
-
-def test_block_position_on_a_session_day():
-    value, _ = pkt._block_position("2026-09-24")
-    assert value["program_week"] == 1
-    assert value["target_date_entry"]["session_role"] == "heavy"
-    assert value["next_lifting_session"]["date"] == "2026-09-26"
+    assert value["program_week"] == 0 and value["next_session"] is None
 
 
 # ── the instructions point at it ───────────────────────────────────────────────────────

@@ -1,0 +1,473 @@
+"""tests/test_session_sequence_4110.py — the program's sessions follow a SEQUENCE, not weekdays.
+
+WHY THIS FILE EXISTS
+
+#4064 bound each v0.3 session to a weekday (Thu 09-24 / Sat 09-26 / Mon 09-28, then
+Mon/Wed/Fri). Owner, 2026-09-23: "more just focusing on planned sequence and not forgetting
+next if I audible a change." Under the weekday calendar a walk on a lifting day silently
+SKIPPED that session. The same evening he switched to v0.4 Upper/Lower, ORDER-BASED (#4147):
+Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating, starting from the
+Lower-heavy session he had already committed for 2026-09-25. These tests hold the order:
+
+  1. THE SEQUENCE IS PINNED — four per program week, from lower-heavy, deload every 6th week,
+     block of 6 — and defined once, with no weekday fields.
+  2. THE FIXTURES. The committed Lower-heavy performed -> Upper-volume next; NOT performed ->
+     Lower-heavy still next. An audible (walks) postpones and never skips; a session done early
+     or on consecutive days still advances in order; two skipped sessions do not advance the
+     week; Engine days, warm-up-only logs, rest days and pre-switch lifts never advance it; two
+     loaded logs on one day are one session.
+  3. THE MUTATION CONTROLS. A predicate under which a walk advances the position reds the
+     fixture; a block start that admitted the pre-switch lifts would move the first session.
+  4. ONE WEEK. `plan_engine.program_week` (the `not_before_week` gate, #4098), the served
+     session's `week`, the week the load ramp is handed (#4090) and the chat commit gate's
+     week are the same number.
+  5. THE SURFACES. `constraint_block` names the position and the session that advanced it;
+     the generator builds the sequence's session on a day the nominal grid calls a walk;
+     plan_next_session through the MCP handler serves it; an unread Hevy record is
+     `sequence_unreadable` / week None — never a silent session 1.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import pathlib
+import sys
+from contextlib import ExitStack
+from unittest.mock import patch
+
+import pytest
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "lambdas"))
+
+os.environ.setdefault("S3_BUCKET", "test-bucket")
+os.environ.setdefault("USER_ID", "matthew")
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+
+from training import owner_redlines, plan_engine, program_structure, routine_generator, session_sequence, training_streaks  # noqa: E402
+
+UH, LH, UV, LV = "upper_heavy", "lower_heavy", "upper_volume", "lower_volume"
+FIRST_TARGET = "2026-09-25"  # the committed Lower-heavy (routine b1b9960468f374e30dcdeca8630dd18f, Hevy 4b743f67)
+
+
+def lift(day: str, title: str = "Foundation - Full Body - 1 - 1", *, start: str | None = None, wid: str | None = None) -> dict:
+    return {
+        "date": day,
+        "sk": f"DATE#{day}#WORKOUT#{wid or 'L' + day}",
+        "title": title,
+        "source_workout_id": wid or "L" + day,
+        "start_time": start or f"{day}T14:00:00Z",
+        "exercises": [
+            {
+                "name": "Linear Leg Press",
+                "sets": [{"type": "warmup", "weight_kg": 40, "reps": 10}, {"type": "normal", "weight_kg": 90, "reps": 5}],
+            }
+        ],
+    }
+
+
+def walk(day: str) -> dict:
+    return {
+        "date": day,
+        "sk": f"DATE#{day}#WORKOUT#W{day}",
+        "title": "Walk",
+        "source_workout_id": "W" + day,
+        "exercises": [{"name": "Walking", "sets": [{"type": "normal", "duration_sec": 3600, "distance_m": 5000}]}],
+    }
+
+
+def engine(day: str) -> dict:
+    """The live Engine day: cycling + treadmill + stretching — no load (2026-09-21's shape)."""
+    return {
+        "date": day,
+        "sk": f"DATE#{day}#WORKOUT#E{day}",
+        "title": "Foundation - Engine - 3 - 15",
+        "source_workout_id": "E" + day,
+        "exercises": [
+            {"name": "Cycling", "sets": [{"type": "normal", "duration_sec": 1800}]},
+            {"name": "Treadmill", "sets": [{"type": "normal", "duration_sec": 1800}]},
+            {"name": "Stretching", "sets": [{"type": "normal", "duration_sec": 600}]},
+        ],
+    }
+
+
+def warmup_only(day: str) -> dict:
+    return {
+        "date": day,
+        "title": "Started, bailed",
+        "source_workout_id": "U" + day,
+        "exercises": [{"name": "Bench Press (Barbell)", "sets": [{"type": "warmup", "weight_kg": 20, "reps": 10}]}],
+    }
+
+
+def served(day: str, rows: list[dict]) -> dict:
+    e = session_sequence.next_session(day, rows)
+    assert e is not None and e["source"] == "session_sequence", e
+    return e
+
+
+# ── 1. the sequence, pinned ──────────────────────────────────────────────────
+# The first 13 program weeks, written out: the order from lower-heavy, four a week, blocks of 6,
+# deloads in weeks 6 and 12. (week, [roles]) — the roles literal, not generated by the code.
+EXPECTED_WEEKS = [(w, [LH, UV, LV, UH]) for w in range(1, 14)]
+
+
+def test_the_first_13_program_weeks_are_pinned():
+    got = session_sequence.preview(52)
+    weeks: dict[int, list[str]] = {}
+    for p in got:
+        weeks.setdefault(p["week"], []).append(p["session_role"])
+        assert p["session_in_week"] == p["sequence_index"] % 4 + 1
+        assert p["block"] == (1 if p["week"] <= 6 else (2 if p["week"] <= 12 else 3))
+        assert p["deload"] == (p["week"] in (6, 12))
+        assert p["archetype"] == program_structure.SESSION_TEMPLATES[p["session_role"]]["archetype"]
+    assert sorted(weeks.items()) == EXPECTED_WEEKS
+    assert session_sequence.position(0)["position_label"] == "week 1 · session 1 of 4 · lower-heavy"
+    assert session_sequence.position(1)["position_label"] == "week 1 · session 2 of 4 · upper-volume"
+    assert session_sequence.position(3)["position_label"] == "week 1 · session 4 of 4 · upper-heavy"
+    assert session_sequence.position(20)["position_label"] == "week 6 · session 1 of 4 · lower-heavy · DELOAD"
+
+
+def test_the_sequence_is_defined_once_in_program_structure():
+    seq = program_structure.SESSION_SEQUENCE
+    assert seq["block_start"] == "2026-09-24" and seq["program_version"] == "0.4"
+    assert seq["session_roles"] == [UH, LH, UV, LV] and seq["first_role"] == LH
+    assert seq["sessions_per_week"] == 4 and seq["weeks_per_block"] == 6
+    assert seq["first_session"]["routine_id"] == "b1b9960468f374e30dcdeca8630dd18f" and seq["first_session"]["target_date"] == FIRST_TARGET
+    assert set(seq["session_roles"]) == set(program_structure.SESSION_TEMPLATES)
+    assert program_structure.summary()["session_sequence"] is seq
+    # the weekday placement is retired, not kept beside the sequence as a second answer: no
+    # weekday fields on the sequence, no calendar functions; v0.3's calendar is history only
+    assert not {"steady_weekdays", "opening_sessions", "optional_fourth_weekday"} & set(seq)
+    for gone in ("block_calendar", "calendar_entry", "_session_dates"):
+        assert not hasattr(program_structure, gone), gone
+    assert program_structure.BLOCK_CALENDAR["superseded"]["superseded_by"] == "0.4"
+
+
+def test_deload_period_is_the_redlines_with_a_mutation_control():
+    firsts = [p["week"] for p in session_sequence.preview(52) if p["deload"] and p["session_in_week"] == 1]
+    assert firsts == [6, 12]
+    with patch.dict(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"], {"every_nth_week": 4}):
+        assert [p["week"] for p in session_sequence.preview(52) if p["deload"] and p["session_in_week"] == 1] == [4, 8, 12]
+
+
+# ── 2. the fixtures ──────────────────────────────────────────────────────────
+def test_the_committed_lower_heavy_performed_serves_upper_volume_next():
+    rows = [lift(FIRST_TARGET, title="Lower — 2026-09-25")]
+    e = served("2026-09-26", rows)
+    assert (e["session_role"], e["archetype"], e["week"], e["session_in_week"]) == (UV, "upper", 1, 2)
+    assert e["position_label"] == "week 1 · session 2 of 4 · upper-volume"
+    assert e["advanced_by"]["date"] == FIRST_TARGET and e["advanced_by"]["was"] == "week 1 · session 1 of 4 · lower-heavy"
+
+
+def test_the_committed_lower_heavy_not_performed_is_still_next():
+    for rows in ([], [walk(FIRST_TARGET)], [walk(FIRST_TARGET), engine("2026-09-26")]):
+        for day in (FIRST_TARGET, "2026-09-26", "2026-09-27"):
+            e = served(day, rows)
+            assert (e["session_role"], e["completed_sessions"], e["advanced_by"]) == (LH, 0, None), (day, rows)
+
+
+def test_an_audible_postpones_the_next_session_and_never_skips_it():
+    rows = [lift(FIRST_TARGET), walk("2026-09-26"), walk("2026-09-27")]
+    for d in ("2026-09-26", "2026-09-27", "2026-09-28"):
+        assert served(d, rows)["session_role"] == UV, d
+
+
+def test_out_of_order_days_still_advance_in_order():
+    """Lifting early (Thursday, before the committed Friday target), on consecutive days, or
+    after a gap — the ORDER holds, whatever the dates."""
+    early = [lift("2026-09-24")]
+    assert served(FIRST_TARGET, early)["session_role"] == UV, "a Thursday lift is the lower-heavy, done early"
+    irregular = [lift("2026-09-24"), lift("2026-09-25"), lift("2026-09-29"), lift("2026-10-03")]
+    assert [served(d, irregular)["session_role"] for d in ("2026-09-25", "2026-09-26", "2026-09-30", "2026-10-04")] == [UV, LV, UH, LH]
+    assert served("2026-10-04", irregular)["week"] == 2
+
+
+def test_two_skipped_sessions_do_not_advance_the_week():
+    rows = [lift(f"2026-09-{d}") for d in (24, 25, 26, 27)]
+    assert served("2026-09-28", rows)["week"] == 2
+    skipped = [lift("2026-09-24"), walk("2026-09-26"), walk("2026-09-28")] + [walk(f"2026-10-0{n}") for n in range(1, 7)]
+    e = served("2026-10-07", skipped)
+    assert (e["week"], e["session_role"], e["completed_sessions"]) == (1, UV, 1)
+
+
+def test_engine_days_warmup_only_logs_and_rest_days_never_advance():
+    rows = [lift("2026-09-24"), engine("2026-09-25"), warmup_only("2026-09-26")]
+    assert served("2026-09-28", rows)["session_role"] == UV  # 09-27: nothing logged at all
+
+
+def test_two_loaded_logs_on_one_day_are_one_session():
+    rows = [lift("2026-09-24", start="2026-09-24T15:00:00Z", wid="b"), lift("2026-09-24", start="2026-09-24T14:00:00Z", wid="a")]
+    e = served("2026-09-25", rows)
+    assert e["completed_sessions"] == 1 and e["session_role"] == UV
+    assert e["advanced_by"]["workout_id"] == "a" and e["advanced_by"]["loaded_logs_that_day"] == 2
+
+
+def test_pre_switch_lifts_and_a_same_day_log_do_not_count():
+    rows = PRE_SWITCH
+    first = served("2026-09-24", rows)
+    assert (first["session_role"], first["completed_sessions"], first["advanced_by"]) == (LH, 0, None)
+    # a session logged ON the planned day is the one that day's plan served — stable all day
+    assert served(FIRST_TARGET, rows + [lift(FIRST_TARGET)])["session_role"] == LH
+    assert served("2026-09-26", rows + [lift(FIRST_TARGET)])["session_role"] == UV
+    assert session_sequence.next_session("2026-09-23", rows) is None, "before the block start the nominal grid answers"
+
+
+def test_tombstoned_rows_never_count():
+    assert served("2026-09-26", [{**lift(FIRST_TARGET), "tombstone": True}])["session_role"] == LH
+
+
+def test_every_loaded_session_advances_seven_days_a_week():
+    """Every loaded session is the next one; the redline's 3–4/wk ceiling is an ADVISORY beside
+    it, never a skip. The v0.3 'non-consecutive days' advisory is gone: the order alternates."""
+    rows = [lift(f"2026-09-{d}") for d in (24, 25, 26, 27)]
+    e = served("2026-09-28", rows)
+    assert (e["week"], e["session_role"]) == (2, LH)
+    assert e["spacing"]["loaded_yesterday"] is True and e["spacing"]["loaded_sessions_prior_7d"] == 4
+    assert len(e["spacing"]["advisories"]) == 1 and "ceiling" in e["spacing"]["advisories"][0]
+
+
+# ── 3. the mutation controls ─────────────────────────────────────────────────
+def test_mutation_control_a_walk_that_advances_the_position_reds_the_fixture():
+    rows = [lift(FIRST_TARGET), walk("2026-09-26"), walk("2026-09-27")]
+    with patch.object(training_streaks, "is_loaded_session", lambda w: True):
+        e = session_sequence.next_session("2026-09-28", rows)
+    assert e["session_role"] != UV, "with walks counted, the next session is no longer upper-volume — the fixture can fail"
+    assert e["completed_sessions"] == 3 and e["session_role"] == UH
+
+
+PRE_SWITCH = [lift(f"2026-09-{d}") for d in (16, 17, 19, 20, 22, 23)]
+
+
+def test_mutation_control_a_block_start_that_admitted_pre_switch_lifts_moves_the_first_session():
+    with patch.dict(program_structure.SESSION_SEQUENCE, {"block_start": "2026-09-01"}):
+        e = session_sequence.next_session("2026-09-24", PRE_SWITCH)
+    assert e["session_role"] != LH and e["completed_sessions"] == 6
+    assert session_sequence.block_start() == "2026-09-24"
+
+
+# ── 4. one week ──────────────────────────────────────────────────────────────
+def _sessions(n: int) -> list[dict]:
+    from common.pacific_time import shift_day_key
+
+    return [lift(shift_day_key("2026-09-24", i)) for i in range(n)]
+
+
+@pytest.mark.parametrize("n_done", [0, 3, 4, 19, 20, 23, 24])
+def test_the_gate_the_session_the_ramp_and_the_chat_gate_read_one_week(n_done):
+    from common.pacific_time import shift_day_key
+
+    from mcp import hevy_prescription_gate
+
+    rows = _sessions(n_done)
+    day = shift_day_key("2026-09-24", n_done + 1)
+    week = plan_engine.program_week(day, rows)
+    assert week == n_done // 4 + 1
+    block = plan_engine.constraint_block(date=day, block_workouts=rows)
+    assert block["program_week"] == week == block["session"]["week"]
+    anchor = next(t for t in block["tripwires"] if t["id"] == "anchor_lift_strength_drop")
+    assert (anchor["state"] == "not_yet_active") == (week < 6)
+    # the ramp is handed the served session's week (full_body_session reads day_entry['week'])
+    with patch("training.load_ramp.ramp_floor", side_effect=lambda f, w: {**f, "_week": w}) as rf:
+        _generate(day, block_workouts=rows)
+    assert {c.args[1] for c in rf.call_args_list} <= {week}
+    assert hevy_prescription_gate.v03_load_rule(day, block_workouts=rows)["week"] == week
+
+
+def test_program_week_is_zero_before_the_block_and_unknown_when_unread():
+    assert plan_engine.program_week("2026-09-23") == 0
+    assert plan_engine.program_week("2026-09-24", None) is None
+    assert plan_engine.program_week("2026-09-24", []) == 1
+    assert plan_engine.program_week("not-a-day", []) is None
+
+
+# ── 5. the surfaces ──────────────────────────────────────────────────────────
+def _generate(day: str, **kw):
+    with patch.object(routine_generator, "_load_note_indexes", return_value=({}, {}, {}, {})):
+        return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, **kw))
+
+
+def test_constraint_block_names_the_position_and_what_advanced_it():
+    rows = [lift(FIRST_TARGET, title="Lower — 2026-09-25"), walk("2026-09-26")]
+    block = plan_engine.constraint_block(date="2026-09-27", block_workouts=rows)
+    s = block["session"]
+    assert s["source"] == "session_sequence" and s["position_label"] == "week 1 · session 2 of 4 · upper-volume"
+    assert s["advanced_by"]["title"] == "Lower — 2026-09-25"
+    assert s["prescription"]["session_role"] == UV and s["prescription"]["hevy_folder"] == "Upper"
+    assert block["inputs"]["block_workouts"]["state"] == "measured"
+
+
+def test_an_unread_record_is_unknown_never_session_one():
+    block = plan_engine.constraint_block(date="2026-09-27")
+    assert block["session"]["source"] == "sequence_unreadable" and "prescription" not in block["session"]
+    assert block["program_week"] is None
+    assert block["inputs"]["block_workouts"]["state"] == "not_supplied"
+
+
+def test_generator_serves_the_sequence_on_a_day_the_nominal_grid_calls_a_walk():
+    rows = [lift(FIRST_TARGET), walk("2026-09-26")]
+    ideal = _generate("2026-09-27", block_workouts=rows)[0]  # Sunday: a walk on the nominal grid
+    assert ideal.archetype == "upper" and ideal.title.startswith("UPPER-VOLUME — W1")
+    assert ideal.inputs_snapshot["calendar"]["position_label"] == "week 1 · session 2 of 4 · upper-volume"
+    assert any(
+        "session sequence: week 1 · session 2 of 4 · upper-volume" in r and f"advanced by {FIRST_TARGET}" in r for r in ideal.rationale
+    )
+
+
+def test_generator_reads_the_record_itself_when_the_caller_did_not_and_says_so_when_it_cannot():
+    with patch.object(session_sequence, "load_block_workouts", return_value=[lift("2026-09-24")]) as ld:
+        assert _generate(FIRST_TARGET)[0].title.startswith("UPPER-VOLUME")
+    ld.assert_called_once_with(FIRST_TARGET)
+    with patch.object(session_sequence, "load_block_workouts", side_effect=RuntimeError("ddb down")):
+        routines = _generate("2026-09-27")
+    assert routines[0].archetype == "aerobic"
+    assert any("session sequence UNREADABLE" in r for r in routines[0].rationale)
+
+
+@pytest.mark.parametrize("day", ["2026-09-28", "2026-09-29", "2026-10-01", "2026-10-02"])  # the nominal grid's four lifting days
+def test_an_unreadable_record_drafts_no_lifting_session_matching_planned_session(day):
+    """#4110 review: the generator and `planned_session` give ONE answer when the Hevy read fails —
+    `sequence_unreadable`, no prescription — never the nominal weekday's session (Mon = upper_heavy)."""
+    assert program_structure.week_grid()["schedule"][str(__import__("datetime").date.fromisoformat(day).weekday())]["archetype"] in (
+        "upper",
+        "lower",
+    )
+    with patch.object(session_sequence, "load_block_workouts", side_effect=RuntimeError("ddb down")):
+        routines = _generate(day)
+    assert len(routines) == 1 and routines[0].archetype == "aerobic" and routines[0].exercises == []
+    assert routines[0].inputs_snapshot["calendar"] == {"source": "sequence_unreadable", "week": None, "session_role": None}
+    assert any("NO lifting session is drafted" in r for r in routines[0].rationale)
+    ps = program_structure.planned_session(day, block_workouts=None)
+    assert ps["source"] == "sequence_unreadable" and "prescription" not in ps
+
+
+def test_mutation_control_the_weekday_fallback_serves_a_nominal_lifting_session():
+    """Restore the pre-review fallback (weekday entry + a note) and Monday drafts upper-heavy — the divergence."""
+    real = routine_generator._schedule_entry_for_date
+
+    def weekday_fallback(target_date, week_cfg, source=None, block_workouts=None):
+        e = real(target_date, week_cfg, source, block_workouts)
+        if e.get("source") == "sequence_unreadable":
+            from datetime import date
+
+            return {
+                **dict(week_cfg["schedule"][str(date.fromisoformat(target_date).weekday())]),
+                "sequence_unreadable": e["sequence_unreadable"],
+            }
+        return e
+
+    with (
+        patch.object(session_sequence, "load_block_workouts", side_effect=RuntimeError("ddb down")),
+        patch.object(routine_generator, "_schedule_entry_for_date", weekday_fallback),
+    ):
+        routines = _generate("2026-09-28")
+    assert routines[0].archetype == "upper", "the fallback serves the nominal Monday — the test above must red on it"
+
+
+def test_inactive_program_never_reads_the_sequence():
+    with (
+        patch.object(program_structure, "ACTIVE", False),
+        patch.object(session_sequence, "load_block_workouts", side_effect=AssertionError("sequence read under an inactive program")),
+        patch.object(session_sequence, "next_session", side_effect=AssertionError("sequence read under an inactive program")),
+    ):
+        _generate("2026-09-27")
+
+
+def test_plan_next_session_through_the_mcp_handler_serves_the_next_undone_session():
+    from mcp import handler as h
+    from tests.test_program_session_4064_4147 import _stage1_patches
+
+    rows = [lift(FIRST_TARGET), walk("2026-09-26")]
+    with ExitStack() as st:
+        for cm in _stage1_patches():
+            st.enter_context(cm)
+        st.enter_context(patch("mcp.tools_plan._block_workouts", return_value=rows))
+        st.enter_context(patch.object(h, "_emit_tool_metric"))
+        st.enter_context(patch.object(h, "_audit_tool_call"))
+        resp = h.handle_tools_call({"name": "plan_next_session", "arguments": {"target_date": "2026-09-27"}})
+    out = json.loads(resp["content"][0]["text"])
+    s = out["constraint_block"]["session"]
+    assert (s["source"], s["session_role"], s["position_label"]) == ("session_sequence", UV, "week 1 · session 2 of 4 · upper-volume")
+    assert s["advanced_by"]["date"] == FIRST_TARGET
+    assert out["constraint_block"]["program_week"] == 1
+
+
+def test_the_mcp_reader_uses_the_sanctioned_hevy_path_from_the_block_start():
+    from mcp import tools_plan
+
+    with patch("mcp.tools_strength._read_hevy_all_phases", return_value=([lift("2026-09-24")], ["experiment"])) as rd:
+        assert tools_plan._block_workouts("2026-09-27") == [lift("2026-09-24")]
+    rd.assert_called_once_with("2026-09-24", "2026-09-26")
+    with patch("mcp.tools_strength._read_hevy_all_phases", side_effect=AssertionError("nothing to read before the block")):
+        assert tools_plan._block_workouts("2026-09-24") == []
+
+
+# ── 6. the first v0.4 session (#4147) ────────────────────────────────────────
+@pytest.mark.parametrize("day", ["2026-09-24", FIRST_TARGET])
+@pytest.mark.parametrize("rows", [[], PRE_SWITCH], ids=["empty-record", "pre-switch-lifts"])
+def test_the_first_v04_session_is_the_committed_lower_heavy(day, rows):
+    """Nothing performed since the switch: the plan, the generator and the chat gate all serve
+    lower-heavy, week 1, block 1 — barbell squat heavy, RDL as the moderate hinge."""
+    from mcp import hevy_prescription_gate
+
+    catalog = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
+    ps = program_structure.planned_session(day, block_workouts=rows, catalog_movements=catalog)
+    assert (ps["session_role"], ps["archetype"], ps["week"], ps["block"], ps["deload"]) == (LH, "lower", 1, 1, False)
+    assert (ps["source"], ps["sequence_index"], ps["position_label"]) == ("session_sequence", 0, "week 1 · session 1 of 4 · lower-heavy")
+    assert ps["program_version"] == "0.4" and ps["advanced_by"] is None
+    anchors = [(e["movement_key"], e["intensity"]) for e in ps["prescription"]["exposures"] if e["kind"] == "anchor"]
+    assert anchors == [("squat_barbell", "heavy"), ("romanian_deadlift_barbell", "moderate")]
+
+    assert plan_engine.program_week(day, rows) == 1
+    block = plan_engine.constraint_block(date=day, block_workouts=rows)
+    assert (block["session"]["session_role"], block["program_week"]) == (LH, 1)
+
+    ideal = _generate(day, block_workouts=rows)[0]
+    assert ideal.title.startswith("LOWER-HEAVY — W1") and ideal.archetype == "lower"
+    assert ideal.inputs_snapshot["load_floors"]["load_rule"]["week"] == 1
+
+    rule = hevy_prescription_gate.v03_load_rule(day, block_workouts=rows)
+    assert (rule["week"], rule["week_state"], rule["block"], rule["program_version"]) == (1, "measured", 1, "0.4")
+
+
+def test_the_chat_gate_reads_nothing_on_the_block_start_day():
+    from mcp import hevy_prescription_gate
+
+    with patch("mcp.tools_strength._read_hevy_all_phases", side_effect=AssertionError("no read on the block start day")):
+        rule = hevy_prescription_gate.v03_load_rule("2026-09-24")
+    assert (rule["week"], rule["week_state"]) == (1, "measured")
+
+
+def test_the_chat_gate_reads_the_sequence_week_and_says_so_when_it_cannot():
+    from mcp import hevy_prescription_gate
+
+    rows = [lift(f"2026-09-{d}") for d in (24, 25, 26, 27)]
+    assert hevy_prescription_gate.v03_load_rule("2026-09-28", block_workouts=rows)["week"] == 2
+    with patch("mcp.plan_hevy_windows._block_workouts", side_effect=RuntimeError("ddb down")):
+        rule = hevy_prescription_gate.v03_load_rule("2026-09-28")
+    assert rule["week"] == 1 and rule["week_state"] == "unreadable" and "RuntimeError" in rule["week_source"]
+    assert hevy_prescription_gate.v03_load_rule("2026-09-23") is None, "before the block start the #3927 floor stands"
+
+
+def test_the_generator_side_read_closes_the_day_before_the_planned_day():
+    """#4129 x #4110: the per-workout sk is DATE#<day>#WORKOUT#<id>, so an unsuffixed END bound
+    drops the last day's session — the session that should advance TODAY's plan. The window is
+    [block start, before_day): yesterday's row is read, today's is not."""
+    from training import exercise_history
+
+    captured = {}
+
+    class _Table:
+        def query(self, **kw):
+            cond = kw["KeyConditionExpression"]
+            _key, lo, hi = cond.get_expression()["values"][1].get_expression()["values"]
+            captured["bounds"] = (lo, hi)
+            sks = ["DATE#2026-09-24#WORKOUT#a", "DATE#2026-09-26#WORKOUT#b", "DATE#2026-09-27#WORKOUT#c"]
+            return {"Items": [{"sk": k, "source_workout_id": k[-1]} for k in sks if lo <= k <= hi]}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        rows = session_sequence.load_block_workouts("2026-09-27")
+    assert captured["bounds"] == ("DATE#2026-09-24", "DATE#2026-09-26~")
+    assert [r["source_workout_id"] for r in rows] == ["a", "b"], "yesterday's session (09-26) must advance today's plan"

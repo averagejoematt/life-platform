@@ -254,6 +254,12 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
 
 
 _ROLE_WHY = {
+    # v0.4 (#4147) — upper/lower, in order
+    "upper_heavy": "Upper heavy: one top set at RPE 7-8 on bench and row, back-offs 10% lighter. Loads hold.",
+    "lower_heavy": "Lower heavy: one top set at RPE 7-8 on the squat, back-offs 10% lighter. Loads hold.",
+    "upper_volume": "Upper volume: steady sets of 8-12, a few left in the tank. Loads hold.",
+    "lower_volume": "Lower volume: steady sets of 8-12, a few left in the tank. Loads hold.",
+    # v0.3 (superseded 2026-09-24) — kept so a v0.3 routine still reads right
     "heavy": "Full-body heavy: one top set at RPE 7-8, back-offs 10% lighter. Loads hold.",
     "moderate": "Full-body moderate: steady working sets, 2-3 left in the tank. Loads hold.",
     "heavy_moderate": "Full-body heavy-moderate: two anchors heavy, two moderate. Loads hold.",
@@ -277,7 +283,7 @@ def format_why_note(ir: RoutineSpec) -> str:
         return "Recovery red. Deloading today; protect joints."
     if "portfolio guard active" in rationale_blob:
         return "Aerobic base low. Holding strength flat to protect Zone 2."
-    # #4064: a v0.3 §3 session says what KIND of day it is before it says anything else.
+    # #4064: a program session (v0.4 upper/lower, #4147) says what KIND of day it is before anything else.
     cal = (getattr(ir, "inputs_snapshot", None) or {}).get("calendar") or {}
     if cal.get("deload"):
         return "Deload week: fewer sets, same loads. Leave feeling fresh."
