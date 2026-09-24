@@ -81,7 +81,7 @@ def test_cap_raises_capexceeded(monkeypatch):
     monkeypatch.setattr(tnl, "_haiku_call", lambda n, x: [])
     t = FakeTable()
     # Pre-seed the usage counter at the cap.
-    t.put_item({"pk": tnl._USAGE_PK, "sk": f"MONTH#{tnl._month()}", "calls": 300})
+    t.put_item({"pk": tnl._USAGE_PK, "sk": tnl.usage_sk(), "calls": 300})
     fn = tnl.make_llm_fn(t, monthly_cap=300)
     try:
         fn("a brand new note never seen", TAXONOMY)
@@ -95,7 +95,7 @@ def test_cap_breach_degrades_in_extractor(monkeypatch):
     from training.training_notes import extract_signals
 
     t = FakeTable()
-    t.put_item({"pk": tnl._USAGE_PK, "sk": f"MONTH#{tnl._month()}", "calls": 999})
+    t.put_item({"pk": tnl._USAGE_PK, "sk": tnl.usage_sk(), "calls": 999})
     fn = tnl.make_llm_fn(t, monthly_cap=300)
     rec = extract_signals("Low effort level 10 for whole thing", llm_fn=fn)
     assert rec["degraded"] is True
