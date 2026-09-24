@@ -160,12 +160,29 @@ RULINGS: tuple[Ruling, ...] = (
         "'no committed twin' invariant covers it the day someone commits one.",
         producer="lambdas/training/hevy_template_cache.py:CACHE_KEY",
     ),
+    Ruling(
+        "config/coaching/routine_specs/*/*.json",
+        RUNTIME_GENERATED,
+        "#4079: S3-only, one object per committed routine, written by `manage_hevy_routine commit` "
+        "(mcp/routine_spec_ledger.py:save_routine_spec) and by deploy/backfill_routine_specs.py for routines "
+        "committed before it existed. Owner-private; nothing under this prefix is ever committed to the repo.",
+        producer="mcp/routine_spec_ledger.py:SPEC_KEY_FAMILY",
+    ),
     # ── repo_generated: a repo-side script writes the file into the tree ──
     Ruling(
         "config/strava_activity_type_census.json",
         REPO_GENERATED,
         "Its own `_provenance.generated_by` names scripts/strava_type_census.py, which writes CENSUS_PATH under the "
         "repo's config/ dir (line 34) — the tree is the output, not a print of an S3 object. Uploading it is a publish.",
+    ),
+    Ruling(
+        "config/movement_catalog.json",
+        REPO_GENERATED,
+        "#4108: its own `_provenance.generated_by` names deploy/build_movement_catalog.py, which writes CATALOG_PATH under "
+        "the repo's config/ dir from a read-only DynamoDB query + read-only Hevy template GETs, and the output is "
+        "committed — the tree is the authority, not a print of an S3 object. The hand-curated half (`reviewed: true`) "
+        "and any `coach_added` entry are preserved field-for-field by the builder, so a human edit in the repo is still "
+        "an edit to the authority. Read by six modules, written by no Lambda. Uploading it is a publish.",
     ),
     # ── hand_owned: a human edits the repo copy; it is the authority ──
     Ruling(
@@ -231,13 +248,6 @@ RULINGS: tuple[Ruling, ...] = (
         HAND_OWNED,
         "Hand-authored accountability-ledger settings/causes read by lambdas/web/site_api_ledger.py. The ledger's "
         "TOTALS live in DynamoDB; this file is the static config half and nothing writes it.",
-    ),
-    Ruling(
-        "config/movement_catalog.json",
-        HAND_OWNED,
-        "The generator's curated movement pool (its `_comment` says so; ADR-069 draws the line against the generated "
-        "hevy_template_index). Read by five modules, written by none — verified with the AST writer scan and by "
-        "grep for a repo-side writer; RUNBOOK §Hevy lists it as one of the four hand-owned `aws s3 cp` files.",
     ),
     Ruling(
         "config/personas.json",

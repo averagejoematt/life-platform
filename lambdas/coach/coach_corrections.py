@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -466,3 +467,33 @@ def stale_cycle_corrections(corrections: list, *, current_cycle: Optional[int]) 
         if cyc is not None and int(cyc) < int(current_cycle):
             out.append(c)
     return out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4083 — the false-positive ranking (epic #3742): which SIGNAL a coach got wrong most
+# ══════════════════════════════════════════════════════════════════════════════
+# The ledger has been unused since #1690 shipped it — five owner overrides in one
+# fortnight all traced to fatigue proxies, and nothing counted that. A `signal` is the
+# metric/flag id a correction was ABOUT: the stage-2 veto-override path
+# (`coach.critic_overrides.override_item_ref`) already stamps `item_ref.signal` from the
+# critic's own `metric`; the live-session override path (`mcp.tools_coach_corrections`,
+# #4083) stamps the same key from the caller's `signal` arg. A weekly-pack correction
+# (`coach_correction_resolver.build_item_ref`) carries no signal — nothing here invents
+# one for it, so those rows are excluded rather than silently bucketed under None.
+def false_positive_signal_ranking(corrections: list, *, limit: int = 20) -> list[dict]:
+    """Pure: rank named SIGNALS by how many corrections were logged against them,
+    descending count then alphabetical. Every row in `corrections` that carries no
+    `item_ref.signal` is skipped — a false-positive rate about a signal nobody named is
+    not computable, never assumed zero.
+
+    Reads across whatever `corrections` the caller passed (typically ALL statuses, via
+    `list_corrections(table)` — a signal's false-positive count does not reset once a
+    row is applied-to-prompt/applied-to-gate; the correction still happened)."""
+    counts: dict[str, int] = defaultdict(int)
+    for c in corrections or []:
+        signal = (c.get("item_ref") or {}).get("signal")
+        if not signal:
+            continue
+        counts[str(signal)] += 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    return [{"signal": signal, "false_positive_count": n} for signal, n in ranked[: max(0, int(limit))]]

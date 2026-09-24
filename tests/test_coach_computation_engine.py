@@ -642,7 +642,7 @@ class TestFetchRange:
         (call,) = fake.query_calls
         assert call["ExpressionAttributeValues"][":pk"] == engine.USER_PREFIX + "whoop"
         assert call["ExpressionAttributeValues"][":s"] == "DATE#2026-06-01"
-        assert call["ExpressionAttributeValues"][":e"] == "DATE#2026-06-15"
+        assert call["ExpressionAttributeValues"][":e"] == "DATE#2026-06-15~"  # #4129: end day closed
         assert "#phase" in call["ExpressionAttributeNames"]  # pilot rows stay hidden
 
     def test_a_failed_query_degrades_to_an_empty_series_not_an_exception(self, monkeypatch):

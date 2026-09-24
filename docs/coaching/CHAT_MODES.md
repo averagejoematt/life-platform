@@ -124,6 +124,8 @@ individual tools (`get_coach_checkin_queue`, `get_habit_reflection_queue`,
 depth — e.g. `get_coach_checkin_queue` when a fresh question should be *generated*; the
 opener deliberately never triggers generation.
 
+**A write that waits on approval is QUEUED, never announced (`#4078`).** When a mode would say a write is "queued pending approval", it calls `manage_pending_writes action=enqueue` first and says "queued" only once that returned a `pending_id` — four sessions (09-08, 09-18, 09-20, 09-21) ended announcing writes that no queue held. Open items come back in `get_capture_queues`' `pending_writes` section at the next opener; approve performs the write through its own tool, discard drops it, and the nightly qa-smoke warns on any item open past 3 days.
+
 **The evening is ONE flow (`#1484`).** The journal-interview *evening* variant is the
 unified evening ritual, bridging what used to be four separately-skippable surfaces:
 interview → Notion write → the one-tap drinks count (always offered when
@@ -149,7 +151,9 @@ of re-deriving it:
 | Weekly Field Notes response | `log_field_note_response` | The week's AI Lab Notes must already exist (`get_field_notes` first). |
 | Insight / hypothesis / pattern noticed | `save_insight` | Returns `insight_id` for a later `update_insight_outcome` call. |
 | A decision (followed/overrode platform advice) | `log_decision` | Outcome recorded later via `update_decision_outcome`. |
-| Durable context (calibration, failure pattern, what worked, milestone, weekly plate, personal curve, experiment result) | `write_platform_memory` | `category` must be one of the 7 enum values — see the tool schema. |
+| Durable context (calibration, failure pattern, what worked, milestone, weekly plate, personal curve, experiment result) | `write_platform_memory` | `category` must be one of the 8 enum values — see the tool schema. |
+| A standing training constraint (a gate, a toe flag, a back flag) | `write_platform_memory` with `category='training'` | #4077 — a training-domain writer no longer needs to route through `constraints_preferences`; `plan_next_session` stage 1 reads it as `standing_constraints_from_chat`. |
+| Matthew overrides a coach's flag/verdict mid-conversation | `log_coach_correction` | #4083 — name the SIGNAL (metric/flag) that was wrong via `signal`, so the false-positive ranking (`get_intelligence_quality`) can attribute it; see that tool's schema. |
 | Evening drinks count | `log_evening_intake` | PRIVATE (`#1405`) — 0-4 tap, no free text. Defaults to the Pacific evening; idempotent (re-log updates, returns `previous_count`). Drinks-only by decision — ADR-137. |
 | Journal entry (Morning/Evening/Weekly Reflection/Stressor/Health Event) | Notion connector (`notion-create-pages`) | **Not** an MCP write — Notion is the sole journal SOT (dual-SOT rejected, see the 2026-07-18 chat-journey session notes). Use the expanded date-key syntax from the section above. |
 | Night-before training session | `manage_hevy_routine` (`draft_custom` → `dry_run` → `commit`) | Never pass `title` — it's auto-rendered. |

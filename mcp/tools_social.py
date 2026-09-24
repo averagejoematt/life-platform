@@ -48,8 +48,13 @@ def tool_get_social_dashboard(args):
     end = args.get("end_date", pacific_today())
     start = args.get("start_date", (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d"))
 
-    from mcp.core import _apply_phase_filter  # ADR-058
+    from mcp.core import _apply_phase_filter, _resolve_include_pilot_key  # ADR-058 / #4088
 
+    # #4088: `interactions` is RAW_TIMESERIES — a logged fact, kept forever — so the phase
+    # decision is DERIVED from the key's taxonomy class (reads across every phase; the
+    # caller's date window is the bound), never the unconditional ADR-058 filter that hid
+    # every pre-genesis interaction from a 90-day dashboard.
+    include_pilot, derived = _resolve_include_pilot_key(INTERACTIONS_PK, "DATE#")
     resp = table.query(
         **_apply_phase_filter(
             {
@@ -59,10 +64,11 @@ def tool_get_social_dashboard(args):
                     ":s": f"DATE#{start}",
                     ":e": f"DATE#{end}\xff",
                 },
-            }
+            },
+            include_pilot=include_pilot,
         )
     )
-    items = [decimal_to_float(i) for i in resp.get("Items", [])]
+    items = [decimal_to_float(i) for i in resp.get("Items", []) if not (derived and i.get("tombstone"))]
     items.sort(key=lambda x: x.get("date", ""))
 
     if not items:

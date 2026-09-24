@@ -87,7 +87,7 @@ def _fetch_source(source, start, end):
             "ExpressionAttributeValues": {
                 ":pk": USER_PREFIX + source,
                 ":s": "DATE#" + start,
-                ":e": "DATE#" + end,
+                ":e": "DATE#" + end + "~",
             },
         },
         include_pilot=True,

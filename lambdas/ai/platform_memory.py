@@ -105,6 +105,23 @@ MEMORY_CATEGORIES: dict[str, dict] = {
         "coach_domains": ALL_DOMAINS,
         "durable": True,
     },
+    "training": {
+        # #4077: `write_platform_memory` rejected this domain outright, so a standing
+        # training constraint stated in chat (the RDL gate, a toe flag, a back flag) had
+        # no durable home — it survived only as conversational context, gone the next
+        # session. Distinct from `constraints_preferences` (that category is EVERY
+        # standing constraint, cross-domain) so `plan_next_session` stage 1 can read
+        # ONE narrow, training-scoped category without a coach filter on every record.
+        "description": (
+            "Standing training constraints stated in chat — a gate, a toe flag, a back flag, or similar — "
+            "that plan_next_session stage 1 must plan around until Matthew says otherwise."
+        ),
+        "channels": (CHANNEL_CONVERSATION,),
+        "retention_days": 730,
+        "privacy_tier": TIER_COACH_CONTEXT,
+        "coach_domains": frozenset({"physical"}),  # physical_coach absorbs training (persona_registry)
+        "durable": True,
+    },
     "coaching_calibration": {
         "description": "How to coach Matthew — computed response patterns plus explicit asks from chat ('push harder').",
         "channels": (CHANNEL_CONVERSATION, CHANNEL_COMPUTED),

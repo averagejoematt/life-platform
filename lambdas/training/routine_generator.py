@@ -36,8 +36,9 @@ from typing import Any, Callable
 
 from common.repo_config import config_dir
 
-from training import program_structure  # #3755: the program as data (anchors, accessory pool)
+from training import program_conflicts, program_structure  # #3755 the program as data; #4080 its catalog_gaps() audit
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
+from training.movement_catalog import generator_eligible  # #4108: the ONE auto-programming rule
 from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
@@ -468,7 +469,9 @@ def _select_movements_for_muscle(
     candidates = [
         (k, v)
         for k, v in catalog["movements"].items()
-        if v.get("primary_muscle") == muscle and v.get("skill_tier", 99) <= skill_ceiling and k not in chosen_so_far
+        # #4108: the skill ceiling AND the prescribable-shape rule (reviewed, or carries a rep
+        # range) — one predicate in training.movement_catalog, no frequency gate (owner ruling C).
+        if v.get("primary_muscle") == muscle and generator_eligible(v, skill_ceiling) and k not in chosen_so_far
     ]
     if not candidates:
         return []
@@ -620,13 +623,15 @@ def _enforce_load_floors(
     days_since_last_workout: int | None,
     layoff_days: int,
     rationale: list[str],
-    floor_transform: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    floor_fn: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Derive and APPLY the prescription floor for every block. Returns the audit dict.
 
-    `floor_transform` (#4090) re-bases each derived floor before it is applied — the v0.3
-    path passes `load_ramp.ramp_floor`, so its sessions prescribe the §3 entry ramp while
-    every other path keeps the #3927 best-load floor unchanged.
+    `floor_fn` (#4090/#4107) replaces `prescription_floor` with a function of the same
+    signature — the v0.3 path passes `load_ramp.v03_floor` (band anchor -> nearest-band
+    fallback -> the §3 entry ramp), so its sessions prescribe the ramp while every other
+    path keeps the #3927 best-load floor unchanged. One function, so the generator and the
+    chat commit gate cannot derive the v0.3 load two ways.
 
     This is acceptance box 1's enforcement point: one place where a prescribed load is
     compared against what he has already done at this bodyweight, and raised if it is
@@ -655,7 +660,7 @@ def _enforce_load_floors(
 
     for block in exercises:
         template_id = catalog.get("movements", {}).get(block.movement_key, {}).get("hevy_template_id_hint")
-        floor = prescription_floor(
+        floor = (floor_fn or prescription_floor)(
             template_id,
             history_index,
             weight_index,
@@ -664,8 +669,6 @@ def _enforce_load_floors(
             layoff_days=layoff_days,
             as_of=target_date,
         )
-        if floor_transform is not None:
-            floor = floor_transform(floor)
         corrections = apply_prescription_floor(block.sets, floor)
         cue = render_floor_cue(floor)
         if cue:
@@ -679,6 +682,11 @@ def _enforce_load_floors(
             "discount_pct": floor.get("discount_pct"),
             "layoff_reason": floor.get("layoff_reason"),
             "ramp": floor.get("ramp"),
+            # #4107: where the anchor came from — the current band, or the nearest one he has lifted in
+            "anchor_band": floor.get("anchor_band"),
+            "anchor_date": floor.get("anchor_date"),
+            "fallback": floor.get("fallback"),
+            "fallback_detail": floor.get("fallback_detail"),
             "corrections": corrections,
         }
         if corrections:
@@ -733,7 +741,7 @@ def _build_inputs_snapshot(inputs: GeneratorInputs, landmarks: dict[str, Any], c
         # the catalog does not carry is one the selector can NEVER pick. Recorded on every
         # generation, not computed on demand, because the failure is silent by nature: the
         # session comes out fine, just without the lift the program said was an anchor.
-        "program_catalog_gaps": program_structure.catalog_gaps((catalog.get("movements") or {}).keys()),
+        "program_catalog_gaps": program_conflicts.catalog_gaps((catalog.get("movements") or {}).keys()),
     }
 
 

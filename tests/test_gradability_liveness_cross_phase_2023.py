@@ -254,9 +254,10 @@ def test_current_phase_rows_are_not_excluded_by_the_fix():
 #     at its injection site instead, same as achievement_rules / milestone_ledger,
 #     whose internals take the filter as an argument); and reads routed through the
 #     site_api_common helpers (`_query_source`, `_latest_item`, `_latest_item_asof`),
-#     which are themselves derived as per-source — their CALLERS' choices are
-#     per-call decisions in the site-api family, kept honest by
-#     `test_site_api_raw_helpers_expose_include_pilot` below.
+#     which are themselves derived as per-source — since #4088 they DERIVE the
+#     decision from the source's class by default, every caller is ruled in
+#     tests/test_site_api_derived_phase_4088.py, and the parameter itself is kept
+#     honest by `test_site_api_raw_helpers_expose_include_pilot` below.
 #   * Verdicts are function-granularity, worst-call-wins: one blind call inside an
 #     otherwise cross-phase function marks the whole function blind.
 
@@ -353,14 +354,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
     "lambdas/intelligence/journal_analyzer_lambda.py::lambda_handler": (
         "The analyzer's own outputs are deliberately phase-stamped (J-8/#504) so the analysis is "
         "per-cycle by design; an in-cycle input window matches the output contract."
-    ),
-    "lambdas/emails/monday_compass_lambda.py::query_source": (
-        "<=7-day windows for the week-ahead compass — a current-week view; pre-genesis days are " "out of scope for it by intent."
-    ),
-    "lambdas/emails/monday_compass_lambda.py::query_source_latest": (
-        "Newest-first Limit:1 — the liveness SHAPE — but its only caller reads computed_metrics "
-        "(EXPERIMENT_SCOPED), where the filter is correct. Repointing it at a raw source would "
-        "make it an exact clone of the #2023 defect, so re-classify it if that ever happens."
     ),
     "lambdas/emails/nutrition_review_lambda.py::query_all": (
         "Unbounded partition scan, but its callers pass genome/labs/dexa — all CROSS_PHASE, so "
@@ -510,13 +503,24 @@ _PER_SOURCE_READS: dict[str, str] = {
         "computed_metrics / computed_insights / adaptive_mode stay current-cycle."
     ),
     "lambdas/web/site_api_common.py::_query_source": (
-        "Explicit include_pilot pass-through parameter — the site-api family classifies phase per "
-        "call site; test_site_api_raw_helpers_expose_include_pilot keeps the parameter honest."
+        "include_pilot=None DERIVES the decision per source (#4088, `_resolve_include_pilot` -> "
+        "source_reads_cross_phase); an explicit bool still wins. Every call site is ruled — derived, "
+        "genesis DATE-clamped, or explicit — in tests/test_site_api_derived_phase_4088.py."
     ),
-    "lambdas/web/site_api_common.py::_latest_item": ("Same pass-through contract as _query_source above."),
+    "lambdas/web/site_api_common.py::_latest_item": ("Same derived default as _query_source above (#4088), same pin."),
     "lambdas/web/site_api_common.py::_latest_item_asof": (
-        "Same pass-through contract; time-travel callers pass include_pilot=True so prior-cycle "
-        "history stays visible (mirrors handle_character)."
+        "Same derived default (#4088); a raw series' prior-cycle history is visible to a time-travel "
+        "read without opting in, and /api/vitals' explicit `ip` still wins."
+    ),
+    "lambdas/emails/monday_compass_lambda.py::query_source": (
+        "include_pilot=None derives per source (#4088): whoop/day_grade (RAW_TIMESERIES) read across "
+        "phases inside the <=7-day window, character_sheet/habit_scores (EXPERIMENT_SCOPED) keep the "
+        "filter. Pinned by tests/test_site_api_derived_phase_4088.py (moved from the sanctioned "
+        "current-cycle ledger: the 7-day DATE window is the bound, not the phase tag)."
+    ),
+    "lambdas/emails/monday_compass_lambda.py::query_source_latest": (
+        "Same derived default (#4088); its only caller reads computed_metrics (EXPERIMENT_SCOPED), "
+        "so the derived answer keeps the filter there."
     ),
     # #2150 — the declared-debt remainder #2109 left behind. Pinned by
     # tests/test_genesis_blind_digest_and_readers_2150.py.

@@ -56,6 +56,7 @@ from common.digest_utils import (
 from common.pacific_time import PACIFIC, pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
+from training import self_added_volume_report  # #4111: the end-of-week self_added_volume report
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -184,6 +185,7 @@ def nutrition_last_log_absence(today):
 from emails.weekly_digest_extractors import (  # noqa: E402
     compute_4week_trends,
     compute_banister,
+    compute_sleep_debt,
     delta_html,
     ex_apple_health,
     ex_character_sheet,
@@ -235,21 +237,6 @@ def weight_projection(w4_weight_avgs, goal_weight, current_weight):
 # ══════════════════════════════════════════════════════════════════════════════
 # SLEEP DEBT
 # ══════════════════════════════════════════════════════════════════════════════
-
-
-def compute_sleep_debt(whoop_dict, target_hrs=7.5):
-    """Compute 7-day sleep debt from Whoop records (SOT for sleep duration v2.55.0)."""
-    if not whoop_dict:
-        return None
-    durs = []
-    for r in whoop_dict.values():
-        d = safe_float(r, "sleep_duration_hours")
-        if d is not None:
-            durs.append(d)
-    if not durs:
-        return None
-    debt = round(max(0, (target_hrs * len(durs)) - sum(durs)), 1)
-    return {"debt_hrs": debt, "nights": len(durs), "avg_hrs": avg(durs), "target_hrs": target_hrs}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -651,6 +638,7 @@ def gather_all():
         "character_sheet": character_sheet,
         "character_sheet_prior": character_sheet_prior,
         "acwr_data": acwr_data,  # BS-09
+        "self_added_volume": self_added_volume_report.evaluate_for_digest(hevy_full, w1_end),  # #4111, report_only
         "mcp_mutations_line": get_mcp_mutations_digest_line(w1_start, w1_end),  # #753
         # #2221: the delivery-free streak line. PRIVATE-by-default — the reader itself
         # checks nutrition_delivery_public() before it touches the partition (#2233), so
@@ -1207,6 +1195,7 @@ def build_html(data, commentary, profile):
         tr_rows += row("Total Volume", f'{fmt_num(mfw["total_volume_lbs"])} lbs, {mfw["total_sets"]} sets', highlight=True)
         for w in mfw.get("workouts", [])[:4]:
             tr_rows += row(f'↳ {w["date"]} {w["name"]}', f'{w["exercises"]} exercises · {fmt_num(w["volume_lbs"])} lbs')
+    tr_rows += self_added_volume_report.digest_rows(data.get("self_added_volume"), row, _esc)  # #4111
     training_section = section("Training", "🏃", tbl(tr_rows)) if tr_rows else ""
 
     # ── Banister ──

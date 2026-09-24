@@ -122,6 +122,7 @@ ENGINE_INPUTS = (
     "hevy_workouts_rotation_window",
     "hevy_workouts_prescription_window",
     "block_workouts",
+    "training_memory_constraints",
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -635,6 +636,7 @@ def constraint_block(
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
     block_workouts: list[dict[str, Any]] | None = None,
+    training_memory_constraints: list[dict[str, Any]] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
@@ -670,6 +672,7 @@ def constraint_block(
             "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
             "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
             "block_workouts": block_workouts,
+            "training_memory_constraints": training_memory_constraints,
         },
         input_status,
     )
@@ -805,6 +808,13 @@ def constraint_block(
         # in the bundle).
         "walking": walking,
         "standing_constraints": training_context_registry.summary(),
+        # #4077: the SAME kind of standing constraint (RDL gate, toe flag, back flag), but
+        # from `write_platform_memory(category='training')` — a chat write, no deploy — not
+        # the code registry above. Read here from `mcp.tools_plan` alongside it, never merged
+        # into it: the code registry is owner-gate-reviewed (`CONFIRMED_BY_OWNER`), a chat
+        # write is not, and collapsing the two would silently launder an unreviewed write
+        # into a reviewed list.
+        "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
         # sequence (heavy -> moderate -> heavy-moderate from 2026-09-24; it advances only on a
         # completed loaded Hevy session; deload every 6th program week) and the §3 session — anchors at heavy/moderate with their sets and reps,
@@ -914,8 +924,19 @@ def constraint_block(
                 ),
                 (
                     "the program has UNRESOLVED conflicts with the owner's own redlines: "
-                    + ", ".join(c["id"] for c in program["conflicts"])
-                    if program["conflicts"]
+                    + ", ".join(c["id"] for c in program["conflicts"] if not c.get("resolved"))
+                    if any(not c.get("resolved") for c in program["conflicts"])
+                    else None
+                ),
+                # #4080: a conflict resolved by owner ruling stays NAMED (audit trail — see
+                # program_structure.conflicts()) rather than silently dropping out of the
+                # block; it must never read as "UNRESOLVED" once it isn't.
+                (
+                    "the program's conflict(s) RESOLVED by owner ruling: "
+                    + ", ".join(
+                        f"{c['id']} ({c.get('resolution_source', 'no source recorded')})" for c in program["conflicts"] if c.get("resolved")
+                    )
+                    if any(c.get("resolved") for c in program["conflicts"])
                     else None
                 ),
                 (

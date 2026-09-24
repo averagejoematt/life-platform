@@ -22,13 +22,14 @@ retroactive half — the owner's 2026-09-20 ruling on #3770 is RETIRE-AND-RECREA
 
 TWO TABLES, TWO JOBS
 
-`TEMPLATE_MUSCLE_OVERRIDES` is read by every aggregation that classifies a Hevy
-exercise by template id rather than by name — `training/muscle_volume.attribute_exercise`
-(#4071; feeds `mcp/strength_helpers.classify_exercise` and
-`mcp/tools_strength.py::tool_get_muscle_volume`) and
-`lambdas/web/site_api_training.py::_classify_muscles`. It makes every set ALREADY
-logged against the old id count as the corrected muscle group, forever — nothing
-here re-tags Hevy, it only corrects how this platform reads Hevy.
+`TEMPLATE_MUSCLE_OVERRIDES` is read by `training/muscle_volume.attribute_exercise`
+(#4071) — the ONE place a Hevy exercise is classified by template id rather than by
+name. Every per-muscle reader goes through it: `mcp/strength_helpers.classify_exercise`,
+`mcp/tools_strength.py::tool_get_muscle_volume`, and (#4095)
+`lambdas/web/site_api_training.py::_compute_muscle_volume`, which used to carry its own
+copy of this lookup and now delegates to `attribute_exercise` like everything else. It
+makes every set ALREADY logged against the old id count as the corrected muscle group,
+forever — nothing here re-tags Hevy, it only corrects how this platform reads Hevy.
 
 `RETIRED_TEMPLATE_IDS` is read by the title resolvers
 (`mcp/hevy_resolution.py`, `lambdas/training/hevy_template_index.py`) so that once
@@ -41,8 +42,8 @@ from __future__ import annotations
 
 #: Hevy template id (lowercased, as the API returns it) -> the corrected muscle-group
 #: label, in THIS platform's vocabulary (matches `training/muscle_volume.MUSCLES` /
-#: `_VOLUME_LANDMARKS` keys in mcp/strength_helpers.py and `_MUSCLE_MAP` /
-#: `_LANDMARKS` keys in lambdas/web/site_api_training.py — both use "Calves").
+#: `_VOLUME_LANDMARKS` keys in mcp/strength_helpers.py and the `_LANDMARKS` keys in
+#: lambdas/web/site_api_training.py — both use "Calves").
 TEMPLATE_MUSCLE_OVERRIDES: dict[str, str] = {
     # 2026-09-08: created by create_missing's pre-#3718 guessed-muscle-group path with
     # primary_muscle_group='shoulders' (live-confirmed 2026-09-13 and again 2026-09-20 —

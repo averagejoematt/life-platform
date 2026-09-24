@@ -5,6 +5,7 @@ observatory_week / cycle_compare / survival. Reads facade state via `_g`."""
 from datetime import datetime, timedelta, timezone
 
 from common import stats_core  # #3549: the ONE sanctioned interval for a served proportion (ADR-105)
+from common.digest_utils import filter_day_rows
 
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -126,7 +127,8 @@ def tools_baseline(*, _g) -> dict:
     baseline_end = (datetime.strptime(EXPERIMENT_START, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Current: last 7 days
-    d7 = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
+    # #4088: genesis DATE clamp — "current vs the experiment's first week" is this experiment's frame.
+    d7 = max((datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     baseline_whoop = _query_source("whoop", EXPERIMENT_START, baseline_end)
     current_whoop = _query_source("whoop", d7, today)
@@ -160,7 +162,7 @@ def tools_baseline(*, _g) -> dict:
     _p = _get_profile()
     baseline["weight_lbs"] = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
-    latest_withings = _latest_item("withings")
+    latest_withings = _latest_item("withings", since=EXPERIMENT_START)  # #4088: genesis DATE clamp (vs the experiment baseline)
     current["weight_lbs"] = round(float(latest_withings["weight_lbs"])) if latest_withings and latest_withings.get("weight_lbs") else None
 
     return _ok(
@@ -515,7 +517,7 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
             notable = f"Protein averaged {round(avg_protein)}g/day this week"
 
         elif domain == "training":
-            items = _query_source("whoop", start_date, end_date, include_pilot=ip)
+            items = filter_day_rows(_query_source("whoop", start_date, end_date, include_pilot=ip))  # #3442: day strain only
             strains = [float(i.get("strain", 0)) for i in items if i.get("strain")]
             recoveries = [float(i.get("recovery_score", 0)) for i in items if i.get("recovery_score")]
             avg_strain = sum(strains) / len(strains) if strains else 0

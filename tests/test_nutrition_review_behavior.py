@@ -1239,9 +1239,9 @@ def test_gather_reads_the_seven_days_ending_yesterday(monkeypatch, frozen_clock)
     assert data["dates"] == DATES
     mf = [q for q in table.queries if q["ExpressionAttributeValues"][":pk"].endswith("macrofactor")]
     assert mf[0]["ExpressionAttributeValues"][":s"] == f"DATE#{W1_START}"
-    assert mf[0]["ExpressionAttributeValues"][":e"] == f"DATE#{W1_END}"
+    assert mf[0]["ExpressionAttributeValues"][":e"] == f"DATE#{W1_END}~"  # #4129: end day closed
     assert mf[1]["ExpressionAttributeValues"][":s"] == f"DATE#{W2_START}"
-    assert mf[1]["ExpressionAttributeValues"][":e"] == f"DATE#{W2_END}"
+    assert mf[1]["ExpressionAttributeValues"][":e"] == f"DATE#{W2_END}~"
 
 
 def test_gather_reads_thirty_days_of_weight(monkeypatch, frozen_clock):

@@ -312,3 +312,91 @@ def test_the_mcp_reader_uses_the_sanctioned_hevy_path_from_the_block_start():
     rd.assert_called_once_with("2026-09-24", "2026-09-26")
     with patch("mcp.tools_strength._read_hevy_all_phases", side_effect=AssertionError("nothing to read before the block")):
         assert tools_plan._block_workouts("2026-09-24") == []
+
+
+# ── 6. Thursday 2026-09-24 does not move (#4110 x #4064 x #4132) ─────────────
+# The weekday calendar #4064 shipped served, on Thu 09-24: block 1, week 1, the HEAVY session,
+# not a deload — and, with #4132's anchor keys, squat_barbell / barbell_bench_press (hint
+# 79D0BB3A) / machine_row / lat_pulldown. Written out by hand from main's retired calendar test
+# (`test_calendar_entry_answers_every_day_in_week_1` + the 09-24 generator pin), so the sequence
+# cannot agree with a regression by construction. Thursday is the first session of the block
+# under BOTH schemes: nothing is completed on or after the block start before it, and a real
+# pre-block record (the cycle-17 lifts of 09-16..09-23) must not advance it.
+THURSDAY = "2026-09-24"
+CALENDAR_SERVED_THURSDAY = {"session_role": H, "week": 1, "block": 1, "deload": False, "archetype": "full"}
+THURSDAY_ANCHORS = ["squat_barbell", "barbell_bench_press", "machine_row", "lat_pulldown"]
+PRE_BLOCK = [lift(f"2026-09-{d}") for d in (16, 17, 19, 20, 22, 23)]
+
+
+@pytest.mark.parametrize("rows", [[], PRE_BLOCK], ids=["empty-record", "pre-block-lifts"])
+def test_thursday_2026_09_24_is_block_1_session_1_heavy_under_both_schemes(rows):
+    from mcp import hevy_prescription_gate
+
+    catalog = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
+    ps = program_structure.planned_session(THURSDAY, block_workouts=rows, catalog_movements=catalog)
+    assert {k: ps[k] for k in CALENDAR_SERVED_THURSDAY} == CALENDAR_SERVED_THURSDAY
+    assert (ps["source"], ps["sequence_index"], ps["position_label"]) == ("session_sequence", 0, "week 1 · session 1 of 3 · heavy")
+    assert ps["advanced_by"] is None
+    anchors = [e["movement_key"] for e in ps["prescription"]["exposures"] if e["kind"] == "anchor"]
+    assert anchors == THURSDAY_ANCHORS
+    assert catalog["barbell_bench_press"]["hevy_template_id_hint"] == "79D0BB3A"
+
+    # the gate, the served session and the ramp read the same week — 1
+    assert plan_engine.program_week(THURSDAY, rows) == 1
+    block = plan_engine.constraint_block(date=THURSDAY, block_workouts=rows)
+    assert (block["session"]["session_role"], block["program_week"]) == (H, 1)
+
+    # the generator builds the same HEAVY session, week 1, ramped as week 1
+    ideal = _generate(THURSDAY, block_workouts=rows)[0]
+    assert ideal.title.startswith("Full Body HEAVY — W1")
+    assert [b.movement_key for b in ideal.exercises][:4] == THURSDAY_ANCHORS
+    assert ideal.inputs_snapshot["calendar"]["week"] == 1 and ideal.inputs_snapshot["calendar"]["session_role"] == H
+    assert ideal.inputs_snapshot["load_floors"]["load_rule"]["week"] == 1
+
+    # the chat commit gate: week 1, measured, with no Hevy read at all (nothing precedes the block start)
+    with patch("mcp.tools_strength._read_hevy_all_phases", side_effect=AssertionError("no read on the block start day")):
+        rule = hevy_prescription_gate.v03_load_rule(THURSDAY)
+    assert (rule["week"], rule["week_state"], rule["block"]) == (1, "measured", 1)
+
+
+def test_mutation_control_a_pre_block_lift_that_counted_would_move_thursday():
+    """Proves the Thursday pin can fail: if the block-start filter were dropped, the six
+    pre-block lifts would put Thursday at week 3 · heavy — a different load week."""
+    real = session_sequence.block_start
+    with patch.object(session_sequence, "block_start", return_value="2026-09-01"):
+        e = session_sequence.next_session(THURSDAY, PRE_BLOCK)
+    assert e["position_label"] != "week 1 · session 1 of 3 · heavy" and e["week"] == 3
+    assert real() == THURSDAY
+
+
+def test_the_chat_gate_reads_the_sequence_week_and_says_so_when_it_cannot():
+    from mcp import hevy_prescription_gate
+
+    rows = [lift(shift) for shift in ("2026-09-24", "2026-09-25", "2026-09-27")]
+    assert hevy_prescription_gate.v03_load_rule("2026-09-28", block_workouts=rows)["week"] == 2
+    with patch("mcp.plan_hevy_windows._block_workouts", side_effect=RuntimeError("ddb down")):
+        rule = hevy_prescription_gate.v03_load_rule("2026-09-28")
+    assert rule["week"] == 1 and rule["week_state"] == "unreadable" and "RuntimeError" in rule["week_source"]
+    assert hevy_prescription_gate.v03_load_rule("2026-09-23") is None, "before the block start the #3927 floor stands"
+
+
+def test_the_generator_side_read_closes_the_day_before_the_planned_day():
+    """#4129 x #4110: the per-workout sk is DATE#<day>#WORKOUT#<id>, so an unsuffixed END bound
+    drops the last day's session — the session that should advance TODAY's plan. The window is
+    [block start, before_day): yesterday's row is read, today's is not."""
+    from training import exercise_history
+
+    captured = {}
+
+    class _Table:
+        def query(self, **kw):
+            cond = kw["KeyConditionExpression"]
+            _key, lo, hi = cond.get_expression()["values"][1].get_expression()["values"]
+            captured["bounds"] = (lo, hi)
+            sks = ["DATE#2026-09-24#WORKOUT#a", "DATE#2026-09-26#WORKOUT#b", "DATE#2026-09-27#WORKOUT#c"]
+            return {"Items": [{"sk": k, "source_workout_id": k[-1]} for k in sks if lo <= k <= hi]}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        rows = session_sequence.load_block_workouts("2026-09-27")
+    assert captured["bounds"] == ("DATE#2026-09-24", "DATE#2026-09-26~")
+    assert [r["source_workout_id"] for r in rows] == ["a", "b"], "yesterday's session (09-26) must advance today's plan"

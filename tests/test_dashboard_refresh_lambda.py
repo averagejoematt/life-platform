@@ -475,7 +475,7 @@ def test_fetch_range_builds_a_bounded_key_condition_and_floats_decimals(monkeypa
     kwargs = table.query_calls[0]
     assert kwargs["ExpressionAttributeValues"][":pk"] == "USER#matthew#SOURCE#withings"
     assert kwargs["ExpressionAttributeValues"][":s"] == "DATE#2026-06-10"
-    assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-06-17"
+    assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-06-17~"  # #4129: end day closed
 
 
 def test_fetch_range_applies_the_phase_filter_per_source_class(monkeypatch):

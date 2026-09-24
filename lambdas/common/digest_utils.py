@@ -136,7 +136,7 @@ def query_range(table, source, start_date, end_date, user_id="matthew", include_
         "ExpressionAttributeValues": {
             ":pk": pk,
             ":s": f"DATE#{start_date}",
-            ":e": f"DATE#{end_date}",
+            ":e": f"DATE#{end_date}~",
         },
     }
     while True:

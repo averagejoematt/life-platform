@@ -252,12 +252,15 @@ def load_block_workouts(before_day: str) -> list[dict[str, Any]]:
     start = block_start()
     if before_day <= start:
         return []
+    last_day = shift_day_key(before_day, -1)
     pk = f"USER#{exercise_history.USER_ID}#SOURCE#hevy"
     rows: list[dict[str, Any]] = []
     last_key = None
     while True:
         kwargs: dict[str, Any] = with_phase_filter(
-            {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start}", f"DATE#{before_day}")},
+            # #4129: the per-workout rows are DATE#<day>#WORKOUT#<id>, so the END day is closed with
+            # "~" — and the end day is the day BEFORE `before_day`, keeping the window [start, before_day).
+            {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start}", f"DATE#{last_day}~")},
             include_pilot=True,
         )
         if last_key:

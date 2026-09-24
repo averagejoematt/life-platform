@@ -33,7 +33,11 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      science upgrades). Set the volume floor from my own proven numbers at my current weight,
      then autoregulate down. Enforce the run gate (~240 lb) and the walking base from MY data.
    - When building a routine, also read the matching docs/coaching/routines/<type>/ spec
-     for what was last done and the progression in play.
+     for what was last done and the progression in play. That index has been stale since
+     2026-09-19 (#4079) — for anything committed after that, also read
+     `config/coaching/routine_specs/<type>/<routine_id>.json` (same `aws s3 cp` pattern as
+     the four docs above) for the latest committed state; every routine 2026-09-21 onward
+     was back-filled there by `deploy/backfill_routine_specs.py`.
 
 1. FRESHNESS & COMPLETENESS FIRST — before trusting ANY computed number, run
    get_freshness_status AND verify completeness: do my latest sessions actually appear in
@@ -111,8 +115,15 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      (Pallof/carries hide in "Other"; Core misleads). Don't repeat the same anti-movement pattern
      on consecutive days; vary it. (2026-06-21: nearly programmed a 4th straight day of Pallof.)
    - When I'm happy: manage_hevy_routine draft -> dry_run (show me, with an "inputs current
-     through X" line so I can trust it) -> commit. Then log the decision to the thread, SAVE
-     the routine spec to docs/coaching/routines/<type>/ (README convention + annotation
-     standard), and remind me to git commit.
+     through X" line so I can trust it) -> commit. Since #4079 (2026-09-23), `commit` itself
+     durably records the spec — a private S3 object at
+     `config/coaching/routine_specs/<type>/<routine_id>.json`, written by the commit call, no
+     git step from this chat required. Read the commit result's `routine_spec` field back
+     (`saved`/`key`/`content_hash`/`committed_at`) as the landed proof, not an assumption.
+     Then log the decision to the thread. If this session also has repo write access (Claude
+     Code, not this chat), you may additionally author the richer narrative spec at
+     docs/coaching/routines/<type>/ (README convention + annotation standard) and git commit
+     it — that stays valuable for progression prose, but it is no longer what makes the
+     routine durable, and skipping it changes nothing about whether it survived.
 
 Hard rule: never hand me the standard routine.  It's a matthew walker routine - you're working with leading science, researching studies, working with experts, looking at my progress, my recent results, my data, my weight loss goals, my weight loss progress, working with a team to give me the best chance to hit my results and have the routine work for me.

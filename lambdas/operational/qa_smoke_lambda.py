@@ -65,6 +65,7 @@ from operational import (
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     hook_liveness_qa,  # noqa: E402  (#3615 box 1: the hook × artifact liveness matrix)
     nudge_ledger_qa,  # noqa: E402  (#3569 dead-man)
+    pending_writes_qa,  # noqa: E402  (#4078 dead-man: queued chat writes left unresolved)
     qa_check_edge_429,  # noqa: E402
     qa_check_oauth_door,  # noqa: E402
     raw_archive_qa,  # noqa: E402
@@ -1188,6 +1189,7 @@ def check_steps():
         # #3860: an unclassified pk family blocks the NEXT reset — report it the day it appears, not at reset time
         ("pk_family_census", check_pk_family_census),
         ("orphan_routine_drafts", check_orphan_routine_drafts),  # #3772: drafts the soft-timeout left behind
+        ("pending_writes_age", lambda: pending_writes_qa.check_pending_writes_age(table, Check, CONTENT_TRUTH)),  # #4078 dead-man
         # #3615 box 1: every reader hook × its downstream artifacts, walked nightly and
         # stamped with the cycle day — a MISSING cell is a red, an honestly-absent one is
         # a DECLARED, dated contract. Before this, check_predict_week_freshness above was

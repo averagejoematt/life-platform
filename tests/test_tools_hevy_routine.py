@@ -12,6 +12,7 @@ from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 # The MCP package depends on boto3 + config at import time; conftest sets the
 # path. Importing the tool module is enough.
 from mcp import hevy_resolution as res, tools_hevy_routine as t
+from tests.redteam_binding_testkit import bind
 
 # The dry_run/commit paths render the routine title via routine_title.build_title_context,
 # which reads DynamoDB (phase state + routine index + performed history). Unit tests must
@@ -120,6 +121,7 @@ def test_commit_handles_orphan_created():
         archetype="upper",
         exercises=[ExerciseBlock(movement_key="db_bench_press_flat", sets=[Set(reps=10)])],
     )
+    bind(ir)  # #4066
     captured: dict = {}
 
     def fake_put(updated):
@@ -453,10 +455,18 @@ def _commit_patches(ir, **folders_kwargs):
             "training.hevy_write_client.create_routine",
             return_value={"routine": {"id": "new-id", "updated_at": "2026-09-06T12:00:00Z"}},
         ),
+        # #4079: the spec-ledger write is its own concern (mcp/routine_spec_ledger.py,
+        # tested directly in test_routine_spec_ledger_4079.py) — stub it here so every
+        # commit test in this file stays offline instead of attempting a real S3 call.
+        patch(
+            "mcp.routine_spec_ledger.save_routine_spec",
+            return_value={"saved": True, "key": "config/coaching/routine_specs/push/stub.json"},
+        ),
     ]
 
 
 def _commit(ir, extra=(), args=None, **folders_kwargs):
+    bind(ir)  # #4066 — these tests are about foldering/title warnings, not the red-team binding
     with ExitStack() as stack:
         for cm in [*_commit_patches(ir, **folders_kwargs), *extra]:
             stack.enter_context(cm)
@@ -579,6 +589,7 @@ def test_commit_update_branch_says_the_folder_cannot_change():
     ir = _push_ir("r-update")
     ir.hevy_routine_id = "existing-id"
     ir.hevy_updated_at = "2026-09-06T10:00:00Z"
+    bind(ir)  # #4066
     with (
         patch("training.routine_repo.get_current", return_value=ir),
         patch("training.routine_repo.put_versioned"),
@@ -590,11 +601,48 @@ def test_commit_update_branch_says_the_folder_cannot_change():
             "training.hevy_write_client.update_routine_with_guard",
             return_value={"routine": {"id": "existing-id", "updated_at": "2026-09-06T12:00:00Z"}},
         ),
+        patch("mcp.routine_spec_ledger.save_routine_spec", return_value={"saved": True, "key": "stub.json"}),
     ):
         result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-update"})
     folders_mock.assert_not_called()
     assert result["status"] == "committed"
     assert "create-only" in result["folder"]
+
+
+def test_commit_result_carries_the_spec_ledger_report():
+    """#4079: `commit` writes the spec to its own durable home and folds the
+    report into the result — the "instant recorded" proof a chat session reads
+    back instead of being told to save a markdown file and git commit it.
+
+    Patches the ledger call directly (not through `_commit_patches`, which
+    stubs the same target for every OTHER test in this file) so the mock here
+    is the one actually observed."""
+    ir = bind(_push_ir("r-spec-ledger"))  # #4066 — the ledger, not the red-team binding, is under test
+    with (
+        patch("training.routine_repo.get_current", return_value=ir),
+        patch("training.routine_repo.put_versioned"),
+        patch("training.routine_repo.upsert_id_map"),
+        patch("training.hevy_template_cache.resolve_movement", return_value="55E6546B"),
+        patch("training.routine_title.build_title_context", return_value=_TITLE_CTX),
+        patch("training.hevy_write_client.list_folders", return_value={"routine_folders": [{"id": 1, "title": "Push"}]}),
+        patch(
+            "training.hevy_write_client.create_routine",
+            return_value={"routine": {"id": "new-id", "updated_at": "2026-09-06T12:00:00Z"}},
+        ),
+        patch("mcp.routine_spec_ledger.save_routine_spec") as save_mock,
+    ):
+        save_mock.return_value = {
+            "saved": True,
+            "key": "config/coaching/routine_specs/push/r-spec-ledger.json",
+            "committed_at": "2026-09-23T00:00:00+00:00",
+            "content_hash": "a" * 64,
+        }
+        result = t.tool_manage_hevy_routine({"action": "commit", "routine_id": "r-spec-ledger"})
+    save_mock.assert_called_once()
+    (called_ir,), _ = save_mock.call_args
+    assert called_ir.routine_id == "r-spec-ledger"
+    assert result["routine_spec"]["saved"] is True
+    assert result["routine_spec"]["key"] == "config/coaching/routine_specs/push/r-spec-ledger.json"
 
 
 def test_tool_description_tells_the_caller_both_title_args_are_draft_time_only():

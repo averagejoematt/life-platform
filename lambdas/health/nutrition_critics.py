@@ -606,14 +606,20 @@ def build_adherence_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     if above is None:
         unknown.append("training_above_prescription_weeks")
     elif int(above) >= vol_t["threshold_weeks"]:
+        # #4111 (owner ruling 2026-09-23): a `report_only` tripwire names the run length as
+        # information for the end-of-week report — no change/veto, no mechanical `to`. The
+        # branch reads the redline's own `tripwire_class` rather than assuming it, so a future
+        # `report_only` tripwire gets the same treatment without a second edit here (a fixture
+        # pins both arms in `tests/test_nutrition_critics_3754.py`).
+        report_only = vol_t.get("tripwire_class") == "report_only"
         flags.append(
             _flag(
                 "training_above_prescription_weeks",
-                "change",
+                "info" if report_only else "change",
                 f"training above the prescription {above} weeks running (tripwire `{vol_t['id']}`) — {vol_t['action']}",
                 provenance=vol_t["provenance"],
-                field="training",
-                to="subtract_only",
+                field=None if report_only else "training",
+                to=None if report_only else "subtract_only",
             )
         )
     return p

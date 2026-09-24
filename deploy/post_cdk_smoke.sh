@@ -9,6 +9,9 @@
 #   1. CloudFront HTTPS + TLS + redirect (delegates to smoke_test_cloudfront.sh)
 #   2. Lambda error state — all email + compute Lambdas
 #   3. MCP warm ping — invokes a cached tool to confirm the intelligence layer
+#   4. Liveness-sensor self-tests (#4034) — every sensor DERIVED from
+#      tests/test_heartbeat_completeness.py's COVERAGE registry performs its real read
+#      and a scratch write (deploy/sensor_self_test.py); any degraded verdict FAILS
 #
 # Usage:
 #   bash deploy/post_cdk_smoke.sh                         # all checks
@@ -65,7 +68,7 @@ check() {
 # ── Section 1: CloudFront ─────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo " Section 1/3 — CloudFront HTTPS smoke test"
+echo " Section 1/4 — CloudFront HTTPS smoke test"
 echo "══════════════════════════════════════════════════════════════"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -82,7 +85,7 @@ fi
 # ── Section 2: Lambda error state ─────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo " Section 2/3 — Lambda error state (last 5 min)"
+echo " Section 2/4 — Lambda error state (last 5 min)"
 echo "══════════════════════════════════════════════════════════════"
 
 # All email + compute Lambdas — the ones CDK touches on EmailStack / ComputeStack
@@ -171,7 +174,7 @@ done
 # ── Section 3: MCP intelligence layer warm ping ───────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo " Section 3/3 — MCP intelligence layer warm ping"
+echo " Section 3/4 — MCP intelligence layer warm ping"
 echo "══════════════════════════════════════════════════════════════"
 
 if [[ "$SKIP_MCP" == "true" ]]; then
@@ -212,6 +215,23 @@ else
     fi
     rm -f /tmp/mcp_smoke_response.json
   fi
+fi
+
+# ── Section 4: liveness-sensor self-tests (#4034) ─────────────────────────────
+# The set is derived inside the script from the heartbeat ledger — never listed here.
+# A sensor whose alarm vanished, whose actions were disabled, or whose metric can no
+# longer be read is a deploy that silently blinded a dead-man: that is a FAIL, not a WARN.
+echo ""
+echo "══════════════════════════════════════════════════════════════"
+echo " Section 4/4 — Liveness-sensor self-tests (#4034)"
+echo "══════════════════════════════════════════════════════════════"
+
+if SELF_TEST_OUT=$(python3 "$SCRIPT_DIR/sensor_self_test.py" --self-test 2>&1); then
+  echo "$SELF_TEST_OUT"
+  check "Liveness sensors: every derived sensor read + scratch write ok" "pass"
+else
+  echo "$SELF_TEST_OUT"
+  check "Liveness sensors" "fail: one or more sensor self-tests DEGRADED (see [DEGRADED] lines above)"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

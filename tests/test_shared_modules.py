@@ -756,15 +756,18 @@ def test_query_range_paginates_and_returns_dict_by_date():
 
 
 def test_query_range_applies_phase_filter_and_bounds():
-    """Every platform DDB read is phase-scoped (ADR-058); dict form uses the plain
-    end bound, list form extends it with the '~' suffix for per-workout sks (#485)."""
+    """Every platform DDB read is phase-scoped (ADR-058); both forms end the range with the
+    '~' suffix. The list form needs it for per-workout sks (#485); the dict form drops
+    sub-records anyway (#3442), so for it the suffix admits nothing it keeps — it carries
+    the suffix because it is a caller-supplied-partition helper and the #4129 census
+    (scripts/date_range_read_census.py) holds every such helper to one rule."""
     from common import digest_utils
 
     table = _FakePagingTable([{"Items": []}])
     digest_utils.query_range(table, "whoop", "2026-01-01", "2026-01-07")
     kwargs = table.calls[0]
     assert "FilterExpression" in kwargs and ":phase_experiment" in kwargs["ExpressionAttributeValues"]
-    assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-01-07"
+    assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-01-07~"
 
     table2 = _FakePagingTable([{"Items": []}])
     digest_utils.query_range_list(table2, "hevy", "2026-01-01", "2026-01-07")

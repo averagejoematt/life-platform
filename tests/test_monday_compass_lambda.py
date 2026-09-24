@@ -153,18 +153,22 @@ class TestQuerySource:
         assert "ExclusiveStartKey" not in fake.calls[0]
         assert fake.calls[1]["ExclusiveStartKey"] == {"pk": "x", "sk": "y"}
 
-    def test_applies_key_condition_and_phase_filter(self, monkeypatch):
-        fake = _PagedTable([{"Items": []}])
+    def test_applies_key_condition_and_derives_the_phase_filter(self, monkeypatch):
+        """#4088: the phase decision is derived per source — whoop (RAW_TIMESERIES) reads
+        across phases inside its date window; habit_scores (EXPERIMENT_SCOPED) keeps the
+        ADR-058 filter."""
+        fake = _PagedTable([{"Items": []}, {"Items": []}])
         monkeypatch.setattr(mc, "table", fake)
 
         assert mc.query_source("whoop", "2026-06-01", "2026-06-08") == []
+        assert mc.query_source("habit_scores", "2026-06-01", "2026-06-08") == []
 
         kwargs = fake.calls[0]
         assert kwargs["ExpressionAttributeValues"][":pk"] == "USER#matthew#SOURCE#whoop"
         assert kwargs["ExpressionAttributeValues"][":s"] == "DATE#2026-06-01"
-        assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-06-08"
-        # ADR-058 default-deny: the phase filter is applied by with_phase_filter
-        assert "#phase" in kwargs["FilterExpression"]
+        assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-06-08~"  # #4129: end day closed
+        assert "FilterExpression" not in kwargs, "a raw series must not be phase-filtered (#4088)"
+        assert "#phase" in fake.calls[1]["FilterExpression"], "an EXPERIMENT_SCOPED source keeps the filter"
 
 
 class TestQuerySourceLatest:

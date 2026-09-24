@@ -35,6 +35,10 @@ path can prescribe what the platform did not compute; silently rewriting a
 caller-supplied number would be a different (and worse) surprise than refusing.
 The cron path applies; the chat path refuses. Both derive the floor the same way,
 from `routine_generator.prescription_floor`, so there is ONE definition of a floor.
+#4107: while the v0.3 program is ACTIVE the floor is `load_ramp.v03_floor` on both paths
+(the band anchor, the nearest-band fallback, the week's §3 entry ramp) — the chat path
+used to hold a draft_custom routine to the 100 % best-load floor the generator no longer
+prescribes, so the two paths disagreed about the same session.
 
 `floor` and `re_entry` variants are exempt BY DESIGN and say so in the result:
 they prescribe a deliberately reduced session, and a floor asserted over one would
@@ -59,6 +63,7 @@ a memoised history index is a stale floor, and a stale floor is the exact defect
 
 from __future__ import annotations
 
+import functools
 import logging
 from typing import Any
 
@@ -190,10 +195,31 @@ def derive_load_floors(
     dslw = _days_since_last_workout(history_index, target_date)
     audit["days_since_last_workout"] = dslw
     movements = _catalog_movements() if movements is None else movements
+    # #4065: the chat path's half of the #4090 back-off seam. The generator writes
+    # `back_off_floor_kg` for the sets it authors; a hand-drafted v0.3 heavy exposure gets the
+    # same field from the redline rep scheme (parsed, never a hand list; −pct off the floor,
+    # rounded DOWN to the rack step). An unparsed scheme writes none, so back-offs fail closed.
+    from training.rep_scheme import back_off_min_kg, heavy_back_off_scheme
+
+    scheme = heavy_back_off_scheme()
+    audit["back_off_scheme"] = {k: v for k, v in scheme.items() if k != "source_text"}
+
+    floor_fn, back_off_pct = prescription_floor, None
+    v03 = v03_load_rule(target_date)
+    if v03 is not None:
+        # #4107: under v0.3 the chat path's floor IS the generator's load — the same
+        # `load_ramp.v03_floor` (band anchor -> nearest-band fallback -> the week's ramp),
+        # not the #3927 100 % best-load floor. One load path, so a draft_custom routine
+        # carrying the generator's own numbers commits, and one under them refuses.
+        from training import load_ramp
+
+        floor_fn = functools.partial(load_ramp.v03_floor, week=v03["week"])
+        back_off_pct = v03["back_off_pct_of_top"]
+        audit["load_rule"] = v03
 
     for ex in getattr(ir, "exercises", None) or []:
         key = getattr(ex, "movement_key", None) or "?"
-        floor = prescription_floor(
+        floor = floor_fn(
             _template_id_for(key, movements),
             history_index,
             weight_index,
@@ -201,10 +227,72 @@ def derive_load_floors(
             days_since_last_workout=dslw,
             as_of=target_date,
         )
-        audit["movements"][key] = {
-            k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")
-        }
+        row = {k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")}
+        if v03 is not None:
+            row.update({k: floor.get(k) for k in ("ramp", "anchor_band", "anchor_date", "fallback", "fallback_detail")})
+            if floor.get("floor_kg") and back_off_pct is not None:
+                # §3's heavy exposure is [top, back-off, back-off] at −10 % of the top set; the
+                # chat path cannot know which exposure a caller meant as heavy, so every set
+                # after the first is judged against the back-off floor — the same number the
+                # generator records as `back_off_floor_kg` (#4090).
+                from training.routine_generator import _floor_half_kg
+
+                row["back_off_floor_kg"] = _floor_half_kg(float(floor["floor_kg"]) * back_off_pct / 100.0)
+        if "back_off_floor_kg" not in row and floor.get("floor_kg") and scheme.get("status") == "ok":
+            # #4065: outside the v0.3 load rule the back-off floor comes from the redline rep scheme.
+            row["back_off_floor_kg"] = back_off_min_kg(float(floor["floor_kg"]), scheme)
+        audit["movements"][key] = row
     return audit
+
+
+def v03_load_rule(target_date: str, block_workouts: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+    """The v0.3 load rule for `target_date`, or None (#4107).
+
+    None when the program is not ACTIVE, or when the date is before the block start — the
+    program's loads begin with its sequence, and a pre-block chat routine keeps the #3927
+    best-load floor it was always judged against.
+
+    #4110: the week is the session SEQUENCE's (`session_sequence.next_session`) — completed
+    loaded Hevy sessions // 3 + 1 — the same week `full_body_session` ramps and the
+    `not_before_week` gate reads. `block_workouts` is the Hevy record since the block start;
+    None reads it (`plan_hevy_windows._block_workouts`, the sanctioned MCP Hevy read). A read
+    that fails leaves the week UNKNOWN: the rule then ramps as week 1 — the lowest v0.3 floor,
+    so an unreadable record can never refuse the generator's own loads — and says so in
+    `week_state` rather than presenting week 1 as measured."""
+    from training import program_structure, session_sequence
+
+    if not program_structure.ACTIVE or not target_date:
+        return None
+    if target_date < session_sequence.block_start():
+        return None
+    read_error = None
+    if block_workouts is None:
+        from mcp.plan_hevy_windows import _block_workouts
+
+        try:
+            block_workouts = _block_workouts(target_date)
+        except Exception as e:  # noqa: BLE001 — reported on the rule as week_state, never a silent week
+            read_error = f"{type(e).__name__}: {e}"
+    try:
+        entry = session_sequence.next_session(target_date, block_workouts)
+    except ValueError:
+        return None
+    if entry is None:
+        return None
+    known = entry.get("source") == "session_sequence"
+    pct = 100 + int(program_structure.EXPOSURES["heavy"]["back_off_pct"])  # §3: back-offs at −10 % of the top set
+    return {
+        "rule": "v0.3 §3 entry ramp (load_ramp.v03_floor)",
+        "week": int(entry.get("week") or 1),
+        "week_state": "measured" if known else "unreadable",
+        "week_source": (
+            f"session sequence: {entry.get('position_label')}"
+            if known
+            else f"session sequence UNREADABLE ({read_error or entry.get('note')}) — ramped as week 1, the lowest v0.3 floor"
+        ),
+        "block": entry.get("block"),
+        "back_off_pct_of_top": pct,
+    }
 
 
 def prescription_gate(ir: Any, **kw: Any) -> dict[str, Any]:
@@ -296,6 +384,7 @@ def refusal_message(gate: dict[str, Any] | None) -> str | None:
             lines.append(
                 f"{v.get('where')} set {v.get('set')} prescribes {_fmt(v.get('prescribed_kg'))} "
                 f"against a floor of {_fmt(v.get('floor_kg'))} — {_provenance(gate, v)}"
+                + (f" — not a prescribed back-off: {v['back_off_note']}" if v.get("back_off_note") else "")
             )
     return (
         f"Refusing to commit — subtract-only violation (#3927/#3971), {len(lines)} finding(s): "
@@ -321,5 +410,7 @@ def summary(gate: dict[str, Any] | None) -> str:
         f"load_floors status={floors.get('status', '?')}{reason}, source={floors.get('source', '?')}, "
         f"{with_floor}/{len(movements)} movement(s) carry a band-matched floor; "
         f"conditional-up scan ran on routine notes + every exercise note, "
-        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}"
+        f"{len(audit.get('violations') or [])} violation(s), floors_checked={audit.get('floors_checked')}, "
+        f"{audit.get('back_offs_checked', 0)} back-off set(s) held to their back-off floor "
+        f"(rep scheme {(audit.get('back_off_scheme') or {}).get('status', '?')}, #4065/#4090)"
     )

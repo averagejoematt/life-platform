@@ -18,6 +18,7 @@ floor, and every one is written into the rationale, never applied silently.
 
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 from training import load_ramp, program_structure, routine_generator as _rg
@@ -201,7 +202,8 @@ def full_body_routines(
     ramp_p = load_ramp.params()
     rationale.append(
         f"loads: v0.3 §3 entry ramp, week {ramp_week} = {load_ramp.ramp_pct(ramp_week, ramp_p)}% of the band anchor after the "
-        f"{ramp_p['discount_pct']}% detraining discount (cap {ramp_p['cap_pct']}% of band e1RM); back-offs −10 % of the top set"
+        f"{ramp_p['discount_pct']}% detraining discount on anchors >= {load_ramp.DETRAINING_ANCHOR_AGE_DAYS} d older than block 1 "
+        f"(cap {ramp_p['cap_pct']}% of band e1RM; no in-band history -> the nearest band he has lifted in); back-offs −10 % of the top set"
     )
     load_floors = _enforce_load_floors(
         blocks,
@@ -212,7 +214,7 @@ def full_body_routines(
         days_since_last_workout=inputs.days_since_last_workout,
         layoff_days=int(week_cfg.get("re_entry_days_threshold", LAYOFF_DAYS_DEFAULT)),
         rationale=rationale,
-        floor_transform=lambda f: load_ramp.ramp_floor(f, ramp_week),
+        floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),  # #4107: the ONE v0.3 load path
     )
     load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
     load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
@@ -267,8 +269,11 @@ def full_body_routines(
     # The Minimum Viable Session (§3): anchors only, top set + one back-off, ~25 min.
     # Resolved at skill tier 1 — the floor has always been machine/DB-only for the version
     # of Matthew who shows up tired, so the bench anchor is the machine press here.
+    # anchor_exempt=False: the #4080 exemption targets the interim Sports-Medicine ceiling
+    # (2), not this deliberately lower tired-day floor — a barbell top set has no business
+    # on the Minimum Viable Session regardless of which pattern family it belongs to.
     mvs_rx = program_structure.session_prescription_for_role(
-        role, deload=False, catalog_movements=catalog.get("movements") or {}, skill_ceiling=1
+        role, deload=False, catalog_movements=catalog.get("movements") or {}, skill_ceiling=1, anchor_exempt=False
     )
     mvs_blocks, _mvs_used, _ = _blocks_from_prescription(mvs_rx, catalog, None, "off", anchors_only=True, top_plus_one=True)
     floor_cap = int(week_cfg.get("floor_session_set_count", 6)) + 2

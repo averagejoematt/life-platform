@@ -26,6 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import experiment.phase_filter as _phase_filter  # #4088: the derived phase decision (module ref, so it stays patchable)
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
 from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
@@ -615,14 +616,73 @@ def night_of_for(as_of):
         return None
 
 
-def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool = False) -> list:
-    """Query DynamoDB for a source within a date range. ADR-058: phase=pilot hidden by default."""
+def _resolve_include_pilot(source: str, include_pilot: bool | None) -> tuple[bool, bool]:
+    """The phase decision for one site read: an explicit bool wins, `None` DERIVES it (#4088).
+
+    The same rule `mcp/core.py::_resolve_include_pilot` applies at the MCP chokepoint
+    (#4061/#4087): `None` asks `phase_filter.source_reads_cross_phase(source)` (#2109), so a
+    RAW_TIMESERIES / CROSS_PHASE / SYSTEM_STATE partition reads across every phase — bounded
+    by the caller's DATE window, never by the phase tag — and an EXPERIMENT_SCOPED one keeps
+    the ADR-058 filter. An unknown or unclassifiable source keeps the filter (fail-soft,
+    conservative). Returns `(include_pilot, derived)`.
+
+    A public page that means "this experiment" says so with a genesis DATE clamp on its
+    window (`_experiment_date`, `max(..., EXPERIMENT_START)`), never by leaning on a phase
+    tag to truncate a raw series — every call site's ruling is enumerated in
+    `tests/test_site_api_derived_phase_4088.py`.
+    """
+    if include_pilot is None:
+        return bool(_phase_filter.source_reads_cross_phase(source)), True
+    return bool(include_pilot), False
+
+
+# Upper bound on the pages a derived newest-first read walks past superseded
+# (`tombstone=true`) rows before answering "none". A raw series carries at most a
+# handful of superseded rows at its head (#4030's hevy aggregates), so this is a
+# guard against a pathological partition, not a working limit.
+_LATEST_TOMBSTONE_PAGES = 10
+
+
+def _newest_visible(kwargs: dict, derived: bool) -> dict | None:
+    """The first row of a newest-first `Limit: 1` query that a DERIVED read may serve.
+
+    A derived read drops superseded rows (`tombstone=true`) — the item-level rule
+    `phase_filter.singleton_visible` encodes, and the one `_query_source` applies below.
+    With `Limit: 1` a tombstoned head row would otherwise answer "no data", so the read
+    steps past it (bounded). An explicit include_pilot keeps the pre-#4088 single-page
+    behaviour exactly.
+    """
+    pages = 0
+    while True:
+        resp = table.query(**kwargs)
+        items = _decimal_to_float(resp.get("Items", []))
+        if not derived:
+            return items[0] if items else None
+        for item in items:
+            if not item.get("tombstone"):
+                return item
+        last_key = resp.get("LastEvaluatedKey")
+        pages += 1
+        if not last_key or pages >= _LATEST_TOMBSTONE_PAGES:
+            return None
+        kwargs = dict(kwargs, ExclusiveStartKey=last_key)
+
+
+def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool | None = None) -> list:
+    """Query DynamoDB for a source within a date range.
+
+    #4088: the phase decision is DERIVED per source (`_resolve_include_pilot`) — a raw
+    series reads across every phase inside the caller's date window; an EXPERIMENT_SCOPED
+    source keeps the ADR-058 filter. An explicit `include_pilot` wins. A derived read also
+    drops superseded (`tombstone=true`) rows.
+    """
     if start_date > end_date:
         return []  # EXPERIMENT_START is in the future — no data yet
+    include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
     kwargs = with_phase_filter(
         {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"),
         },
         include_pilot=include_pilot,
     )
@@ -636,42 +696,56 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
         if not last_key:
             break
         kwargs["ExclusiveStartKey"] = last_key
+    if derived:
+        items = [i for i in items if not i.get("tombstone")]
     return _decimal_to_float(items)
 
 
-def _latest_item(source: str, include_pilot: bool = False) -> dict | None:
-    """Get the most recent item for a source. ADR-058: phase=pilot hidden by default."""
+def _latest_item(source: str, include_pilot: bool | None = None, *, since: str | None = None) -> dict | None:
+    """Get the most recent item for a source. #4088: phase decision derived per source.
+
+    `since` (YYYY-MM-DD) is the genesis DATE clamp for a surface that means "this
+    experiment" (pass `since=EXPERIMENT_START`): it bounds the read by the sort KEY, so a
+    raw series' prior-cycle head row is excluded by its date — never by its phase tag
+    (#2109). A since in the future (pre-start countdown) answers None.
+
+    NB DynamoDB applies `Limit` BEFORE a FilterExpression, so for an EXPERIMENT_SCOPED
+    source (filter kept) a pilot-tagged head row still yields None — the honest answer for
+    a scoped source, unchanged here. A raw series no longer has that failure mode.
+    """
+    include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
+    key_cond = Key("pk").eq(pk)
+    if since:
+        key_cond = key_cond & Key("sk").between(f"DATE#{since}", "DATE#~")
     kwargs = with_phase_filter(
         {
-            "KeyConditionExpression": Key("pk").eq(pk),
+            "KeyConditionExpression": key_cond,
             "ScanIndexForward": False,
             "Limit": 1,
         },
         include_pilot=include_pilot,
     )
-    resp = table.query(**kwargs)
-    items = _decimal_to_float(resp.get("Items", []))
-    return items[0] if items else None
+    return _newest_visible(kwargs, derived)
 
 
-def _latest_item_asof(source: str, date: str, include_pilot: bool = False) -> dict | None:
+def _latest_item_asof(source: str, date: str, include_pilot: bool | None = None) -> dict | None:
     """Most-recent item on-or-before `date` (DATE#YYYY-MM-DD) — the time-travel
     counterpart of _latest_item. Phase 4 historical windows: 'the latest reading as it
-    stood that morning'. ADR-058: pass include_pilot=True when time-travelling so
-    prior-cycle history is visible (mirrors handle_character)."""
+    stood that morning'. #4088: the phase decision is derived per source, so a raw
+    series' prior-cycle history is visible without the caller opting in; an explicit
+    include_pilot (e.g. /api/vitals' `ip`) still wins."""
+    include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
     kwargs = with_phase_filter(
         {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between("DATE#0000-00-00", f"DATE#{date}"),
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between("DATE#0000-00-00", f"DATE#{date}~"),
             "ScanIndexForward": False,
             "Limit": 1,
         },
         include_pilot=include_pilot,
     )
-    resp = table.query(**kwargs)
-    items = _decimal_to_float(resp.get("Items", []))
-    return items[0] if items else None
+    return _newest_visible(kwargs, derived)
 
 
 def nutrition_delivery_public() -> bool:
