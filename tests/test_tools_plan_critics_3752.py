@@ -625,8 +625,10 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
         for i in range(5)
     ]
     out1, _, _ = _run(ir, ev, invoke=cut_by_4)
-    assert out1["critics"]["recheck"]["total_sets"] == 16
+    # #4149: the cut is the owner's −30 % deload computed in code (20 -> 14), not the model's -4;
+    # the relative fake still matters — it is what compounded live, and it must not leak in.
+    assert out1["critics"]["recheck"]["total_sets"] == 14
     assert len(out1["critics"]["draft_exercises"]) == 5 and sum(len(e["sets"]) for e in out1["critics"]["draft_exercises"]) == 20
     out2, _, _ = _run(ir, ev, invoke=cut_by_4)
-    assert out2["critics"]["recheck"]["total_sets"] == 16, "a re-run must land on the same cut, not cut again"
-    assert sum(len(e.sets) for e in ir.exercises) == 16
+    assert out2["critics"]["recheck"]["total_sets"] == 14, "a re-run must land on the same cut, not cut again"
+    assert sum(len(e.sets) for e in ir.exercises) == 14

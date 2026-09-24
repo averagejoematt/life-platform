@@ -271,12 +271,31 @@ _ESCALATIONS = [
 _BARE_NUMBER_ONLY_IF = re.compile(r"\b\d+(?:\.\d+)?\s*(?:lb|lbs|kg)?\s+only\s+if\b", re.IGNORECASE)
 
 
+# #4149: a PROHIBITION of the escalation is not an escalation. Live false positive (09-23): the
+# note "don't add weight" read as a conditional up-branch because the clause also carried an
+# `if`. The negator must sit DIRECTLY before the escalation (a few filler words at most), so
+# "if you're not sore, add weight" and "if not tired add weight" stay findings — a bare `not`
+# is deliberately absent; only "not to" counts ("careful not to add load").
+_NEGATED_ESCALATION = re.compile(
+    r"\b(?:don['’]?t|do\s+not|never|no|not\s+to|shouldn['’]?t|should\s+not|won['’]?t|will\s+not|must\s+not|mustn['’]?t)"
+    r"\s+(?:(?:ever|yet|you|try\s+to|need\s+to)\s+)?$",
+    re.IGNORECASE,
+)
+
+
+def _negated(clause, m):
+    """True when the escalation match `m` is the object of a negator ("don't add weight")."""
+    return bool(_NEGATED_ESCALATION.search(clause[: m.start()]))
+
+
 def find_conditional_up(text):
     """Every conditional-UP clause in one block of prescription prose.
 
     Returns a list of {clause, pattern, match} — empty when the prose is clean. A list
     rather than a bool because a caller (and a failing test) has to be able to print the
-    sentence, not just the verdict.
+    sentence, not just the verdict. A negated escalation ("don't add weight", "never add
+    load", "no extra set") is a prohibition, not a finding (#4149); a later un-negated
+    escalation in the same clause still is.
     """
     if not text:
         return []
@@ -291,11 +310,9 @@ def find_conditional_up(text):
             continue
         if not _CONDITION_MARKER.search(clause):
             continue
-        for name, rx in _ESCALATIONS:
-            m = rx.search(clause)
-            if m:
-                found.append({"clause": clause, "pattern": name, "match": m.group(0)})
-                break
+        hit = next(((name, m) for name, rx in _ESCALATIONS for m in rx.finditer(clause) if not _negated(clause, m)), None)
+        if hit:
+            found.append({"clause": clause, "pattern": hit[0], "match": hit[1].group(0)})
     return found
 
 
@@ -319,6 +336,33 @@ def _is_working(s):
     return str(_field(s, "type", "normal") or "normal").lower() != "warmup" and _field(s, "weight_kg") is not None
 
 
+def _n_back_offs(scheme):
+    if scheme is None:
+        from training.rep_scheme import heavy_back_off_scheme
+
+        scheme = heavy_back_off_scheme()
+    return int(scheme.get("back_offs") or 0) if scheme.get("status") == "ok" else 0, scheme
+
+
+def set_floors_kg(exercise, floor, n_back_offs):
+    """The floor each set of ONE exercise is judged against, in kg (None: no floor applies).
+
+    The ONE derivation of the back-off seam below — `audit_prescription` judges with it, and
+    stage 2's critic clamp (#4149, via `hevy_prescription_gate.critic_set_floors`) holds a
+    critic's change to it, so the clamp and the commit gate cannot disagree about a set."""
+    sets = _sets_of(exercise)
+    out = [None] * len(sets)
+    top = (floor or {}).get("floor_kg")
+    if not top:
+        return out
+    back_off = (floor or {}).get("back_off_floor_kg")
+    working = [i for i, s in enumerate(sets) if _is_working(s)]
+    back_off_idx = set(working[1 : 1 + n_back_offs]) if back_off else set()
+    for i in working:
+        out[i] = float(back_off) if i in back_off_idx else float(top)
+    return out
+
+
 def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
     """Is this routine subtract-only? Deterministic, no model, no I/O.
 
@@ -338,11 +382,7 @@ def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
     `floors` is optional, and its absence is reported (`floors_checked: False`) rather
     than passed over: an audit that could not see the floors is not a clean audit.
     """
-    if scheme is None:
-        from training.rep_scheme import heavy_back_off_scheme
-
-        scheme = heavy_back_off_scheme()
-    n_back_offs = int(scheme.get("back_offs") or 0) if scheme.get("status") == "ok" else 0
+    n_back_offs, scheme = _n_back_offs(scheme)
     violations, back_offs_checked = [], 0
     for hit in find_conditional_up(routine_notes):
         violations.append({"kind": "conditional_up", "where": "routine_notes", **hit})
@@ -359,11 +399,12 @@ def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
         if not top_floor_kg:
             continue
         back_off_floor_kg = floor.get("back_off_floor_kg")
-        working = [i for i, s in enumerate(_sets_of(ex)) if _is_working(s)]
+        per_set = set_floors_kg(ex, floor, n_back_offs)
+        working = [i for i, f in enumerate(per_set) if f is not None]
         back_off_idx = set(working[1 : 1 + n_back_offs]) if back_off_floor_kg else set()
         for i in working:
             w = float(_field(_sets_of(ex)[i], "weight_kg"))
-            floor_kg = float(back_off_floor_kg) if i in back_off_idx else float(top_floor_kg)
+            floor_kg = per_set[i]
             back_offs_checked += i in back_off_idx
             if w >= floor_kg - LOAD_TOLERANCE_KG:
                 continue
