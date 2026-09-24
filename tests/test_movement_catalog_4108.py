@@ -107,7 +107,9 @@ def test_the_26_curated_entries_are_kept_and_marked_reviewed():
         assert CATALOG[k]["reviewed"] is True and CATALOG[k]["provenance"] == mc.PROVENANCE_CURATED, k
     # their hand-written fields are untouched — a spot check of values the builder could only have changed by mistake
     assert CATALOG["barbell_bench_press"]["skill_tier"] == 3 and CATALOG["barbell_bench_press"]["joint_friendly_score"] == 1
-    assert "hevy_template_id_hint" not in CATALOG["barbell_bench_press"]  # ADR-069: resolves by title, on purpose
+    # #4080 (2026-09-23): a live-verified hint was added by hand so the v0.3 load floor can find the bench history;
+    # ADR-069's exact-title resolution still runs at commit. The builder preserves it (curated entries are verbatim).
+    assert CATALOG["barbell_bench_press"].get("hevy_template_id_hint") == "79D0BB3A"
     assert CATALOG["lat_pulldown"]["skill_tier"] == 1  # curated at 1 although a cable movement generates at 2
     assert CATALOG["cycling"]["_cardio"]
     # and the curated movements come first, in their original order

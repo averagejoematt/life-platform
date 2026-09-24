@@ -903,8 +903,19 @@ def constraint_block(
                 ),
                 (
                     "the program has UNRESOLVED conflicts with the owner's own redlines: "
-                    + ", ".join(c["id"] for c in program["conflicts"])
-                    if program["conflicts"]
+                    + ", ".join(c["id"] for c in program["conflicts"] if not c.get("resolved"))
+                    if any(not c.get("resolved") for c in program["conflicts"])
+                    else None
+                ),
+                # #4080: a conflict resolved by owner ruling stays NAMED (audit trail — see
+                # program_structure.conflicts()) rather than silently dropping out of the
+                # block; it must never read as "UNRESOLVED" once it isn't.
+                (
+                    "the program's conflict(s) RESOLVED by owner ruling: "
+                    + ", ".join(
+                        f"{c['id']} ({c.get('resolution_source', 'no source recorded')})" for c in program["conflicts"] if c.get("resolved")
+                    )
+                    if any(c.get("resolved") for c in program["conflicts"])
                     else None
                 ),
                 (

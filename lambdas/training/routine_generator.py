@@ -36,7 +36,7 @@ from typing import Any, Callable
 
 from common.repo_config import config_dir
 
-from training import program_structure  # #3755: the program as data (anchors, accessory pool)
+from training import program_conflicts, program_structure  # #3755 the program as data; #4080 its catalog_gaps() audit
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
 from training.movement_catalog import generator_eligible  # #4108: the ONE auto-programming rule
 from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
@@ -717,7 +717,7 @@ def _build_inputs_snapshot(inputs: GeneratorInputs, landmarks: dict[str, Any], c
         # the catalog does not carry is one the selector can NEVER pick. Recorded on every
         # generation, not computed on demand, because the failure is silent by nature: the
         # session comes out fine, just without the lift the program said was an anchor.
-        "program_catalog_gaps": program_structure.catalog_gaps((catalog.get("movements") or {}).keys()),
+        "program_catalog_gaps": program_conflicts.catalog_gaps((catalog.get("movements") or {}).keys()),
     }
 
 
