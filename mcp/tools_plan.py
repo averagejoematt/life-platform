@@ -51,6 +51,7 @@ from training.commit_binding import binding_for  # #4066
 
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_helpers import _catalog_and_ceiling, _days_between, _minus_days, _resolver, _union_evidence_rows  # noqa: F401 (#4149)
+from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
 
 logger = logging.getLogger("tools_plan")
 
@@ -353,42 +354,6 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
     return {"exercises": considered, "scope": scope}
 
 
-def _rotation_window(end_date: str) -> tuple[str | None, list[dict[str, Any]] | None]:
-    """(window start, Hevy rows) for the program's trailing accessory-rotation window (#3755).
-
-    Read DIRECTLY from the hevy partition, the same way `_walking_volume_last_7d` does and
-    for the same reason: `get_workouts`'s `_slim_workout` projection drops `exercises`,
-    which is the only place the movement NAMES live — and the names ARE the measurement
-    here. A read that RAISES yields None, so the engine reports rotation `unknown` rather
-    than reading an empty window as a clean rotation.
-    """
-    from common.pacific_time import shift_day_key
-    from training import program_structure
-
-    from mcp.core import query_source_range
-
-    window_days = int(program_structure.ROTATION_RULE["window_days"])
-    start = shift_day_key(end_date, -(window_days - 1))
-    if start == end_date:  # unparseable day key — shift_day_key returns it unchanged
-        return None, None
-    # #4072: a raise propagates to `_read` at the call site, which records its error class.
-    return start, query_source_range("hevy", start, end_date)
-
-
-def _prescription_window(end_date: str) -> list[dict[str, Any]] | None:
-    """Hevy rows for self_added_volume (#4081): Monday three whole weeks back through `end_date`.
-    Direct partition read (as `_rotation_window`): rows carry the stored `adherence` block that
-    `get_workouts`'s slim projection drops. None only for a bad date; a raise reaches `_read`."""
-    from training import self_added_volume
-
-    from mcp.core import query_source_range
-
-    start = self_added_volume.window_start(end_date)
-    if start is None:
-        return None
-    return query_source_range("hevy", start, end_date)
-
-
 def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -> None:
     """Put the per-source breakdown on the block's walking read, beside the total (#3930).
 
@@ -664,6 +629,12 @@ def tool_plan_next_session(args):
     # draft will be built from. A read that raises leaves the session pattern-level and says so.
     catalog_movements, skill_ceiling = _catalog_and_ceiling()
 
+    # #4110: the session and the program week follow the COMPLETED sessions since the block
+    # start, not the weekday — so the Hevy record since then is an engine input of its own.
+    block_workouts, status["block_workouts"] = _read("block_workouts", _block_workouts, target_date)
+    if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
+        status["block_workouts"] = st(ABSENT, "no Hevy session since the program's block start")
+
     block = plan_engine.constraint_block(
         date=target_date,
         catalog_movements=catalog_movements,
@@ -700,6 +671,7 @@ def tool_plan_next_session(args):
         hevy_workouts_rotation_window=rotation_rows,
         rotation_window_start=rotation_start,
         hevy_workouts_prescription_window=prescription_rows,
+        block_workouts=block_workouts,
         training_memory_constraints=training_memory,
         input_status=status,
     )
@@ -714,8 +686,9 @@ def tool_plan_next_session(args):
         "constraint_block": block,
         "protein_days_measured_7d": protein_measured,
         "how_to_use": (
-            "Stage 1 is the deterministic constraint block. `constraint_block.session` is the session the program "
-            "schedules on this date (block calendar + v0.3 §3 prescription) — start from it. Draft against the block, then say plainly which constraint "
+            "Stage 1 is the deterministic constraint block. `constraint_block.session` is the NEXT UNDONE session "
+            f"of the v{plan_engine.program_structure.PROGRAM_VERSION} sequence (its position, and the completed session that advanced it, #4110) with its prescription — "
+            "start from it. Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
             "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
             "WITH routine_id — stage 2, the red team (#3752). A routine that skipped stage 2 is NOT red-teamed and "

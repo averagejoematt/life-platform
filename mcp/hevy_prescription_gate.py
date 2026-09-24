@@ -245,25 +245,53 @@ def derive_load_floors(
     return audit
 
 
-def v03_load_rule(target_date: str) -> dict[str, Any] | None:
+def v03_load_rule(target_date: str, block_workouts: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     """The v0.3 load rule for `target_date`, or None (#4107).
 
-    None when the program is not ACTIVE, or when the date is before block 1 — the program's
-    loads begin with its calendar, and a pre-block-1 chat routine keeps the #3927 best-load
-    floor it was always judged against. The week is the block calendar's
-    (`program_structure.calendar_entry`), the same week `full_body_session` ramps."""
-    from training import program_structure
+    None when the program is not ACTIVE, or when the date is before the block start — the
+    program's loads begin with its sequence, and a pre-block chat routine keeps the #3927
+    best-load floor it was always judged against.
+
+    #4110: the week is the session SEQUENCE's (`session_sequence.next_session`) — completed loaded
+    Hevy sessions // `SESSION_SEQUENCE['sessions_per_week']` + 1 (4 under v0.4) — the same week `full_body_session` ramps and the
+    `not_before_week` gate reads. `block_workouts` is the Hevy record since the block start;
+    None reads it (`plan_hevy_windows._block_workouts`, the sanctioned MCP Hevy read). A read
+    that fails leaves the week UNKNOWN: the rule then ramps as week 1 — the lowest ramp floor,
+    so an unreadable record can never refuse the generator's own loads — and says so in
+    `week_state` rather than presenting week 1 as measured."""
+    from training import program_structure, session_sequence
 
     if not program_structure.ACTIVE or not target_date:
         return None
-    cal = program_structure.calendar_entry(target_date)
-    if cal is None:
+    if target_date < session_sequence.block_start():
         return None
+    read_error = None
+    if block_workouts is None:
+        from mcp.plan_hevy_windows import _block_workouts
+
+        try:
+            block_workouts = _block_workouts(target_date)
+        except Exception as e:  # noqa: BLE001 — reported on the rule as week_state, never a silent week
+            read_error = f"{type(e).__name__}: {e}"
+    try:
+        entry = session_sequence.next_session(target_date, block_workouts)
+    except ValueError:
+        return None
+    if entry is None:
+        return None
+    known = entry.get("source") == "session_sequence"
     pct = 100 + int(program_structure.EXPOSURES["heavy"]["back_off_pct"])  # §3: back-offs at −10 % of the top set
     return {
-        "rule": "v0.3 §3 entry ramp (load_ramp.v03_floor)",
-        "week": int(cal.get("week") or 1),
-        "block": cal.get("block"),
+        "rule": "§3 entry ramp (load_ramp.v03_floor)",
+        "program_version": program_structure.PROGRAM_VERSION,
+        "week": int(entry.get("week") or 1),
+        "week_state": "measured" if known else "unreadable",
+        "week_source": (
+            f"session sequence: {entry.get('position_label')}"
+            if known
+            else f"session sequence UNREADABLE ({read_error or entry.get('note')}) — ramped as week 1, the lowest v0.3 floor"
+        ),
+        "block": entry.get("block"),
         "back_off_pct_of_top": pct,
     }
 

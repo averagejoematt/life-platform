@@ -40,13 +40,15 @@ FOLDER_BY_ARCHETYPE = {
     "push": "Push",
     "pull": "Pull",
     "legs": "Legs",
-    "lower": "Legs",
+    # #4147 v0.4: the owner's folders are Upper / Lower. Must equal program_structure.HEVY_FOLDERS
+    # (held by a test). `legs` (the PPL-era archetype) still files into "Legs".
+    "lower": "Lower",
     "upper": "Upper",
     "engine": "Engine",
     "full_body": "Full Body",
     # #4064: v0.3's week grid and block calendar name the archetype `full`; without this
     # row every v0.3 session was filed into a folder titled "Full" (arch.title()), beside
-    # the "Full Body" folder this map already named. Must equal program_structure.HEVY_FOLDER.
+    # the "Full Body" folder this map already named. Equals program_v03.HEVY_FOLDER (history).
     "full": "Full Body",
     "conditioning": "Engine",
 }

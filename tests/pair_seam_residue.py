@@ -467,6 +467,27 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "named. Pinned by tests/test_plan_input_read_state_4072.py::TestReadinessFloorReadsWhoop::"
         "test_a_writer_shape_drift_is_read_failed_not_absent and test_an_empty_window_is_absent_not_failed.",
     ),
+    # #4110 (2026-09-24): the three stage-1 Hevy window readers moved VERBATIM out of
+    # mcp/tools_plan.py (module-size ceiling) into mcp/plan_hevy_windows.py, and one of them
+    # (`_block_workouts`) is new: the v0.3 session sequence's record since the block start.
+    "hevy::mcp/plan_hevy_windows.py::read": (
+        "2026-09-24",
+        "#4110: plan_hevy_windows does NOT parse the hevy wire shape — each reader turns a date into rows and hands "
+        "them on untouched (`_rotation_window`/`_prescription_window` through `mcp.core.query_source_range`, the "
+        "`hevy::mcp/tools_plan.py` reads they were before the move; `_block_workouts` through "
+        "`tools_strength._read_hevy_all_phases`, the ONE sanctioned cross-phase Hevy read). The field-level consumers "
+        "are the training modules: `_block_workouts`' rows reach `session_sequence.completed_sessions`, which reads "
+        "only `date`, `tombstone`, `title`, `source_workout_id`/`workout_id`, `start_time` and — through "
+        "`training_streaks.is_loaded_session`, the one loaded-session definition (#4105) — `exercises[].name` and "
+        "`exercises[].sets[].{type|set_type, weight_kg|weight_lbs}`, accepting both the raw row and the normalised "
+        "shape. VERIFIED, not assumed: a writer-side rename of the set weight makes every session unloaded, so the "
+        "sequence stops ADVANCING and serves the same session with `advanced_by: null` and the note 'no loaded Hevy "
+        "session since the block start' — it can postpone, never skip or double a session, and the stale position is "
+        "named on every plan. A failed read is `sequence_unreadable` / week None, never session 1. Pinned by "
+        "tests/test_session_sequence_4110.py::test_engine_days_warmup_only_logs_and_rest_days_never_advance, "
+        "::test_an_unread_record_is_unknown_never_session_one and "
+        "::test_mutation_control_a_walk_that_advances_the_position_reds_the_fixture.",
+    ),
     # #4075 decision 4A (2026-09-23): get_training view=load stopped running its own
     # Hevy-blind day model and now reads the hevy partition — but only to hand the rows,
     # untouched, to training_load.daily_training_load, the SAME function daily-metrics-compute

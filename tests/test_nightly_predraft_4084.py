@@ -275,6 +275,7 @@ def test_a_routine_the_predraft_did_not_author_is_never_versioned_over():
             patch("training.routine_repo.put_versioned", side_effect=r.put_versioned),
             patch("training.routine_repo.list_by_date_range", side_effect=r.list_by_date_range),
             patch.object(npd, "scheduled_session", return_value=LIFTING),
+            patch.object(npd, "_block_record", return_value=[]),  # nothing performed yet
             patch.object(npd, "_draft", side_effect=AssertionError("must not draft over the owner's routine")),
             patch.object(npd, "_stage_2", side_effect=AssertionError("must not red-team the owner's routine")),
         ):
@@ -372,13 +373,28 @@ def test_stage_1_attaches_the_predraft_first():
 
 
 def test_the_seam_is_the_function_stage_1_uses():
-    """#4110 re-points ONE function. Pin that it is stage 1's own session picker today."""
+    """#4110/#4147 re-pointed ONE function: stage 1's own session picker, handed the same
+    completed-session record stage 1 passes (the v0.4 order advances only on it)."""
+    done = [{"date": "2026-09-25", "exercises": []}]
     with (
         patch("mcp.plan_helpers._catalog_and_ceiling", return_value=({"m": {}}, 3)),
+        patch("mcp.plan_hevy_windows._block_workouts", return_value=done) as reader,
         patch("training.plan_engine._scheduled_session", return_value=LIFTING) as picker,
     ):
         assert npd.scheduled_session(TARGET) is LIFTING
-    picker.assert_called_once_with(TARGET, {"m": {}}, 3)
+    reader.assert_called_once_with(TARGET)
+    picker.assert_called_once_with(TARGET, {"m": {}}, 3, done)
+
+
+def test_an_unread_sequence_record_is_named_never_a_silent_session_one():
+    """A failed Hevy read hands the picker None: the real picker then says `sequence_unreadable`
+    and carries no prescription, so the predraft reads `no_session` — it never drafts session 1."""
+    with (
+        patch("mcp.plan_helpers._catalog_and_ceiling", return_value=({}, 2)),
+        patch("mcp.plan_hevy_windows._block_workouts", side_effect=RuntimeError("ddb down")),
+    ):
+        session = npd.scheduled_session("2026-09-27")
+    assert session["source"] == "sequence_unreadable" and not npd.is_lifting_session(session)
 
 
 def test_an_unreadable_predraft_is_named_never_read_as_none():
@@ -387,3 +403,71 @@ def test_an_unreadable_predraft_is_named_never_read_as_none():
         npd.attach_to_stage_1(out, TARGET)
     assert out["predraft"]["status"] == "unreadable" and "RuntimeError" in out["predraft"]["error"]
     assert out["how_to_use"] == "stage 1"
+
+
+# ── #4110/#4147: the owner routine blocks only when it IS the served session ──────────
+def _v04_session(role, archetype):
+    return {"label": role, "archetype": archetype, "session_role": role, "prescription": {"exposures": []}, "source": "session_sequence"}
+
+
+def _run_with(routines, session, block_record):
+    r = _Repo(routines)
+    with (
+        patch("training.routine_repo.get_current", side_effect=r.get_current),
+        patch("training.routine_repo.put_versioned", side_effect=r.put_versioned),
+        patch("training.routine_repo.list_by_date_range", side_effect=r.list_by_date_range),
+        patch.object(npd, "scheduled_session", return_value=session),
+        patch.object(npd, "_block_record", return_value=block_record),
+        patch.object(npd, "_draft", side_effect=_fake_draft(r)),
+        patch.object(npd, "_stage_2", side_effect=_fake_stage_2(r)),
+    ):
+        out = npd.run(TARGET)
+    return out, r
+
+
+# The committed first v0.4 session: chat-authored Lower (routine b1b99604…, Hevy 4b743f67), stamped
+# for the target date, archetype `lower`, no role stamp — and two stale cron-drafted v0.3 `full` routines.
+OWNER_LOWER = dict(
+    routine_id="b1b9960468f374e30dcdeca8630dd18f", archetype="lower", status="active", hevy_routine_id="4b743f67", created_by="chat"
+)
+STALE_V03 = [_ir("v03-ideal", created_by="cron"), _ir("v03-floor", variant="floor", created_by="cron")]
+PERFORMED_LOWER = [
+    {
+        "date": "2026-09-23",
+        "hevy_routine_id": "4b743f67",
+        "exercises": [{"name": "Squat (Barbell)", "sets": [{"weight_kg": 60, "reps": 5}]}],
+    }
+]
+
+
+def test_a_committed_lower_heavy_performed_early_does_not_block_the_next_sessions_predraft():
+    """The owner's Lower-heavy is stamped for the target date but performed the day before, so the
+    sequence now serves upper-volume there: the pre-draft must draft it — and never touch his routine
+    or the stale v0.3 drafts."""
+    out, r = _run_with([_ir(**OWNER_LOWER), *STALE_V03], _v04_session("upper_volume", "upper"), PERFORMED_LOWER)
+    assert out["outcome"] == npd.DRAFTED, out
+    assert {x["routine_id"] for x in out["other_routines_on_date"]} >= {OWNER_LOWER["routine_id"], "v03-ideal"}
+    for rid in (OWNER_LOWER["routine_id"], "v03-ideal", "v03-floor"):
+        assert npd.MARKER not in (r.get_current(rid).inputs_snapshot or {}), f"{rid} was versioned over"
+    assert r.get_current(OWNER_LOWER["routine_id"]).version == 1
+
+
+def test_the_committed_lower_heavy_not_yet_performed_still_blocks():
+    """Not performed: the sequence still serves lower-heavy, which IS the owner's routine — skip."""
+    out, r = _run_with([_ir(**OWNER_LOWER), *STALE_V03], _v04_session("lower_heavy", "lower"), [])
+    assert out["outcome"] == npd.SKIPPED_OWNER_ROUTINE
+    assert [x["routine_id"] for x in out["routines"]] == [OWNER_LOWER["routine_id"]]
+    assert r.puts == 0
+
+
+def test_a_performed_routine_of_the_served_role_does_not_block():
+    """Same archetype, but that routine was already performed (its Hevy id is in the record)."""
+    out, _r = _run_with([_ir(**OWNER_LOWER)], _v04_session("lower_volume", "lower"), PERFORMED_LOWER)
+    assert out["outcome"] == npd.DRAFTED
+
+
+def test_mutation_control_a_date_only_skip_would_block_the_friday_predraft():
+    """The pre-#4110 rule (any owner routine on the date blocks) reds the performed-early fixture."""
+    with patch.object(npd, "_blocks_served_session", lambda ir, session, performed: npd._is_owner_routine(ir)):
+        out, _r = _run_with([_ir(**OWNER_LOWER), *STALE_V03], _v04_session("upper_volume", "upper"), PERFORMED_LOWER)
+    assert out["outcome"] == npd.SKIPPED_OWNER_ROUTINE

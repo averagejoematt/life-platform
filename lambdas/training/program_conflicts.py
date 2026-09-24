@@ -1,4 +1,4 @@
-"""program_conflicts.py — where the v0.3 program disagrees with what is already stated (#3755, #4080).
+"""program_conflicts.py — where the ACTIVE program (v0.4 since 2026-09-24, #4147) disagrees with what is already stated (#3755, #4080).
 
 Extracted from `program_structure.py` (which crossed the 1000-line module ceiling, #4080) as
 one cohesive unit: the program's AUDIT against the owner's redlines and the movement
@@ -54,7 +54,7 @@ ANCHOR_SKILL_CEILING_RULING: dict[str, Any] = {
 # Named here rather than discovered later. `summary()` carries them into every constraint
 # block, so a plan built on this program cannot be built on a silent override.
 def conflicts() -> list[dict[str, Any]]:
-    """Where v0.3 contradicts something already stated. Computed against owner_redlines."""
+    """Where the ACTIVE program contradicts something already stated. Computed against owner_redlines."""
     from training import owner_redlines, program_structure
 
     lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
