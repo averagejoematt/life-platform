@@ -12,7 +12,7 @@
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from ~20 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 85 MCP tools. **106 Lambdas** run the ingest → compute → email pipeline daily.
+The Life Platform is a personal health intelligence system. It pulls data from ~20 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 86 MCP tools. **106 Lambdas** run the ingest → compute → email pipeline daily.
 
 **Pipeline (UTC, ADR-052):**
 - Ingestion: hourly at UTC hours 12–23 + 0–5 (`INGEST_HOURLY`, `ingestion_stack.py` — skips the overnight-PT hours). Exceptions: **Habitify all 24 hours** (`HABITIFY_HOURLY`, #3666 — the skipped UTC 6–11 is 23:00–04:00 PT, when evening habits are ticked), Weather 2x/day, Todoist 1x/day (14:00 UTC), **Hevy all 24 hours** (#3720 — a 5:30 PM PT lift landed after the old 16:00 PT cutoff and stayed invisible until 5 AM), Garmin PAUSED (no schedule — ADR-074)
