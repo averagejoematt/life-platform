@@ -42,7 +42,7 @@ Stdlib-only — safe to import anywhere.
 import json
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 from html.parser import HTMLParser
 
 # Haiku by default — structured verdict task (ADR-049 tiering, ADR-063 budget).
@@ -245,6 +245,58 @@ def _cycle_line(phase):
     )
 
 
+ISO_WEEK_LINE_MAX_WEEKS = 8
+
+
+def _iso_week_line(phase):
+    """The ISO-8601 week calendar of the cycle, as ground truth (#4137).
+
+    Weekly surfaces (the lab-notes field note, the /data/mind weekly read) label
+    themselves `WEEK 2026-W38`. On 2026-09-23 the judge computed W38's boundaries
+    itself — twice, two different wrong ways, in one run ("W38 runs 09-22..09-28"
+    and "W38 runs 09-13..09-19"; the truth is Mon 09-14..Sun 09-20) — and gated a
+    correctly-dated W38 note as a "hard temporal impossibility" on both pages. The
+    #2959 rule applies: ground truth is fed, never inferred. The line lists every
+    ISO week from the one holding Day 1 to the current one (the most recent
+    ISO_WEEK_LINE_MAX_WEEKS once a cycle is long, always keeping the Day-1 week),
+    each with its Monday..Sunday dates and the cycle days it holds. It states
+    facts only; it adds no exemption.
+    """
+    start = date.fromisoformat(phase["start_date"])
+    today = date.fromisoformat(phase["today"])
+    if today < start:
+        return ""
+    first_monday = start - timedelta(days=start.weekday())
+    last_monday = today - timedelta(days=today.weekday())
+    mondays = []
+    m = first_monday
+    while m <= last_monday:
+        mondays.append(m)
+        m += timedelta(days=7)
+    if len(mondays) > ISO_WEEK_LINE_MAX_WEEKS:
+        mondays = [mondays[0]] + mondays[-(ISO_WEEK_LINE_MAX_WEEKS - 1) :]
+    weeks = []
+    for mon in mondays:
+        sun = mon + timedelta(days=6)
+        iso_year, iso_week, _ = mon.isocalendar()
+        lo = max(mon, start)
+        hi = min(sun, today)
+        d_lo = (lo - start).days + 1
+        d_hi = (hi - start).days + 1
+        held = f"Day {d_lo}" if d_lo == d_hi else f"Days {d_lo}–{d_hi}"
+        notes = []
+        if mon < start:
+            notes.append(f"{(start - mon).days} pre-cycle day(s)")
+        if sun > today:
+            notes.append("in progress")
+        suffix = f"; {', '.join(notes)}" if notes else ""
+        weeks.append(f"{iso_year}-W{iso_week:02d} = {mon.isoformat()} (Mon) to {sun.isoformat()} (Sun), {held}{suffix}")
+    return (
+        " Week labels on this site are ISO-8601 weeks (Monday to Sunday). Their exact dates are ground truth — "
+        "use these, never compute your own: " + "; ".join(weeks) + "."
+    )
+
+
 def _phase_line(phase):
     if phase["pre_start"]:
         return (
@@ -266,7 +318,9 @@ def _phase_line(phase):
         f"A window, span, average or count SMALLER than {phase['day_n']} day(s) is EXPECTED and CORRECT — "
         f"trailing windows are deliberately clamped to the cycle start, so on Day {phase['day_n']} a field "
         f"may honestly report any span from 0 to {phase['day_n']} day(s). Only a span LONGER than "
-        f"{phase['day_n']} day(s) is impossible. Never flag a number for being smaller than {phase['day_n']}." + _cycle_line(phase)
+        f"{phase['day_n']} day(s) is impossible. Never flag a number for being smaller than {phase['day_n']}."
+        + _cycle_line(phase)
+        + _iso_week_line(phase)
     )
 
 
