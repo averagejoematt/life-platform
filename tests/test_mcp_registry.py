@@ -37,7 +37,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    85  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    86  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
@@ -61,6 +61,10 @@ EXPECTED_MAX_TOOLS = (
     # sessions (09-08/18/20/21) and no queue existed, so the writes died with the chat.
     # ONE tool with four actions (enqueue/list/approve/discard), not four tools; its
     # registry lines were paid by moving log_coach_correction's parameter table out.
+    # +1 (#4082): get_coach_session_packet — eight chat coaching sessions (09-14..22) each spent
+    # 10+ calls re-verifying the same inputs. ONE read returning them together, every field from
+    # its canonical function; a `view` on get_training / plan_next_session was ruled out (the
+    # packet spans nutrition, recovery and the program, and plan_next_session is at its ceiling).
 )
 
 

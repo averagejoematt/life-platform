@@ -151,7 +151,13 @@ def test_a_synthetic_tool_on_a_branch_is_pending_reconcile_and_red_on_main():
         assert "#4123" in on_branch, on_branch
         on_main = _run_status_case("refs/heads/main")
         assert "1 failed" in on_main, on_main
-        assert f"literal {base_count} != registry {base_count + 1}" in on_main, on_main
+        # The PUBLISHED literal, not the branch registry's count: on a branch that itself adds a
+        # tool (#4082) the two differ until the reconcile job runs on main, and this case is
+        # about the synthetic tool, not the branch's own.
+        import re
+
+        literal = int(re.search(r'"mcp_tools":\s*(\d+)', (_REPO / "lambdas" / "web" / "platform_counts.py").read_text()).group(1))
+        assert f"literal {literal} != registry {base_count + 1}" in on_main, on_main
     finally:
         _REGISTRY.write_text(original, encoding="utf-8")
     assert _REGISTRY.read_text(encoding="utf-8") == original

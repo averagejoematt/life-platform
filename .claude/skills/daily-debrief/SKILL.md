@@ -52,6 +52,26 @@ role-playing six personas cannot disagree with itself about data it was handed a
 once; the critics can, and each must name the number it argued from. Do not describe a
 plan as red-teamed unless stage 2 ran on the routine you are committing.
 
+### 0b. The packet — ONE call before any other data tool (#4082)
+
+`get_coach_session_packet(target_date=<the session being coached>)` — tomorrow's date when
+authoring. It returns, in one read, what a debrief used to re-verify over 10+ calls: working
+sets per muscle (7d + 28d completed days), the last session of each type and each v0.3
+session role with every set and note, MacroFactor kcal + protein over 7 days with the
+protein-floor count, weekly walking hours (the one #4105 definition), the loss rate, the
+active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.3
+block position. Every field is `measured` / `absent` / `read_failed` and names its canonical
+source; nothing in it is a second computation.
+
+- Quote it. Re-pull a field only when it is `absent`/`read_failed` or Matthew disputes it —
+  a second tool over a different window is how one quantity reached him as two numbers
+  (#4068).
+- `read_failed` is never zero or empty: name the field and what it leaves unknown.
+- It is the planner's INPUTS. Authoring still runs `plan_next_session` stage 1 → draft →
+  stage 2 (below); the packet does not replace the constraint block.
+- Today's session logged AFTER the packet was read is not in it — re-call the packet (not
+  the individual tools) once the workout has synced.
+
 ### 1. FRESHNESS & COMPLETENESS FIRST (carries over verbatim from COACH_SESSION.md §1)
 
 Before trusting any computed number: `get_freshness_status`, and verify completeness —

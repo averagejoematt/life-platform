@@ -467,6 +467,20 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "named. Pinned by tests/test_plan_input_read_state_4072.py::TestReadinessFloorReadsWhoop::"
         "test_a_writer_shape_drift_is_read_failed_not_absent and test_an_empty_window_is_absent_not_failed.",
     ),
+    # #4082 (2026-09-23): get_coach_session_packet's `last_session_by_type` shows the newest
+    # performed session of each type — the read that joins tools_coach_packet to the hevy partition.
+    "hevy::mcp/tools_coach_packet.py::read": (
+        "2026-09-23",
+        "#4082: `_last_sessions` reads through `tools_strength._read_hevy_all_phases` (the ONE sanctioned "
+        "cross-phase Hevy read, itself a residue seam) and parses no set shape of its own: exercises go through "
+        "`training.muscle_volume.normalize_hevy_items`, the type through `routine_title.resolve_archetype`, load "
+        "through `training_streaks.is_loaded_session` — the shared readers every other consumer uses. Its own keys "
+        "are `sk` (the DATE#<day>#WORKOUT#<id> filter) plus display pass-throughs (date, title, workout_uid, "
+        "duration_sec, adherence, description), shown verbatim, None visible. VERIFIED, not assumed: a writer-side "
+        "sk change leaves rows with no per-workout marker, which raises InputShapeError and the field reports "
+        "`read_failed (InputShapeError: ...)` BY NAME — never `absent`. Pinned by "
+        "tests/test_coach_session_packet_4082.py::test_a_hevy_key_scheme_drift_is_read_failed_not_absent.",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]

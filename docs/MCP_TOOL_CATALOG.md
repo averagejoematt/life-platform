@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-23
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-24
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-23 | **Total tools:** 85
+**Version:** v8.6.0 | **Last updated:** 2026-09-24 | **Total tools:** 86
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 85 Tools — by module
+## All 86 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -32,6 +32,7 @@
 | `mcp/tools_health.py` | 3 |
 | `mcp/tools_benchmark.py` | 1 |
 | `mcp/tools_plan.py` | 1 |
+| `mcp/tools_coach_packet.py` | 1 |
 | `mcp/tools_strength.py` | 2 |
 | `mcp/tools_nutrition.py` | 2 |
 | `mcp/tools_correlation.py` | 1 |
@@ -111,6 +112,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `plan_next_session` | target_date=, routine_id=, veto_override= | The planning engine, from one place whichever client asks. STAGE 1 (no routine_id): the DETERMINISTIC constraint block — the walking-volume gap against his own proven floor (FIRST, because it is the largest lever at his current weight), recovery tier, ACWR, 28d per-muscle volume, the weight-matched reference WITH the sentences its evidence cannot support, and each owner tripwire as tripped / clear / UNKNOWN. No model runs in stage 1. STAGE 2 (pass a drafted routine_id): the RED TEAM (#3752) — four critics, each a separate model call over a DISJOINT evidence packet (muscle-defense: anchor-lift trend + protein; joints/tendons: pain flags, novelty, streak; rate-advocate: the owner's redlines and which tripwires are clear; blueprint historian: the band reference + the labelled #3717 attestation). Each returns approve / change <field> to <value> / veto with the metric and number it argued from. Changes are APPLIED to the draft and re-checked; a veto BLOCKS commit; the verdicts ride in the Hevy notes and the training coach thread. Order: plan_next_session → manage_hevy_routine draft_custom → plan_next_session(routine_id) → dry_run → commit. A draft not passed through stage 2 commits with a 'not red-teamed' warning. OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other critic's changes still apply, and the override is recorded on the routine and in the corrections ledger. Never skip stage 2 to get past a veto. |
+
+### mcp.tools_coach_packet (`mcp/tools_coach_packet.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_coach_session_packet` | target_date= | CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the last session of each type (and each v0.3 session role) with every set and every note, MacroFactor kcal + protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), the loss rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.3 block position. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the error class) — a failed read is never an empty week — and names the canonical function it came from; nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block. |
 
 ### Strength Training (`mcp/tools_strength.py`)
 

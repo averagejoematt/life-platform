@@ -25,6 +25,7 @@ from mcp.tools_coach_intelligence import (
     tool_get_coach_track_record,
     tool_get_predictions,
 )
+from mcp.tools_coach_packet import COACH_PACKET_DESCRIPTION, COACH_PACKET_INPUT, tool_get_coach_session_packet  # #4082
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
     tool_find_days,
@@ -565,6 +566,14 @@ TOOLS = {
                 },
                 "required": [],
             },
+        },
+    },
+    "get_coach_session_packet": {
+        "fn": tool_get_coach_session_packet,
+        "schema": {
+            "name": "get_coach_session_packet",
+            "description": COACH_PACKET_DESCRIPTION,
+            "inputSchema": COACH_PACKET_INPUT,
         },
     },
     "get_exercise_history": {
