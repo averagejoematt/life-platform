@@ -100,7 +100,7 @@ def discover_gate_census_count(root: Path | None = None) -> tuple[int | None, st
             sys.path.insert(0, scripts_path)
         import gate_census  # local import: scripts/ is a lazy sys.path addition, not a package
 
-        census = gate_census.build_census(root)
+        census = gate_census.build_census(root, detail=False)  # #4135: the count-only build — same gates, no risk-flag analysis
         gates = census.get("gates")
         if not gates:
             return None, "build_census() returned zero gates"
