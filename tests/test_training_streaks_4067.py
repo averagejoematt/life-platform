@@ -119,17 +119,16 @@ def _all(joints_packet):
 
 
 # ── the thresholds are his ─────────────────────────────────────────────────────────
-def test_the_rest_ask_fires_only_past_his_longest_2024_25_loaded_streak():
-    """Mutation control: lower REST_ASK_AT_STREAK to 4 — the fixture above reds first; set it
-    above the record's max and the 7th-day case here reds."""
-    assert ts.REST_ASK_AT_STREAK == ts.CALIBRATION["loaded_streak_max"]
-    for loaded in range(0, ts.UPPER_TAIL_AT_STREAK):
-        assert [f for f in _joints(30, loaded)["flags"] if "streak" in f["metric"]] == []
-    tail = [f for f in _joints(30, ts.UPPER_TAIL_AT_STREAK)["flags"] if f["metric"] == "loaded_lifting_streak"]
-    assert [f["severity"] for f in tail] == ["info"]
-    ask = [f for f in _joints(0, ts.REST_ASK_AT_STREAK)["flags"] if f["metric"] == "loaded_lifting_streak"]
-    assert [f["severity"] for f in ask] == ["change"] and "rest day" in ask[0]["reason"]
-    assert "2024-09-15..2025-05-09" in ask[0]["reason"] and ask[0]["provenance"] == "owner-history"
+def test_no_loaded_streak_length_flags_since_4161():
+    """#4161 (owner-approved red team, 2026-09-24): the rest-day ask and the upper-tail line are
+    RETIRED — a loaded-day count is not a validated fatigue signal. At every length, including one
+    past his 2024–25 record, the streak is carried in `numbers` and flags nothing. Mutation
+    control: restore a streak flag in `build_joints_packet` and the 7- and 10-day cases red."""
+    assert not hasattr(ts, "loaded_streak_flag") and not hasattr(ts, "REST_ASK_AT_STREAK")
+    for loaded in (0, 4, 5, 6, 7, 10):
+        p = _joints(30, loaded)
+        assert p["numbers"]["loaded_lifting_streak"] == loaded
+        assert [f for f in p["flags"] if "streak" in f["metric"]] == [], loaded
 
 
 def test_the_recorded_calibration_is_internally_consistent():
@@ -181,4 +180,4 @@ def test_the_evidence_gatherer_reads_load_from_the_sanctioned_hevy_path():
     ):
         out = tp._training_streaks(TARGET)
     assert out["active_day_streak"] == 16 and out["loaded_lifting_streak"] == 4
-    assert out["rest_ask_at_loaded_streak"] == ts.REST_ASK_AT_STREAK
+    assert "no rest-day ask" in out["loaded_streak_role"]  # #4161: context only

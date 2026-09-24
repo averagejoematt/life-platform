@@ -213,7 +213,16 @@ def test_the_trap_bar_gate_and_the_load_hold_rule_have_one_home_each():
     lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     assert lifting["load_rule"].startswith("hold")
     assert lifting["load_entry"]["then"] == "hold" and lifting["load_entry"]["max_pct_of_band_e1rm_until_week_8"] == 85
-    assert lifting["deload"] == {"every_nth_week": 6, "sets_pct": -30, "loads": "held"}
+    # #4161 (v3.3): one pre-planned deload at the later of week 6 or the block lock, −40 % sets for 7 days, loads held
+    dl = lifting["deload"]
+    assert (dl["at_program_week"], dl["every_nth_week"], dl["sets_pct"], dl["days"], dl["loads"], dl["week_off"]) == (
+        6,
+        6,
+        -40,
+        7,
+        "held",
+        False,
+    )
     assert any("HOLD" in n for n in program_structure.week_grid()["_notes"])
 
 

@@ -197,11 +197,13 @@ def test_v03_is_marked_superseded_and_kept_readable():
     assert program_structure.BLOCK_CALENDAR["block_1_start"] == program_structure.SESSION_SEQUENCE["block_start"]
 
 
-def test_deload_cuts_about_30_percent_of_sets_and_keeps_every_top_set_and_anchor():
+def test_deload_cuts_about_40_percent_of_sets_and_keeps_every_top_set_and_anchor():
+    """#4161 (v3.3): −40 % sets, loads held (Coleman 2024) — was −30 %."""
     for role in program_structure.SESSION_TEMPLATES:
         full = program_structure.session_prescription_for_role(role)
         dl = program_structure.session_prescription_for_role(role, deload=True)
-        assert dl["deload_trim"]["sets_after"] == full["total_sets"] - round(full["total_sets"] * 0.30)
+        assert dl["deload_trim"]["sets_after"] == full["total_sets"] - round(full["total_sets"] * 0.40)
+        assert dl["deload_trim"]["pct"] == -40 and dl["deload_trim"]["loads"] == "held"
         assert [e["pattern"] for e in dl["exposures"]] == [e["pattern"] for e in full["exposures"]]
         for e in dl["exposures"]:
             assert len(e["sets"]) >= 1
@@ -295,11 +297,12 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
 
 
 def test_generator_deload_week_holds_loads_and_cuts_sets():
-    # program week 6 opens after 20 completed sessions (4 a week); index 20 is lower-heavy again
-    ideal = _generate("2026-10-28", block_workouts=_done(20))[0]
-    assert "DELOAD" in ideal.title and ideal.title.startswith("LOWER-HEAVY — W6")
-    assert any("deload: sets 12 -> 8" in r for r in ideal.rationale)
-    assert sum(len(b.sets) for b in ideal.exercises) == 8
+    # #4161: lifting daily, hybrid week 6 opens 10-29 — before the block lock — so the deload opens on
+    # the lock date 11-04 and runs 7 days; index 44 (11-07, week 7) is lower-heavy inside it
+    ideal = _generate("2026-11-07", block_workouts=_done(44))[0]
+    assert "DELOAD" in ideal.title and ideal.title.startswith("LOWER-HEAVY — W7")
+    assert any("deload: sets 12 -> 7" in r for r in ideal.rationale)
+    assert sum(len(b.sets) for b in ideal.exercises) == 7
 
 
 def test_red_recovery_drops_accessories_not_anchors():

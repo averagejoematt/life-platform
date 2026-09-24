@@ -263,8 +263,8 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():
     """Week 9 reads the SAME discount ruling as week 1 — an age measured to the session date
     would discount the 09-20 anchor from late October and cut the load mid-ramp."""
-    # #4110/#4147: 35 completed sessions = week 9's upper-heavy (4 a week from lower-heavy), whatever the date
-    w9 = _generate("2026-11-18", weights={**WEIGHTS, "2026-11-17": 314.0}, block_workouts=_completed(35))[0].inputs_snapshot["load_floors"][
+    # #4161: hybrid weeks (4 sessions AND >= 7 days) — lifting daily, index 59 (11-22) is week 9's upper-heavy
+    w9 = _generate("2026-11-22", weights={**WEIGHTS, "2026-11-21": 314.0}, block_workouts=_completed(59))[0].inputs_snapshot["load_floors"][
         "movements"
     ]["lat_pulldown"]
     assert w9["ramp"]["week"] == 9 and w9["ramp"]["discount_pct"] == 0

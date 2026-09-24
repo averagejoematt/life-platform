@@ -180,7 +180,27 @@ def test_the_replayed_answer_commits_against_the_gate_floor_the_minus_25_run_fai
 
 # ── 2. every numeric change is code's ────────────────────────────────────────────────
 def test_a_grounded_escalation_applies_the_flags_number_never_the_models():
-    """Mutation control: in `reconcile`, take `to` from the model again -> 8 not 6 and this reds."""
+    """The flag's number, never the model's. Since #4161 the advocate's flag is governed (it adds
+    nothing), so this is held on the joints fatigue flag — a governed `change` the model cannot move.
+    Mutation control: in `reconcile`, take `to` from the model again -> 8/40/2 not 14 and this reds."""
+    from coach import critics_fatigue as cf
+
+    d = {"total_sets": 20, "exercises": []}
+    fat = cf.assess(readiness_low_streak_days=2, perf_by_idx={}, soreness_by_idx={}, same_region={"state": "clear"})
+    p = c.build_joints_packet(
+        d, pain_by_idx={}, days_since_by_idx={}, active_day_streak=5, loaded_lifting_streak=5, pain_layer_status="ok", fatigue=fat
+    )
+    for asked in (8, 40, 2):
+        m = {"verdict": "veto", "metric": "fatigue_trigger", "value": True, "field": "session.total_sets", "to": asked, "sentence": "x"}
+        v = c.reconcile(c.deterministic_verdict(p), m, p)
+        assert (v["verdict"], v["field"], v["to"]) == ("change", "session.total_sets", 14)
+
+
+def test_the_advocate_adds_nothing_whatever_the_model_asks():
+    """#4161 RULING (owner-approved 2026-09-24, Roth 2023): the advocate's "+1 set" is DROPPED. Its
+    all-clear flag is governed info — a model escalation on it is discarded — and `apply_changes`
+    refuses any total above the draft. Mutation control: restore a field/to on the flag -> a change
+    verdict appears and this reds."""
     ir = RoutineSpec(
         routine_id="r",
         target_date="2026-09-24",
@@ -189,39 +209,31 @@ def test_a_grounded_escalation_applies_the_flags_number_never_the_models():
     )
     d = c.draft_summary(ir)
     p = c.build_rate_advocate_packet(
-        d,
-        tripwires=[{"id": "a", "state": "clear"}],
-        walking=None,
-        rate_target=None,
-        current_rate_lb_wk=None,
-        lifting_sessions_7d=None,
+        d, tripwires=[{"id": "a", "state": "clear"}], walking=None, rate_target=None, current_rate_lb_wk=None, lifting_sessions_7d=None
     )
-    for asked in (8, 40, 6, 1):
+    f = next(f for f in p["flags"] if f["metric"] == "tripwires_clear")
+    assert f["severity"] == "info" and f["governed"] is True and f["field"] is None and f["to"] is None
+    for asked in (8, 40, 6):
         m = {"verdict": "change", "metric": "tripwires_clear", "value": 1, "field": "session.total_sets", "to": asked, "sentence": "More."}
         v = c.reconcile(c.deterministic_verdict(p), m, p)
-        assert (v["verdict"], v["field"], v["to"]) == ("change", "session.total_sets", 5 + c.ADVOCATE_ADD_SETS)
+        assert v["verdict"] == "approve" and "governs" in (v["discarded"] or "")
+    [rec] = c.apply_changes(ir, [{"critic": "rate_advocate", "verdict": "change", "field": "session.total_sets", "to": 6}])
+    assert rec["applied"] is False and "no critic adds sets" in rec["why"] and c.MAX_ADDED_SETS == 0
+    assert sum(len(e.sets) for e in ir.exercises) == 5 and c.ADVOCATE_RULING["adds_sets"] == 0
 
 
-def test_the_loaded_streak_escalation_is_the_owners_signed_deload():
-    """Live, one upper-tail streak signal drew 18, 14 and 2 total sets from the model. The number
-    is now the owner's `deload.sets_pct` off the draft (loads held)."""
-    from training import owner_redlines
+def test_a_long_loaded_streak_with_no_performance_drop_does_not_trigger():
+    """#4161: the loaded-streak escalation is RETIRED. A 6-day lifting streak with readiness clear and
+    no same-role performance drop flags nothing; the streak is context in `numbers`."""
+    from coach import critics_fatigue as cf
 
-    pct = owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"]["sets_pct"]
     d = {"total_sets": 20, "exercises": []}
-    p = c.build_joints_packet(d, pain_by_idx={}, days_since_by_idx={}, active_day_streak=5, loaded_lifting_streak=5, pain_layer_status="ok")
-    f = next(f for f in p["flags"] if f["metric"] == "loaded_lifting_streak")
-    assert f["severity"] == "info" and f["field"] == "session.total_sets" and f["to"] == round(20 * (1 + pct / 100))
-    for asked in (18, 14, 2):
-        m = {
-            "verdict": "change",
-            "metric": "loaded_lifting_streak",
-            "value": 5,
-            "field": "session.total_sets",
-            "to": asked,
-            "sentence": "x",
-        }
-        assert c.reconcile(c.deterministic_verdict(p), m, p)["to"] == f["to"]
+    fat = cf.assess(readiness_low_streak_days=0, perf_by_idx={0: {"state": "clear"}}, soreness_by_idx={}, same_region={"state": "clear"})
+    p = c.build_joints_packet(
+        d, pain_by_idx={}, days_since_by_idx={}, active_day_streak=6, loaded_lifting_streak=6, pain_layer_status="ok", fatigue=fat
+    )
+    assert p["numbers"]["loaded_lifting_streak"] == 6 and p["numbers"]["fatigue_trigger"] is False
+    assert c.deterministic_verdict(p)["verdict"] == "approve" and not [f for f in p["flags"] if f["severity"] == "change"]
 
 
 def test_every_critic_prompt_is_pinned_at_temperature_zero():
@@ -295,15 +307,16 @@ def test_a_partial_cut_is_clamped_to_each_sets_own_floor_and_named():
     assert ra.audit_prescription(ir.exercises, floors={"squat_barbell": SQUAT_FLOOR}, scheme=BACK_OFF_SCHEME)["ok"] is True
 
 
-def test_an_added_set_past_the_back_off_window_is_raised_to_the_top_floor():
-    """The advocate clones the last set; a third back-off sits past the scheme's window, so the
-    gate holds it to the TOP floor (#4065). The clamp must agree or the draft is uncommittable."""
+def test_an_added_set_is_refused_so_no_back_off_window_can_be_overrun():
+    """#4149 held an advocate-cloned 4th set to the TOP floor (#4065). Since #4161 no critic adds
+    sets, so the case cannot arise: the addition is refused by name and the draft is unchanged."""
     ir = _squat_ir()
+    before = [s.weight_kg for s in ir.exercises[0].sets]
     [rec] = c.apply_changes(
         ir, [{"critic": "rate_advocate", "verdict": "change", "field": "session.total_sets", "to": 4}], set_floors=_gate_floors
     )
-    assert rec["applied"] is True and "set 4 43.0kg < floor 48.0kg" in rec["conflict"]
-    assert [s.weight_kg for s in ir.exercises[0].sets] == [48.0, 43.0, 43.0, 48.0]
+    assert rec["applied"] is False and "no critic adds sets" in rec["why"]
+    assert [s.weight_kg for s in ir.exercises[0].sets] == before
     assert ra.audit_prescription(ir.exercises, floors={"squat_barbell": SQUAT_FLOOR}, scheme=BACK_OFF_SCHEME)["ok"] is True
 
 

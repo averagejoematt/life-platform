@@ -484,6 +484,20 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     # #4110 (2026-09-24): the three stage-1 Hevy window readers moved VERBATIM out of
     # mcp/tools_plan.py (module-size ceiling) into mcp/plan_hevy_windows.py, and one of them
     # (`_block_workouts`) is new: the v0.3 session sequence's record since the block start.
+    "hevy::mcp/plan_draft_evidence.py::read": (
+        "2026-09-24",
+        "#4161: code MOVED from mcp/tools_plan.py under the #1665 size ratchet, not a new reader. plan_draft_evidence does "
+        "NOT parse the hevy wire shape: `_training_streaks` reads through `tools_strength._read_hevy_all_phases` (the ONE "
+        "sanctioned cross-phase Hevy read) and `strength_helpers.normalize_hevy_items`, then hands the rows to "
+        "`training_streaks.streaks`, whose only field reads are `date`/`sk` and — through `is_loaded_session`, the one "
+        "loaded-session definition (#4105) — `exercises[].name` and `exercises[].sets[].{type|set_type, "
+        "weight_kg|weight_lbs}`; `_workout_dates` takes dates from `get_workouts`; the per-lift history comes from "
+        "`get_exercise_history`'s own session rows. VERIFIED, not assumed: a writer-side rename of the set weight makes "
+        "every session unloaded, so `loaded_lifting_streak` reads 0 — and since #4161 the loaded streak is CONTEXT ONLY "
+        "(it flags nothing; the fatigue trigger is performance or readiness), so a drift cannot manufacture or suppress a "
+        "cut. Pinned by tests/test_training_streaks_4067.py::test_no_loaded_streak_length_flags_since_4161 and "
+        "::test_the_evidence_gatherer_reads_load_from_the_sanctioned_hevy_path.",
+    ),
     "hevy::mcp/plan_hevy_windows.py::read": (
         "2026-09-24",
         "#4110: plan_hevy_windows does NOT parse the hevy wire shape — each reader turns a date into rows and hands "

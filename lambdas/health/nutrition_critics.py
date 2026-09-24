@@ -132,6 +132,12 @@ def _logged(values: list[Any] | None) -> list[float]:
     return [x for x in (_num(v) for v in (values or [])) if x is not None]
 
 
+def _protein7_counts(inputs: dict[str, Any]) -> tuple[int | None, int]:
+    """(missed, measured) over the trailing 7 days of `protein_g_by_day` — THE count (`owner_redlines.protein_days_missed`)."""
+    s = _series(inputs, "protein_g_by_day")
+    return owner_redlines.protein_days_missed([_num(v) for v in s[-7:]] if s is not None else None)
+
+
 def _mean(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 0) if values else None
 
@@ -186,7 +192,9 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     energy = _redline("energy_floor_kcal")
     overshoot_t = _tripwire("rate_overshoot")
     weight = _num(inputs.get("weight_lb"))
-    target = owner_redlines.rate_target_lb_per_wk(weight)
+    # v3.3 ruling "B" (#4161): the target this critic argues against is the SERVED one — gated by protein adherence
+    p_missed, p_measured = _protein7_counts(inputs)
+    target = owner_redlines.rate_target_lb_per_wk(weight, protein_missed_7d=p_missed, protein_measured_7d=p_measured)
     loss = _loss_rate(inputs)
     intake14 = _logged(_series(inputs, "intake_kcal_by_day"))
     mean14 = _mean(intake14)
@@ -201,6 +209,8 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             "weighin_span_days": inputs.get("weighin_span_days"),
             "rate_provisional": inputs.get("rate_provisional"),
             "rate_target_lb_wk": (target or {}).get("target_lb_wk"),
+            "rate_step_target_lb_wk": (target or {}).get("step_target_lb_wk"),
+            "rate_protein_gate": ((target or {}).get("protein_gate") or {}).get("state"),
             "rate_cap_lb_wk": (target or {}).get("cap_lb_wk"),
             "rate_band_low_lb_wk": (target or {}).get("low_lb_wk"),
             "rate_band_high_lb_wk": (target or {}).get("high_lb_wk"),
@@ -228,13 +238,19 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     sched_prov = f"{sched['provenance']} ({sched['derived_by']})"
     if target is not None and loss is not None:
         tgt, cap = target["target_lb_wk"], target["cap_lb_wk"]
+        gate = target.get("protein_gate") or {}
+        sched_word = (
+            f"PROTEIN-GATED (the lower band — {gate.get('missed_7d')} of {gate.get('measured_7d')} measured days under the floor, ruling B)"
+            if gate.get("applied")
+            else "scheduled"
+        )
         n_str = f"n={inputs.get('weighin_count')} weigh-ins over {inputs.get('weighin_span_days')} d"
         if inputs.get("rate_provisional"):
             flags.append(
                 _flag(
                     "loss_rate_14d_lb_wk",
                     "info",
-                    f"trend {loss} lb/wk is PROVISIONAL ({n_str}) — no change is argued from it; the schedule's target at {weight:.0f} lb is {tgt} lb/wk",
+                    f"trend {loss} lb/wk is PROVISIONAL ({n_str}) — no change is argued from it; the {sched_word} target at {weight:.0f} lb is {tgt} lb/wk",
                     provenance=sched_prov,
                 )
             )
@@ -244,7 +260,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
                     _flag(
                         "loss_rate_14d_lb_wk",
                         "change",
-                        f"losing {loss} lb/wk against the scheduled {tgt} lb/wk at {weight:.0f} lb ({n_str}), and mean intake {mean14:.0f} kcal "
+                        f"losing {loss} lb/wk against the {sched_word} {tgt} lb/wk at {weight:.0f} lb ({n_str}), and mean intake {mean14:.0f} kcal "
                         f"is ABOVE the prescribed {lo}-{hi} band — bring intake to the band's top ({hi}), not below it",
                         provenance=sched_prov,
                         field="intake_kcal_per_day",
@@ -256,7 +272,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
                     _flag(
                         "loss_rate_14d_lb_wk",
                         "change",
-                        f"losing {loss} lb/wk against the scheduled {tgt} lb/wk at {weight:.0f} lb ({n_str}) with mean intake "
+                        f"losing {loss} lb/wk against the {sched_word} {tgt} lb/wk at {weight:.0f} lb ({n_str}) with mean intake "
                         f"{'unknown' if mean14 is None else f'{mean14:.0f} kcal'} inside or below the prescribed {lo}-{hi} band — "
                         "an ADHERENCE AUDIT (gram-scale logging week), never 'eat less': the redline is eat MORE, not less",
                         provenance=sched_prov,
@@ -439,7 +455,7 @@ def build_muscle_defense_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             n["protein_target_days_7d"] = None
             unknown += ["protein_days_missed_7d", "protein_target_days_7d"]
         else:
-            missed = sum(1 for g in grams if g < protein["value"])
+            missed = owner_redlines.protein_days_missed(grams)[0] or 0  # #4161: THE count, shared with the rate gate
             at_target = sum(1 for g in grams if g >= protein["target_g"])
             n["protein_days_missed_7d"] = missed
             n["protein_target_days_7d"] = at_target

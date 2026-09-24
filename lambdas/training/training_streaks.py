@@ -33,11 +33,12 @@ as the predicate:
   gaps between streaks median 1 rest day
   active-day streaks   (the #4067 filing, same window) longest 84, median 18, 97 % of days active
 
-So: a session that would be the 7th consecutive loaded day is outside anything he did in the
-campaign that worked → the rest-day ask (`REST_ASK_AT_STREAK` = 6 prior days). A session that
-would be day 6 is inside his record but in its upper tail (6 of 59 streaks reached it) → an
-info line (`UPPER_TAIL_AT_STREAK` = 5 prior days). Day 5 and below carries no flag at all —
-and no flag means the model has no handle to escalate a rest-day ask from (`critics.reconcile`).
+#4067 turned that record into a rest-day ask (a 7th consecutive loaded day) and an upper-tail info
+line (a 6th). #4161 RETIRED both (the 2026-09-24 evidence red team, owner-approved): a loaded-day
+count is not a validated fatigue signal (Kataoka 2022 Sports Med 52(1):25; Yang 2018 Front Physiol
+9:725), so the joints critic now triggers on performance or readiness (`coach.critics_fatigue`). The
+streaks are still MEASURED here and carried as context; the calibration below is kept as the record
+of his 2024–25 rhythm, not as a threshold anything acts on.
 """
 
 from __future__ import annotations
@@ -49,8 +50,6 @@ from common.pacific_time import parse_day_key, shift_day_key
 from training import walking_volume
 
 # ── calibration (see module docstring for the measurement) ───────────────────────────
-REST_ASK_AT_STREAK = 6
-UPPER_TAIL_AT_STREAK = 5
 CALIBRATION: dict[str, Any] = {
     "window": "2024-09-15..2025-05-09",
     "source": "USER#matthew#SOURCE#hevy per-workout rows, legacy daily aggregates excluded",
@@ -140,24 +139,3 @@ def streaks(
         "active_is_floor": _floor(active) or strava_items is None,
         "loaded_is_floor": _floor(loaded),
     }
-
-
-def loaded_streak_flag(loaded: int | None) -> tuple[str, str] | None:
-    """(severity, reason) for the joints critic's `loaded_lifting_streak` flag, or None for no
-    flag. `change` = the rest-day ask (the next session would outrun his whole record); `info`
-    = the record's upper tail. Nothing below `UPPER_TAIL_AT_STREAK`, and nothing for None."""
-    cal = CALIBRATION
-    if loaded is None or loaded < UPPER_TAIL_AT_STREAK:
-        return None
-    if loaded >= REST_ASK_AT_STREAK:
-        return (
-            "change",
-            f"rest day: this would be loaded day {loaded + 1} in a row — longer than any of his "
-            f"{cal['loaded_streaks_n']} loaded streaks in {cal['window']} (max {cal['loaded_streak_max']})",
-        )
-    return (
-        "info",
-        f"loaded day {loaded + 1} in a row — inside his {cal['window']} record but its upper tail "
-        f"({cal['loaded_streak_lengths'][cal['loaded_streak_max']]} of {cal['loaded_streaks_n']} streaks reached "
-        f"{cal['loaded_streak_max']}; median {cal['loaded_streak_median']})",
-    )

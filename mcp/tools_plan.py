@@ -50,29 +50,19 @@ from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
 
 from mcp.core import LAYER_UNKNOWN
-from mcp.plan_helpers import _catalog_and_ceiling, _days_between, _minus_days, _resolver, _union_evidence_rows  # noqa: F401 (#4149)
+from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
+from mcp.plan_helpers import _catalog_and_ceiling, _days_between, _minus_days, _resolver, _safe, _union_evidence_rows  # noqa: F401 (#4149)
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
 
 logger = logging.getLogger("tools_plan")
 
-ANCHOR_HISTORY_LOOKBACK_DAYS = 180
-PAIN_LOOKBACK_DAYS = 28
 STREAK_LOOKBACK_DAYS = 14
-BLOCK_LOOKBACK_DAYS = 56  # 8 weeks, enough to count the trailing consistent block (>=2 lifts/wk)
 # #4051: the stage-1 pain-evidence set is the movements PERFORMED in the trailing
 # PAIN_LOOKBACK_DAYS — the same window the note layer is read over, deliberately ONE number.
 # The cap is a latency bound, not a semantic one: 27 distinct templates is a live 28-day
 # week-and-a-half, so a set that exceeds this is an anomaly and the scope says it truncated
 # rather than silently dropping the tail.
 PERFORMED_MOVEMENT_CAP = 80
-
-
-def _safe(fn, *a, **kw):
-    """Call a tool defensively — a reader that fails yields None, never a default."""
-    try:
-        return fn(*a, **kw)
-    except Exception:  # noqa: BLE001
-        return None
 
 
 # A tool's `{"error": ...}` that means "the window is empty", not "the read broke" (#4072).
@@ -394,7 +384,6 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
 
     from mcp.tools_nutrition import tool_get_nutrition
 
-    floor_g = owner_redlines.REDLINES["protein_floor_g"]["value"]
     res = tool_get_nutrition({"view": "summary", "start_date": _minus_days(end_date, 6), "end_date": end_date}) or {}
     if isinstance(res, dict) and res.get("error"):
         if _NO_DATA_ERROR.search(str(res.get("error"))):
@@ -406,10 +395,10 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
     if res and "daily_breakdown" not in res and "daily_rows" not in res:
         # #4072: a non-empty return with neither key is a shape change, not an empty week.
         raise InputShapeError(f"get_nutrition summary carried neither daily_breakdown nor daily_rows (keys: {sorted(res)[:12]})")
-    rows = [r for r in (res.get("daily_breakdown") or res.get("daily_rows") or []) if r.get("protein_g") is not None]
-    if not rows:
-        return None, None
-    return sum(1 for r in rows if float(r["protein_g"]) < floor_g), len(rows)
+    missed, measured = owner_redlines.protein_days_missed(
+        [r.get("protein_g") for r in (res.get("daily_breakdown") or res.get("daily_rows") or [])]
+    )
+    return (missed, measured) if measured else (None, None)  # #4161: THE count, shared with the nutrition critics
 
 
 def tool_plan_next_session(args):
@@ -635,6 +624,7 @@ def tool_plan_next_session(args):
     if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
         status["block_workouts"] = st(ABSENT, "no Hevy session since the program's block start")
 
+    attach_fatigue_inputs(evidence, readiness_low_streak_days=readiness_streak, block_workouts=block_workouts, target_date=target_date)
     block = plan_engine.constraint_block(
         date=target_date,
         catalog_movements=catalog_movements,
@@ -656,6 +646,7 @@ def tool_plan_next_session(args):
         days_since_movement={r["label"]: r["days_since"] for r in rows if r.get("days_since") is not None},
         reference=reference if isinstance(reference, dict) else None,
         protein_days_missed_7d=protein_missed,
+        protein_days_measured_7d=protein_measured,  # #4161 ruling "B": the rate target's protein gate
         readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],
@@ -751,211 +742,19 @@ def _nutrition_critics_block() -> dict[str, Any]:
     return block
 
 
-# ── stage 2 evidence: the SAME readers a chat turn would call, gathered per draft lift ──
-def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict[str, Any]:
-    """Per-draft-exercise evidence for the critics: anchor-lift trend, pain flags, days since.
-    Plus the two streaks (#4067) and the lifting-session count from the performed record."""
-    from mcp.tools_strength import tool_get_exercise_history
-    from mcp.tools_training_notes import tool_get_exercise_notes
-
-    resolver = _safe(_resolver)
-    anchor_ids = _safe(_core_anchor_identities) or {}
-    exercises: list[dict[str, Any]] = []
-    for idx, ex in enumerate(getattr(ir, "exercises", None) or []):
-        key = getattr(ex, "movement_key", "") or ""
-        label = (getattr(ex, "rationale_tag", "") or "") if (getattr(ex, "rationale_tag", "") or "") != "custom" else key
-        tid = _safe(resolver, key) if resolver else None
-        row: dict[str, Any] = {"idx": idx, "label": label or key, "template_id": tid}
-        hist = (
-            _safe(
-                tool_get_exercise_history,
-                {"template_id": tid, "start_date": _minus_days(target_date, ANCHOR_HISTORY_LOOKBACK_DAYS), "end_date": target_date},
-            )
-            if tid
-            else None
-        )
-        sessions = (hist or {}).get("sessions") or []
-        # #4069: the trend is computed over ONE template identity (see `_anchor_trend`), and the
-        # row says which core anchor family — if any — the drafted lift belongs to.
-        row.update(_anchor_trend(sessions, target_date))
-        family = _core_anchor_family(key, row.get("identity") or tid, anchor_ids)
-        if family:
-            row["anchor_family"] = family
-        pain = _safe(tool_get_exercise_notes, {"template_id": tid, "lookback_days": PAIN_LOOKBACK_DAYS}) if tid else None
-        if pain and "error" not in pain:
-            row["pain_flag_any"] = pain.get("pain_flag_any")
-            row["pain_dates"] = pain.get("pain_dates") or []
-            row["pain_layer_status"] = pain.get("layer_status")
-        exercises.append(row)
-
-    dates = _safe(_workout_dates, _minus_days(target_date, BLOCK_LOOKBACK_DAYS), target_date)
-    streaks = _safe(_training_streaks, target_date) or {"active_day_streak": None, "loaded_lifting_streak": None}
-    week_start = _minus_days(target_date, 7)
-    lifting_7d = len({d for d in dates if week_start <= d < target_date}) if dates is not None else None
-    weeks_in_block = _weeks_in_block(dates, target_date) if dates is not None else None
-    # the per-movement reads each carry the derived layer's own status; a dark read on ANY
-    # drafted movement makes the whole pain input unknown (never clear by omission, #3768)
-    statuses = [e.get("pain_layer_status") for e in exercises if e.get("pain_layer_status")]
-    if statuses and all(s not in ("dark", "unknown") for s in statuses):
-        layer_status = statuses[0]
-    elif statuses:
-        layer_status = next(s for s in statuses if s in ("dark", "unknown"))
-    return {
-        "exercises": exercises,
-        # #4067: two streaks. `loaded_lifting_streak` is the one the rest-day ask keys on.
-        "active_day_streak": streaks.get("active_day_streak"),
-        "loaded_lifting_streak": streaks.get("loaded_lifting_streak"),
-        "streaks": streaks,
-        "lifting_sessions_7d": lifting_7d,
-        "weeks_in_block": weeks_in_block,
-        "pain_layer_status": layer_status,
-    }
-
-
-def _training_streaks(target_date: str) -> dict[str, Any]:
-    """{active_day_streak, loaded_lifting_streak, …} before `target_date` (#4067).
-
-    Hevy through `tools_strength._read_hevy_all_phases` — the ONE sanctioned Hevy read path
-    (cross-phase by the taxonomy, tombstoned legacy aggregates out) — because the LOAD is in
-    the sets, which `get_workouts`' slim projection drops. Strava only widens the ACTIVE
-    streak. A Hevy read that raises propagates (the caller's `_safe` makes both streaks
-    unknown); a Strava read that raises leaves the active streak a declared floor."""
-    from training import training_streaks
-
-    from mcp.core import query_source_range
-    from mcp.strength_helpers import normalize_hevy_items
-    from mcp.tools_strength import _read_hevy_all_phases
-
-    start = _minus_days(target_date, BLOCK_LOOKBACK_DAYS)
-    end = _minus_days(target_date, 1)
-    items, _phases = _read_hevy_all_phases(start, end)
-    hevy = normalize_hevy_items(items)
-    strava = _safe(query_source_range, "strava", start, end)
-    out = training_streaks.streaks(hevy, strava, target_date, window_start=start)
-    out["window"] = {"start": start, "end": end}
-    out["rest_ask_at_loaded_streak"] = training_streaks.REST_ASK_AT_STREAK
-    return out
-
-
-def _weeks_in_block(dates: list[str], target_date: str, min_per_week: int = 2, max_weeks: int = 8) -> int:
-    """Trailing consecutive 7-day windows (ending the day before target) with >= min_per_week lifts."""
-    weeks = 0
-    for w in range(max_weeks):
-        end = _minus_days(target_date, 7 * w)  # exclusive
-        start = _minus_days(target_date, 7 * (w + 1))
-        if len({d for d in dates if start <= d < end}) >= min_per_week:
-            weeks += 1
-        else:
-            break
-    return weeks
-
-
-def _workout_dates(start: str, end: str) -> list[str]:
-    """Performed lifting days, read through `get_workouts` — the SAME tool a chat turn calls.
-
-    Deliberately not a direct partition read: a new reader of a partition another module
-    writes is a new must-agree seam (#2847), and this module needs only the dates the
-    existing tool already normalises."""
-    from mcp.tools_hevy import tool_get_workouts
-
-    res = tool_get_workouts({"start_date": start, "end_date": end, "source": "hevy", "limit": 500}) or {}
-    return sorted({(w.get("date") or "")[:10] for w in res.get("workouts") or [] if w.get("date")})
-
-
-def _loss_rate_of(reference: dict[str, Any] | None) -> tuple[float | None, bool | None]:
-    """(rate lb/wk, provisional) from the reference's `loss_rate` block (#4068). A reference
-    without the block (inapplicable, or an older payload) yields its bare rate, provisional
-    unknown."""
-    block = (reference or {}).get("loss_rate")
-    if isinstance(block, dict):
-        return block.get("rate_lb_wk"), block.get("provisional")
-    return (reference or {}).get("current_rate_lb_wk"), None
-
-
-def _anchor_trend(sessions: list[dict[str, Any]], target_date: str) -> dict[str, Any]:
-    """The anchor-lift trend over ONE template identity — pure, the tripwire's only input (#4069, #4098).
-
-    `sessions` comes from `get_exercise_history(template_id=…)`, which already selects one
-    identity (a raw Hevy template id through the #3929 alias registry). This re-asserts it
-    rather than trusting it: the series is cut to the identity of the LATEST session, so a
-    history that ever mixed variants (the substring merge that put barbell bench and incline
-    DB bench into one '-120 lb' series) compares a lift only with itself. Sessions of any
-    other identity are counted in `excluded_other_identity_sessions`, never dropped silently.
-    A variant switch therefore starts a NEW series — it can never read as a strength drop.
-
-    #4098: the comparison is the redline's v3 definition — a rolling e1RM median, computed by
-    `plan_engine.anchor_e1rm_trend` over each session's `best_1rm` — never the top weight with
-    its reps thrown away (75 × 5 against 45 × 8 is ~87 vs ~57 lb e1RM, not "75 vs 45").
-    `last_top_lbs` stays on the row for the critic's hold-to load; it is not the comparison.
-    """
-    from training import plan_engine
-
-    if not sessions:
-        return {}
-
-    def _ident(s: dict[str, Any]) -> str:
-        return str(s.get("identity") or s.get("template_id") or "").upper()
-
-    ident = _ident(sessions[-1])
-    series = [s for s in sessions if _ident(s) == ident]
-    out: dict[str, Any] = {"identity": ident or None}
-    if len(series) != len(sessions):
-        out["excluded_other_identity_sessions"] = len(sessions) - len(series)
-    last = series[-1]
-    out["days_since"] = _days_between(last.get("date"), target_date)
-    out["last_top_lbs"] = last.get("best_weight")
-    out["n_sessions"] = len(series)
-    out.update(plan_engine.anchor_e1rm_trend([s.get("best_1rm") for s in series]))
-    return out
-
-
-def _core_anchor_identities() -> dict[str, str]:
-    """template identity -> core anchor family, for the four the tripwire reads (#4069).
-
-    Built from `program_structure.ANCHORS[family]["catalog_keys"]` for `CORE_ANCHORS`, each
-    key resolved READ-ONLY (`peek_template_id` — never the write-capable resolver) and mapped
-    through the alias registry. A key with no known template id is simply absent; the drafted
-    row can still be recognised by its catalog movement_key (`_core_anchor_family`).
-    """
-    from training import program_structure
-    from training.hevy_template_cache import peek_template_id
-
-    from mcp.strength_helpers import exercise_identity
-    from mcp.tools_strength import template_alias_map
-
-    alias_map, _status = template_alias_map()
-    out: dict[str, str] = {}
-    for family in program_structure.CORE_ANCHORS:
-        for key in program_structure.ANCHORS[family]["catalog_keys"]:
-            tid = _safe(peek_template_id, key)
-            if tid:
-                out.setdefault(exercise_identity(tid, "", alias_map), family)
-                out.setdefault(str(tid).strip().upper(), family)
-    return out
-
-
-def _core_anchor_family(movement_key: str, identity: str | None, anchor_ids: dict[str, str]) -> str | None:
-    """Which of the four core anchors a drafted lift is, by catalog key or template identity — never by name."""
-    from training import program_structure
-
-    for family in program_structure.CORE_ANCHORS:
-        if movement_key and movement_key in program_structure.ANCHORS[family]["catalog_keys"]:
-            return family
-    return anchor_ids.get(str(identity or "").upper()) if identity else None
-
-
-def _worst_anchor(evidence: dict[str, Any]) -> tuple[float | None, int | None]:
-    """The engine's `anchor_lift_strength_drop` input: the worst drop among CORE-anchor rows only.
-
-    #4069: the redline's signal names "the four core anchors (bench, row, squat, hinge)"; this
-    used to take the max over EVERY drafted exercise, which is how a shoulder-press series (not a
-    core anchor) reached the tripwire. Non-anchor rows keep their trend for the per-exercise critic.
-    """
-    rows = [e for e in evidence.get("exercises", []) if e.get("drop_pct") is not None and e.get("anchor_family")]
-    if not rows:
-        return None, None
-    w = max(rows, key=lambda e: e["drop_pct"])
-    return w["drop_pct"], w.get("sessions_below")
+# ── stage 2 evidence — extracted to `mcp.plan_draft_evidence` (#4161, the #1665 size ratchet); re-exported ──
+from mcp.plan_draft_evidence import (  # noqa: E402,F401
+    _anchor_trend,
+    _core_anchor_family,
+    _core_anchor_identities,
+    _gather_draft_evidence,
+    _loss_rate_of,
+    _training_streaks,
+    _weeks_in_block,
+    _workout_dates,
+    _worst_anchor,
+    attach_fatigue_inputs,
+)
 
 
 # ── stage 2: the red team ────────────────────────────────────────────────────────────
@@ -995,6 +794,8 @@ def _run_stage_2(
                 loaded_lifting_streak=evidence.get("loaded_lifting_streak"),
                 pain_layer_status=evidence.get("pain_layer_status"),
                 dismissals=dismissals,  # #4036 — the owner's own override of a flag instance
+                stale_by_idx={i: e["stale"] for i, e in by_idx.items() if e.get("stale")},  # #4161: the cap scales with the gap
+                fatigue=evidence.get("fatigue"),  # #4161: performance / readiness, not a loaded-day count
             ),
             "rate_advocate": critics.build_rate_advocate_packet(
                 draft,

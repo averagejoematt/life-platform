@@ -285,8 +285,8 @@ def test_last_session_by_role_comes_from_the_session_sequence(stub_readers, monk
     rows = _block_rows()
     monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: (rows, ["experiment"]))
     value = pkt._last_sessions("2026-09-27")
-    done = session_sequence.completed_sessions(rows, "2026-09-28")
-    expect = {session_sequence.position(c["sequence_index"])["session_role"]: c["workout_id"] for c in done}
+    done = session_sequence.completed_positions(rows, "2026-09-28")  # #4161: the ledger, one definition
+    expect = {c["session_role"]: c["workout_id"] for c in done}
     assert {r: row["workout_uid"].split(":")[1] for r, row in value["by_session_role"].items()} == expect
     assert value["by_session_role"]["lower_heavy"]["workout_uid"] == "hevy:u1"  # first_role
     assert value["by_session_role"]["upper_volume"]["workout_uid"] == "hevy:u2"  # the walk did not advance it

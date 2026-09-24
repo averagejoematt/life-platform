@@ -55,7 +55,7 @@ from typing import Any
 ACTIVE = True
 """True since 2026-09-21: the owner reviewed and approved v0.3 (#3753, gate:owner satisfied)."""
 
-REDLINES_VERSION = "3.2"
+REDLINES_VERSION = "3.3"
 """v3 (2026-09-22 UTC / approved 2026-09-21 PT): six independent personas — transformation coach,
 obesity-medicine physician, performance nutritionist, S&C coach, lived experience, and a blueprint
 historian arguing only from his own 2024–25 data — ran blind on one evidence packet compiled from
@@ -74,7 +74,15 @@ v3.2 (2026-09-24, #4147): the owner switched the program to v0.4 Upper/Lower, or
 and `sets_per_muscle_wk` [6, 10] -> [8, 12] (~10), which moves the `volume_ceiling` tripwire's
 top with it — and the rep scheme gains v0.4's volume exposure (8–12). Every other v3/v3.1
 redline is kept unchanged: protein, energy floor, walking floor, rate schedule, tripwires,
-subtract-only authoring, band-matched anchoring, novel-again, the 10 % detraining discount."""
+subtract-only authoring, band-matched anchoring, novel-again, the 10 % detraining discount.
+
+v3.3 (2026-09-24, #4161): two owner rulings the same day. (a) The 2026-09-24 evidence red team's
+training recommendations were approved: the deload moves from every 6th session-counted week at
+−30 % to ONE pre-planned deload at the later of program week 6 (hybrid weeks) or the v0.4 block
+lock, −40 % sets for 7 days, loads held (`lifting_sessions_per_wk.deload`). (b) Ruling "B": the
+loss-rate target is CONDITIONAL ON PROTEIN ADHERENCE (`rate_protein_gate`) — the 180 g floor stays
+(~2.33 g/kg of DXA lean mass, inside Helms 2014's 2.3–3.1 g/kg range); the risk is adherence, not
+the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
@@ -278,6 +286,18 @@ REDLINES: dict[str, dict[str, Any]] = {
             "gained lean; Pasiakos 2013, no benefit past 2× RDA). Measured now: 107–146 g mean, floor met on 2 of 20 logged days."
         ),
     },
+    # v3.3 ruling "B" (owner, 2026-09-24, #4161): the served rate target is conditional on protein adherence.
+    "rate_protein_gate": {
+        "missed_days_threshold": 3,
+        "window_days": 7,
+        "min_measured_days": 4,
+        "gated_target": "rate_band_pct_bw_per_wk.low x bodyweight (the envelope's LOWER band — a schedule step carries no lower value)",
+        "unmeasured_day": "UNKNOWN, not missed — only a MacroFactor-logged day can miss the floor",
+        "provenance": "owner",
+        "stated": "2026-09-24",
+        "evidence": "Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; 180 g = 2.33 g/kg of 77.4 kg DXA lean)",
+        "note": "missed >= 3 of the trailing 7 MEASURED days -> the lower band; < 3 -> the step target returns; < 4 measured days -> unknown, target unchanged",
+    },
     "fat_floor_g": {
         "value": 65,
         "per_meal_g": 10,
@@ -365,7 +385,21 @@ REDLINES: dict[str, dict[str, Any]] = {
         },
         "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
-        "deload": {"every_nth_week": 6, "sets_pct": -30, "loads": "held"},
+        # v3.3 (#4161, the 2026-09-24 red team, owner-approved): was {"every_nth_week": 6, "sets_pct": -30} — every 6th
+        # session-counted week. Now ONE pre-planned deload at the LATER of program week 6 or the v0.4 block lock
+        # (`program_structure.BLOCK_LOCK['locked_until']`, the one home of that date), then every 6th week after it.
+        "deload": {
+            "at_program_week": 6,
+            "not_before": "program_structure.BLOCK_LOCK['locked_until']",
+            "every_nth_week": 6,
+            "sets_pct": -40,
+            "days": 7,
+            "loads": "held",
+            "week_off": False,
+            "provenance": "owner",
+            "stated": "2026-09-24",
+            "evidence": "Coleman 2024 PeerJ 12:e16777 (a one-week deload mid-block: strength and hypertrophy not improved over continuous training, not lost)",
+        },
         "minimum_viable_session": "anchors only, top set + one back-off, ~25 min",
         "success": "the same load, the same reps, week after week, while the bodyweight under it falls — relative strength up ~35 % over the campaign is the win",
         "provenance": "population-derived",
@@ -972,32 +1006,7 @@ def summary() -> dict[str, Any]:
     }
 
 
-def rate_schedule_step(weight_lb: float) -> dict[str, Any]:
-    """The scheduled step for a bodyweight — the first step whose `above_lb` the weight exceeds."""
-    for step in REDLINES["rate_schedule_lb_wk"]["steps"]:
-        if weight_lb > step["above_lb"]:
-            return step
-    return REDLINES["rate_schedule_lb_wk"]["steps"][-1]
-
-
-def rate_target_lb_per_wk(weight_lb: float | None) -> dict[str, Any] | None:
-    """The rate at a given bodyweight: the %BW envelope in pounds AND the scheduled absolute target."""
-    if not weight_lb:
-        return None
-    band = REDLINES["rate_band_pct_bw_per_wk"]
-    step = rate_schedule_step(weight_lb)
-    return {
-        "low_lb_wk": round(weight_lb * band["low"] / 100, 1),
-        "high_lb_wk": round(weight_lb * band["high"] / 100, 1),
-        "target_lb_wk": step["target"],
-        "cap_lb_wk": step["cap"],
-        "dxa_gate": step.get("dxa_gate"),
-        "target_pct_bw_wk": round(step["target"] / weight_lb * 100, 2) if weight_lb else None,
-        "schedule_step_above_lb": step["above_lb"],
-        "landing_phase": weight_lb <= REDLINES["landing"]["deceleration_begins_lb"],
-        "provenance": band["provenance"],
-        "schedule_provenance": REDLINES["rate_schedule_lb_wk"]["provenance"],
-        "stated": band["stated"],
-        "owner_to_resolve": band.get("owner_to_resolve"),
-        "resolution": band.get("resolution"),
-    }
+# #4161: the rate arithmetic (the schedule step, the protein-adherence gate, the served target) lives in the
+# cohesive sibling `training.redline_rate` — this module was at the 1,000-line ceiling (#1665). The DATA
+# stays here, one home; every caller still reads `owner_redlines.rate_target_lb_per_wk` & co.
+from training.redline_rate import protein_days_missed, protein_gate, rate_schedule_step, rate_target_lb_per_wk  # noqa: E402,F401
