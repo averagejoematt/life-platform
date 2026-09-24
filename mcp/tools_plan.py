@@ -633,7 +633,7 @@ def tool_plan_next_session(args):
     # start, not the weekday — so the Hevy record since then is an engine input of its own.
     block_workouts, status["block_workouts"] = _read("block_workouts", _block_workouts, target_date)
     if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
-        status["block_workouts"] = st(ABSENT, "no Hevy session since the v0.3 block start")
+        status["block_workouts"] = st(ABSENT, "no Hevy session since the program's block start")
 
     block = plan_engine.constraint_block(
         date=target_date,

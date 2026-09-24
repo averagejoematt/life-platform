@@ -85,7 +85,9 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, self_added_volume, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.7.0"  # #4110: the session and the program week follow the completed-session SEQUENCE, not weekdays
+ENGINE_VERSION = (
+    "plan-engine@1.7.0"  # #4110/#4147: the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
+)
 # plan-engine@1.6.0 (#4081): self_added_volume evaluated from adherence's set counts; 1.5.0 #4098: `not_before_week` enforced + rolling e1RM anchor drop
 # plan-engine@1.4.0 (#4072): every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
 
@@ -240,8 +242,8 @@ def anchor_drop_tripped(drop_pct: float | None, sessions_below: int | None) -> b
 # ── `not_before_week`: a redline that is not armed yet (#4098) ───────────────
 # `anchor_lift_strength_drop` declares `not_before_week: 6` ("the ramp is still under 85 % of
 # band e1RM"). Before #4098 nothing read it: the tripwire was live in the ramp weeks, comparing
-# a detraining return with a best from before the break. The week is the v0.3 session
-# sequence's (`session_sequence.program_week`, #4110): completed loaded sessions // 3, + 1.
+# a detraining return with a best from before the break. The week is the program's session
+# sequence's (`session_sequence.program_week`, #4110): completed loaded sessions // sessions_per_week (v0.4: 4), + 1.
 def program_week(day: str, block_workouts: list[dict[str, Any]] | None = None) -> int | None:
     """THE program week for `day` — 0 before the block start, None when the Hevy record since the
     block start was not read (an unknown week never arms a gated tripwire) or the day key is bad."""
@@ -649,7 +651,7 @@ def constraint_block(
     `measured` / `absent` / `read_failed` (+ error class) / `not_read`. It is reported per
     input on `inputs`, and it is what lets a None read `read_failed` instead of `unknown`.
 
-    `block_workouts` (#4110) is the Hevy record since the v0.3 block start. The served session
+    `block_workouts` (#4110) is the Hevy record since the program's block start. The served session
     and the program week are derived from it — the completed loaded sessions — so a None
     (not read) leaves both unknown rather than defaulting to session 1.
     """
@@ -816,8 +818,9 @@ def constraint_block(
         # into a reviewed list.
         "standing_constraints_from_chat": training_memory_constraints or [],
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
-        # sequence (heavy -> moderate -> heavy-moderate from 2026-09-24; it advances only on a
-        # completed loaded Hevy session; deload every 6th program week) and the §3 session — anchors at heavy/moderate with their sets and reps,
+        # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
+        # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; deload
+        # every 6th program week) and its session — anchors with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
@@ -945,7 +948,7 @@ def constraint_block(
                     else (
                         None
                         if rotation["ok"]
-                        else "the accessory layer is DRIFTING (v0.3 fixes accessories for the block) — added in the trailing 7 days: "
+                        else "the accessory layer is DRIFTING (the program fixes accessories for the block) — added in the trailing 7 days: "
                         + ", ".join(rotation["added_in_trailing_7d"][:4])
                     )
                 ),

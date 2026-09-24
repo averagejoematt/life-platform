@@ -28,6 +28,11 @@ What these tests hold:
      carries loads on squat / row with `fallback: nearest_band`. The heavy bench is the
      barbell bench, which carries no `hevy_template_id_hint` (ADR-069), so the load path
      reports `no_template_id` for it rather than a load — pinned in test_v03_load_ramp_4090.
+
+#4147 (2026-09-24): the program is v0.4 Upper/Lower, served in order from lower-heavy. The load
+path is unchanged (load_ramp is another lane's, #4148); the heavy squat is read through the first
+v0.4 session (lower-heavy, nothing completed) and the row / pulldown through upper-heavy (three
+completed — `_generate_upper`).
 """
 
 from __future__ import annotations
@@ -59,9 +64,10 @@ LB = 0.45359237
 TID = {
     k: MOVEMENTS[k]["hevy_template_id_hint"] for k in ("squat_barbell", "leg_press", "db_bench_press_flat", "machine_row", "lat_pulldown")
 }
-# #4080: the 09-24 heavy anchors the load path can load (both carry a template id). The third,
-# `barbell_bench_press`, has no `hevy_template_id_hint` (ADR-069) — never loaded from history.
+# #4080: heavy anchors the load path can load (both carry a template id). #4147: under v0.4 the
+# squat is heavy on lower-heavy and the row on upper-heavy.
 HEAVY = ("squat_barbell", "machine_row")
+UPPER_DAY = "2026-09-27"  # three sessions done (lower-heavy, upper-volume, lower-volume) -> upper-heavy, week 1
 
 # The live 2026-09-23 shape (#4107's table): leg press 0 in band / 5 elsewhere, DB bench's
 # nearest band one session at 300–309 with more sessions further down, machine row one
@@ -77,6 +83,7 @@ WEIGHTS = {
     "2025-05-18": 195.0,
     "2026-09-20": 316.0,
     "2026-09-23": 315.4,
+    "2026-09-27": 315.4,
 }
 
 
@@ -116,6 +123,16 @@ NEAREST = {
 def _generate(day="2026-09-24", history=HISTORY, weights=WEIGHTS, block_workouts=None):
     with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, block_workouts=block_workouts))
+
+
+def _generate_upper(**kw):
+    """The v0.4 upper-heavy session (bench / row heavy, press / pulldown moderate), week 1."""
+    return _generate(UPPER_DAY, block_workouts=_completed(3), **kw)
+
+
+def _ideal_for(key: str):
+    """The v0.4 session that carries `key` heavy: squat -> lower-heavy (09-24), row -> upper-heavy."""
+    return _generate()[0] if key == "squat_barbell" else _generate_upper()[0]
 
 
 def _completed(n: int) -> list[dict]:
@@ -160,10 +177,10 @@ def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nea
     assert "nearest band you have lifted in: 270-279" in _block(ideal, "squat_barbell").notes
 
 
-def test_every_heavy_anchor_of_2026_09_24_is_loaded_from_its_nearest_band():
-    ideal = _generate()[0]
-    rows = ideal.inputs_snapshot["load_floors"]["movements"]
+def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_band():
     for key in HEAVY:
+        ideal = _ideal_for(key)
+        rows = ideal.inputs_snapshot["load_floors"]["movements"]
         band, day, lb = NEAREST[key]
         assert (rows[key]["anchor_band"], rows[key]["anchor_date"], rows[key]["fallback"]) == (band, day, "nearest_band"), key
         top = _block(ideal, key).sets[0].weight_kg
@@ -172,15 +189,15 @@ def test_every_heavy_anchor_of_2026_09_24_is_loaded_from_its_nearest_band():
 
 
 def test_mutation_control_without_the_fallback_the_heavy_anchors_come_out_unloaded():
-    with patch.object(load_ramp, "nearest_band_anchor", return_value=None):
-        ideal = _generate()[0]
     for key in HEAVY:
+        with patch.object(load_ramp, "nearest_band_anchor", return_value=None):
+            ideal = _ideal_for(key)
         assert all(s.weight_kg is None for s in _block(ideal, key).sets), key
         assert ideal.inputs_snapshot["load_floors"]["movements"][key]["status"] == "no_band_matched_history"
 
 
 def test_an_in_band_anchor_is_not_a_fallback():
-    ideal = _generate()[0]
+    ideal = _generate_upper()[0]
     row = ideal.inputs_snapshot["load_floors"]["movements"]["lat_pulldown"]
     assert row["fallback"] is None and row["anchor_band"] == "310-319" and row["anchor_date"] == "2026-09-20"
 
@@ -236,7 +253,7 @@ def test_the_detraining_discount_applies_only_to_anchors_28_days_older_than_bloc
 
 
 def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
-    ideal = _generate()[0]
+    ideal = _generate_upper()[0]
     row = ideal.inputs_snapshot["load_floors"]["movements"]["lat_pulldown"]
     assert row["ramp"]["discount_pct"] == 0 and row["ramp"]["discount"]["anchor_age_days_at_block_1"] == 4
     assert _block(ideal, "lat_pulldown").sets[0].weight_kg == load_ramp._ceil_half_kg(140 * LB * 0.60)
@@ -246,8 +263,8 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():
     """Week 9 reads the SAME discount ruling as week 1 — an age measured to the session date
     would discount the 09-20 anchor from late October and cut the load mid-ramp."""
-    # #4110: 24 completed sessions = the first session of program week 9, whatever the date
-    w9 = _generate("2026-11-18", weights={**WEIGHTS, "2026-11-17": 314.0}, block_workouts=_completed(24))[0].inputs_snapshot["load_floors"][
+    # #4110/#4147: 35 completed sessions = week 9's upper-heavy (4 a week from lower-heavy), whatever the date
+    w9 = _generate("2026-11-18", weights={**WEIGHTS, "2026-11-17": 314.0}, block_workouts=_completed(35))[0].inputs_snapshot["load_floors"][
         "movements"
     ]["lat_pulldown"]
     assert w9["ramp"]["week"] == 9 and w9["ramp"]["discount_pct"] == 0
@@ -255,7 +272,7 @@ def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session
 
 def test_mutation_control_an_age_of_zero_discounts_the_this_cycle_anchor_twice():
     with patch.object(load_ramp, "DETRAINING_ANCHOR_AGE_DAYS", 0):
-        ideal = _generate()[0]
+        ideal = _generate_upper()[0]
     assert ideal.inputs_snapshot["load_floors"]["movements"]["lat_pulldown"]["ramp"]["discount_pct"] == 10
 
 
@@ -273,26 +290,37 @@ def _as_custom(ideal, **overrides):
     )
 
 
-def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads():
+def _gate(ideal, **kw):
+    """The chat commit gate on a draft_custom copy of `ideal`, its Hevy record injected (#4110:
+    the gate reads the sequence week; no DDB read in a test)."""
     from mcp.hevy_prescription_gate import prescription_gate
 
-    ideal = _generate()[0]
-    gate = prescription_gate(_as_custom(ideal), movements=MOVEMENTS, history_index=HISTORY, weight_index=WEIGHTS)
+    done = _completed(3) if ideal.target_date == UPPER_DAY else []
+    with patch("mcp.plan_hevy_windows._block_workouts", return_value=done):
+        return prescription_gate(_as_custom(ideal), movements=MOVEMENTS, history_index=HISTORY, weight_index=WEIGHTS, **kw)
+
+
+@pytest.mark.parametrize("which", ["lower_heavy", "upper_heavy"])
+def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which):
+    ideal = _generate()[0] if which == "lower_heavy" else _generate_upper()[0]
+    gate = _gate(ideal)
     assert gate["verdict"] == "clean", gate["audit"]
     rows = gate["load_floors"]["movements"]
     assert gate["load_floors"]["load_rule"]["week"] == 1
     gen = ideal.inputs_snapshot["load_floors"]["movements"]
-    for key in ("squat_barbell", "barbell_bench_press", "machine_row", "lat_pulldown"):
+    keys = {
+        "lower_heavy": ("squat_barbell", "romanian_deadlift_barbell"),
+        "upper_heavy": ("barbell_bench_press", "machine_row", "lat_pulldown"),
+    }
+    for key in keys[which]:
         for f in ("floor_kg", "anchor_band", "anchor_date", "fallback"):
             assert rows[key][f] == gen[key][f], (key, f)
 
 
 def test_the_chat_gate_refuses_a_top_set_under_the_ramped_load():
-    from mcp.hevy_prescription_gate import prescription_gate
-
     ideal = _generate()[0]
     _block(ideal, "squat_barbell").sets[0].weight_kg -= 5
-    gate = prescription_gate(_as_custom(ideal), movements=MOVEMENTS, history_index=HISTORY, weight_index=WEIGHTS)
+    gate = _gate(ideal)
     assert gate["verdict"] == "refuse"
     assert {v["where"] for v in gate["audit"]["violations"]} == {"squat_barbell"}
 
@@ -302,9 +330,9 @@ def test_mutation_control_the_100_percent_floor_refuses_the_generator_own_loads(
     generator wrote would refuse at commit on the in-band anchor."""
     from mcp import hevy_prescription_gate
 
-    ideal = _generate()[0]
+    ideal = _generate_upper()[0]
     with patch.object(hevy_prescription_gate, "v03_load_rule", return_value=None):
-        gate = hevy_prescription_gate.prescription_gate(_as_custom(ideal), movements=MOVEMENTS, history_index=HISTORY, weight_index=WEIGHTS)
+        gate = _gate(ideal)
     assert gate["verdict"] == "refuse" and "lat_pulldown" in {v["where"] for v in gate["audit"]["violations"]}
 
 
@@ -359,22 +387,25 @@ def test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback():
 
 
 # ── 5. the planner ──────────────────────────────────────────────────────────
-def test_plan_next_session_2026_09_24_loads_squat_and_row_from_the_nearest_band():
+@pytest.mark.parametrize("key", HEAVY)
+def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key):
+    """#4147: the squat through lower-heavy on 09-24 (nothing completed), the row through
+    upper-heavy on 09-27 (three completed) — the planner and the draft carry the same load."""
     from mcp import handler as h
-    from tests.test_fullbody_block_calendar_4064 import _stage1_patches
+    from tests.test_program_session_4064_4147 import _stage1_patches
 
+    day, done = ("2026-09-24", []) if key == "squat_barbell" else (UPPER_DAY, _completed(3))
     with ExitStack() as st:
         for cm in _stage1_patches():
             st.enter_context(cm)
         st.enter_context(patch("mcp.tools_plan._load_anchor_indexes", return_value=(HISTORY, WEIGHTS)))
+        st.enter_context(patch("mcp.tools_plan._block_workouts", return_value=done))
         st.enter_context(patch.object(h, "_emit_tool_metric"))
         st.enter_context(patch.object(h, "_audit_tool_call"))
-        resp = h.handle_tools_call({"name": "plan_next_session", "arguments": {"target_date": "2026-09-24"}})
+        resp = h.handle_tools_call({"name": "plan_next_session", "arguments": {"target_date": day}})
     session = json.loads(resp["content"][0]["text"])["constraint_block"]["session"]
-    ideal = _generate()[0]
+    ideal = _ideal_for(key)
     by_key = {e["movement_key"]: e["load"] for e in session["prescription"]["exposures"]}
-    assert set(HEAVY) <= set(by_key)
-    for key in HEAVY:
-        load = by_key[key]
-        assert load["fallback"] == "nearest_band" and load["anchor_band"] == NEAREST[key][0], key
-        assert load["top_kg"] == _block(ideal, key).sets[0].weight_kg, "planner and draft disagree"
+    load = by_key[key]
+    assert load["fallback"] == "nearest_band" and load["anchor_band"] == NEAREST[key][0], key
+    assert load["top_kg"] == _block(ideal, key).sets[0].weight_kg, "planner and draft disagree"

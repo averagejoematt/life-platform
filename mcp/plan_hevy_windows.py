@@ -8,7 +8,7 @@ sites and every `patch("mcp.tools_plan._rotation_window", ...)` keep working unc
 
   * `_rotation_window`     — the accessory-rotation window (#3755)
   * `_prescription_window` — the self_added_volume window (#4081)
-  * `_block_workouts`      — the v0.3 session sequence's record since the block start (#4110);
+  * `_block_workouts`      — the program's session sequence record since the block start (#4110);
                              also read by `mcp.hevy_prescription_gate` for the ramp's week
 
 A raise propagates to the caller (`tools_plan._read` records it as `read_failed`, #4072).
@@ -58,7 +58,7 @@ def _prescription_window(end_date: str) -> list[dict[str, Any]] | None:
 
 
 def _block_workouts(target_date: str) -> list[dict[str, Any]]:
-    """Every Hevy row from the v0.3 block start to the day before `target_date` (#4110) — the
+    """Every Hevy row from the program's block start to the day before `target_date` (#4110) — the
     record the session sequence advances on. Read through `tools_strength._read_hevy_all_phases`,
     the ONE sanctioned Hevy read path (#4030/#4032). Before the block start there is nothing to
     read and the answer is an empty list; a raise propagates to `_read` as `read_failed`."""

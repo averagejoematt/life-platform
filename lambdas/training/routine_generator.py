@@ -91,7 +91,7 @@ class GeneratorInputs:
         days_since_last_workout: int = 1,
         history_last_dates: dict[str, str] | None = None,  # movement_key -> last YYYY-MM-DD
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
-        block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the v0.3 block start; None = read it here
+        block_workouts: list[dict[str, Any]] | None = None,  # #4110: Hevy rows since the program's block start; None = read it here
     ) -> None:
         self.target_date = target_date
         self.recovery_tier = recovery_tier
@@ -112,11 +112,9 @@ def _archetype_for_date(target_date: str, week_cfg: dict[str, Any]) -> str:
 def _schedule_entry_for_date(
     target_date: str, week_cfg: dict[str, Any], source: str | None = None, block_workouts: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
-    """The whole schedule entry for the day. #3755 v0.3: the module grid carries two keys the
-    JSON grid never had — `session_role` (heavy / moderate / heavy_moderate / optional_fourth)
-    and `optional` (the fourth full-body day, gated on two green recovery days). They ride on
-    the rationale and the title so the flag reaches the pushed routine; nothing is gated on
-    them here — the program reports, the owner decides.
+    """The whole schedule entry for the day. #3755: the module grid carries a key the JSON grid
+    never had — `session_role` (v0.4: upper_heavy / lower_heavy / upper_volume / lower_volume,
+    #4147) — which routes the day to the program's session and rides on the rationale and title.
 
     #4110 (replacing #4064's weekday calendar): when the seam served the MODULE grid
     (`source == "module"`, i.e. the program is ACTIVE), the session SEQUENCE answers first —
@@ -138,7 +136,7 @@ def _schedule_entry_for_date(
 
 
 def _block_workouts_for(inputs: GeneratorInputs) -> list[dict[str, Any]] | None:
-    """The Hevy record since the v0.3 block start (#4110): the caller's, else one DDB read.
+    """The Hevy record since the program's block start (#4110): the caller's, else one DDB read.
     A failed read is None (the sequence position is then unknown, and the entry says so)."""
     if inputs.block_workouts is not None:
         return inputs.block_workouts
@@ -824,9 +822,11 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     if archetype in ("rest", "aerobic", "mobility"):
         # Non-lifting day — return a minimal placeholder ideal + floor.
         return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
-    if archetype == "full" and day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
-        # #4064 — a v0.3 role is a §3 session (anchors at heavy/moderate, fixed accessories,
-        # deload every 6th program week), not a muscle-budget session with a role label on it.
+    if day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
+        # #4064/#4147 — a program role (v0.4: upper/lower heavy/volume) is the program's session
+        # (anchors at heavy/moderate/volume, fixed accessories, deload every 6th program week),
+        # not a muscle-budget session with a role label on it. Only the module grid carries a
+        # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines
 
         return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets)

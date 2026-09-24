@@ -1,4 +1,4 @@
-"""session_sequence.py — v0.3's sessions as a SEQUENCE, not a weekday calendar (#4110).
+"""session_sequence.py — the program's sessions as a SEQUENCE, not a weekday calendar (#4110).
 
 WHY THIS EXISTS
 
@@ -7,9 +7,12 @@ Mon/Wed/Fri. Owner, 2026-09-23: "we plan 7 days a week of exercise with seldom r
 sometimes I'll listen to body and do a walk instead, so more just focusing on planned sequence
 and not forgetting next if I audible a change." Under a weekday calendar a walk on a lifting
 day silently SKIPPED that session, and the next date's session was served although the
-previous one never happened.
+previous one never happened. The same evening the owner switched to v0.4 Upper/Lower (#4147),
+ORDER-BASED: Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating, the next
+session being the one after the last PERFORMED lift. This module serves that order.
 
-THE RULE, AS ARITHMETIC (pure — every Hevy row is injected)
+THE RULE, AS ARITHMETIC (pure — every Hevy row is injected; the numbers are
+`program_structure.SESSION_SEQUENCE`, one definition)
 
   completed   = the distinct Pacific days in [block start, the planned day) carrying a LOADED
                 Hevy session — `training_streaks.is_loaded_session`, the ONE definition (#4105):
@@ -17,27 +20,30 @@ THE RULE, AS ARITHMETIC (pure — every Hevy row is injected)
                 A walk, an Engine day (treadmill + bike + stretching) or a rest day carries no
                 load, so it never advances the position.
   index       = len(completed)                       (0-based: the next UNDONE session)
-  week        = index // 3 + 1                       (3 loaded sessions = 1 program week)
-  role        = session_roles[index % 3]             heavy -> moderate -> heavy-moderate
+  role        = session_roles[(offset + index) % 4]  offset = the index of `first_role`
+                                                     (Lower-heavy — the committed first v0.4 session)
+  week        = index // 4 + 1                       (4 loaded sessions = 1 program week)
   deload      = week % every_nth_week == 0           (`owner_redlines`, one home: every 6th)
   block       = (week - 1) // weeks_per_block + 1
 
-RULINGS (#4110 — stated so a reader can dispute them, not discover them)
+RULINGS (#4110/#4147 — stated so a reader can dispute them, not discover them)
 
   * The weekday calendar is RETIRED, not kept as a suggestion: two answers to "what is next"
     is the defect. Before the block start the weekday grid still answers (as it did).
+  * The sequence starts at Lower-heavy, the session the owner committed from chat on 2026-09-23
+    (target 2026-09-25). Counting starts 2026-09-24, the first Pacific day after the switch, so
+    a lift on Thursday advances it exactly as Friday's would; no pre-switch lift ever does.
   * A session logged ON the planned day is the one that day's plan served; it advances the
     NEXT day's plan. So the plan for a date is stable all day — a re-run after the workout (the
     stage-2 critics, the commit gate) sees the same session the draft was built for.
   * Two loaded logs on one Pacific day are ONE session (a split or re-started log), never two.
-  * The optional 4th is retired as a sequence slot. Every loaded session advances the sequence;
-    a 4th in seven days is simply the next session. The redline's calendar ceiling (3–4 lifting
-    sessions a week) and its "non-consecutive days" are reported as ADVISORIES beside the
-    served session (`spacing`), never by skipping the session — the owner audibles, the plan
-    remembers.
   * Any loaded session advances the position — the plan does not try to decide from a Hevy
-    title whether he "really" did the heavy day. The session that advanced it is named
+    title whether he "really" did the upper day. The session that advanced it is named
     (`advanced_by`: date, title, workout id) so a mismatch is visible, not inferred.
+  * The redline's calendar ceiling (3–4 lifting sessions a week) is reported as an ADVISORY
+    beside the served session (`spacing`), never by skipping it — the owner audibles, the plan
+    remembers. v0.3's "non-consecutive days" advisory is gone: the order alternates upper and
+    lower, so back-to-back days never load the same region twice.
 """
 
 from __future__ import annotations
@@ -49,6 +55,7 @@ from common.pacific_time import parse_day_key, shift_day_key
 from training import program_structure, training_streaks
 
 ISSUE = "#4110"
+PROGRAM_ISSUE = "#4147"
 
 
 def _seq() -> dict[str, Any]:
@@ -110,15 +117,18 @@ def position(index: int) -> dict[str, Any]:
     seq = _seq()
     per = int(seq["sessions_per_week"])
     roles = seq["session_roles"]
+    offset = roles.index(seq.get("first_role") or roles[0])
     i = max(0, int(index))
     week = i // per + 1
     in_week = i % per + 1
-    role = roles[i % per]
+    role = roles[(offset + i) % len(roles)]
     deload = week % _deload_every() == 0
     block = (week - 1) // int(seq["weeks_per_block"]) + 1
     label = program_structure._ROLE_LABEL[role]
     return {
         "sequence_index": i,
+        "program_version": seq.get("program_version"),
+        "archetype": program_structure.SESSION_TEMPLATES[role]["archetype"],
         "week": week,
         "session_in_week": in_week,
         "sessions_per_week": per,
@@ -144,11 +154,6 @@ def _spacing(completed: list[dict[str, Any]], day: str) -> dict[str, Any]:
     trailing = [c for c in completed if c["date"] >= week_ago]
     loaded_yesterday = bool(completed) and completed[-1]["date"] == yesterday
     advisories: list[str] = []
-    if loaded_yesterday:
-        advisories.append(
-            "a loaded session was logged yesterday — the redline puts lifting on non-consecutive days; a walk or Engine day "
-            "today keeps this session next, it does not skip it"
-        )
     if len(trailing) >= int(lift["high"]):
         advisories.append(
             f"{len(trailing)} loaded sessions in the 7 days before this one — at the redline's {lift['low']}–{lift['high']}/wk "
@@ -179,7 +184,7 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
             "archetype": None,
             "week": None,
             "note": (
-                f"the Hevy record since {block_start()} was not read — the next session in the v0.3 sequence is UNKNOWN "
+                f"the Hevy record since {block_start()} was not read — the next session in the v{_seq().get('program_version')} sequence is UNKNOWN "
                 f"(it advances only on a completed loaded session, {ISSUE})"
             ),
         }
@@ -188,7 +193,6 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
     last = done[-1] if done else None
     return {
         **pos,
-        "archetype": "full",
         "source": "session_sequence",
         "completed_sessions": len(done),
         "advanced_by": (
@@ -202,12 +206,14 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
         ),
         "spacing": _spacing(done, day),
         "label": (
-            f"full-body {program_structure._ROLE_LABEL[pos['session_role']]} — week {pos['week']} · session {pos['session_in_week']} "
+            f"{program_structure._ROLE_LABEL[pos['session_role']]} — week {pos['week']} · session {pos['session_in_week']} "
             f"of {pos['sessions_per_week']}, block {pos['block']}" + (" (DELOAD)" if pos["deload"] else "")
         ),
         "rule": (
-            "the v0.3 sessions run as a SEQUENCE (heavy -> moderate -> heavy-moderate); the position advances only on a completed "
-            f"loaded Hevy session, so a walk or rest day postpones a session and never skips it ({ISSUE})"
+            f"the v{_seq().get('program_version')} sessions run as a SEQUENCE ("
+            + " -> ".join(program_structure._ROLE_LABEL[r].lower() for r in _seq()["session_roles"])
+            + f", from {program_structure._ROLE_LABEL[_seq()['first_role']].lower()}); the position advances only on a completed "
+            f"loaded Hevy session, so a walk or rest day postpones a session and never skips it ({ISSUE}, {PROGRAM_ISSUE})"
         ),
     }
 

@@ -282,7 +282,8 @@ def v03_load_rule(target_date: str, block_workouts: list[dict[str, Any]] | None 
     known = entry.get("source") == "session_sequence"
     pct = 100 + int(program_structure.EXPOSURES["heavy"]["back_off_pct"])  # §3: back-offs at −10 % of the top set
     return {
-        "rule": "v0.3 §3 entry ramp (load_ramp.v03_floor)",
+        "rule": "§3 entry ramp (load_ramp.v03_floor)",
+        "program_version": program_structure.PROGRAM_VERSION,
         "week": int(entry.get("week") or 1),
         "week_state": "measured" if known else "unreadable",
         "week_source": (

@@ -47,10 +47,11 @@ DB_SP = ("878CD1D0", "Shoulder Press (Dumbbell)")
 
 def _week_start(week: int) -> str:
     """The first day of program `week` when he lifts every day from the block start (#4110: the
-    week follows COMPLETED sessions — 3 per week — not the calendar)."""
+    week follows COMPLETED sessions — `sessions_per_week` of them, 4 under v0.4 — not the calendar)."""
     from common.pacific_time import shift_day_key
 
-    return shift_day_key(program_structure.SESSION_SEQUENCE["block_start"], 3 * (week - 1))
+    per = int(program_structure.SESSION_SEQUENCE["sessions_per_week"])
+    return shift_day_key(program_structure.SESSION_SEQUENCE["block_start"], per * (week - 1))
 
 
 def _block_rows(date: str) -> list[dict[str, Any]]:

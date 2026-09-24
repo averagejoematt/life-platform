@@ -554,7 +554,7 @@ MANAGE_HEVY_ROUTINE_DESCRIPTION = (
     "— DO NOT pass a title; leave it to the compiler. `title` and `force_title` are DRAFT-TIME arguments, read "
     "only by draft_custom: passing either to 'commit' does nothing and the result returns a warning naming it. "
     "To force a title: draft_custom(force_title=true, title=...) → dry_run → commit. NEW routines are filed "
-    "into a per-type Hevy folder (Full Body under v0.3; Push/Pull/Legs/Engine for the older splits), found or created at the first commit; commit's `folder` key reports the outcome and reads "
+    "into a per-type Hevy folder (Upper / Lower under v0.4; Full Body for v0.3 history; Push/Pull/Legs/Engine for the older splits), found or created at the first commit; commit's `folder` key reports the outcome and reads "
     "'unfoldered: <reason>' when that failed. `commit` ALSO durably records the routine's own spec — no git "
     "step, no docs/coaching/routines/ file needed for it to survive (#4079): read the result's `routine_spec` "
     "key (`saved`/`key`/`content_hash`/`committed_at`) as the landed proof, not an assumption. Honest framing: "

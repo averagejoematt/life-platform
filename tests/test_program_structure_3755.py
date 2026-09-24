@@ -62,12 +62,13 @@ def _hevy_rows() -> list[dict]:
 
 # ── 1. gate:owner cannot be simulated ────────────────────────────────────────
 def test_active_is_true_only_with_the_owner_review_date():
-    """The owner approved v0.3 on 2026-09-21 (#3753/#3755). ACTIVE without that date is the
-    inherited-assumption failure this module exists to prevent — the pair is pinned.
-    Mutation control (recorded in the PR): set ACTIVE = False → this reds."""
+    """The owner approved v0.3 on 2026-09-21 (#3753/#3755) and switched to v0.4 on 2026-09-23
+    (#4147). ACTIVE without that date is the inherited-assumption failure this module exists to
+    prevent — the pair is pinned. Mutation control (recorded in the PR): set ACTIVE = False → this reds."""
     assert program_structure.ACTIVE is True
-    assert program_structure.LAST_REVIEWED_BY_OWNER == "2026-09-21"
-    assert program_structure.PROGRAM_VERSION == "0.3"
+    assert program_structure.LAST_REVIEWED_BY_OWNER == "2026-09-23"
+    assert program_structure.PROGRAM_VERSION == "0.4"
+    assert program_structure.DECISION_SK == "DECISION#2026-09-24T03:10:59"
 
 
 def test_active_and_review_date_cannot_disagree():
@@ -80,18 +81,26 @@ def test_active_and_review_date_cannot_disagree():
 def test_summary_reports_active_with_the_review_date():
     s = program_structure.summary()
     assert s["active"] is True
-    assert s["status_note"].startswith("ACTIVE") and "2026-09-21" in s["status_note"]
-    assert s["split"] == "full_body"
-    assert s["program_version"] == "0.3"
-    assert s["prose_home"].endswith("TRAINING_PROGRAM_v0.3.md")
+    assert s["status_note"].startswith("ACTIVE") and "2026-09-23" in s["status_note"]
+    assert s["split"] == "upper_lower"
+    assert s["program_version"] == "0.4"
+    assert s["prose_home"].endswith("TRAINING_PROGRAM_v0.4.md")
+    assert s["superseded_programs"]["0.3"]["superseded_on"] == "2026-09-24"
 
 
 def test_the_split_decision_records_both_owner_dates():
-    """The 2026-09-19 PPL ruling was real and was overtaken, not ignored — both dates travel."""
+    """Each ruling was real and was overtaken, not ignored — every date travels. v0.4 (2026-09-23)
+    supersedes v0.3 (2026-09-21), whose own record of the 2026-09-19 PPL ruling is kept verbatim."""
+    from training import program_v03
+
     d = program_structure.SPLIT_DECISION
-    assert d["chosen"] == "full_body" and d["stated"] == "2026-09-21" and d["provenance"] == "owner"
-    assert d["supersedes"]["stated"] == "2026-09-19" and "PPL" in d["supersedes"]["ruling"]
-    assert any("ppl" in r for r in d["rejected"])
+    assert d["chosen"] == "upper_lower" and d["stated"] == "2026-09-23" and d["provenance"] == "owner"
+    assert d["decision_sk"] == "DECISION#2026-09-24T03:10:59"
+    assert d["supersedes"]["stated"] == "2026-09-21" and "v0.3" in d["supersedes"]["ruling"]
+    assert any("full_body" in r for r in d["rejected"]) and any("ppl" in r for r in d["rejected"])
+    old = program_v03.SPLIT_DECISION
+    assert old["chosen"] == "full_body" and old["stated"] == "2026-09-21"
+    assert old["supersedes"]["stated"] == "2026-09-19" and "PPL" in old["supersedes"]["ruling"]
 
 
 def test_every_anchor_and_knob_carries_provenance():
@@ -146,35 +155,33 @@ def test_week_grid_keys_equal_the_json_keys():
     assert set(program_structure.week_grid()) == set(live), "week_grid() must be a drop-in for config/training_week.json"
 
 
-def test_week_grid_is_a_full_body_week_the_generator_can_read():
+def test_week_grid_is_an_upper_lower_week_the_generator_can_read():
     grid = program_structure.week_grid()
     assert grid["_version"] == 3
     archetypes = {d["archetype"] for d in grid["schedule"].values()}
-    assert archetypes == {"full", "aerobic"}, "v0.3: full-body lifting days and walking days, nothing else"
+    assert archetypes == {"upper", "lower", "aerobic"}, "v0.4: upper/lower lifting days and walking days, nothing else"
     # every scheduled archetype must have a targets entry, or the generator silently
     # produces an empty session for that day
     for day in grid["schedule"].values():
         assert day["archetype"] in grid["archetype_targets"], day
-    assert set(grid["archetype_targets"]["full"]) == {"chest", "back", "shoulders", "quadriceps", "hamstrings", "glutes"}
-    assert grid["session_set_ceiling"] == 18, "v0.3 §3: 12–18 hard sets per session"
-    assert grid["session_minutes_ceiling"] == 70, "v0.3 §3: 55–70 min"
-    assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move; the 6–10 target lives in owner_redlines"
+    assert set(grid["archetype_targets"]["upper"]) == {"chest", "back", "shoulders", "biceps", "triceps"}
+    assert set(grid["archetype_targets"]["lower"]) == {"quadriceps", "hamstrings", "glutes", "calves"}
+    assert grid["session_set_ceiling"] == 18, "§3: 12–18 hard sets per session (unchanged in v0.4)"
+    assert grid["session_minutes_ceiling"] == 70, "§3: 55–70 min"
+    assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move; the 8–12 target lives in owner_redlines"
     assert grid["exercise_notes_mode"] == "one_best_line" and grid["exercise_notes_lookback_days"] == 3650
 
 
-def test_three_required_lifting_days_on_non_consecutive_days_plus_an_optional_fourth():
+def test_the_nominal_week_carries_the_four_v04_roles_in_order():
+    """#4147: the weekday placement is NOMINAL (the sequence serves); it still carries the four
+    roles in the owner's order, inside the 3–4/wk redline, with walking on every other day."""
     grid = program_structure.week_grid()
-    lifting = [int(k) for k, d in grid["schedule"].items() if d["archetype"] == "full"]
-    required = [int(k) for k, d in grid["schedule"].items() if d["archetype"] == "full" and not d.get("optional")]
-    optional = [d for d in grid["schedule"].values() if d.get("optional")]
-    assert required == [0, 2, 4], "heavy / moderate / heavy-moderate on Mon / Wed / Fri"
-    assert all(b - a >= 2 for a, b in zip(required, required[1:])), "the three required sessions are non-consecutive"
-    assert len(optional) == 1 and optional[0]["session_role"] == "optional_fourth"
-    assert "two consecutive green recovery days" in optional[0]["gate"]
-    assert "OPTIONAL" in optional[0]["label"]
-    assert len(lifting) == 4 and program_structure.lifting_days() == ["0", "2", "4", "5"]
-    roles = [grid["schedule"][k]["session_role"] for k in ("0", "2", "4")]
-    assert roles == ["heavy", "moderate", "heavy_moderate"]
+    lifting = [int(k) for k, d in grid["schedule"].items() if d["archetype"] in ("upper", "lower")]
+    assert lifting == [0, 1, 3, 4] and program_structure.lifting_days() == ["0", "1", "3", "4"]
+    roles = [grid["schedule"][str(k)]["session_role"] for k in lifting]
+    assert roles == program_structure.SESSION_SEQUENCE["session_roles"] == ["upper_heavy", "lower_heavy", "upper_volume", "lower_volume"]
+    assert not any(d.get("optional") for d in grid["schedule"].values()), "v0.4 has no optional fourth slot"
+    assert all("nominal" in grid["schedule"][str(k)]["label"] for k in lifting)
     # walking is every day: the non-lifting days are aerobic, never rest
     assert all(d["archetype"] == "aerobic" for k, d in grid["schedule"].items() if int(k) not in lifting)
 
@@ -251,24 +258,24 @@ def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
     def _lift(day):
         return {"date": day, "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]}
 
-    # #4110 (was #4064's block calendar): from the block start (Thu 2026-09-24) the session
-    # SEQUENCE answers, and a v0.3 role is built as a §3 session (anchor patterns at
-    # heavy/moderate), not a muscle-budget one. Two sessions done -> week 1's third: heavy-moderate.
+    # #4110/#4147: from the block start the session SEQUENCE answers, and a program role is built
+    # as the program's session, not a muscle-budget one. v0.4 starts at lower-heavy: two sessions
+    # done (lower-heavy, upper-volume) -> week 1's third is lower-volume.
     third = _gen("2026-09-28", [_lift("2026-09-24"), _lift("2026-09-26")])[0]
-    assert third.archetype == "full" and third.variant == "ideal"
+    assert third.archetype == "lower" and third.variant == "ideal"
     assert 12 <= sum(len(e.sets) for e in third.exercises) <= 18
     assert any(r.startswith("week grid source=module") for r in third.rationale)
-    assert any("session_role=heavy_moderate" in r for r in third.rationale)
-    assert any(r.startswith("session sequence: week 1 · session 3 of 3 · heavy-moderate, block 1") for r in third.rationale)
+    assert any("session_role=lower_volume" in r for r in third.rationale)
+    assert any(r.startswith("session sequence: week 1 · session 3 of 4 · lower-volume, block 1") for r in third.rationale)
     patterns = {e.rationale_tag.split(":")[1] for e in third.exercises if e.rationale_tag.startswith("anchor:")}
-    assert patterns == {"hinge", "overhead_press", "bench", "row"}
-    # before the block start the weekday grid answers — a Monday is still the grid's heavy day
+    assert patterns == {"hinge", "squat"}
+    # before the block start the (nominal) weekday grid answers — a Monday is its upper-heavy day
     pre_block = _gen("2026-09-21")[0]
-    assert pre_block.archetype == "full" and any("session_role=heavy;" in r for r in pre_block.rationale)
-    # on/after the block start there is no weekday walk or optional Saturday: a Tuesday with
-    # nothing completed still serves the next undone session (a walk POSTPONES, #4110)
+    assert pre_block.archetype == "upper" and any("session_role=upper_heavy;" in r for r in pre_block.rationale)
+    # on/after the block start there is no weekday walk: a Tuesday with nothing completed still
+    # serves the next undone session — lower-heavy, the first v0.4 session (a walk POSTPONES, #4110)
     tuesday = _gen("2026-09-29")[0]
-    assert tuesday.archetype == "full" and tuesday.title.startswith("Full Body HEAVY — W1")
+    assert tuesday.archetype == "lower" and tuesday.title.startswith("LOWER-HEAVY — W1")
 
 
 def test_catalog_gaps_names_anchor_members_the_generator_cannot_select():
@@ -321,7 +328,7 @@ def test_seam_serves_the_module_when_active__mutation_control(monkeypatch):
     assert resolved.source == "module"
     assert calls == [], "the JSON must not be read at all once the program is active"
     assert set(resolved.week) == set(program_structure.week_grid())
-    assert "v0.3" in resolved.detail and "full_body" in resolved.detail and "2026-09-21" in resolved.detail
+    assert "v0.4" in resolved.detail and "upper_lower" in resolved.detail and "2026-09-21" in resolved.detail
 
 
 def test_seam_result_always_names_its_source():
@@ -503,8 +510,8 @@ def test_constraint_block_carries_the_program_summary():
     2026-09-23 exemption (#4080) — it must still be NAMED in honesty (audit trail), but as
     resolved, never as UNRESOLVED."""
     block = _block()
-    assert block["program"]["program_version"] == "0.3"
-    assert block["program"]["split"] == "full_body"
+    assert block["program"]["program_version"] == "0.4"
+    assert block["program"]["split"] == "upper_lower"
     assert block["program"]["active"] is True
     assert not any("is PROPOSED, not approved" in line for line in block["honesty"])
     assert not any("UNRESOLVED conflicts" in line for line in block["honesty"])

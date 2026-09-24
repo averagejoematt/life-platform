@@ -55,7 +55,7 @@ from typing import Any
 ACTIVE = True
 """True since 2026-09-21: the owner reviewed and approved v0.3 (#3753, gate:owner satisfied)."""
 
-REDLINES_VERSION = "3.1"
+REDLINES_VERSION = "3.2"
 """v3 (2026-09-22 UTC / approved 2026-09-21 PT): six independent personas — transformation coach,
 obesity-medicine physician, performance nutritionist, S&C coach, lived experience, and a blueprint
 historian arguing only from his own 2024–25 data — ran blind on one evidence packet compiled from
@@ -67,10 +67,18 @@ below are his instruction to the coach.
 
 v3.1 (2026-09-23, #4111): the owner overruled the `self_added_volume` tripwire's action — it no
 longer reads training above prescription as an anxiety tell, enforces subtract-only, or asks about
-mood; it is now an end-of-week report only. Nothing else in v3 changed."""
+mood; it is now an end-of-week report only. Nothing else in v3 changed.
+
+v3.2 (2026-09-24, #4147): the owner switched the program to v0.4 Upper/Lower, order-based
+(`DECISION#2026-09-24T03:10:59`). Two values move with it — `lifting_sessions_per_wk.structure`
+and `sets_per_muscle_wk` [6, 10] -> [8, 12] (~10), which moves the `volume_ceiling` tripwire's
+top with it — and the rep scheme gains v0.4's volume exposure (8–12). Every other v3/v3.1
+redline is kept unchanged: protein, energy floor, walking floor, rate schedule, tripwires,
+subtract-only authoring, band-matched anchoring, novel-again, the 10 % detraining discount."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
-PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3.md"
+PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
+PLAN_V0_3 = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3.md"  # superseded 2026-09-24, kept
 
 CHANGELOG_V1_TO_V2: list[str] = [
     "rate: the 0.5–1.0 %BW band is kept as the envelope; a scheduled absolute target replaces the unresolved "
@@ -319,8 +327,15 @@ REDLINES: dict[str, dict[str, Any]] = {
     "lifting_sessions_per_wk": {
         "low": 3,
         "high": 4,
-        "structure": "full-body: heavy / moderate / heavy-moderate on non-consecutive days; the optional 4th only after two green recovery days",
-        "sets_per_muscle_wk": [6, 10],
+        # #4147 (owner, 2026-09-23, DECISION#2026-09-24T03:10:59): v0.4 Upper/Lower replaced v0.3 full-body. The v0.3
+        # structure string is kept below as history; the numbers it did not touch are unchanged.
+        "structure": (
+            "upper/lower in ORDER: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, repeating; the next session is the one "
+            "after the last performed lift, whatever the date (a walk audible postpones, never skips); each muscle 2x/wk"
+        ),
+        "structure_v0_3": "full-body: heavy / moderate / heavy-moderate on non-consecutive days; the optional 4th only after two green recovery days",
+        "sets_per_muscle_wk": [8, 12],
+        "sets_per_muscle_wk_provenance": "owner 2026-09-23 (#4147, v0.4): ~10 hard sets/muscle/wk; was [6, 10] under v0.3 (red team 2026-09-22)",
         "sets_per_muscle_wk_small": [4, 6],
         "total_hard_sets_wk": [50, 65],
         "session_minutes": [55, 70],
@@ -348,7 +363,7 @@ REDLINES: dict[str, dict[str, Any]] = {
                 "the first three exposures of a novel-again pattern",
             ],
         },
-        "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; accessories 8–15 at RIR 1–2",
+        "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
         "deload": {"every_nth_week": 6, "sets_pct": -30, "loads": "held"},
         "minimum_viable_session": "anchors only, top set + one back-off, ~25 min",
@@ -894,9 +909,11 @@ TRIPWIRES: list[dict[str, Any]] = [
     {
         "id": "volume_ceiling",
         "signal": "hard sets per muscle per week, or working sets in one session",
-        "threshold": {"sets_per_muscle_wk": 10, "sets_per_session": 18},
+        # #4147: moves with v0.4's band (owner, 2026-09-23: ~10 sets/muscle/wk, [8, 12]) — 12; it was 10, the top of v0.3's 6–10.
+        # derived from the band, never re-typed: the ceiling IS the band's top
+        "threshold": {"sets_per_muscle_wk": REDLINES["lifting_sessions_per_wk"]["sets_per_muscle_wk"][1], "sets_per_session": 18},
         "provenance": "population-derived",
-        "derived_by": "S&C coach (red team 2026-09-22); the 6–10 band is the redline, this is its top",
+        "derived_by": "S&C coach (red team 2026-09-22); the redline band is `lifting_sessions_per_wk.sets_per_muscle_wk` (v0.4: 8–12), this is its top",
         "action": "the plan does not grow next week — MRV is lower in a deficit and he can overshoot it without feeling it; above the band the next week's sets come down, never up",
         "evaluated_by_engine": False,
         "note": "The 28-day per-muscle sets are already computed; the per-session count is the generator's own `session_set_ceiling` (18).",

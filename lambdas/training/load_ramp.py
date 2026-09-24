@@ -77,7 +77,7 @@ that by AST). Two additions over #4090:
   * THE DISCOUNT HAS AN AGE. §3 says "after the 10–15 % detraining discount": a discount
     for detraining, so an anchor he set days ago is not detrained. It applies only when the
     anchor is at least `DETRAINING_ANCHOR_AGE_DAYS` (28) older than the program's block-1
-    start (`program_structure.SESSION_SEQUENCE['block_start']`, 2026-09-24). Measured to
+    start (`program_structure.BLOCK_CALENDAR['block_1_start']`, 2026-09-24). Measured to
     the block start rather than to each session's date, so the decision is FIXED per anchor
     for the whole program: an age measured to the session date would flip an in-cycle anchor
     to discounted four weeks in and cut the load 10 % mid-ramp, against "Loads HOLD". 28 d
@@ -162,11 +162,10 @@ def band_e1rm_kg(best_kg: float, reps: list[int] | None) -> float:
 
 
 def block_1_start() -> str:
-    """The program's block-1 start — the ONE date the anchor's age is measured to (#4107).
-    Since #4110 it is the session sequence's `block_start` (the weekday calendar is retired)."""
+    """The program's block-1 start — the ONE date the anchor's age is measured to (#4107)."""
     from training import program_structure
 
-    return str(program_structure.SESSION_SEQUENCE["block_start"])
+    return str(program_structure.BLOCK_CALENDAR["block_1_start"])
 
 
 def anchor_discount(anchor_date: str | None, p: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:

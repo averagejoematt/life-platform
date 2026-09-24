@@ -26,6 +26,11 @@ What these tests hold:
      reds delts.
   7. THE PLANNER, through the MCP handler, carries the same loads on `session.loads`.
   8. THE OTHER PATHS ARE UNCHANGED — without the transform the floor is the band best.
+
+#4147 (2026-09-24): the program is v0.4 Upper/Lower now, served in order from lower-heavy. The
+ramp itself is unchanged (load_ramp is another lane's, #4148); these tests read it through the
+v0.4 UPPER-HEAVY session — the fourth in order, so three completed sessions (`_done(3)`) put it
+next — whose heavy anchors are the barbell bench and the machine row.
 """
 
 from __future__ import annotations
@@ -58,31 +63,30 @@ LB = 0.45359237
 # at a bodyweight inside the same 10-lb band as the target-date weigh-in. #4080: the heavy
 # day's squat is `squat_barbell` (owner option B exempts the squat family from skill_ceiling
 # 2, and it is the squat's first key); `leg_press` stays for §8's non-v0.3 path test.
-ANCHOR_LB = {"squat_barbell": 300.0, "leg_press": 400.0, "machine_row": 200.0, "lat_pulldown": 180.0}
-ANCHOR_REPS = {"squat_barbell": 5, "leg_press": 8, "machine_row": 10, "lat_pulldown": 10}
+ANCHOR_LB = {"squat_barbell": 300.0, "leg_press": 400.0, "machine_row": 200.0, "lat_pulldown": 180.0, "barbell_bench_press": 250.0}
+ANCHOR_REPS = {"squat_barbell": 5, "leg_press": 8, "machine_row": 10, "lat_pulldown": 10, "barbell_bench_press": 5}
 HISTORY = {
     MOVEMENTS[k]["hevy_template_id_hint"]: [
         {"date": "2025-01-10", "top_weight_kg": lb * LB, "sets": [{"weight_kg": lb * LB, "reps": ANCHOR_REPS[k]}]}
     ]
     for k, lb in ANCHOR_LB.items()
 }
-WEIGHTS = {"2025-01-10": 316.0, "2026-09-23": 315.0, "2026-11-17": 314.0}
-# The 09-24 heavy anchors the load path CAN load: each has a `hevy_template_id_hint`, which is
-# the key `_enforce_load_floors` looks the history up by. The third heavy anchor,
-# `barbell_bench_press`, has none (ADR-069: resolved by exact title at dry_run/commit), so its
-# floor is `no_template_id` and its sets carry no load — see the test named for it below.
-HEAVY_ANCHORS = ("squat_barbell", "machine_row")
-UNLOADABLE_HEAVY = "barbell_bench_press"
+WEIGHTS = {"2025-01-10": 316.0, "2026-09-23": 315.0, "2026-09-27": 315.0, "2026-11-17": 314.0}
+# The v0.4 upper-heavy session's heavy anchors (#4147) — each has a `hevy_template_id_hint`, the
+# key `_enforce_load_floors` looks the history up by (the bench's is the live-verified 79D0BB3A).
+HEAVY_ANCHORS = ("barbell_bench_press", "machine_row")
+BENCH = "barbell_bench_press"
+DAY = "2026-09-27"  # week 1, after three completed sessions (lower-heavy, upper-volume, lower-volume)
 
 
-def _generate(day: str, history=HISTORY, weights=WEIGHTS, **kw):
-    kw.setdefault("block_workouts", [])  # #4110: no session completed — the sequence serves week 1 · session 1
+def _generate(day: str = DAY, history=HISTORY, weights=WEIGHTS, **kw):
+    kw.setdefault("block_workouts", _done(3))  # #4147: three done -> upper-heavy is next, still week 1
     with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, **kw))
 
 
 def _done(n: int) -> list[dict]:
-    """`n` completed loaded sessions from the v0.3 block start, one a day (#4110)."""
+    """`n` completed loaded sessions from the block start, one a day (#4110)."""
     from common.pacific_time import shift_day_key
 
     return [
@@ -130,13 +134,13 @@ def test_moving_the_redline_moves_the_ramp_and_an_out_of_band_start_refuses():
 
 # ── 2. week 1 ────────────────────────────────────────────────────────────────
 def test_week_1_heavy_top_sets_land_at_60_to_65_percent_of_the_discounted_anchor():
-    ideal = _generate("2026-09-24")[0]
-    assert ideal.inputs_snapshot["calendar"]["week"] == 1
+    ideal = _generate()[0]
+    assert ideal.inputs_snapshot["calendar"]["week"] == 1 and ideal.inputs_snapshot["calendar"]["session_role"] == "upper_heavy"
     for key in HEAVY_ANCHORS:
         share = _top(ideal, key) / _discounted(key)
         assert 0.60 <= share <= 0.65, (key, share)
     audit = ideal.inputs_snapshot["load_floors"]
-    assert audit["load_rule"]["week"] == 1 and audit["movements"]["squat_barbell"]["ramp"]["ramp_pct"] == 60
+    assert audit["load_rule"]["week"] == 1 and audit["movements"][BENCH]["ramp"]["ramp_pct"] == 60
     assert any("entry ramp, week 1 = 60%" in r for r in ideal.rationale)
 
 
@@ -146,16 +150,16 @@ def test_the_barbell_bench_heavy_anchor_is_loaded_through_its_verified_template_
     its history and ramps it like every other heavy anchor; ADR-069's title resolution still runs
     at commit. Mutation control: without the hint the floor reads `no_template_id` and no set is
     loaded, which is exactly the regression this pins."""
-    assert MOVEMENTS[UNLOADABLE_HEAVY].get("hevy_template_id_hint") == "79D0BB3A"
-    ideal = _generate("2026-09-24")[0]
-    block = next(b for b in ideal.exercises if b.movement_key == UNLOADABLE_HEAVY)
+    assert MOVEMENTS[BENCH].get("hevy_template_id_hint") == "79D0BB3A"
+    ideal = _generate()[0]
+    block = next(b for b in ideal.exercises if b.movement_key == BENCH)
     assert block.rationale_tag == "anchor:bench:heavy"
-    status = ideal.inputs_snapshot["load_floors"]["movements"][UNLOADABLE_HEAVY]["status"]
+    status = ideal.inputs_snapshot["load_floors"]["movements"][BENCH]["status"]
     assert status != "no_template_id"
 
 
 def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_the_ramp():
-    ideal = _generate("2026-09-24")[0]
+    ideal = _generate()[0]
     for key in HEAVY_ANCHORS:
         block = next(b for b in ideal.exercises if b.movement_key == key)
         top = block.sets[0].weight_kg
@@ -166,15 +170,16 @@ def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_th
 
 
 def test_moderate_anchors_ride_the_same_ramp():
-    ideal = _generate("2026-09-24")[0]
+    ideal = _generate()[0]
     pulldown = next(b for b in ideal.exercises if b.movement_key == "lat_pulldown")
     assert all(0.60 <= s.weight_kg / _discounted("lat_pulldown") <= 0.65 for s in pulldown.sets)
 
 
 # ── 3. week 9 ────────────────────────────────────────────────────────────────
 def test_week_9_is_capped_at_85_percent():
-    ideal = _generate("2026-11-18", block_workouts=_done(24))[0]  # #4110: week 9 = 24 completed sessions
-    assert ideal.inputs_snapshot["calendar"]["week"] == 9 and "HEAVY" in ideal.title
+    # #4147: 35 completed -> index 35 = week 9's fourth session, upper-heavy (4 a week, from lower-heavy)
+    ideal = _generate("2026-11-18", block_workouts=_done(35))[0]
+    assert ideal.inputs_snapshot["calendar"]["week"] == 9 and ideal.title.startswith("UPPER-HEAVY")
     for key in HEAVY_ANCHORS:
         top = _top(ideal, key)
         share = top / _discounted(key)
@@ -196,31 +201,31 @@ def test_rounding_never_crosses_the_e1rm_cap():
 # ── 4. mutation control ──────────────────────────────────────────────────────
 def test_mutation_control_without_the_ramp_week_1_reads_100_percent():
     with patch.object(load_ramp, "ramp_floor", side_effect=lambda f, _w: f):
-        ideal = _generate("2026-09-24")[0]
+        ideal = _generate()[0]
     for key in HEAVY_ANCHORS:
         assert _top(ideal, key) == pytest.approx(ANCHOR_LB[key] * LB), key
         assert not 0.60 <= _top(ideal, key) / _discounted(key) <= 0.65, "the ramp-less week 1 must red the week-1 assertion"
 
 
 def test_no_band_matched_anchor_means_no_ramped_load():
-    ideal = _generate("2026-09-24", history={})[0]
+    ideal = _generate(history={})[0]
     assert all(s.weight_kg is None for b in ideal.exercises for s in b.sets)
-    # the barbell squat HAS a template id, so its absence is `no_history`, not `no_template_id`
-    assert ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]["status"] == "no_history"
+    # the barbell bench HAS a template id, so its absence is `no_history`, not `no_template_id`
+    assert ideal.inputs_snapshot["load_floors"]["movements"][BENCH]["status"] == "no_history"
 
 
 # ── 5. the commit gate ───────────────────────────────────────────────────────
 def test_the_commit_gate_accepts_the_ramped_session_and_refuses_without_the_back_off_floor():
     from mcp.hevy_prescription_gate import prescription_gate
 
-    ideal = _generate("2026-09-24")[0]
+    ideal = _generate()[0]
     assert prescription_gate(ideal)["verdict"] == "clean"
     for m in ideal.inputs_snapshot["load_floors"]["movements"].values():
         m.pop("back_off_floor_kg", None)
     gate = prescription_gate(ideal)
     assert gate["verdict"] == "refuse"
-    # exactly the LOADED heavy anchors: their back-offs sit 10 % under the top set with no
-    # recorded back-off floor. The unloaded barbell bench has no load to be under anything.
+    # exactly the heavy anchors: their back-offs sit 10 % under the top set with no recorded
+    # back-off floor.
     assert {v["where"] for v in gate["audit"]["violations"]} == set(HEAVY_ANCHORS)
 
 
@@ -228,7 +233,7 @@ def test_the_commit_gate_accepts_the_ramped_session_and_refuses_without_the_back
 def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
     week = program_structure.weekly_sets_by_muscle(MOVEMENTS)
     lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
-    assert lift["sets_per_muscle_wk"] == [6, 10] and lift["sets_per_muscle_wk_small"] == [4, 6]
+    assert lift["sets_per_muscle_wk"] == [8, 12] and lift["sets_per_muscle_wk_small"] == [4, 6]  # #4147: v0.4's ~10
     for group, row in week.items():
         lo, hi = row["range"]
         assert lo <= row["sets"] <= hi, (group, row)
@@ -241,33 +246,37 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
     assert lo <= total <= hi, total
 
 
-def test_mutation_control_the_pre_4090_templates_break_back_and_delts():
-    heavy = program_structure.SESSION_TEMPLATES["heavy"]
-    moderate = program_structure.SESSION_TEMPLATES["moderate"]
+def test_mutation_control_the_pre_4090_shape_breaks_delts():
+    """#4090's two fixes, re-applied to v0.4 (#4147): pulldown at 3 sets on both upper days puts back
+    at 12 (the band's top) and a lateral raise on upper-heavy puts delts at 8 — over 4–6."""
+    upper_heavy = program_structure.SESSION_TEMPLATES["upper_heavy"]
+    upper_volume = program_structure.SESSION_TEMPLATES["upper_volume"]
     with (
-        patch.dict(heavy, {"anchor_sets": {}, "accessories": ["leg_curl", "db_lateral_raise"]}),
-        patch.dict(moderate, {"anchor_sets": {}}),
+        patch.dict(upper_heavy, {"anchor_sets": {}, "accessories": ["cable_tricep_pushdown", "db_lateral_raise"]}),
+        patch.dict(upper_volume, {"anchor_sets": {}}),
     ):
         week = program_structure.weekly_sets_by_muscle(MOVEMENTS)
-    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 8
+    assert week["back"]["sets"] == 12 and week["delts"]["sets"] == 8 and week["delts"]["sets"] > week["delts"]["range"][1]
 
 
 # ── 7. the planner carries the same loads ────────────────────────────────────
 def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
     from mcp import handler as h
-    from tests.test_fullbody_block_calendar_4064 import _stage1_patches
+    from tests.test_program_session_4064_4147 import _stage1_patches
 
     with ExitStack() as st:
         for cm in _stage1_patches():
             st.enter_context(cm)
         st.enter_context(patch("mcp.tools_plan._load_anchor_indexes", return_value=(HISTORY, WEIGHTS)))
+        st.enter_context(patch("mcp.tools_plan._block_workouts", return_value=_done(3)))  # #4147: upper-heavy next
         st.enter_context(patch.object(h, "_emit_tool_metric"))
         st.enter_context(patch.object(h, "_audit_tool_call"))
-        resp = h.handle_tools_call({"name": "plan_next_session", "arguments": {"target_date": "2026-09-24"}})
+        resp = h.handle_tools_call({"name": "plan_next_session", "arguments": {"target_date": DAY}})
     session = json.loads(resp["content"][0]["text"])["constraint_block"]["session"]
+    assert session["session_role"] == "upper_heavy"
     assert session["loads"]["status"] == "applied" and session["loads"]["week"] == 1
-    assert session["weekly_sets_by_muscle"]["back"] == {"sets": 10, "range": [6, 10]}
-    ideal = _generate("2026-09-24")[0]
+    assert session["weekly_sets_by_muscle"]["back"] == {"sets": 10, "range": [8, 12]}
+    ideal = _generate()[0]
     assert set(HEAVY_ANCHORS) <= {e["movement_key"] for e in session["prescription"]["exposures"]}
     for e in session["prescription"]["exposures"]:
         if e["movement_key"] in HEAVY_ANCHORS:
@@ -278,7 +287,7 @@ def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
 
 def test_plan_next_session_reports_an_unreadable_anchor_by_name():
     from mcp import handler as h
-    from tests.test_fullbody_block_calendar_4064 import _stage1_patches
+    from tests.test_program_session_4064_4147 import _stage1_patches
 
     with ExitStack() as st:
         for cm in _stage1_patches():
