@@ -72,7 +72,7 @@ def test_discover_gate_census_count_reports_the_planted_importerror():
     PyYAML import lives, #518) and confirm the reason is captured, not thrown away."""
     import gate_census
 
-    def _boom(root):
+    def _boom(root, **_kw):
         raise ModuleNotFoundError("No module named 'yaml'")
 
     orig = gate_census.build_census

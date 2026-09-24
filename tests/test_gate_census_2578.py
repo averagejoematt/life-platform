@@ -1013,3 +1013,56 @@ def test_attempted_unproven_entries_say_why():
     for gid, note in gc.ATTEMPTED_UNPROVEN.items():
         assert len(note) > 120, f"{gid}: 'could not prove' with no reason is the same silence it replaces"
         assert "PROVED" in note.upper() or "ATTEMPTED" in note.upper(), f"{gid}: the note must state its own status"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #4135 — the COUNT-ONLY census the doc-fact sync runs, and the registry prefilter.
+# ─────────────────────────────────────────────────────────────────────────────
+def test_count_only_census_finds_exactly_the_full_census_gates(real_census):
+    """`deploy/sync_census_fact.py` counts `build_census(detail=False)`. It skips risk
+    flags, mention counts and the annassign exposure — work that annotates a gate and
+    never adds or drops one. Pin that: the same gate ids, in the same order, and the
+    same families_skipped as the full build on the real tree. A detail=False branch
+    that `continue`d past a gate (or a prefilter that dropped a registry) reds here."""
+    lite = gc.build_census(detail=False)
+    assert [g["id"] for g in lite["gates"]] == [g["id"] for g in real_census["gates"]]
+    assert lite["families_skipped"] == real_census["families_skipped"]
+    assert lite["annassign_exposure"] is None  # absent, never a zero that reads as measured
+
+
+def test_registry_prefilter_is_a_superset_of_the_registry_name_rule():
+    """The prefilter skips ast.parse for a file with none of `_REGISTRY_HINT`'s substrings.
+    That is exact only if EVERY name `_REGISTRY_NAME` accepts contains one of them. One
+    probe per alternation arm of the rule, plus every registry name on the real tree."""
+    probes = [
+        "GATE_CLASSES",
+        "X_CHECKS",
+        "_X_RULES",
+        "XALLOWLIST",
+        "XDENYLIST",
+        "X_EXEMPT_Y",
+        "BASELINE",
+        "_X_BASELINE",
+        "CHOKEPOINTS",
+        "X_GATES",
+        "X_GUARDS",
+        "GATE_X",
+        "X_CLASSES",
+    ]
+    for name in probes:
+        assert gc._REGISTRY_NAME.match(name), f"probe {name} no longer matches the rule — update the probe list"
+        assert gc._REGISTRY_HINT.search(name), f"{name} matches _REGISTRY_NAME but not the prefilter — its file would be skipped"
+    assert not gc._REGISTRY_HINT.search("SOURCE_REGISTRY = {}"), "the prefilter must actually skip something"
+
+
+def test_registry_prefilter_does_not_drop_a_planted_registry(tmp_path):
+    """Can-fail control on a synthetic tree: a file whose ONLY registry-shaped token is the
+    binding itself must still be parsed and expanded entry by entry."""
+    (tmp_path / "scripts").mkdir()
+    planted = tmp_path / "scripts" / "planted.py"
+    planted.write_text('LANE_GUARDS = {"alpha": 1, "beta": 2}\n')
+    skipped = tmp_path / "scripts" / "plain.py"
+    skipped.write_text('SOURCE_REGISTRY = {"x": 1}\n')
+    gates, counters = gc.discover_registry_gates(tmp_path, [planted, skipped])
+    assert sorted(g.name for g in gates) == ["LANE_GUARDS[alpha]", "LANE_GUARDS[beta]"]
+    assert counters["registries"] == 1
