@@ -278,7 +278,7 @@ def test_an_incomplete_sweep_is_refused_rather_than_reported(monkeypatch):
         "gates": [{"id": f"synthetic::{i}"} for i in range(450)],
         "families_skipped": [{"family": "structural", "reason": "tests/premerge_derivation.py not importable (ImportError: blocked)"}],
     }
-    monkeypatch.setattr(gate_census, "build_census", lambda root: partial)
+    monkeypatch.setattr(gate_census, "build_census", lambda root, **_kw: partial)
     count, error = fact.discover_gate_census_count(REPO)
     assert count is None, "a sweep missing a whole family must not be reported as a count"
     assert "incomplete sweep" in error
@@ -293,7 +293,7 @@ def test_the_same_stub_without_the_skip_is_reported(monkeypatch):
     import gate_census
 
     complete = {"gates": [{"id": f"synthetic::{i}"} for i in range(450)], "families_skipped": []}
-    monkeypatch.setattr(gate_census, "build_census", lambda root: complete)
+    monkeypatch.setattr(gate_census, "build_census", lambda root, **_kw: complete)
     count, error = fact.discover_gate_census_count(REPO)
     assert (count, error) == (450, None)
 

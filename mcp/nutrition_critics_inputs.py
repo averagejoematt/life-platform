@@ -106,6 +106,7 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         "weighin_span_days": None,
         "rate_provisional": None,
         "weekly_loss_rates_lb_wk": None,
+        "weekly_loss_rate_weeks": None,
     }
     if rows is None:
         return out
@@ -120,6 +121,8 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         out["rate_provisional"] = rate["provisional"]
     out["loss_rate"] = rate
     out["weekly_loss_rates_lb_wk"] = shared_quantities.weekly_loss_rates_from_rows(usable, end)
+    # #4150: every trailing week with its status — a partial/thin week is REPORTED here and never counted above
+    out["weekly_loss_rate_weeks"] = shared_quantities.weekly_loss_rate_weeks_from_rows(usable, end)
     return out
 
 

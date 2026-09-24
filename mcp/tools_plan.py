@@ -731,6 +731,10 @@ def tool_plan_next_session(args):
     # the same resolver, so the two surfaces cannot disagree. Owner-only (MCP), never a site
     # or email surface.
     out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
+    if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
+        from mcp.nightly_predraft import attach_to_stage_1
+
+        attach_to_stage_1(out, target_date)
     if ir is not None:
         out["critics"] = _run_stage_2(
             ir,

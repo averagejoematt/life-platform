@@ -793,7 +793,7 @@ _NONZERO_EXIT = re.compile(r"sys\.exit\(\s*(?!0\s*\))|SystemExit\(\s*(?!0)|exit\
 NAME_ONLY_CANDIDATES: list[dict[str, Any]] = []
 
 
-def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], dict[str, int]]:
+def discover_guard_scripts(root: Path, files: list[Path], detail: bool = True) -> tuple[list[Gate], dict[str, int]]:
     gates: list[Gate] = []
     NAME_ONLY_CANDIDATES.clear()
     counters = {"candidates": 0, "no_nonzero_exit": 0, "shell_unscreened": 0, "name_only": 0}
@@ -805,8 +805,12 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
     # (a directory the corpus did not include). A caller-detector that does not read all
     # the callers is the same defect this census exists to find.
     hooks = list((root / ".git" / "hooks").glob("*")) if (root / ".git" / "hooks").is_dir() else []
+    # #4135: detail=False (the count-only census) skips the corpus + risk flags —
+    # they annotate a gate, they never add or drop one.
     referenced_corpus = "\n".join(
-        _read(p) for p in files + hooks if p.suffix in {".py", ".yml", ".yaml", ".sh", ".toml", ".cfg", ""} or p.name == "Makefile"
+        _read(p)
+        for p in (files + hooks if detail else [])
+        if p.suffix in {".py", ".yml", ".yaml", ".sh", ".toml", ".cfg", ""} or p.name == "Makefile"
     )
 
     for path in files:
@@ -860,12 +864,12 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
                 )
             )
             continue
-        flags = _static_source_flags(text)
+        flags = _static_source_flags(text) if detail else []
         # Count references excluding the file's own text; match the module STEM as well
         # as the filename, since a python caller imports `check_css_tokens`, not
         # `check_css_tokens.py`.
-        others = referenced_corpus.replace(text, "")
-        if path.name not in others and rel not in others and re.search(rf"\b{re.escape(path.stem)}\b", others) is None:
+        others = referenced_corpus.replace(text, "") if detail else ""
+        if detail and path.name not in others and rel not in others and re.search(rf"\b{re.escape(path.stem)}\b", others) is None:
             flags.append("unreferenced-entrypoint")
         gates.append(
             Gate(
@@ -902,16 +906,24 @@ def _literal_entries(value: ast.expr | None) -> list[str] | None:
     return None
 
 
-def discover_registry_gates(root: Path, files: list[Path]) -> tuple[list[Gate], dict[str, int]]:
+# #4135 — an exact SUPERSET prefilter: every name _REGISTRY_NAME can match contains one of
+# these substrings, and a module-level binding's name appears verbatim in its source, so a
+# file with none of them has no registry to find and is never ast.parse'd.
+_REGISTRY_HINT = re.compile(r"_CHECKS|_RULES|ALLOWLIST|DENYLIST|_EXEMPT|BASELINE|CHOKEPOINTS|_GATES|_GUARDS|GATE_|_CLASSES")
+
+
+def discover_registry_gates(root: Path, files: list[Path], detail: bool = True) -> tuple[list[Gate], dict[str, int]]:
     gates: list[Gate] = []
     counters = {"registries": 0, "non_literal_registries": 0, "entries": 0, "annassign_registries": 0}
 
     py = [p for p in files if p.suffix == ".py" and p.relative_to(root).parts[0] in _REGISTRY_ROOTS]
     corpus_by_file = {p: _read(p) for p in py}
-    all_source = "\n".join(corpus_by_file.values())
+    all_source = "\n".join(corpus_by_file.values()) if detail else ""
 
     for path in py:
         rel = path.relative_to(root).as_posix()
+        if not _REGISTRY_HINT.search(corpus_by_file[path]):
+            continue
         try:
             tree = ast.parse(corpus_by_file[path])
         except SyntaxError:
@@ -942,7 +954,7 @@ def discover_registry_gates(root: Path, files: list[Path]) -> tuple[list[Gate], 
             # risk_flags: attaching one file's syntactic smell to all N of its entries
             # would multiply a single lead into N and make the histogram a lie about
             # how many distinct leads exist.
-            module_flags = _static_source_flags(corpus_by_file[path])
+            module_flags = _static_source_flags(corpus_by_file[path]) if detail else []
             # Exemption DATA (allowlists, denylists, size baselines) and behavioural
             # registries fail differently, and conflating them is how the first run of
             # this detector reported 39 `declared-unwired` hits that were mostly a
@@ -961,8 +973,8 @@ def discover_registry_gates(root: Path, files: list[Path]) -> tuple[list[Gate], 
                 else:
                     # #2564's shape: an entry name that appears nowhere but its own
                     # registry and the test that reads the registry.
-                    mentions = all_source.count(f'"{entry}"') + all_source.count(f"'{entry}'")
-                    if mentions <= 1:
+                    mentions = all_source.count(f'"{entry}"') + all_source.count(f"'{entry}'") if detail else -1
+                    if 0 <= mentions <= 1:
                         flags.append("declared-unwired")
                 gates.append(
                     Gate(
@@ -1081,7 +1093,10 @@ def discover_sentinel_gates(root: Path) -> tuple[list[Gate], dict[str, int]]:
 FAMILIES = ("ci", "guard", "registry", "qa", "structural", "sentinel")
 
 
-def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -> dict[str, Any]:
+def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES, *, detail: bool = True) -> dict[str, Any]:
+    """The census. `detail=False` (#4135) is the COUNT-ONLY build the doc-fact sync uses:
+    the same gates and families_skipped, without risk flags, mention counts or the
+    annassign exposure (None) — tests/test_gate_census_2578.py pins the gate-id parity."""
     root = root or REPO_ROOT
     families = tuple(families)
     dropped = [f for f in FAMILIES if f not in families]
@@ -1097,11 +1112,11 @@ def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -
         gates += g
         counters["ci"] = c
     if "guard" in families:
-        g, c = discover_guard_scripts(root, files)
+        g, c = discover_guard_scripts(root, files, detail)
         gates += g
         counters["guard"] = c
     if "registry" in families:
-        g, c = discover_registry_gates(root, files)
+        g, c = discover_registry_gates(root, files, detail)
         gates += g
         counters["registry"] = c
     if "qa" in families:
@@ -1181,7 +1196,7 @@ def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -
         "families_run": list(families),
         "families_dropped": dropped,
         "counters": counters,
-        "annassign_exposure": annassign_exposure(root, files),
+        "annassign_exposure": annassign_exposure(root, files) if detail else None,
         "gates": [asdict(g) for g in gates],
     }
 
