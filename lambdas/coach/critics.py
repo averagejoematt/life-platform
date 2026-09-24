@@ -60,14 +60,13 @@ chokepoint (ADR-062) or a test double.
 
 from __future__ import annotations
 
-import copy
 import json
 import re
 from typing import Any, Callable
 
 from training import owner_redlines, training_context_registry, training_streaks
 
-CRITICS_VERSION = "critics@1.3.0"  # #4067: two streaks, the rest-day ask keys on the loaded one; #4068: THE loss rate
+CRITICS_VERSION = "critics@1.4.0"  # #4149: every numeric change computed in code; critic loads clamped to the subtract-only floor
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
@@ -82,6 +81,17 @@ BUDGET_FEATURE = "plan_critics"
 # (a loaded bar). Both are assumptions this lane made to make the rule computable; the owner
 # can tighten either without touching the critic logic.
 NOVEL_AGAIN_DAYS = 28
+# #4149 — THE DETERMINISM RULING. On 2026-09-23 the joints critic answered one signal
+# (squat_barbell days_since_movement 98/99) three ways: sets 3->2, load -25 %, load -13 %; the
+# model chose the number. A days-since signal now moves VOLUME, computed here, never LOAD: the
+# v0.3 entry ramp (`load_ramp.v03_floor` — layoff discount x the week's ramp) already prices the
+# layoff into the load and the commit gate holds that load as a floor, so a critic load cut on
+# the same signal double-discounts and is uncommittable by construction (the -25 % run was
+# refused at 36 kg against a 48 kg floor). INTERPRETATION RECORDED (not an owner ruling): a
+# novel-again pattern's session 1 carries at most NOVEL_AGAIN_MAX_WORKING_SETS working sets
+# (one of the model's own three answers, the only committable one). The owner can move the
+# number without touching the logic.
+NOVEL_AGAIN_MAX_WORKING_SETS = 2
 CALIBRATION_COLD_DAYS = 14
 AXIAL_HEAVY_LBS = 135.0
 _AXIAL_SQUAT = ("squat", "front squat", "back squat", "hack squat", "leg press", "goblet")
@@ -94,20 +104,23 @@ CALIBRATION_REDLINES = {
     "pain_flag_loaded": "a movement carrying a pain flag on a named site is substituted, not loaded (owner calibration doc §4; tripwire pain_flag_named_site)",
 }
 
-# `change` grammar — the only fields a critic may move, and the only ones `apply_changes`
-# knows how to move. Anything else is recorded as `unapplied` and never silently dropped.
-CHANGE_FIELD_RE = re.compile(r"^(exercises\[(\d+)\]\.(weight_lbs|set_count|reps|drop)|session\.total_sets)$")
-MAX_ADDED_SETS = 3  # the advocate may add, never more than this in one pass
-_LBS_PER_KG = 2.2046226218
+# The `change` grammar, MAX_ADDED_SETS, the lb/kg factor and the label live in `critics_apply`
+# (#4149 extraction) and are re-exported here unchanged.
+from coach.critics_apply import (  # noqa: E402,F401
+    _LBS_PER_KG,
+    CHANGE_FIELD_RE,
+    FLOOR_TOLERANCE_KG,
+    MAX_ADDED_SETS,
+    _label,
+    apply_changes,
+)
+
+# #4149: the advocate's escalation is a code-computed quantum, not a model-chosen total — one
+# set per pass (INTERPRETATION RECORDED: the smallest step; MAX_ADDED_SETS stays the bound).
+ADVOCATE_ADD_SETS = 1
 
 
 # ── the draft, summarised the same way for every critic ───────────────────────────────
-def _label(ex: Any) -> str:
-    tag = getattr(ex, "rationale_tag", "") or ""
-    key = getattr(ex, "movement_key", "") or ""
-    return (tag if tag and tag != "custom" else key) or "?"
-
-
 def draft_summary(ir: Any) -> dict[str, Any]:
     """What every critic sees of the plan — the SAME view, so the packets are the only
     thing that differs between them."""
@@ -151,8 +164,29 @@ def _axial_pattern(name: str) -> str | None:
 
 
 # ── packets: one per critic, pairwise-disjoint metric names ───────────────────────────
-def _flag(metric: str, severity: str, reason: str, *, provenance: str, field: str | None = None, to: Any = None) -> dict[str, Any]:
-    return {"metric": metric, "severity": severity, "reason": reason, "provenance": provenance, "field": field, "to": to}
+def _flag(
+    metric: str,
+    severity: str,
+    reason: str,
+    *,
+    provenance: str,
+    field: str | None = None,
+    to: Any = None,
+    governed: bool = False,
+) -> dict[str, Any]:
+    """One packet flag. `field`/`to` are computed HERE, never by the model (#4149): on a
+    `change` flag they are the change; on an `info` flag they are what a grounded model
+    escalation applies. `governed` marks a signal a code rule already answers in full — the
+    model may not escalate it at all, so its verdict cannot vary with the sample."""
+    return {
+        "metric": metric,
+        "severity": severity,
+        "reason": reason,
+        "provenance": provenance,
+        "field": field,
+        "to": to,
+        "governed": governed,
+    }
 
 
 # #4112: extracted to the cohesive sibling `critics_muscle_defense` (this module was at its
@@ -202,7 +236,11 @@ def build_joints_packet(
     if loaded_lifting_streak is None:
         unknown.append("loaded_lifting_streak")
     elif streak_flag:
-        flags.append(_flag("loaded_lifting_streak", *streak_flag, provenance=training_streaks.CALIBRATION["provenance"]))
+        # #4149: the upper-tail line is an escalation handle; if the model takes it, the cut is
+        # the owner's own signed deload (`lifting_sessions_per_wk.deload.sets_pct`, loads held),
+        # computed here — live, the model had picked 18, 14 and 2 total sets for one signal.
+        esc = {} if streak_flag[0] != "info" else {"field": "session.total_sets", "to": _deload_total_sets(draft)}
+        flags.append(_flag("loaded_lifting_streak", *streak_flag, provenance=training_streaks.CALIBRATION["provenance"], **esc))
     heavy_axial_cold: list[dict[str, Any]] = []
     dismissed_rows: list[dict[str, Any]] = []  # #4036 — every owner dismissal this packet met
     for ex in draft["exercises"]:
@@ -216,14 +254,7 @@ def build_joints_packet(
                 _flag(dk, "info", f"{ex['label']}: no performed history in the window — treated as novel-again", provenance="owner-history")
             )
         elif novel:
-            flags.append(
-                _flag(
-                    dk,
-                    "info",
-                    f"{ex['label']}: last performed {ds} days ago — novel-again pattern, tendons lag muscle",
-                    provenance="owner-history",
-                )
-            )
+            flags.append(_novel_again_flag(ex, dk, ds))
         if novel and ex.get("to_failure"):
             violations.append(
                 {
@@ -305,6 +336,37 @@ def build_joints_packet(
     }
 
 
+def _deload_total_sets(draft: dict[str, Any]) -> int:
+    """The session's total sets under the owner's signed deload cut (−30 % sets as of v3), >= 1."""
+    pct = float(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"]["sets_pct"])
+    return max(1, int(round(int(draft.get("total_sets") or 0) * (1 + pct / 100.0))))
+
+
+def _novel_again_flag(ex: dict[str, Any], dk: str, ds: int) -> dict[str, Any]:
+    """The days-since rule, answered in code (#4149 — the ruling at NOVEL_AGAIN_MAX_WORKING_SETS).
+
+    A LOADED movement last performed >= NOVEL_AGAIN_DAYS ago with more working sets than the cap
+    draws a `change` to the cap; at or under the cap the rule is already met and the flag is
+    `info`. Either way the flag is `governed`: the model cannot re-escalate it into a load cut
+    or a different set count, so one (signal, value) gives one answer on every run."""
+    cap = NOVEL_AGAIN_MAX_WORKING_SETS
+    reason = f"{ex['label']}: last performed {ds} days ago — novel-again pattern, tendons lag muscle"
+    loaded = ex.get("top_weight_lbs") is not None
+    if loaded and (ex.get("n_working_sets") or 0) > cap:
+        warmups = (ex.get("n_sets") or 0) - (ex.get("n_working_sets") or 0)
+        return _flag(
+            dk,
+            "change",
+            f"{reason}: {ex['n_working_sets']} -> {cap} working sets on session 1 (load stays the entry ramp's, never cut here)",
+            provenance="owner-history",
+            field=f"exercises[{ex['idx']}].set_count",
+            to=warmups + cap,
+            governed=True,
+        )
+    tail = f"; working sets already <= {cap}" if loaded else "; unloaded"
+    return _flag(dk, "info", reason + tail, provenance="owner-history", governed=True)
+
+
 def _walking_split_sentence(walking: dict[str, Any]) -> str:
     """The per-source split, inline in the critic's sentence: " (strava 6.04 + hevy 8.33)".
 
@@ -384,6 +446,9 @@ def build_rate_advocate_packet(
                 f"all {len(clear)} armed tripwires clear — nothing in the data argues for holding back"
                 + (f" ({len(inactive)} not yet active: {', '.join(inactive)})" if inactive else ""),
                 provenance="owner",
+                # #4149: what a grounded escalation adds, computed here — never the model's total
+                field="session.total_sets",
+                to=int(draft.get("total_sets") or 0) + ADVOCATE_ADD_SETS,
             )
         )
     if tripped:
@@ -649,6 +714,9 @@ def _prompt(packet: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
         "model": HAIKU_MODEL,
         "max_tokens": MAX_TOKENS,
         "system": system,
+        # #4149: pinned. The verdict's NUMBERS are computed in code regardless; this keeps the
+        # objection and its sentence from varying with the sample as well.
+        "temperature": 0,
         "messages": [{"role": "user", "content": user + "\nReturn the JSON object."}],
     }
 
@@ -701,23 +769,34 @@ def reconcile(det: dict[str, Any], model: dict[str, Any] | None, packet: dict[st
     rank = {"approve": 0, "change": 1, "veto": 2}
     if rank[model["verdict"]] <= rank[det["verdict"]]:
         return out  # the model agrees or is milder — the floor holds
-    flagged = {f["metric"] for f in packet.get("flags", [])} | {v["metric"] for v in packet.get("violations", [])}
+    flags = {f["metric"]: f for f in packet.get("flags", [])}
+    violated = {v["metric"] for v in packet.get("violations", [])}
     metric = model.get("metric")
-    if metric not in flagged or metric not in packet["numbers"]:
+    if (metric not in flags and metric not in violated) or metric not in packet["numbers"]:
         out["discarded"] = f"model said {model['verdict']} on {metric!r}, which no flag in this packet names — objection discarded (#3851)"
         return out
-    # grounded escalation: one step up from the floor, never more
+    flag = flags.get(metric) or {}
+    if flag.get("governed"):
+        # #4149: a code rule already answers this signal in full; a model escalation here is how
+        # one days-since value became three different changes on 2026-09-23.
+        out["discarded"] = f"model said {model['verdict']} on {metric!r}, which a code rule governs — the rule's answer stands (#4149)"
+        return out
+    # grounded escalation: one step up from the floor, never more. The model chooses WHETHER to
+    # object on a flagged metric; the field and number applied are the FLAG's, computed in code
+    # (#4149) — a model-chosen number is recorded on `model`, never applied.
     target = "change" if det["verdict"] == "approve" else "veto"
     if model["verdict"] == "veto" and target == "change":
         out["discarded"] = f"model veto on {metric!r} downgraded to change — a veto needs a redline, and none is violated here"
-    field = model.get("field") if isinstance(model.get("field"), str) and CHANGE_FIELD_RE.match(model.get("field") or "") else None
+    if model.get("field") or model.get("to") is not None:
+        out["model_numbers_not_applied"] = f"{model.get('field')} -> {model.get('to')}: a model-chosen number is never applied (#4149)"
+    code_field = flag.get("field")
     out.update(
         {
             "verdict": target,
             "metric": metric,
             "value": packet["numbers"].get(metric),
-            "field": field or det.get("field"),
-            "to": model.get("to") if field else det.get("to"),
+            "field": code_field or det.get("field"),
+            "to": flag.get("to") if code_field else det.get("to"),
         }
     )
     out["reason"] = out.get("sentence") or out["reason"]
@@ -767,100 +846,9 @@ def run_critics(
 
 
 # ── applying changes and re-checking ──────────────────────────────────────────────────
-def apply_changes(ir: Any, verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Apply every `change` verdict to the IR in place. Returns one record per change,
-    `applied` True/False with the reason — an unapplied change is visible, never dropped."""
-    records: list[dict[str, Any]] = []
-    for v in verdicts:
-        if v.get("verdict") != "change" or not v.get("field"):
-            if v.get("verdict") == "change":
-                records.append(
-                    {
-                        "critic": v["critic"],
-                        "field": None,
-                        "applied": False,
-                        "why": "change carried no mechanical field — coach must act on it",
-                    }
-                )
-            continue
-        m = CHANGE_FIELD_RE.match(v["field"])
-        rec = {"critic": v["critic"], "field": v["field"], "to": v.get("to"), "applied": False, "why": None}
-        if not m:
-            rec["why"] = "field outside the change grammar"
-            records.append(rec)
-            continue
-        try:
-            rec["applied"], rec["why"] = _apply_one(ir, m, v.get("to"))
-        except Exception as e:  # noqa: BLE001
-            rec["why"] = f"{type(e).__name__}: {e}"
-        records.append(rec)
-    return records
-
-
-def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
-    exercises = getattr(ir, "exercises", None) or []
-    if m.group(1) == "session.total_sets":
-        if to == "hold":
-            return False, "hold: no growth this week — the draft is not enlarged, nothing to trim automatically"
-        target = int(to)
-        current = sum(len(getattr(e, "sets", []) or []) for e in exercises)
-        if target == current:
-            return False, f"total_sets already {current}"
-        if target > current:
-            # the advocate's lane: ADD sets, bounded at +MAX_ADDED_SETS, cloned from the last working set
-            if not exercises or not exercises[-1].sets:
-                return False, "no exercise to add sets to"
-            target = min(target, current + MAX_ADDED_SETS)
-            while current < target:
-                exercises[-1].sets.append(_clone(exercises[-1].sets[-1]))
-                current += 1
-            return True, None
-        # LIVE FINDING 2026-09-20 (routine 73bc228c v2): trimming from the LAST exercise backwards
-        # took a 22 -> 18 cut entirely out of face pulls and hammer curls (3 -> 1 each) and left
-        # the two 4-set anchors untouched — a deload shape no coach would write. Round-robin:
-        # one set at a time from the exercise with the MOST sets (ties -> the later one), never
-        # below one set per exercise, so a cut spreads across the session instead of hollowing
-        # out its tail.
-        while current > target:
-            candidates = [ex for ex in exercises if len(ex.sets) > 1]
-            if not candidates:
-                break
-            victim = max(candidates, key=lambda ex: (len(ex.sets), exercises.index(ex)))
-            victim.sets.pop()
-            current -= 1
-        return current == target, None if current == target else f"could only trim to {current}"
-    idx, attr = int(m.group(2)), m.group(3)
-    if idx >= len(exercises):
-        return False, f"exercises[{idx}] does not exist"
-    ex = exercises[idx]
-    if attr == "drop":
-        exercises.pop(idx)
-        return True, None
-    if attr == "weight_lbs":
-        kg = float(to) / _LBS_PER_KG
-        for s in ex.sets:
-            if (getattr(s, "type", "normal") or "normal") != "warmup" and getattr(s, "weight_kg", None) is not None:
-                s.weight_kg = round(kg, 2)
-        return True, None
-    if attr == "reps":
-        for s in ex.sets:
-            if (getattr(s, "type", "normal") or "normal") != "warmup":
-                s.reps = int(to)
-        return True, None
-    if attr == "set_count":
-        n = int(to)
-        if n < 1:
-            return False, "set_count below 1"
-        while len(ex.sets) > n:
-            ex.sets.pop()
-        while len(ex.sets) < n and ex.sets:
-            ex.sets.append(_clone(ex.sets[-1]))
-        return len(ex.sets) == n, None
-    return False, "unreachable"
-
-
-def _clone(s: Any) -> Any:
-    return copy.deepcopy(s)
+# #4149: `apply_changes` + the floor clamp live in the cohesive sibling `critics_apply` (this
+# module was nearing its size ceiling — the #4112 precedent). Every caller still reads
+# `critics.apply_changes`.
 
 
 def recheck(
@@ -952,6 +940,9 @@ def notes_block(ir: Any) -> str:
     applied = [c for c in rec.get("changes", []) if c.get("applied")]
     if applied:
         lines.append("applied: " + "; ".join(f"{c['field']} -> {c['to']}" for c in applied))
+    for c in rec.get("changes", []):
+        if c.get("conflict"):
+            lines.append(f"CONFLICT: {c['conflict']}"[:300])
     for o in rec.get("owner_overrides") or []:
         if o.get("applied"):
             words = " ".join(str(o.get("owner_words") or "").split())

@@ -190,8 +190,9 @@ def test_tsb_strava_weighttraining_echo_not_double_counted():
     hevy_60d = [_hevy("2026-06-18", 17, 108)]
 
     load, basis = dmc._daily_training_load(strava_60d, hevy_60d, today)
-    # 108 min at the lift rate (50/h) = 90 points — once, not twice.
-    assert abs(load["2026-06-18"] - 90.0) < 0.5, load
+    # #4075 4A: a Hevy record with no set log → 108 min × the stated 0.25 work fraction
+    # × 50/h = 22.5 points — once, not twice (the echo would add 22.5 more).
+    assert abs(load["2026-06-18"] - 22.5) < 0.5, load
     assert basis["strava_duration_days"] == 0, basis
 
 

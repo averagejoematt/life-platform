@@ -24,7 +24,12 @@ record, and the reason survives log retention.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
+
+from common.numeric import decimals_to_float, floats_to_decimal
+
+logger = logging.getLogger(__name__)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
@@ -86,7 +91,45 @@ MAX_TOKENS_DERIVATION = {
 # 2 x 265 = 530 -> 640. max_tokens is a CEILING, not a charge — billing is on tokens actually
 # emitted — so the headroom costs $0 until it is used, while a breach degrades LOUDLY.
 MAX_TOKENS = 640
-DEFAULT_MONTHLY_CAP = 300
+
+# ── The monthly CALL cap, per lane (#4151) ────────────────────────────────────
+# 300 was written the day this layer shipped (2026-06-21, #187 — "monthly cap ~300" in
+# ADR-094) with no measurement behind it. It is now DERIVED, and it is charged PER LANE:
+#
+#   * `live` — the on-ingest hook in hevy-backfill, one call per NEW note text.
+#   * `bulk` — every sweep: `reextract_days`, `deploy/backfill_training_notes.py`.
+#
+# The split is the fix for #4151's specimen: the attended historical backfill of 2026-09-19
+# spent ~277 of September's 301 calls on notes from 2021-2023, and from that instant every
+# new session the owner logged degraded to deterministic-only (`cap_exceeded` on 25 of 28
+# sessions in the 14-day health window). A sweep can no longer starve the live path.
+#
+# The OTHER half of the specimen was the hash cache (see `cache_put`): it never held a
+# non-empty extraction, so each of the corpus's 566 noted sessions was billed although they
+# carry only 111 distinct note texts. With the cache working, a full-corpus pass costs at
+# most the distinct-note count, and that is what the bulk number below is sized on.
+MONTHLY_CAP_DERIVATION = {
+    "metric": (
+        "noted exercise-sessions per month (SOURCE#hevy, non-empty exercise notes) for the live lane; "
+        "distinct note_hash over every head record in USER#matthew#SOURCE#training_notes#EXERCISE#* for the bulk lane; "
+        "per-call cost from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=hevy-backfill}"
+    ),
+    "window": "SOURCE#hevy 2025-09-01 → 2026-09-23; the whole note partition + the metric 2026-09-01 → 2026-09-23, read 2026-09-23",
+    "live_monthly_noted_sessions": {"2025-10": 1, "2026-06": 21, "2026-09 (to the 23rd)": 30},
+    "live_projected_peak_month": 39,
+    "bulk_corpus_head_records": 566,
+    "bulk_corpus_distinct_notes": 111,
+    "cost_per_call_usd": {"n": 24, "mean": 0.00066, "max": 0.00101},
+    "rule": (
+        "each lane: at least 2x its measured demand, rounded up to the next 100. live: 2 x 39 = 78, "
+        "and the 2026-06-21 value of 300 already clears it by 7.7x, so it is RETAINED rather than cut (an edited "
+        "note mints a new hash and a new call, and that edit rate has never been measured). bulk: 2 x 111 = 222 -> 300. "
+        "Worst case both lanes at cap = 600 x $0.00101 = $0.61/month"
+    ),
+    "re_derive_when": "a live month exceeds 150 noted sessions, the distinct-note corpus exceeds 150, or cap_exceeded is recorded on either lane",
+}
+DEFAULT_MONTHLY_CAP = 300  # per lane — see MONTHLY_CAP_DERIVATION
+LANES = ("live", "bulk")
 
 _CACHE_PK = "USER#matthew#SOURCE#training_notes#CACHE"
 _USAGE_PK = "USER#matthew#SOURCE#training_notes#USAGE"
@@ -218,35 +261,60 @@ def _month(now=None):
     return (now or datetime.now(timezone.utc)).strftime("%Y-%m")
 
 
+def usage_sk(now=None, lane: str = "live") -> str:
+    """The per-lane monthly counter key (#4151): `MONTH#YYYY-MM#<lane>`.
+
+    Rows keyed plain `MONTH#YYYY-MM` were written before the split, when one counter was
+    charged by BOTH lanes. They are history, left as they are: the 301 in `MONTH#2026-09`
+    cannot be divided between the lanes after the fact (the Lambda metric accounts for 24;
+    the rest were the attended backfill, which is unmetered). Nothing reads them now.
+    """
+    if lane not in LANES:
+        raise ValueError(f"unknown training-notes cap lane {lane!r} (expected one of {LANES})")
+    return f"MONTH#{_month(now)}#{lane}"
+
+
 def cache_get(table, note_hash: str):
     try:
         r = table.get_item(Key={"pk": _CACHE_PK, "sk": f"HASH#{note_hash}"})
         it = r.get("Item")
-        return it.get("signals") if it else None
+        # #4151: stored as Decimal (see cache_put). Hand back the same float shape a model
+        # call returns, so a cache hit and a fresh extraction are indistinguishable downstream.
+        return decimals_to_float(it.get("signals")) if it else None
     except Exception:
         return None
 
 
 def cache_put(table, note_hash: str, signals: list):
+    """Best-effort — but never SILENT again (#4151).
+
+    `signals` carries float `confidence` values, and boto3 rejects a float with
+    `TypeError: Float types are not supported`. The write used to hand them over raw under a
+    bare `except: pass`, so from 2026-06-21 to #4151 the cache never held a single non-empty
+    extraction: all 19 live CACHE rows had 0 signals. Every repeat of a note was billed
+    again, and that is how one bulk pass spent a month's cap on 111 distinct notes.
+    """
     try:
-        table.put_item(Item={"pk": _CACHE_PK, "sk": f"HASH#{note_hash}", "signals": signals, "at": _month()})
-    except Exception:
-        pass  # cache is best-effort; never break extraction on a cache write
+        table.put_item(Item={"pk": _CACHE_PK, "sk": f"HASH#{note_hash}", "signals": floats_to_decimal(signals), "at": _month()})
+    except Exception as e:  # noqa: BLE001 — the cache must never break an extraction
+        logger.warning("training-notes hash-cache write failed (the next identical note re-bills): %s: %s", type(e).__name__, e)
 
 
-def monthly_calls(table, now=None) -> int:
+def monthly_calls(table, now=None, lane: str = "live") -> int:
     try:
-        r = table.get_item(Key={"pk": _USAGE_PK, "sk": f"MONTH#{_month(now)}"})
+        r = table.get_item(Key={"pk": _USAGE_PK, "sk": usage_sk(now, lane)})
         it = r.get("Item")
         return int(it.get("calls", 0)) if it else 0
+    except ValueError:
+        raise
     except Exception:
         return 0
 
 
-def _bump_calls(table, now=None):
+def _bump_calls(table, now=None, lane: str = "live"):
     try:
         table.update_item(
-            Key={"pk": _USAGE_PK, "sk": f"MONTH#{_month(now)}"},
+            Key={"pk": _USAGE_PK, "sk": usage_sk(now, lane)},
             UpdateExpression="SET calls = if_not_exists(calls, :z) + :one",
             ExpressionAttributeValues={":z": 0, ":one": 1},
         )
@@ -254,14 +322,20 @@ def _bump_calls(table, now=None):
         pass
 
 
-def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP):
+def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live"):
     """Build the llm_fn passed to training_notes.extract_signals: hash-cached + capped.
+
+    `lane` names the monthly counter this closure charges (#4151): `live` for the on-ingest
+    hook, `bulk` for any sweep. The lanes never share a counter, so a sweep cannot spend the
+    live path's month.
 
     Returns a closure (note_text, taxonomy) -> list[signal]. On a cache hit it returns
     the cached signals with no model call and no cap consumption. On a cap breach it
     raises CapExceeded (→ the caller degrades, deterministic-only). The future Bedrock
     swap only touches _haiku_call.
     """
+
+    usage_sk(lane=lane)  # validate the lane at build time, not on the first uncached note
 
     def _fn(note_text, taxonomy):
         from training.training_notes import note_hash as _nh
@@ -270,8 +344,8 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP):
         cached = cache_get(table, h)
         if cached is not None:
             return cached
-        if monthly_calls(table) >= monthly_cap:
-            raise CapExceeded(f"training-notes Haiku monthly cap {monthly_cap} reached")
+        if monthly_calls(table, lane=lane) >= monthly_cap:
+            raise CapExceeded(f"training-notes Haiku monthly cap {monthly_cap} reached ({lane} lane)")
         try:
             signals = _haiku_call(note_text, taxonomy)
         except ExtractionDegraded:
@@ -279,9 +353,9 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP):
             # counter is evidence of attempts (#3699 read the missing July/August rows as
             # proof the tail was down), so a billed call must count even when it degrades.
             # A CapExceeded raises above this, before any spend, and is deliberately outside.
-            _bump_calls(table)
+            _bump_calls(table, lane=lane)
             raise
-        _bump_calls(table)
+        _bump_calls(table, lane=lane)
         # A degrade is never cached: the old code wrote the silent [] into the hash cache, so
         # one bad response impoverished that note for as long as its text was unchanged.
         cache_put(table, h, signals)

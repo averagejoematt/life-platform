@@ -216,10 +216,10 @@ def tool_get_readiness_score(args):
         }
         # #4075: the label follows the load's actual provenance — an HR-scored window is
         # measured, so `confidence != "power"` no longer means "duration proxy".
-        if training_load.is_duration_proxy(_tsb_basis):
-            raw["load_basis_note"] = "duration-proxy basis — at least half the load is a duration estimate (no HR, no power)"
-        elif _tsb_conf and _tsb_conf != "power":
-            raw["load_basis_note"] = "heart-rate basis — loads are Banister TRIMP above the Zone-1 ceiling, not power-meter data"
+        # #4075 4A: the sentence is DERIVED from the basis shares (training_load.basis_description),
+        # so a worked-set-driven window names worked-set time instead of reading as "heart-rate".
+        if _basis_note := training_load.basis_description(_tsb_basis):
+            raw["load_basis_note"] = _basis_note
         components["training_form"] = {
             "score": round(tsb_score, 1),
             "weight": 0.10,

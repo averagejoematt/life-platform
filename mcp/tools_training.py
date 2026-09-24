@@ -6,9 +6,10 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training import training_load  # #4075: the ONE load model (computed_metrics' TSB)
 
-from mcp.core import get_profile, get_sot, query_source
-from mcp.helpers import classify_hr_zone, compute_daily_load_score, compute_ewa, warm_start_seed
+from mcp.core import get_profile, query_source
+from mcp.helpers import classify_hr_zone, compute_ewa, warm_start_seed
 from mcp.strength_helpers import classify_exercise
 from mcp.tools_correlation import tool_get_zone2_breakdown
 
@@ -31,14 +32,21 @@ def _get_training_load(args):
     warmup_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=84)
     warmup_start = warmup_dt.strftime("%Y-%m-%d")
 
-    cardio_source = get_sot("cardio")
-    day_records = query_source(cardio_source, warmup_start, end_date)
-
-    load_by_date = {}
-    for day in day_records:
-        d = day.get("date")
-        if d:
-            load_by_date[d] = compute_daily_load_score(day)
+    # #4075 (owner ruling 2026-09-24, 4A): the per-day load is `training_load`'s — the
+    # ONE model computed_metrics' stored TSB, readiness and the brief read — not a second
+    # day-level model. Before this, `mcp/helpers.compute_daily_load_score` scored raw kJ,
+    # else an un-normalised TRIMP on a day-level HR the Strava writer does not store, else
+    # distance x 10, and never saw Hevy: on 2026-09-22 it read TSB +1.5 "neutral" while
+    # computed_metrics read -75. Strava + Hevy are both read cross-phase through the one
+    # MCP chokepoint (`query_source`, #4061 derived phase scope, tombstones dropped).
+    strava_records = query_source("strava", warmup_start, end_date)
+    hevy_records = query_source("hevy", warmup_start, end_date)
+    load_by_date, load_basis = training_load.daily_training_load(strava_records, hevy_records)
+    # A day with a record but zero load (a Zone-1 walk) is OBSERVED rest, not a gap.
+    observed_days = {training_load.day_key(r) for r in list(strava_records or []) + list(hevy_records or [])}
+    observed_days.discard("")
+    for d in observed_days:
+        load_by_date.setdefault(d, 0.0)
 
     cur = warmup_dt
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
@@ -69,21 +77,35 @@ def _get_training_load(args):
     ctl_series = compute_ewa(chrono, 42, seed=seed)
     atl_series = compute_ewa(chrono, 7, seed=seed)
 
+    # #4075: the injury-risk verdict on each row is the PLATFORM's ACWR for that date —
+    # `computed_metrics.acwr` / `acwr_zone` from acwr-compute (Whoop-strain EWMA 7/28), the
+    # number get_acwr_status, the brief and view=recommendation read. This view used to
+    # label risk from its own ATL/CTL ratio; on the corrected load that ratio read
+    # 1.67-1.96 on 12 of 2026-09-08..22's 15 days ("HIGH — injury risk elevated") while
+    # acwr-compute read 1.24-1.28 "safe" — two contradicting ACWRs. The Banister ratio is
+    # still published, renamed, and carries no risk verdict. Absent platform ACWR = None.
+    platform_acwr = {}
+    try:
+        for r in query_source("computed_metrics", start_date, end_date) or []:
+            if r.get("date") and r.get("acwr") is not None:
+                platform_acwr[r["date"]] = r
+    except Exception:
+        platform_acwr = {}
+
     start_dt_req = datetime.strptime(start_date, "%Y-%m-%d")
     result_rows = []
     for (date_str, ctl), (_, atl) in zip(ctl_series, atl_series):
         if datetime.strptime(date_str, "%Y-%m-%d") < start_dt_req:
             continue
         tsb = round(ctl - atl, 2)
-        acwr = round(atl / ctl, 2) if ctl > 0 else None
-
-        risk = "low"
-        # Gabbett 2016: >1.3 moderate injury risk, >1.5 high; 0.8-1.3 is sweet spot
-        if acwr is not None:
-            if acwr > 1.5:
-                risk = "HIGH — injury risk elevated, consider reducing load"
-            elif acwr > 1.3:
-                risk = "moderate — monitor carefully"
+        load_ratio = round(atl / ctl, 2) if ctl > 0 else None
+        cm = platform_acwr.get(date_str)
+        try:
+            acwr = round(float(cm["acwr"]), 3) if cm else None
+        except (TypeError, ValueError):
+            acwr = None
+        # Gabbett 2016 zones, as acwr-compute classifies them — never re-derived here.
+        risk = (cm.get("acwr_zone") or None) if cm else None
 
         form = "neutral"
         if tsb > 5:
@@ -102,6 +124,7 @@ def _get_training_load(args):
                 "tsb_form": tsb,
                 "acwr": acwr,
                 "injury_risk": risk,
+                "load_model_atl_ctl_ratio": load_ratio,
                 "form_status": form,
             }
         )
@@ -151,7 +174,18 @@ def _get_training_load(args):
 
     return {
         "model": "Banister Impulse-Response (CTL=42d EWA, ATL=7d EWA)",
-        "load_proxy": "kJ (cycling) > TRIMP (HR×time) > distance+elevation estimate",
+        # #4075: the per-day load is training_load's — the model computed_metrics stores.
+        "load_model": training_load.LOAD_MODEL,
+        "load_proxy": (
+            "TSS-like points (100 = 1 h at threshold): Strava kJ/7.2 > HR TRIMP above the Zone-1 ceiling > "
+            "no-HR duration proxy; Hevy on worked-set time (reps x 3 s, warm-ups excluded)"
+        ),
+        "load_basis": load_basis,
+        "smoothing_note": (
+            "Same per-day load as computed_metrics.tsb; the EWMA here is warm-started over an 84-day "
+            "warm-up (acwr_compute's seeding), where the stored TSB runs a cold-started 60-day window, "
+            "so the two TSBs can differ by the seed's residual — never by the load model."
+        ),
         "current_state": latest,
         "coverage": coverage,
         "peak_fitness": {"ctl": peak_ctl["ctl_fitness"], "date": peak_ctl["date"]},
@@ -161,7 +195,15 @@ def _get_training_load(args):
             "CTL": "Fitness base (42-day). Higher = more aerobic capacity built.",
             "ATL": "Fatigue (7-day). Spikes after big training blocks.",
             "TSB": "Form = CTL - ATL. Positive = fresh, negative = tired.",
-            "ACWR": "Acute:Chronic ratio. >1.3 caution, >1.5 injury risk.",
+            "ACWR": (
+                "acwr / injury_risk are the PLATFORM's acute:chronic ratio for that date — computed_metrics.acwr / "
+                "acwr_zone (acwr-compute, Whoop-strain EWMA 7/28, Gabbett 2016 population zones), the number "
+                "get_acwr_status, the brief and view=recommendation read; None where acwr-compute wrote none (#4075)."
+            ),
+            "load_model_atl_ctl_ratio": (
+                "This model's ATL(7d)/CTL(42d). A load-model ratio, NOT an injury-risk verdict: it is unstable over a "
+                "low chronic base (Lolli et al. 2019 ratio coupling) and is deliberately given no risk label (#4075)."
+            ),
             "Monotony": "Weekly mean load / SD. >2.0 = illness risk (Galpin). Vary intensity.",
         },
     }
@@ -614,9 +656,36 @@ def _get_training_recommendation(args):
             training_context["ctl"] = cs.get("ctl_fitness")
             training_context["atl"] = cs.get("atl_fatigue")
             training_context["tsb"] = cs.get("tsb_form")
-            training_context["acwr"] = cs.get("acwr")
             training_context["form_status"] = cs.get("form_status")
-            training_context["injury_risk"] = cs.get("injury_risk")
+            # The Banister ATL/CTL ratio of the view=load model, published for
+            # transparency but NOT a risk verdict and NOT the injury override's input.
+            training_context["load_model_atl_ctl_ratio"] = cs.get("load_model_atl_ctl_ratio")
+            training_context["load_model_atl_ctl_ratio_note"] = (
+                "view=load's Banister ATL(7d)/CTL(42d) — a load-model ratio, not an injury-risk ACWR; the injury "
+                "override reads `acwr` (computed_metrics.acwr, acwr-compute)"
+            )
+    except Exception:
+        pass
+    # #4075: the injury-risk override reads the platform's ONE ACWR — `computed_metrics.acwr`
+    # from acwr-compute (Whoop-strain EWMA 7/28, Gabbett zones labelled as population
+    # constants, ratio-coupling caveat), the number `get_acwr_status` and the brief read.
+    # It used to read view=load's own ATL/CTL ratio. Once view=load moved onto the real
+    # load model, that ratio read 2.5-2.8 on every day of 2026-09-15..22 (a fortnight-old
+    # programme over a low summer base; acwr-compute read 1.28 "safe"), which would pin
+    # this view RED "Full Rest" daily — a second ACWR overriding the first.
+    training_context["acwr"] = None
+    training_context["acwr_source"] = None
+    try:
+        cm_rows = query_source("computed_metrics", d3_start, target_date)
+        with_acwr = sorted((r for r in cm_rows or [] if r.get("acwr") is not None), key=lambda r: r.get("date", ""))
+        if with_acwr:
+            latest_acwr = with_acwr[-1]
+            training_context["acwr"] = _sf(latest_acwr.get("acwr"))
+            training_context["acwr_zone"] = latest_acwr.get("acwr_zone")
+            training_context["acwr_source"] = f"computed_metrics.acwr ({latest_acwr.get('date')}, acwr-compute: Whoop-strain EWMA 7/28)"
+            az = latest_acwr.get("acwr_zone")
+            if az:
+                training_context["injury_risk"] = az
     except Exception:
         pass
 
@@ -984,7 +1053,8 @@ def _get_training_recommendation(args):
         },
         "muscle_recovery": muscle_recovery,
         "recent_activities_7d": recent_activities[:10],
-        "source": "whoop + eightsleep + garmin + strava + macrofactor_workouts",
+        # #4075: hevy (the load model's set log) and computed_metrics (the one ACWR) are read.
+        "source": "whoop + eightsleep + garmin + strava + hevy + macrofactor_workouts + computed_metrics",
     }
 
 

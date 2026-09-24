@@ -341,6 +341,33 @@ def prescription_gate(ir: Any, **kw: Any) -> dict[str, Any]:
     return out
 
 
+def critic_set_floors(ir: Any, **kw: Any) -> Any:
+    """Stage 2's critic clamp (#4149): `exercise -> [floor_kg | None per set]`, or None.
+
+    The floors are `prescription_gate`'s own — the stored generator audit or
+    `derive_load_floors` (under v0.3, `load_ramp.v03_floor`) — and the per-set split is
+    `recovery_authoring.set_floors_kg`, the function `audit_prescription` judges with. So a
+    critic change held to these floors is, by construction, one the commit gate accepts. None
+    (no clamp) only where the gate itself asserts no floor: a no-load variant, or floors it
+    could not derive — `critics.apply_changes` then records nothing it did not check."""
+    from mcp.recovery_authoring import _n_back_offs, set_floors_kg
+
+    try:
+        gate = prescription_gate(ir, **kw)
+    except Exception as e:  # noqa: BLE001 — a clamp that cannot read its floors is absent, not fatal
+        logger.warning("critic floor clamp: prescription gate failed (%s) — no clamp this run", e)
+        return None
+    movements = (gate.get("load_floors") or {}).get("movements") or {}
+    if not gate.get("enforced") or not movements:
+        return None
+    n_back_offs, _ = _n_back_offs(None)
+
+    def floors_of(ex: Any) -> list:
+        return set_floors_kg(ex, movements.get(getattr(ex, "movement_key", None) or "?") or {}, n_back_offs)
+
+    return floors_of
+
+
 def _fmt(kg: Any) -> str:
     from training.routine_generator import _fmt_load
 

@@ -113,7 +113,8 @@ def test_walk_and_lift_same_day_are_additive():
     strava = [_walk_day(d, 60)]
     hevy = [_hevy_day(d, 60)]
     load_by_day, _ = tl.daily_training_load(strava, hevy, today)
-    assert abs(load_by_day[d] - (tl.WALK_TSS_PER_HOUR + tl.LIFT_TSS_PER_HOUR)) < 0.5
+    # #4075 4A: a Hevy record with no set log is charged the stated work fraction.
+    assert abs(load_by_day[d] - (tl.WALK_TSS_PER_HOUR + 0.25 * tl.LIFT_TSS_PER_HOUR)) < 0.5
 
 
 def test_multi_device_duplicate_walk_not_double_counted():
@@ -271,7 +272,7 @@ def test_duration_proxy_only_when_hr_absent_and_labelled():
     _load, basis = tl.daily_training_load([{"date": d, "activities": [_hr_walk(60, 130)]}], [], today)
     assert basis["confidence"] == "hr" and basis["strava_hr_days"] == 1 and basis["strava_duration_days"] == 0
     assert basis["proxy_share"] == 0.0 and basis["hr_share"] == 1.0
-    assert basis["model"] == tl.HR_MODEL and basis["z1_ceiling_bpm"] == tl.Z1_CEILING_HR
+    assert basis["model"] == tl.LOAD_MODEL and basis["hr_model"] == tl.HR_MODEL and basis["z1_ceiling_bpm"] == tl.Z1_CEILING_HR
     assert not tl.is_duration_proxy(basis) and tl.basis_note(basis) == ""
     _load, basis = tl.daily_training_load([{"date": d, "activities": [{"type": "Walk", "moving_time_seconds": 3600}]}], [], today)
     assert basis["confidence"] == "duration_proxy" and tl.is_duration_proxy(basis)
@@ -292,7 +293,8 @@ def test_hevy_pushed_workout_echo_is_not_double_counted():
     d = (today - timedelta(days=1)).isoformat()
     echo = {"sport_type": "Workout", "device_name": "Hevy", "moving_time_seconds": 125 * 60}
     load, _ = tl.daily_training_load([{"date": d, "activities": [echo]}], [_hevy_day(d, 125)], today)
-    assert abs(load[d] - 125 / 60 * tl.LIFT_TSS_PER_HOUR) < 0.1, load
+    # Only the Hevy term (no set log → the stated 0.25 work fraction), not echo + Hevy.
+    assert abs(load[d] - 0.25 * 125 / 60 * tl.LIFT_TSS_PER_HOUR) < 0.1, load
     # Without a Hevy record that day the Strava copy is the only record and still counts.
     load, _ = tl.daily_training_load([{"date": d, "activities": [echo]}], [], today)
     assert abs(load[d] - 125 / 60 * tl.DEFAULT_CARDIO_TSS_PER_HOUR) < 0.1, load
@@ -307,13 +309,14 @@ def test_hevy_sk_rows_resolve_to_their_day():
 def test_no_second_trimp_implementation_in_the_training_or_compute_paths():
     """Derivation guard (#4075): the Banister TRIMP weighting lives in ONE place on the
     paths that write/serve the stored TSB. A second copy is how two TSBs disagree.
-    `mcp/helpers.compute_daily_load_score` is the one known, named exception (the MCP
-    get_training view=load model) — see #4075's PR for why it was not rewired here."""
+    The MCP get_training view=load model (`mcp/helpers.compute_daily_load_score`) was
+    the named exception until #4075 4A rewired it onto this module; none remain."""
     import re
 
     root = Path(__file__).parent.parent
     pat = re.compile(r"exp\(\s*1\.92")
-    allowed = {"lambdas/training/training_load.py", "mcp/helpers.py"}
+    # #4075 4A retired `mcp/helpers.compute_daily_load_score`, the one named exception.
+    allowed = {"lambdas/training/training_load.py"}
     hits = []
     for base in ("lambdas", "mcp"):
         for f in (root / base).rglob("*.py"):
