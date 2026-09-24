@@ -111,22 +111,27 @@ FAILED = "failed"  # NOT honest-terminal: emits no PredraftOutcome, so the dead-
 def scheduled_session(target_date: str) -> dict[str, Any] | None:
     """The session the program serves on `target_date` — the SAME function stage 1 uses (#4064).
 
-    #4110 / PR #4120 (v0.4 Upper/Lower, ORDER-BASED: the next undone session in the sequence is
-    served on whatever day he trains) re-points the ONE `return` line below to
-
-        return plan_engine._scheduled_session(target_date, catalog, ceiling, tools_plan._block_workouts(target_date))
-
-    — the same completed-session record stage 1 passes. Nothing else in this module decides what
-    tomorrow's session is, and nothing here assumes a weekday grid or an archetype: a session is
-    draftable iff it carries a `prescription` (`is_lifting_session`), whatever its archetype
-    (`full`, `upper`, `lower`). None / no prescription is the first-class `no_session` outcome.
+    #4110 / #4147 (PR #4120 — v0.4 Upper/Lower, ORDER-BASED: the next undone session in the
+    sequence is served on whatever day he trains): the session picker is handed the same
+    completed-session record stage 1 passes (`plan_hevy_windows._block_workouts`, re-exported as
+    `tools_plan._block_workouts`). A read that RAISES hands it None, so the session says
+    `sequence_unreadable` by name and carries no prescription — the first-class `no_session`
+    outcome, never a silent session 1. Nothing here assumes a weekday grid or an archetype: a
+    session is draftable iff it carries a `prescription` (`is_lifting_session`), whatever its
+    archetype (`upper`, `lower`; `full` for v0.3 history).
     """
     from training import plan_engine
 
     from mcp.plan_helpers import _catalog_and_ceiling
+    from mcp.plan_hevy_windows import _block_workouts
 
     catalog, ceiling = _catalog_and_ceiling()
-    return plan_engine._scheduled_session(target_date, catalog, ceiling)
+    try:
+        block_workouts = _block_workouts(target_date)
+    except Exception as e:  # noqa: BLE001 — named on the session as sequence_unreadable, never a silent session 1
+        logger.warning(f"nightly predraft: the Hevy record since the block start was not read ({type(e).__name__}: {e})")
+        block_workouts = None
+    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts)
 
 
 def is_lifting_session(session: dict[str, Any] | None) -> bool:

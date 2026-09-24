@@ -372,13 +372,28 @@ def test_stage_1_attaches_the_predraft_first():
 
 
 def test_the_seam_is_the_function_stage_1_uses():
-    """#4110 re-points ONE function. Pin that it is stage 1's own session picker today."""
+    """#4110/#4147 re-pointed ONE function: stage 1's own session picker, handed the same
+    completed-session record stage 1 passes (the v0.4 order advances only on it)."""
+    done = [{"date": "2026-09-25", "exercises": []}]
     with (
         patch("mcp.plan_helpers._catalog_and_ceiling", return_value=({"m": {}}, 3)),
+        patch("mcp.plan_hevy_windows._block_workouts", return_value=done) as reader,
         patch("training.plan_engine._scheduled_session", return_value=LIFTING) as picker,
     ):
         assert npd.scheduled_session(TARGET) is LIFTING
-    picker.assert_called_once_with(TARGET, {"m": {}}, 3)
+    reader.assert_called_once_with(TARGET)
+    picker.assert_called_once_with(TARGET, {"m": {}}, 3, done)
+
+
+def test_an_unread_sequence_record_is_named_never_a_silent_session_one():
+    """A failed Hevy read hands the picker None: the real picker then says `sequence_unreadable`
+    and carries no prescription, so the predraft reads `no_session` — it never drafts session 1."""
+    with (
+        patch("mcp.plan_helpers._catalog_and_ceiling", return_value=({}, 2)),
+        patch("mcp.plan_hevy_windows._block_workouts", side_effect=RuntimeError("ddb down")),
+    ):
+        session = npd.scheduled_session("2026-09-27")
+    assert session["source"] == "sequence_unreadable" and not npd.is_lifting_session(session)
 
 
 def test_an_unreadable_predraft_is_named_never_read_as_none():
