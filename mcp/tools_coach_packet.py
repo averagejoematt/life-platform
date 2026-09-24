@@ -207,17 +207,17 @@ def _last_sessions(target_date: str) -> dict[str, Any]:
     by_role: dict[str, dict[str, Any]] = {}
     for it in workouts:
         day = str(it.get("date") or "")[:10]
-        pos = positions.get(day)
+        pos = positions.get(day) or {}
         # The ONE loaded session the sequence credited for that day — a second log that day, or an
         # unloaded one, is not a program session and claims no role.
-        credited = pos is not None and pos.get("workout_id") in (None, it.get("source_workout_id") or it.get("workout_id"))
-        role = pos["session_role"] if credited else None
+        credited = bool(pos) and pos.get("workout_id") in (None, it.get("source_workout_id") or it.get("workout_id"))
+        role = pos.get("session_role") if credited else None
         archetype = resolve_archetype(it, index) or "unresolved"
         if archetype in by_type and (not role or role in by_role):
             continue
         row = _session_row(it, archetype, role)
         if credited:
-            row["sequence_position"] = pos["position_label"]
+            row["sequence_position"] = pos.get("position_label")
         by_type.setdefault(archetype, row)
         if role:
             by_role.setdefault(role, row)
