@@ -49,6 +49,7 @@ This module is PURE. Inputs are a plain dict resolved by the caller (the MCP lay
 
 from __future__ import annotations
 
+import itertools
 from typing import Any
 
 from coach.critics import deterministic_verdict, reconcile
@@ -83,7 +84,8 @@ INPUT_KEYS = (
     "weighin_count",
     "weighin_span_days",
     "rate_provisional",  # bool: the trend window is too short to argue from
-    "weekly_loss_rates_lb_wk",  # POSITIVE = loss, one per trailing week, oldest->newest
+    "weekly_loss_rates_lb_wk",  # POSITIVE = loss, one per COUNTED (complete) trailing week, oldest->newest (#4150)
+    "weekly_loss_rate_weeks",  # every trailing week with its status — partial/thin weeks reported, not counted (#4150)
     "weeks_since_genesis",
     "walking_hr_this_wk",
     "walking_hr_last_wk",
@@ -206,6 +208,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             "prescribed_band_kcal": [lo, hi],
             "weeks_since_genesis": weeks,
             "weekly_loss_rates_lb_wk": rates or None,
+            "weekly_loss_rate_weeks": inputs.get("weekly_loss_rate_weeks"),
             "metabolic_adaptation_severity": inputs.get("metabolic_adaptation_severity"),
         }
     )
@@ -282,7 +285,9 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
         # the overshoot rule — the redline's own words, quoted
         need = int(overshoot_t["threshold_weeks"])
         over = [r > cap for r in rates[-need:]] if len(rates) >= need else []
-        n["rate_over_cap_consecutive_weeks"] = sum(1 for r in reversed(rates) if r > cap) if rates else None
+        # CONSECUTIVE from the newest counted week back — the run stops at the first week under the
+        # cap. `rates` holds only complete weeks (#4150), so a partial week never starts the clock.
+        n["rate_over_cap_consecutive_weeks"] = sum(1 for _ in itertools.takewhile(lambda r: r > cap, reversed(rates))) if rates else None
         if over and all(over) and weeks is not None and weeks > 4:
             to = (mean14 + 250) if mean14 is not None else None
             flags.append(

@@ -45,6 +45,19 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
     honesty   a window spanning fewer than `tdee.MIN_TREND_DAYS` days is `provisional`: the
               number is reported, and no critic argues a change from it.
 
+  WEEKLY LOSS RATES (#4150 — what the overshoot rule counts)
+    weeks     the trailing 7-day windows ending `end`, `end - 7`, ... — same estimator, same
+              water floor as the loss rate;
+    counted   a week's rate is COUNTED (returned by `weekly_loss_rates_from_rows`, the list
+              `rate_over_cap_consecutive_weeks` reads) only when the week is COMPLETE — all 7
+              days lie after water weeks 1-2, so the water floor did not clip it — AND it
+              holds >= `MIN_WEEKLY_WEIGHINS` (4) weigh-ins. Anything else is reported by
+              `weekly_loss_rate_weeks_from_rows` with its status (`partial`,
+              `insufficient_weighins`, `water`, `no_rate`) and never counted. The specimen:
+              on 2026-09-23 the week 09-16..09-22 was clipped to 09-20..09-22 (3 weigh-ins,
+              6.82 lb/wk) and counted as a full week over the cap — one week toward the
+              "2 consecutive weeks" overshoot clock, on 3 days of evidence.
+
   The TDEE back-solve's endpoint trend (`health.tdee.weight_trend_lb_per_wk`, #3931) is a
   DIFFERENT quantity — "could this intake have produced this much change" — and is left alone.
 
@@ -68,6 +81,20 @@ SHARED_QUANTITIES_VERSION = "shared-quantities@1.0.0"
 WALK_WINDOW_DAYS = 7
 LOSS_RATE_WINDOW_DAYS = 14
 WATER_WEEKS_EXCLUDED = 2  # v0.3 §1 — owner_redlines rate_schedule_lb_wk: "weeks 1–2 excluded (water)"
+WEEK_DAYS = 7
+# #4150 — a week's loss rate is counted only with at least this many weigh-ins in its 7 days.
+# CONVENTION, not population-derived and not his variance (ADR-105 label): 4 is the smallest
+# count that is a MAJORITY of the week's 7 days (4/7 > 1/2), so a counted week's slope is never
+# carried by a minority of its mornings; and it leaves 2 residual degrees of freedom in the
+# least-squares fit (n - 2), where n = 2 is the first-vs-last endpoint this module rejects and
+# n = 3 lets one noisy morning swing the slope with a single residual to show it. His own
+# cadence clears it: 7 of 7 days weighed 09-17..09-23 (the week after the water weeks).
+# Re-derive from his weigh-in cadence once 4+ complete post-water weeks exist.
+MIN_WEEKLY_WEIGHINS = 4
+MIN_WEEKLY_WEIGHINS_PROVENANCE = (
+    "convention (ADR-105 label: neither population-derived nor personal variance) — a majority of the week's 7 days, "
+    "and >= 2 residual degrees of freedom in the least-squares slope (#4150)"
+)
 
 
 def _genesis() -> str:
@@ -194,12 +221,63 @@ def loss_rate_from_rows(
     return out
 
 
-def weekly_loss_rates_from_rows(rows: list[dict[str, Any]] | None, end: str, *, weeks: int = 2) -> list[float] | None:
-    """PURE: one rate per trailing 7-day week, oldest -> newest, same estimator and water floor.
-    A week with fewer than two post-water weigh-ins is skipped. None when no week has a rate."""
-    rates: list[float] = []
+def weekly_loss_rate_weeks_from_rows(
+    rows: list[dict[str, Any]] | None,
+    end: str,
+    *,
+    weeks: int = 2,
+    genesis: str | None = None,
+) -> list[dict[str, Any]]:
+    """PURE: every trailing 7-day week ending `end`, `end - 7`, ..., oldest -> newest, each
+    with its rate, its evidence and whether it is COUNTED (#4150).
+
+    `status` is one of:
+      complete               7 unclipped post-water days, >= MIN_WEEKLY_WEIGHINS weigh-ins — counted
+      partial                the water floor clipped the week (fewer than 7 days measured) — a
+                             provisional rate may be reported, never counted
+      insufficient_weighins  a full week with fewer than MIN_WEEKLY_WEIGHINS weigh-ins — never counted
+      water                  the week lies wholly inside water weeks 1-2 — no rate
+      no_rate                fewer than two weigh-ins, or a degenerate window — no rate"""
+    out: list[dict[str, Any]] = []
     for k in range(weeks - 1, -1, -1):
-        r = loss_rate_from_rows(rows, shift_day_key(end, -7 * k), window_days=7)
-        if r["rate_lb_wk"] is not None:
-            rates.append(r["rate_lb_wk"])
+        week_end = shift_day_key(end, -WEEK_DAYS * k)
+        nominal_start = shift_day_key(week_end, -(WEEK_DAYS - 1))
+        r = loss_rate_from_rows(rows, week_end, window_days=WEEK_DAYS, genesis=genesis)
+        start = r["window"]["start"]
+        days_measured = max(0, _days(start, week_end) + 1) if start <= week_end else 0
+        row: dict[str, Any] = {
+            "start": nominal_start,
+            "end": week_end,
+            "measured_start": start if start <= week_end else None,
+            "days_measured": days_measured,
+            "n_weighins": r["n_weighins"],
+            "rate_lb_wk": r["rate_lb_wk"],
+            "counted": False,
+            "min_weighins": MIN_WEEKLY_WEIGHINS,
+        }
+        if start > week_end:
+            row["status"], row["reason"] = "water", r.get("reason")
+        elif days_measured < WEEK_DAYS:
+            row["status"] = "partial"
+            row["reason"] = (
+                f"only {days_measured} of 7 days after water weeks 1-2 ({start}..{week_end}) — provisional, reported, never counted"
+            )
+        elif r["rate_lb_wk"] is None:
+            row["status"], row["reason"] = "no_rate", r.get("reason")
+        elif r["n_weighins"] < MIN_WEEKLY_WEIGHINS:
+            row["status"] = "insufficient_weighins"
+            row["reason"] = f"{r['n_weighins']} weigh-in(s) in {start}..{week_end}, under the {MIN_WEEKLY_WEIGHINS} a counted week needs"
+        else:
+            row["status"], row["counted"] = "complete", True
+        out.append(row)
+    return out
+
+
+def weekly_loss_rates_from_rows(
+    rows: list[dict[str, Any]] | None, end: str, *, weeks: int = 2, genesis: str | None = None
+) -> list[float] | None:
+    """PURE: the COUNTED weekly rates, oldest -> newest — only complete 7-day post-water weeks
+    with >= MIN_WEEKLY_WEIGHINS weigh-ins (#4150). A partial or thin week is dropped here and
+    reported by `weekly_loss_rate_weeks_from_rows`. None when no week is counted."""
+    rates = [w["rate_lb_wk"] for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis) if w["counted"]]
     return rates or None
