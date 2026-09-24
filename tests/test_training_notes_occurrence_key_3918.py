@@ -599,7 +599,7 @@ def test_bounded_cap_is_the_live_count_plus_exactly_n():
     bf = _backfill_module()
     from training import training_notes_llm as tl
 
-    t = FakeTable([{"pk": tl._USAGE_PK, "sk": f"MONTH#{tl._month()}", "calls": 300}])
+    t = FakeTable([{"pk": tl._USAGE_PK, "sk": tl.usage_sk(lane="bulk"), "calls": 300}])
     assert bf.bounded_cap(t, 1) == 301
     assert bf.bounded_cap(t, 0) == 300
     assert bf.bounded_cap(FakeTable(), 1) == 1
