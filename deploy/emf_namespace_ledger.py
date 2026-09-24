@@ -535,7 +535,7 @@ LEDGER: dict[str, dict] = {
         note="RecallsDue, documented in CHANGELOG, read by nothing. A gauge with no dial.",
     ),
     "LifePlatform/HevyRoutine": _row(
-        owner="hevy_restamp + hevy_routine_cron + hevy-backfill (index rebuild)",
+        owner="hevy_restamp + hevy_routine_cron + hevy-backfill (index rebuild) + nightly pre-draft (#4084)",
         verdict=KEEP,
         cardinality=FIXED,
         driver=None,
@@ -548,7 +548,10 @@ LEDGER: dict[str, dict] = {
             "hevy-template-index-not-rebuilt-48h, which is the ONLY thing that can see the daily template-index "
             "rebuild die: that job swallows all three of its failure modes (dead rule, failed Hevy walk, refused "
             "shrink), so nothing raises, and the hourly poll on the same function keeps Invocations green "
-            "regardless. Retiring the namespace would now trade silent-failure coverage for pennies (ADR-116)."
+            "regardless. Retiring the namespace would now trade silent-failure coverage for pennies (ADR-116). "
+            "#4084 adds PredraftOutcome{Job=nightly_predraft} (one series, one datapoint a night from "
+            "mcp/nightly_predraft.py on the mcp-warmer's 02:00Z rule), the heartbeat behind nightly-predraft-missing — "
+            "the warmer's own Invocations cannot see that rule die, because its 17:10Z run keeps them green."
         ),
     ),
 }
