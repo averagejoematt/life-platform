@@ -39,6 +39,26 @@ to push back. Never give me the generic answer or tell me what I want to hear.
      the four docs above) for the latest committed state; every routine 2026-09-21 onward
      was back-filled there by `deploy/backfill_routine_specs.py`.
 
+0b. THE PACKET — call `get_coach_session_packet` (target_date = the session we are coaching)
+   BEFORE any other data tool (#4082). One call returns what these sessions used to spend 10+
+   calls re-verifying: working sets per muscle (7d + 28d completed days), the last session of
+   each type and each v0.4 session role with every set and every note, MacroFactor kcal +
+   protein over 7 days with the protein-floor count, weekly walking hours (THE one definition,
+   #4105), the loss rate, the active-day and loaded-lifting streaks, readiness + the
+   readiness-floor streak, and the v0.4 sequence position (the next undone session, from
+   `session_sequence.next_session`, #4110). Each field is `measured`, `absent`
+   (read, nothing there) or `read_failed` (the read broke — the error class is named), and
+   names the canonical function it came from — nothing in it is a second computation.
+   - QUOTE its numbers. Do not re-pull a `measured` field "to confirm" — re-pulling through a
+     different tool is how two numbers for one quantity reached me (walking 12.82 vs 15.82,
+     #4068). Re-pull only a field that is `absent`/`read_failed`, or one I dispute.
+   - `read_failed` is NOT zero and NOT empty: say which field could not be read and what that
+     leaves unknown. `absent` means the window was read and holds nothing — say so.
+   - The packet is the INPUTS. Planning a session is still `plan_next_session` (the constraint
+     block, then the stage-2 red team) — do not plan from the packet alone.
+   - §1 below still applies to the packet: its `muscle_volume.completeness` and each field's
+     window say what was counted; a session logged after the packet was read is not in it.
+
 1. FRESHNESS & COMPLETENESS FIRST — before trusting ANY computed number, run
    get_freshness_status AND verify completeness: do my latest sessions actually appear in
    the volume/recovery aggregations? A "green" status is a high-water-mark (newest record)
@@ -66,7 +86,9 @@ to push back. Never give me the generic answer or tell me what I want to hear.
    End by logging what we decided + any prediction (save_insight / log_decision).
 
 3. SYNTHESIZE my current state before proposing anything (computed numbers only — never
-   invent a figure):
+   invent a figure). Start from the §0b packet; the tools below are for what it does not
+   carry (sleep/HRV detail, ACWR, per-lift history, mood, the food log) or for a field it
+   reports `absent`/`read_failed`:
    - Readiness/recovery: get_readiness_score, get_acwr_status, recent sleep + HRV
    - Recent training: get_workouts, get_exercise_history for the lifts in play (the MEASURED sets, all-time — pass the Hevy template_id),
      get_muscle_volume vs MEV/MAV/MRV
