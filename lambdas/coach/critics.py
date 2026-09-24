@@ -377,7 +377,14 @@ def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, number
     prov = critics_fatigue.FATIGUE_PROVENANCE["provenance"]
     cut = {"field": "session.total_sets", "to": _deload_total_sets(draft), "governed": True}
     tail = "−30 % sets, loads held, THIS session only — then re-test (#4161)"
-    if fatigue.get("triggered"):
+    resp = fatigue.get("response") or {}
+    numbers["fatigue_cut_superseded_by_deload"] = bool(resp.get("superseded_by_deload"))
+    if resp.get("superseded_by_deload") and (fatigue.get("triggered") or region.get("state") == "triggered"):
+        # never stack: the served deload's cut is the larger one, so it is the cut — no second one on top
+        why = "; ".join(fatigue.get("reasons") or []) or f"{region.get('region')} loaded under the 48 h guard"
+        msg = f"{why} — inside the deload ({resp.get('deload_sets_pct')} % sets), the larger cut is taken, not both (#4161)"
+        flags.append(_flag("fatigue_trigger", "info", msg, provenance=prov, governed=True))
+    elif fatigue.get("triggered"):
         flags.append(_flag("fatigue_trigger", "change", "; ".join(fatigue.get("reasons") or []) + f" — {tail}", provenance=prov, **cut))
     elif region.get("state") == "triggered":
         why = f"{region.get('region')} loaded on {', '.join(region.get('loaded_on') or [])} — under the {critics_fatigue.SAME_REGION_MIN_HOURS} h same-region guard"

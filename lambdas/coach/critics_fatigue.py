@@ -22,9 +22,9 @@ argued with two of those numbers, and the owner approved its recommendations the
        READINESS (Bell 2023 Sports Med Open 9:87, the deload Delphi; Rogerson 2024 Sports Med
        Open doi:10.1186/s40798-024-00691-y). The trigger is now either of:
 
-         performance — the top-set load >= 5 % below the PRIOR SAME-SESSION exposure of that
-                       lift (same session role, so a volume day never reads as a drop from a
-                       heavy day), at target RPE, on 2 consecutive exposures;
+         performance — the top-set load >= 5 % below the REFERENCE (the last same-session-role
+                       exposure before the drop — so a volume day never reads as a drop from a
+                       heavy day), at target RPE, on 2 consecutive exposures; a sustained drop fires;
          readiness   — the readiness floor (Whoop recovery, `owner_redlines` `readiness_floor`)
                        low on 2 consecutive days, OR a soreness/pain note on a drafted lift on
                        2 consecutive TRAINING days (the existing pain-flag dates).
@@ -154,8 +154,10 @@ def performance_drop(sessions: list[dict[str, Any]], role_by_date: dict[str, str
     """The top-set trend over this lift's exposures IN THE SAME SESSION ROLE (oldest first).
 
     `triggered` when each of the last PERF_DROP_CONSECUTIVE exposures has a top set >= PERF_DROP_PCT %
-    below the exposure before it, at target RPE (or unlogged RPE, named). Fewer exposures than the
-    rule needs is `insufficient`, never a clear."""
+    below the REFERENCE — the last same-role exposure BEFORE them — at target RPE (or unlogged RPE,
+    named). A SUSTAINED drop (200 -> 190 -> 190) fires; a dip and recovery (200 -> 198 -> 200) does not.
+    (#4161 review: comparing each exposure with the one before it missed the sustained case.)
+    Fewer exposures than the rule needs is `insufficient`, never a clear."""
     if not role or role_by_date is None:
         return {"state": "unknown", "reason": "the session role of past exposures is unknown (the session sequence was not read)"}
     same = [s for s in sessions if role_by_date.get(str(s.get("date"))[:10]) == role]
@@ -165,16 +167,16 @@ def performance_drop(sessions: list[dict[str, Any]], role_by_date: dict[str, str
     out: dict[str, Any] = {"role": role, "exposures": [{"date": d, "top_lbs": w, "rpe": r} for d, w, r in tops[-need:]]}
     if len(tops) < need:
         return {**out, "state": "insufficient", "reason": f"{len(tops)} {role} exposure(s) with a top set — the rule needs {need}"}
-    drops, unlogged = [], []
-    for (d0, w0, _r0), (d1, w1, r1) in zip(tops[-need:], tops[-need + 1 :]):
-        pct = round((w0 - w1) / w0 * 100.0, 1)
-        at_rpe = r1 is None or r1 >= TARGET_RPE_LOW
-        drops.append(pct >= PERF_DROP_PCT and at_rpe)
+    ref_date, ref, _ = tops[-need]
+    out["reference"] = {"date": ref_date, "top_lbs": ref}
+    drops, unlogged, pcts = [], [], []
+    for _d1, w1, r1 in tops[-PERF_DROP_CONSECUTIVE:]:
+        pct = round((ref - w1) / ref * 100.0, 1)
+        drops.append(pct >= PERF_DROP_PCT and (r1 is None or r1 >= TARGET_RPE_LOW))
         if r1 is None:
-            unlogged.append(d1)
-        out.setdefault("drop_pct", []).append(pct)
-    out["state"] = "triggered" if all(drops) else "clear"
-    out["rpe_unlogged_on"] = unlogged
+            unlogged.append(_d1)
+        pcts.append(pct)
+    out.update(drop_pct=pcts, state="triggered" if all(drops) else "clear", rpe_unlogged_on=unlogged)
     return out
 
 
@@ -229,8 +231,13 @@ def assess(
     perf_by_idx: dict[int, dict[str, Any]] | None,
     soreness_by_idx: dict[int, list[str] | None] | None,
     same_region: dict[str, Any] | None,
+    deload_sets_pct: int | None = None,
 ) -> dict[str, Any]:
-    """The one fatigue verdict the joints packet reads: which trigger fired, on what, and the response."""
+    """The one fatigue verdict the joints packet reads: which trigger fired, on what, and the response.
+
+    `deload_sets_pct` is the served session's deload cut when it sits inside the deload window (else None).
+    The two cuts never STACK (#4161 review): the larger one is taken — inside the −40 % deload the −30 %
+    fatigue response adds nothing (`response.superseded_by_deload`)."""
     fired: list[str] = []
     if readiness_low_streak_days is not None and readiness_low_streak_days >= READINESS_CONSECUTIVE_DAYS:
         fired.append(f"readiness below the floor on {readiness_low_streak_days} consecutive days (>= {READINESS_CONSECUTIVE_DAYS})")
@@ -248,10 +255,11 @@ def assess(
         unknown.append("readiness_low_streak_days")
     if perf_by_idx is None:
         unknown.append("performance_drop")
+    superseded = deload_sets_pct is not None and int(deload_sets_pct) <= int(FATIGUE_RESPONSE["sets_pct"])
     return {
         "triggered": bool(fired),
         "reasons": fired,
         "same_region_48h": same_region or {"state": "unknown"},
-        "response": FATIGUE_RESPONSE,
+        "response": {**FATIGUE_RESPONSE, "superseded_by_deload": superseded, "deload_sets_pct": deload_sets_pct},
         "unknown": unknown,
     }

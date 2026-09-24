@@ -257,7 +257,7 @@ ROLES = {"2026-09-24": "upper_heavy", "2026-09-28": "upper_heavy", "2026-10-02":
 def test_two_consecutive_same_role_drops_at_target_rpe_trigger():
     tops = [_hist("2026-09-24", 200), _hist("2026-09-26", 150), _hist("2026-09-28", 188), _hist("2026-10-02", 176)]
     p = cf.performance_drop(tops, ROLES, "upper_heavy")
-    assert p["state"] == "triggered" and p["drop_pct"] == [6.0, 6.4]
+    assert p["state"] == "triggered" and p["drop_pct"] == [6.0, 12.0] and p["reference"] == {"date": "2026-09-24", "top_lbs": 200}
     assert p["exposures"][0]["top_lbs"] == 200, "the volume-day 150 is never compared with a heavy day"
 
 
@@ -303,7 +303,7 @@ def test_a_six_day_lifting_streak_with_no_drop_does_not_trigger():
     "kw",
     [
         {"readiness_low_streak_days": 2},
-        {"perf_by_idx": {0: {"state": "triggered", "role": "upper_heavy", "drop_pct": [6.0, 6.4], "rpe_unlogged_on": []}}},
+        {"perf_by_idx": {0: {"state": "triggered", "role": "upper_heavy", "drop_pct": [6.0, 12.0], "rpe_unlogged_on": []}}},
         {"soreness_by_idx": {0: ["2026-09-28", "2026-09-29"]}},
     ],
     ids=["readiness", "performance", "soreness"],
@@ -412,3 +412,113 @@ def test_ruling_b_carries_its_provenance_and_version():
     )
     assert "Helms 2014" in g["evidence"] and "10.1186/1550-2783-11-20" in g["evidence"]
     assert owner_redlines.REDLINES_VERSION == "3.3" and owner_redlines.REDLINES["protein_floor_g"]["value"] == 180
+
+
+# ── #4161 review fixes ─────────────────────────────────────────────────────────────────
+def _pairwise_rule(tops: list[float]) -> bool:
+    """The rule the review rejected: each exposure >= 5 % below the one BEFORE it (kept only as the control)."""
+    return all((a - b) / a * 100 >= 5 for a, b in zip(tops[-3:], tops[-2:]))
+
+
+def test_a_sustained_drop_triggers_and_a_dip_that_recovers_does_not():
+    sustained = [_hist("2026-09-24", 200), _hist("2026-09-28", 190), _hist("2026-10-02", 190)]
+    got = cf.performance_drop(sustained, ROLES, "upper_heavy")
+    assert got["state"] == "triggered" and got["drop_pct"] == [5.0, 5.0]
+    dip = [_hist("2026-09-24", 200), _hist("2026-09-28", 198), _hist("2026-10-02", 200)]
+    assert cf.performance_drop(dip, ROLES, "upper_heavy")["state"] == "clear"
+    # mutation control: the rejected each-vs-previous reading never fires on the sustained drop
+    assert _pairwise_rule([200, 190, 190]) is False and _pairwise_rule([200, 198, 200]) is False
+    with patch.object(cf, "PERF_DROP_PCT", 5.1):
+        assert cf.performance_drop(sustained, ROLES, "upper_heavy")["state"] == "clear", "the 5 % line is what decides it"
+
+
+def test_a_critic_set_count_increase_is_refused():
+    from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+    ir = RoutineSpec(
+        routine_id="r",
+        target_date="2026-10-10",
+        archetype="x",
+        exercises=[ExerciseBlock(movement_key="tmpl:1", rationale_tag="Row", sets=[Set(weight_kg=40, reps=10) for _ in range(2)])],
+    )
+    [rec] = c.apply_changes(ir, [{"critic": "joints_tendons", "verdict": "change", "field": "exercises[0].set_count", "to": 5}])
+    assert rec["applied"] is False and "no critic adds sets" in rec["why"] and len(ir.exercises[0].sets) == 2
+    [rec] = c.apply_changes(ir, [{"critic": "joints_tendons", "verdict": "change", "field": "exercises[0].set_count", "to": 1}])
+    assert rec["applied"] is True and len(ir.exercises[0].sets) == 1, "a reduction still applies"
+
+
+def test_inside_the_deload_the_fatigue_cut_does_not_stack():
+    base = {"readiness_low_streak_days": 3, "perf_by_idx": {}, "soreness_by_idx": {}, "same_region": {"state": "clear"}}
+    in_deload = _joints(cf.assess(**base, deload_sets_pct=-40), total=12)
+    v = c.deterministic_verdict(in_deload)
+    assert v["verdict"] == "approve" and in_deload["numbers"]["fatigue_cut_superseded_by_deload"] is True
+    assert any("larger cut is taken, not both" in f["reason"] for f in in_deload["flags"])
+    # mutation control: outside the deload the same trigger cuts
+    out = c.deterministic_verdict(_joints(cf.assess(**base), total=12))
+    assert (out["verdict"], out["to"]) == ("change", 8)
+
+
+def test_the_stage_2_evidence_marks_a_deload_session_superseded():
+    from mcp import plan_draft_evidence as pde
+
+    ev = {"exercises": []}
+    pde.attach_fatigue_inputs(ev, readiness_low_streak_days=3, block_workouts=daily(41), target_date="2026-11-04")
+    assert ev["fatigue"]["response"]["superseded_by_deload"] is True and ev["fatigue"]["response"]["deload_sets_pct"] == -40
+
+
+def test_a_version_bump_is_not_a_structural_edit():
+    with patch.dict(program_structure.SESSION_SEQUENCE, {"program_version": "0.4.1"}):
+        assert session_sequence.block_lock_state("2026-10-10")["state"] == "locked"
+
+
+def test_a_fingerprint_re_record_without_the_owner_note_reds():
+    assert session_sequence.fingerprint_record_problems() == []
+    with patch.dict(program_structure.BLOCK_LOCK, {"structure_fingerprint": "deadbeefdeadbeef"}):
+        assert session_sequence.fingerprint_record_problems(), "a bare re-record must not pass"
+        assert session_sequence.block_lock_state("2026-10-10")["state"] == "violated"
+    bad = {**program_structure.BLOCK_LOCK["structure_fingerprint_record"], "provenance": "platform"}
+    with patch.dict(program_structure.BLOCK_LOCK, {"structure_fingerprint_record": bad}):
+        assert "record provenance is not 'owner'" in session_sequence.fingerprint_record_problems()
+
+
+def test_the_gated_target_is_one_data_field():
+    g = owner_redlines.REDLINES["rate_protein_gate"]["gated_target"]
+    assert g["source"] == "rate_band_pct_bw_per_wk.low" and g["fixed_lb_wk"] is None
+    assert owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)["target_lb_wk"] == 1.6
+    with patch.dict(g, {"fixed_lb_wk": 2.5}):
+        rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)
+    assert rt["target_lb_wk"] == 2.5 and rt["protein_gate"]["gated_target_source"] == "rate_protein_gate.gated_target.fixed_lb_wk"
+
+
+@pytest.mark.parametrize("target_offset", [0, 1])
+def test_the_plan_gate_and_the_deficit_advocate_read_one_window(target_offset):
+    """Same MacroFactor days -> the same window, the same counts, the same gate state at both sites.
+    Mutation control: the pre-review [target-6, target] window reads a different week and a different state."""
+    from health import nutrition_critics as nc
+
+    from mcp import tools_plan as tp
+
+    as_of = "2026-10-10"
+    last_complete = shift_day_key(as_of, -1)
+    days = [shift_day_key(last_complete, -i) for i in range(13, -1, -1)]  # 14 completed days, oldest first
+    # 4 misses, early in the completed week (last_complete-6 .. last_complete-3)
+    grams = {d: (150 if shift_day_key(last_complete, -6) <= d <= shift_day_key(last_complete, -3) else 190) for d in days}
+    grams[as_of] = 190  # a partial row for the as-of day itself must never be read
+
+    def nutrition(args):
+        rows = [{"date": d, "protein_g": g} for d, g in grams.items() if args["start_date"] <= d <= args["end_date"]]
+        return {"daily_breakdown": rows}
+
+    target = shift_day_key(as_of, target_offset)
+    # the plan's clock is pinned to the fixture's as-of day, so the window cannot drift with the wall clock
+    with patch("mcp.tools_plan.pacific_today", return_value=as_of), patch("mcp.tools_nutrition.tool_get_nutrition", side_effect=nutrition):
+        missed, measured = tp._protein_days_7d(target)
+    win = owner_redlines.protein_window(target, as_of)
+    assert win == {"start": shift_day_key(last_complete, -6), "end": last_complete}
+    plan = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured, protein_window_days=win)
+    adv = nc.build_deficit_advocate_packet({"weight_lb": WEIGHT, "window_end": last_complete, "protein_g_by_day": [grams[d] for d in days]})
+    assert plan["protein_gate"]["state"] == adv["numbers"]["rate_protein_gate"] == "gated"
+    assert plan["protein_gate"]["window"] == win
+    if target_offset == 1:  # mutation control: the pre-review window [target-6, target] sees 2 misses — a different state
+        old = [g for d, g in grams.items() if shift_day_key(target, -6) <= d <= target]
+        assert owner_redlines.protein_gate(*owner_redlines.protein_days_missed(old))["state"] == "clear"

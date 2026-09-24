@@ -168,7 +168,8 @@ def deload_cfg() -> dict[str, Any]:
     return cfg
 
 
-_STRUCTURAL_KEYS = ("session_roles", "first_role", "sessions_per_week", "weeks_per_block", "block_start", "program_version")
+# program_version is NOT structure (#4161 review): a version bump with no structural change must not read `violated`
+_STRUCTURAL_KEYS = ("session_roles", "first_role", "sessions_per_week", "weeks_per_block", "block_start")
 
 
 def structure_fingerprint() -> str:
@@ -182,6 +183,26 @@ def structure_fingerprint() -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+def fingerprint_record_problems(lock: dict[str, Any] | None = None) -> list[str]:
+    """Why `BLOCK_LOCK`'s recorded fingerprint is not an OWNER-attested record, or [] (#4161 review).
+
+    A re-recorded `structure_fingerprint` must travel with `structure_fingerprint_record`: the same value,
+    `provenance: "owner"`, a `stated` day key, and a `ref` naming the decision or issue that allowed it —
+    so re-recording the lock can never be how a structural edit quietly passes the guard."""
+    lock = lock if lock is not None else program_structure.BLOCK_LOCK
+    rec = lock.get("structure_fingerprint_record") or {}
+    out = []
+    if rec.get("fingerprint") != lock.get("structure_fingerprint"):
+        out.append(f"record names {rec.get('fingerprint')!r}, the lock holds {lock.get('structure_fingerprint')!r}")
+    if rec.get("provenance") != "owner":
+        out.append("record provenance is not 'owner'")
+    if parse_day_key(str(rec.get("stated") or "")) is None:
+        out.append("record carries no dated `stated`")
+    if "#" not in str(rec.get("ref") or ""):
+        out.append("record names no decision/issue `ref`")
+    return out
+
+
 def block_lock_state(day: str) -> dict[str, Any]:
     """The owner's v0.4 block lock as a guard the engine READS (#4161; it was recorded, not enforced).
 
@@ -192,13 +213,15 @@ def block_lock_state(day: str) -> dict[str, Any]:
     lock = program_structure.BLOCK_LOCK
     locked = day < str(lock["locked_until"])
     live, recorded = structure_fingerprint(), str(lock.get("structure_fingerprint"))
-    state = ("violated" if live != recorded else "locked") if locked else "open"
+    problems = fingerprint_record_problems(lock)
+    state = ("violated" if live != recorded or problems else "locked") if locked else "open"
     return {
         "state": state,
         "locked_until": lock["locked_until"],
         "structure_fingerprint": live,
         "recorded_fingerprint": recorded,
         "rule": lock["rule"],
+        "record_problems": problems,
         **(
             {
                 "refusal": f"a STRUCTURAL edit to v{_seq().get('program_version')} before {lock['locked_until']} — the owner's block lock ({WEEK_ISSUE})"

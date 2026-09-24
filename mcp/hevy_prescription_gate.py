@@ -252,8 +252,9 @@ def v03_load_rule(target_date: str, block_workouts: list[dict[str, Any]] | None 
     program's loads begin with its sequence, and a pre-block chat routine keeps the #3927
     best-load floor it was always judged against.
 
-    #4110: the week is the session SEQUENCE's (`session_sequence.next_session`) — completed loaded
-    Hevy sessions // `SESSION_SEQUENCE['sessions_per_week']` + 1 (4 under v0.4) — the same week `full_body_session` ramps and the
+    #4110/#4161: the week is the session SEQUENCE's (`session_sequence.next_session` over `ledger()`) — HYBRID:
+    a week advances only when its 4-session cycle is complete AND >= 7 days have passed since the previous
+    advance (`session_sequence.WEEK_RULE`) — the same week `full_body_session` ramps and the
     `not_before_week` gate reads. `block_workouts` is the Hevy record since the block start;
     None reads it (`plan_hevy_windows._block_workouts`, the sanctioned MCP Hevy read). A read
     that fails leaves the week UNKNOWN: the rule then ramps as week 1 — the lowest ramp floor,

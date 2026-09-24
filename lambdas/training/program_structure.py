@@ -551,7 +551,14 @@ BLOCK_LOCK: dict[str, Any] = {
     "locked_until": "2026-11-04",
     "rule": "no STRUCTURAL edits to v0.4 (split, order, templates, accessories) before this date; loads and deloads run as written",
     # #4161: enforced — `session_sequence.block_lock_state` compares the live structure with this, recorded at the lock
-    "structure_fingerprint": "b55ef41a7b2036af",  # recorded 2026-09-24 over origin/main 7218b187 (#4161)
+    "structure_fingerprint": "000ffceefa732c6e",
+    # every re-record carries this note — `session_sequence.fingerprint_record_problems` reds a bare edit (#4161 review)
+    "structure_fingerprint_record": {
+        "fingerprint": "000ffceefa732c6e",
+        "provenance": "owner",
+        "stated": "2026-09-24",
+        "ref": "#4161 (owner-approved red team: enforce the lock) over origin/main 7218b187, the block as locked by DECISION#2026-09-24T03:10:59",
+    },
     "provenance": "owner",
     "stated": "2026-09-23",
     "decision_sk": DECISION_SK,

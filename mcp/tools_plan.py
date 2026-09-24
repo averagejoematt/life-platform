@@ -374,7 +374,9 @@ def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -
 
 
 def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
-    """(days below the owner's protein floor, days measured) over the trailing 7 days.
+    """(days below the owner's protein floor, days measured) over THE protein-gate window for a plan on
+    `end_date` (#4161: `owner_redlines.protein_window` — the 7 COMPLETED days ending the day before the
+    plan and never after yesterday, the same window the nutrition critics' deficit advocate reads).
 
     Counts only days MacroFactor logged — an unlogged day is not a missed day, it is an
     unmeasured one, and the measured count travels with the answer so 0-of-2 is never
@@ -384,7 +386,8 @@ def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
 
     from mcp.tools_nutrition import tool_get_nutrition
 
-    res = tool_get_nutrition({"view": "summary", "start_date": _minus_days(end_date, 6), "end_date": end_date}) or {}
+    win = owner_redlines.protein_window(end_date, pacific_today())
+    res = tool_get_nutrition({"view": "summary", "start_date": win["start"], "end_date": win["end"]}) or {}
     if isinstance(res, dict) and res.get("error"):
         if _NO_DATA_ERROR.search(str(res.get("error"))):
             return None, None  # "No MacroFactor data" is an empty window, not a broken read
@@ -647,6 +650,7 @@ def tool_plan_next_session(args):
         reference=reference if isinstance(reference, dict) else None,
         protein_days_missed_7d=protein_missed,
         protein_days_measured_7d=protein_measured,  # #4161 ruling "B": the rate target's protein gate
+        protein_window=plan_engine.owner_redlines.protein_window(target_date, pacific_today()),
         readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],

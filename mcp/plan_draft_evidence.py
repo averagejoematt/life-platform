@@ -143,6 +143,8 @@ def attach_fatigue_inputs(
         perf_by_idx=perf if role_by_date is not None else None,
         soreness_by_idx=sore,
         same_region=critics_fatigue.same_region_recent(block_workouts, target_date, region),
+        # #4161 review: inside the deload window the larger cut is taken, never both
+        deload_sets_pct=(served or {}).get("deload_plan", {}).get("sets_pct") if (served or {}).get("deload") else None,
     )
     evidence["fatigue"]["performance"] = {i: p for i, p in perf.items() if p.get("state") != "insufficient"}
 

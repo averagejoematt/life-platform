@@ -291,7 +291,13 @@ REDLINES: dict[str, dict[str, Any]] = {
         "missed_days_threshold": 3,
         "window_days": 7,
         "min_measured_days": 4,
-        "gated_target": "rate_band_pct_bw_per_wk.low x bodyweight (the envelope's LOWER band — a schedule step carries no lower value)",
+        # THE one field the owner's pending choice (1.6 vs a middle value) moves: set `fixed_lb_wk` to a number and the gate serves it
+        "gated_target": {
+            "source": "rate_band_pct_bw_per_wk.low",
+            "fixed_lb_wk": None,
+            "note": "low %BW x bodyweight today (1.6 at 316 lb)",
+        },
+        "window": "the 7 COMPLETED Pacific days ending the day before the plan, never after yesterday (MacroFactor ~24 h lag)",
         "unmeasured_day": "UNKNOWN, not missed — only a MacroFactor-logged day can miss the floor",
         "provenance": "owner",
         "stated": "2026-09-24",
@@ -1009,4 +1015,11 @@ def summary() -> dict[str, Any]:
 # #4161: the rate arithmetic (the schedule step, the protein-adherence gate, the served target) lives in the
 # cohesive sibling `training.redline_rate` — this module was at the 1,000-line ceiling (#1665). The DATA
 # stays here, one home; every caller still reads `owner_redlines.rate_target_lb_per_wk` & co.
-from training.redline_rate import protein_days_missed, protein_gate, rate_schedule_step, rate_target_lb_per_wk  # noqa: E402,F401
+from training.redline_rate import (  # noqa: E402,F401
+    gated_target_lb_wk,
+    protein_days_missed,
+    protein_gate,
+    protein_window,
+    rate_schedule_step,
+    rate_target_lb_per_wk,
+)

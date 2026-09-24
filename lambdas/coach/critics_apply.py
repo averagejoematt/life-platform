@@ -17,7 +17,6 @@ PURE: no I/O, and no import of `coach.critics` (which imports this module).
 
 from __future__ import annotations
 
-import copy
 import re
 from typing import Any, Callable
 
@@ -159,13 +158,10 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
         n = int(to)
         if n < 1:
             return False, "set_count below 1"
+        if n > len(ex.sets):
+            # #4161: MAX_ADDED_SETS = 0 is structural — a set_count ABOVE the draft is an addition, refused by name
+            return False, f"refused: no critic adds sets (set_count {len(ex.sets)} -> {n}; MAX_ADDED_SETS={MAX_ADDED_SETS}, #4161)"
         while len(ex.sets) > n:
             ex.sets.pop()
-        while len(ex.sets) < n and ex.sets:
-            ex.sets.append(_clone(ex.sets[-1]))
         return len(ex.sets) == n, None
     return False, "unreachable"
-
-
-def _clone(s: Any) -> Any:
-    return copy.deepcopy(s)

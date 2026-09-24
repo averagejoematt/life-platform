@@ -138,6 +138,15 @@ def _protein7_counts(inputs: dict[str, Any]) -> tuple[int | None, int]:
     return owner_redlines.protein_days_missed([_num(v) for v in s[-7:]] if s is not None else None)
 
 
+def _protein7_window(inputs: dict[str, Any]) -> dict[str, str] | None:
+    """The 7 days `_protein7_counts` read — the last 7 of the series ending `window_end` (a completed day,
+    `_nutrition_through_date`), i.e. `owner_redlines.protein_window` for a plan on or after today (#4161)."""
+    from common.pacific_time import parse_day_key, shift_day_key
+
+    end = inputs.get("window_end")
+    return {"start": shift_day_key(end, -6), "end": end} if end and parse_day_key(str(end)) else None
+
+
 def _mean(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 0) if values else None
 
@@ -194,7 +203,9 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     weight = _num(inputs.get("weight_lb"))
     # v3.3 ruling "B" (#4161): the target this critic argues against is the SERVED one — gated by protein adherence
     p_missed, p_measured = _protein7_counts(inputs)
-    target = owner_redlines.rate_target_lb_per_wk(weight, protein_missed_7d=p_missed, protein_measured_7d=p_measured)
+    target = owner_redlines.rate_target_lb_per_wk(
+        weight, protein_missed_7d=p_missed, protein_measured_7d=p_measured, protein_window_days=_protein7_window(inputs)
+    )
     loss = _loss_rate(inputs)
     intake14 = _logged(_series(inputs, "intake_kcal_by_day"))
     mean14 = _mean(intake14)

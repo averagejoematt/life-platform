@@ -35,10 +35,29 @@ def protein_days_missed(grams_by_day: list[Any] | None) -> tuple[int | None, int
     return (sum(1 for g in grams if g < floor) if grams else None), len(grams)
 
 
-def protein_gate(missed: int | None, measured: int | None) -> dict[str, Any]:
-    """Ruling "B" (v3.3): is the served rate target the schedule step, or the envelope's lower band?"""
+def protein_window(target_date: str, today: str) -> dict[str, str]:
+    """THE protein-gate window (#4161): the 7 COMPLETED Pacific days ending the earlier of the day before
+    `target_date` and yesterday — MacroFactor lands ~24 h late, so today is never complete. The plan's
+    gate (`tools_plan._protein_days_7d`) and the nutrition critics' deficit advocate both read this."""
+    from common.pacific_time import shift_day_key
+
+    end = min(shift_day_key(target_date, -1), shift_day_key(today, -1))
+    return {"start": shift_day_key(end, -6), "end": end}
+
+
+def gated_target_lb_wk(weight_lb: float) -> tuple[float, str]:
+    """(the gated target, where it came from) — the ONE field `rate_protein_gate.gated_target` decides."""
+    gt = _redlines()["rate_protein_gate"]["gated_target"]
+    if gt.get("fixed_lb_wk") is not None:
+        return float(gt["fixed_lb_wk"]), "rate_protein_gate.gated_target.fixed_lb_wk"
+    return round(weight_lb * _redlines()["rate_band_pct_bw_per_wk"]["low"] / 100, 1), str(gt["source"])
+
+
+def protein_gate(missed: int | None, measured: int | None, window: dict[str, str] | None = None) -> dict[str, Any]:
+    """Ruling "B" (v3.3): is the served rate target the schedule step, or the gated target? `window` is echoed."""
     g = _redlines()["rate_protein_gate"]
     out = {"missed_7d": missed, "measured_7d": measured, "threshold": g["missed_days_threshold"], "min_measured": g["min_measured_days"]}
+    out["window"] = window
     if missed is None or measured is None or measured < g["min_measured_days"]:
         return {
             **out,
@@ -51,7 +70,11 @@ def protein_gate(missed: int | None, measured: int | None) -> dict[str, Any]:
 
 
 def rate_target_lb_per_wk(
-    weight_lb: float | None, *, protein_missed_7d: int | None = None, protein_measured_7d: int | None = None
+    weight_lb: float | None,
+    *,
+    protein_missed_7d: int | None = None,
+    protein_measured_7d: int | None = None,
+    protein_window_days: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """The rate at a given bodyweight: the %BW envelope in pounds AND the scheduled absolute target —
     gated by protein adherence (v3.3 ruling "B", `protein_gate`): `target_lb_wk` is the SERVED target."""
@@ -60,16 +83,19 @@ def rate_target_lb_per_wk(
     band = _redlines()["rate_band_pct_bw_per_wk"]
     step = rate_schedule_step(weight_lb)
     low = round(weight_lb * band["low"] / 100, 1)
-    gate = protein_gate(protein_missed_7d, protein_measured_7d)
+    gate = protein_gate(protein_missed_7d, protein_measured_7d, protein_window_days)
+    gated, gated_source = gated_target_lb_wk(weight_lb)
+    gate["gated_target_lb_wk"], gate["gated_target_source"] = gated, gated_source
+    served = gated if gate["applied"] else step["target"]
     return {
         "low_lb_wk": low,
         "high_lb_wk": round(weight_lb * band["high"] / 100, 1),
-        "target_lb_wk": low if gate["applied"] else step["target"],
+        "target_lb_wk": served,
         "step_target_lb_wk": step["target"],
         "protein_gate": gate,
         "cap_lb_wk": step["cap"],
         "dxa_gate": step.get("dxa_gate"),
-        "target_pct_bw_wk": round((low if gate["applied"] else step["target"]) / weight_lb * 100, 2),
+        "target_pct_bw_wk": round(served / weight_lb * 100, 2),
         "schedule_step_above_lb": step["above_lb"],
         "landing_phase": weight_lb <= _redlines()["landing"]["deceleration_begins_lb"],
         "provenance": band["provenance"],

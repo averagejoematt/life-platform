@@ -622,6 +622,7 @@ def constraint_block(
     reference: dict[str, Any] | None = None,
     protein_days_missed_7d: int | None = None,
     protein_days_measured_7d: int | None = None,
+    protein_window: dict[str, str] | None = None,
     readiness_low_streak_days: int | None = None,
     anchor_lift_drop_pct: float | None = None,
     anchor_lift_drop_sessions: int | None = None,
@@ -826,7 +827,10 @@ def constraint_block(
         "session": session,
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
         "rate_target": owner_redlines.rate_target_lb_per_wk(
-            weight_lb, protein_missed_7d=protein_days_missed_7d, protein_measured_7d=protein_days_measured_7d
+            weight_lb,
+            protein_missed_7d=protein_days_missed_7d,
+            protein_measured_7d=protein_days_measured_7d,
+            protein_window_days=protein_window,
         ),
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
