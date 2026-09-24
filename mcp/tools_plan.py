@@ -50,7 +50,7 @@ from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
 
 from mcp.core import LAYER_UNKNOWN
-from mcp.plan_helpers import _catalog_and_ceiling, _minus_days, _resolver, _union_evidence_rows  # noqa: F401  (#4081/#4105 size fix)
+from mcp.plan_helpers import _catalog_and_ceiling, _days_between, _minus_days, _resolver, _union_evidence_rows  # noqa: F401 (#4149)
 
 logger = logging.getLogger("tools_plan")
 
@@ -983,13 +983,6 @@ def _worst_anchor(evidence: dict[str, Any]) -> tuple[float | None, int | None]:
         return None, None
     w = max(rows, key=lambda e: e["drop_pct"])
     return w["drop_pct"], w.get("sessions_below")
-
-
-def _days_between(a: str | None, b: str) -> int | None:
-    try:
-        return (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(str(a)[:10], "%Y-%m-%d")).days
-    except (TypeError, ValueError):
-        return None
 
 
 # ── stage 2: the red team ────────────────────────────────────────────────────────────
