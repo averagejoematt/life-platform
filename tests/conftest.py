@@ -771,6 +771,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # #4075: an rglob sweep of lambdas/ + mcp/ keeping the TRIMP exponent in one module. Pure
         # repo shape — a second copy is exactly a PR's own diff.
         "test_training_load.py",
+        # #4075 4A: an rglob sweep of lambdas/ + mcp/ keeping the Hevy lift rate + per-rep tempo
+        # in ONE module and retiring the MCP second load model. Pure repo shape — a second
+        # load derivation is exactly a PR's own diff.
+        "test_training_load_worked_set_4075.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own

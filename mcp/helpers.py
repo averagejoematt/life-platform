@@ -2,12 +2,11 @@
 Shared computation helpers: aggregation, training load, statistics, classification.
 """
 
-import math
 from collections import defaultdict
 
 from common import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
-from mcp.core import get_profile, get_sot, query_source
+from mcp.core import get_sot, query_source
 
 # ── Aggregation ──
 
@@ -71,25 +70,9 @@ def flatten_strava_activity(day_record):
 
 
 # ── Training load model helpers ───────────────────────────────────────────────
-def compute_daily_load_score(day_record):
-    kj = day_record.get("total_kilojoules") or 0
-    dist = day_record.get("total_distance_miles") or 0
-    elev = day_record.get("total_elevation_gain_feet") or 0
-    hr_avg = day_record.get("average_heartrate") or 0
-    time_s = day_record.get("total_moving_time_seconds") or 0
-
-    if kj > 0:
-        return float(kj)
-
-    if hr_avg > 0 and time_s > 0:
-        profile = get_profile()
-        rhr = profile.get("resting_heart_rate_baseline", 55)
-        mhr = profile.get("max_heart_rate", 190)
-        hr_r = (hr_avg - rhr) / max(mhr - rhr, 1)
-        trimp = (time_s / 3600) * hr_avg * 0.64 * math.exp(1.92 * hr_r)
-        return round(trimp, 1)
-
-    return round(dist * 10 + elev / 100, 1)
+# #4075: `compute_daily_load_score` (a second, day-level load model: raw kJ, else an
+# un-normalised TRIMP, else distance x 10, blind to Hevy) was retired. The ONE per-day
+# load model is `lambdas/training/training_load.py`; `get_training view=load` reads it.
 
 
 def compute_ewa(daily_values_chrono, decay_days, seed=0.0):
