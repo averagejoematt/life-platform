@@ -991,6 +991,11 @@ def handle_bridge_invoke(event):
 
 # ── Lambda handler (entry point) ─────────────────────────────────────────────
 def lambda_handler(event, context):
+    # 0. #4084: the nightly pre-draft's own rule (constant input, no `source` key) on the warmer
+    if isinstance(event, dict) and event.get("job") == "nightly_predraft":
+        from mcp.nightly_predraft import lambda_entry
+
+        return lambda_entry(event)
     # 1. EventBridge scheduled rule — nightly cache warmer, no auth
     if event.get("source") == "aws.events" or event.get("detail-type") == "Scheduled Event":
         logger.info("[lambda_handler] EventBridge trigger — running nightly cache warmer")
