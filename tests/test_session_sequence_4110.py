@@ -321,9 +321,49 @@ def test_generator_reads_the_record_itself_when_the_caller_did_not_and_says_so_w
         assert _generate(FIRST_TARGET)[0].title.startswith("UPPER-VOLUME")
     ld.assert_called_once_with(FIRST_TARGET)
     with patch.object(session_sequence, "load_block_workouts", side_effect=RuntimeError("ddb down")):
-        routines = _generate("2026-09-27")  # Sunday — the nominal grid's walk
+        routines = _generate("2026-09-27")
     assert routines[0].archetype == "aerobic"
     assert any("session sequence UNREADABLE" in r for r in routines[0].rationale)
+
+
+@pytest.mark.parametrize("day", ["2026-09-28", "2026-09-29", "2026-10-01", "2026-10-02"])  # the nominal grid's four lifting days
+def test_an_unreadable_record_drafts_no_lifting_session_matching_planned_session(day):
+    """#4110 review: the generator and `planned_session` give ONE answer when the Hevy read fails —
+    `sequence_unreadable`, no prescription — never the nominal weekday's session (Mon = upper_heavy)."""
+    assert program_structure.week_grid()["schedule"][str(__import__("datetime").date.fromisoformat(day).weekday())]["archetype"] in (
+        "upper",
+        "lower",
+    )
+    with patch.object(session_sequence, "load_block_workouts", side_effect=RuntimeError("ddb down")):
+        routines = _generate(day)
+    assert len(routines) == 1 and routines[0].archetype == "aerobic" and routines[0].exercises == []
+    assert routines[0].inputs_snapshot["calendar"] == {"source": "sequence_unreadable", "week": None, "session_role": None}
+    assert any("NO lifting session is drafted" in r for r in routines[0].rationale)
+    ps = program_structure.planned_session(day, block_workouts=None)
+    assert ps["source"] == "sequence_unreadable" and "prescription" not in ps
+
+
+def test_mutation_control_the_weekday_fallback_serves_a_nominal_lifting_session():
+    """Restore the pre-review fallback (weekday entry + a note) and Monday drafts upper-heavy — the divergence."""
+    real = routine_generator._schedule_entry_for_date
+
+    def weekday_fallback(target_date, week_cfg, source=None, block_workouts=None):
+        e = real(target_date, week_cfg, source, block_workouts)
+        if e.get("source") == "sequence_unreadable":
+            from datetime import date
+
+            return {
+                **dict(week_cfg["schedule"][str(date.fromisoformat(target_date).weekday())]),
+                "sequence_unreadable": e["sequence_unreadable"],
+            }
+        return e
+
+    with (
+        patch.object(session_sequence, "load_block_workouts", side_effect=RuntimeError("ddb down")),
+        patch.object(routine_generator, "_schedule_entry_for_date", weekday_fallback),
+    ):
+        routines = _generate("2026-09-28")
+    assert routines[0].archetype == "upper", "the fallback serves the nominal Monday — the test above must red on it"
 
 
 def test_inactive_program_never_reads_the_sequence():

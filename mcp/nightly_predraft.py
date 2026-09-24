@@ -108,6 +108,27 @@ FAILED = "failed"  # NOT honest-terminal: emits no PredraftOutcome, so the dead-
 
 
 # ── THE seam ────────────────────────────────────────────────────────────────────────────
+def _block_record(target_date: str) -> list[dict[str, Any]] | None:
+    """Stage 1's completed-session record since the block start (`plan_hevy_windows._block_workouts`).
+    A read that RAISES is None — the session then says `sequence_unreadable` by name."""
+    from mcp.plan_hevy_windows import _block_workouts
+
+    try:
+        return _block_workouts(target_date)
+    except Exception as e:  # noqa: BLE001 — named on the session as sequence_unreadable, never a silent session 1
+        logger.warning(f"nightly predraft: the Hevy record since the block start was not read ({type(e).__name__}: {e})")
+        return None
+
+
+def _session_from(target_date: str, block_workouts: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    from training import plan_engine
+
+    from mcp.plan_helpers import _catalog_and_ceiling
+
+    catalog, ceiling = _catalog_and_ceiling()
+    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts)
+
+
 def scheduled_session(target_date: str) -> dict[str, Any] | None:
     """The session the program serves on `target_date` — the SAME function stage 1 uses (#4064).
 
@@ -120,18 +141,7 @@ def scheduled_session(target_date: str) -> dict[str, Any] | None:
     session is draftable iff it carries a `prescription` (`is_lifting_session`), whatever its
     archetype (`upper`, `lower`; `full` for v0.3 history).
     """
-    from training import plan_engine
-
-    from mcp.plan_helpers import _catalog_and_ceiling
-    from mcp.plan_hevy_windows import _block_workouts
-
-    catalog, ceiling = _catalog_and_ceiling()
-    try:
-        block_workouts = _block_workouts(target_date)
-    except Exception as e:  # noqa: BLE001 — named on the session as sequence_unreadable, never a silent session 1
-        logger.warning(f"nightly predraft: the Hevy record since the block start was not read ({type(e).__name__}: {e})")
-        block_workouts = None
-    return plan_engine._scheduled_session(target_date, catalog, ceiling, block_workouts)
+    return _session_from(target_date, _block_record(target_date))
 
 
 def is_lifting_session(session: dict[str, Any] | None) -> bool:
@@ -171,18 +181,55 @@ def _is_owner_routine(ir: Any) -> bool:
     return not _is_ours(ir) or bool(getattr(ir, "hevy_routine_id", None)) or getattr(ir, "status", None) == "active"
 
 
+def _routine_role(ir: Any) -> tuple[str, str | None]:
+    """(archetype, session_role or None) of a routine. The role is the generator's calendar stamp or
+    the pre-draft marker's; a chat-authored routine carries only its archetype."""
+    snap = getattr(ir, "inputs_snapshot", None) or {}
+    role = (snap.get("calendar") or {}).get("session_role") or (snap.get(MARKER) or {}).get("session_role")
+    return str(getattr(ir, "archetype", "") or "").lower(), role
+
+
+def _performed_hevy_ids(block_workouts: list[dict[str, Any]] | None) -> set[str]:
+    """Hevy routine ids of the loaded sessions already performed since the block start."""
+    from training import training_streaks
+
+    return {
+        str(w.get("hevy_routine_id"))
+        for w in block_workouts or []
+        if w.get("hevy_routine_id") and not w.get("tombstone") and training_streaks.is_loaded_session(w)
+    }
+
+
+def _blocks_served_session(ir: Any, session: dict[str, Any], performed: set[str] | frozenset[str]) -> bool:
+    """#4110/#4147: an owner routine blocks the pre-draft only when it IS the session the sequence
+    now serves — the same role (or, for a chat-authored routine with no role stamp, the same
+    archetype) — AND it has not been performed. The date alone decides nothing: under an ORDER a
+    routine stamped for tomorrow can be done today (the committed Lower-heavy stamped 09-25,
+    performed 09-24), and tomorrow's served session is then a different one. A superseded v0.3
+    `full` draft is never the served v0.4 session."""
+    if not _is_owner_routine(ir):
+        return False
+    hid = str(getattr(ir, "hevy_routine_id", None) or "")
+    if hid and hid in performed:
+        return False
+    archetype, role = _routine_role(ir)
+    if role:
+        return role == session.get("session_role")
+    return bool(archetype) and archetype == str(session.get("archetype") or "").lower()
+
+
 # ── write side ──────────────────────────────────────────────────────────────────────────
-def _mark_draft(target_date: str, primary_id: str, session: dict[str, Any], run_at: str) -> None:
+def _mark_draft(target_date: str, primary_id: str, session: dict[str, Any], run_at: str, preexisting: frozenset[str] = frozenset()) -> None:
     """Stamp the marker on EVERY routine the draft just persisted (ideal + its floor / re-entry
     siblings — `_action_draft` writes all of them), each as its next version, before stage 2 (see
     module doc). Only `primary_id` is red-teamed; the siblings are marked so a re-run does not read
-    them as the owner's routines. Safe to take the whole date: `run` only drafts on a date that
-    had no live routine."""
+    them as the owner's routines. `preexisting` (#4110) are the routines on the date BEFORE the draft —
+    an owner routine for a different session can share the date now, and it is never versioned over."""
     from training.routine_repo import put_versioned
 
     marked = False
     for ir in _routines_for(target_date):
-        if getattr(ir, "status", None) == "archived":
+        if getattr(ir, "status", None) == "archived" or ir.routine_id in preexisting:
             continue
         role = PRIMARY if ir.routine_id == primary_id else SIBLING
         marked = marked or role == PRIMARY
@@ -249,14 +296,25 @@ def run(target_date: str | None = None) -> dict[str, Any]:
 
     existing = _routines_for(target)
     mine = [r for r in existing if _is_primary(r) and getattr(r, "status", None) != "archived"]
-    owners = [r for r in existing if _is_owner_routine(r)]
+    owners = [r for r in existing if _blocks_served_session(r, session, frozenset())]
+    if owners:  # the served role is on file: read the record once to drop any already PERFORMED
+        performed = _performed_hevy_ids(_block_record(target))
+        owners = [r for r in owners if _blocks_served_session(r, session, performed)]
     if owners:
         out.update(
             outcome=SKIPPED_OWNER_ROUTINE,
-            reason="a routine the pre-draft did not author is already on file for this date — it is never versioned over",
+            reason=(
+                f"a routine the pre-draft did not author is already on file for this date AND is the session the sequence serves "
+                f"({session.get('session_role')}, not yet performed) — it is never versioned over"
+            ),
             routines=[{"routine_id": r.routine_id, "status": r.status, "hevy_linked": bool(r.hevy_routine_id)} for r in owners],
         )
         return out
+    others = [r for r in existing if _is_owner_routine(r)]
+    if others:  # on file for the date but NOT the served session — named, never blocking, never touched
+        out["other_routines_on_date"] = [
+            {"routine_id": r.routine_id, "archetype": _routine_role(r)[0], "session_role": _routine_role(r)[1]} for r in others
+        ]
     done = [r for r in mine if _red_teamed(r)]
     if done:
         r = done[0]
@@ -276,7 +334,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
             )
             return out
         routine_id = drafted["ideal_routine_id"]
-        _mark_draft(target, routine_id, session, run_at)
+        _mark_draft(target, routine_id, session, run_at, frozenset(r.routine_id for r in existing))
 
     res = _stage_2(target, routine_id)
     rec = (res or {}).get("critics") or {}

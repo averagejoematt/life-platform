@@ -171,8 +171,6 @@ def full_body_routines(
                 else "; the first session of the program"
             )
         )
-    elif day_entry.get("sequence_unreadable"):
-        rationale.append(f"session sequence UNREADABLE — {day_entry['sequence_unreadable']}; weekday grid: {day_entry.get('label')}")
     else:
         rationale.append(f"weekday grid: {day_entry.get('label')}")
     if deload and rx.get("deload_trim"):

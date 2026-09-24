@@ -221,7 +221,12 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
 def program_week(day: str, workouts: Iterable[dict[str, Any]] | None) -> int | None:
     """THE program week for `day` — 0 before the block start, None when the Hevy record was not
     read (or the day key is unreadable). Read by the `not_before_week` gate (#4098) and the load
-    ramp (#4090) — one function, so the two can never disagree about which week it is."""
+    ramp (#4090) — one function, so the two can never disagree about which week it is.
+
+    HONESTY (#4110 review): a program week is counted in COMPLETED sessions (4 per week under v0.4),
+    not calendar weeks, so a week with audibles is longer than seven days. `BLOCK_LOCK` (no structural
+    edits before 2026-11-04) is recorded data and is NOT enforced in code; the owner is being asked to
+    rule on whether the lock and the deload should follow calendar or completed weeks."""
     try:
         entry = next_session(day, workouts)
     except ValueError:

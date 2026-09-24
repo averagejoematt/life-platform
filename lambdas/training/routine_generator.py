@@ -121,8 +121,10 @@ def _schedule_entry_for_date(
     the next undone session, which advances only on a completed loaded Hevy session, so a walk
     on a lifting day postpones the session instead of skipping it. Before the block start it
     returns None and the weekday grid answers, as it always has. If the Hevy record could not
-    be read, the weekday grid answers AND the entry says the sequence was unreadable — never a
-    silent session 1. The JSON grid (v0.2 / any inactive program) never consults the sequence."""
+    be read the next session is UNKNOWN, and the entry says so: no lifting session is drafted —
+    never the nominal weekday's session and never a silent session 1, the same answer
+    `program_structure.planned_session` gives (`sequence_unreadable`, no prescription). The JSON
+    grid (v0.2 / any inactive program) never consults the sequence."""
     dow = date.fromisoformat(target_date).weekday()
     if source == "module":
         from training import session_sequence
@@ -131,7 +133,14 @@ def _schedule_entry_for_date(
         if seq is not None and seq.get("source") == "session_sequence":
             return seq
         if seq is not None:
-            return {**dict(week_cfg["schedule"].get(str(dow)) or {}), "sequence_unreadable": seq["note"]}
+            # #4110 review: a non-lifting placeholder that names the unreadable record — the one
+            # outcome that cannot prescribe a session the sequence did not choose (walking is every day).
+            return {
+                "archetype": "aerobic",
+                "source": "sequence_unreadable",
+                "sequence_unreadable": seq["note"],
+                "label": "session sequence UNREADABLE — no lifting session drafted",
+            }
     return dict(week_cfg["schedule"].get(str(dow)) or {})
 
 
@@ -1127,7 +1136,10 @@ def _non_lifting_pair(
 ) -> list[RoutineSpec]:
     rationale = [f"non-lifting day: archetype={archetype}"]
     if day_entry and day_entry.get("sequence_unreadable"):
-        rationale.append(f"session sequence UNREADABLE — {day_entry['sequence_unreadable']}; the weekday grid answered")
+        rationale.append(
+            f"session sequence UNREADABLE — {day_entry['sequence_unreadable']}; NO lifting session is drafted: the next session is "
+            "unknown, and the nominal weekday is never served in its place (#4110)"
+        )
     ideal = RoutineSpec(
         routine_id=_new_routine_id(inputs.target_date, archetype, "ideal"),
         target_date=inputs.target_date,
@@ -1146,7 +1158,12 @@ def _non_lifting_pair(
         status="draft",
         exercises=[],
         budget_used={},
-        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog),
+        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog)
+        | (
+            {"calendar": {"source": "sequence_unreadable", "week": None, "session_role": None}}
+            if (day_entry or {}).get("sequence_unreadable")
+            else {}
+        ),
         rationale=rationale,
         caps={"total_sets": 0, "session_minutes": 60},
     )

@@ -687,7 +687,7 @@ def tool_plan_next_session(args):
         "protein_days_measured_7d": protein_measured,
         "how_to_use": (
             "Stage 1 is the deterministic constraint block. `constraint_block.session` is the NEXT UNDONE session "
-            "of the v0.3 sequence (its position, and the completed session that advanced it, #4110) with its §3 prescription — "
+            f"of the v{plan_engine.program_structure.PROGRAM_VERSION} sequence (its position, and the completed session that advanced it, #4110) with its prescription — "
             "start from it. Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
             "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
