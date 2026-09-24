@@ -355,7 +355,7 @@ def test_load_series_is_hand_derivable_from_the_closed_form(sources):
     for n, row in ((85, first), (265, last)):
         assert row["ctl_fitness"] == round(100 + (100 - 100) * math.exp(-n / 42), 2) == 100.0
         assert row["atl_fatigue"] == round(100 + (100 - 100) * math.exp(-n / 7), 2) == 100.0
-        assert row["acwr"] == 1.0 and row["tsb_form"] == 0.0
+        assert row["load_model_atl_ctl_ratio"] == 1.0 and row["tsb_form"] == 0.0
     assert out["current_state"] == last
 
 
@@ -376,10 +376,10 @@ def test_load_ewma_convergence_is_hand_derivable_when_the_seed_is_genuinely_zero
     out = call("get_training", {"view": "load", "start_date": _d(-180), "end_date": TODAY})
 
     first, last = out["series"][0], out["series"][-1]
-    assert (first["ctl_fitness"], first["atl_fatigue"], first["acwr"]) == (0.0, 0.0, None)
+    assert (first["ctl_fitness"], first["atl_fatigue"], first["load_model_atl_ctl_ratio"]) == (0.0, 0.0, None)
     assert last["ctl_fitness"] == round(100 * (1 - math.exp(-101 / 42)), 2) == 90.97
     assert last["atl_fatigue"] == round(100 * (1 - math.exp(-101 / 7)), 2) == 100.0
-    assert last["acwr"] == round(100.0 / 90.97, 2) == 1.1
+    assert last["load_model_atl_ctl_ratio"] == round(100.0 / 90.97, 2) == 1.1
 
 
 def test_constant_training_should_not_produce_a_fabricated_early_fatigue_cliff(sources):
@@ -387,8 +387,28 @@ def test_constant_training_should_not_produce_a_fabricated_early_fatigue_cliff(s
     sources(strava=rows)
     out = call("get_training", {"view": "load", "start_date": _d(-180), "end_date": TODAY})
     first, last = out["series"][0], out["series"][-1]
-    assert first["acwr"] == pytest.approx(last["acwr"], abs=0.03)
+    assert first["load_model_atl_ctl_ratio"] == pytest.approx(last["load_model_atl_ctl_ratio"], abs=0.03)
     assert first["form_status"] == last["form_status"]
+
+
+def test_load_rows_take_injury_risk_from_the_platform_acwr_not_the_load_ratio_4075(sources):
+    """#4075 review. A step change in load drives this model's ATL/CTL ratio far above 1.5
+    (the 2026-09-08..22 shape: 1.67-1.96 on 12 of 15 days) while acwr-compute's stored
+    ACWR reads 1.28 "safe". No row may print a HIGH risk label the platform ACWR
+    contradicts; the row's acwr / injury_risk ARE the platform's. Mutation control:
+    labelling risk from `load_model_atl_ctl_ratio` (the pre-review code) fails this."""
+    rows = [strava_day(_d(-i), kilojoules=(2000 if i <= 6 else 50)) for i in range(0, 300)]
+    cm = [computed_metrics_day(_d(-i), acwr=1.28, acwr_zone="safe") for i in range(1, 7)]
+    sources(strava=rows, computed_metrics=cm)
+    out = call("get_training", {"view": "load", "start_date": _d(-6), "end_date": TODAY})
+    spiked = [r for r in out["series"] if (r["load_model_atl_ctl_ratio"] or 0) > 1.5]
+    assert spiked, "fixture must drive the load-model ratio above 1.5"
+    for r in out["series"]:
+        assert "HIGH" not in str(r["injury_risk"]), r
+    by_date = {r["date"]: r for r in out["series"]}
+    assert by_date[_d(-1)]["acwr"] == 1.28 and by_date[_d(-1)]["injury_risk"] == "safe"
+    # Honest absence: acwr-compute wrote nothing for TODAY — no verdict, never a default "low".
+    assert by_date[TODAY]["acwr"] is None and by_date[TODAY]["injury_risk"] is None
 
 
 def test_load_form_bands_are_ordered_most_negative_first(sources):
@@ -815,7 +835,7 @@ def test_a_load_model_ratio_spike_alone_does_not_force_red_4075(sources):
     shape of 2026-09-15..22 (a new programme over a low summer base: the Banister ratio
     read 2.5-2.8 while acwr-compute read 1.28). The override follows the ONE ACWR, so
     the tier stays GREEN; the Banister ratio is still published, labelled, beside it.
-    Re-pointing the override at `load_model_acwr` fails this test."""
+    Re-pointing the override at `load_model_atl_ctl_ratio` fails this test."""
     rows = [strava_day(_d(-i), kilojoules=(2000 if i <= 6 else 50)) for i in range(0, 300)]
     sources(
         whoop=[_recovery_day(TODAY, recovery=95)],
@@ -827,7 +847,8 @@ def test_a_load_model_ratio_spike_alone_does_not_force_red_4075(sources):
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     ctx = out["training_context"]["training_load"]
-    assert ctx["load_model_acwr"] > 1.5  # the spike is real in the load model...
+    assert ctx["load_model_atl_ctl_ratio"] > 1.5  # the spike is real in the load model...
+    assert "not an injury-risk" in ctx["load_model_atl_ctl_ratio_note"]  # ...and labelled as no risk verdict
     assert ctx["acwr"] == 1.28  # ...but the injury override reads the platform ACWR
     assert out["readiness_tier"] == "GREEN"
 

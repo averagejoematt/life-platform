@@ -566,6 +566,46 @@ def is_duration_proxy(basis):
     return basis.get("confidence") in ("duration_proxy", "hevy_fallback")
 
 
+def basis_description(basis):
+    """One honest sentence naming what drove the window's load, or None (#4075 4A).
+
+    Derived from the stored basis's shares, never from ``confidence`` alone: under the
+    worked-set model a non-proxy window can be driven by Hevy worked-set time, by HR, or
+    by a mix, and a sentence keyed on "not power" would call a lifting window "heart-rate".
+    A power-only window, or no basis at all, returns None (nothing to qualify).
+    """
+    if not basis:
+        return None
+    conf = str(basis.get("confidence") or "")
+    if is_duration_proxy(basis):
+        return "duration-proxy basis — at least half the load is a duration estimate (no HR, no power)"
+    if conf in ("", "none", "power"):
+        return None
+
+    def _share(key):
+        try:
+            v = basis.get(key)
+            return float(v) if v is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    labels = (
+        ("worked_set_share", "Hevy worked-set time (working sets x reps x the stated per-rep tempo, warm-ups excluded)"),
+        ("hr_share", "heart rate (Banister TRIMP above the Zone-1 ceiling)"),
+        ("proxy_share", "duration estimates (no HR, no power)"),
+    )
+    parts = [(_share(k), text) for k, text in labels if _share(k) > 0]
+    if not parts:
+        # A pre-#4075-4A basis carries no worked_set_share; say only what it does carry.
+        if conf == "hr":
+            return "heart-rate basis — loads are Banister TRIMP above the Zone-1 ceiling, not power-meter data"
+        return None
+    parts.sort(key=lambda p: -p[0])
+    head = f"{parts[0][1].split(' (')[0]} basis"
+    detail = "; ".join(f"{round(sh * 100)}% {text}" for sh, text in parts)
+    return f"{head} — {detail}; not power-meter data"
+
+
 def basis_note(basis):
     """Human-readable provenance suffix for anywhere TSB renders (M-3).
 

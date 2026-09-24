@@ -77,21 +77,35 @@ def _get_training_load(args):
     ctl_series = compute_ewa(chrono, 42, seed=seed)
     atl_series = compute_ewa(chrono, 7, seed=seed)
 
+    # #4075: the injury-risk verdict on each row is the PLATFORM's ACWR for that date —
+    # `computed_metrics.acwr` / `acwr_zone` from acwr-compute (Whoop-strain EWMA 7/28), the
+    # number get_acwr_status, the brief and view=recommendation read. This view used to
+    # label risk from its own ATL/CTL ratio; on the corrected load that ratio read
+    # 1.67-1.96 on 12 of 2026-09-08..22's 15 days ("HIGH — injury risk elevated") while
+    # acwr-compute read 1.24-1.28 "safe" — two contradicting ACWRs. The Banister ratio is
+    # still published, renamed, and carries no risk verdict. Absent platform ACWR = None.
+    platform_acwr = {}
+    try:
+        for r in query_source("computed_metrics", start_date, end_date) or []:
+            if r.get("date") and r.get("acwr") is not None:
+                platform_acwr[r["date"]] = r
+    except Exception:
+        platform_acwr = {}
+
     start_dt_req = datetime.strptime(start_date, "%Y-%m-%d")
     result_rows = []
     for (date_str, ctl), (_, atl) in zip(ctl_series, atl_series):
         if datetime.strptime(date_str, "%Y-%m-%d") < start_dt_req:
             continue
         tsb = round(ctl - atl, 2)
-        acwr = round(atl / ctl, 2) if ctl > 0 else None
-
-        risk = "low"
-        # Gabbett 2016: >1.3 moderate injury risk, >1.5 high; 0.8-1.3 is sweet spot
-        if acwr is not None:
-            if acwr > 1.5:
-                risk = "HIGH — injury risk elevated, consider reducing load"
-            elif acwr > 1.3:
-                risk = "moderate — monitor carefully"
+        load_ratio = round(atl / ctl, 2) if ctl > 0 else None
+        cm = platform_acwr.get(date_str)
+        try:
+            acwr = round(float(cm["acwr"]), 3) if cm else None
+        except (TypeError, ValueError):
+            acwr = None
+        # Gabbett 2016 zones, as acwr-compute classifies them — never re-derived here.
+        risk = (cm.get("acwr_zone") or None) if cm else None
 
         form = "neutral"
         if tsb > 5:
@@ -110,6 +124,7 @@ def _get_training_load(args):
                 "tsb_form": tsb,
                 "acwr": acwr,
                 "injury_risk": risk,
+                "load_model_atl_ctl_ratio": load_ratio,
                 "form_status": form,
             }
         )
@@ -181,9 +196,13 @@ def _get_training_load(args):
             "ATL": "Fatigue (7-day). Spikes after big training blocks.",
             "TSB": "Form = CTL - ATL. Positive = fresh, negative = tired.",
             "ACWR": (
-                "Acute:Chronic ratio of THIS model (ATL 7d / CTL 42d). >1.3 caution, >1.5 injury risk (Gabbett 2016 "
-                "population zones). Not the platform's injury-risk ACWR: get_acwr_status, the brief and "
-                "view=recommendation read computed_metrics.acwr (acwr-compute, Whoop-strain EWMA 7/28) (#4075)."
+                "acwr / injury_risk are the PLATFORM's acute:chronic ratio for that date — computed_metrics.acwr / "
+                "acwr_zone (acwr-compute, Whoop-strain EWMA 7/28, Gabbett 2016 population zones), the number "
+                "get_acwr_status, the brief and view=recommendation read; None where acwr-compute wrote none (#4075)."
+            ),
+            "load_model_atl_ctl_ratio": (
+                "This model's ATL(7d)/CTL(42d). A load-model ratio, NOT an injury-risk verdict: it is unstable over a "
+                "low chronic base (Lolli et al. 2019 ratio coupling) and is deliberately given no risk label (#4075)."
             ),
             "Monotony": "Weekly mean load / SD. >2.0 = illness risk (Galpin). Vary intensity.",
         },
@@ -639,8 +658,12 @@ def _get_training_recommendation(args):
             training_context["tsb"] = cs.get("tsb_form")
             training_context["form_status"] = cs.get("form_status")
             # The Banister ATL/CTL ratio of the view=load model, published for
-            # transparency but NOT the injury override's input (see below).
-            training_context["load_model_acwr"] = cs.get("acwr")
+            # transparency but NOT a risk verdict and NOT the injury override's input.
+            training_context["load_model_atl_ctl_ratio"] = cs.get("load_model_atl_ctl_ratio")
+            training_context["load_model_atl_ctl_ratio_note"] = (
+                "view=load's Banister ATL(7d)/CTL(42d) — a load-model ratio, not an injury-risk ACWR; the injury "
+                "override reads `acwr` (computed_metrics.acwr, acwr-compute)"
+            )
     except Exception:
         pass
     # #4075: the injury-risk override reads the platform's ONE ACWR — `computed_metrics.acwr`
