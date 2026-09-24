@@ -128,11 +128,20 @@ def test_a_logged_cardio_block_takes_the_no_hr_rate_for_its_modality():
 
 
 def test_a_workout_with_no_set_log_takes_the_stated_work_fraction():
-    from health.tdee import LIFTING_WORK_FRACTION_FALLBACK
-
+    """The fraction is health.tdee's ONE constant (read from there, not restated); the
+    tdee value is read by AST so this file drives no module with a clock (#2376)."""
+    tdee_src = (ROOT / "lambdas/health/tdee.py").read_text(encoding="utf-8")
+    fraction = next(
+        ast.literal_eval(n.value)
+        for n in ast.walk(ast.parse(tdee_src))
+        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "LIFTING_WORK_FRACTION_FALLBACK" for t in n.targets)
+    )
+    assert "from health.tdee import LIFTING_WORK_FRACTION_FALLBACK" in (ROOT / "lambdas/training/training_load.py").read_text(
+        encoding="utf-8"
+    )
     s = tl.hevy_session_load({"date": DAY, "duration_sec": 120 * 60})
     assert s["basis"] == "no_set_log_work_fraction"
-    assert abs(s["points"] - 2.0 * LIFTING_WORK_FRACTION_FALLBACK * tl.LIFT_TSS_PER_HOUR) < 1e-9
+    assert abs(s["points"] - 2.0 * fraction * tl.LIFT_TSS_PER_HOUR) < 1e-9
 
 
 def test_the_hevy_api_wire_name_for_duration_is_read_too():

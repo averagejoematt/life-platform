@@ -467,6 +467,19 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "named. Pinned by tests/test_plan_input_read_state_4072.py::TestReadinessFloorReadsWhoop::"
         "test_a_writer_shape_drift_is_read_failed_not_absent and test_an_empty_window_is_absent_not_failed.",
     ),
+    # #4075 decision 4A (2026-09-23): get_training view=load stopped running its own
+    # Hevy-blind day model and now reads the hevy partition — but only to hand the rows,
+    # untouched, to training_load.daily_training_load, the SAME function daily-metrics-compute
+    # feeds (whose hevy read is already in the residue above).
+    "hevy::mcp/tools_training.py::read": (
+        "2026-09-23",
+        "#4075 4A: `_get_training_load` reads no hevy field itself; it passes the rows to "
+        "training_load.daily_training_load, the one consumer daily-metrics-compute also feeds, so this seam adds no "
+        "second shape to agree on. The shape that consumer depends on (`exercises[].sets[]` with `type`/`reps`/"
+        "`duration_sec`/`distance_m`, `start_time`/`end_time`, `duration_sec`, `tombstone`) is pinned key-for-key "
+        "from a live SOURCE#hevy read in tests/test_training_load_worked_set_4075.py, and a record with no set log "
+        "degrades to the stated work fraction BY NAME (basis `no_set_log_work_fraction`), never to zero.",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]

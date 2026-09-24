@@ -74,7 +74,9 @@ charges a whole lifting session as work any more.
 """
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+
+from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
 # ~200 W FTP → 720 kJ/h at threshold = 100 TSS-like points.
 KJ_PER_TSS_POINT = 7.2
@@ -250,17 +252,6 @@ def _num(v):
     return f if f == f else None  # NaN → None
 
 
-def _parse_ts(v):
-    """An ISO-8601 instant as an aware UTC datetime, or None."""
-    if not v:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-
-
 def hr_intervals(activities):
     """Merged UTC [start, end] intervals covered by HR-bearing, non-echo Strava activities.
 
@@ -271,7 +262,7 @@ def hr_intervals(activities):
     for act in activities or []:
         if not (_num(act.get("average_heartrate")) or 0) > 0 or is_hevy_echo(act):
             continue
-        start = _parse_ts(act.get("start_date"))
+        start = parse_iso_utc(act.get("start_date"))
         secs = _num(act.get("elapsed_time_seconds")) or _num(act.get("moving_time_seconds")) or 0
         if start is None or secs <= 0:
             continue
@@ -381,18 +372,13 @@ def hevy_session_load(workout, intervals=None):
     cardio_secs = sum(sec for sec, _r in cardio_blocks)
     out["cardio_seconds"] = cardio_secs
     if cardio_secs > 0:
-        covered = _overlap_seconds(_parse_ts(workout.get("start_time")), _parse_ts(workout.get("end_time")), intervals)
+        covered = _overlap_seconds(parse_iso_utc(workout.get("start_time")), parse_iso_utc(workout.get("end_time")), intervals)
         covered = min(covered, cardio_secs)
         out["cardio_hr_covered_seconds"] = covered
         uncovered_share = 1.0 - covered / cardio_secs
         out["cardio_points"] = sum(sec / 3600.0 * rate for sec, rate in cardio_blocks) * uncovered_share
     out["points"] = out["lift_points"] + out["cardio_points"]
     return out
-
-
-def hevy_day_load(hevy_records, intervals=None):
-    """TSS-like load for one day's Hevy records (worked-set time, #4075 4A)."""
-    return sum(hevy_session_load(r, intervals)["points"] for r in hevy_records or [] if not r.get("tombstone"))
 
 
 def daily_training_load(strava_60d, hevy_60d, today=None):
