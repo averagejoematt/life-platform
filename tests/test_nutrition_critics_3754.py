@@ -631,7 +631,10 @@ def test_withings_trend_reads_the_shared_loss_rate_and_splits_the_weeks():
     assert t["weighin_count"] == 14 and t["weighin_span_days"] == 13 and t["rate_provisional"] is False
     assert t["weekly_loss_rates_lb_wk"] == [2.8, 2.8]
     thin = nci.withings_trend(rows[-3:], keys)
-    assert thin["rate_provisional"] is True and thin["weekly_loss_rates_lb_wk"] == [2.8]
+    # #4150 (2026-09-23): a week with 3 weigh-ins is reported, never counted — it was [2.8]
+    # before the complete-week rule (MIN_WEEKLY_WEIGHINS = 4)
+    assert thin["rate_provisional"] is True and thin["weekly_loss_rates_lb_wk"] is None
+    assert thin["weekly_loss_rate_weeks"][-1]["status"] == "insufficient_weighins" and thin["weekly_loss_rate_weeks"][-1]["n_weighins"] == 3
     assert nci.withings_trend(None, keys)["weight_lb"] is None
 
 
