@@ -286,13 +286,30 @@ def test_a_routine_the_predraft_did_not_author_is_never_versioned_over():
 
 # ── honest absence ──────────────────────────────────────────────────────────────────
 def test_no_lifting_session_is_reported_not_guessed(repo):
+    """A walk day, and an order-based seam that serves nothing (#4110 v0.4), are both first-class absence."""
+    got = {}
+    for name, served in (("walk", WALK), ("none", None), ("no_prescription", {"archetype": "upper", "label": "Upper-heavy"})):
+        with (
+            patch.object(npd, "scheduled_session", return_value=served),
+            patch.object(npd, "_draft", side_effect=AssertionError("no session, no draft")),
+        ):
+            got[name] = npd.run(TARGET)["outcome"]
+    assert got == {"walk": npd.NO_SESSION, "none": npd.NO_SESSION, "no_prescription": npd.NO_SESSION}
+    assert npd.predraft_for(TARGET)["status"] == "none"
+
+
+def test_the_draft_decision_is_archetype_agnostic(repo):
+    """v0.4 serves `upper` / `lower`: a prescribed session drafts whatever its archetype (#4110)."""
+    upper = {"label": "Upper-heavy (session 1 of 4)", "archetype": "upper", "session_role": "upper_heavy", "prescription": {"x": 1}}
     with (
-        patch.object(npd, "scheduled_session", return_value=WALK),
-        patch.object(npd, "_draft", side_effect=AssertionError("no session, no draft")),
+        patch.object(npd, "scheduled_session", return_value=upper),
+        patch.object(npd, "_draft", side_effect=_fake_draft(repo)),
+        patch.object(npd, "_stage_2", side_effect=_fake_stage_2(repo)),
     ):
         out = npd.run(TARGET)
-    assert out["outcome"] == npd.NO_SESSION and "walk" in out["reason"]
-    assert npd.predraft_for(TARGET)["status"] == "none"
+    assert out["outcome"] == npd.DRAFTED and out["session"]["archetype"] == "upper"
+    marker = repo.get_current("r-ideal").inputs_snapshot[npd.MARKER]
+    assert marker["session_role"] == "upper_heavy" and marker["role"] == npd.PRIMARY
 
 
 def test_a_refused_draft_is_blocked_not_overridden(repo):

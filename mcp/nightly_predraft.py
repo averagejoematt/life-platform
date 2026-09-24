@@ -7,7 +7,8 @@ WHY THIS EXISTS
   chat REVIEWS a draft instead of building one.
 
 WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
-  1. `scheduled_session(tomorrow)` — THE seam (below). No lifting session → honest absence.
+  1. `scheduled_session(tomorrow)` — THE seam (below). No lifting session → the first-class
+     `no_session` outcome, never a guessed one. Archetype-agnostic (full / upper / lower).
   2. Idempotency + ownership: a routine already on file for tomorrow decides the run —
      our own red-teamed pre-draft → `exists` (no-op); our own un-red-teamed pre-draft (a run
      that died mid-way) → resume at stage 2; ANY other routine (the owner drafted, or it is
@@ -107,11 +108,18 @@ FAILED = "failed"  # NOT honest-terminal: emits no PredraftOutcome, so the dead-
 
 
 # ── THE seam ────────────────────────────────────────────────────────────────────────────
-def scheduled_session(target_date: str) -> dict[str, Any]:
+def scheduled_session(target_date: str) -> dict[str, Any] | None:
     """The session the program serves on `target_date` — the SAME function stage 1 uses (#4064).
 
-    #4110 re-points this ONE line (calendar → sequence). Nothing else in this module decides
-    what tomorrow's session is.
+    #4110 / PR #4120 (v0.4 Upper/Lower, ORDER-BASED: the next undone session in the sequence is
+    served on whatever day he trains) re-points the ONE `return` line below to
+
+        return plan_engine._scheduled_session(target_date, catalog, ceiling, tools_plan._block_workouts(target_date))
+
+    — the same completed-session record stage 1 passes. Nothing else in this module decides what
+    tomorrow's session is, and nothing here assumes a weekday grid or an archetype: a session is
+    draftable iff it carries a `prescription` (`is_lifting_session`), whatever its archetype
+    (`full`, `upper`, `lower`). None / no prescription is the first-class `no_session` outcome.
     """
     from training import plan_engine
 
@@ -225,11 +233,12 @@ def run(target_date: str | None = None) -> dict[str, Any]:
     run_at = datetime.now(timezone.utc).isoformat()
     out: dict[str, Any] = {"job": JOB["name"], "target_date": target, "run_at": run_at, "engine": ENGINE_VERSION}
 
-    session = scheduled_session(target)
+    session = scheduled_session(target) or {}
     out["session"] = {k: session.get(k) for k in ("label", "archetype", "session_role", "optional", "source", "week", "note")}
     if not is_lifting_session(session):
         out.update(
-            outcome=NO_SESSION, reason=f"the program serves no lifting session on {target} ({session.get('label') or session.get('note')})"
+            outcome=NO_SESSION,
+            reason=f"the program serves no lifting session on {target} ({session.get('label') or session.get('note') or 'no session returned'})",
         )
         return out
 
