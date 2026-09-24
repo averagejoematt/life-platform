@@ -55,6 +55,7 @@ os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
 from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
+from training import training_load  # noqa: E402  (#4075: the one load model view=load reads)
 
 from mcp import core as mcp_core, tools_correlation as tc, tools_training as tt  # noqa: E402
 from mcp.registry import TOOLS  # noqa: E402
@@ -151,13 +152,19 @@ class RecordingTable:
 def strava_day(date: str, *, kilojoules=None, activities=None, activity_count=None) -> dict:
     """One Strava DATE# record as ``strava_lambda`` writes it.
 
-    ``total_kilojoules`` is the top-priority load proxy in
-    ``mcp/helpers.py::compute_daily_load_score`` (kJ > TRIMP > distance+elev), so
-    supplying it makes the load model's input exactly known.
+    ``kilojoules=L`` makes the day's load exactly L TSS-like points: #4075 moved
+    view=load onto ``training/training_load.py`` (the ONE load model computed_metrics'
+    TSB reads), which scores a power-backed activity as ``kJ / KJ_PER_TSS_POINT``. So
+    the day carries one activity with ``L × KJ_PER_TSS_POINT`` kJ (and the day-level
+    ``total_kilojoules`` the writer also stores). ``L = 0`` is an OBSERVED zero-load day
+    — the record exists, so it counts toward coverage.
     """
     rec: dict = {"pk": "USER#matthew#SOURCE#strava", "sk": f"DATE#{date}", "date": date, "source": "strava"}
     if kilojoules is not None:
-        rec["total_kilojoules"] = kilojoules
+        kj = kilojoules * training_load.KJ_PER_TSS_POINT
+        rec["total_kilojoules"] = kj
+        if activities is None:
+            activities = [{"sport_type": "Ride", "kilojoules": kj, "moving_time_seconds": 3600}] if kj > 0 else []
     if activities is not None:
         rec["activities"] = activities
     if activity_count is not None:
@@ -210,7 +217,6 @@ def profile(monkeypatch):
     prof = {"max_heart_rate": 190, "resting_heart_rate_baseline": 55}
     monkeypatch.setattr(tt, "get_profile", lambda: prof)
     monkeypatch.setattr(tc, "get_profile", lambda: prof)
-    monkeypatch.setattr(tt, "get_sot", lambda domain: {"cardio": "strava"}.get(domain, "strava"))
     return prof
 
 
@@ -722,14 +728,22 @@ def test_recommendation_unknown_tier_is_not_promoted_by_the_consecutive_day_floo
 
 
 def test_recommendation_measured_acwr_override_still_fires_with_no_recovery_signals(sources):
-    """The ACWR > 1.5 override comes from the load model, not from the recovery
-    signals, so it is a MEASURED fact and must survive a dark recovery side —
-    an UNKNOWN readiness tier must not swallow a real injury-risk verdict."""
-    rows = [strava_day(_d(-i), kilojoules=(2000 if i <= 6 else 50)) for i in range(0, 300)]
-    sources(whoop=[], eightsleep=[], garmin=[], strava=rows, macrofactor_workouts=[], computed_metrics=[])
+    """The ACWR > 1.5 override comes from the platform's measured ACWR, not from the
+    recovery signals, so it must survive a dark recovery side — an UNKNOWN readiness
+    tier must not swallow a real injury-risk verdict. #4075: the ACWR is the stored
+    `computed_metrics.acwr` (acwr-compute), the one get_acwr_status reads."""
+    sources(
+        whoop=[],
+        eightsleep=[],
+        garmin=[],
+        strava=[],
+        macrofactor_workouts=[],
+        computed_metrics=[computed_metrics_day(_d(-1), acwr=1.62, acwr_zone="danger")],
+    )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert out["composite_readiness"] is None  # still no recovery measurement
-    assert out["training_context"]["training_load"]["acwr"] > 1.5
+    assert out["training_context"]["training_load"]["acwr"] == 1.62
+    assert out["training_context"]["training_load"]["acwr_source"].startswith("computed_metrics.acwr")
     assert out["readiness_tier"] == "RED"
 
 
@@ -776,9 +790,32 @@ def test_recommendation_composite_carries_the_n_behind_its_average(sources):
 
 
 def test_recommendation_acwr_above_one_point_five_forces_red(sources):
-    """The one hard override that does fire: a load-model ACWR > 1.5 pins the tier
-    to RED regardless of recovery. Built by a step change in load, not asserted
-    off recovery alone."""
+    """The one hard override that does fire: the platform ACWR > 1.5 pins the tier
+    to RED regardless of recovery."""
+    sources(
+        whoop=[_recovery_day(TODAY, recovery=95)],
+        eightsleep=[{"date": TODAY, "sleep_score": 95}],
+        garmin=[{"date": TODAY, "body_battery_high": 95}],
+        strava=[],
+        macrofactor_workouts=[],
+        computed_metrics=[
+            computed_metrics_day(_d(-2), acwr=1.2, acwr_zone="safe"),
+            computed_metrics_day(_d(-1), acwr=1.7, acwr_zone="danger"),
+        ],
+    )
+    out = call("get_training", {"view": "recommendation", "date": TODAY})
+    assert out["training_context"]["training_load"]["acwr"] == 1.7  # the NEWEST stored reading
+    assert out["readiness_tier"] == "RED"
+    assert out["recommendation"]["type"] in ("Full Rest", "Active Recovery")
+
+
+def test_a_load_model_ratio_spike_alone_does_not_force_red_4075(sources):
+    """#4075 mutation control. A step change in load drives view=load's own ATL/CTL
+    ratio far above 1.5, but the platform ACWR (acwr-compute) reads 1.28 'safe' — the
+    shape of 2026-09-15..22 (a new programme over a low summer base: the Banister ratio
+    read 2.5-2.8 while acwr-compute read 1.28). The override follows the ONE ACWR, so
+    the tier stays GREEN; the Banister ratio is still published, labelled, beside it.
+    Re-pointing the override at `load_model_acwr` fails this test."""
     rows = [strava_day(_d(-i), kilojoules=(2000 if i <= 6 else 50)) for i in range(0, 300)]
     sources(
         whoop=[_recovery_day(TODAY, recovery=95)],
@@ -786,12 +823,13 @@ def test_recommendation_acwr_above_one_point_five_forces_red(sources):
         garmin=[{"date": TODAY, "body_battery_high": 95}],
         strava=rows,
         macrofactor_workouts=[],
-        computed_metrics=[],
+        computed_metrics=[computed_metrics_day(_d(-1), acwr=1.28, acwr_zone="safe")],
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["training_context"]["training_load"]["acwr"] > 1.5
-    assert out["readiness_tier"] == "RED"
-    assert out["recommendation"]["type"] in ("Full Rest", "Active Recovery")
+    ctx = out["training_context"]["training_load"]
+    assert ctx["load_model_acwr"] > 1.5  # the spike is real in the load model...
+    assert ctx["acwr"] == 1.28  # ...but the injury override reads the platform ACWR
+    assert out["readiness_tier"] == "GREEN"
 
 
 def test_five_consecutive_training_days_demotes_green_to_yellow(sources):
@@ -915,17 +953,17 @@ def test_recommendation_hr_ceilings_are_derived_from_the_profile_max_hr(sources)
     assert out["recommendation"]["hr_ceiling"] == round(190 * 0.7) == 133
 
 
-def test_recommendation_reads_exactly_the_five_declared_partitions(sources):
-    """The `source` field claims whoop + eightsleep + garmin + strava +
-    macrofactor_workouts. Assert the tool actually queries those and no other
-    partition (a silent extra read is how a private partition leaks)."""
+def test_recommendation_reads_exactly_the_declared_partitions(sources):
+    """The `source` field claims whoop + eightsleep + garmin + strava + hevy +
+    macrofactor_workouts + computed_metrics (#4075 added hevy — the load model's set
+    log — and computed_metrics — the one ACWR). Assert the tool actually queries those
+    and no other partition (a silent extra read is how a private partition leaks)."""
     reader = sources(whoop=[], eightsleep=[], garmin=[], strava=[], macrofactor_workouts=[], computed_metrics=[])
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     queried = {c[0] for c in reader.calls}
     declared = set(out["source"].replace(" ", "").split("+"))
-    # computed_metrics/strava arrive via the nested load + zone2 sub-calls.
     assert declared <= queried
-    assert queried <= declared | {"computed_metrics"}
+    assert queried <= declared
 
 
 def test_recommendation_never_passes_include_pilot(sources):

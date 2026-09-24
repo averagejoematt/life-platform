@@ -1044,6 +1044,22 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
     ),
+    "structural::test_training_load_worked_set_4075.py": MutationSpec(
+        gate_id="structural::test_training_load_worked_set_4075.py",
+        target="tests/test_training_load_worked_set_4075.py",
+        detects=(
+            "a SECOND Hevy lifting load term — a module defining its own LIFT_TSS_PER_HOUR (points per lifting "
+            "hour) beside training/training_load.py. That is the split #4075 decision 4A closed: the stored TSB "
+            "charging worked-set time while another producer charged whole-session duration"
+        ),
+        plants=(
+            (
+                "lambdas/training/_census_probe_4075ws.py",
+                "LIFT_TSS_PER_HOUR = 50.0\n\n\ndef session_load(duration_sec):\n" "    return duration_sec / 3600.0 * LIFT_TSS_PER_HOUR\n",
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1743,10 +1759,22 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         ":: tests/test_training_load.py::test_no_second_trimp_implementation_in_the_training_or_compute_paths | "
         "reverted: 24 passed in 0.19s",
         "Covers the SET: every .py under lambdas/ and mcp/ on disk (rglob, so an untracked module is in scope), grepped "
-        "for the Banister exponent `exp(1.92`; two allowlisted homes (training/training_load.py, and the legacy "
-        "mcp/helpers load model #4075 names as the next consolidation). STILL INVISIBLE, stated: a TRIMP written with a "
+        "for the Banister exponent `exp(1.92`; ONE allowlisted home, training/training_load.py (the legacy "
+        "mcp/helpers load model was the second until #4075 decision 4A retired it). STILL INVISIBLE, stated: a TRIMP written with a "
         "different constant spelling (e.g. `math.e ** (1.92*x)` or a named constant), and any load model that is not "
         "TRIMP-shaped at all.",
+        proved_on="2026-09-23",
+    ),
+    "structural::test_training_load_worked_set_4075.py": _proof(
+        "structural::test_training_load_worked_set_4075.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 18 passed in 1.12s | mutated: 1 failed, 17 passed in 1.35s "
+        ":: tests/test_training_load_worked_set_4075.py::test_the_lift_rate_and_the_per_rep_tempo_live_in_one_module | "
+        "reverted: 18 passed in 1.29s",
+        "Covers the SET: every .py under lambdas/ and mcp/ on disk (rglob, so an untracked module is in scope), grepped "
+        "for an assignment to LIFT_TSS_PER_HOUR or SECONDS_PER_REP outside training/training_load.py, plus the retired "
+        "`def compute_daily_load_score`; the same file's behavioural cases carry their own mutation controls (rest "
+        "excluded, warm-ups excluded, HR-covered cardio not re-charged). STILL INVISIBLE, stated: a second lifting "
+        "load term spelled with different constant names, or one that inlines its rate as a bare literal.",
         proved_on="2026-09-23",
     ),
 }

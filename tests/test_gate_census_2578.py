@@ -933,7 +933,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # #4034's own +1): lane {proven 196, unproven 540, not-applicable 6, attempted-unproven 5} vs main {141,
         # 540, 6, 5} — exactly the 55 `structural::test_glossary_4035.py` / `structural::test_rate_n_contract_4035.py`
         # / `registry::scripts/v4_glossary.py::GLOSS_ALLOWLIST::*` / `::GLOSS_EXEMPT_PAGES::*` ids enter, none leaves.
-        <= 196
+        # Upper bound 196 -> 197 (2026-09-23, #4075 decision 4A): structural::test_training_load_worked_set_4075.py — the
+        # one-lifting-load-term rglob guard — arrives PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS,
+        # ARMED 1/1: an untracked lambdas/training/_census_probe_4075ws.py defining LIFT_TSS_PER_HOUR; baseline 18 passed |
+        # mutated 1 failed :: test_the_lift_rate_and_the_per_rep_tempo_live_in_one_module | reverted 18 passed). Unproven
+        # stays 540; one entrant. MEASURED on the lane with gate_census.build_census(): {proven 197, unproven 540, 6, 5}.
+        <= 197
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
