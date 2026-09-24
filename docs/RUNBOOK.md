@@ -1781,11 +1781,13 @@ A successful test triggers a real workflow run (~$0.05 of Bedrock, ~10 min). The
 
 ### PAT rotation (every 90 days)
 
-The fine-grained PAT in `life-platform/github-dispatch-token` expires every 90 days by design.
+The fine-grained PAT in `life-platform/github-dispatch-token` (GitHub name `life-platform-dispatcher`) has two consumers: the remediation dispatcher (urgent alarm → `repository_dispatch`) and qa-smoke's closure-probe leg (#4022, closes `closure:live-proof` issues on observed proof).
+
+**Current token: regenerated 2026-09-23, expires 2027-09-23** (owner's 1-year choice). **Incident, 2026-09-23:** the previous token had expired unnoticed. The closure-probe leg's first armed run got `HTTP 401`, and the urgent-alarm fast path had been dark for the same window. A 401 means expired or bad credentials; a missing scope returns 403. Before the expiry, regenerate it (GitHub → the token → **Regenerate token**) and store it with the silent-read recipe below.
 
 **Setup or rotation:**
 1. Open https://github.com/settings/personal-access-tokens → **Generate new token (fine-grained)**.
-2. Settings: name `life-platform-dispatcher`, expiry 90 days, repository access **Only `averagejoematt/life-platform`**, permissions **Contents: Read and write** ONLY (Metadata: Read-only is granted automatically — that's fine, leave it).
+2. Settings: name `life-platform-dispatcher`, repository access **Only `averagejoematt/life-platform`**, permissions **Contents: Read and write** (the dispatcher) and **Issues: Read and write** (the #4022 closure probe). Metadata: Read-only is granted automatically.
 3. Generate, copy. Then:
    ```bash
    # First time:
@@ -1794,16 +1796,24 @@ The fine-grained PAT in `life-platform/github-dispatch-token` expires every 90 d
      --secret-string 'PASTE_TOKEN_HERE' \
      --region us-west-2
 
-   # Rotation (subsequent times):
-   aws secretsmanager update-secret \
-     --secret-id life-platform/github-dispatch-token \
-     --secret-string 'PASTE_NEW_TOKEN_HERE' \
-     --region us-west-2
+   # Rotation (subsequent times) — silent read, so the token never lands in shell history or a
+   # chat transcript. Two one-line steps; check the length (~93) before writing:
+   read -rs "T?Paste token: "; echo; echo "length: ${#T}"
+   aws secretsmanager put-secret-value --secret-id life-platform/github-dispatch-token --region us-west-2 --secret-string "$T" --query VersionId --output text; unset T
    ```
+   Verify without printing it: a GET of `/repos/averagejoematt/life-platform/issues` with the secret returns 200. The response's `github-authentication-token-expiration` header names the new expiry.
 4. No Lambda redeploy needed — the dispatcher re-reads the secret on each cold start.
 5. Old PAT can be left to expire naturally OR deleted at github.com/settings/personal-access-tokens.
 
 **If the PAT is missing or expired**, urgent alarms still email you via the existing SNS subscriptions (no degradation); the dispatcher logs `SecretNotFound` or `GitHub HTTP 401` and the Mon/Wed/Fri ~10:35 PT sweep still covers the signal — just without the urgent fast path.
+
+### Vendor transient in the canary gate: the standing watch (#3830)
+
+#3830 (closed 2026-09-24 on its 26 seam tests plus the mutation proof, by owner ruling) made a Bedrock `ServiceUnavailableException` / `ThrottlingException` / timeout in the canary's gating lane NON-gating. It is still alarmed and named in the CI log. An `AccessDeniedException` still gates. Its one unobserved property is a REAL vendor transient passing through a deploy. When one happens, check that:
+- the Smoke job's log shows `::warning::Canary: 1 external-transient failure(s) — NOT gating this deploy`;
+- the Smoke job concluded `success`, with no auto-rollback.
+
+Grep: `aws logs filter-log-events --log-group-name /aws/lambda/life-platform-canary --filter-pattern '"failed_external_transient"'`. If instead it gated or rolled back, reopen #3830 with that run.
 
 ---
 
