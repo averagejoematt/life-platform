@@ -21,6 +21,8 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
+    aws_events as events,
+    aws_events_targets as targets,
     aws_iam as iam,
     aws_lambda as _lambda,
     aws_s3 as s3,
@@ -234,6 +236,54 @@ class McpStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
         )
         warmer_no_invocations_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # ── #4084: the nightly pre-draft — tomorrow's session drafted + red-teamed ──
+        # Same function, constant input (the #3764 hevy_index_rule idiom): the fleet gains a
+        # schedule, not a function. mcp.handler dispatches {"job": "nightly_predraft"} to
+        # mcp/nightly_predraft.py, whose JOB dict is the one declaration these literals must
+        # match (tests/test_nightly_predraft_4084.py reads this file and compares).
+        # Fixed UTC: 02:00Z = 19:00 PDT / 18:00 PST — the same Pacific day either way.
+        predraft_rule = events.Rule(
+            self,
+            "NightlyPredraft",
+            schedule=events.Schedule.expression("cron(0 2 * * ? *)"),
+            description="#4084: draft + red-team tomorrow's session (never commits to Hevy)",
+        )
+        predraft_rule.add_target(targets.LambdaFunction(warmer, event=events.RuleTargetInput.from_object({"job": "nightly_predraft"})))
+
+        # ── #4084: the pre-draft's dead-man ──────────────────────────────────────
+        # mcp-warmer-no-invocations-24h CANNOT see this rule die — the 17:10Z warmer run keeps
+        # the function's Invocations >= 1 with the pre-draft rule stone dead (the #3764 lesson:
+        # an Invocations heartbeat on a shared function is green by construction). So the job
+        # emits PredraftOutcome=1 (EMF) on every HONEST outcome — drafted, exists, no_session,
+        # skipped, blocked — and nothing on a crash. 24 consecutive empty 1-hour buckets with
+        # missing = BREACHING closes exactly at the end of the 02:00-03:00Z bucket the run
+        # should have landed in: red when there is no pre-draft outcome by 03:00Z.
+        # Digest (ADR-050): a missing pre-draft means the evening chat builds the session the
+        # way it always did — slower, never wrong.
+        predraft_missing_alarm = cloudwatch.Alarm(
+            self,
+            "NightlyPredraftMissing",
+            alarm_name="nightly-predraft-missing",
+            alarm_description=(
+                "#4084: no nightly pre-draft outcome in the last 24 hourly buckets — the 02:00Z run did not reach an "
+                "honest outcome by 03:00Z (rule not firing, or the run crashed). Check the NIGHTLY_PREDRAFT log line "
+                "in /aws/lambda/life-platform-mcp-warmer."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/HevyRoutine",
+                metric_name="PredraftOutcome",
+                dimensions_map={"Job": "nightly_predraft"},
+                period=Duration.seconds(3600),
+                statistic="Sum",
+            ),
+            evaluation_periods=24,
+            datapoints_to_alarm=24,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        predraft_missing_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── #809: recursive-invocation guard (adopted from the 2026-05-25 orphan batch) ──
         # AWS drops Lambda invocations it detects as recursive; a nonzero

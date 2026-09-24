@@ -612,6 +612,12 @@
       "stack": "mcp_stack",
       "via": "declaration"
     },
+    "nightly-predraft-missing": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
     "paging-budget-tier-3": {
       "kind": "metric",
       "routing": "paging",
@@ -929,7 +935,7 @@
   ],
   "cost_surface": {
     "ai_features": 19,
-    "alarms": 132,
+    "alarms": 133,
     "emf_namespaces": 32,
     "schedules": 90,
     "secrets": 30
@@ -7309,9 +7315,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 132,
+      "alarms": 133,
       "alarms_by_routing": {
-        "digest": 88,
+        "digest": 89,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
