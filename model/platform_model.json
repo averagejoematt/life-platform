@@ -3842,6 +3842,13 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/training/session_sequence.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/training/training_context_registry.py",
       "partition": "training_constraints",
       "via": "pk"
@@ -5406,6 +5413,13 @@
       "module": "mcp/nutrition_micronutrients.py",
       "partition": "macrofactor",
       "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/plan_hevy_windows.py",
+      "partition": "hevy",
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -7336,7 +7350,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 710,
+      "edges": 712,
       "lambdas": 106,
       "mcp_tool_modules": 33,
       "mcp_tools": 85,
@@ -7351,8 +7365,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 355,
-        "sites_resolved": 885,
-        "sites_total": 1240
+        "sites_resolved": 887,
+        "sites_total": 1242
       },
       "schedule_resolution": {
         "dynamic": 0,
