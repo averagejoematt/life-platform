@@ -28,7 +28,9 @@ Refs #<!-- issue number — instrument; first live output that will close it: ..
 ## Checklist
 
 - [ ] `black` + `flake8` clean on any changed Python (line-length 140; never run `black` on `.json`)
-- [ ] Targeted `pytest` for what I touched passes locally
+- [ ] **Landed through this PR's premerge lane** (#3528): `pr-checks.yml`'s `premerge` marker lane is the test gate for
+      code — locally I ran `pytest -m premerge` on what I touched. Code never lands by direct push:
+      `deploy/agent_commit.sh --push` refuses a code path on main (docs-only pushes run the derived Docs-CI gates).
 - [ ] Conventional-commit title (`feat|fix|chore|docs|refactor|test|ci|build|perf|style(scope): …`)
 - [ ] **Docs:** updated the affected page(s) **OR** none needed (one-clause reason: …)
 - [ ] Shared code stays **one bundle, no layer** (#781) — I did not reintroduce a Lambda layer for shared modules

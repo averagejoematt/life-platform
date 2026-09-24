@@ -151,10 +151,21 @@ ROW_MAP: list[dict] = [
         "requirements": [("source", "training_constraints", OO)],
         "claims": [],
     },
+    # #4063: declared before the first row exists; identity-free episode state with no
+    # public projection at all.
+    {
+        "key": "named_human_contact",
+        "pattern": r"^Named-human contact state",
+        "requirements": [("source", "named_human_contact", OO)],
+        "claims": [],
+    },
     # #3719: already served publicly with no tier and no consent stamp. The owner ruled
     # keep-publishing (2026-09-13), so this records the consent rather than changing the
     # surface — publication by STAMP, never by omission.
     {"key": "measurements", "pattern": r"^Tape measurements", "requirements": [("source", "measurements", OP)], "claims": []},
+    # #4078: the chat pending-writes queue — owner-only because a queued row carries whatever
+    # the target write tool accepts. Declared before the first row exists.
+    {"key": "pending_writes", "pattern": r"^Chat pending-writes queue", "requirements": [("source", "pending_writes", OO)], "claims": []},
 ]
 
 # The #2782/#2809 trio is ruled Tier-2 by docs/SCHEMA.md (its prose home predates this

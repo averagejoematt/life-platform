@@ -300,4 +300,9 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),
     "write_platform_memory": (DETERMINISTIC_KEY, "one row per (category, key) — a rewrite is the point, not a duplicate"),
+    # ── #4078 ──────────────────────────────────────────────────────────────────
+    "manage_pending_writes": (
+        READ_BEFORE_WRITE,
+        "enqueue returns the open row with the same sha256(tool, args); approve/discard are conditional puts on status, so a replay performs nothing twice",
+    ),
 }

@@ -5,8 +5,10 @@ check-in) needs the same pre-flight picture: what's pending across every
 manual-capture surface. Before this tool, opening a session meant 4-6 separate
 MCP calls; get_capture_queues aggregates all of them into one.
 
-Read-only composition over six existing tools' internals — this module never
-re-implements their logic and never opens a new key family:
+Read-only composition over existing tools' internals — this module never
+re-implements their logic, and every section reads a key family some other
+module owns (pending_writes reads the #4078 queue through that module's own
+reader, never a copy of its key shape):
 
   coach_checkin    — the PERSISTED open questions only (cc.recent_checkins /
                       cc.open_checkins — the read-only half of
@@ -43,6 +45,13 @@ re-implements their logic and never opens a new key family:
                       stable episode_key so it shows once per condition-episode.
                       Reuses the freshness read (computed once) for its
                       journal-dark trigger. Machinery: mcp/ritual_triggers.py.
+  pending_writes   — #4078: writes a chat session QUEUED for Matthew's approval
+                      (`manage_pending_writes`), open items only, each with its
+                      age_days and an `overdue` flag past the ruled dead-man age.
+                      This is the one section that reads a key family of its own
+                      (`SOURCE#pending_writes`, `lambdas/coach/pending_writes.py`)
+                      — it is the surfacing half of that queue, so a write queued
+                      in one chat is in front of him at the start of the next.
 
 Fail-soft per section (#1478 hard requirement): each section is computed
 inside its own try/except via `_section()`. One broken sub-queue (a DynamoDB
@@ -65,10 +74,11 @@ from mcp.tools_reading import tool_get_due_recalls
 
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
-    from coach import coach_checkin as cc, intake_response as ir
+    from coach import coach_checkin as cc, intake_response as ir, pending_writes as pw
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import coach_checkin as cc, intake_response as ir
+        from lambdas.coach import pending_writes as pw
 
 # Evening-intake arming progress reads over the same window compute_intake_response
 # defaults to (#1405), so the fraction reported here matches get_intake_response.
@@ -166,13 +176,31 @@ def _suggested_rituals_section(freshness_result):
     return build_suggested_rituals(today, usable)
 
 
+def _pending_writes_section():
+    """#4078: open queued writes, oldest first, each with its age. Surfacing is the
+    point — an item queued in one chat must be in front of Matthew at the next opener."""
+    import time
+
+    now_epoch = time.time()
+    rows = pw.open_items(table)
+    items = [pw.present(r, now_epoch) for r in rows]
+    return {
+        "count": len(items),
+        "overdue_count": sum(1 for it in items if it["overdue"]),
+        "dead_man_days": pw.DEAD_MAN_DAYS,
+        "items": items[:10],
+        "how_to_resolve": "manage_pending_writes action=approve|discard pending_id=<id> — only on Matthew's say-so.",
+    }
+
+
 def tool_get_capture_queues(args):
     """One-call session opener: every pending capture surface in one read (#1478),
     plus the platform's own checkpoint proposals (#1578).
 
     Aggregates six existing read tools' internals — no new key families, no
     re-implemented logic — and adds a seventh `suggested_rituals` section: the
-    deterministic triggers that PROPOSE a diary/interview ritual (#1578). Each
+    deterministic triggers that PROPOSE a diary/interview ritual (#1578), and an
+    eighth `pending_writes` section: writes a chat queued for approval (#4078). Each
     section fails soft independently (see module docstring); a broken sub-queue
     never blocks the others. Skip-without-penalty framing throughout — nothing
     here is a nag, just what's possible.
@@ -187,9 +215,12 @@ def tool_get_capture_queues(args):
         "reading_recalls": _section("reading_recalls", _reading_recalls_section),
         "freshness_flags": freshness,
         "suggested_rituals": _section("suggested_rituals", lambda: _suggested_rituals_section(freshness)),
+        "pending_writes": _section("pending_writes", _pending_writes_section),  # #4078
         "how_to_use": (
             "One call, six pending-capture surfaces — the canonical session opener for workout debriefs, "
             "journal interviews, speak-to-the-coaches, and open check-ins. Everything here is optional: skip "
-            "anything empty or 'unavailable' without penalty, and never nag Matthew about what's pending."
+            "anything empty or 'unavailable' without penalty, and never nag Matthew about what's pending. "
+            "The one exception is pending_writes: those are writes an earlier chat queued for his approval — "
+            "name them once and ask approve or discard (manage_pending_writes), because nothing else will."
         ),
     }

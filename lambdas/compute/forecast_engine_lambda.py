@@ -109,7 +109,7 @@ def fetch_series(source, field, start, end):
         "ExpressionAttributeValues": {
             ":pk": USER_PREFIX + source,
             ":s": "DATE#" + start,
-            ":e": "DATE#" + end,
+            ":e": "DATE#" + end + "~",
         },
     }
     rows = []

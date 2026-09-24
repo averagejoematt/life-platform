@@ -1128,8 +1128,8 @@ class TestGatherDailyData:
             for q in table.queries
             if q.get("ExpressionAttributeValues", {}).get(":pk") == brief.USER_PREFIX + "whoop"
         }
-        assert ("DATE#" + D7, "DATE#" + YESTERDAY) in whoop_windows
-        assert ("DATE#" + D30, "DATE#" + YESTERDAY) in whoop_windows
+        assert ("DATE#" + D7, "DATE#" + YESTERDAY + "~") in whoop_windows  # #4129: the end day closed
+        assert ("DATE#" + D30, "DATE#" + YESTERDAY + "~") in whoop_windows
 
     def test_the_banister_window_is_sixty_days_of_strava(self, table):
         brief.gather_daily_data(PROFILE, YESTERDAY)

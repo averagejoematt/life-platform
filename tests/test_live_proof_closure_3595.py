@@ -99,20 +99,22 @@ def test_the_requirement_is_registered_with_both_detectors_and_a_real_rule():
 def test_no_live_proof_is_armed_block_from_day_one_and_the_env_cannot_disarm_it(monkeypatch):
     """The other six ride FLIP_BAR; this one does not. `CLOSURE_CONTRACT_MODE=warn` is the
     exact bypass a 2am lane would reach for, so it must not work here."""
-    assert cc.BLOCK_CODES == frozenset({"no-live-proof"})
+    # #3597 armed a second code (`unhomed-residual`); this test owns the first one.
+    assert cc.BLOCK_CODES == frozenset({"no-live-proof", "unhomed-residual"})
     assert cc.DEFAULT_MODE == "warn", "the flip of the OTHER six is still a dated, measured decision"
     monkeypatch.setenv(cc.MODE_ENV, "warn")
     assert cc.arming_for("no-live-proof") == "block"
     assert cc.arming_for("no-live-proof", "warn") == "block"
-    assert cc.arming_for("unhomed-residual", "warn") == "warn"
-    assert cc.arming_for("unhomed-residual") == "warn"
+    assert cc.arming_for("unhomed-residual", "warn") == "block"  # #3597 armed it
+    assert cc.arming_for("post-close-comment", "warn") == "warn"
+    assert cc.arming_for("post-close-comment") == "warn"
     monkeypatch.setenv(cc.MODE_ENV, "block")
-    assert cc.arming_for("unhomed-residual") == "block", "an ambient block still arms the other six"
+    assert cc.arming_for("post-close-comment") == "block", "an ambient block still arms the others"
 
 
 def test_the_rendered_doc_block_states_the_block_arming_and_the_three_legs():
     block = cc.render_conventions_block()
-    assert "`no-live-proof`, armed **block** from day one" in block
+    assert "`no-live-proof`, `unhomed-residual`, armed **block** whatever the posture" in block
     assert cc.INSTRUMENT_LABEL in block and "**Closure class:**" in block
     assert cc.LIVE_PROOF_SINCE in block, "a going-forward-only rule states its start date in the doc"
     doc = (ROOT / "docs" / "CONVENTIONS.md").read_text(encoding="utf-8")

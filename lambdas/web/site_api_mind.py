@@ -239,7 +239,7 @@ def mind_overview(*, _g) -> dict:
         j_resp = table.query(
             **with_phase_filter(
                 {  # ADR-058: hide pilot journal records
-                    "KeyConditionExpression": Key("pk").eq(journal_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
+                    "KeyConditionExpression": Key("pk").eq(journal_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}~"),
                     "Select": "COUNT",
                 }
             )

@@ -470,6 +470,11 @@ SOURCE_CLASS: dict[str, str] = {
     "hevy_id_map": SYSTEM_STATE,
     "routine_index": SYSTEM_STATE,
     "email_log": SYSTEM_STATE,  # ADR-077 dec E: immutable sent-mail archive, GA on read
+    "named_human_contact": SYSTEM_STATE,  # #4063: the named-human contact path's episode de-dup /
+    # cooldown row (one STATE#current: episode anchor date, per-rung sent-on + mode). Pure send
+    # bookkeeping like email_log — it must SURVIVE a reset, because wiping it mid-episode would
+    # re-mail the contact for a stretch they were already told about. Identity-free by contract
+    # (the contact lives only in the private S3 config); owner-only in privacy.field_tiers.
     "google_calendar": SYSTEM_STATE,  # dead: no writer (ADR-077 finding 7)
     "composite_scores": SYSTEM_STATE,  # dead: ADR-025 removed partition
     "sleep_unified": SYSTEM_STATE,  # dead: #487/ADR-113 retired the reconciler — no writer, no
@@ -490,6 +495,13 @@ SOURCE_CLASS: dict[str, str] = {
     # moderation (site_api_social) — audience state like VOTES#/CHALLENGE_FOLLOWS, kept across resets.
     "email_digest": SYSTEM_STATE,  # #951: between-chronicle digest change-marker
     # (between_chronicle_lambda, STATE#between_chronicle) — pure dedup state.
+    # #4078: chat writes queued for Matthew's approval (`coach/pending_writes.py`, PENDING#<ts>-<hash>).
+    # Ruled SYSTEM_STATE before the first row exists: the queue is a workflow buffer, not a fact about
+    # the experiment — an approved item's payload lands in its TARGET partition under that partition's
+    # own class. An open item is an owner decision outstanding and must survive a reset untouched and
+    # unfiltered (the same reasoning as experiment_suggestions above); SYSTEM_STATE is the class the
+    # phase machinery ignores entirely. Resolved rows self-expire via `ttl`; open rows never do.
+    "pending_writes": SYSTEM_STATE,
 }
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;
@@ -507,6 +519,10 @@ MEMORY_DURABLE_CATEGORIES = frozenset(
         # context survives an experiment reset (same reasoning as CHECKIN#).
         "life_context",
         "constraints_preferences",
+        # #4077: standing training constraints (RDL gate, toe flag, back flag) are a
+        # fact about Matthew's body, not the current experiment run — same reasoning
+        # as constraints_preferences, a reset must not silently clear one.
+        "training",
     }
 )
 MEMORY_SCOPED_CATEGORIES = frozenset(

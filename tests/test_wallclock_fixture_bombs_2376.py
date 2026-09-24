@@ -78,6 +78,12 @@ _LAMBDAS = _REPO / "lambdas"
 # files also use the constant for date arithmetic / row-building / assertion
 # text, which is what keeps them in the scan.
 EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
+    "test_producer_census_4034.py": (
+        "every grading call receives NOW explicitly (grade/summarize/check_producer_census(now=NOW)); "
+        "source_registry is imported only for a facet read (SOURCE_REGISTRY[src]['paused']), never a handler. "
+        "The two datetime.now() reads are DELIBERATE dated-row expiries (FIRST_DUE past its window, an ON_DEMAND "
+        "row past 365 days) — the #3506 re-attest pattern, designed to red on the day the row goes stale"
+    ),
     "test_quiet_behavioral_notice_2326.py": (
         "every scan_quiet_behavioral_sources call receives _TODAY explicitly as an "
         "argument — the module under test takes today as a parameter and consults no "

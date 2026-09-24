@@ -554,7 +554,37 @@ _SECOND_V03_LOAD_PATH_PY = (
     '"""probe."""\n\nfrom training.load_ramp import ramp_floor\n\n\n' "def my_load(floor, week):\n" "    return ramp_floor(floor, week)\n"
 )
 
+# #4035 box 2: a site page carrying a bare, unregistered, un-glossed capitalised acronym
+# in reader-visible prose — the exact gate-(b) defect the glossary's two-sided gate exists
+# to catch (`site/config/glossary.json` has no entry, `v4_glossary.GLOSS_ALLOWLIST` has no
+# dated exemption). Needs a nav/footer chrome marker so `_non_legacy_content_pages()` (the
+# gate's own scan population) picks the page up at all.
+_UNGLOSSED_ACRONYM_HTML = (
+    "<!doctype html><html><head><title>probe</title></head><body>"
+    '<nav class="doors"></nav>'
+    "<p>ZQXVK shows up here, unglossed and unregistered — a newcomer gets no explanation.</p>"
+    '<footer class="site-foot"></footer>'
+    "</body></html>"
+)
+
+# #4035 box 3: a site/assets/js/ module rendering `weekly_rate_lbs` into copy with NO
+# rate_provisional / weighin_count / weighin_span_days anywhere in the same file — the
+# exact defect tests/test_rate_n_contract_4035.py exists to catch (a rate from a thin
+# weigh-in record read as confidently as a mature one).
+_RATE_WITH_NO_N_JS = "export function probe(j) { return `trend ${j.weekly_rate_lbs} lb/wk`; }\n"
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
+    "structural::test_obligation_carriers_3597.py": MutationSpec(
+        gate_id="structural::test_obligation_carriers_3597.py",
+        target="tests/test_obligation_carriers_3597.py",
+        detects=(
+            "a NEW residue ledger (a module-level `*_RESIDUE` binding) landing with no RESIDUE_LEDGERS "
+            "registration — no carrier, no condition, no expiry: the forensic RCA's class 7, a waiver "
+            "that outlives its condition because nothing owns its date (#3597)"
+        ),
+        plants=(("tests/_census_probe_3597.py", '# probe\nPROBE_RESIDUE = {"x": "2026-09-23"}\n'),),
+        track=True,  # discovery reads the TRACKED set (git ls-files), so the plant is git-added
+    ),
     "structural::test_shared_quantities_4068.py": MutationSpec(
         gate_id="structural::test_shared_quantities_4068.py",
         target="tests/test_shared_quantities_4068.py",
@@ -980,6 +1010,28 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/training/_census_probe_4107.py", _SECOND_V03_LOAD_PATH_PY),),
         track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
     ),
+    "structural::test_glossary_4035.py": MutationSpec(
+        gate_id="structural::test_glossary_4035.py",
+        target="tests/test_glossary_4035.py",
+        detects=(
+            "a shipped site/ page carrying a bare, unregistered, un-glossed capitalised acronym in "
+            "reader-visible prose — gate (b) of the newcomer glossary's two-sided gate (#4035): 'every "
+            "term' has to be falsifiable, not 'the terms someone remembered'"
+        ),
+        plants=(("site/_census_probe_4035.html", _UNGLOSSED_ACRONYM_HTML),),
+        track=False,  # _non_legacy_content_pages() rglobs site/ on disk, so an untracked page is in scope
+    ),
+    "structural::test_rate_n_contract_4035.py": MutationSpec(
+        gate_id="structural::test_rate_n_contract_4035.py",
+        target="tests/test_rate_n_contract_4035.py",
+        detects=(
+            "a site/assets/js/ module rendering journey.weekly_rate_lbs into reader copy with no "
+            "rate_provisional / weighin_count / weighin_span_days anywhere in the same file — a rate "
+            "from a thin weigh-in record shown as confidently as one from a mature record (#4035 box 3)"
+        ),
+        plants=(("site/assets/js/_census_probe_4035_rate.js", _RATE_WITH_NO_N_JS),),
+        track=False,  # the gate rglobs site/assets/js/ on disk, so an untracked module is in scope
+    ),
     "structural::test_training_load.py": MutationSpec(
         gate_id="structural::test_training_load.py",
         target="tests/test_training_load.py",
@@ -1050,6 +1102,20 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_obligation_carriers_3597.py": _proof(
+        "structural::test_obligation_carriers_3597.py",
+        "ARMED 1/1 — baseline: 32 passed in 13.80s | mutated: 1 failed, 31 passed in 13.49s :: "
+        "test_the_live_residue_registry_meets_its_contract | reverted: 32 passed in 13.45s",
+        "Residue discovery reads module-level `*_RESIDUE` bindings (ast, module body only) in the TRACKED .py set under "
+        "tests/ scripts/ lambdas/ deploy/ mcp/ cdk/, plus data files matching tests/*_baseline.json and "
+        "tests/*residue*.json. Invisible: a debt ledger named anything else (`*_ALLOWLIST`, `*_EXEMPT`, `*_WAIVER` — "
+        "133 such bindings, mostly constants, classified under #4122), an untracked module, and a ledger nested "
+        "inside a function. The obligation half is a cue-nominated, structurally-homed rule over four named surfaces "
+        "(DECISIONS, PROPORTIONALITY, alarm_citations.json, the heartbeat COVERAGE exemptions); an obligation phrased "
+        "outside the cue vocabulary, or on any other surface, is not seen. Expiry itself is probed by the daily "
+        "operating-calendar sweep, never by this file.",
+        proved_on="2026-09-23",
+    ),
     "structural::test_shared_quantities_4068.py": _proof(
         "structural::test_shared_quantities_4068.py",
         "ARMED 1/1 — baseline: 24 passed in 4.05s | mutated: 1 failed, 23 passed in 4.15s :: "
@@ -1640,6 +1706,35 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "(hevy_prescription_gate) each name v03_floor, so a consumer that silently dropped back to prescription_floor "
         "is visible. STILL INVISIBLE, stated: a module that re-implements the ramp arithmetic without calling either "
         "function (a hand-written `anchor * 0.85 * 0.60`), and a call made through an alias or getattr string.",
+        proved_on="2026-09-23",
+    ),
+    "structural::test_glossary_4035.py": _proof(
+        "structural::test_glossary_4035.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 9 passed in 0.37s | mutated: 2 failed, 7 passed in 0.47s "
+        ":: tests/test_glossary_4035.py::test_apply_chrome_check_is_green_for_glossary; "
+        "tests/test_glossary_4035.py::test_no_unregistered_acronym_coinage | reverted: 9 passed in 0.37s",
+        "Covers gate (b): every non-legacy site/**/*.html carrying a nav-doors or footer-site-foot chrome "
+        "marker (_non_legacy_content_pages(), filesystem rglob — an untracked page is in scope), scanned "
+        "outside head/script/style/svg/nav/footer/loop-forward for a bare 2-6 letter ALL-CAPS token that "
+        "is neither a registered glossary term nor a dated GLOSS_ALLOWLIST entry. The mutated run also "
+        "reds the chrome-drift check (v4_apply_chrome.py --check), because the probe page's bare nav "
+        "marker with no head-chrome anchor still enters the glossary re-application pass and the drift "
+        "check sees the unglossed acronym as a would-change page. STILL INVISIBLE, stated: a Title-Case "
+        "coinage (the ACRONYM_RE heuristic is bare ALL-CAPS only — a follow-up named in v4_glossary.py's "
+        "own docstring), and the JS-rendered JSON tile-blurb residual v4_glossary.py's docstring declares.",
+        proved_on="2026-09-23",
+    ),
+    "structural::test_rate_n_contract_4035.py": _proof(
+        "structural::test_rate_n_contract_4035.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 2 passed in 0.42s | mutated: 1 failed, 1 passed in "
+        "0.47s :: tests/test_rate_n_contract_4035.py::test_any_rate_consumer_also_shows_its_n | "
+        "reverted: 2 passed in 0.51s",
+        "Covers the SET: every site/assets/js/**/*.js file plus every non-legacy site/**/index.html on "
+        "disk (rglob, so an untracked module is in scope), each grepped for the literal weekly_rate_lbs; "
+        "a match with no rate_provisional / weighin_count / weighin_span_days anywhere in the SAME file "
+        "reds by filename. STILL INVISIBLE, stated: a file that renders the rate through a shared "
+        "helper/import rather than the literal field name, and lost_lbs-only consumers (a raw signed "
+        "delta, not a computed rate — out of scope by the test's own docstring).",
         proved_on="2026-09-23",
     ),
     "structural::test_training_load.py": _proof(

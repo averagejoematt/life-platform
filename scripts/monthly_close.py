@@ -724,6 +724,15 @@ def main(argv=None) -> int:
     for label, msg in problems:
         _problem(msg, label)
 
+    # #4034: pages-sent / pages-acted-on / ratio + DEMOTE candidates, from the signal ledger.
+    import alarm_page_close  # sibling module — scripts/ is this file's own directory
+
+    lines, problems = alarm_page_close.page_block_lines(boto3.client("s3", region_name=REGION), start, end)
+    for ln in lines:
+        print(ln)
+    for label, msg in problems:
+        _problem(msg, label)
+
     # The candidate row
     fmt = lambda v, spec=".2f": format(v, spec) if v is not None else "??"  # noqa: E731
     print("\n" + "=" * 78)

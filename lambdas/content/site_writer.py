@@ -202,7 +202,7 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
                     "ExpressionAttributeValues": {
                         ":pk": f"USER#{user_id}#SOURCE#chronicle",
                         ":s": f"DATE#{week_ago}",
-                        ":e": f"DATE#{today.isoformat()}",
+                        ":e": f"DATE#{today.isoformat()}~",
                     },
                     "ScanIndexForward": False,
                     "Limit": 1,
@@ -245,7 +245,7 @@ def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
                     "ExpressionAttributeValues": {
                         ":pk": f"USER#{user_id}#SOURCE#chronicle",
                         ":s": f"DATE#{d90}",
-                        ":e": f"DATE#{today.isoformat()}",
+                        ":e": f"DATE#{today.isoformat()}~",
                     },
                     "ScanIndexForward": False,
                     "Limit": count,

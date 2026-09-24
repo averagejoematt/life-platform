@@ -671,7 +671,10 @@ def test_intelligence_quality_queries_the_profile_partition_with_the_derived_pha
     unfiltered rather than applying the ADR-058 filter unconditionally."""
     t = quality_table()
     td.tool_get_intelligence_quality({"days": 7})
-    (kwargs,) = t.calls
+    # #4083: a SECOND query now reads the coach_corrections ledger for the signal-false-
+    # positive ranking — the validator read (checked below) is still the FIRST call.
+    # #4088: that read derives its phase decision per source, so it carries no filter.
+    kwargs = t.calls[0]
     assert "FilterExpression" not in kwargs
     assert "KeyConditionExpression" in kwargs
 
@@ -789,3 +792,91 @@ def test_guard_intelligence_quality_reader_carries_no_hand_typed_check_count():
         f"the validator registry has {n} checks ({', '.join(_VALIDATOR_CHECKS)}); "
         "the denominator must be summed from each row's stored checks_run, never a literal"
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4083 — owner_correction_signals: the signal false-positive ranking, fixture over
+# PLANTED corrections. A single fake table serves BOTH partitions this tool now reads
+# (intelligence_quality validator rows AND the coach_corrections ledger); the responder
+# tells them apart by the KeyConditionExpression's own pk value, exactly what real DDB
+# discriminates on.
+# ──────────────────────────────────────────────────────────────────────────────
+
+CORRECTIONS_PK = "USER#matthew#SOURCE#coach_corrections"
+
+
+def _corrections_pk_of(kwargs) -> str | None:
+    """Like the module's `_pk_of` (line ~204) but tolerant of a plain `pk.eq(...)`
+    KeyConditionExpression with no `begins_with` AND-clause — `list_corrections` queries
+    ONLY on pk, never a compound condition."""
+    expr = kwargs.get("KeyConditionExpression")
+    if expr is None:
+        return None
+    values = expr.get_expression().get("values") or ()
+    return values[1] if len(values) > 1 else None
+
+
+def _planted_corrections():
+    """Three corrections: two override the SAME signal (twice), one names another —
+    weekly-pack corrections (no signal) mixed in and correctly excluded."""
+    return [
+        {"sk": "CORRECTION#2026-09-20#aaa11111", "item_ref": {"surface": "plan_critics", "signal": "readiness_low_streak_days"}},
+        {"sk": "CORRECTION#2026-09-21#bbb22222", "item_ref": {"surface": "chat_coaching", "signal": "readiness_low_streak_days"}},
+        {"sk": "CORRECTION#2026-09-22#ccc33333", "item_ref": {"surface": "chat_coaching", "signal": "toe_flag"}},
+        {"sk": "CORRECTION#2026-09-19#ddd44444", "item_ref": {"pack_number": 3, "surface": "coach_brief"}},  # no signal
+    ]
+
+
+@pytest.fixture()
+def quality_and_corrections_table(monkeypatch):
+    def _install(corrections=None, quality_rows=QUALITY_ROWS):
+        rows = quality_rows if corrections is None else None
+
+        def _responder(kwargs, _n):
+            if _corrections_pk_of(kwargs) == CORRECTIONS_PK:
+                return {"Items": list(corrections if corrections is not None else _planted_corrections())}
+            return {"Items": list(rows if rows is not None else quality_rows)}
+
+        t = _FakeTable(_responder)
+        monkeypatch.setattr(mcore, "table", t)
+        return t
+
+    return _install
+
+
+def test_owner_correction_signals_ranks_planted_corrections_by_false_positive_count(quality_and_corrections_table):
+    quality_and_corrections_table()
+    out = td.tool_get_intelligence_quality({})
+    ranking = out["owner_correction_signals"]["ranking"]
+    assert ranking[0] == {"signal": "readiness_low_streak_days", "false_positive_count": 2}
+    assert ranking[1] == {"signal": "toe_flag", "false_positive_count": 1}
+    assert out["owner_correction_signals"]["corrections_read"] == 4  # the pack-number row is READ, just excluded from ranking
+
+
+def test_owner_correction_signals_excludes_signalless_pack_corrections(quality_and_corrections_table):
+    quality_and_corrections_table(corrections=[{"sk": "CORRECTION#2026-09-19#x", "item_ref": {"pack_number": 1}}])
+    out = td.tool_get_intelligence_quality({})
+    assert out["owner_correction_signals"]["ranking"] == []
+
+
+def test_owner_correction_signals_empty_ledger_is_an_empty_ranking_not_an_error(quality_and_corrections_table):
+    quality_and_corrections_table(corrections=[])
+    out = td.tool_get_intelligence_quality({})
+    assert out["owner_correction_signals"] == {"ranking": [], "corrections_read": 0}
+
+
+def test_owner_correction_signals_failure_does_not_blank_the_validator_report(quality_and_corrections_table, monkeypatch):
+    quality_and_corrections_table()
+
+    from coach import coach_corrections as cc  # SAME module tools_data.py imports
+
+    def _boom(*a, **kw):
+        raise RuntimeError("ledger unreadable")
+
+    monkeypatch.setattr(cc, "list_corrections", _boom)
+    out = td.tool_get_intelligence_quality({})
+    # the validator's own fields are untouched by the corrections-ledger failure
+    assert out["total_flags"] == 3
+    assert out["owner_correction_signals"]["ranking"] == []
+    assert out["owner_correction_signals"]["corrections_read"] is None
+    assert "ledger unreadable" in out["owner_correction_signals"]["error"]

@@ -57,7 +57,6 @@ NON_PAGE_GENERATORS = {
     "v4_build_data_sources.py": "site/data/*.json",
     "v4_build_stack_manifest.py": "site/data/stack.json",
     "v4_build_portraits.py": "site/assets/js/portrait_data.js",
-    "v4_build_journal.py": "journal posts under generated/, not site/",
     "v4_build_permanence_terms.py": "a JSON artifact",
 }
 

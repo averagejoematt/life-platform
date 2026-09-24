@@ -42,6 +42,11 @@ have. Only chrome-bearing pages are touched, and a page is only given the block 
 already carries at least one head-chrome tag to anchor on, so the redirect stubs and
 authoring fragments (which have none) can never be handed one.
 
+Glossary pass (#4035): after the chrome above, every page also gets
+`v4_glossary.apply_glossary()` — the committed `site/config/glossary.json` term
+registry, wrapped at each term's first prose appearance in `<abbr class="gloss">`. See
+`v4_glossary.py`'s docstring for the excluded regions and the two declared-exempt pages.
+
   python3 scripts/v4_apply_chrome.py            # rewrite in place, print summary
   python3 scripts/v4_apply_chrome.py --check    # exit 1 if any page would change (CI)
 
@@ -57,6 +62,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import v4_chrome  # noqa: E402
+import v4_glossary  # noqa: E402 — #4035: the first-appearance term registry pass
 
 SITE_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "site")
 
@@ -160,8 +166,9 @@ def apply_head_chrome(html: str):
 
 
 def rewrite(html: str, self_path: str | None = None):
-    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed)."""
-    nav_changed = foot_changed = gained_icons = foot_converted = lf_changed = head_changed = False
+    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted,
+    lf_changed, head_changed, gloss_changed)."""
+    nav_changed = foot_changed = gained_icons = foot_converted = lf_changed = head_changed = gloss_changed = False
     door = None
     follow = False
 
@@ -224,7 +231,15 @@ def rewrite(html: str, self_path: str | None = None):
     # never reach here (main() filters them) and carry no head-chrome tag to anchor on.
     html, head_changed = apply_head_chrome(html)
 
-    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed
+    # #4035: the glossary pass runs LAST, over whatever prose the page ends up with —
+    # it never touches the nav/footer/loop-forward/head blocks just (re)written above
+    # (v4_glossary.py excludes those regions itself), so ordering here doesn't matter
+    # to correctness; last is simplest to reason about.
+    new_html = v4_glossary.apply_glossary(html, page_path=self_path)
+    gloss_changed = new_html != html
+    html = new_html
+
+    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed, gloss_changed
 
 
 def write_page(path, html: str) -> str:
@@ -271,6 +286,7 @@ def main() -> int:
     gained_icons = []
     lf_changed = []
     head_changed = []
+    gloss_changed = []
     by_door: dict[str | None, int] = {}
     follow_count = 0
     total = 0
@@ -281,7 +297,7 @@ def main() -> int:
             continue
         total += 1
         rel = os.path.relpath(path, SITE_ROOT)
-        new, nc, fc, door, follow, gi, conv, lf, hc = rewrite(original, self_path=url_path(rel))
+        new, nc, fc, door, follow, gi, conv, lf, hc, gc = rewrite(original, self_path=url_path(rel))
         if '<nav class="doors"' in original:
             by_door[door] = by_door.get(door, 0) + 1
             if follow:
@@ -298,6 +314,8 @@ def main() -> int:
             lf_changed.append(rel)
         if hc:
             head_changed.append(rel)
+        if gc:
+            gloss_changed.append(rel)
         if new != original and not args.check:
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(new)
@@ -307,6 +325,7 @@ def main() -> int:
     print(f"  footer rewritten: {len(foot_changed)}")
     print(f"  loop-forward inserted/rewritten: {len(lf_changed)}")
     print(f"  head chrome flattened: {len(head_changed)}")
+    print(f"  glossary re-applied: {len(gloss_changed)}")
     print(f"  variant/missing footers converted to canonical: {len(foot_converted)}")
     for rel in foot_converted:
         print(f"      + {rel}")
@@ -318,7 +337,7 @@ def main() -> int:
         print(f"      {door if door is not None else '(none)':<12} {by_door[door]}")
     print(f"  follow-pill pages (detected & preserved): {follow_count}")
 
-    if args.check and (nav_changed or foot_changed or lf_changed or head_changed):
+    if args.check and (nav_changed or foot_changed or lf_changed or head_changed or gloss_changed):
         print("\nCHECK FAILED: chrome is out of sync with v4_chrome.py — run without --check.", file=sys.stderr)
         return 1
     return 0

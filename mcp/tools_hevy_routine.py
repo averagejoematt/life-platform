@@ -41,6 +41,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
+from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 
 # #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
 # module for the same reason — this file sits at the ratchet's ceiling.
@@ -984,6 +985,11 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     gate_refusal = refusal_message(gate)
     if gate_refusal:
         return mcp_error(gate_refusal, error_code=SUBTRACT_ONLY_ERROR_CODE, detail=gate["audit"]["violations"])
+    # #4066: the commit must be the routine stage 2 verdicted, unchanged since — or an explicit owner override.
+    binding_refusal, binding_line, binding_warnings = commit_binding.preflight(ir, args, mcp_error)
+    if binding_refusal:
+        return binding_refusal
+    warnings += binding_warnings
     if gate.get("load_floors"):
         ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "load_floors": gate["load_floors"]}
     folder_note: str | None = None
@@ -1041,11 +1047,15 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
             "folder": folder_note or _UPDATE_FOLDER_NOTE,
             # #3752 — whether the red team ran on THIS routine, in the result, never only in a log.
             "critics": commit_status(ir),
+            "redteam_binding": binding_line,  # #4066
             # #3971 — whether the subtract-only gate ran, was clean, or was SKIPPED (floor/re_entry).
             "prescription_gate": _gate_summary(gate),
             # #3718 — what Hevy actually holds, read back after the write.
             **wc.readback_fields(check, took_update_branch),
         }
+        from mcp.routine_spec_ledger import save_routine_spec  # #4079: private spec ledger, fail-soft, no git step
+
+        out["routine_spec"] = save_routine_spec(ir)
         if not check.get("verified"):
             ir.status = "unverified"
             put_versioned(ir)
@@ -1094,6 +1104,9 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
         except Exception:  # noqa: BLE001
             body_text = ""
         logger.warning("[hevy commit] %s rejected routine %s — body: %s", e.code, routine_id, body_text[:1000])
+        # #4066: a 404 on the update branch is a routine deleted in the app — name both ids.
+        if gone := commit_binding.deleted_routine_error(e.code, body_text, ir, bool(ir.hevy_routine_id), mcp_error):
+            return gone
         return mcp_error(
             f"Hevy rejected the routine — HTTP {e.code}. Response body: {body_text[:1000] or '(empty)'}",
             error_code="HEVY_BAD_REQUEST",
@@ -1238,8 +1251,5 @@ def tool_manage_hevy_routine(args: dict[str, Any] | None = None) -> dict[str, An
     args = args or {}
     action = (args.get("action") or "").strip().lower()
     if action not in _VALID_ACTIONS:
-        return mcp_error(
-            f"action must be one of: {sorted(_VALID_ACTIONS)}",
-            error_code="INVALID_ACTION",
-        )
+        return mcp_error(f"action must be one of: {sorted(_VALID_ACTIONS)}", error_code="INVALID_ACTION")
     return _DISPATCH[action](args)

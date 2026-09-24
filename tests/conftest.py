@@ -236,7 +236,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
+        # #3528: AST/positional sweep of scripts/ + deploy/ for every `git push` caller — a NEW
+        # pusher that skips `ci_gate_commands` is a repo-shape change that must red on the PR
+        # that adds it, not sit invisible until the next direct push lands untested.
+        "test_ci_stand_ins_derive.py",
         "test_shared_quantities_4068.py",  # #4068: rglob — only mcp.shared_quantities builds the walking layer / reports the loss rate
+        "test_obligation_carriers_3597.py",  # #3597: git ls-files + AST — a new `*_RESIDUE` ledger / tests/*_baseline.json must register a carrier + expiry
         "test_composite_alarm_lookup_3390.py",  # #3503: AST sweep — every CloudWatch alarm read in first-party source states its AlarmTypes
         "test_reconcile_tombstone_cycle_4008.py",  # #4008: the opening-cycle tombstone re-stamp planner — pure, mutation-guarded, reuses check 22's predicate
         # #3688: source sweep of lambdas/ mcp/ scripts/ deploy/ cdk/ + the three QA
@@ -829,6 +834,20 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # `/progress-photos/` is introduced by a PR's own diff, and once merged it is a
         # crawler-visible link to Matthew's body photographs that nothing else would notice.
         "test_progress_viewer_privacy_3760.py",
+        # #4035: rglob sweep of site/**/*.html (+ site/assets/js/) — the two-sided glossary
+        # gate. Its covered population (which pages carry a registered term, which acronyms
+        # appear un-glossed) changes with every page a PR adds or edits, and site/** merges
+        # auto-deploy (#750) — a reader sees the drift before any post-merge lane would.
+        "test_glossary_4035.py",
+        # #4035 box 3: rglob sweep of site/assets/js/**/*.js + non-legacy site/**/index.html
+        # for any consumer of weekly_rate_lbs — the rate-shows-its-n contract. Same reasoning
+        # as test_glossary_4035.py above: a new rate-rendering file is exactly a PR's own
+        # diff, and site/** auto-deploys on merge.
+        "test_rate_n_contract_4035.py",
+        # #4063: greps every tracked file for a contact-shaped address (the named human's
+        # identity lives ONLY in the private S3 config). Pure repo shape: a PR that adds the
+        # contact to this PUBLIC tree must red on itself, before the merge publishes it.
+        "test_named_human_contact_4063.py",
     }
 )
 

@@ -424,6 +424,22 @@ LEDGER: dict[str, dict] = {
             "visible by following the filter variable."
         ),
     ),
+    "LifePlatform/SelfTest": _row(
+        owner="deploy/sensor_self_test.py (#4034 box 2 — the post-deploy sensor self-tests)",
+        verdict=KEEP,
+        cardinality=FAN_OUT,
+        driver="liveness sensors derived from tests/test_heartbeat_completeness.py x SelfTestWrite (22 on 2026-09-23)",
+        live_series=0,
+        series_budget=40,
+        ritual_consumer="deploy/post_cdk_smoke.sh",
+        note=(
+            "The SCRATCH key every sensor self-test writes to (dimension Sensor=<id>) so a self-test can neither "
+            "feed nor mute the alarm it tests. One datapoint per sensor per deploy — prorated to cents. The "
+            "consumer is the post-deploy ritual that runs the self-tests and fails on a degraded verdict; a "
+            "write that raises IS the degraded verdict, so the series is evidence, not a dial. Budget 40 = the "
+            "22 derived sensors plus room for the ledger to grow; the set is derived, so growth needs no edit here."
+        ),
+    ),
     # ── retirement candidates: nothing reads them (flagged, NOT deleted) ─────
     "LifePlatform/DailyBrief": _row(
         owner="lambdas/emails/daily_brief_lambda.py",

@@ -29,9 +29,12 @@ Read `TRAINING_CALIBRATION.md`, `TRAINING_PROGRAM.md`, and `PROVEN_BLUEPRINT.md`
 the S3 owner prefix before reasoning about anything (owner-private since #3043 —
 `aws s3 cp s3://matthew-life-platform/config/coaching/<name> -`). If authoring is in
 scope, also read the matching `docs/coaching/routines/<type>/` spec for what was last
-built and the progression currently in play. Do not fall back to a generic routine or
-generic coaching — these three docs are how Matthew is calibrated and what's actually
-being run.
+built and the progression currently in play — that index has been stale since 2026-09-19
+(#4079), so for anything committed after that, also read
+`config/coaching/routine_specs/<type>/<routine_id>.json` (same `aws s3 cp` pattern) for
+the latest committed state; every routine 2026-09-21 onward was back-filled there by
+`deploy/backfill_routine_specs.py`. Do not fall back to a generic routine or generic
+coaching — these three docs are how Matthew is calibrated and what's actually being run.
 
 Persona: training coach, peer-to-peer (Matthew has lifted for years — skip the basics).
 Reason through the Personal Board's lenses and surface genuine disagreement rather than
@@ -113,7 +116,16 @@ review today's actual session before looking ahead at all.
   `save_insight`; a decision Matthew made against/with platform advice → `log_decision`
   (outcome later via `update_decision_outcome`); anything that belongs in the compounding
   substrate (a calibration correction, a failure pattern, what worked) →
-  `write_platform_memory` with the matching category.
+  `write_platform_memory` with the matching category. **A standing training constraint he
+  states (a gate, a toe flag, a back flag) → `write_platform_memory(category='training')`
+  (#4077)** — its own narrow category, not `constraints_preferences`, so
+  `plan_next_session` stage 1 reads it directly as `standing_constraints_from_chat`.
+- **Matthew overrides a coach's read mid-session** — a flag he says is stale, a verdict
+  he disagrees with — **log it: `log_coach_correction(signal=<the metric/flag id that
+  was wrong>, correction=<his words, verbatim>, coach=<bare id>)` (#4083)**. No pack
+  number is needed for this path — name the SIGNAL, not an item number. This is what
+  feeds `get_intelligence_quality`'s false-positive-by-signal ranking; an override that
+  isn't logged doesn't count toward it.
 
 ### 4. SYNTHESIZE current state (only as deep as authoring needs — don't fan out)
 

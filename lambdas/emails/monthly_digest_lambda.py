@@ -164,7 +164,7 @@ def fetch_range(source, start, end):
         **with_phase_filter(
             {
                 "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}"},
+                "ExpressionAttributeValues": {":pk": f"USER#{USER_ID}#SOURCE#{source}", ":s": f"DATE#{start}", ":e": f"DATE#{end}~"},
             },
             include_pilot=source_reads_cross_phase(source),
         )
@@ -828,7 +828,7 @@ def _already_sent_this_month(today) -> bool:
     try:
         r = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": _email_log_pk(), ":s": f"DATE#{month_start}", ":e": f"DATE#{today.isoformat()}"},
+            ExpressionAttributeValues={":pk": _email_log_pk(), ":s": f"DATE#{month_start}", ":e": f"DATE#{today.isoformat()}~"},
         )
         return bool(r.get("Items"))
     except Exception as e:
