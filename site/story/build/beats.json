@@ -3618,6 +3618,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4028"
         }
       ]
+    },
+    {
+      "id": "2026-09-24-served-in-order",
+      "date": "2026-09-24",
+      "title": "Served in order, not by weekday",
+      "shipped": "The training program moved to an upper/lower split of four sessions, and the engine now serves them in order rather than by day of the week. Whatever day he walks in, he gets the next session he has not done. Before Thursday's workout the plan read 'week 1 · session 1 of 4 · lower-heavy'. After he logged it, the plan read 'week 1 · session 2 of 4 · upper-volume' and named the workout that advanced it. The same night, a scheduled job began drafting and red-teaming the next session at 7 pm, so the evening conversation reviews a plan instead of building one from scratch.",
+      "why_it_mattered": "A weekday grid punishes a missed day: skip Tuesday and the program quietly drops Tuesday's work. A sequence cannot skip anything. It only waits. The red team also got more trustworthy: one critic had returned three different changes for the same input, and it now gives one answer per signal.",
+      "gotcha": "The overnight run that should have shipped this stalled for about six and a half hours on one unapproved command while everyone slept. Two finished changes sat unmerged, and the deploy windows were lost. What ran unattended was fine; the one new kind of command was not.",
+      "honest_miss": "Thursday's own session exposed a new defect. A note written for one lift, 'RPE 7 max' on the squat, was read as a cap on every exercise, so the check-in reported 15 sets over a ceiling that never applied to them. It is filed and not fixed. And the rule deciding what counts as a training week — four sessions, and at least seven days — is built and passes every check, but waits on two owner answers before it merges.",
+      "prs": [
+        {
+          "label": "PR #4120",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4120"
+        },
+        {
+          "label": "PR #4152",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4152"
+        },
+        {
+          "label": "PR #4155",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4155"
+        }
+      ]
     }
   ]
 }
