@@ -52,6 +52,7 @@
 - #2978: the 10-19 re-measure.
 - #3761: photos, when the owner is ready.
 - #4163: an auto-filed visual-QA advisory failure; triage next session.
+- #4164: the 09-25 17:17Z PII endpoint sweep red (`/api/content_cadence` [pii-card]). A local re-run was clean. The inferred cause is `_meta.request_id = uuid4().hex[:16]` coming out all digits, a ~9 %-per-run false red. Fix: scope the card arm by JSON path, and print the path on every violation.
 - Dependabot PRs #4050, #4048, #3826 sit untouched (not-work — dependency bumps, not this session's scope).
 
 **Build beat:** 2026-09-24-served-in-order
