@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "what": "The reader-facing vocabulary registry (#4182, ruling vii, 2026-09-26). Every builder term that reaches a reader page's MAIN content is listed here with its ruling. Consumers: tests/test_site_vocabulary_registry.py (the derivation guard + shrink-only ratchet over site/**/index.html main content) and, later, the build's inline <dfn> glosses. Charter primitives 1+2: this file owns the vocabulary; nothing else may hand-list it.",
+    "rulings": {
+      "rename": "the reader-facing word changes to reader_form; URLs, code identifiers and /method/* keep the term",
+      "cut": "the term leaves reader pages (it may stay on /method/* and in essays)",
+      "keep-with-gloss": "the term stays; its first use on every reader page carries the gloss inline (a <dfn title>)"
+    },
+    "panel": "Product Board personas + four stand-ins, red-teamed 2026-09-26; dissent in docs/SITE_TRANSFORMATION_V6.md §9"
+  },
+  "terms": [
+    {"term": "reset", "ruling": "rename", "reader_form": "a fresh start", "gloss": "He has restarted this experiment before; this is start number 17, on September 6.", "label_form": "cycle 17, started Sep 6"},
+    {"term": "correlation", "ruling": "keep-with-gloss", "reader_form": "correlation", "gloss": "moves together with — not caused by"},
+    {"term": "cockpit", "ruling": "keep-with-gloss", "reader_form": "the cockpit", "gloss": "today's page — the day's numbers, read back in one screen", "note": "the page's own name stays; the nav label is the owner's morning decision"},
+    {"term": "chronicle", "ruling": "rename", "reader_form": "the weekly write-up", "gloss": "Elena Voss, the site's AI journalist, writes up each week.", "note": "the byline keeps her title"},
+    {"term": "model", "ruling": "rename", "reader_form": "the forecast / the engine (by sense)", "gloss": "the forecast expected 7.4 h; he slept 9.9"},
+    {"term": "as of", "ruling": "rename", "reader_form": "data through <date> / written <day> <time> PT", "gloss": "one freshness line per page, in words"},
+    {"term": "cycle", "ruling": "keep-with-gloss", "reader_form": "cycle", "gloss": "one attempt at this experiment, from a start date"},
+    {"term": "Third Wall", "ruling": "cut", "reader_form": "What the AI said, and how it felt", "gloss": "the AI's read, next to how the week actually felt"},
+    {"term": "pillar", "ruling": "rename", "reader_form": "the seven areas", "gloss": "seven areas of his life, each scored 0–100 from his data — he calls them pillars"},
+    {"term": "protocol", "ruling": "keep-with-gloss", "reader_form": "protocol (the door) / what he's trying (cards)", "gloss": "a rule he follows on purpose, to see if a number moves"},
+    {"term": "gate", "ruling": "cut", "reader_form": "a check that has to pass before something ships", "gloss": "builder word; stays on /method/* and in essays"},
+    {"term": "HRV", "ruling": "keep-with-gloss", "reader_form": "HRV", "gloss": "heart-rate variability — a nightly nervous-system reading; higher is usually better rested"},
+    {"term": "glucose", "ruling": "keep-with-gloss", "reader_form": "blood sugar", "gloss": "blood sugar — no sensor this cycle"},
+    {"term": "Whoop", "ruling": "keep-with-gloss", "reader_form": "Whoop", "gloss": "a wrist band that scores sleep and recovery"},
+    {"term": "character level", "ruling": "rename", "reader_form": "the engine's score", "gloss": "how many weeks the seven areas have held up"}
+  ]
+}

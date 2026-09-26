@@ -248,13 +248,25 @@ _CURATED = [
         "api_deps": ["/api/character", "/api/pulse", "/api/journey"],
         "js_modules": ["cockpit.js"],
         "visual": {
-            "wait_for": "[data-bind='level']",
+            # #4182: the first screen is the three questions; the level moved into the
+            # collapsed "engine's score" section (visible only once opened).
+            "wait_for": ".three-q .tq-h",
             "checks": [
+                {
+                    "selector": "[data-bind='tq-week'], [data-bind='tq-night'], [data-bind='tq-today']",
+                    "not_empty": True,
+                    "desc": "the three questions answered",
+                },
                 {"selector": "[data-bind='level']", "not_empty": True, "desc": "character level rendered"},
                 {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
                 {"selector": ".site-foot-cols .sf-col", "min_count": 4, "desc": "footer mega-menu (4 columns) present (CC-05)"},
             ],
-            "interact": {"click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens with the Day-Grade Replay detail"},
+            "interact": {
+                "open": ".engine-sum",
+                "click": ".row",
+                "expect": ".pillar-detail",
+                "desc": "engine section opens, then the pillar disclosure opens with the Day-Grade Replay detail",
+            },
         },
     },
     {
@@ -635,8 +647,20 @@ _CURATED = [
         "content_class": "live-data",
         # #1386: the Read tab also renders the Dispute Docket band (graceful-empty
         # until the first docket opens).
-        "api_deps": ["/api/coaches", "/api/coach_team", "/api/coach_docket"],
-        "js_modules": ["coaching.js"],
+        # #4182: the first screen (coach_today.js) reads the dashboard + the record, the
+        # calibration record (the selection chain's rule 2), and —
+        # only when a read is > 48 h old — the weigh-ins and the 7-day protein average.
+        "api_deps": [
+            "/api/coaches",
+            "/api/coach_team",
+            "/api/coach_docket",
+            "/api/coaching-dashboard",
+            "/api/predictions",
+            "/api/calibration",
+            "/api/weight_progress",
+            "/api/nutrition_overview",
+        ],
+        "js_modules": ["coaching.js", "coach_today.js"],
         "visual": {
             "wait_for": "[data-dx-tabs]",
             "checks": [

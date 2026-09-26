@@ -38,7 +38,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) — the operating reflexes that used to live only in the operator's private memory, and the honest list of what still does (#2848) · [OPERATING_KNOWLEDGE_LEDGER.md](OPERATING_KNOWLEDGE_LEDGER.md) — the maintained registry of which operator-memory rule lives where in this repo, and which deliberately do not (#2848) · [CONTINUITY.md](CONTINUITY.md) — the map of every state surface outside `docs/` (session handovers, platform memory, skills), the memory-export tooling, and the day-1 reading order · [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the from-zero rebuild runbook if the laptop is gone.
 
 **"I'm changing the public website"**:
-[PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) — the durable why · [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) — what each page is for · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) — the standards · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) — how to change it well · [SITE_AUTHORING.md](SITE_AUTHORING.md) — add/change a page end-to-end
+[PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) — the durable why · [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) — what each page is for · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) — the standards · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) — how to change it well · [SITE_TRANSFORMATION_V6.md](SITE_TRANSFORMATION_V6.md) — the v6 plan: the reader's three questions first, the rulings, page by page (2026-09-26, #4182) · [SITE_AUTHORING.md](SITE_AUTHORING.md) — add/change a page end-to-end
 
 ---
 
@@ -83,7 +83,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–155)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–156)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/review craft` grades against |
 | [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |
