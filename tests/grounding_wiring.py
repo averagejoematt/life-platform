@@ -325,6 +325,24 @@ SURFACES = {
             "night": _NO_NIGHT_MAP,
         },
     ),
+    # #4188: the head coach's DAILY lead read (COACH#eli_marsh / LEAD_DAILY#), served as
+    # /api/coaching-dashboard.lead_daily and the coaching door's first read. Every figure is
+    # pre-computed into a `cited` block; `check()` refuses any number token not in it (exact,
+    # a re-rounding included) on top of these three classes.
+    "lambdas/coach/lead_daily_read.py::_grounding_findings": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": _THIRD_PERSON_SURFACE,
+            "night": (
+                "not armed, and a real residual: the read's sleep/recovery/HRV facts come from "
+                "web.vitals_resolver.resolve_vitals (the cockpit's truth, cited with its own as-of date in words), "
+                "while the one derivable night map (ai_calls._nightly_vitals_for) is built from the brief's own "
+                "whoop rows — two sources that can name different nights. Arming the class waits on citing the "
+                "vitals from the same rows the map is keyed on; until then the exact cited-number check is what "
+                "stops an invented or revised vital."
+            ),
+        },
+    ),
     # #2430: the quarterly in-voice memoir (generated/coach_memoirs.json). Its gate was
     # real but partial — fabricated_numbers + the cites_a_miss bar — and invisible here,
     # so the two classes a QUARTER-long retrospective most obviously carries were nobody's
@@ -806,6 +824,15 @@ SURFACE_FACETS = {
         "The reflection is published to generated/coach_daily.json and rendered on the coach pages with no second gate "
         "downstream. Fail-closed through `_accepts`, which ANDs the ER-03 verdict with an empty finding list: the handler "
         "regenerates once stricter, and a coach that still fails is added to `skipped` — dropped, never shipped.",
+    ),
+    "lambdas/coach/lead_daily_read.py::_grounding_findings": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "run@reasons",
+        "The lead read is the coaching door's first screen (/api/coaching-dashboard.lead_daily, /api/coach/eli_marsh). "
+        "Fail-closed: `run` regenerates once when `check()` returns reasons and, if any survive, returns `held` before "
+        "the write — nothing is stored, and the door falls back to its existing chain. A quality-gate regeneration must "
+        "re-pass the same check or it is discarded.",
     ),
     "lambdas/compute/coach_memoir_lambda.py::gate_check": _facet(
         PUBLIC,

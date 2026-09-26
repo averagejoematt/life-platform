@@ -1315,28 +1315,19 @@ def _run_ai_coach_pipeline(
                 logger.info(f"{_label} Coach V2 HELD by {_raw.reason} gate — terminal for this domain, legacy fallback skipped (#966)")
                 _raw = None
             _result = _raw or ""
-            if _cid == "sleep":
-                result["sleep_coach_v2_text"] = _result
-            elif _cid == "nutrition":
-                result["nutrition_coach_v2_text"] = _result
-            elif _cid == "training":
-                result["training_coach_v2_text"] = _result
-            elif _cid == "mind":
-                result["mind_coach_v2_text"] = _result
-            elif _cid == "physical":
-                result["physical_coach_v2_text"] = _result
-            elif _cid == "glucose":
-                result["glucose_coach_v2_text"] = _result
-            elif _cid == "labs":
-                result["labs_coach_v2_text"] = _result
-            elif _cid == "explorer":
-                result["explorer_coach_v2_text"] = _result
+            result[f"{_cid}_coach_v2_text"] = _result  # every roster id has its pre-declared key above
             if _result:
                 logger.info(f"{_label} Coach V2: {_result[:80]}")
             elif _cid not in _held_domains:
                 logger.info(f"{_label} Coach V2 returned None — will use legacy")
         except Exception as e:
             logger.warning(f"{_label} Coach V2 failed (non-blocking): {e}")
+
+    # #4188: the head coach's DAILY lead read for the coaching door — one budget-first Haiku
+    # call over facts computed from this same `data`, every figure cited, fail-closed.
+    from coach import lead_daily_read
+
+    logger.info(f"[lead_daily] {lead_daily_read.run(data, profile, table=table, persist=persist)}")
 
     # Invoke ensemble digest (async) after all v2 coaches complete.
     # #2255: fanning this out is a write — coach-ensemble-digest persists its own

@@ -1208,15 +1208,22 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
         # callers (board_quality_gate.enforce) and the daily-brief caller
         # (_enforce_quality_gate below) route through this one function, so
         # the rule covers both surfaces from a single definition.
+        # #4185: the deterministic reader CHECK classes (absence premise, unit number not
+        # served, unlabeled window figure, raw instant, banned term; + the reader-slot
+        # classes when the brief names a slot) merge into the SAME report beside #1973.
+        # `merge_into_report` applies the cycle-boundary findings exactly as this block
+        # did inline (`cycle_boundary_violations` + passed=False), then the reader
+        # findings (`reader_check_findings`, each named by `check`, corrections appended
+        # to `suggestions`, which `_quality_gate_correction_note` already renders). The
+        # merge is total — each half fails soft on its own — and moved here to keep this
+        # size-ratcheted module (#1665) from growing.
         try:
+            from coach.reader_checks import merge_into_report as _rc_merge
             from web.board_quality_gate import cycle_boundary_violations as _cbv
 
-            _cb_findings = _cbv(output_text)
-            if _cb_findings:
-                payload["cycle_boundary_violations"] = _cb_findings
-                payload["passed"] = False
+            _rc_merge(payload, output_text, generation_brief, cycle_boundary=_cbv)
         except Exception as _cbv_e:
-            print(f"[COACH-QUALITY-GATE:{coach_id}] cycle-boundary check unavailable (non-blocking): {_cbv_e}")
+            print(f"[COACH-QUALITY-GATE:{coach_id}] cycle-boundary / reader checks unavailable (non-blocking): {_cbv_e}")
         return payload
     except Exception as e:
         print(f"[COACH-QUALITY-GATE:{coach_id}] sync invoke failed (fail-open, not blocking): {e}")
