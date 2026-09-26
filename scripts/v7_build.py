@@ -48,6 +48,7 @@ sys.path.insert(0, HERE)
 
 import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
+from v7 import week  # noqa: E402
 
 SITE_DIR = os.path.join(ROOT, "site")
 
@@ -68,6 +69,12 @@ PAGES = (
 
 SITE_NAME = "averagejoematt"
 
+# The per-page body templates (scripts/v7/<page>.py — CSS, JS, body(base)). A page with no
+# entry keeps the scaffold body below; each page's lane adds ONE line here.
+BODIES = {
+    "story/": week,
+}
+
 
 def _esc(s: str) -> str:
     return html.escape(s, quote=True)
@@ -82,6 +89,18 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
     bar = v4_chrome.doors_nav(current_door=page)
     foot = v4_chrome.site_footer()
     canonical = f"https://averagejoematt.com{base}{page}"
+    mod = BODIES.get(page)
+    page_css = f'  <link rel="stylesheet" href="{mod.CSS}">\n' if mod else ""
+    page_js = f'  <script type="module" src="{mod.JS}"></script>\n' if mod else ""
+    main_inner = (
+        mod.body(base)
+        if mod
+        else (
+            f"    <h1>{_esc(title)}</h1>\n"
+            f'    <p class="v7-job">{_esc(job)}</p>\n'
+            f'    <p class="v7-placeholder">Not built yet — {_esc(due)} of the build week.</p>\n'
+        )
+    )
     return (
         "<!DOCTYPE html>\n"
         '<html lang="en" class="v7">\n'
@@ -96,6 +115,7 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         '  <link rel="stylesheet" href="/assets/css/fonts.css">\n'
         '  <link rel="stylesheet" href="/assets/css/tokens.css">\n'
         '  <link rel="stylesheet" href="/assets/css/v7.css">\n'
+        f"{page_css}"
         '  <script src="/assets/js/boot_theme.js"></script>\n'
         "</head>\n"
         '<body class="v7-body">\n'
@@ -103,13 +123,12 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         f"{notice}"
         f"  {mast}\n"
         f'  <main id="main" class="v7-main">\n'
-        f"    <h1>{_esc(title)}</h1>\n"
-        f'    <p class="v7-job">{_esc(job)}</p>\n'
-        f'    <p class="v7-placeholder">Not built yet — {_esc(due)} of the build week.</p>\n'
+        f"{main_inner}"
         "  </main>\n"
         f"  {foot}\n"
         f"  {bar}\n"
         '  <script type="module" src="/assets/js/v7_shell.js"></script>\n'
+        f"{page_js}"
         "</body>\n"
         "</html>\n"
     )
