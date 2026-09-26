@@ -154,7 +154,7 @@ def _fake_urlopen_factory(payloads_by_path, failing_paths=frozenset()):
     return _fake_urlopen
 
 
-def test_checks_returns_three_named_legs(monkeypatch):
+def test_checks_returns_five_named_legs(monkeypatch):
     import operational.weight_truth_qa as wq
 
     payloads = {
@@ -165,7 +165,13 @@ def test_checks_returns_three_named_legs(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen_factory(payloads))
     results = wq.checks(_FakeCheck, "http://example.test", "content_truth")
     names = {c.name for c in results}
-    assert names == {"cross_surface:weight", "cross_surface:vitals", "cross_surface:sleep_disclosure"}
+    assert names == {
+        "cross_surface:weight",
+        "cross_surface:vitals",
+        "cross_surface:sleep_disclosure",
+        "cross_surface:coach_consistency",
+        "cross_surface:coach_vs_engine",
+    }
     assert all(c.passed for c in results), [(c.name, c.message) for c in results]
 
 
@@ -184,10 +190,22 @@ def test_a_sleep_detail_only_outage_does_not_blank_the_weight_and_vitals_legs(mo
     assert by_name["cross_surface:sleep_disclosure"].passed is None  # warned, not failed
 
 
-def test_a_vitals_outage_warns_all_three_legs_fail_soft(monkeypatch):
+def test_a_vitals_outage_warns_only_the_vitals_dependent_legs_fail_soft(monkeypatch):
+    """A /api/vitals outage must blank exactly the legs that read it (weight,
+    vitals, sleep_disclosure — the sleep leg needs vitals' sleep_hours too), and
+    must NOT blank the #4186 coach-agreement legs, which never read /api/vitals
+    at all (they run off /api/coaching-dashboard + /api/nutrition_overview +
+    /api/journey). Same fail-soft property as
+    test_a_sleep_detail_only_outage_does_not_blank_the_weight_and_vitals_legs
+    above, mirrored for the newer legs: an outage on one surface never blanks a
+    check that doesn't depend on that surface."""
     import operational.weight_truth_qa as wq
 
     payloads = {"/api/coaching-dashboard": {"coaches": []}, "/api/sleep_detail": {"sleep_detail": {"total_sleep_hours": 6.8}}}
     monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen_factory(payloads, failing_paths={"/api/vitals"}))
     results = wq.checks(_FakeCheck, "http://example.test", "content_truth")
-    assert all(c.passed is None for c in results), [(c.name, c.passed) for c in results]
+    by_name = {c.name: c for c in results}
+    warned = {"cross_surface:weight", "cross_surface:vitals", "cross_surface:sleep_disclosure"}
+    unaffected = {"cross_surface:coach_consistency", "cross_surface:coach_vs_engine"}
+    assert all(by_name[n].passed is None for n in warned), [(n, by_name[n].passed) for n in warned]
+    assert all(by_name[n].passed is True for n in unaffected), [(n, by_name[n].passed) for n in unaffected]

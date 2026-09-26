@@ -53,6 +53,7 @@ from decimal import Decimal
 
 import boto3
 from common.compute_metadata import tag_record  # #2811: hoisted — it was imported locally in three functions
+from common.constants import EXPERIMENT_START_DATE  # #4184: the trajectory RATE is experiment-scoped, not cross-phase
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
@@ -1039,12 +1040,11 @@ def assemble_data(yesterday_str, profile):
     # Weight (latest + week-ago + avatar fallback)
     withings_7d = fetch_range("withings", (today - timedelta(days=7)).isoformat(), yesterday_str)
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday_str)
-    target_7d_date = (today - timedelta(days=7)).isoformat()
     # #2221: was `next(...)` — the OLDEST reading in the 14-day window at or before
     # day-7, i.e. a figure that could be 14 days old under a name (`weight_delta_7d`)
     # that #1917 gave it FOR honesty — while daily_brief_lambda took the NEWEST such
     # reading off the same window. Both now resolve through the one helper.
-    week_ago_weight = weight_recency.week_ago_weight(withings_14d, target_7d_date)
+    week_ago_weight = weight_recency.week_ago_weight(withings_14d, (today - timedelta(days=7)).isoformat())
     # BUG-01 (#783): weigh-ins are sporadic — a >7-day gap is routine, not an outage
     # (source_registry: 'a missing week is a lapse, not an outage'). latest_weight feeds
     # the ADR-104 grounding/honesty gate via canonical_facts; with only a 7-day lookback it
@@ -1060,7 +1060,13 @@ def assemble_data(yesterday_str, profile):
     # Weight trajectory (28d regression rate + suppressed-when-provisional projection) —
     # the ONE shared computation (weight_trend); the brief/public_stats read this, so the
     # rate is identical to the website's /api/journey instead of a divergent 7-day delta.
-    withings_28d = fetch_range("withings", (today - timedelta(days=28)).isoformat(), yesterday_str)
+    # #4184: the RATE is experiment-scoped even though RAW_TIMESERIES fetches elsewhere in
+    # this function are deliberately cross-phase (see fetch_range's docstring) — a flat
+    # 28-day window reaches across the genesis into the prior cycle's weigh-ins, clearing
+    # weight_trajectory's 21-day provisional floor on data the experiment hasn't earned yet.
+    # site_api_journey.journey() clamps the same way (`d120 = max(..., EXPERIMENT_START)`);
+    # mirror it here so the two producers of one number agree.
+    withings_28d = fetch_range("withings", max((today - timedelta(days=28)).isoformat(), EXPERIMENT_START_DATE), yesterday_str)
     _wt_series = [(w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in withings_28d if safe_float(w, "weight_lbs")]
     weight_traj = weight_trend.weight_trajectory(
         _wt_series, latest_weight, float(profile.get("goal_weight_lbs", 185.0)), ref_dt=datetime.now(timezone.utc)

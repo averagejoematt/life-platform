@@ -101,8 +101,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "chronicle::lambdas/emails/coach_panel_podcast_lambda.py::read": SEED_DATE,
     "chronicle::lambdas/web/ask_retrieval.py::read": SEED_DATE,
     "chronicle::lambdas/web/site_api_coach_narrative.py::read": SEED_DATE,
-    "coach_actions::lambdas/intelligence/intelligence_common.py::write": SEED_DATE,
-    "coach_actions::lambdas/web/site_api_lambda.py::read": SEED_DATE,
     "coach_thread::lambdas/training/training_notes.py::write": SEED_DATE,
     "coach_thread::mcp/tools_coach_intelligence.py::read": SEED_DATE,
     "computed_insights::lambdas/compute/daily_insight_compute_lambda.py::read": SEED_DATE,
