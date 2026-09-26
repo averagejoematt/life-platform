@@ -119,12 +119,18 @@ def test_carry_mark_wired_into_training_lever():
 
 # ── #1252 — carried-from-prep marker on the /protocols/ supplements 'as of' ──────
 def test_supplements_asof_carry_marker():
+    """#1252, re-pinned by #4182: the supplements fold no longer carries an "as of" fig —
+    the door's ONE freshness line reads "Data through <day in words>." (dates in words,
+    never ISO, never "as of"). The honesty rule is unchanged: when the served stack is
+    dated before genesis (carried forward from prep, cross_phase), the freshness line
+    must co-render the "carried from prep" marker. Removing the marker reds this test."""
     src = _read(_EVIDENCE_BODY_JS)
     assert "GENESIS_ISO" in src, "#1252: evidence_body.js must import genesis for the comparison"
     assert "asof < GENESIS_ISO" in src, "#1252: supplements must compare as_of to genesis"
+    assert "const through = dataThrough(asof);" in src, "#4182: the freshness line is derived from the served as_of_date"
     assert (
-        'fig(d.as_of_date, "as of", asofCarried ? "carried from prep" : null)' in src
-    ), "#1252: the supplements 'as of' fig must co-render the carried marker when pre-genesis"
+        '${esc(through)}${asofCarried ? " · carried from prep" : ""}' in src
+    ), "#1252/#4182: the supplements 'data through' line must co-render the carried marker when pre-genesis"
 
 
 # ── #1244 RETIRED — the Home season-premiere beat is GONE (launch re-anchor) ────

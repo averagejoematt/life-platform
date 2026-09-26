@@ -50,7 +50,7 @@ REGISTRY = [
     (
         "vitals",
         "Vitals & pulse",
-        "Today's pulse + the daily trend — weight, recovery, sleep, HRV, steps.",
+        "Today's weight, recovery, sleep, heart-rate variability and steps, with the daily trend.",
         "The body",
         "data",
         "/api/pulse",
@@ -60,7 +60,7 @@ REGISTRY = [
     (
         "physical",
         "Weight & composition",
-        "The daily weight cockpit — trend, milestones, projection — plus the episodic DEXA & bio-age arc.",
+        "Every weigh-in and the trend toward the goal, plus the body-composition scan.",
         "The body",
         "data",
         "/api/physical_overview",
@@ -70,7 +70,7 @@ REGISTRY = [
     (
         "labs",
         "Bloodwork",
-        "153 biomarkers over time — the inside view the wearables can't see.",
+        "His blood tests — the results outside their reference range first.",
         "The body",
         "data",
         "/api/labs",
@@ -81,7 +81,7 @@ REGISTRY = [
         # #4182: unlisted (the 25-page reach set) — no sensor this cycle; /data/nutrition/ carries the honest line.
         "glucose",
         "Glucose & meals",
-        "Continuous glucose married to what you ate — peak, rise, return.",
+        "Blood sugar against meals — no sensor is being worn.",
         "The body",
         "data",
         "/api/glucose",
@@ -92,7 +92,7 @@ REGISTRY = [
     (
         "sleep",
         "Sleep",
-        "Score, efficiency, deep/REM, HRV, and the recovery it buys.",
+        "Last night by two devices, recovery, and his usual bedtime.",
         "The body",
         "data",
         "/api/sleep_detail",
@@ -102,7 +102,7 @@ REGISTRY = [
     (
         "training",
         "Training & workouts",
-        "Sessions, Zone-2, strain, steps, and strength 1RMs.",
+        "Gym sessions, walks, steps, and whether the lifts are going up.",
         "The body",
         "data",
         "/api/training_overview",
@@ -112,7 +112,7 @@ REGISTRY = [
     (
         "nutrition",
         "Nutrition",
-        "Intake, macros, frequent meals, and protein sources vs the deficit.",
+        "What he eats — calories, protein, and the days he logged.",
         "The body",
         "data",
         "/api/nutrition_overview",
@@ -124,7 +124,7 @@ REGISTRY = [
         # the vitals hero's raw strain-vs-recovery 2×2. Ported from the private tool.
         "autonomic",
         "Autonomic balance",
-        "Where the nervous system sits — Flow, Stress, Recovery, or Burnout — Z-scored against your own baseline.",
+        "How stressed or recovered his nervous system reads, against his own baseline.",
         "The body",
         "data",
         "/api/autonomic_balance",
@@ -135,7 +135,7 @@ REGISTRY = [
         # RQA-07 (#414): the dedicated Zone-2 breakdown against the 150-min reference.
         "zone2",
         "Zone-2 training",
-        "Weekly aerobic minutes against the 150-min/week reference, plus the full 5-zone distribution.",
+        "Minutes of easy cardio each week, against the common 150-minute guideline.",
         "The body",
         "data",
         "/api/zone2",
@@ -170,7 +170,7 @@ REGISTRY = [
     (
         "habits",
         "Habits",
-        "The daily adherence layer the Consistency area is built on.",
+        "The daily habits he tracks, and how many he kept.",
         "Mind & accountability",
         "data",
         "/api/habits",
@@ -246,7 +246,7 @@ REGISTRY = [
         # #4182: unlisted (the 25-page reach set) — /protocols/ IS the supplements readout — a second tile was a duplicate.
         "supplements",
         "Supplements",
-        "The daily stack — what's in it, why, and what the evidence actually supports.",
+        "What he takes every day, what each one should move, and what the evidence supports.",
         "Protocol & experiments",
         "data",
         "/api/supplements",
@@ -267,7 +267,7 @@ REGISTRY = [
     (
         "experiments",
         "Experiments",
-        "The N=1 instrument: hypotheses run as read-only proof.",
+        "What he'd try next, what it should move, and how we'd know it worked.",
         "Protocol & experiments",
         "data",
         "/api/experiments",
@@ -841,7 +841,7 @@ PILLARS = [
         "nav_key": "data",
         "kicker": "the data · what the body &amp; mind report",
         "h1": "The Data",
-        "lede": "Every source the platform reads — the body, the mind, and the signals the engine finds across them. Live now and over time. Correlative, read-only, flagged when thin.",
+        "lede": "Weight, sleep, training, eating, blood tests — what his devices and apps record.",
         "groups": ["The body", "Mind & accountability", "The character"],
     },
     {
@@ -850,9 +850,9 @@ PILLARS = [
         "door": "protocols",
         "title": "Protocols",
         "nav_key": "protocols",
-        "kicker": "the protocols · the levers you pull",
+        "kicker": "the protocols · what he takes and tries",
         "h1": "The Protocols",
-        "lede": "The levers — supplements, experiments, challenges, and the discoveries they chase. What gets changed to move the data, and whether it moved.",
+        "lede": "Supplements and experiments — each with what it should move, and how that's measured.",
         "groups": ["Protocol & experiments"],
     },
     {
@@ -862,8 +862,9 @@ PILLARS = [
         "title": "Method",
         "nav_key": "data",  # footer-tier: no door of its own; nav keeps 5 doors
         "kicker": "the method · under the hood",
+        "lead": "wrong",
         "h1": "The Method",
-        "lede": "Under the hood — how the numbers are made, how honest they are, and every fresh start along the way. The machine, how it holds up, and the fresh starts.",
+        "lede": "How every number here is made, and every time the machine was wrong — shown, not summarised.",
         "groups": ["How it holds up", "The machine", "The fresh starts"],
     },
 ]
@@ -1000,8 +1001,15 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
     # assets/js/page_data.js — the hardened CSP has no 'unsafe-inline'.
     # "</" is escaped inside the payload so no JSON string can close the tag.
     judge_cal = judge_calibration_block() if any(s.get("slug") == "calibration" for s in registry_json(pillar["groups"])) else None
+    registry = registry_json(pillar["groups"])
+    lead = pillar.get("lead")
+    if lead:
+        # #4182: the lead topic is the rail's first tile, so its group becomes the first
+        # tab (the group tabs follow first appearance); every other tile keeps its
+        # registry order.
+        registry = [e for e in registry if e["slug"] == lead] + [e for e in registry if e["slug"] != lead]
     page_data = {
-        "registry": registry_json(pillar["groups"]),
+        "registry": registry,
         "start": start_slug,
         "base": pillar["base"],
         "door": pillar["door"],
@@ -1093,6 +1101,11 @@ def main() -> int:
         # in" placeholders made the worst first impression on the page. Other pillars
         # keep registry order. Hash deep-links still win in evidence.js.
         first = "physical" if (pillar["dir"] == "data" and "physical" in slugs) else slugs[0]
+        # #4182: a pillar may name a `lead` topic — the hub opens on it and the rail
+        # starts with it (the Method hub leads with "The wrong page": every time the
+        # machine was wrong is the promise its lede makes).
+        if pillar.get("lead") in slugs:
+            first = pillar["lead"]
         # #1395: the Data + Protocols HUBS get a <noscript> static core (real headline
         # numbers + as-of) and a data-driven OG override, so the crawler / no-JS / unfurl
         # view is real content, not a blank shell. Method is footer-tier (no unfurl

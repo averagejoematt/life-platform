@@ -34,7 +34,14 @@ function libItem(i, status, extra) {
   };
 }
 
-test("pipeline — rendered card count equals the header's claimed count, past the old 60-cap", async () => {
+// #4182 reverses the single "In the pipeline (N)" list: ready-to-start entries render
+// FIRST as their own section, the backlog below as "Ideas waiting (N)". The #2151
+// invariant is kept PER SECTION — each header's count is its own array's length, and
+// every entry renders (no silent cap).
+const countOf = (html, re) => Number((re.exec(html) || [])[1]);
+const cards = (html, cls) => (html.match(new RegExp(`<article class="${cls}">`, "g")) || []).length;
+
+test("pipeline — each section's header count equals its rendered cards, past the old 60-cap", async () => {
   stubEmptyFetch();
   // 67 total (5 available + 62 backlog) mirrors the live count that exposed the
   // bug (#2151) and stays comfortably above the old slice(0, 60) boundary.
@@ -45,31 +52,36 @@ test("pipeline — rendered card count equals the header's claimed count, past t
 
   const html = await renderExperiments({ experiments: pipeline });
 
-  const claimMatch = /In the pipeline \((\d+)\)/.exec(html);
-  assert.ok(claimMatch, "the pipeline section must state its count in the header");
-  const claimed = Number(claimMatch[1]);
-  assert.equal(claimed, 67, "header count must be the full pipeline length");
-
-  // The fixture has no "running" experiments and no published decisions, so
-  // every "<article class=\"rd-card\">" in the output belongs to the pipeline —
-  // rendered count is a direct proxy for pipeline cards drawn.
-  const rendered = (html.match(/<article class="rd-card">/g) || []).length;
-  assert.equal(rendered, claimed, "rendered card count must equal the claimed header count");
-  assert.equal(rendered, 67, "all 67 entries must render — none silently capped");
+  assert.equal(countOf(html, /Ready to start \((\d+)\)/), 5, "the ready header states its full count");
+  assert.equal(cards(html, "rd-card rd-card--ready"), 5, "every ready entry renders as a ready card");
+  assert.equal(countOf(html, /Ideas waiting \((\d+)\)/), 62, "the waiting header states its full count");
+  // No running experiments and no decisions in the fixture, so every plain rd-card is a waiting card.
+  assert.equal(cards(html, "rd-card"), 62, "all 62 waiting entries render — none silently capped");
+  assert.ok(html.indexOf("Ready to start") < html.indexOf("Ideas waiting"), "ready entries come first");
 
   for (const item of pipeline) {
     assert.ok(html.includes(item.name), `${item.name} must appear — the old slice(0, 60) silently dropped the pipeline's tail`);
   }
 });
 
-test("pipeline — a small pipeline still reports and renders a matching count (no off-by-one)", async () => {
+test("pipeline — a small pipeline still reports and renders matching counts (no off-by-one)", async () => {
   stubEmptyFetch();
   const pipeline = [libItem(0, "available"), libItem(1, "backlog"), libItem(2, "backlog")];
   const html = await renderExperiments({ experiments: pipeline });
-  const claimed = Number(/In the pipeline \((\d+)\)/.exec(html)[1]);
-  const rendered = (html.match(/<article class="rd-card">/g) || []).length;
-  assert.equal(claimed, 3);
-  assert.equal(rendered, 3);
+  assert.equal(countOf(html, /Ready to start \((\d+)\)/), 1);
+  assert.equal(cards(html, "rd-card rd-card--ready"), 1);
+  assert.equal(countOf(html, /Ideas waiting \((\d+)\)/), 2);
+  assert.equal(cards(html, "rd-card"), 2);
+});
+
+test("#4182 fold — one sentence from the status counts, small counts in words", async () => {
+  stubEmptyFetch();
+  const avail = Array.from({ length: 4 }, (_, i) => libItem(i, "available"));
+  const backlog = Array.from({ length: 63 }, (_, i) => libItem(i + 4, "backlog"));
+  const html = await renderExperiments({ experiments: [...avail, ...backlog], _meta: { generated_at: "2026-09-26T16:46:51Z" } });
+  assert.ok(html.includes("Nothing is running yet. Four experiments are ready to start; 63 ideas are waiting."), html.slice(0, 400));
+  assert.ok(html.includes("Data through Saturday, September 26."), "one freshness line, the date in words");
+  assert.equal(/\d{4}-\d{2}-\d{2}/.test(html.slice(0, html.indexOf("Ready to start"))), false, "no ISO date in the fold");
 });
 
 test("citation_note — reachable without hover on the no-direct-study marker", async () => {
