@@ -189,7 +189,7 @@ test("R6 fix 2: the public-text lint flags an ISO date, a percent sign or a bran
   assert.deepEqual(V.lintPublic(""), []);
   const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
   const html = V.readHTML(pick, { latest_checked: null }, new Date(), null);
-  assert.ok(html.includes("as served</summary>"), "the linted read is under details");
+  assert.ok(html.includes("<summary>The read, as served</summary>"), "the linted read is under details");
   assert.ok(html.includes("Whoop logged 86%"), "the served text is not rewritten");
   assert.ok(html.includes("an ISO date, a percent sign, a device brand"));
   assert.ok(!/<blockquote[^>]*>On the night of 2026/.test(html.split("<details")[0]), "nothing raw on the main screen");

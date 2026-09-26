@@ -394,7 +394,7 @@ export function readHTML(pick, profile, now, calibration) {
   const src = c.lead ? "api_coaching-dashboard.lead_daily.text" : "api_coaching-dashboard.coaches[].position_summary";
   const why = lintPublic(text);
   if (text && !why.length) parts.push(`<blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote>`);
-  else if (text) parts.push(`<details class="v7c-details"><summary>What ${esc(surname(name))} wrote to Matthew, as served</summary><blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote><p class="v7c-note">Kept off the main screen: it carries ${esc(why.join(", "))}. Served without edits.</p></details>`);
+  else if (text) parts.push(`<details class="v7c-details"><summary>The read, as served</summary><blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote><p class="v7c-note">Kept off the main screen: it carries ${esc(why.join(", "))}. Served without edits.</p></details>`);
   else parts.push(`<p class="v7c-absent">No public read is served for today.</p>`);
   const reason = reasonSentence(pick, calibration);
   if (reason) parts.push(`<p class="v7c-note" data-src="${esc(reason.src)}">${esc(reason.text)}</p>`);
