@@ -228,7 +228,11 @@ def test_prompt_truncates_oversized_prose():
     # windows, the UTC billing frame). Measured overhead 7760 with the cycle
     # sentence; ~440 chars headroom kept, same allowed-to-grow-not-unnoticed
     # contract as every prior raise.
-    assert len(prompt) < rtq.MAX_PROSE_CHARS + 8200
+    # 8200 → 8600 on 2026-09-25 (#4163): #4137's ISO week calendar (~480 chars at Day 20,
+    # capped at 8 weeks) had used the headroom, and the experiment-week sentence that stops
+    # the judge reading 'DAY 20 · WEEK 3' as ISO W38 adds ~190. Measured overhead 8202 in this
+    # fixture; on a live cycle the calendar grows ~95 chars/week up to its 8-week cap.
+    assert len(prompt) < rtq.MAX_PROSE_CHARS + 8600
 
 
 def test_batching_four_to_six_surfaces_per_call():

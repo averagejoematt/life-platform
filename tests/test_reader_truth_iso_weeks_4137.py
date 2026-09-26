@@ -79,3 +79,24 @@ def test_the_calendar_reaches_the_built_prompt():
     prompt = rtq.build_prompt([{"name": "Lab notes", "path": "/coaching/lab-notes/", "prose": "WEEK 2026-W38"}], phase)
     assert "2026-W38 = 2026-09-14 (Mon) to 2026-09-20 (Sun)" in prompt
     assert "never compute your own" in prompt
+
+
+def test_the_bare_experiment_week_is_stated_apart_from_the_iso_calendar():
+    """#4163: on 2026-09-25 (Day 20) the judge read the header 'DAY 20 · WEEK 3' as ISO
+    W38 because the line said every week label is ISO, and gated a correct header HIGH.
+    The site's header week is floor((day-1)/7)+1 (site/assets/js/coach_popover.js
+    genesisCount); the line must state that number for today, apart from the ISO list."""
+    line = rtq._iso_week_line(_phase("2026-09-06", "2026-09-25"))
+    assert "DAY 20 · WEEK 3" in line
+    assert "Week 3 = 2026-09-20..2026-09-26)" in line
+    assert "2026-W39 = 2026-09-21 (Mon) to 2026-09-27 (Sun), Days 16–20; in progress" in line
+    # mutation control: the old claim that EVERY week label is ISO must not return
+    assert "Week labels on this site are ISO-8601 weeks" not in line
+
+
+def test_the_experiment_week_matches_the_site_header_formula_across_a_cycle():
+    start = date(2026, 9, 6)
+    for n in range(1, 60):
+        today = start + timedelta(days=n - 1)
+        line = rtq._iso_week_line(_phase(start.isoformat(), today.isoformat()))
+        assert f"DAY {n} · WEEK {(n - 1) // 7 + 1}' is the experiment week" in line
