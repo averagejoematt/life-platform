@@ -45,7 +45,7 @@ import argparse
 import html
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -68,7 +68,7 @@ CANONICAL = "/story/build/agent-review/"
 TITLE = "The Agent's Performance Review — The Story — averagejoematt"
 DESCRIPTION = (
     "The self-healing remediation agent's public track record — triaged alarms, PRs opened, "
-    "auto-merge gate decisions, and honest fix-survival-at-14-days grading. Computed from the "
+    "auto-merge decisions, and honest fix-survival-at-14-days grading. Computed from the "
     "audit log the agent already writes; security-shaped items are withheld."
 )
 S3_BUCKET = "matthew-life-platform"
@@ -189,7 +189,7 @@ SURVIVAL_LABELS = {
 }
 KIND_LABELS = {
     "auto-merge": "auto-merged fix",
-    "gate-hold": "gate held for review",
+    "gate-hold": "held for human review",
     "proposed-pr": "PR opened for a human",
 }
 
@@ -292,14 +292,19 @@ def render(rec: dict) -> str:
     surv = rec["survival"]
     cases = rec["cases"]
     asof = (rec.get("generated_at") or "")[:10]
+    # #4182 (ruling: "as of" -> "written <day>", in words, never ISO)
+    try:
+        asof_words = date.fromisoformat(asof).strftime("%B %-d, %Y") if asof else ""
+    except ValueError:
+        asof_words = asof
 
     stats = "".join(
         [
             _stat(counts["agent_runs"], "agent runs"),
             _stat(counts["signals_triaged"], "signals triaged"),
             _stat(counts["prs_opened"], "PRs opened"),
-            _stat(counts["gate_merges"], "gate auto-merges"),
-            _stat(counts["gate_holds"], "gate holds"),
+            _stat(counts["gate_merges"], "auto-merges"),
+            _stat(counts["gate_holds"], "held for review"),
             _stat(counts["needs_human"], "escalated to human"),
         ]
     )
@@ -323,7 +328,7 @@ def render(rec: dict) -> str:
     else:
         cases_html = (
             '<div class="ar-empty">'
-            "<p>No public case files. The auto-merge gate recorded no merged or held decisions in its "
+            "<p>No public case files. The auto-merge check recorded no merged or held decisions in its "
             "lifetime and was retired on 2026-08-30, so there is nothing to grade — which is itself the "
             "honest read on an agent that runs in <strong>shadow mode</strong>, permanently (it triages "
             "and proposes, but a human merges). Proposed PRs still appear here as they are opened.</p>"
@@ -378,7 +383,7 @@ def render(rec: dict) -> str:
     <div class="page-hero">
       <p class="ph-kicker label">the story &middot; the honesty machinery, graded</p>
       <h1 class="ph-title">The Agent's Performance Review</h1>
-      <p class="ph-promise">The self-healing remediation agent gets the same treatment as the coaches: a public track record. Everything below is computed from the audit log the agent already writes &mdash; what it triaged, what it proposed, what the auto-merge gate decided, and whether each landed fix actually <em>held</em> for 14 days or the alarm re-fired.{mode_line}</p>
+      <p class="ph-promise">The self-healing remediation agent gets the same treatment as the coaches: a public track record. Everything below is computed from the audit log the agent already writes &mdash; what it triaged, what it proposed, what the auto-merge check decided, and whether each landed fix actually <em>held</em> for 14 days or the alarm re-fired.{mode_line}</p>
       {loop_ribbon("story")}
     </div>
 
@@ -394,7 +399,7 @@ def render(rec: dict) -> str:
     {withheld_note}
 
     <section class="ar-provenance">
-      <p class="provenance"><span class="pv-src">Computed by <code>scripts/v4_build_agent_review.py</code> from <code>remediation-log/</code> (the agent + auto-merge-gate audit log) via <code>remediation/track_record.py</code> &middot; as of {esc(asof)}</span></p>
+      <p class="provenance"><span class="pv-src">Computed by <code>scripts/v4_build_agent_review.py</code> from <code>remediation-log/</code> (the agent + auto-merge audit log) via <code>remediation/track_record.py</code> &middot; written {esc(asof_words) if asof_words else esc(asof)}</span></p>
       <p class="ar-note">No new inference and no hand-kept numbers: this page reads records the platform wrote about itself. Case files pass an alarm-type allowlist before they render &mdash; security- or exploit-adjacent classes are excluded by design (R22), and the count withheld is shown above rather than hidden.</p>
     </section>
   </main>

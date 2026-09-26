@@ -65,6 +65,18 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .topic-h1 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1.08; margin-top: var(--sp-2); }
 .topic-lede { margin-top: var(--sp-3); color: var(--ink-muted); max-width: var(--measure); }
 
+/* #4182 D5 — the /protocols/ landing topic (supplements): the crumb + 3-line topic
+   description sits ABOVE the fold sentence ("What he takes…") and its "Data through
+   <day>" line, pushing the fold to start at 714px at 390 wide — past the first screen.
+   Collapsed to one line here only: every other topic (and every other door) keeps its
+   full crumb + description untouched. */
+@media (max-width: 600px) {
+  html[data-door="protocols"] .ev-main[data-slug="supplements"] .ev-crumbs { display: none; }
+  html[data-door="protocols"] .ev-main[data-slug="supplements"] .topic-lede {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden;
+  }
+}
+
 .readout { margin-top: var(--sp-6); border-top: var(--border-hair); }
 .figs { display: flex; flex-wrap: wrap; gap: clamp(1.25rem, 0.8rem + 3vw, 3rem); padding: var(--sp-5) 0; }
 .fig { display: grid; gap: var(--sp-1); }

@@ -35,7 +35,7 @@ import { renderPulse } from "/assets/js/evidence_vitals.js";
 import { renderAutonomic, renderZone2 } from "/assets/js/evidence_autonomic.js";
 import { mountSectionToc } from "/assets/js/section_toc.js";
 import { mountOrientStrip } from "/assets/js/orient.js"; // #4182 — the one-line strip
-import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter
+import { dayInWords } from "/assets/js/entry_age.js"; // #4182 D5 — the ONE prose date formatter fold sentences use
 
 const PAGE_DATA = pageData();
 
@@ -64,8 +64,8 @@ function coachRefreshNote(generatedAt, paused) {
   const d = generatedAt ? new Date(generatedAt) : null;
   const valid = d && !isNaN(d.getTime());
   const date = valid ? d.toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }) : "";
-  if (paused) return date ? `as of ${date} — refresh paused (budget guard)` : "refresh paused (budget guard)";
-  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${date} — next refresh pending`;
+  if (paused) return date ? `written ${date} — refresh paused (budget guard)` : "refresh paused (budget guard)";
+  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `written ${date} — next refresh pending`;
   return "";
 }
 
@@ -269,6 +269,7 @@ async function renderCenter({ scrollToTop = false } = {}) {
   const my = ++renderSeq;
   const t = BYSLUG[current]; if (!t) return;
   const main = $("[data-main]");
+  main.dataset.slug = t.slug; // #4182 D5 — so CSS can target one topic's landing view (the /protocols/ fold-height fix) without a client-side class hack
   main.querySelector("[data-crumb]").innerHTML = `${esc(DOOR)} / ${esc(t.slug)}`;
   { const _ti = main.querySelector("[data-title]"); _ti.innerHTML = domainIcon(t.slug, { cls: "dom-ico dom-ico-lead" }) + esc(t.title); }
   // #4035: an unconditional overwrite here discarded the server's already-glossed
@@ -342,8 +343,8 @@ function wireFirstRun() {
 
 /* ── The fold (#4182, A-grade rubric 2/4/5/6) ────────────────────────────────
    One served fact with its date, in the first screen at 390px: a short paragraph above
-   the tile rail, ONE "Data through <day>" line (the day in words via calendarDay — the
-   one formatter; >48 h old says how old), and the Data door's return trigger. Each topic
+   the tile rail, ONE "Data through <day>" line (the day in words via dayInWords — the
+   one prose formatter; >48 h old says how old), and the Data door's return trigger. Each topic
    module owns its own fold builder next to its renderer (the SAME payload, fetched once
    — renderCenter hands the endpoint's promise over); the hub and /data/physical/ read
    /api/journey. A topic without a fold, or a failed fetch, leaves the slot empty —
@@ -360,7 +361,7 @@ const FOLDS = {
 const DATA_RETURN = "He weighs in most mornings · no blood test scheduled";
 
 export function throughLine(ymd, today) {
-  const day = calendarDay(ymd);
+  const day = dayInWords(ymd);
   if (!day) return "";
   const age = Math.round((Date.parse(today) - Date.parse(ymd)) / 86400000);
   return `Data through ${day}${Number.isFinite(age) && age >= 2 ? ` — ${age} days ago` : ""}`;

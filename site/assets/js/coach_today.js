@@ -16,6 +16,8 @@
 //   * every timestamp is in words and Pacific ("written Thursday 10:10 AM PT"), never the
 //     machine form "as of 2026-09-21" (vocabulary ruling vii-6).
 
+import { dayLabel } from "/assets/js/entry_age.js"; // #4182 — the ONE compact date-label spelling, shared with dayInWords
+
 const PT = "America/Los_Angeles";
 export const READ_STALE_HOURS = 48; // older than this, the read is demoted beneath a banner
 export const READ_OFF_FIRST_SCREEN_DAYS = 7; // older than this, it leaves the first screen
@@ -163,15 +165,15 @@ export function writtenStamp(iso, now) {
   return `written ${day} ${time} PT`;
 }
 
-// A served calendar date ("2026-10-02", a due date) in words: "Friday Oct 2". Pinned to UTC
-// noon so no viewer's offset can move it a day.
+// A served calendar date ("2026-10-02", a due date) as the compact LABEL: "Fri Oct 2".
+// #4182 D5: this used to build its own weekday+month string ("Friday Oct 2") while
+// entry_age.js's dayInWords() built the doors' prose spelling ("Friday, October 2") —
+// two formatters disagreeing on the same served date. dayLabel() (entry_age.js) is now
+// the one compact spelling; this stays as a thin wrapper so every existing caller's
+// import path (`from "/assets/js/coach_today.js"`) is unchanged. Fold SENTENCES import
+// dayInWords directly; this stays for chart labels, captions and kickers.
 export function calendarDay(ymd) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ""))) return "";
-  const d = new Date(`${ymd}T12:00:00Z`);
-  if (isNaN(d.getTime())) return "";
-  const wd = d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" });
-  const md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
-  return `${wd} ${md}`;
+  return dayLabel(ymd);
 }
 
 // The integrator's weekly call, labelled at its own cadence (#4188).
