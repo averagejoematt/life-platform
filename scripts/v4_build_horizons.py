@@ -75,7 +75,7 @@ def render() -> str:
 <body class="dx-page">
   <a class="skip" href="#dx">Skip to the picks</a>
   <header class="story-top">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the data</span></a>
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the numbers</span></a>
     {doors}
   </header>
   <main id="dx" class="dx-main">

@@ -42,10 +42,11 @@ have. Only chrome-bearing pages are touched, and a page is only given the block 
 already carries at least one head-chrome tag to anchor on, so the redirect stubs and
 authoring fragments (which have none) can never be handed one.
 
-Glossary pass (#4035): after the chrome above, every page also gets
-`v4_glossary.apply_glossary()` — the committed `site/config/glossary.json` term
-registry, wrapped at each term's first prose appearance in `<abbr class="gloss">`. See
-`v4_glossary.py`'s docstring for the excluded regions and the two declared-exempt pages.
+Glossary pass (#4035, one registry since #4182): after the chrome above, every page also
+gets `v4_glossary.apply_glossary()` — the `site/data/glossary.json` term registry, wrapped
+at each term's first ELIGIBLE prose appearance in `<dfn class="gloss" tabindex="0" title
+data-gloss>`. See `v4_glossary.py`'s docstring for the excluded regions, the skipped
+contexts and the two declared-exempt pages.
 
   python3 scripts/v4_apply_chrome.py            # rewrite in place, print summary
   python3 scripts/v4_apply_chrome.py --check    # exit 1 if any page would change (CI)
@@ -268,7 +269,11 @@ def write_page(path, html: str) -> str:
     """
     path = os.fspath(path)
     rel = os.path.relpath(path, SITE_ROOT).replace(os.sep, "/")
-    normalized, *_ = rewrite(html, self_path=rel)
+    # #4182: rewrite() keys the loop-forward self-swap and the glossary's exempt pages off
+    # the VIEWER path ("/method/registry/"); passing the file path ("method/registry/
+    # index.html") silently glossed the two exempt pages at generation time, and main()'s
+    # later pass then stripped them again — two writers disagreeing about one page.
+    normalized, *_ = rewrite(html, self_path=url_path(rel))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(normalized)

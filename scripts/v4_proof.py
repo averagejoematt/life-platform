@@ -515,7 +515,7 @@ def coaching_read_block_html(read: dict) -> str:
             f'<p class="label">The coaching — pre-start · as of {_esc(read.get("as_of", ""))}</p>'
             f"<p>The experiment begins <strong>{_esc(start_disp)}</strong>, with the first baseline weigh-in. "
             "The AI coaching board reads only this run's data — its first take lands here once Day 1's numbers exist.</p>"
-            '<p>Meanwhile: <a href="/coaching/team/">who the coaches are</a> · '
+            '<p>Meanwhile: <a href="/coaching/by-coach/">who the coaches are</a> · '
             '<a href="/coaching/scorecard/">how their calls get graded</a>.</p>'
             "</section></noscript>"
         )
@@ -535,7 +535,7 @@ def coaching_read_block_html(read: dict) -> str:
             "<p>The cycle is under way, but the board hasn't published its first read of this run's data yet — "
             "each coach reads only this cycle's numbers, and the first take lands once the daily computes have "
             "something real to argue about.</p>"
-            '<p>Meanwhile: <a href="/coaching/team/">who the coaches are</a> · '
+            '<p>Meanwhile: <a href="/coaching/by-coach/">who the coaches are</a> · '
             '<a href="/coaching/scorecard/">how their calls get graded</a>.</p>'
             "</section></noscript>"
         )
@@ -564,7 +564,7 @@ def coaching_read_block_html(read: dict) -> str:
     lines.append(
         "<p>The live board (today's read, the disagreements, each coach on top of the "
         'actual numbers) needs JavaScript. <a href="/coaching/by-coach/">By coach</a> · '
-        '<a href="/coaching/team/">who they are</a>.</p>'
+        '<a href="/coaching/by-coach/">who they are</a>.</p>'
     )
     lines.append("</section></noscript>")
     return "".join(lines)
@@ -706,8 +706,8 @@ def load_protocols() -> dict:
 
 _DOORS_TAIL = (
     "The live view (today's numbers, the AI board's read, the interactive charts) needs "
-    'JavaScript. The doors: <a href="/cockpit/">the cockpit</a> · <a href="/data/">the data</a> · '
-    '<a href="/coaching/">the coaching</a> · <a href="/protocols/">the protocols</a> · '
+    'JavaScript. The doors: <a href="/cockpit/">today</a> · <a href="/data/">the numbers</a> · '
+    '<a href="/coaching/">the coaches</a> · <a href="/protocols/">what he tries</a> · '
     '<a href="/story/">the story</a>.'
 )
 
@@ -787,14 +787,37 @@ def home_block_html(journey: dict, char: dict) -> str:
     return "".join(lines)
 
 
+# #4182: the Data door's five topic pages are part of the 25-page reach set, so the hub's
+# static core carries a plain link to each — statically reachable whether or not the
+# live roster could be fetched at build time (the tile rail is JS-rendered, invisible to
+# a crawler and to tests/site_text.static_reach()).
+DATA_TOPIC_LINKS = (
+    ("/data/physical/", "Weight &amp; body"),
+    ("/data/sleep/", "Sleep"),
+    ("/data/training/", "Training"),
+    ("/data/nutrition/", "Eating"),
+    ("/data/labs/", "Blood tests"),
+)
+
+
+def _data_topic_links_html() -> str:
+    links = " · ".join(f'<a href="{href}">{label}</a>' for href, label in DATA_TOPIC_LINKS)
+    return f'<p class="proof-topics">The topics: {links}.</p>'
+
+
 def data_block_html(summary: dict) -> str:
     """The data door's static core (#1395): the real source roster + fresh count baked
     into `/data/`'s served HTML as <noscript>. Every source label is real (from
-    /api/source_freshness); nothing is invented."""
+    /api/source_freshness); nothing is invented. The five topic links (#4182) ship even
+    when the roster is unavailable — they are the door's static reach, not data."""
     summary = summary or {}
     total = summary.get("total")
     if not isinstance(total, int) or total <= 0:
-        return ""
+        return (
+            '<noscript><section class="proof-static dx-prose" aria-label="The numbers, by topic">'
+            f"{_data_topic_links_html()}"
+            "</section></noscript>"
+        )
     fresh = summary.get("fresh", 0)
     as_of = summary.get("as_of", "") or _today()
     labels = summary.get("labels") or []
@@ -807,8 +830,8 @@ def data_block_html(summary: dict) -> str:
         f"<p><strong>{int(total)} sources on the board, {int(fresh)} fresh right now.</strong> "
         "The body and the mind — wearables, labs, glucose, journals — read daily, live and over time.</p>"
         f"{roster}"
-        "<p>The live trends, the cross-source signals, and the flagged-when-thin caveats need "
-        'JavaScript. Start on <a href="/data/">the data</a>.</p>'
+        "<p>The live trends, the cross-source signals, and the flagged-when-thin caveats need JavaScript.</p>"
+        f"{_data_topic_links_html()}"
         "</section></noscript>"
     )
 
@@ -829,7 +852,7 @@ def protocols_block_html(summary: dict) -> str:
         "Supplements, timed protocols, and challenges — each one changes an input to move the data, "
         "graded on whether it actually did.</p>"
         "<p>The live protocol state and the discoveries they chase need JavaScript. "
-        'Start on <a href="/protocols/">the protocols</a>.</p>'
+        'Start on <a href="/protocols/">what he tries</a>.</p>'
         "</section></noscript>"
     )
 

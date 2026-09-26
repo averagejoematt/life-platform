@@ -1370,6 +1370,22 @@ a.wf-stop:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; 
    Column headings are ink, not ember: six ember headings meant the accent carried no
    information. The station you are inside keeps the ember rail + heading. */
 .site-foot { border-top: var(--border-hair); margin-top: var(--sp-7); padding: var(--sp-6) var(--gutter) var(--sp-5); }
+/* ── The reader form (#4182, M3) — "did this page make sense?" at the top of the canonical
+   footer. Ships `hidden`; page_feedback.js un-hides it. Tokens only, no ember (it is a
+   question, not a call to action); every control reaches the 44px touch floor (§10.4). */
+.page-feedback { max-width: var(--container); margin: 0 auto var(--sp-6); display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-4); }
+.page-feedback[hidden] { display: none; }
+.pf-set { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
+.pf-q { font-size: var(--fs-small); color: var(--ink); padding: 0; margin-right: var(--sp-2); }
+.pf-opt { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; font-size: var(--fs-small); color: var(--ink-muted); cursor: pointer; }
+.pf-more { display: grid; gap: var(--sp-1); flex: 1 1 16rem; font-size: var(--fs-small); color: var(--ink-muted); }
+.pf-optional { color: var(--ink-faint); }
+.pf-more textarea { min-height: 44px; font: inherit; color: var(--ink); background: var(--surface); border: var(--border-hair); border-radius: var(--radius-xs); padding: var(--sp-2); resize: vertical; }
+.pf-send { min-height: 44px; padding: 0 var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink); background: transparent; border: var(--border-hair); border-radius: var(--radius-xs); cursor: pointer; }
+.pf-send:hover { border-color: var(--ink-muted); }
+.pf-send:disabled { color: var(--ink-faint); cursor: default; }
+.pf-status { flex-basis: 100%; margin: 0; font-size: var(--fs-small); color: var(--ink-muted); }
+.pf-status:empty { display: none; }
 .site-foot-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); max-width: var(--container); margin-inline: auto; }
 @media (min-width: 761px) { .site-foot-cols { grid-template-columns: repeat(4, 1fr); } }
 .sf-col { display: grid; gap: var(--sp-2); align-content: start; border-inline-start: 1px solid transparent; padding-inline-start: var(--sp-3); }
@@ -1653,7 +1669,7 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 .provenance .pv-stale { color: var(--ember); }
 
 /* ── .gloss — the newcomer's glossary (#4035): a registered term's FIRST appearance
-   per page, from site/config/glossary.json via scripts/v4_glossary.py. Native <abbr>
+   per page, from site/data/glossary.json (was site/config/, #4182) via scripts/v4_glossary.py. Native <abbr>
    semantics (title = the definition, keyboard/AT accessible with zero JS) dressed in a
    dotted underline the same muted-ink weight as the rest of the type triad — never
    ember (the single-ember rule: this is a reading aid, not a call to action). */
@@ -1663,6 +1679,12 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
    carried, now inline. dfn's UA italic is dropped: it is a reading aid, not emphasis. */
 dfn.gloss { font-style: normal; }
 dfn.gloss:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+/* #4182 (M2): the tap reveal. Since #4182 the build emits <dfn class="gloss" tabindex="0"
+   title data-gloss> for every registered term's first eligible appearance
+   (site/data/glossary.json → scripts/v4_glossary.py), and a phone has no hover to show a
+   `title`. Tapping focuses the dfn (tabindex=0); focus prints the definition inline,
+   muted, after the word — blur hides it again. Keyboard readers get the same. */
+dfn.gloss:focus::after { content: " — " attr(data-gloss); color: var(--ink-muted); font-size: var(--fs-small); }
 
 /* ── .orient-strip — the one-line newcomer note (#4182, panel ruling 2(v)). Replaces the
    full-viewport "NEW HERE?" cards on /cockpit/ and the /data/ door: one muted line under

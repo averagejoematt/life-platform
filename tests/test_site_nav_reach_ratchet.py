@@ -1,10 +1,11 @@
 """tests/test_site_nav_reach_ratchet.py — the page-reach ratchet (#4182, ruling vi).
 
-91 reader pages exist; 39 are reachable from "/" by static <a href> links (2026-09-26). A
+91 reader pages exist; 39 were reachable from "/" by static <a href> links at landing, 25
+since the panel's reach-set ruling the same day (#4182). A
 newcomer meets the reachable set, not the served set, and the site was overwhelming because
 that set grew one page at a time with no counter. This is the counter: the statically
 reachable count may only go down from tests/site_vocabulary_residue.py::NAV_REACH_CEILING,
-and lowering that number is how the owner's cap (24 proposed) is set. Unlisted pages keep
+and lowering that number is how the owner's cap is set. Unlisted pages keep
 their URLs — served-but-unlinked is the sanctioned state (/method/state/ already lives there).
 
 Static reach only (see tests/site_text.py's stated limit): links evidence.js injects at

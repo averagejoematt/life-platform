@@ -246,7 +246,7 @@ function coachDossierHTML(coach) {
     h += `<p class="cd-count label">${esc(cc.held || commits.length)} held · ${esc(cc.kept || 0)} kept · ${esc(cc.broken || 0)} broken · ${esc((cc.pending || 0) + (cc.unresolved || 0))} open${notGradeable ? ` · ${esc(notGradeable)} not gradeable` : ""}</p><ul class="ce-trail">`;
     for (const c of commits.slice(0, 8)) {
       const st = c.status && c.status !== "pending" ? esc(c.status) : (c.due_date ? `due ${esc(c.due_date)}` : "open");
-      h += `<li class="ce-item">${dateLine(c.date, st)}<p class="ce-say">${esc(c.text)}</p>${c.check ? `<p class="label cd-check">graded on ${esc(c.check.metric)} ${esc(c.check.direction)}${evLink(c)}</p>` : ""}${corrNotes(c)}</li>`;
+      h += `<li class="ce-item">${dateLine(c.date, st)}<p class="ce-say" data-verbatim>${esc(c.text)}</p>${c.check ? `<p class="label cd-check">graded on ${esc(c.check.metric)} ${esc(c.check.direction)}${evLink(c)}</p>` : ""}${corrNotes(c)}</li>`;
     }
     h += `</ul>`;
   }
@@ -493,6 +493,9 @@ function docketHTML(dk) {
 // The brief's line keeps its slot on the Read tab below. Nothing here edits served text:
 // the page chooses, dates and glosses (panel §4 item 6).
 const _roleOf = (c) => String(c.title || "").toLowerCase();
+// #4182: every served-coach-text element below carries `data-verbatim` — the fence the
+// runtime gloss pass (gloss_runtime.js → orient.js::glossFirst) never crosses. Glosses for a
+// coach's words render BESIDE them (glossHTML), never inside.
 function glossHTML(text) {
   const g = glossesFor(text);
   if (!g.length) return "";
@@ -546,12 +549,12 @@ async function renderToday(mount) {
       `<p class="provenance"><span class="pv-src${readTier === "stale" ? " pv-stale" : ""}">${esc(writtenStamp(chosen.analysis_generated_at, now))}</span>` +
       `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
       `<p class="provenance ct-why"><span>${esc(pick.reason)}</span></p>` +
-      `<div class="prose ct-text"><p>${esc(text)}</p></div>` +
+      `<div class="prose ct-text" data-verbatim><p>${esc(text)}</p></div>` +
       `<p class="ct-full label"><a href="/coaching/by-coach/#${esc(pid)}">${clipped ? "full read" : "more from this coach"} →</a></p>` +
       glossHTML(text);
     const ask = pickAsk(d.open_actions, chosen.coach_id);
     if (ask) {
-      h += `<p class="ct-ask"><span class="label">the ask</span> ${esc(ask.text)}` +
+      h += `<p class="ct-ask"><span class="label">the ask</span> <span data-verbatim>${esc(ask.text)}</span>` +
         `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}</span></p>`;
     }
     const rec = recordLine(preds && preds.overall);
@@ -564,7 +567,7 @@ async function renderToday(mount) {
     const huddle = ((team && team.huddle) || []).filter((x) => x && x.read_of_him);
     if (huddle.length) {
       h += `<p class="ct-kicker label">where each coach has him — their standing stance, not a daily read</p><ul class="ct-stances">` +
-        huddle.map((x) => `<li><span class="ct-name">${esc(x.name || "")}</span> <span class="prose">${esc(x.read_of_him)}</span></li>`).join("") + `</ul>`;
+        huddle.map((x) => `<li><span class="ct-name">${esc(x.name || "")}</span> <span class="prose" data-verbatim>${esc(x.read_of_him)}</span></li>`).join("") + `</ul>`;
     }
     h += `</section>`;
   }
@@ -634,7 +637,7 @@ async function renderReadToday(read) {
     // to the DATA day (yesterday by mint time, #1251). One honest label, shared
     // with cockpit/home.
     h += `<section class="read-priority"><p class="dx-kicker label">${BRIEF_LINE_KICKER}</p>` +
-      `<blockquote class="rp-text">${esc(daily)}</blockquote></section>`;
+      `<blockquote class="rp-text" data-verbatim>${esc(daily)}</blockquote></section>`;
   }
   if (!firstScreen) {
     if (team) h += tensionsHTML(team);
@@ -699,7 +702,7 @@ async function renderReadWeek(read) {
     const wpAsOf = weeklyAsOf(wp.generated_at, wp.as_of_day_n);
     h += `<section class="read-priority"><p class="dx-kicker label">the week's call · ${esc(wp.coach_name || LEAD_BYLINE_FALLBACK)}</p>` +
       (wpAsOf ? `<p class="rp-asof label">${esc(wpAsOf)}</p>` : "") +
-      `<blockquote class="rp-text">${esc(wp.weekly_priority)}</blockquote></section>`;
+      `<blockquote class="rp-text" data-verbatim>${esc(wp.weekly_priority)}</blockquote></section>`;
   }
   const notes = (wp && wp.cross_domain_notes) || {};
   const keys = Object.keys(notes);
@@ -809,7 +812,7 @@ async function renderByCoachLead(read, coach) {
   let h = `<div class="coach-head coach-head--lead" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(coach.board_role || "")}</h2><p class="coach-head-name label">${esc(coach.name || "")}</p><p class="coach-head-tier label">the head coach · lead tier</p></div></div>`;
   h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
   if (coach.short_bio) h += `<p class="dx-prose tl-bio">${esc(coach.short_bio)}</p>`;
-  if (coach.philosophy) h += `<blockquote class="tl-philosophy">${esc(coach.philosophy)}</blockquote>`;
+  if (coach.philosophy) h += `<blockquote class="tl-philosophy" data-verbatim>${esc(coach.philosophy)}</blockquote>`;
   const focus = (team && (((team.lead || {}).staff_focus || []).length ? team.lead.staff_focus : team.team_focus)) || [];
   if (focus.length) h += `<p class="tl-focus label">what he's got the staff focused on: ${focus.slice(0, 3).map(esc).join(" · ")}</p>`;
   else h += `<p class="tl-focus label">staff focus lands with the coaches' first weekly stances — nothing to synthesize yet.</p>`;
@@ -1023,7 +1026,7 @@ async function renderTeamRead(read) {
     h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
     h += `<div class="tl-head" style="--coach:${esc(L.color || "")}">${portrait(L, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(L, { title: "" })}</span>`}<span class="tl-name">${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
     if (L.short_bio) h += `<p class="dx-prose tl-bio">${esc(L.short_bio)}</p>`;
-    if (L.philosophy) h += `<blockquote class="tl-philosophy">${esc(L.philosophy)}</blockquote>`;
+    if (L.philosophy) h += `<blockquote class="tl-philosophy" data-verbatim>${esc(L.philosophy)}</blockquote>`;
     if ((L.staff_focus || []).length) h += `<p class="tl-focus label">what he's got the staff focused on: ${L.staff_focus.map(esc).join(" · ")}</p>`;
     h += `</section>`;
   }
@@ -1055,7 +1058,7 @@ async function renderTeamCoach(read, id) {
   const isLead = d.tier === "lead";
   let h = `<div class="coach-head${isLead ? " coach-head--lead" : ""}" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(d.board_role || d.domain || "")}</h2><p class="coach-head-name label">${esc(d.name || "")}</p>${isLead ? `<p class="coach-head-tier label">the head coach · lead tier</p>` : ""}</div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
-  if (isLead && d.philosophy) h += `<blockquote class="tl-philosophy">${esc(d.philosophy)}</blockquote>`;
+  if (isLead && d.philosophy) h += `<blockquote class="tl-philosophy" data-verbatim>${esc(d.philosophy)}</blockquote>`;
   h += coachCharacterHTML(d.character);
   // #1113 immersive bio: the cast sheet (authored traits) → the live record
   // (real engine records, honest-empty pre-data) → how the voice is built
@@ -1583,7 +1586,7 @@ function _scCallHTML(p, shareUrl) {
   return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
     `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}${dueBit}</div>` +
-    `<p class="sc-call-claim">${esc(p.text || "")}</p>` +
+    `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>` +
     `${p.outcome_notes ? `<p class="sc-call-why label">${esc(p.outcome_notes)}</p>` : ""}` +
     `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
 }
@@ -1601,7 +1604,7 @@ async function renderAnswer(read, id) {
   const a = ((data && data.answers) || []).find((x) => String(x.id) === String(id));
   if (!a) { read.innerHTML = `<p class="dx-prose">That question isn't here yet.</p>`; return; }
   const resp = (a.responses && a.responses.length)
-    ? a.responses.map((r) => `<div class="voice machine"><span class="who">${esc(r.name || r.coach || "The board")}</span><p class="what">${esc(r.text)}</p></div>`).join("")
+    ? a.responses.map((r) => `<div class="voice machine"><span class="who">${esc(r.name || r.coach || "The board")}</span><p class="what" data-verbatim>${esc(r.text)}</p></div>`).join("")
     : (a.answer ? `<div class="voice machine"><span class="who">The board</span><p class="what">${esc(a.answer)}</p></div>` : `<p class="dx-prose">An answer is on the way.</p>`);
   // #404: the answer's permalink (a static moment shell with its own share
   // card) — button appears only once the daily sweep has minted it.

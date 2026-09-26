@@ -1,27 +1,32 @@
 """The newcomer's glossary — the two-sided gate (#4035, re-filed from #3618).
 
-`site/config/glossary.json` is the committed term registry; `scripts/v4_glossary.py`
-applies it at build time (first appearance per page, wrapped in `<abbr class="gloss">`);
+`site/data/glossary.json` is the ONE term registry (#4182 folded #4035's retired
+`site/config/glossary.json` into it); `scripts/v4_glossary.py` applies it at build time
+(first ELIGIBLE appearance per page, wrapped in `<dfn class="gloss" tabindex="0" title
+data-gloss>` — eligible = outside links, buttons, h1/h2, code, labels and `<noscript>`);
 `scripts/v4_apply_chrome.py` is the writer. This file is the gate over the BUILT
 (committed) HTML — not the applier's own logic (that gets direct unit coverage below
 too, but the gate itself must check what actually shipped):
 
 1. `test_apply_chrome_check_is_green_for_glossary` — `v4_apply_chrome.py --check` sees
    no glossary drift (mirrors `test_site_chrome.py`'s chrome-drift assertion).
-2. `test_every_registered_term_is_glossed_at_first_appearance` — gate (a): a registered
-   term's first prose appearance on a page must be wrapped; a later plain-text
-   appearance of the SAME term on the SAME page is fine (only the first one is glossed
-   by design).
+2. `test_every_registered_term_is_glossed_at_first_appearance` — gate (a): every
+   registered term with an eligible appearance on a page must be wrapped there, exactly
+   once; a later plain-text appearance of the SAME term is fine (only the first is glossed).
 3. `test_no_unregistered_acronym_coinage` — gate (b): no capitalised 2-6 letter token in
    page prose may be neither a registered term nor an explicit, dated allowlist entry —
    the falsifiable half of "every term," not "the terms someone remembered."
 4. Unit coverage for `apply_glossary`/`strip_glossary` idempotency and the exempt-page
    contract, isolated from the live site tree.
+5. (#4182) the word-ci terms + the skipped contexts + the legacy-wrap convergence, and the
+   runtime half: `glossary_terms.js` is the registry's generated copy, and served coach
+   prose is fenced `data-verbatim` so the runtime pass never touches it.
 """
 
 from __future__ import annotations
 
 import html as html_escape_mod
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -58,30 +63,24 @@ def test_apply_chrome_check_is_green_for_glossary():
 
 
 def test_every_registered_term_is_glossed_at_first_appearance():
-    """Gate (a): scanning the SAME prose region the applier scans, a registered term's
-    first occurrence on a page must already be inside `<abbr class="gloss">` — never
-    bare. Reds if a page is hand-edited (or a future generator emits raw HTML) without
-    going through `v4_apply_chrome.py`, catching regression the drift check above would
-    also catch but stating the FAILURE MODE explicitly by term.
+    """Gate (a): every registered term that has an ELIGIBLE appearance on a page (the same
+    text the applier walks — `v4_glossary.eligible_terms`) must carry exactly one
+    `<dfn class="gloss">` wrap with its registry definition, never zero. Reds if a page is
+    hand-edited (or a generator emits raw HTML) without going through `v4_apply_chrome.py`,
+    stating the failure by term — the drift check above would also catch it, by page only.
     """
     terms = v4_glossary.load_glossary()
     checked_pages = 0
     for rel, html in _non_legacy_content_pages():
         page_path = v4_apply_chrome.url_path(str(rel))
-        text = v4_glossary.scan_content_text(html, page_path=page_path)
-        if not text:
+        if page_path in v4_glossary.GLOSS_EXEMPT_PAGES:
             continue  # exempt page (declared in v4_glossary.GLOSS_EXEMPT_PAGES)
         checked_pages += 1
-        for term in terms:
-            first = text.find(term)
-            if first == -1:
-                continue  # term doesn't appear on this page at all
-            # The glossed HTML wraps the term as `<abbr class="gloss" title="...">TERM`
-            # immediately before its first plain-text appearance's position in the
-            # STRIPPED content stream is identical (stripping removes only the wrapper
-            # markup, not text) — so the live page must contain the wrap literally.
-            wrapped = f'<abbr class="gloss" title="{html_escape_mod.escape(terms[term], quote=True)}">{term}</abbr>'
-            assert wrapped in html, f"{rel}: {term!r} appears in prose but its first occurrence is not glossed"
+        for term in v4_glossary.eligible_terms(html, page_path=page_path):
+            d = html_escape_mod.escape(terms[term], quote=True)
+            wraps = re.findall(rf'<dfn class="gloss" tabindex="0" title="{re.escape(d)}" data-gloss="{re.escape(d)}">([^<]*)</dfn>', html)
+            wraps = [w for w in wraps if w.lower() == term.lower()]
+            assert len(wraps) == 1, f"{rel}: {term!r} appears in eligible prose but is wrapped {len(wraps)} times (want exactly 1)"
     assert checked_pages > 0, "no non-exempt content pages found — the gate didn't run over anything"
 
 
@@ -107,7 +106,7 @@ def test_no_unregistered_acronym_coinage():
     assert checked_pages > 0, "no non-exempt content pages found — the gate didn't run over anything"
     assert not offenders, (
         "unregistered capitalised acronym(s) found in page prose — register each in "
-        "site/config/glossary.json (with a real definition) or add a dated, reasoned "
+        "site/data/glossary.json (kind acronym, match exact, a real definition) or add a dated, reasoned "
         "entry to v4_glossary.GLOSS_ALLOWLIST:\n"
         + "\n".join(f"  {tok}: {', '.join(sorted(pages))}" for tok, pages in sorted(offenders.items()))
     )
@@ -171,7 +170,7 @@ def test_each_exempt_page_entry_is_load_bearing_and_not_blanket(monkeypatch, pag
 def test_apply_glossary_wraps_first_occurrence_only():
     html = "<p>Track your HRV daily. HRV trends matter more than any single HRV reading.</p>"
     out = v4_glossary.apply_glossary(html)
-    assert out.count('<abbr class="gloss"') == 1
+    assert out.count('<dfn class="gloss"') == 1
     assert out.count("HRV") == 3  # 1 wrapped + 2 bare occurrences; wrapping doesn't touch the text itself
     assert "HRV trends matter" in out  # later occurrences stay plain
     assert "any single HRV reading" in out
@@ -187,8 +186,8 @@ def test_apply_glossary_skips_script_style_nav_footer():
         "<p>Real prose about HRV.</p>"
     )
     out = v4_glossary.apply_glossary(html)
-    assert out.count('<abbr class="gloss"') == 1
-    assert "Real prose about <abbr" in out
+    assert out.count('<dfn class="gloss"') == 1
+    assert "Real prose about <dfn" in out
 
 
 def test_apply_glossary_is_idempotent():
@@ -222,7 +221,7 @@ def test_evidence_js_never_blindly_overwrites_the_glossed_topic_lede():
     `main.querySelector("[data-blurb]").textContent = t.blurb;` unconditionally on
     EVERY render call, including the initial page load — discarding the server's
     already-glossed `<p class="topic-lede" data-blurb>` (v4_glossary.py's own build-
-    time `<abbr class="gloss">` wrap) for a live reader before they ever saw it. A
+    time gloss wrap) for a live reader before they ever saw it. A
     Playwright render pass (`tests/pr_render_gate.py`) is what actually caught this —
     this regression test pins the fix at the source level so it can't quietly revert:
     the unconditional overwrite must not reappear, and a same-content guard must.
@@ -236,3 +235,50 @@ def test_evidence_js_never_blindly_overwrites_the_glossed_topic_lede():
     assert "be.textContent.trim() !== String(t.blurb" in src, (
         "the same-content guard that preserves the server's glossed topic-lede on first " "paint is missing from evidence.js"
     )
+
+
+# ── #4182: one registry, build-time <dfn>, word-ci terms, and the runtime half ──────────
+
+
+def test_word_ci_terms_gloss_prose_but_never_links_headings_or_noscript():
+    """The keep-with-gloss words match case-insensitively, word-bounded, and only where a
+    reader meets them as prose: never inside a link, a button, an h1/h2, code, a label or
+    the no-JS copy. The first ELIGIBLE appearance wins, in its own casing, and a page built
+    under #4035's <abbr> generation converges on the same output (idempotent both ways)."""
+    html = (
+        "<h1>The cockpit</h1><noscript><p>cockpit</p></noscript>"
+        '<p><a href="/cockpit/">the cockpit</a> and <code>cockpit</code></p>'
+        "<p>Cockpit reads come first; the cockpit again; cockpits never match.</p>"
+        "<p>His HRV and his hrv.</p>"
+    )
+    out = v4_glossary.apply_glossary(html)
+    g = v4_glossary.load_glossary()
+    d = html_escape_mod.escape(g["cockpit"], quote=True)
+    assert f'<p><dfn class="gloss" tabindex="0" title="{d}" data-gloss="{d}">Cockpit</dfn> reads' in out
+    assert out.count("<dfn") == 2  # cockpit once (prose) + HRV once (exact case only)
+    assert "<h1>The cockpit</h1>" in out and '<a href="/cockpit/">the cockpit</a>' in out and "<code>cockpit</code>" in out
+    assert "<noscript><p>cockpit</p></noscript>" in out
+    assert "his hrv." in out  # HRV is exact-case: the lowercase form is not the acronym
+    legacy = html.replace("His HRV", '<p>His <abbr class="gloss" title="old">HRV</abbr>'.replace("<p>", ""))
+    assert v4_glossary.apply_glossary(legacy) == out
+    assert v4_glossary.apply_glossary(out) == out
+    assert v4_glossary.eligible_terms(html) == {"cockpit", "HRV"}
+
+
+def test_runtime_half_is_the_registry_and_never_touches_served_coach_text():
+    """The runtime pass (gloss_runtime.js) glosses JS-rendered text from
+    `glossary_terms.js`, which must be the registry's GENERATED copy — a hand edit, or a
+    registry edit without `--emit-js`, reds here. It skips `[data-verbatim]`, and the
+    served coach prose containers carry that fence ("the page may gloss a coach; it may
+    not rewrite one" — and a tooltip spliced into a quote is an edit a reader sees)."""
+    js = (SITE / "assets" / "js" / "glossary_terms.js").read_text(encoding="utf-8")
+    assert js == v4_glossary.render_terms_js(), "glossary_terms.js is stale — run: python3 scripts/v4_glossary.py --emit-js"
+    assert not (SITE / "config" / "glossary.json").exists(), "the retired second registry is back — site/data/glossary.json is the one"
+    runtime = (SITE / "assets" / "js" / "gloss_runtime.js").read_text(encoding="utf-8")
+    assert 'from "/assets/js/glossary_terms.js"' in runtime and "glossFirst(" in runtime
+    assert "[data-verbatim]" in (SITE / "assets" / "js" / "orient.js").read_text(encoding="utf-8")
+    assert "gloss_runtime.js" in v4_apply_chrome.v4_chrome.site_footer(), "the runtime pass is not loaded from the canonical footer"
+    for name in ("coaching.js", "three_questions.js"):
+        assert "data-verbatim" in (SITE / "assets" / "js" / name).read_text(
+            encoding="utf-8"
+        ), f"{name} renders served coach text without the data-verbatim fence"
