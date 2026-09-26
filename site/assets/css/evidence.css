@@ -495,10 +495,66 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .ev-side.is-list .ev-side-h { display: block; margin-top: var(--sp-3); color: var(--ink-faint); }
   .ev-side.is-list .ev-side-h:first-child { margin-top: 0; }
 }
+/* ── #4182: the rail at ≤600 (Tyrell's ruling) ─────────────────────────────────
+   The swipe strip clipped tiles mid-word ("Blood", "153 bior") and the group tabs
+   clipped too ("THE CHAR…"). On a phone the rail now collapses to the ACTIVE tile as one
+   full-width chip beside the "All N topics" toggle; the toggle opens a 2-column grid of
+   every topic (group headings span both columns, titles wrap, blurbs clamp at two lines).
+   Nothing scrolls sideways, so the "k / n" readout and the tabs row go (the grid carries
+   the group headings). Desktop and the 601–820 tablet strip are unchanged. */
+@media (max-width: 600px) {
+  .ev-tabs { display: none; }
+  .ev-app .ev-layout { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "side bar" "main main"; align-items: center; }
+  .ev-layout > .ev-railbar { grid-area: bar; }
+  .ev-layout > .ev-side { grid-area: side; }
+  .ev-layout > .ev-main { grid-area: main; }
+  .ev-app .ev-layout:has(> .ev-side.is-list) { grid-template-areas: "bar bar" "side side" "main main"; }
+  .ev-railbar-pos { display: none; }
+  .ev-side { grid-auto-flow: row; grid-auto-columns: unset; overflow-x: visible; scroll-snap-type: none; padding-bottom: 0; }
+  .ev-side:not(.is-list) .ev-tile:not(.is-active) { display: none; }
+  .ev-side:not(.is-list) .ev-tile { min-height: 44px; align-content: center; padding-block: var(--sp-2); }
+  .ev-side:not(.is-list) .ev-tile-b { display: none; }
+  .ev-side.is-list { grid-template-columns: 1fr 1fr; }
+  .ev-side.is-list .ev-side-h { grid-column: 1 / -1; }
+  .ev-side.is-list .ev-tile { min-width: 0; padding: var(--sp-3); align-content: start; }
+  .ev-side.is-list .ev-tile-t { overflow-wrap: anywhere; }
+  .ev-side.is-list .ev-tile-b { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; align-self: start; max-height: calc(2 * 1.35em); }
+}
 .ev-tile.is-active { border-left-color: var(--ember); background: color-mix(in oklch, var(--ember) 7%, var(--surface)); }
 .ev-tile-t { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.1; }
 .ev-tile-b { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); line-height: 1.35; }
 .ev-tile.is-active .ev-tile-t { color: var(--ink); }
+
+/* ── #4182: the fold — one served fact, dated, above the rail ─────────────────
+   Reserved while it loads (is-loading) so the rail below doesn't jump when it fills. */
+.ev-fold { margin: 0 var(--gutter); max-width: var(--measure); border-left: 2px solid var(--ember); padding-left: var(--sp-4); }
+.ev-fold.is-loading { min-height: 7.5rem; }
+.ev-fold-k { color: var(--ink-faint); }
+.ev-fold-t { margin-top: var(--sp-2); font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.45; color: var(--ink); }
+.ev-fold-through, .ev-fold-next { margin-top: var(--sp-2); color: var(--ink-muted); }
+.ev-fold-next { color: var(--ink-faint); }
+
+/* #4182: the sleep forecast's habit labels never clip ("Sleep consistency" in full) —
+   label and score share the first row, the bar takes the full second row. */
+.fc-anchors .suf-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l v" "t t"; }
+.fc-anchors .suf-l { grid-area: l; white-space: normal; overflow: visible; text-overflow: clip; }
+.fc-anchors .suf-track { grid-area: t; }
+.fc-anchors .suf-v { grid-area: v; }
+
+/* #4182: the sleep signal board's correlation line wraps under its bar — nowrap pushed
+   /data/sleep/ 28px past a 1280 viewport (B1 audit: scrollWidth 1308). The same wrap
+   for every readout bar label ("Omega3 Total" clipped on nutrition). */
+.cb-card .corr-row { grid-template-columns: minmax(0, 1fr) 90px; }
+.cb-card .corr-r { grid-column: 1 / -1; white-space: normal; }
+.readout .suf-l { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+
+/* #4182: the labs tables — the reference range wraps inside its own cell (some ranges
+   are sentences), so the result column never gets pushed off-screen. */
+.rd-tbl--labs { table-layout: fixed; }
+.rd-tbl--labs th:nth-child(1) { width: 36%; } .rd-tbl--labs th:nth-child(2) { width: 28%; }
+.rd-tbl--labs :is(th, td) { padding-inline: var(--sp-2); overflow-wrap: anywhere; }
+.rd-tbl--labs .rd-range { white-space: normal; }
+.lab-full-body .hb-group { margin-top: var(--sp-4); }
 
 /* Center pane (reuses .topic-h1 / .topic-lede / .readout / .deeper) */
 .ev-main { min-width: 0; scroll-margin-top: var(--sp-4); }

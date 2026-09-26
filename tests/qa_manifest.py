@@ -210,6 +210,14 @@ _CURATED = [
         # hub; the constellation moved below the fold but keeps its section (and these
         # constellation checks stay true of the page).
         "name": "Home (loop dial)",
+        # #4182 M4: the newcomer-comprehension judge's ground truth for this door —
+        # from docs/SITE_MAP_AND_INTENT.md's "front door" role + SITE_TRANSFORMATION_V6.md
+        # §5's reader-model amendment. ≤30 words, asserted by tests/test_qa_manifest.py.
+        "intent": (
+            "The front door: introduces Matthew's public weight-loss experiment and its AI "
+            "coaches, then routes a newcomer into one of three doors — the numbers, the "
+            "coaches, or the story."
+        ),
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
@@ -242,6 +250,12 @@ _CURATED = [
     {
         "path": "/cockpit/",
         "name": "Cockpit",
+        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "today's
+        # slice of the whole loop" + SITE_TRANSFORMATION_V6.md §4 "the three questions").
+        "intent": (
+            "Today's slice of the loop: answers how the week is going, how last night went, "
+            "and what today holds, then a click into the engine's detailed score."
+        ),
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
@@ -272,6 +286,13 @@ _CURATED = [
     {
         "path": "/story/",
         "name": "Story hub",
+        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the human
+        # journey narrating the whole loop, week by week").
+        "intent": (
+            "The narration: a weekly AI-written chronicle of the whole experiment, plus "
+            "Matthew's own journal. A reader clicks into the latest write-up to read what "
+            "happened this week."
+        ),
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "narrative",
@@ -496,6 +517,12 @@ _CURATED = [
     {
         "path": "/data/",
         "name": "Data hub",
+        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the
+        # engine — every source, now & over time").
+        "intent": (
+            "The engine: every measured source — weight, sleep, training, eating, blood — now "
+            "and over time. A reader clicks into a topic readout for the full trend."
+        ),
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
@@ -509,6 +536,12 @@ _CURATED = [
     {
         "path": "/protocols/",
         "name": "Protocols hub",
+        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the
+        # levers — what gets changed to move the data, and whether it moved").
+        "intent": (
+            "The levers: what Matthew takes and tries, each tied to a hypothesis and its "
+            "measured effect. A reader clicks into one protocol or experiment's evidence."
+        ),
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
@@ -642,6 +675,12 @@ _CURATED = [
         "path": "/coaching/",
         "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
         "name": "Coaching hub (My Team)",
+        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "AI reads
+        # the data and argues about it").
+        "intent": (
+            "The AI brain: seven coaches read Matthew's data and argue about it. A reader "
+            "clicks the freshest coach read, or one coach's tabbed profile and track record."
+        ),
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",

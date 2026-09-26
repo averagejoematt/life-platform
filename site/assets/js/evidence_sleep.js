@@ -6,6 +6,32 @@ import { lineChart, stackedBar, correlationChip, dualLineChart, sparkline, targe
 import { explainMount } from "/assets/js/explain.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, todayPT, fig, figs, sec, empty, note, socialContextSection } from "/assets/js/evidence_shared.js";
 import { genesisCount } from "/assets/js/coach_popover.js"; // #2941 — THE PT day-index, so #2957's window copy states a checked cause
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter
+
+// #4182 — the sleep fold: the night named, BOTH instruments' hours side by side (Whoop and
+// the Eight Sleep mattress measure the same night differently — #2921/#3451 show both,
+// never pick one silently), recovery against the served average WITH its window, HRV
+// glossed where it appears, and the usual bedtime.
+export function sleepFold(d) {
+  const s = (d && d.sleep_detail) || {};
+  const night = String(s.night_of || (s.figure_scope || {}).night_of || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(night)) return null;
+  const h = (v) => (Math.round(Number(v) * 10) / 10).toFixed(1);
+  const wh = (s.whoop || {}).total_sleep_hours ?? s.whoop_hours;
+  const es = (s.eightsleep || {}).total_sleep_hours ?? ((s.figure_scope || {}).total_sleep_hours_source === "eightsleep" ? s.total_sleep_hours : null);
+  const bits = [];
+  if (wh != null && es != null) bits.push(`Night of ${calendarDay(night)}: ${h(wh)} h by Whoop, ${h(es)} h by the Eight Sleep mattress — two instruments, both shown.`);
+  else if (wh != null || es != null) bits.push(`Night of ${calendarDay(night)}: ${h(wh ?? es)} h by ${wh != null ? "Whoop" : "the Eight Sleep mattress"}.`);
+  else bits.push(`Night of ${calendarDay(night)}.`);
+  if (s.recovery_score != null) {
+    const avg = s.avg_recovery_window != null && s.avg_window_days != null ? ` against his ${s.avg_window_days}-day average of ${fmt(s.avg_recovery_window)}%` : "";
+    const other = s.recovery_night_of ? ` (from the night of ${calendarDay(String(s.recovery_night_of).slice(0, 10))}, the latest Whoop reading)` : "";
+    bits.push(`Recovery ${fmt(s.recovery_score)}%${avg}${other}.`);
+  }
+  if (s.hrv != null) bits.push(`HRV (heart-rate variability) ${fmt(s.hrv)} ms — higher usually means better recovered.`);
+  if (s.avg_bedtime) bits.push(`Usual bedtime ${s.avg_bedtime}.`);
+  return { text: bits.join(" "), through: night };
+}
 
 // §0 Forecast hero (P0.1) — the circadian-compliance forecast, PROMOTED to lead. A 0→100
 // "tonight's odds" gauge + the four anchors (each with the lever to pull now) + two-voice.
@@ -23,7 +49,7 @@ export function circadianForecast(circ) {
     if (c.measured === false) {
       return `<div class="suf-row fc-unmeasured"><span class="suf-l">${esc(ttl(name))}</span>` +
         `<span class="suf-track"></span>` +
-        `<span class="suf-v mono">unknown — no signal</span></div>`;
+        `<span class="suf-v mono">not measured</span></div>`;
     }
     const pct = c.max ? Math.max(0, Math.min(1, c.score / c.max)) : 0;
     const tone = pct >= 0.7 ? "suf-ember" : "suf-ink"; // ember on-track, muted at-risk — never red
@@ -35,13 +61,13 @@ export function circadianForecast(circ) {
   const score = circ.score;
   const atRisk = score != null && score < 60;
   const machine = [score != null ? `tonight ${fmt(score)}/100` : null, circ.category && circ.category !== "unmeasured" && ttl(circ.category),
-    comps.length ? `${measuredN} of ${comps.length} anchors measured` : null,
+    comps.length ? `${measuredN} of ${comps.length} habits measured` : null,
     score != null && circ.weakest_component && `lever: ${ttl(circ.weakest_component)}`].filter(Boolean).join(" · ");
   const serif = measuredN === 0
     ? "No circadian anchor carried a real signal today — no forecast is scored from defaults. It returns when a meal log, a journal entry, or enough sleep history lands."
     : (circ.prescription && !isBad(circ.prescription)) ? circ.prescription
       : (atRisk ? "Tonight's set-up is soft — the lever above is the one to pull before bed." : "Today's behaviours have tonight pointed the right way. The night below is the evidence, not the verdict.");
-  const gauge = (score != null) ? targetSpine(score, 100, { valueLabel: "tonight", targetLabel: "100", unit: "", label: `Circadian compliance — what today's behaviours set up for tonight (${measuredN} of ${comps.length || 4} anchors measured)` }) : "";
+  const gauge = (score != null) ? targetSpine(score, 100, { valueLabel: "tonight", targetLabel: "100", unit: "", label: `Tonight's set-up — what today's habits point to (${measuredN} of ${comps.length || 4} measured)` }) : "";
   return sec("Tonight's odds — the forecast",
     gauge + (anchors ? `<div class="suf-rows fc-anchors">${anchors}</div>` : "") +
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
@@ -77,13 +103,14 @@ export async function renderSleep(d) {
   const s = d.sleep_detail || {};
   const [circ, nut, corr] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/nutrition_overview"), tryJSON("/api/sleep_correlations")]);
   const parts = [];
-  // §0 — the forecast LEADS (prospective, not retrospective).
+  // #4182: the forecast moves to screen two — the fold now leads with the night itself
+  // (reverses #0's "the forecast LEADS"): a newcomer asks "how did he sleep?" first.
   const fcHero = circadianForecast(circ);
-  if (fcHero) parts.push(fcHero);
+  let fcPlaced = false;
   // §1 — last night, demoted to EVIDENCE beneath the forecast. The "night of" date
   // is sourced from the LIVE sleep_detail wake date (#487 retired sleep_unified —
   // its date ran 1–2 nights stale, which mislabelled these fresher figures).
-  const lastNightHdr = "Last night — the evidence" + (lastNightDate(s) ? ` · the night of ${lastNightDate(s)}` : "");
+  const lastNightHdr = "Last night" + (s.night_of ? ` — ${calendarDay(String(s.night_of).slice(0, 10))}` : lastNightDate(s) ? ` — ${lastNightDate(s)}` : "");
   // #495/M-9: when the API substituted an older night's Whoop recovery (its own
   // night rides in recovery_night_of), caption the splice everywhere those
   // figures render — never night-A hours + night-B recovery under one header.
@@ -98,7 +125,8 @@ export async function renderSleep(d) {
   // from the API's own disclosure rather than switching which device leads.
   const _hoursSrc = s.figure_scope && s.figure_scope.total_sleep_hours_source === "eightsleep" ? "Eight Sleep" : null;
   if (Object.values(s).some(has)) {
-    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), _hoursSrc ? `hours · ${_hoursSrc}` : "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
+    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), _hoursSrc ? `hours · ${_hoursSrc}` : "hours"), _hoursSrc && s.whoop_hours != null && fig(fmt(s.whoop_hours, 1), "hours · Whoop"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's the evidence tonight's forecast below gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
+    if (fcHero) { parts.push(fcHero); fcPlaced = true; }
     // #2921: ONE device's own stage hours, not Eight Sleep's total against Whoop's
     // stages (the bug — a total that could read smaller than the stages beside it).
     // `s.whoop` is additive (may be absent pre-deploy of the API change), so this
@@ -175,6 +203,7 @@ export async function renderSleep(d) {
     }
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", spine: true, emptyMsg: "The sleep-score trend fills in nightly." })));
   }
+  if (fcHero && !fcPlaced) parts.unshift(fcHero); // no night on record: the forecast is all there is
   // #1917: label the average with the window it ACTUALLY covers. This read
   // `30d_avg_recovery` under a hardcoded "30d avg recovery" label; on Day 6 of a
   // cycle that window is genesis-clamped to 6 days, so the label was a claim the

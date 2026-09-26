@@ -955,12 +955,19 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 4066c80eb: lane {proven 213, unproven 540, not-applicable 6, attempted-unproven 5} vs main {212, 540, 6, 5}. The bound
         # was already 213 from the concurrent #4182 merge above, so this entrant needed no numeric raise — recorded here rather
         # than silently absorbed.
-        # Upper bound 213 -> 214 (2026-09-26, #4182 lane L-API, merged on top of #4196's 213):
+        # Upper bound 213 -> 214 (2026-09-26, #4182 M4, the comprehension judge): `ci::visual-qa.yml::visual-qa::10`, the new
+        # `continue-on-error` CI step this lane's workflow edit mints, arrives PROVEN — CI_PROOFS in
+        # scripts/gate_census_proofs.py, wired into gate_census.PROVEN_CAN_FAIL. Mutation planted directly in the real tracked
+        # tests/comprehension_qa.py: main()'s body replaced with a bare `return 0`, deleting the
+        # `if not os.path.exists(_ARTIFACT_PATH): return 1` check. `python3 -m pytest tests/test_comprehension_qa.py -k
+        # main_returns -v`: BASELINE 3 passed; MUTATED 2 failed / 1 passed (the two artifact-missing/crash cases both asserted
+        # `main() == 1` and got 0); REVERTED 3 passed, byte-identical. Unproven stays 540; one entrant.
+        # Upper bound 214 -> 215 (2026-09-26, #4182 lane L-API, merged on top of #4210's 214):
         # registry::deploy/capture_api_schemas.py::WRITE_PATH_EXEMPT::/api/page_feedback arrives PROVEN via a REGISTRY_PROOFS
         # record (the entry deleted from the real file -> test_every_post_only_simple_route_is_registered_in_the_capture_script
-        # FAILED naming it; restored -> 44 passed). Unproven stays 540; one entrant. MEASURED by id-set diff against a
-        # `git archive origin/main` export at 64e2ea59c: lane {proven 214, unproven 540, 6, 5} vs main {213, 540, 6, 5}.
-        <= 214
+        # FAILED naming it; restored -> 44 passed). Unproven stays 540; one entrant. MEASURED by id-set diff on the MERGE tree against a
+        # `git archive origin/main` export at cf332052f: lane {proven 215, unproven 540, 6, 5} vs main {214, 540, 6, 5}.
+        <= 215
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
