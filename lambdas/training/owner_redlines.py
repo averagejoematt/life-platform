@@ -291,6 +291,12 @@ REDLINES: dict[str, dict[str, Any]] = {
         "missed_days_threshold": 3,
         "window_days": 7,
         "min_measured_days": 4,
+        # Owner ruling 2026-09-25 (#4162): at >= 40 % body fat the gate REPORTS and never moves the served
+        # target — Forbes/Hall 2007 (the lean share of a loss falls as starting fat rises), Sardeli 2018
+        # (resistance training kept 93.5 % of diet-induced lean loss), Wycherley 2012 (high protein +0.43 kg
+        # FFM). The body-fat-scaled tiers and the week-8 DXA override are their own story (#4166).
+        "mode": "report_only",
+        "mode_ruling": "owner 2026-09-25: report_only at >= 40 % body fat; 'enforce' serves the gated target",
         # THE one field the owner's pending choice (1.6 vs a middle value) moves: set `fixed_lb_wk` to a number and the gate serves it
         "gated_target": {
             "source": "rate_band_pct_bw_per_wk.low",

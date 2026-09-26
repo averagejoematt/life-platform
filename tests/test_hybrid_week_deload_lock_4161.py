@@ -383,6 +383,12 @@ WEIGHT = 316.0
     ids=["four-misses", "two-misses", "three-measured", "unlogged-not-missed"],
 )
 def test_the_protein_gate(grams, state, target):
+    """The gate's arithmetic under mode=enforce (the < 30 % body-fat tier, #4166)."""
+    with patch.dict(owner_redlines.REDLINES["rate_protein_gate"], {"mode": "enforce"}):
+        _assert_the_protein_gate(grams, state, target)
+
+
+def _assert_the_protein_gate(grams, state, target):
     missed, measured = owner_redlines.protein_days_missed(grams)
     rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured)
     assert rt["protein_gate"]["state"] == state and rt["target_lb_wk"] == target and rt["step_target_lb_wk"] == 3.5
@@ -396,8 +402,32 @@ def test_the_protein_gate(grams, state, target):
     assert (n["rate_target_lb_wk"], n["rate_step_target_lb_wk"], n["rate_protein_gate"]) == (target, 3.5, state)
 
 
+def test_report_only_reads_the_gate_and_never_moves_the_target_4162():
+    """Owner ruling 2026-09-25 (#4162): at >= 40 % body fat the gate is REPORT-ONLY. Four misses still
+    read `gated` / would_apply, and the served target stays the step (3.5 at 316 lb) at every site."""
+    from health import nutrition_critics as nc
+
+    g = owner_redlines.REDLINES["rate_protein_gate"]
+    assert g["mode"] == "report_only" and "2026-09-25" in g["mode_ruling"]
+    grams = [150, 150, 150, 150, 190, 190, 190]
+    missed, measured = owner_redlines.protein_days_missed(grams)
+    rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured)
+    gate = rt["protein_gate"]
+    assert (gate["state"], gate["would_apply"], gate["applied"], gate["mode"]) == ("gated", True, False, "report_only")
+    assert rt["target_lb_wk"] == rt["step_target_lb_wk"] == 3.5
+    block = plan_engine.constraint_block(
+        date="2026-09-20", weight_lb=WEIGHT, protein_days_missed_7d=missed, protein_days_measured_7d=measured
+    )
+    assert block["rate_target"]["target_lb_wk"] == 3.5
+    n = nc.build_deficit_advocate_packet({"weight_lb": WEIGHT, "protein_g_by_day": grams})["numbers"]
+    assert (n["rate_target_lb_wk"], n["rate_protein_gate"]) == (3.5, "gated")
+    # mutation control: the same misses under enforce DO move the target
+    with patch.dict(g, {"mode": "enforce"}):
+        assert owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured)["target_lb_wk"] < 3.5
+
+
 def test_mutation_control_a_higher_miss_threshold_stops_gating_four_misses():
-    with patch.dict(owner_redlines.REDLINES["rate_protein_gate"], {"missed_days_threshold": 5}):
+    with patch.dict(owner_redlines.REDLINES["rate_protein_gate"], {"missed_days_threshold": 5, "mode": "enforce"}):
         assert owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)["target_lb_wk"] == 3.5
 
 
@@ -484,9 +514,11 @@ def test_a_fingerprint_re_record_without_the_owner_note_reds():
 def test_the_gated_target_is_one_data_field():
     g = owner_redlines.REDLINES["rate_protein_gate"]["gated_target"]
     assert g["source"] == "rate_band_pct_bw_per_wk.low" and g["fixed_lb_wk"] is None
-    assert owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)["target_lb_wk"] == 1.6
-    with patch.dict(g, {"fixed_lb_wk": 2.5}):
-        rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)
+    gate = owner_redlines.REDLINES["rate_protein_gate"]
+    with patch.dict(gate, {"mode": "enforce"}):  # the < 30 % body-fat tier (#4166); report_only serves the step
+        assert owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)["target_lb_wk"] == 1.6
+        with patch.dict(g, {"fixed_lb_wk": 2.5}):
+            rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=4, protein_measured_7d=7)
     assert rt["target_lb_wk"] == 2.5 and rt["protein_gate"]["gated_target_source"] == "rate_protein_gate.gated_target.fixed_lb_wk"
 
 

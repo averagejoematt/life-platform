@@ -62,11 +62,21 @@ def protein_gate(missed: int | None, measured: int | None, window: dict[str, str
         return {
             **out,
             "state": "unknown",
+            "would_apply": False,
+            "mode": g.get("mode", "enforce"),
             "applied": False,
             "reason": f"{measured or 0} measured day(s) < {g['min_measured_days']} — target unchanged",
         }
-    applied = missed >= g["missed_days_threshold"]
-    return {**out, "state": "gated" if applied else "clear", "applied": applied}
+    would_apply = missed >= g["missed_days_threshold"]
+    mode = g.get("mode", "enforce")
+    # report_only (owner 2026-09-25, #4162): the state is still read and reported; the served target never moves
+    return {
+        **out,
+        "state": "gated" if would_apply else "clear",
+        "would_apply": would_apply,
+        "mode": mode,
+        "applied": would_apply and mode == "enforce",
+    }
 
 
 def rate_target_lb_per_wk(
