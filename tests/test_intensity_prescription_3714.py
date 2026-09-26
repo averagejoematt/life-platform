@@ -135,6 +135,71 @@ def test_malformed_branch_dict_falls_through_instead_of_raising():
     assert resolve_ceiling("bench", "RPE 8 cap.", "", {"exercises": {"bench": {"green": {"rpe_cap": "n/a"}}}})["rpe"] == 8.0
 
 
+# ── #4160 — a routine note that NAMES a movement scopes to it, not the session ──────
+#
+# LIVE SPECIMEN (verbatim, 09-24, routine `b1b9960468f374e30dcdeca8630dd18f`, Hevy
+# workout `3ca1117e…`): "Upper/Lower blk 1 - Lower-heavy. Squat novel-again: exposure 1
+# of 3, RPE 7 max." Before #4160 this was read as a SESSION-WIDE RPE-7 ceiling, so RDL
+# (`tmpl:2B4B7310`), leg press, leg curl and calf press were graded against 7 instead of
+# their own/#4073 program-default ceilings — 15 sets read "over ceiling", 11.8% adherence.
+_LIVE_0924_NOTE = "Upper/Lower blk 1 - Lower-heavy. Squat novel-again: exposure 1 of 3, RPE 7 max."
+
+
+def test_a_named_movement_clause_caps_only_the_named_movement():
+    """The squat IS the movement the clause names — it keeps the RPE 7 cap."""
+    out = resolve_ceiling("squat_barbell", "", _LIVE_0924_NOTE, None, movement_title="Squat (Barbell)")
+    assert out == {"rpe": 7.0, "basis": "routine_notes:rpe"}
+
+
+@pytest.mark.parametrize(
+    "movement_key,title",
+    [
+        ("romanian_deadlift_barbell", "Romanian Deadlift (Barbell)"),
+        ("leg_press", "Leg Press (Machine)"),
+        ("leg_curl", "Lying Leg Curl (Machine)"),
+        ("calf_press_machine", "Calf Press (Machine)"),
+    ],
+)
+def test_a_named_movement_clause_does_not_cap_a_different_movement(movement_key, title):
+    """MUTATION CONTROL: this is the regression #4160 exists to fix. If the scoping is
+    ever dropped and the clause is read session-wide again, EVERY one of these
+    movements reads `{"rpe": 7.0, "basis": "routine_notes:rpe"}` instead of the correct
+    `{"rpe": None, "basis": None}` — this test goes red the moment that happens."""
+    assert resolve_ceiling(movement_key, "", _LIVE_0924_NOTE, None, movement_title=title) == {"rpe": None, "basis": None}
+
+
+def test_an_unscoped_clause_still_reads_session_wide():
+    """Only a clause that names NO movement stays session-wide — pre-#4160 behavior,
+    unchanged. A comma is not a name separator ("Pull," is prose)."""
+    note = "Pull, RPE 8 hard cap, nothing to failure."
+    for movement_key, title in [("lat_pulldown", "Lat Pulldown (Cable)"), ("db_curl", "Bicep Curl (Dumbbell)")]:
+        assert resolve_ceiling(movement_key, "", note, None, movement_title=title) == {"rpe": 8.0, "basis": "routine_notes:rpe"}
+
+
+def test_mutation_the_same_note_made_session_wide_again_caps_everyone():
+    """Flip the live note's scoped clause back to session-wide prose (no name) and
+    confirm the OLD behavior returns for every movement — proving the two tests above
+    are actually exercising the scoping, not some unrelated title mismatch."""
+    made_session_wide = "Upper/Lower blk 1 - Lower-heavy. Keep everything at RPE 7 max."
+    for movement_key, title in [
+        ("squat_barbell", "Squat (Barbell)"),
+        ("romanian_deadlift_barbell", "Romanian Deadlift (Barbell)"),
+        ("leg_press", "Leg Press (Machine)"),
+    ]:
+        assert resolve_ceiling(movement_key, "", made_session_wide, None, movement_title=title) == {
+            "rpe": 7.0,
+            "basis": "routine_notes:rpe",
+        }
+
+
+def test_no_movement_title_reads_the_whole_block_unscoped_pre_4160_behavior():
+    """A caller that does not pass `movement_title` (every call site before #4160) is
+    unaffected: the whole `routine_notes` block reads exactly as `read_ceiling` always
+    has, name or no name."""
+    out = resolve_ceiling("romanian_deadlift_barbell", "", _LIVE_0924_NOTE, None)
+    assert out == {"rpe": 7.0, "basis": "routine_notes:rpe"}
+
+
 # ── Grading ──────────────────────────────────────────────────────────────────
 def test_warmup_sets_are_not_working_sets():
     assert is_working_set({"type": "warmup"}) is False
