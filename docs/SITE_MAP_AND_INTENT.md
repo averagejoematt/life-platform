@@ -1,6 +1,6 @@
 # Site Map & Page Intent
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-05
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-26
 
 > **What each page is for, and why it matters to the platform** — one scannable registry so
 > future redesigns start from intent, not guesswork. Pair with [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md)
@@ -38,15 +38,13 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 
 ### Home — `/` · the front door
 - **Loop role:** teaches the loop, then routes in. **Audience:** primarily Reddit newcomers + first-time visitors.
-- **Must deliver:** the day-of-experiment counter (the "what day are we on" number), the loop
-  diagram (what this site *is*), the headline proof (lbs down, the waveform), and clear doors. Short scroll.
+- **Must deliver (amended 2026-09-26, #4182 — see `SITE_TRANSFORMATION_V6.md` §5):** in this order — the friends' read (the weight move + five plain lines, dated in words), the coaches defined once (software, not people), three doors as sentences; *then* the loop diagram ("How the pieces fit"), the headline proof and the day counter. Short scroll.
 - **Good looks like:** a newcomer understands the whole thing in one screen and wants to explore.
 - **Files:** `site/index.html`, `site/assets/js/story.js`, `story.css`. **Endpoints:** `/public_stats.json`, `/api/journey`, `/api/journey_waveform`, `/api/character`, `/api/field_notes`.
 
 ### The Cockpit — `/now/` · today's slice
 - **Loop role:** today's slice of the whole loop, read back to you. **Audience:** Matthew (daily return) + curious visitors.
-- **Must deliver:** today's snapshot (the whole-life score + 7 pillars), what changed since
-  yesterday, the board's *one* accurate priority, tonight's forecast, the onboarding card for newcomers.
+- **Must deliver (amended 2026-09-26, #4182):** the three questions first — *how's the week / last night / today* — from served fields with their dates, n and CI; the daily line; the whole-life score is a second-screen instrument under a plain-English key, never the first thing on the page.
 - **Good looks like:** the page you check every morning; orienting, honest, never harsh. The board
   credits real effort (baseline-relative), never catastrophizes.
 - **Files:** `site/now/index.html`, `assets/js/cockpit.js`, `cockpit.css`. **Endpoints:** `/api/snapshot`, `/api/changes-since`, `/api/weekly_priority`, `/api/circadian`.
@@ -64,8 +62,7 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 ### The Coaching — `/coaching/` · the AI brain
 - **Loop role:** AI reads the data and argues about it. **Audience:** everyone — it's the showcase of "AI applied to one life."
 - **Sections:** *The Team* (the collective read + per-coach tabbed profiles: Current read / Track record / Bio) and *AI lab notes* (the Third Wall: the AI's read ↔ how it felt). The named experts + their disagreements are the moat.
-- **Must deliver:** each coach's stance, track record (predictions, scored), and current feedback;
-  the disagreements surfaced (not averaged); honest empty-states before data accrues.
+- **Must deliver (amended 2026-09-26, #4182):** one read per day at the top — chosen by a stated rule, its written-time in words, its age said out loud past 48 h; the weekly call labelled weekly; then each coach's stance and scored track record, the disagreements surfaced (not averaged), honest empty-states before data accrues. Served coach text is never rewritten — glossed, and marked disputed where a figure disagrees with the engine.
 - **Good looks like:** you can watch a model apply real knowledge to real data and take sides.
 - **Files:** `coaching.js`, `v4_build_coaching.py`, coach styles in `story.css`. **Endpoints:** `/api/coaches`, `/api/coach/{id}`, `/api/coach_team`, `/api/predictions`, `/api/field_notes`, `/api/board_ask` + `/api/board_question` (**reader Q&A — ask-the-board**: the door's engagement/conversion loop, rate-limited 5/IP/hr, moderated via `generated/board_questions/` → `scripts/publish_board_answer.py`; unit-economically protected to degrade LAST per ADR-100/125).
 

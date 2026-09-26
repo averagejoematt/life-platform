@@ -1,6 +1,6 @@
 /*
   evidence.js — the archive ROUTER (#581 split). Registry dispatch, shared head/hero/tabs/
-  sidebar chrome, theme toggle and the first-run orientation card for the three archive
+  sidebar chrome, theme toggle and the one-line first-run strip (#4182) for the three archive
   pillars (/data/, /protocols/, /method/). Every actual readout lives in a per-family
   renderer module (evidence_*.js) imported below — this file only wires them up.
 
@@ -34,6 +34,7 @@ import { renderSleep, renderMind, renderVices } from "/assets/js/evidence_sleep.
 import { renderPulse } from "/assets/js/evidence_vitals.js";
 import { renderAutonomic, renderZone2 } from "/assets/js/evidence_autonomic.js";
 import { mountSectionToc } from "/assets/js/section_toc.js";
+import { mountOrientStrip, glossFirst } from "/assets/js/orient.js"; // #4182 — the one-line strip + inline glosses
 
 const PAGE_DATA = pageData();
 
@@ -299,48 +300,30 @@ function select(slug, push = true) {
 window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || slugFromPath() || (LISTED[0] && LISTED[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
 
 
-/* ── First-run orientation — mirrors the Cockpit's PG-02 card ─────────────────
-   A dismissible "what am I looking at" card for first-time visitors to the Data
-   archive. Shown once (localStorage), non-modal, sits above the instrument — never
-   blocks the dense view a repeat reader uses. Injected from JS so the generated
-   shells need no rebuild; scoped to the Data door for v1. Renders pre-fetch so it
-   appears even when /api/* is unreachable (e.g. local QA). */
+/* ── First-run orientation → one line (#4182, panel ruling 2(v)) ─────────────
+   The Data door used to open on a full-viewport "NEW HERE?" card — on a 390px phone
+   the topic's own content started ~1.4 viewports down (B1 newcomer audit, 2026-09-25).
+   It is now one dismissible line under the kicker, same localStorage key (a reader who
+   dismissed the card never sees the strip). The card's three definitions move INLINE
+   onto the hero promise, where the reader first meets the words: "Correlative" (N=1 —
+   a pattern in one life, not proof of cause), "read-only" (the real numbers, not
+   medical advice) and "flagged when thin" (what "preliminary" means). Injected from JS
+   so the generated shells need no rebuild; scoped to the Data door, as before. */
 
 const INTRO_KEY = "ajm-data-intro-v1";
 
+const DATA_GLOSSES = [
+  ["Correlative", "N=1: a pattern seen in one person's data. It shows things moving together — correlation, not proof that one causes the other."],
+  ["read-only", "The numbers are the real ones, shown as recorded. Nothing here is medical advice."],
+  ["flagged when thin", "Labels like \u201cpreliminary\u201d or a small n mean early signal from few days of data — flagged, never faked."],
+];
+
 function wireFirstRun() {
   if (DOOR !== "data") return;
-  let seen;
-  try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
-  if (seen) return;
-  const head = $(".page-hero");
-  if (!head) return;
-
-  const intro = document.createElement("aside");
-  intro.className = "ev-intro";
-  intro.setAttribute("aria-label", "What you're looking at");
-  intro.innerHTML = `
-    <button class="ev-intro__x" type="button" aria-label="Dismiss orientation">&times;</button>
-    <p class="ev-intro__k label">new here?</p>
-    <h2 class="ev-intro__h">Every source this one life is measured by.</h2>
-    <ul class="ev-intro__list">
-      <li><strong>Pick a topic</strong><span class="ev-intro__where ev-intro__where--wide"> on the left</span><span class="ev-intro__where ev-intro__where--narrow"> above</span> — grouped into <em>the body</em> and <em>mind &amp; accountability</em>. Its trend loads in the center; no page jumps.</li>
-      <li>Labels like <em>N=1</em> or <em>preliminary</em> mean a correlation from a single life, not proof — and thin data is flagged, never faked.</li>
-      <li><strong>Read-only.</strong> The numbers are the real ones; nothing here is medical advice.</li>
-    </ul>
-    <button class="ev-intro__go" type="button">Got it &mdash; show me the data</button>
-    <p class="ev-intro__note label">Shown once. It won't interrupt again.</p>`;
-
-  const onKey = (e) => { if (e.key === "Escape") dismiss(); };
-  function dismiss() {
-    try { localStorage.setItem(INTRO_KEY, "1"); } catch (e) {}
-    document.removeEventListener("keydown", onKey);
-    intro.remove();
-  }
-  intro.querySelector(".ev-intro__x").addEventListener("click", dismiss);
-  intro.querySelector(".ev-intro__go").addEventListener("click", dismiss);
-  document.addEventListener("keydown", onKey);
-  head.insertAdjacentElement("afterend", intro);
+  const hero = $(".page-hero");
+  const promise = hero && hero.querySelector(".ph-promise");
+  for (const [term, def] of DATA_GLOSSES) glossFirst(promise, term, def);
+  mountOrientStrip({ key: INTRO_KEY, what: "his numbers", anchor: hero && hero.querySelector(".ph-kicker") });
 }
 
 initTheme();

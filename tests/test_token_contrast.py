@@ -349,7 +349,8 @@ RECEDE_TEXT_RULES = {
         ["ink", "ink-muted", "ink-faint"],
         "a de-celebrated timeline row: the event line and its date label",
     ),
-    ".ev-intro__note": ([".ev-intro__note"], ["ink-muted"], "the evidence-intro footnote"),
+    # `.ev-intro__note` left this set with its rule: #4182 retired the /data/ first-run card
+    # (panel ruling 2(v)) for the one-line .orient-strip, which recedes by ink, not opacity.
     ".rdg-abandoned .rdg-face": (
         [".rdg-abandoned .rdg-face"],
         ["ink", "ink-faint"],
@@ -520,9 +521,9 @@ def test_every_opacity_declaration_is_classified():
 # stays proven rather than one specimen of it.
 SHIPPED_OPACITY = {
     # selector: (shipped alpha, did it ALSO fail dark?, anchor to replace, the restored rule)
-    # `dark_too=False` for .ev-intro__note is a real scope fact, not a weakening: --ink-muted
-    # at 0.8 held 5.13:1 on the dark page and fell to 3.35:1 on the light one. Every other
-    # row failed in all three palette blocks.
+    # `dark_too=False` was a real scope fact for .ev-intro__note (--ink-muted at 0.8 held
+    # 5.13:1 dark, 3.35:1 light); that rule was retired with the /data/ first-run card by
+    # #4182, so every remaining row failed in all three palette blocks.
     ".ch-rung.is-locked": (0.55, True, ".ch-rung.is-locked { border-style: dashed; }", ".ch-rung.is-locked { opacity: 0.55; }"),
     ".ch-fx": (0.75, True, "gap: var(--sp-1); }\n.ch-fx.is-active", "gap: var(--sp-1); opacity: 0.75; }\n.ch-fx.is-active"),
     ".ch-fx.is-inert": (0.55, True, ".ch-fx.is-inert { border-style: dashed; }", ".ch-fx.is-inert { opacity: 0.55; }"),
@@ -537,12 +538,6 @@ SHIPPED_OPACITY = {
         True,
         ".ch-tl li.ch-tl-muted { border-left-color: var(--rule); }",
         ".ch-tl li.ch-tl-muted { opacity: 0.75; }",
-    ),
-    ".ev-intro__note": (
-        0.8,
-        False,
-        ".ev-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); }",
-        ".ev-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); opacity: 0.8; }",
     ),
     ".rdg-abandoned .rdg-face": (
         0.72,
@@ -918,14 +913,9 @@ DERIVED_SHIPPED = {
         ["ember", "ink-faint", "ink-muted"],
         ALL_BLOCKS,
     ),
-    ".cockpit-intro__note": (
-        "cockpit.css",
-        0.8,
-        ".cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); }",
-        ".cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); opacity: 0.8; }",
-        ["ink-muted"],
-        LIGHT_ONLY,
-    ),
+    # `.cockpit-intro__note` left this set with its rule: #4182 retired the cockpit's
+    # first-run card (panel ruling 2(v)). The LIGHT_ONLY scope-fact it carried is recorded
+    # in the comment above; no live member needs it today.
     ".rd-comp-note": (
         "cockpit.css",
         0.85,

@@ -3668,6 +3668,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4175"
         }
       ]
+    },
+    {
+      "id": "2026-09-26-a-site-a-friend-can-read",
+      "date": "2026-09-26",
+      "title": "A site a friend can read",
+      "shipped": "The front door now answers the friend's question first: 'Is he okay this week?' — the weight move and five plain lines — sits directly under the claim instead of three screens down under a 90-word manifesto, the AI coaches are defined once (software, not people), and the loop diagram follows as 'How the pieces fit'. The cockpit opens on three questions with real numbers — how's the week, last night, today — and the whole-life score moved into a collapsed section with a plain key. The coaching door opens on today's read, chosen by a stated rule (the open ask, else the best checked record at n ≥ 10, else the freshest), with the weekly call labelled weekly and a banner when a read is more than two days old. The chronicle opens on its first sentence instead of a bracketed machine line. And a vocabulary registry with a shrink-only guard means builder words can only leave reader pages from here.",
+      "why_it_mattered": "Three weeks into the experiment the site's own subject had not opened it once, and friends who did were overwhelmed by the layout and the words. The site's bar is 'a daily instrument he returns to'; measured against that, every door scored 1–3 of 5 on a ten-second test at phone width. The pages were organised around the builder's model — the loop, the pillars, the calibration machinery — and not around the three questions a friend asks: who is he, how is it going, what do I look at today.",
+      "gotcha": "The post-deploy visual gate went red twice on the new pages and declined to roll back both times, correctly. The first red was the gate's own: the demoted score sits inside a collapsed section, and the check read hidden text as empty. The second was real — a link in running text distinguishable only by colour, a serious accessibility fault — fixed with an underline within the hour. A registry written the same night counted served coach quotes baked into the no-JS fallback as builder vocabulary and had to learn the difference.",
+      "honest_miss": "The nav labels, the home headline, whether the score's tier name leaves the reader surface for good, and the page cap are the owner's morning calls, not the night's. Two coaches still state numbers the engine contradicts on the same page — that fix is upstream, in four engine PRs waiting to be merged and deployed — and the 'today's read' rule falls back to whichever coach ran last early in a cycle, when no one has ten checked calls yet.",
+      "prs": [
+        {
+          "label": "PR #4195",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4195"
+        },
+        {
+          "label": "PR #4200",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4200"
+        },
+        {
+          "label": "PR #4199",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4199"
+        },
+        {
+          "label": "PR #4197",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4197"
+        },
+        {
+          "label": "PR #4198",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4198"
+        }
+      ]
     }
   ]
 }

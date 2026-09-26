@@ -16,16 +16,29 @@ STORY_CSS = open(os.path.join(_REPO, "site/assets/css/story.css")).read()
 
 
 def test_okay_beat_present_and_high_on_the_page():
-    """The section exists inside the arc and comes BEFORE the loop/dispatches
-    beats — family gets their answer near the top, not buried."""
-    assert 'class="beat beat-okay"' in HOME
+    """The section exists and is the FIRST thing after the hero — before the loop
+    dial and before the constellation — so family gets their answer in the fold.
+
+    #4182 (owner ruling 2026-09-25, the site-v6 front door): this reverses the
+    2026-07-19 order (#1469 variant A "the dial owns the fold" + the constellation
+    leading the arc). The owner's own report — three weeks unused, friends
+    "overwhelmed with the layout, the content, what to do" — outranks the July
+    pick; the red-team record is docs/SITE_TRANSFORMATION_V6.md."""
+    assert 'class="beat beat-okay okay-first"' in HOME
     assert "Is he okay this week?" in HOME
-    # High: within the first two beats. The constellation now deliberately LEADS
-    # (#1469 follow-up, Matthew 2026-07-19 — the seven-pillar hover figure was too
-    # loved to sit deep), with okay immediately after it and both before the
-    # dispatches/chronicle beat.
-    assert HOME.find("beat-constellation") < HOME.find("beat-okay")
-    assert HOME.find("beat-okay") < HOME.find("beat-dispatches")
+    okay = HOME.find("beat-okay")
+    assert HOME.find('class="hero hero-claim"') < okay  # under the claim, not above it
+    assert okay < HOME.find('class="loop-dial"')  # before the loop dial
+    assert okay < HOME.find("beat-constellation")  # before the constellation
+    assert okay < HOME.find("beat-dispatches")
+    # The friends' block defines the coaches once and offers the three doors as sentences.
+    section = HOME[okay : HOME.find("</section>", okay)]
+    assert "software, not people" in section
+    for door in ("/cockpit/", "/coaching/", "/story/"):
+        assert f'href="{door}"' in section
+    # The loop stage is retitled as the second screen, never the first.
+    assert '<h2 class="stage-h beat-h">How the pieces fit</h2>' in HOME
+    assert HOME.find('<h2 class="stage-h beat-h">') > okay
 
 
 def test_okay_beat_has_a_no_js_fallback_pointer():

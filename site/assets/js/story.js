@@ -12,6 +12,7 @@
 */
 
 import { initTheme } from "/assets/js/theme.js";
+import { cleanExcerpt, statsRow } from "/assets/js/chronicle_text.js"; // #4191 — the home teaser opens on the chronicle's first sentence
 import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount, preStart } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth (+ #931 pre-start)
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
@@ -274,7 +275,9 @@ function drawConstellation(pillars, coupling, activeEffects) {
 // P0.1 — genesis math now lives in coach_popover.js (one source of truth). Home/Story keep
 // their "watch it happen" suffix; the day/week numbers come from the shared util so no door
 // can drift (the bug that had Home on Week 1 while Story/Coaching were on Week 2).
-const STORY_GENESIS_SUFFIX = " — a transformation you can watch happen in real time.";
+// #4182 — the "a transformation you can watch happen in real time" suffix is struck (owner's
+// panel, 2026-09-26: it reads as a promise; the north star is proof, not promises).
+const STORY_GENESIS_SUFFIX = "";
 function renderNumbers(journey, pre) {
   // #3524 — EVERY figure in this row is bound in EVERY state, from ONE decision
   // (journeyFigures, pure + unit-tested). Before this, `current` was written only
@@ -664,7 +667,7 @@ function dxEntries(src, data) {
   // the old insertion-order scramble). `id` prefers the unique `sequence` field so
   // two same-date Prologue parts (which can share `week`, e.g. both 0) never
   // collide on master-detail selection.
-  return sortChronicleNewestFirst(posts).map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.sequence ?? p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
+  return sortChronicleNewestFirst(posts).map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.sequence ?? p.week, label: lbl, title: p.title || lbl, date: p.date, meta: statsRow(p.stats_line), excerpt: cleanExcerpt(p.excerpt, p.title), word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
 }
 
 
