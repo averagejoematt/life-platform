@@ -21,6 +21,7 @@
 */
 
 import { dfn } from "/assets/js/orient.js";
+import { dayInWords, daysOverdue, lateWords, countWord } from "/assets/js/entry_age.js"; // #4219 — the ask's lateness, in words
 
 const PT = "America/Los_Angeles";
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -160,14 +161,29 @@ export function proteinLine(nut) {
 /** "The one ask": the soonest-due open commitment a coach set (open_actions is sorted
  *  soonest-due-first by the API, #4187). The coach's own words, quoted — the page may
  *  frame a coach, never rewrite one. Empty list → "" (the line is omitted). */
-export function askLine(dash) {
-  const a = dash && Array.isArray(dash.open_actions) ? dash.open_actions[0] : null;
-  if (!a || isBad(a.text)) return "";
+export function askLine(dash, now = new Date()) {
+  const list = (dash && Array.isArray(dash.open_actions) ? dash.open_actions : []).filter((x) => x && !isBad(x.text));
+  if (!list.length) return "";
+  // #4219: open_actions is sorted soonest-due first, so a week-late ask sorts to the top.
+  // The one ask is the first CURRENT one; only when every open ask is past due does a
+  // late one lead — and then its lateness is printed, never a stale ask posing as today's.
+  const lateBy = list.map((x) => daysOverdue(x, now) || 0);
+  const cur = lateBy.findIndex((d) => d === 0);
+  const i = cur >= 0 ? cur : 0;
+  const a = list[i];
   const who = isBad(a.coach_name) ? "" : String(a.coach_name);
-  const asked = fmtDay(a.asked_on), due = fmtDay(a.due);
-  const meta = [who, asked, due ? `due ${due}` : ""].filter(Boolean).join(", ");
+  const asked = dayInWords(a.asked_on, { weekday: false }), due = dayInWords(a.due, { weekday: false });
+  const meta = [who, asked ? `asked ${asked}` : "", due ? `due ${due}` : ""].filter(Boolean).join(", ");
+  const late = lateWords(lateBy[i]);
+  const nLate = lateBy.filter((d) => d > 0).length;
+  let tail = "";
+  if (cur < 0 && list.length > 1) tail = ` All ${countWord(list.length)} open asks are past due.`;
+  else if (cur >= 0 && nLate) tail = ` ${countWord(nLate, { capital: true })} earlier ask${nLate === 1 ? " is" : "s are"} past due.`;
   // data-verbatim (#4182): the coach's own words — the runtime gloss pass never splices into them
-  return `<span class="tq-ask-k">The one ask:</span> “<span data-verbatim>${esc(String(a.text).trim())}</span>”${meta ? ` — ${esc(meta)}` : ""}.`;
+  return (
+    `<span class="tq-ask-k">The one ask:</span> “<span data-verbatim>${esc(String(a.text).trim())}</span>”` +
+    `${meta ? ` — ${esc(meta)}` : ""}${late ? ` — <strong class="tq-late">${esc(late)}</strong>` : ""}.${esc(tail)}`
+  );
 }
 
 /* ── The single freshness line ───────────────────────────────────────────── */
