@@ -41,7 +41,10 @@ import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — rea
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { rosterEntries } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
+import { instantDayInWords } from "/assets/js/entry_age.js"; // #4182 sweep fix 2 — the lab-note card's date in words
 import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
+// ISO week key → served genesis-week label ("2026-W38" → "Week 3"), filled by the list build.
+const FIELD_NOTE_LABELS = {};
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -122,7 +125,18 @@ function entriesFor(s, data) {
     return s.kind === "team" ? [{ id: "team", title: "My Team", date: "the team's collective read on you" }].concat(roster) : roster;
   }
   if (s.kind === "fieldnotes") {
-    const weeks = (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
+    // #4182 (A-grade sweep fix 2): the card names the GENESIS week ("Week 3", the served
+    // `week_label`) and the day in words — the ISO week ("2026-W38") is the storage key
+    // (the id), never printed: "Week 3 · Sunday, September 20", sub-lined "what the AI said, and how it felt".
+    const weeks = (data.entries || []).map((e) => {
+      const lbl = e.week_label || "";
+      if (lbl) FIELD_NOTE_LABELS[e.week] = lbl;
+      const day = instantDayInWords(e.ai_generated_at);
+      const head = [lbl, day].filter(Boolean).join(" · ") || "This week";
+      // The section's own words ride as the sub-line (the ≤600 chip strip hides it, so the
+      // chip stays one short line; the reader's h2 carries the same words).
+      return { id: e.week, title: head, date: "", sub: "what the AI said, and how it felt" };
+    });
     // #1574: coach reactions to things Matthew said, listed above the weekly notes.
     // #1675: the same list now also carries reactions to his PUBLIC social posts —
     // one mechanism, one surface. The id encodes date@channel~uid so the renderer can
@@ -1099,7 +1113,8 @@ async function renderFieldNote(read, id) {
         `<p class="pending-sub label">He answers the AI on his own time; an empty slot is honest, not a gap. When he writes back, it lands right here, beside the machine's read.</p></div>`;
     const hasAny = ai.length || mattText;
     // #4182 (ruling vii-8): the section's own title, in words — "the Third Wall" is cut.
-    read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)} · the AI's read ↔ Matthew's response${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
+    const wk = e.week_label || FIELD_NOTE_LABELS[id] || ""; // #4182 sweep fix 2 — the genesis week, never the ISO key
+    read.innerHTML = `<p class="dx-kicker label">${wk ? `${esc(wk)} · ` : ""}the AI's read and Matthew's response${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
       `<h2 class="dx-title">What the AI said, and how it felt</h2>` +
       (hasAny ? ai.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") + mattVoice
         : `<p class="dx-prose">No field note recorded for this week yet.</p>`);

@@ -117,3 +117,13 @@ export function nextWriteUpText(cad, pending) {
   }
   return String(c.display || "").replace(/\s*[—–-]\s*publishes once Matthew reviews and approves the draft\.?\s*$/i, ".").replace(/\.\.$/, ".");
 }
+
+// #4182 — the loop close's return trigger on every page ("…the write-up lands Wednesday,
+// September 30"). The SAME rule as the story door's nextWriteUpText — one source for the
+// date, only the sentence frame differs: a held draft or a paused cadence keeps its own
+// served words. "" when nothing is served (the static fallback copy then stands).
+export function loopReturnText(cad, pending) {
+  const t = nextWriteUpText(cad, pending);
+  const m = /^Next write-up: (.+)$/.exec(t);
+  return m ? `the write-up lands ${m[1]}` : t;
+}
