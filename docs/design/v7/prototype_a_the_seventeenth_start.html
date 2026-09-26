@@ -1,0 +1,489 @@
+<title>The Seventeenth Start</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* ── palette: newsprint, ink, one printer's blue for "live / next", green only when earned ── */
+  :root {
+    --paper: #F6F5F1;
+    --surface: #FFFFFF;
+    --well: #EEECE6;
+    --ink: #1B1A18;
+    --ink-2: #57544E;
+    --ink-3: #7A776F;
+    --rule: #D6D3CB;
+    --rule-2: #B9B5AB;
+    --live: #1E4FA3;
+    --live-wash: rgba(30, 79, 163, 0.08);
+    --earned: #2C7A4B;
+    --earned-wash: rgba(44, 122, 75, 0.10);
+    --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+    --gutter: 16px;
+    --bar-h: 58px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #151514;
+      --surface: #1D1D1B;
+      --well: #232321;
+      --ink: #ECEAE3;
+      --ink-2: #B3AFA6;
+      --ink-3: #8C8880;
+      --rule: #34332F;
+      --rule-2: #4A4843;
+      --live: #8FB4F7;
+      --live-wash: rgba(143, 180, 247, 0.12);
+      --earned: #7FC79A;
+      --earned-wash: rgba(127, 199, 154, 0.14);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #151514;
+    --surface: #1D1D1B;
+    --well: #232321;
+    --ink: #ECEAE3;
+    --ink-2: #B3AFA6;
+    --ink-3: #8C8880;
+    --rule: #34332F;
+    --rule-2: #4A4843;
+    --live: #8FB4F7;
+    --live-wash: rgba(143, 180, 247, 0.12);
+    --earned: #7FC79A;
+    --earned-wash: rgba(127, 199, 154, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 24px);
+    overflow-x: hidden;
+  }
+  a { color: var(--live); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 var(--gutter); }
+  img, svg { max-width: 100%; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  p { margin: 0 0 12px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin-bottom: 6px; }
+
+  /* masthead */
+  .mast { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 14px 0 10px; border-bottom: 1px solid var(--ink); font-family: var(--sans); font-size: 13px; }
+  .mast .name { font-weight: 600; letter-spacing: 0.01em; color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .mast .week { color: var(--ink-2); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
+  .spark { display: block; width: 100%; height: 40px; margin-top: 6px; }
+
+  /* screens */
+  .screen[hidden] { display: none; }
+  .screen > .wrap > h1.screen-title { font-family: var(--sans); font-weight: 500; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); margin: 14px 0 0; }
+
+  /* the fold */
+  .lede { display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: start; margin-top: 18px; }
+  .photo { aspect-ratio: 3 / 4; max-width: 100%; border: 1px dashed var(--rule-2); background: var(--well); display: flex; align-items: center; justify-content: center; text-align: center; padding: 10px; font-family: var(--sans); font-size: 11px; line-height: 1.35; color: var(--ink-2); }
+  .photo .cap { display: block; margin-top: 8px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+  .big { font-family: var(--serif); font-weight: 500; font-size: 58px; line-height: 0.95; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 0; }
+  .big small { font-size: 22px; font-weight: 400; letter-spacing: 0; color: var(--ink-2); margin-left: 2px; }
+  .when { font-family: var(--sans); font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+  .delta { font-family: var(--serif); font-size: 17px; line-height: 1.35; margin: 8px 0 0; }
+  .delta b { font-weight: 600; }
+  .range { font-family: var(--sans); font-size: 12.5px; color: var(--ink-2); margin: 6px 0 0; line-height: 1.4; }
+  .premise { font-size: 17px; line-height: 1.5; margin: 14px 0 0; }
+  .alive { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--ink-2); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 8px 0; margin: 16px 0 0; font-variant-numeric: tabular-nums; }
+  .alive b { color: var(--ink); font-weight: 500; }
+
+  /* sections */
+  .sec { border-top: 1px solid var(--rule); padding: 18px 0 8px; margin-top: 16px; }
+  .sec h2 { font-family: var(--sans); font-weight: 600; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink); margin: 0 0 10px; }
+  .sec h2 .as { font-weight: 400; color: var(--ink-3); text-transform: none; letter-spacing: 0; margin-left: 8px; font-family: var(--mono); font-size: 11.5px; }
+  .dated { font-family: var(--sans); font-size: 12.5px; color: var(--ink-2); margin: 0 0 4px; }
+  blockquote { margin: 0 0 12px; padding: 0 0 0 14px; border-left: 2px solid var(--ink); font-style: italic; font-size: 18px; line-height: 1.45; }
+  blockquote.coach { font-style: normal; font-size: 16.5px; border-left-color: var(--rule-2); }
+  .three p { margin-bottom: 10px; }
+  .three .k { font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); display: block; margin-bottom: 1px; }
+  .refuse { font-family: var(--sans); font-size: 14px; color: var(--ink-2); line-height: 1.45; }
+  .refuse li { margin-bottom: 7px; }
+  .refuse b { color: var(--ink); font-weight: 500; }
+  .note { font-family: var(--sans); font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: 14px; line-height: 1.4; }
+  th { text-align: left; font-weight: 500; font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); padding: 0 8px 6px 0; border-bottom: 1px solid var(--rule-2); }
+  td { vertical-align: top; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--rule); }
+  td:last-child, th:last-child { padding-right: 0; }
+  td.d { white-space: nowrap; font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; width: 1%; }
+  .rec td.k { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; }
+  .rec .earned { color: var(--earned); }
+  .rec .ok { color: var(--earned); }
+  .tag { display: inline-block; font-family: var(--sans); font-size: 11px; color: var(--ink-3); border: 1px solid var(--rule-2); border-radius: 2px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+  .tag.live { color: var(--live); border-color: var(--live); }
+  details { border-top: 1px solid var(--rule); padding-top: 8px; }
+  summary { cursor: pointer; font-family: var(--sans); font-size: 13.5px; color: var(--live); padding: 4px 0 8px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+ "; font-family: var(--mono); }
+  details[open] summary::before { content: "– "; }
+
+  /* the disagreement: two witnesses, the number between */
+  .vs { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 10px; }
+  .vs .w { border: 1px solid var(--rule); background: var(--surface); padding: 10px 12px; font-size: 15px; line-height: 1.45; }
+  .vs .w .who { font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink); margin-bottom: 4px; display: block; }
+  .vs .w .who span { font-weight: 400; color: var(--ink-3); text-transform: none; letter-spacing: 0; }
+  .vs .mid { background: var(--well); padding: 10px 12px; font-family: var(--sans); font-size: 13px; color: var(--ink-2); }
+  .vs .mid .n { font-family: var(--mono); font-size: 15px; color: var(--ink); display: block; font-variant-numeric: tabular-nums; margin-bottom: 4px; letter-spacing: 0.02em; }
+  @media (min-width: 601px) { .vs { grid-template-columns: 1fr 150px 1fr; align-items: stretch; } }
+
+  /* attempts chart */
+  .chart { display: block; width: 100%; height: auto; margin: 4px 0 8px; }
+  .chart .lab { font-family: var(--mono); font-size: 10px; fill: var(--ink-3); }
+  .chart .on { fill: var(--ink); }
+  .chart .off { fill: var(--rule); }
+  .chart .now { fill: var(--live); }
+  .chart .mark { stroke: var(--rule-2); stroke-width: 1; stroke-dasharray: 2 3; }
+  .chart .marklab { font-family: var(--mono); font-size: 10px; fill: var(--ink-2); }
+
+  /* write-up */
+  .title { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.1; letter-spacing: -0.01em; margin: 6px 0 4px; }
+  .rail { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .rail div { border-top: 2px solid var(--rule-2); padding-top: 6px; font-family: var(--sans); font-size: 13px; line-height: 1.35; }
+  .rail div.here { border-top-color: var(--ink); }
+  .rail .lab { display: block; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
+  .rail .t { font-family: var(--serif); font-size: 15px; }
+  .rail .d { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); display: block; }
+
+  .empty { font-family: var(--sans); font-size: 15px; color: var(--ink-2); margin: 24px 0; }
+
+  /* bottom bar */
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--ink); padding: 0 0 env(safe-area-inset-bottom, 0px); }
+  .bar ul { list-style: none; margin: 0 auto; padding: 0; max-width: 680px; display: grid; grid-template-columns: repeat(5, 1fr); height: var(--bar-h); }
+  .bar a { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; font-family: var(--sans); font-size: 11.5px; font-weight: 500; letter-spacing: 0.02em; color: var(--ink-2); text-decoration: none; border-bottom: 2px solid transparent; text-align: center; line-height: 1.1; padding: 0 2px; }
+  .bar a .g { font-family: var(--mono); font-size: 13px; margin-bottom: 4px; color: var(--ink-3); }
+  .bar a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
+  .bar a[aria-current="page"] .g { color: var(--ink); }
+
+  @media (max-width: 360px) { .lede { grid-template-columns: 112px 1fr; } .big { font-size: 48px; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<header class="wrap">
+  <div class="mast">
+    <a class="name" href="#home">averagejoematt</a>
+    <span class="week">week 3 · day 21</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ HOME — the case so far ═══════════════════════════ -->
+<section class="screen" id="home" aria-labelledby="home-h">
+  <div class="wrap">
+    <h1 class="screen-title" id="home-h">The case so far</h1>
+
+    <div class="lede">
+      <div class="photo" role="img" aria-label="Empty frame reserved for a dated photograph of Matthew.">
+        <div>His photo goes here — Matthew adds it.<span class="cap">dated · same clothes, same light</span></div>
+      </div>
+      <div>
+        <p class="big">313.8<small>lb</small></p>
+        <p class="when">Saturday, September 26</p>
+        <p class="delta">Down <b>13.5 lb</b> in 21 days, from 327.3.</p>
+        <p class="range">13 weigh-ins · about 4.4 lb a week (2.8 to 4.7), provisional.</p>
+      </div>
+    </div>
+    <svg class="spark" viewBox="0 0 358 40" preserveAspectRatio="none" role="img" aria-label="Thirteen weigh-ins from 327.3 on September 6 to 313.8 on September 26, drawn to the day.">
+      <polyline id="wspark" fill="none" stroke="var(--ink)" stroke-width="1.5" vector-effect="non-scaling-stroke" points=""/>
+      <circle id="wdot" cx="354" cy="20" r="2.5" fill="var(--live)"/>
+    </svg>
+
+    <p class="premise">Matthew weighed 327 lb on Sunday, September 6. His seventeenth counted start; day 21 is already farther than any of the sixteen before it got — the longest ran 13 days. The odds of reaching day 30 are withheld: no start of his ever has.</p>
+
+    <p class="alive">Data through <b>Saturday, September 26</b> · the coaches' checked calls this start, by the site's scorekeeper: <b>18 of 37</b> right · next write-up <b>Wednesday, September 30</b></p>
+
+    <!-- 1. the human -->
+    <div class="sec">
+      <h2>In his words</h2>
+      <p class="dated">Sunday, September 6, 9:02 pm — the evening before day 1, in a note to his coaches:</p>
+      <blockquote>“I am 320+lb and have not worked out consistently for a long time. So I want tomorrow to be day 1. Lets start with a push day.”</blockquote>
+      <p class="dated">Wednesday, September 23, 8:10 pm — on the new lifting plan, the most recent words of his on file:</p>
+      <blockquote>“Yes lets switch to this - i like it - but we dont need to be so prescriptive of DAY of the week, it can just be that order and we flex accordingly.”</blockquote>
+      <p class="note">His journal has been silent since Wednesday, September 9 — 17 days. Nothing from him this week; the weekly write-up quotes no words of his either.</p>
+    </div>
+
+    <div class="sec three">
+      <h2>Is he okay this week?</h2>
+      <p><span class="k">Sleep</span>Friday night he slept 8.6 hours — the wrist strap and the bed sensor agree. The strap scored the night’s recovery (its 0-to-100 readiness figure) at 77; heart-rate variability was 46.5 ms against his 21-day average of 41.</p>
+      <p><span class="k">Eating</span>He logged food every day from September 6 to Friday, September 25 — 20 days — averaging 1,577 calories and 153 g of protein. The 170 g protein floor was cleared on 7 of those 20 days.</p>
+      <p><span class="k">Training</span>Fifteen lifting sessions and fourteen walks in the last 30 days. Friday: a 72-minute walk, an hour on the treadmill (3.1 miles) and 15 minutes of stretching. Saturday is a rest day. Steps are the weak spot: 2,245 a day, averaged over 20 days.</p>
+    </div>
+
+    <!-- 2. the counted failures -->
+    <div class="sec">
+      <h2>Every start, counted</h2>
+      <svg class="chart" viewBox="0 0 358 262" role="img" aria-label="Seventeen attempts since April 1, drawn to one scale of days. Each row is one start; dark cells are days he weighed in, logged food or wrote; pale cells are silent days. A dashed line marks day 30. Only the current start, number 17 at 21 days, is unbroken.">
+        <g id="attempts"></g>
+        <line class="mark" x1="207.2" y1="0" x2="207.2" y2="242"/>
+        <text class="marklab" x="211" y="254">day 30</text>
+        <text class="marklab" x="64" y="254">day 1</text>
+      </svg>
+      <p>Seventeen starts since Wednesday, April 1. None of the sixteen before this one reached day 30; the longest ran 13 days before four silent days ended it. The code that keeps this record refuses to print odds from it. This start is at day 21, with all 21 days engaged.</p>
+      <h2 style="margin-top:14px">Also on the record</h2>
+      <ul class="refuse">
+        <li><b>Three coaches wrote this week that his food log went dark after September 19.</b> It did not: there is a log for every day through Friday, September 25. The error is theirs, and it is still on their pages.</li>
+        <li><b>Dr. Marcus Webb, the nutrition coach: 0 of 5</b> checked calls right this start, by one of the site’s scorekeepers. A second says 20 of 25, because one bet settled on August 10 — before this start — is re-counted every day. Both are left up.</li>
+        <li><b>468 asks expired</b> with no follow-up from the coach who made them, across every start. Of the 49 that were checked, he kept 37.</li>
+        <li><b>What he skips, counted:</b> journal 17 days · blood-sugar sensor 30 days · blood pressure 17 · state of mind 18 · the Garmin watch 103 days, paused by the platform, not by him.</li>
+        <li><b>The site does not publish a calorie deficit.</b> Its estimate is larger than it is willing to vouch for.</li>
+        <li><b>No date to goal.</b> Twenty days of weigh-ins is too few to forecast one, so none is served.</li>
+      </ul>
+    </div>
+
+    <!-- 3. the mechanism -->
+    <div class="sec">
+      <h2>How it works</h2>
+      <p>Thirteen devices and apps are wired in — a scale, a wrist strap, a bed sensor, a food log, a lifting log, his phone — and eleven reported this week; one is stale and one is paused. Every figure on this page is computed by code, not by an AI, and carries its date and its count. Eight AI coaches read those figures each morning and write to him; every dated claim they make is graded later by code against the data, and the misses stay on the record. An AI drafts the weekly write-up and Matthew reviews it before it publishes. Running all of it has cost $102.74 so far in September, for one subscriber.</p>
+      <p class="note">The code, in full: <a href="https://github.com/averagejoematt/life-platform">github.com/averagejoematt/life-platform</a></p>
+    </div>
+
+    <div class="sec">
+      <h2>What resolves next</h2>
+      <table>
+        <thead><tr><th>When</th><th>What</th></tr></thead>
+        <tbody>
+          <tr><td class="d">Sun Sep 27</td><td>Five calls filed on day 1 come due — daily steps and resting heart rate over the first three weeks. Graded by code.</td></tr>
+          <tr><td class="d">Wed Sep 30</td><td>Dr. Webb says the night’s recovery will read under 70 that day; Dr. Patel says it won’t. Patel’s instrument, a glucose sensor, is not worn this start, so her side stands on the record but she is not arguing it. Graded by code.</td></tr>
+          <tr><td class="d">Wed Sep 30</td><td>The next write-up — drafted that day, published once Matthew has read it.</td></tr>
+          <tr><td class="d">Wed Oct 7</td><td>Dr. Park says the seven-night average recovery will be 80 or better; Dr. Reeves says the bounce from 24 to 94 was a return to normal, not a change he made. Graded by code.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- follow -->
+    <div class="sec">
+      <h2>Follow</h2>
+      <p>The write-up lands on Wednesdays. One subscriber so far. <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ TODAY ═══════════════════════════ -->
+<section class="screen" id="today" aria-labelledby="today-h" hidden>
+  <div class="wrap">
+    <h1 class="screen-title" id="today-h">Today</h1>
+    <p class="empty">Not in this prototype. (Matthew’s morning screen: the three questions, the session with its loads, the one ask — allowed to say when it is late.)</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ THIS WEEK — the instalment ═══════════════════════════ -->
+<section class="screen" id="week" aria-labelledby="week-h" hidden>
+  <div class="wrap">
+    <h1 class="screen-title" id="week-h">This week · week 3</h1>
+    <p class="dated" style="margin-top:14px">Tuesday, September 22 · 1,114 words</p>
+    <h2 class="title">The Silence and the Signal</h2>
+    <p class="note" style="margin-bottom:12px">Drafted by the site’s AI writer; Matthew reads each draft before it publishes. The number that week: 315.0 lb.</p>
+    <p>On Monday afternoon, Matthew logged what the platform’s daily brief called the biggest training day of the experiment so far: a 130-minute Engine session followed immediately by a 104-minute walk, the walk…</p>
+    <p class="note">Opening lines, as served. <a href="https://averagejoematt.com/journal/posts/week-06/">Read the full piece (1,114 words)</a>.</p>
+
+    <div class="sec">
+      <h2>His testimony</h2>
+      <p class="note">None on file for this week — his journal has been silent since Wednesday, September 9.</p>
+    </div>
+
+    <div class="sec">
+      <h2>Previously · this week · next</h2>
+      <div class="rail">
+        <div><span class="lab">Previously</span><span class="t">The Volume Problem</span><span class="d">Tue Sep 15 · week 2</span></div>
+        <div class="here"><span class="lab">This week</span><span class="t">The Silence and the Signal</span><span class="d">Tue Sep 22 · week 3</span></div>
+        <div><span class="lab">Next</span><span class="t">Week 4</span><span class="d">Wed Sep 30 · drafted, then reviewed</span></div>
+      </div>
+      <details style="margin-top:14px">
+        <summary>Earlier instalments (4)</summary>
+        <table>
+          <tbody>
+            <tr><td class="d">Tue Sep 8</td><td>The Fifteenth Reset, or: What the Body Remembers — week 1, 1,292 words</td></tr>
+            <tr><td class="d">Sat Sep 5</td><td>The Plan, On the Record — prologue III, 1,615 words</td></tr>
+            <tr><td class="d">Sat Sep 5</td><td>The Night Before Everything — prologue II, 1,129 words</td></tr>
+            <tr><td class="d">Mon Aug 31</td><td>Before the Numbers — prologue I, 1,242 words</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
+    <p class="alive">Data through <b>Saturday, September 26</b></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ HIS NUMBERS ═══════════════════════════ -->
+<section class="screen" id="numbers" aria-labelledby="numbers-h" hidden>
+  <div class="wrap">
+    <h1 class="screen-title" id="numbers-h">His numbers</h1>
+    <p class="empty">Not in this prototype. (Weight · sleep · eating · training · blood tests — one chart and one sentence each.)</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ THE COACHES — expert witnesses with memory ═══════════════════════════ -->
+<section class="screen" id="coaches" aria-labelledby="coaches-h" hidden>
+  <div class="wrap">
+    <h1 class="screen-title" id="coaches-h">The coaches</h1>
+    <p class="note" style="margin-top:8px">Eight AI characters — software, not people — read his numbers each morning. Every dated claim they make is graded later by code. Data through Saturday, September 26.</p>
+
+    <div class="sec">
+      <h2>Today’s read <span class="as">Dr. Max Reyes · training</span></h2>
+      <p class="dated">Written Saturday, September 26, at four minutes past ten in the morning, Pacific time.</p>
+      <p><span class="tag">miss</span> For Friday, September 11, he said the night’s recovery would land near 60, give or take 18 — it came in at 24.</p>
+      <p><span class="tag" style="color:var(--earned);border-color:var(--earned)">hit</span> He said recovery would trend upward over the first two weeks — it did.</p>
+      <p><span class="tag live">due</span> In his own words today: “On 2026-09-18 I flagged the step contraction as a DUE item — I committed to revisiting the explanation explicitly this cycle.” The accounting is below.</p>
+      <p class="dated" style="margin-top:12px">As served:</p>
+      <blockquote class="coach">His recovery EWMA climbed to 81.6% over seven days with a 99% reading on the night of 2026-09-24, but I'm treating this as a favorable data point rather than a confirmed trend — autocorrelation analysis shows insufficient consecutive same-direction points. The more pressing concern is a 36% step contraction that I cannot explain from data alone; I've asked him directly whether this reflects deliberate recovery, logistical disruption, or a baseline shift, as the answer gates downstream training decisions. His protein intake moved from 152.9g to 157.3g but remains 33g below the 190g target, with dangerous fragility around dinner dependency. At his current weight loss rate and caloric intake, lean mass liquidation risk is real, and I'm coordinating with the labs coach on thyroid adaptation risk — I've asked him to track subjective signals of fatigue or cold sensitivity as an early-warning system.</blockquote>
+      <p class="note">EWMA: a running average that weights recent days more heavily. Of the 36 asks he has made of Matthew, 8 were kept and 3 broken — the only coach with a “broken” on his ledger.</p>
+    </div>
+
+    <div class="sec">
+      <h2>Where they disagree <span class="as">opened Wed Sep 23 · resolves Wed Oct 7</span></h2>
+      <div class="vs">
+        <div class="w"><span class="who">Dr. Nathan Reeves <span>· mind · says no</span></span>“Recovery rebound from 24% to 94% represents statistical regression toward baseline after a floor event, not a signal of corrective action by the subject.”</div>
+        <div class="mid"><span class="n">98 · 90 · 78 · 80 · 86 · 99 · 77</span>the last seven nightly recovery readings, September 19 to 26 (none for the 20th). The line: a seven-night average of 80 or better on Wednesday, October 7. Graded by code.</div>
+        <div class="w"><span class="who">Dr. Lisa Park <span>· sleep · says yes</span></span>“Recovery spike from 24% to 94% is genuine architectural improvement; deep sleep at 28.9% and REM at 32.9% on consecutive nights represent structural signal, not noise.”</div>
+      </div>
+      <p class="note">Each stakes her or his own record, frozen by the docket when the dispute opened: Park 0.25 over 20 graded calls, Reeves 0.25 over 4 — where 0.25 is what a coin flip scores and lower is better. A second dispute, Webb against Patel on whether recovery reads under 70 on Wednesday, September 30, stands on the record but is not argued here: Patel’s instrument, a glucose sensor, is not worn this start.</p>
+    </div>
+
+    <div class="sec">
+      <h2>The record <span class="as">by the docket, through Sat Sep 26</span></h2>
+      <p>All coaches together, by the site’s scorekeeper: <b class="num">18 of 37</b> checked calls right this start; 31 of 84 across every start since April.</p>
+      <table class="rec">
+        <thead><tr><th>Graded calls staked</th><th>Coach</th></tr></thead>
+        <tbody>
+          <tr><td class="k">20</td><td>Dr. Lisa Park · sleep — has asked for one morning word on 22 dated records since Sunday, September 7; none has come back, and there is no channel yet to receive it.</td></tr>
+          <tr><td class="k">10</td><td>Dr. Marcus Webb · nutrition — 0 of 5 this start by one scorekeeper; see “also on the record”.</td></tr>
+          <tr><td class="k">4</td><td>Dr. Nathan Reeves · mind — the one coach who has written down how his read changed (Sunday, September 20).</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Per-coach “K of N” is not printed here yet: three scorekeepers disagree on the same day (Webb reads 0 of 5, 20 of 25 and 80 percent). The docket’s frozen counts above are the one set every page agrees on; one keeper is being made canonical before any hit rate is printed beside a name.</p>
+      <details>
+        <summary>The rest of the staff (5)</summary>
+        <table class="rec">
+          <tbody>
+            <tr><td class="k">—</td><td>Dr. Max Reyes · training — today’s read, above; 3 of 3 keepers agree on his 2 of 3.</td></tr>
+            <tr><td class="k">3</td><td>Dr. Amara Patel · blood sugar<span class="tag">no sensor this start</span></td></tr>
+            <tr><td class="k">—</td><td>Dr. Henning Brandt · statistics — no docket stake open.</td></tr>
+            <tr><td class="k">—</td><td>Dr. James Okafor · blood tests — last blood test Friday, April 3; none this start.</td></tr>
+            <tr><td class="k">—</td><td>Dr. Eli Marsh · lead<span class="tag">no checked claim yet</span></td></tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
+  </div>
+</section>
+
+<nav class="bar" aria-label="Sections">
+  <ul>
+    <li><a href="#home" data-screen="home"><span class="g">01</span>Home</a></li>
+    <li><a href="#today" data-screen="today"><span class="g">02</span>Today</a></li>
+    <li><a href="#week" data-screen="week"><span class="g">03</span>This week</a></li>
+    <li><a href="#numbers" data-screen="numbers"><span class="g">04</span>His numbers</a></li>
+    <li><a href="#coaches" data-screen="coaches"><span class="g">05</span>The coaches</a></li>
+  </ul>
+</nav>
+
+<!-- Every number on the page, with the served field it came from (saved corpus, 2026-09-26). -->
+<script type="application/json" id="served">
+{
+  "api_journey.json": {"current_weight_lbs": 313.8, "last_weighin_date": "2026-09-26", "lost_lbs": 13.5, "day_n": 21, "start_weight_lbs": 327.3, "weighin_count": 13, "weekly_rate_lbs": -4.36, "weekly_rate_ci_low": -4.74, "weekly_rate_ci_high": -2.75, "rate_provisional": true, "started_date": "2026-09-06", "week_n": 3, "projected_goal_date": null, "weighin_span_days": 20},
+  "api_weight_progress.json": {"weight_progress": [[ "2026-09-06", 327.3],["2026-09-12",319.7],["2026-09-15",318.9],["2026-09-17",317.3],["2026-09-18",315.1],["2026-09-19",315.6],["2026-09-20",316.9],["2026-09-21",315.8],["2026-09-22",315.0],["2026-09-23",315.4],["2026-09-24",313.7],["2026-09-25",313.1],["2026-09-26",313.8]]},
+  "api_survival.json": {"n_prior_cycles": 16, "reached_horizon_n": 0, "longest_run_days": 13, "collapse_definition": "4+ consecutive days with no weigh-in, food log, or journal entry", "p_reach_30_pct": null, "cycles": [[1,"2026-04-01",61,29,"████████████··············█····███····█·█··███·████···█···███"],[2,"2026-06-01",7,1,"█······"],[3,"2026-06-08",6,5,"████·█"],[4,"2026-06-14",28,13,"█████████████···············"],[5,"2026-07-12",1,1,"█"],[6,"2026-07-13",5,1,"█····"],[7,"2026-07-18",1,0,"·"],[8,"2026-07-19",1,0,"·"],[9,"2026-07-20",2,1,"█·"],[10,"2026-07-22",5,2,"█···█"],[11,"2026-07-27",7,3,"██···█·"],[12,"2026-08-03",7,1,"█······"],[13,"2026-08-10",7,3,"██····█"],[14,"2026-08-17",15,2,"·······█······█"],[15,"2026-09-01",4,4,"████"],[16,"2026-09-05",1,1,"█"],[17,"2026-09-06",21,21,"█████████████████████"]]},
+  "api_calibration.json": {"platform.strata.coaches": {"n": 37, "confirmed": 18}, "platform.lifetime.strata.coaches": {"n": 84, "confirmed": 31}, "coaches": {"sleep": [7,17], "nutrition": [0,5], "mind": [4,5], "physical": [2,3], "glucose": [1,2], "labs": [1,1], "explorer": [3,4], "training(retired)": [0,0]}, "as_of": "2026-09-26"},
+  "api_content_cadence.json": {"chronicle.next_date": "2026-09-30", "chronicle.display": "Next Chronicle installment drafted Wednesday, September 30 — publishes once Matthew reviews and approves the draft."},
+  "api_vitals.json": {"as_of_date": "2026-09-26", "night_of": "2026-09-25", "sleep_hours": 8.6, "recovery_pct": 77.0, "hrv_ms": 46.5, "hrv_avg_ms": 41.0, "hrv_avg_n": 21},
+  "api_nutrition_overview.json": {"nutrition.days_logged": 20, "nutrition.avg_calories": 1577, "nutrition.avg_protein_g": 153.3, "nutrition.protein_floor_g": 170.0, "nutrition.protein_floor_hit_days": 7, "nutrition.latest_date": "2026-09-25", "nutrition_trend.first_date": "2026-09-06", "loss_rate.deficit_published": false, "loss_rate.basis": "refused: deficit_exceeds_50pct_of_tdee"},
+  "api_training_overview.json": {"training.top_activities": {"WeightTraining": 15, "Walk": 14}, "cardio_sessions[2026-09-25]": [["Walk",72],["Treadmill",60,"3.1 mi"],["Stretching",15]], "walking.avg_daily_steps": 2245, "walking.avg_daily_steps_n": 20},
+  "api_pulse.json": {"glyphs.lift.label": "Rest day", "glyphs.journal.gap_days": 17},
+  "api_character.json": {"pillars.mind.absence.last_log_date": "2026-09-09", "pillars.mind.absence.days_dark": 17, "pillars.metabolic.drivers.no_data": ["cgm_glucose_control"]},
+  "api_decisions.json": {"note_2026-09-07T04:02:58Z": "I am 320+lb and have not worked out consistently for a long time. So I want tomorrow to be day 1. Lets start with a push day.", "note_2026-09-24T03:10:59Z": "Yes lets switch to this - i like it - but we dont need to be so prescriptive of DAY of the week, it can just be that order and we flex accordingly"},
+  "api_predictions.json": {"overall.due.earliest_due": "2026-09-27", "pending_due_2026-09-27": 5, "commitments.lifetime": {"unresolved": 468, "graded": 49, "kept": 37}},
+  "api_coach_docket.json": {"open": [{"coach_a": "glucose_coach", "coach_b": "nutrition_coach", "criterion": "recovery_score < 70 on 2026-09-30", "sides": {"glucose_coach": false, "nutrition_coach": true}, "opened_date": "2026-09-23"}, {"coach_a": "mind_coach", "coach_b": "sleep_coach", "criterion": "recovery_score_7day_avg >= 80 on 2026-10-07", "sides": {"mind_coach": false, "sleep_coach": true}, "opened_date": "2026-09-23", "stakes": {"sleep_coach": {"brier": 0.2507, "brier_n": 20}, "mind_coach": {"brier": 0.25, "brier_n": 4}}}]},
+  "api_sleep_detail.json": {"sleep_trend.recovery_score[2026-09-19..26]": [98, 90, 78, 80, 86, 99, 77]},
+  "coachvoice/analysis_physical.json": {"generated_at": "2026-09-26T17:04:22Z", "public_read": "(rendered verbatim above)", "analysis[ledger sentence]": "On 2026-09-18 I flagged the step contraction as a DUE item — I committed to revisiting the explanation explicitly this cycle."},
+  "api_coach_physical_coach.json": {"report_card.track_record.recent[0]": "recovery_score=24.00 on 2026-09-11 vs predicted 59.5 ±17.9488 → refuted", "report_card.track_record.recent[1]": "recovery_score trend=up (slope=0.1439), predicted=up → confirmed", "dossier.commitment_counts": {"held": 36, "kept": 8, "broken": 3}},
+  "api_coach_sleep_coach.json": {"dossier.commitments[morning-word asks]": {"records": 22, "first": "2026-09-07", "last": "2026-09-25", "statuses": {"pending": 19, "unresolved": 3}}, "dossier.commitment_counts": {"held": 38, "kept": 1}},
+  "api_coach_mind_coach.json": {"stance_history[0].as_of": "2026-09-20", "stance_history[0].how_my_read_changed": "(non-empty; the only coach with one)"},
+  "api_source_freshness.json#datatypes": {"apple_health.datatypes.cgm.age_days": 30, "blood_pressure.age_days": 17, "state_of_mind.age_days": 18, "garmin.days_dark": 103, "garmin.status": "paused"},
+  "api_labs.json": {"labs.latest_draw_date": "2026-04-03"},
+  "api_wrong.json": {"predictions.by_coach.nutrition": {"confirmed": 20, "refuted": 5}},
+  "api_coaches.json#headline": {"nutrition_coach.headline_stat": "80% hit-rate · n=25"},
+  "api_nutrition_overview.json#vs-coaches": {"nutrition_trend has a row for every date 2026-09-06..2026-09-25": true, "coach claims of a gap after 09-19": ["api_coaching-dashboard coaches[nutrition].position_summary", "api_coach_nutrition_coach.daily", "coachvoice analysis_explorer/glucose per R3"]},
+  "api_sleep_detail.json#agreement": {"sleep_detail.total_sleep_hours(eightsleep)": 8.6, "sleep_detail.whoop_hours": 8.6},
+  "api_coaches.json": {"count": 8},
+  "api_source_freshness.json": {"summary": {"fresh": 11, "stale": 1, "paused": 1, "total": 13}},
+  "api_receipts.json": {"month_to_date_usd": 102.74},
+  "api_sub_count.json": {"count": 1},
+  "journal_posts.json": {"posts[0]": {"title": "The Silence and the Signal", "date": "2026-09-22", "word_count": 1114, "stats_line": "Weight: 315.0 lbs", "url": "/journal/posts/week-06/"}, "posts[1]": {"title": "The Volume Problem", "date": "2026-09-15"}, "posts[2..5]": ["2026-09-08 The Fifteenth Reset (1292)", "2026-09-05 The Plan, On the Record (1615)", "2026-09-05 The Night Before Everything (1129)", "2026-08-31 Before the Numbers (1242)"]}
+}
+</script>
+
+<script>
+(function () {
+  // Draw the seventeen starts to one scale of days (from api_survival.json cycles, inlined above).
+  var served = JSON.parse(document.getElementById('served').textContent);
+  var cycles = served['api_survival.json'].cycles;
+  var g = document.getElementById('attempts');
+  if (g) {
+    var x0 = 64, cell = 4.8, rowH = 14, boxH = 10;
+    var svgns = 'http://www.w3.org/2000/svg';
+    cycles.forEach(function (c, i) {
+      var y = i * rowH;
+      var lab = document.createElementNS(svgns, 'text');
+      lab.setAttribute('class', 'lab'); lab.setAttribute('x', 0); lab.setAttribute('y', y + 9);
+      var d = c[1].slice(5).split('-');
+      var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(d[0],10)-1];
+      lab.textContent = (c[0] < 10 ? ' ' : '') + c[0] + '  ' + mon + ' ' + parseInt(d[1],10);
+      g.appendChild(lab);
+      var strip = Array.from(c[4]);
+      strip.forEach(function (ch, j) {
+        var r = document.createElementNS(svgns, 'rect');
+        r.setAttribute('x', (x0 + j * cell).toFixed(1)); r.setAttribute('y', y);
+        r.setAttribute('width', (cell - 0.8).toFixed(1)); r.setAttribute('height', boxH);
+        r.setAttribute('class', ch === '█' ? (c[0] === 17 ? 'now' : 'on') : 'off');
+        g.appendChild(r);
+      });
+    });
+  }
+
+  // The weigh-in line, to the day, from api_weight_progress.json (inlined above).
+  var wp = served['api_weight_progress.json'].weight_progress;
+  var sp = document.getElementById('wspark');
+  if (sp && wp.length) {
+    var day = function (d) { return Date.UTC(+d.slice(0,4), +d.slice(5,7)-1, +d.slice(8,10)) / 864e5; };
+    var d0 = day(wp[0][0]), d1 = day(wp[wp.length-1][0]);
+    var ws = wp.map(function (r) { return r[1]; }), wmin = Math.min.apply(null, ws), wmax = Math.max.apply(null, ws);
+    var pts = wp.map(function (r) {
+      var x = 4 + (day(r[0]) - d0) / (d1 - d0) * 350;
+      var y = 4 + (wmax - r[1]) / (wmax - wmin) * 32;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    sp.setAttribute('points', pts.join(' '));
+    var last = pts[pts.length-1].split(',');
+    document.getElementById('wdot').setAttribute('cx', last[0]);
+    document.getElementById('wdot').setAttribute('cy', last[1]);
+  }
+
+  // Five screens, one visible; without JS all five render stacked.
+  var screens = Array.prototype.slice.call(document.querySelectorAll('.screen'));
+  var links = Array.prototype.slice.call(document.querySelectorAll('.bar a'));
+  function show(id) {
+    if (!document.getElementById(id) || !document.getElementById(id).classList.contains('screen')) id = 'home';
+    screens.forEach(function (s) { s.hidden = s.id !== id; });
+    links.forEach(function (a) {
+      if (a.getAttribute('data-screen') === id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', function () { show((location.hash || '#home').slice(1)); });
+  show((location.hash || '#home').slice(1));
+})();
+</script>
