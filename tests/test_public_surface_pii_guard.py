@@ -142,6 +142,57 @@ def test_card_arm_ignores_doi_suffixes_but_not_a_card_beside_one():
     assert any(arm == "pii-card" for arm, _ in guard.scan_text("doi 0265407512453827", vice=[], literals=[]))
 
 
+# ═══ #4164 — the envelope request_id false positive ═══════════════════════════
+#
+# `_meta.request_id` (lambdas/web/site_api_common.py, from `_uuid.uuid4().hex[:16]`)
+# lands as all-decimal ~0.09% of the time, which tripped `pii-card` on a scheduled
+# sweep while a same-instant local re-run came up non-digit and passed. The fix is a
+# JSON-PATH allowlist on the endpoint arm, not a `_CARD_RE` change — a card anywhere
+# ELSE in the payload, including right beside `_meta`, must still fire.
+
+_SIXTEEN_DIGITS = "4111111111111111"
+
+
+def test_card_arm_ignores_meta_request_id_but_not_a_sibling_card():
+    """The exact #4164 shape: a 16-digit `_meta.request_id` passes; the same 16
+    digits sitting in a content field right beside it reds — the mutation control
+    proving the allowlist is scoped by PATH, not by "seen a `_meta` object once"."""
+    clean = json.dumps({"_meta": {"request_id": _SIXTEEN_DIGITS, "served_at": "now"}, "cadence": {"streak": 4}})
+    assert not any(arm == "pii-card" for arm, _ in guard.scan_endpoint_payload(clean, vice=[], literals=[]))
+
+    dirty = json.dumps({"_meta": {"request_id": _SIXTEEN_DIGITS}, "cadence": {"note": _SIXTEEN_DIGITS}})
+    hits = [d for arm, d in guard.scan_endpoint_payload(dirty, vice=[], literals=[]) if arm == "pii-card"]
+    assert hits, "a 16-digit run OUTSIDE the envelope id must still fire even when the envelope id is also present"
+
+
+def test_card_arm_ignores_the_error_envelopes_top_level_request_id():
+    """`_error()`'s envelope carries `request_id` at the TOP level (not under
+    `_meta`) — the second of the two shapes the census found."""
+    clean = json.dumps({"error": "not found", "request_id": _SIXTEEN_DIGITS})
+    assert not any(arm == "pii-card" for arm, _ in guard.scan_endpoint_payload(clean, vice=[], literals=[]))
+
+
+def test_card_violation_output_carries_the_path_and_never_the_digits():
+    """Triage-from-the-log-alone contract: the violation detail names the JSON
+    path of the match and never echoes the matched digits."""
+    payload = json.dumps({"cadence": {"note": _SIXTEEN_DIGITS}})
+    hits = [d for arm, d in guard.scan_endpoint_payload(payload, vice=[], literals=[]) if arm == "pii-card"]
+    assert hits, "expected a pii-card violation on the planted content field"
+    assert any("$.cadence.note" in d for d in hits), hits
+    assert all(_SIXTEEN_DIGITS not in d for d in hits), f"violation detail leaked the matched value: {hits}"
+
+
+def test_card_arm_non_json_body_falls_back_and_still_fires_without_a_path():
+    """A body that is not JSON has no path to scope by — the arm cannot be
+    scoped and must still fire, marked non-json rather than a fabricated path."""
+    hits = [
+        d for arm, d in guard.scan_endpoint_payload("not json, card 4111111111111111 on file", vice=[], literals=[]) if arm == "pii-card"
+    ]
+    assert hits, "a non-JSON body with a bare card number must still fire"
+    assert any("non-json" in d for d in hits), hits
+    assert all(_SIXTEEN_DIGITS not in d for d in hits), f"violation detail leaked the matched value: {hits}"
+
+
 def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     """#1935: an endpoint the arm planned to scan but could not read must land as
     an endpoint-not-scanned violation — fail-closed, no silent pass tally."""

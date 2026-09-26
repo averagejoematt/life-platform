@@ -330,6 +330,49 @@ def iter_payload_keys(node, path="$"):
             yield from iter_payload_keys(v, path + "[]")
 
 
+def iter_payload_leaves(node, path="$"):
+    """Yield (json_path, text) for every scalar leaf in a parsed JSON payload —
+    `text` is the same characters a whole-document `json.dumps` would have
+    produced for that leaf (numbers included), so a leaf-level regex match is
+    identical to the pre-#4164 whole-text scan for anything NOT in
+    `_ENVELOPE_ID_PATHS`."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from iter_payload_leaves(v, f"{path}.{k}")
+    elif isinstance(node, list):
+        for v in node:
+            yield from iter_payload_leaves(v, path + "[]")
+    elif isinstance(node, bool) or node is None:
+        return
+    elif isinstance(node, str):
+        yield path, node
+    elif isinstance(node, (int, float)):
+        yield path, json.dumps(node)
+
+
+# #4164: the site-api response envelope stamps ONE opaque per-request id —
+# `_uuid.uuid4().hex[:16]` (lambdas/web/site_api_lambda.py `lambda_handler`) —
+# landing at `_meta.request_id` on every `_ok`/`_envelope` response and at the
+# top-level `request_id` on every `_error` response (lambdas/web/site_api_common.py).
+# 16 random hex characters land as all-decimal ~(10/16)**16 ≈ 0.09% of the time,
+# which is exactly the scheduled-sweep-red / clean-local-rerun split #4164 reported.
+#
+# A census of every captured shape in tests/api_schemas/*.json (2026-09-25) turned up
+# no OTHER field that is both full-width random hex/digits AND reachable at a fixed
+# path: `run_id` (lambdas/common/compute_metadata.py) is a dashed uuid4 str — its
+# longest single digit run is 12 chars (the final group), structurally short of 16;
+# `record_id` is a DynamoDB sort key (`DATE#...`); `entry_uid`/`uid` is a 12-hex-char
+# derived suffix (lambdas/coach/coach_diary_reaction.py); `coach_id`/`hypothesis_id`/
+# `challenge_id`/etc. are short slugs. `request_id` is the only entry.
+#
+# This is a JSON-PATH allowlist, not a regex change: `_CARD_RE` itself is untouched,
+# and a bare 16-digit run at any OTHER path — including inside a content field that
+# merely happens to sit next to `_meta` — still fires
+# (test_card_arm_ignores_meta_request_id_but_not_a_sibling_card, tests/test_public_
+# surface_pii_guard.py).
+_ENVELOPE_ID_PATHS = frozenset({"$.request_id", "$._meta.request_id"})
+
+
 def iter_shape_keys(node, path="$"):
     """Yield (json_path, key) for every payload key in a captured json_shape tree
     (tests/api_schemas/*.json — shape metadata words like 'type'/'keys'/'items'/
@@ -362,16 +405,38 @@ def _scan_keys(key_iter) -> list:
 
 def scan_endpoint_payload(text: str, vice=None, literals=None) -> list:
     """All arms over one /api/* payload body: the existing scan_text arms PLUS the
-    endpoint-only value tells, PLUS the key tells when the body parses as JSON."""
-    out = scan_text(text, vice=vice, literals=literals)
-    if _GENETIC_VALUE_RE.search(text):
-        out.append(("pii-genetic", "genetic identifier tell in payload text"))
-    if _BIRTH_VALUE_RE.search(text):
-        out.append(("pii-age", "birth-date/chronological-age tell in payload text"))
+    endpoint-only value tells, PLUS the key tells when the body parses as JSON.
+
+    #4164: the pii-card arm is re-run JSON-PATH scoped when the body parses — every
+    leaf scanned independently, skipping the response envelope's own opaque
+    per-request id (`_ENVELOPE_ID_PATHS`) rather than relaxing `_CARD_RE` itself, so
+    a bare 16-digit run at any OTHER path still fires. scan_text's own (whole-text,
+    unscoped) pii-card result is discarded in that case — it cannot tell `_meta.
+    request_id` apart from a planted card. Every pii-card violation this function
+    returns carries a JSON path in its detail and never the matched digits; a body
+    that fails to parse as JSON falls back to scan_text's whole-text result annotated
+    `(path=non-json)` — there is no path to scope by, so the arm cannot be scoped and
+    must still fire."""
+    base = scan_text(text, vice=vice, literals=literals)
+    out = [h for h in base if h[0] != "pii-card"]
     try:
         data = json.loads(text)
     except Exception:
         data = None
+    if data is None:
+        for arm, detail in base:
+            if arm == "pii-card":
+                out.append((arm, f"{detail} (path=non-json)"))
+    else:
+        for path, leaf_text in iter_payload_leaves(data):
+            if path in _ENVELOPE_ID_PATHS:
+                continue
+            if _CARD_RE.search(_DOI_RE.sub(" ", leaf_text)):
+                out.append(("pii-card", f"{path} (16-digit number)"))
+    if _GENETIC_VALUE_RE.search(text):
+        out.append(("pii-genetic", "genetic identifier tell in payload text"))
+    if _BIRTH_VALUE_RE.search(text):
+        out.append(("pii-age", "birth-date/chronological-age tell in payload text"))
     if data is not None:
         out.extend(_scan_keys(iter_payload_keys(data)))
     return out
