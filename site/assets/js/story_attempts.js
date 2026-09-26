@@ -40,7 +40,7 @@ function aliveDays(c) {
 function fateLine(c, collapseDef) {
   if (c.is_current) return `live — day ${n(c.window_days)}`;
   if (c.collapse_day) return `collapsed on day ${n(c.collapse_day)} — ${esc(collapseDef || "engagement went silent")}`;
-  return "re-anchored while still engaged — an administrative reset, not a collapse";
+  return "re-anchored while still engaged — a fresh start, not a collapse";
 }
 
 /* ── the overlay: every attempt on the same day-N axis ─────────────────── */
@@ -71,7 +71,7 @@ function overlaySVG(cycles) {
   }).join("");
 
   const legend =
-    `<text class="att-tick" x="${PADL}" y="${PADT - 14}">every attempt, aligned at day 1 — × collapsed · ↺ re-anchored · ▶ live</text>`;
+    `<text class="att-tick" x="${PADL}" y="${PADT - 14}">every attempt, aligned at day 1 — × ended · ↺ restarted · ▶ running</text>`;
 
   return `<svg class="att-svg" viewBox="0 0 ${W} ${H}" role="img" preserveAspectRatio="xMidYMid meet" ` +
     `aria-label="All attempts overlaid on the same day axis">${axis}${legend}${rows}</svg>`;
@@ -144,7 +144,7 @@ async function boot() {
   const horizon = n(sv.horizon_days || 30);
   const oddsFig = sv.p_reach_30_pct != null
     ? `<span class="att-fig-n num">${n(sv.p_reach_30_pct)}%</span>` +
-      `<span class="label">odds of day ${horizon} (model's own line · ${n(sv.reached_horizon_n)} of ${n(sv.n_prior_cycles)} attempts reached it` +
+      `<span class="label">odds of day ${horizon} (the forecast's own line · ${n(sv.reached_horizon_n)} of ${n(sv.n_prior_cycles)} attempts reached it` +
       `${Array.isArray(sv.p_reach_30_ci95_pct) ? ` · 95% CI ${n(sv.p_reach_30_ci95_pct[0])}–${n(sv.p_reach_30_ci95_pct[1])}%` : ""})</span>`
     : `<span class="att-fig-n num">—</span>` +
       `<span class="label">odds of day ${horizon} · ${sv.n_prior_cycles != null ? `none of ${n(sv.n_prior_cycles)} attempts reached it — no odds served` : "not yet handicapped"}</span>`;

@@ -8,6 +8,7 @@ export const GLOSSARY_TERMS = [
   {"term": "HRV", "gloss": "heart-rate variability — a nightly nervous-system reading; higher is usually better rested", "ci": false},
   {"term": "glucose", "gloss": "blood sugar — no sensor this cycle", "ci": true},
   {"term": "Whoop", "gloss": "a wrist band that scores sleep and recovery", "ci": true},
+  {"term": "Hevy", "gloss": "a workout-logging app", "ci": false},
   {"term": "DEXA", "gloss": "Dual-energy X-ray absorptiometry — the periodic full-body scan behind the body-composition numbers (fat mass, lean mass, bone density).", "ci": false},
   {"term": "CGM", "gloss": "Continuous glucose monitor — a worn sensor that reads blood glucose every few minutes instead of one fingerstick at a time.", "ci": false},
   {"term": "REM", "gloss": "Rapid eye movement — the sleep stage associated with dreaming and memory consolidation, one of the stages sleep trackers report.", "ci": false},

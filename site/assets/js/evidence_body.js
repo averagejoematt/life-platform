@@ -6,8 +6,8 @@ import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, 
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, figs, sec, empty, note, evClass, kvtable, socialContextSection } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #978 pre-start signal · #1252 genesis for carry-forward markers
-import { dataThrough, countWord } from "/assets/js/entry_age.js"; // #4182 — dates + small counts in words, one spelling
-import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter ("Friday Sep 25")
+import { dataThrough, dayInWords, countWord } from "/assets/js/entry_age.js"; // #4182 — prose dates + small counts in words, one spelling
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the compact date LABEL ("Fri Sep 25"), for chart labels/captions only — fold sentences use dayInWords
 
 // #1940 — the correction, stated rather than applied quietly.
 // #1892 withdrew citations that pointed at papers which did not support the claims
@@ -203,7 +203,7 @@ export function labsFold(d) {
   const flagged = L.flagged_count ?? bm.filter(_labFlagged).length;
   const pre = (L.latest_draw_archival || {}).pre_cycle;
   return {
-    text: `Last blood test: ${calendarDay(L.latest_draw_date)}${pre ? " — before this cycle" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
+    text: `Last blood test: ${dayInWords(L.latest_draw_date)}${pre ? " — before this cycle" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
     through: null, // the draw date is IN the sentence — a second freshness line would repeat it
   };
 }
@@ -238,8 +238,9 @@ export function weighinStaleness(j) {
 }
 
 // #4182 — the fold. One served fact, dated in words, on the first screen of /data/ and
-// /data/physical/. Every number is a /api/journey field; the weekday comes from the same
-// calendarDay() formatter that dates everything else, never a second one.
+// /data/physical/. Every number is a /api/journey field; the date comes from dayInWords()
+// — the one prose formatter every fold sentence uses (entry_age.js); calendarDay() stays
+// reserved for compact labels/captions elsewhere on the page.
 const _one = (v) => (Math.round(Number(v) * 10) / 10).toFixed(1);
 const _minus = (v) => (Number(v) < 0 ? "−" : "") + _one(Math.abs(Number(v)));
 const _daysBetween = (a, b) => { const x = Date.parse(a), y = Date.parse(b); return Number.isFinite(x) && Number.isFinite(y) ? Math.round((y - x) / 86400000) : null; };
@@ -249,10 +250,10 @@ export function weightFoldLine(j, today = todayPT()) {
   const lw = String(j.last_weighin_date).slice(0, 10);
   const age = _daysBetween(lw, today);
   // Inside a week the weekday alone is unambiguous ("Saturday's weigh-in"); past it, the date joins.
-  const when = age != null && age >= 0 && age <= 6 ? `${calendarDay(lw).split(" ")[0]}'s weigh-in` : `the ${calendarDay(lw)} weigh-in`;
+  const when = age != null && age >= 0 && age <= 6 ? `${dayInWords(lw).split(",")[0]}'s weigh-in` : `the ${dayInWords(lw)} weigh-in`;
   let s = `${_one(j.current_weight_lbs)} lb at ${when}`;
   if (j.lost_lbs != null && j.start_weight_lbs != null && j.started_date) {
-    s += ` — ${Number(j.lost_lbs) >= 0 ? "down" : "up"} ${_one(Math.abs(Number(j.lost_lbs)))} lb from ${_one(j.start_weight_lbs)} on ${calendarDay(String(j.started_date).slice(0, 10))}`;
+    s += ` — ${Number(j.lost_lbs) >= 0 ? "down" : "up"} ${_one(Math.abs(Number(j.lost_lbs)))} lb from ${_one(j.start_weight_lbs)} on ${dayInWords(String(j.started_date).slice(0, 10))}`;
   }
   if (Number(j.weighin_count) > 0 && Number(j.weighin_span_days) > 0) s += `, ${j.weighin_count} weigh-ins in ${j.weighin_span_days} days`;
   return s + ".";
@@ -270,8 +271,8 @@ export function weightGoalLine(j) {
   }
   const lo = j.projected_goal_date_earliest, hi = j.projected_goal_date_latest;
   if (!j.projected_goal_date) bits.push("No dated projection yet.");
-  else if (lo && hi && lo !== hi) bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} between ${calendarDay(lo)} and ${calendarDay(hi)}.`);
-  else bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} around ${calendarDay(j.projected_goal_date)}.`);
+  else if (lo && hi && lo !== hi) bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} between ${dayInWords(lo)} and ${dayInWords(hi)}.`);
+  else bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} around ${dayInWords(j.projected_goal_date)}.`);
   return bits.join(" ");
 }
 
@@ -951,7 +952,7 @@ export function trainingFold(d, wo) {
   const latest = [...gymDates, ...walkDates].sort().pop();
   if (latest) {
     const kinds = [gymDates.includes(latest) && "a gym session", walkDates.includes(latest) && "a walk"].filter(Boolean);
-    bits.push(`Latest: ${kinds.join(" and ")}, ${calendarDay(latest)}.`);
+    bits.push(`Latest: ${kinds.join(" and ")}, ${dayInWords(latest)}.`);
   }
   return { text: bits.join(" "), through: latest || null };
 }

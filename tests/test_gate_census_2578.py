@@ -967,7 +967,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # record (the entry deleted from the real file -> test_every_post_only_simple_route_is_registered_in_the_capture_script
         # FAILED naming it; restored -> 44 passed). Unproven stays 540; one entrant. MEASURED by id-set diff on the MERGE tree against a
         # `git archive origin/main` export at cf332052f: lane {proven 215, unproven 540, 6, 5} vs main {214, 540, 6, 5}.
-        <= 215
+        # Upper bound 215 -> 216 (2026-09-26, #4182 A-grade sweep, PR #4221): registry::tests/site_vocabulary_residue.py::
+        # BASELINE::Hevy arrives PROVEN via a REGISTRY_PROOFS record (gear's Hevy <dfn> stripped -> 1 failed naming /gear/;
+        # restored -> 1 passed). Unproven stays 540; one entrant.
+        <= 216
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

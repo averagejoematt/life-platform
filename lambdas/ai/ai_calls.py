@@ -1796,7 +1796,7 @@ AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
 DECISION CLASS CEILING: {brief.get('decision_class_ceiling', 'observational')}
 EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary framing.')}
 
-VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". Address Matthew directly as "you". Never refer to yourself in third person.
+VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". This narrative goes to Matthew alone — address him as "you" here. A reader-facing version is condensed from it and can add nothing, so obey the READER RULES now. Never refer to yourself in third person.
 
 MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
@@ -1825,6 +1825,13 @@ DATA INTERPRETATION RULES:
 - If a data source exists but values are null for today, it means today's sync hasn't completed — use the most recent available data
 - NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists in the payload below
 - Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin is available.
+READER RULES (a friend of Matthew's with no health background reads a condensed version):
+- Plain words. Never: EWMA, autocorrelation, etiology, mechanistic(ally), gate/ungate, load-bearing, contingent, interoception, gluconeogenesis, counter-regulatory, slow-wave, standard deviation, n=, slope, Zone 2 hold, catabolic, liquidation, subtherapeutic, BMR/Mifflin. Say: "running average", "the reason", "one good night tends to follow another", "easy cardio", "21 days of data".
+- Every figure carries its day or window IN THE SAME SENTENCE, in words, Pacific time: "182 g on Friday, September 25", "153 g a day over the last 20 logged days", "99 % on the night of Thursday, September 24". A figure with no day is dropped. No ISO dates.
+- Only figures given in the DATA below. Never subtract, divide, average, count days or convert a time — if the difference is not given, say "short of the 170 g floor" with no number.
+- Days logged / last log / silence: state only the given `days_logged`, `last_food_log_date`, `gap_days`, `journal_gap_days`. If none is given he is present — narrate no gap.
+- ONE ask, stated once, doable this week, in the first or last sentence. No list, no two-condition gate, no question he cannot act on.
+- First sentence at most 25 words, carrying the finding-with-date or the ask.
 {few_shot_block}
 
 Write 2-4 paragraphs of {domain_label} coaching for Matthew — target 300-450 words, and do not exceed 500 words (#3190: this was previously unbounded, which is why generation was truncating against max_tokens). Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""

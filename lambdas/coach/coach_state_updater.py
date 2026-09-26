@@ -603,6 +603,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction, d
         "elena_quote": extraction.get("elena_quote"),
         # #2972: the ONE public-audience field — owner-directed candidates are held (None) at write time.
         "public_summary": audience_guard.reader_safe(extraction.get("public_summary"), coach_id, logger),
+        # #4213: the ONE ask, reported in the third person — the by-coach timeline's line.
+        "public_ask": audience_guard.reader_safe(extraction.get("public_ask"), coach_id, logger),
         "word_count": word_count,
         "created_at": now_iso,
     }
@@ -951,6 +953,8 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
             "coach_id": coach_id,
             "created_date": generation_date,
             "commitment_natural": text,
+            # #4213: the reported, third-person twin — the ONLY text a visitor is served.
+            "public_ask": audience_guard.reader_safe(c.get("public_ask"), coach_id, logger),
             "action_check": action_check,  # {metric, direction} or None (qualitative)
             "window_days": window_days,
             "due_date": due_date,

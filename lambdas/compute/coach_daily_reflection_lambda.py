@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 import boto3
 from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
-from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
+from coach import audience_guard, coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import er03_gate
@@ -48,7 +48,10 @@ SKIP_TIER = 2  # PG-10: at budget tier >= 2 the daily reflection does not run
 _SYSTEM_RULES = (
     "You are an AI coach character writing a short daily reflection for a public health-experiment site. "
     "Rules you must obey:\n"
-    "- Speak in your own voice; never open with the user's name.\n"
+    "- Speak in your own voice, in the FIRST PERSON ('I'). This reflection is SERVED TO SITE VISITORS: refer to "
+    "Matthew in the THIRD person (Matthew / he / his) — never 'you', never a name-as-salutation, never an "
+    "imperative aimed at him. Anything you asked him to do is REPORTED ('I've asked him to …'), never commanded.\n"
+    "- Plain words (no EWMA, autocorrelation, etiology, gate). First sentence at most 25 words.\n"
     "- Correlative only — never claim one thing CAUSED another.\n"
     "- Use only numbers that appear in the provided facts; invent no figures and do no arithmetic.\n"
     "- The data is early and small-sample — hedge ('early', 'so far', 'appears', 'trend').\n"
@@ -126,7 +129,12 @@ def _accepts(text, facts, generation_date_iso):
         return False, ["empty"]
     ok, reasons = er03_gate.er03_check(text, allowed_numbers=facts["numbers"], n=facts["n"])
     findings = _grounding_findings(text, facts, generation_date_iso)
-    return (ok and not findings), list(reasons or []) + [f.get("type", "grounding") for f in findings]
+    # #4213: the reflection is served to site visitors — an owner-directed text (second
+    # person / vocative) fails the gate like a fabricated number, so it is retried once
+    # stricter and then dropped; the #2889 reuse path re-gates through here too, so a
+    # cached second-person reflection is never re-published.
+    audience = ["audience_violation"] if audience_guard.is_owner_directed(text) else []
+    return (ok and not findings and not audience), list(reasons or []) + [f.get("type", "grounding") for f in findings] + audience
 
 
 def _voice(s3, coach_config_key):
@@ -147,7 +155,10 @@ def _generate(persona, voice_rules, example, facts, stricter=False):
 
     sys_block = f"{_SYSTEM_RULES}\n\nYour voice rules: {voice_rules}" + (f"\n\nA sample in your voice:\n{example}" if example else "")
     if stricter:
-        sys_block += "\n\nSTRICT: output must contain no numbers that are not in the facts, and no causal words."
+        sys_block += (
+            "\n\nSTRICT: output must contain no numbers that are not in the facts, no causal words, "
+            "and no 'you'/'your' — Matthew is 'he' to this audience."
+        )
     user = (
         f"You are {persona.get('name')} ({persona.get('board_role') or persona.get('domain')}). "
         f"Today's facts about your domain:\n{facts['summary']}\n"

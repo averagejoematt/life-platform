@@ -212,6 +212,22 @@ def shift_day_key(date_str: str, days: int) -> str:
     return (d + timedelta(days=days)).isoformat() if d else date_str
 
 
+def day_in_words(date_str: str, weekday: bool = True) -> str:
+    """A ``YYYY-MM-DD`` day key the way a person reads it: "Sunday, June 14" (#4182).
+
+    THE words form for a day key on a human surface (the daily brief, the data-status
+    banner). The reader-vocabulary ruling (``site/data/glossary.json``, "as of") is dates in
+    words, never ISO and never "as of"; this is the one server-side spelling so two lines of
+    the same email cannot disagree on the form. ``weekday=False`` drops the day name
+    ("June 14"). Returns ``date_str`` unchanged when it is not a parseable day key, matching
+    ``shift_day_key``'s day-key-in contract rather than raising into a render.
+    """
+    d = parse_day_key(date_str)
+    if d is None:
+        return date_str
+    return (d.strftime("%A") + ", " if weekday else "") + d.strftime("%B") + " " + str(d.day)
+
+
 def pacific_day_n(start_date: str, on_date: str | None = None) -> int:
     """1-based day index of a cycle in the Pacific frame — Day 1 IS ``start_date``.
 

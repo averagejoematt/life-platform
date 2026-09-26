@@ -791,7 +791,9 @@ def _dispatch_route(event, path, method):
                     except Exception:
                         continue  # one coach's dossier failing must not blank the board
                     for _cd_commit in _cd_dossier.get("commitments", []) or []:
-                        if _cd_commit.get("status") != "pending":
+                        # #4213: `text` is the commitment's PUBLIC twin (coach_dossier) — a
+                        # commitment with none is not an ask a visitor can be shown.
+                        if _cd_commit.get("status") != "pending" or not _cd_commit.get("text"):
                             continue
                         _cd_actions.append(
                             {
