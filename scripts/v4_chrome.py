@@ -194,6 +194,9 @@ def doors_nav(current_door: str | None = None, with_follow: bool = False) -> str
     "/story/") to mark `aria-current="page"`, or None for pages under no door.
     `with_follow` includes the follow pill immediately before the theme toggle.
     """
+    if EDITION == "v7":
+        # #4182: the v7 bar keys on the page path under V7_BASE ("" home, "cockpit/" …).
+        return v7_bar(current_door)
     if current_door is not None and current_door not in _VALID_DOORS:
         raise ValueError(f"current_door must be one of {sorted(_VALID_DOORS)} or None, got {current_door!r}")
     links = []
@@ -317,6 +320,8 @@ def site_footer(with_asof: bool = False, current_door: str | None = None) -> str
     public-stats metadata, so the stamp rides in the base line between the brand
     and the home link (the `.sf-base` flex line spaces the three apart).
     """
+    if EDITION == "v7":
+        return v7_foot()
     asof = ASOF_STAMP if with_asof else ""
     here = v4_wayfinding.STATION_BY_DOOR.get(current_door) if current_door else None
     cols = "".join(
@@ -421,3 +426,74 @@ def loop_forward(current_door: str | None, self_path: str | None = None) -> str:
         f'<p class="lf-return"><span class="label">or come back</span> {return_bit}</p>'
         "</aside>"
     )
+
+
+# ── The v7 edition (#4182, epic — the rebuild as one serialised investigation) ────────
+#
+# `EDITION` is the ONE switch between the live v4 chrome above and the v7 chrome below.
+# The default is "v4": nothing on the live pages changes until the cut-over PR flips it and
+# re-pours every chrome-bearing page through `v4_apply_chrome.py`. `scripts/v7_build.py`
+# sets EDITION = "v7" (and `V7_BASE`) for its own process only, so the preview shells at
+# `site/next/**` are poured from the same `doors_nav()` / `site_footer()` call sites the
+# live pages use — the cut-over is a flag flip, not a second chrome.
+#
+# `V7_BASE` is the viewer prefix the nine v7 pages are served under: "/" once live,
+# "/next/" for the preview subtree (plan §1b). Page links carry it; asset and API paths
+# never do (they stay root-absolute — the hasher rewrites `/assets/(js|css)/<name>` and
+# would point a `/next/assets/…` reference at a hash that does not exist under `/next/`).
+EDITION = "v4"
+V7_BASE = "/"
+
+# The bottom bar: the five pages a reader reaches with a thumb (CONCEPT §3 rows 1–5).
+# (page path under V7_BASE, label). "" is the v7 home.
+V7_BAR = (
+    ("", "Home"),
+    ("cockpit/", "Today"),
+    ("story/", "This week"),
+    ("data/", "His numbers"),
+    ("coaching/", "The coaches"),
+)
+
+# The footer tier: the four pages that are one tap from any of the five (CONCEPT §3 rows 6–9).
+V7_FOOT = (
+    ("protocols/", "What he’s trying"),
+    ("story/about/", "Who he is"),
+    ("method/", "Under the hood"),
+    ("subscribe/", "Follow"),
+)
+
+REPO_URL = "https://github.com/averagejoematt/life-platform"
+
+
+def v7_href(page: str, base: str | None = None) -> str:
+    """Viewer href of a v7 page under the edition's base ("" → the base itself)."""
+    b = V7_BASE if base is None else base
+    if not b.startswith("/") or not b.endswith("/"):
+        raise ValueError(f"V7_BASE must start and end with '/', got {b!r}")
+    return b + page
+
+
+def v7_bar(current: str | None = None, base: str | None = None) -> str:
+    """The five-item v7 bar. `current` is the page path under the base ("" for home,
+    "cockpit/" …) to mark `aria-current="page"`, or None."""
+    items = []
+    for page, label in V7_BAR:
+        cur = ' aria-current="page"' if page == current else ""
+        items.append(f'<a href="{v7_href(page, base)}"{cur}>{_esc(label)}</a>')
+    return f'<nav class="v7-bar" aria-label="Pages">{"".join(items)}</nav>'
+
+
+def v7_masthead(base: str | None = None) -> str:
+    """The v7 masthead: the brand (home) and the repo link. One line, no menu."""
+    return (
+        '<header class="v7-mast">'
+        f'<a class="v7-brand" href="{v7_href("", base)}">averagejoematt</a>'
+        f'<a class="v7-repo" href="{REPO_URL}" rel="noopener">the code</a>'
+        "</header>"
+    )
+
+
+def v7_foot(base: str | None = None) -> str:
+    """The v7 footer: the four footer-tier pages plus privacy, one line."""
+    links = "".join(f'<a href="{v7_href(page, base)}">{_esc(label)}</a>' for page, label in V7_FOOT)
+    return f'<footer class="v7-foot"><nav aria-label="More">{links}<a href="/privacy/">Privacy</a></nav></footer>'

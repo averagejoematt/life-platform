@@ -1,5 +1,6 @@
 # averagejoematt.com — robots.txt
 User-agent: *
 Allow: /
+Disallow: /next/
 
 Sitemap: https://averagejoematt.com/sitemap.xml

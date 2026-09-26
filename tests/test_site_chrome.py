@@ -176,3 +176,65 @@ def test_stub_and_fragment_pages_stay_head_chrome_free():
         assert 'rel="apple-touch-icon"' not in html, f"{rel}: chrome-free page grew an apple-touch-icon"
         assert 'name="theme-color"' not in html, f"{rel}: chrome-free page grew a theme-color meta"
         assert "image/svg+xml" not in html, f"{rel}: chrome-free page grew the SVG favicon"
+
+
+# ── #4182: the v7 edition switch and the preview shells ─────────────────────────────
+
+
+def test_v7_edition_default_is_v4_and_the_live_chrome_is_unchanged():
+    """`v4_chrome.EDITION` defaults to "v4": doors_nav()/site_footer() keep emitting the
+    live `.doors` / `.site-foot` chrome until the cut-over PR flips the switch."""
+    assert v4_chrome.EDITION == "v4"
+    assert v4_chrome.doors_nav().startswith('<nav class="doors"')
+    assert v4_chrome.site_footer().startswith('<footer class="site-foot"')
+
+
+def test_v7_edition_pours_the_bar_and_the_footer_tier_from_the_same_call_sites(monkeypatch):
+    """Under EDITION="v7" the SAME two call sites emit the five-item bar and the four-page
+    footer under V7_BASE — the cut-over is a flag flip, not a second chrome."""
+    monkeypatch.setattr(v4_chrome, "EDITION", "v7")
+    monkeypatch.setattr(v4_chrome, "V7_BASE", "/next/")
+    bar = v4_chrome.doors_nav(current_door="cockpit/")
+    assert bar.startswith('<nav class="v7-bar"')
+    assert [lbl for _p, lbl in v4_chrome.V7_BAR] == ["Home", "Today", "This week", "His numbers", "The coaches"]
+    assert '<a href="/next/cockpit/" aria-current="page">Today</a>' in bar
+    foot = v4_chrome.site_footer()
+    assert foot.startswith('<footer class="v7-foot"')
+    assert [lbl for _p, lbl in v4_chrome.V7_FOOT] == ["What he’s trying", "Who he is", "Under the hood", "Follow"]
+    assert '<a href="/next/method/">Under the hood</a>' in foot
+
+
+def test_v7_build_emits_nine_noindex_shells_with_root_absolute_assets(tmp_path):
+    """The generator writes the nine shells under `<out>/`; every one carries the noindex
+    meta, the bar, the footer tier, and NO asset reference under the base (plan D4: the
+    hasher would rewrite `/next/assets/…` to a hash that does not exist there)."""
+    out = tmp_path / "site" / "next"
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "v7_build.py"), "--base", "/next/", "--out", str(out)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    shells = sorted(out.rglob("index.html"))
+    assert len(shells) == 9, [str(p.relative_to(out)) for p in shells]
+    for shell in shells:
+        html = shell.read_text(encoding="utf-8")
+        rel = shell.relative_to(out)
+        assert '<meta name="robots" content="noindex,nofollow">' in html, f"{rel}: preview shell without noindex"
+        assert '<nav class="v7-bar"' in html and '<footer class="v7-foot"' in html, f"{rel}: missing the v7 chrome"
+        assert '<nav class="doors"' not in html and '<footer class="site-foot"' not in html, f"{rel}: v4 chrome leaked in"
+        assert "/next/assets/" not in html, f"{rel}: an asset referenced under the base"
+        assert 'href="/assets/css/v7.css"' in html and 'src="/assets/js/v7_shell.js"' in html, f"{rel}: v7 assets not root-absolute"
+        assert "preview — the live site is at" in html, f"{rel}: preview notice missing"
+    assert (SITE / "assets" / "css" / "v7.css").exists() and (SITE / "assets" / "js" / "v7_shell.js").exists()
+
+
+def test_v7_committed_preview_shells_match_a_fresh_build():
+    """The committed `site/next/**` is generator output — `v7_build.py --check` is the
+    drift guard, the same shape as `v4_apply_chrome.py --check`."""
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "v7_build.py"), "--base", "/next/", "--check"],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, f"v7 shells drifted — run scripts/v7_build.py --base /next/ and commit:\n{proc.stdout}\n{proc.stderr}"
