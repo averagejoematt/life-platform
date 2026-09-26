@@ -48,7 +48,7 @@ sys.path.insert(0, HERE)
 
 import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
-from v7 import week  # noqa: E402
+from v7 import hood, week  # noqa: E402 — the per-page templates (#4182)
 
 SITE_DIR = os.path.join(ROOT, "site")
 
@@ -73,6 +73,7 @@ SITE_NAME = "averagejoematt"
 # entry keeps the scaffold body below; each page's lane adds ONE line here.
 BODIES = {
     "story/": week,
+    "method/": hood,
 }
 
 

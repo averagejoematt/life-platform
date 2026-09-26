@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_hood.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body class="v7-body">
@@ -25,10 +26,67 @@
   <main id="main" class="v7-main">
     <h1>Under the hood</h1>
     <p class="v7-job">How a number is made, and the corrections column.</p>
-    <p class="v7-placeholder">Not built yet — Wednesday of the build week.</p>
+    <section class="hd-entry" id="hd-how" aria-labelledby="hd-how-h">
+      <div class="hd-m" data-margin><span class="d">§</span></div>
+      <div class="hd-body">
+        <h2 class="hd-h" id="hd-how-h">How a number is made</h2>
+        <div id="hd-how-body"><p class="hd-note hd-pending">Loading the numbers — this line fills from the site’s served data.</p></div>
+      </div>
+    </section>
+    <section class="hd-entry" id="hd-corrections" aria-labelledby="hd-corrections-h">
+      <div class="hd-m" data-margin></div>
+      <div class="hd-body">
+        <h2 class="hd-h" id="hd-corrections-h">The corrections column</h2>
+        <div id="hd-corrections-body"><p class="hd-note hd-pending">Loading the numbers — this line fills from the site’s served data.</p></div>
+      </div>
+    </section>
+    <section class="hd-entry" id="hd-log" aria-labelledby="hd-log-h">
+      <div class="hd-m" data-margin></div>
+      <div class="hd-body">
+        <h2 class="hd-h" id="hd-log-h">The build log</h2>
+        <div id="hd-log-body"><p class="hd-note hd-pending">Loading the numbers — this line fills from the site’s served data.</p></div>
+      </div>
+    </section>
+    <section class="hd-entry" id="hd-gear" aria-labelledby="hd-gear-h">
+      <div class="hd-m" data-margin><span class="d">§</span></div>
+      <div class="hd-body">
+        <h2 class="hd-h" id="hd-gear-h">The gear</h2>
+        <p class="hd-disclosure" id="hd-disclosure" role="note" aria-label="Affiliate disclosure">Some links on this page are affiliate links. If you buy through one, averagejoematt.com may earn a small commission &mdash; at no additional cost to you. Nothing here is a paid placement: every item is a device or app that genuinely feeds this platform&rsquo;s data, pulled straight from its source registry. If it isn&rsquo;t in the pipeline, it isn&rsquo;t on this page.</p>
+        <table class="hd-gear" data-src="source_registry.catalog_entries()">
+          <thead><tr><th scope="col">Device or app</th><th scope="col">What it feeds</th><th scope="col">Last reported</th></tr></thead>
+          <tbody>
+          <tr data-source="apple_health"><td class="hd-gear-name">Apple Health</td><td class="hd-gear-feeds">Steps, active energy, <dfn class="gloss" tabindex="0" title="Continuous glucose monitor — a worn sensor that reads blood glucose every few minutes instead of one fingerstick at a time." data-gloss="Continuous glucose monitor — a worn sensor that reads blood glucose every few minutes instead of one fingerstick at a time.">CGM</dfn>, blood pressure, state of mind</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="labs"><td class="hd-gear-name">Blood labs</td><td class="hd-gear-feeds">Blood biomarkers (episodic panels), ASCVD 10-year risk, clinician notes</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="habitify"><td class="hd-gear-name">Habitify</td><td class="hd-gear-feeds">Daily habit completions</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="hevy"><td class="hd-gear-name"><dfn class="gloss" tabindex="0" title="a workout-logging app" data-gloss="a workout-logging app">Hevy</dfn></td><td class="hd-gear-feeds">Strength sets, reps, load, rest times</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="macrofactor"><td class="hd-gear-name">MacroFactor</td><td class="hd-gear-feeds">Calories, macros, meals</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="strava"><td class="hd-gear-name">Strava</td><td class="hd-gear-feeds">Activities, walks, heart rate</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="supplements"><td class="hd-gear-name">Supplements</td><td class="hd-gear-feeds">Supplement &amp; medication adherence</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="whoop"><td class="hd-gear-name"><dfn class="gloss" tabindex="0" title="a wrist band that scores sleep and recovery" data-gloss="a wrist band that scores sleep and recovery">Whoop</dfn></td><td class="hd-gear-feeds">Recovery, sleep, <dfn class="gloss" tabindex="0" title="heart-rate variability — a nightly nervous-system reading; higher is usually better rested" data-gloss="heart-rate variability — a nightly nervous-system reading; higher is usually better rested">HRV</dfn>, resting HR, strain</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="withings"><td class="hd-gear-name">Withings</td><td class="hd-gear-feeds">Weight, body composition</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="eightsleep"><td class="hd-gear-name">Eight Sleep</td><td class="hd-gear-feeds">Sleep stages, HR/HRV, restlessness</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="food_delivery"><td class="hd-gear-name">Food delivery</td><td class="hd-gear-feeds">Delivery-order behavioral signal (incl. longest-ever streak)</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="notion"><td class="hd-gear-name">Notion</td><td class="hd-gear-feeds">Journal entries — the subjective layer</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="measurements"><td class="hd-gear-name">Tape measure</td><td class="hd-gear-feeds">Body tape measurements</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="todoist"><td class="hd-gear-name">Todoist</td><td class="hd-gear-feeds">Tasks completed</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="weather"><td class="hd-gear-name">Weather</td><td class="hd-gear-feeds">Temperature, precipitation, daylight, conditions, sunrise/sunset, AQI</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          <tr data-source="garmin"><td class="hd-gear-name">Garmin</td><td class="hd-gear-feeds">Stress, body battery, steps</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
+          </tbody>
+        </table>
+        <p class="hd-note">The list is read from the site’s own source registry at build time — if it isn’t in the pipeline, it isn’t here.</p>
+      </div>
+    </section>
+    <section class="hd-entry" id="hd-return" aria-labelledby="hd-return-h">
+      <div class="hd-m" data-margin><span class="d">→</span></div>
+      <div class="hd-body">
+        <h2 class="hd-h" id="hd-return-h">Next</h2>
+        <div id="hd-return-body"><p class="hd-note hd-pending">Loading the numbers — this line fills from the site’s served data.</p></div>
+      </div>
+    </section>
   </main>
   <footer class="v7-foot"><nav aria-label="More"><a href="/next/protocols/">What he’s trying</a><a href="/next/story/about/">Who he is</a><a href="/next/method/">Under the hood</a><a href="/next/subscribe/">Follow</a><a href="/privacy/">Privacy</a></nav></footer>
   <nav class="v7-bar" aria-label="Pages"><a href="/next/">Home</a><a href="/next/cockpit/">Today</a><a href="/next/story/">This week</a><a href="/next/data/">His numbers</a><a href="/next/coaching/">The coaches</a></nav>
   <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_hood.js"></script>
 </body>
 </html>
