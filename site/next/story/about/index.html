@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_who.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body class="v7-body">
@@ -24,11 +25,33 @@
   <header class="v7-mast"><a class="v7-brand" href="/next/">averagejoematt</a><a class="v7-repo" href="https://github.com/averagejoematt/life-platform" rel="noopener">the code</a></header>
   <main id="main" class="v7-main">
     <h1>Who he is</h1>
-    <p class="v7-job">The subject, in the first person.</p>
-    <p class="v7-placeholder">Not built yet — Wednesday of the build week.</p>
+    <p class="v7-job">In his own words, with the photo and the day count.</p>
+    <section class="who-entry who-fold" id="who-fold" aria-labelledby="who-fold-h">
+      <div class="who-m" data-margin></div>
+      <div class="who-body">
+        <h2 class="who-h" id="who-fold-h">In his own words</h2>
+        <div class="who-fold-grid"><div class="who-photo" id="who-photo" role="img" aria-label="No photo yet."><div><b>No photo yet.</b><span id="who-photo-due"></span></div></div><div class="who-words"><p class="who-first">I've spent two decades making complicated systems reliable and getting people to actually use them. In early 2026 I turned that same thinking on myself — not a challenge, not a 30-day hack, but a proper system: the wearables already on my body, an AI that reads the numbers back to me every morning, and the discipline to publish the down weeks too.</p><p class="who-sig">Matthew, in his own words.</p></div></div><p class="who-receipts" id="who-receipts"><a href="https://github.com/averagejoematt/life-platform" rel="noopener">the code</a></p>
+      </div>
+    </section>
+    <section class="who-entry" id="who-since" aria-labelledby="who-since-h">
+      <div class="who-m" data-margin></div>
+      <div class="who-body">
+        <h2 class="who-h" id="who-since-h">Since <span id="who-since-day" data-src="api_journey.journey.started_date">the day it began</span></h2>
+        <p class="who-note who-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="who-entry" id="who-check" aria-labelledby="who-check-h">
+      <div class="who-m" data-margin></div>
+      <div class="who-body">
+        <h2 class="who-h" id="who-check-h">How to check</h2>
+        <p class="who-how" id="who-how">Every figure on this page is computed by code, not by an AI, and carries its date and its count. An AI drafts the weekly write-up and Matthew reviews it before it publishes.</p><p class="who-small">The code, in full: <a href="https://github.com/averagejoematt/life-platform" rel="noopener">github.com/averagejoematt/life-platform</a>.</p><p class="who-small">Write to him: <span class="who-mail">matt@averagejoematt.com</span></p>
+      </div>
+    </section>
+    <p class="who-return" id="who-return" data-src="api_content_cadence.chronicle.next_date"></p>
   </main>
   <footer class="v7-foot"><nav aria-label="More"><a href="/next/protocols/">What he’s trying</a><a href="/next/story/about/">Who he is</a><a href="/next/method/">Under the hood</a><a href="/next/subscribe/">Follow</a><a href="/privacy/">Privacy</a></nav></footer>
   <nav class="v7-bar" aria-label="Pages"><a href="/next/">Home</a><a href="/next/cockpit/">Today</a><a href="/next/story/">This week</a><a href="/next/data/">His numbers</a><a href="/next/coaching/">The coaches</a></nav>
   <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_who.js"></script>
 </body>
 </html>

@@ -48,7 +48,7 @@ sys.path.insert(0, HERE)
 
 import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
-from v7 import who  # noqa: E402
+from v7 import week, who  # noqa: E402
 
 SITE_DIR = os.path.join(ROOT, "site")
 
@@ -72,6 +72,7 @@ SITE_NAME = "averagejoematt"
 # The per-page body templates (scripts/v7/<page>.py — CSS, JS, body(base)). A page with no
 # entry keeps the scaffold body below; each page's lane adds ONE line here.
 BODIES = {
+    "story/": week,
     "story/about/": who,
 }
 
