@@ -162,9 +162,16 @@ test("a reporting pillar is not gated — story.js keeps its trend copy", () => 
   assert.equal(familyChip(LIVE_SLEEP, "down"), null);
 });
 
-test("flagged absent behaviors on a down trend name the absence, not the trend", () => {
-  const partial = { name: "consistency", xp_delta: -0.3, absent_behaviors: ["habit_ticks"] };
-  assert.deepEqual(familyChip(partial, "down"), { txt: "some days went unlogged", state: "absent" });
+test("flagged absent behaviors on a down trend name the scoring, never a logging gap (#4182)", () => {
+  // `absent_behaviors` are the engine's rules going unmet, not unlogged days — the unlogged
+  // case is the dark-source branch. On 2026-09-25 the live nutrition pillar carried
+  // absent_behaviors [calorie_adherence, protein_total, …] with data_coverage 1.0 while
+  // /api/nutrition_overview served days_logged 20 of 20; the old copy ("some days went
+  // unlogged") was a false claim on the front door. Fixture = that live pillar shape.
+  const partial = { name: "nutrition", xp_delta: -0.3, data_coverage: 1.0, coverage_hold: false, absent_behaviors: ["calorie_adherence", "protein_total", "protein_distribution", "consistency"] };
+  const chip = familyChip(partial, "down");
+  assert.deepEqual(chip, { txt: "logged, but the engine scored it low", state: "down" });
+  assert.ok(!/unlogged/.test(chip.txt), "a fresh-source pillar must never claim unlogged days");
   // …and never on an UP trend: unlogged days can't be used to sour a real climb either.
   assert.equal(familyChip(partial, "up"), null);
 });
