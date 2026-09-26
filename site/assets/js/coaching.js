@@ -43,6 +43,14 @@ import { rosterEntries } from "/assets/js/coach_roster.js"; // #3517 — the pre
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 import { instantDayInWords } from "/assets/js/entry_age.js"; // #4182 sweep fix 2 — the lab-note card's date in words
 import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
+
+/* #4182 (owner ruling 2026-09-26): the cycle count is internal. The server's archival
+   sentence (site_api_phase_frame.archival_frame) says "from a previous cycle — N days
+   before this cycle began DATE"; the reader reads it in the experiment's frame. */
+const _dayFrame = (s) => String(s || "")
+  .replace(/from a previous cycle/i, "from before the experiment")
+  .replace(/before this cycle began/i, "before Day 1,")
+  .replace(/before cycle \d+ began/i, "before the run that began");
 // ISO week key → served genesis-week label ("2026-W38" → "Week 3"), filled by the list build.
 const FIELD_NOTE_LABELS = {};
 
@@ -1166,7 +1174,7 @@ function renderDiaryReaction(read, id) {
   // sentence when it has one; the fallback is the claim without the arithmetic, never
   // a guessed number.
   const arch = r.archival && r.archival.pre_cycle
-    ? `<p class="dx-archival label">${esc(r.archival.label || "From before this experiment")} — kept on the record, not a reading of this experiment.</p>`
+    ? `<p class="dx-archival label">${esc(_dayFrame(r.archival.label) || "From before this experiment")} — kept on the record, not a reading of this experiment.</p>`
     : "";
   read.innerHTML =
     `<p class="dx-kicker label">${isSocial ? "post" : "diary"} reaction · ${esc(r.date || "")} · Matthew ↔ ${esc(r.coach_name || "the coach")}${r.tone ? ` · ${esc(r.tone)}` : ""}</p>` +

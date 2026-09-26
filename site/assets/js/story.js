@@ -97,7 +97,7 @@ const NODE_LINK = {
   relationships: "/data/mind/",
   consistency: "/data/habits/",
 };
-const NODE_NOTE = { metabolic: "Blood sugar — no sensor this cycle" };
+const NODE_NOTE = { metabolic: "Blood sugar — no sensor worn" };
 // Icon key per pillar for the hover door affordance (domainIcon maps to icons.js).
 const NODE_ICON = {
   sleep: "sleep", movement: "training", nutrition: "nutrition", metabolic: "glucose",

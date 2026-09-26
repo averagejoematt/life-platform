@@ -10,6 +10,14 @@ import { lineChart } from "/assets/js/charts.js";
 import { regenerationPaused } from "/assets/js/coach_asof.js";
 import { weeklyCadenceLine } from "/assets/js/coach_today.js"; // #4188 — the weekly call says its cadence
 
+/* #4182 (owner ruling 2026-09-26): the cycle count is internal. The server's archival
+   sentence (site_api_phase_frame.archival_frame) says "from a previous cycle — N days
+   before this cycle began DATE"; the reader reads it in the experiment's frame. */
+const _dayFrame = (s) => String(s || "")
+  .replace(/from a previous cycle/i, "from before the experiment")
+  .replace(/before this cycle began/i, "before Day 1,")
+  .replace(/before cycle \d+ began/i, "before the run that began");
+
 // The board — pick an expert, read their actual per-domain take + track record.
 // WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
 // Reads /api/coach_team tensions: topic + the two coaches' positions head-to-head + the
@@ -378,7 +386,7 @@ export function renderVerify(d) {
   const table = rows ? sec(`Whoop vs Garmin, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Garmin</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   const pausedNote = d.garmin_paused ? `<p class="rd-meta label">Garmin ingestion has been paused since ${esc(d.garmin_last_date)} (vendor anti-automation, ADR-074) — the window above is real history through that date, not a live feed.</p>` : "";
   const archivalNote = d.archival && d.archival.pre_cycle
-    ? `<p class="rd-meta label">${esc(d.archival.label)} — the comparison window itself, not only the Garmin pause.</p>`
+    ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself, not only the Garmin pause.</p>`
     : "";
   const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
   return sec("Cross-device agreement — the credibility signal", headFigs +
@@ -430,7 +438,7 @@ export function renderPipeline(d) {
     // not a live-cycle outage. Numbered server-side from the record's date against
     // the cycle-genesis ledger (no stamp dependency); null = predates cycle 1.
     if (s.carried) {
-      const from = s.carried_from_cycle != null ? `attempt ${esc(String(s.carried_from_cycle))}` : "a previous attempt";
+      const from = "before this experiment";
       html += ` <span class="rd-badge wu-carried">carried from ${from}</span>`;
     }
     return html;

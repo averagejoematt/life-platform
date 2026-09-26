@@ -62,7 +62,7 @@ export function absenceLine(pillar, { short = false } = {}) {
   const days = Number.isFinite(a.days_since_last_log) ? a.days_since_last_log : null;
   const dark = Number.isFinite(a.days_dark) ? a.days_dark : null;
   if (a.transition === "never_logged") {
-    return short ? "nothing logged this cycle" : "Nothing has been logged for this since the cycle began — there is no trend here to read, only an absence.";
+    return short ? "nothing logged since Day 1" : "Nothing has been logged for this since the experiment began — there is no trend here to read, only an absence.";
   }
   if (a.transition === "paused" && days != null) {
     return short

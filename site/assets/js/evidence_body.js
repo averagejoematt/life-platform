@@ -152,7 +152,9 @@ export function renderSupplements(d) {
 // in-cycle companion when the server sends one. Both fields are additive and may be
 // absent on an artifact written before the fix — degrade to no label, never to a guess.
 function drawsScope(L) {
-  const scope = L.total_draws_scope;
+  // #4182 (owner ruling 2026-09-26): the cycle count is internal — the API's lifetime
+  // scope word ("all cycles", site_api_phase_frame.lifetime_scope) reads as "all time" here.
+  const scope = L.total_draws_scope === "all cycles" ? "all time" : L.total_draws_scope;
   if (!scope) return null;
   const n = L.draws_this_cycle;
   return typeof n === "number" ? `${scope} · ${n} since Day 1` : scope;

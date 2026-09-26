@@ -67,7 +67,7 @@ test("unknown is never narrated as absence", () => {
 
 test("the family chip says nothing is logged — never a trend verb", () => {
   const chip = absenceLine(DARK_NUTRITION, { short: true });
-  assert.equal(chip, "nothing logged this cycle");
+  assert.equal(chip, "nothing logged since Day 1");
   assert.ok(!/eased off|slipping|holding steady|on the up/i.test(chip));
 });
 
@@ -152,7 +152,7 @@ test("small-n coach observations still degrade to the honest confidence label", 
 
 test("the family chip refuses a trend verb on a dark pillar — the #2388 headline", () => {
   const chip = familyChip(DARK_NUTRITION, "down");
-  assert.deepEqual(chip, { txt: "nothing logged this cycle", state: "absent" });
+  assert.deepEqual(chip, { txt: "nothing logged since Day 1", state: "absent" });
   // The exact live sentence this replaces.
   assert.ok(!/eased off/i.test(chip.txt));
 });

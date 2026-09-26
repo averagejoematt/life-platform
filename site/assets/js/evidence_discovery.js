@@ -116,7 +116,7 @@ export async function renderDiscoveries(d) {
     const noneYet = !fs && !is
       ? armingLine + `<p class="rd-meta label">No discoveries from this experiment yet — correlations and graded findings appear here as the data accrues.</p>`
       : armingLine;
-    const protoIntro = `<p class="rd-meta label">Standing supplement protocols, deliberately carried across cycle resets — long-horizon levers under continuous measurement, not findings of the current cycle.</p>`;
+    const protoIntro = `<p class="rd-meta label">Standing supplement protocols, deliberately kept running from before the experiment began — long-horizon levers under continuous measurement, not findings of this experiment.</p>`;
     // #1984: the library (this section's source) and the tracked supplement stack
     // (/protocols/supplements) are two unreconciled sources of truth for "what's
     // actually running" — a library entry only keeps the "under continuous
