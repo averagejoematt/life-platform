@@ -77,7 +77,7 @@ export function renderSupplements(d) {
   const through = dataThrough(asof);
   const head = allItems.length
     ? `<p class="rd-primary rd-fold">What he takes: ${fmt(takingN)} in the current stack${pausedN ? `, ${fmt(pausedN)} paused` : ""}.</p>` +
-      (through ? `<p class="rd-meta label rd-fresh">${esc(through)}${asofCarried ? " Carried over from before this start." : ""}</p>` : "")
+      (through ? `<p class="rd-meta label rd-fresh">${esc(through)}${asofCarried ? " · carried from prep" : ""}</p>` : "")
     : "";
   // #978 — cycle-aware framing. Before genesis this catalog is the plan going in, not a
   // progress report; say so, keyed off the same pre-start signal every door uses. Once
