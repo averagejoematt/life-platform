@@ -50,7 +50,7 @@ REGISTRY = [
     (
         "vitals",
         "Vitals & pulse",
-        "Today's pulse + the daily trend — weight, recovery, sleep, HRV, steps.",
+        "Today's weight, recovery, sleep, heart-rate variability and steps, with the daily trend.",
         "The body",
         "data",
         "/api/pulse",
@@ -60,7 +60,7 @@ REGISTRY = [
     (
         "physical",
         "Weight & composition",
-        "The daily weight cockpit — trend, milestones, projection — plus the episodic DEXA & bio-age arc.",
+        "Every weigh-in and the trend toward the goal, plus the body-composition scan.",
         "The body",
         "data",
         "/api/physical_overview",
@@ -70,7 +70,7 @@ REGISTRY = [
     (
         "labs",
         "Bloodwork",
-        "153 biomarkers over time — the inside view the wearables can't see.",
+        "His blood tests — the results outside their reference range first.",
         "The body",
         "data",
         "/api/labs",
@@ -80,7 +80,7 @@ REGISTRY = [
     (
         "glucose",
         "Glucose & meals",
-        "Continuous glucose married to what you ate — peak, rise, return.",
+        "Blood sugar against meals — no sensor is being worn.",
         "The body",
         "data",
         "/api/glucose",
@@ -90,7 +90,7 @@ REGISTRY = [
     (
         "sleep",
         "Sleep",
-        "Score, efficiency, deep/REM, HRV, and the recovery it buys.",
+        "Last night by two devices, recovery, and his usual bedtime.",
         "The body",
         "data",
         "/api/sleep_detail",
@@ -100,7 +100,7 @@ REGISTRY = [
     (
         "training",
         "Training & workouts",
-        "Sessions, Zone-2, strain, steps, and strength 1RMs.",
+        "Gym sessions, walks, steps, and whether the lifts are going up.",
         "The body",
         "data",
         "/api/training_overview",
@@ -110,7 +110,7 @@ REGISTRY = [
     (
         "nutrition",
         "Nutrition",
-        "Intake, macros, frequent meals, and protein sources vs the deficit.",
+        "What he eats — calories, protein, and the days he logged.",
         "The body",
         "data",
         "/api/nutrition_overview",
@@ -122,7 +122,7 @@ REGISTRY = [
         # the vitals hero's raw strain-vs-recovery 2×2. Ported from the private tool.
         "autonomic",
         "Autonomic balance",
-        "Where the nervous system sits — Flow, Stress, Recovery, or Burnout — Z-scored against your own baseline.",
+        "How stressed or recovered his nervous system reads, against his own baseline.",
         "The body",
         "data",
         "/api/autonomic_balance",
@@ -133,7 +133,7 @@ REGISTRY = [
         # RQA-07 (#414): the dedicated Zone-2 breakdown against the 150-min reference.
         "zone2",
         "Zone-2 training",
-        "Weekly aerobic minutes against the 150-min/week reference, plus the full 5-zone distribution.",
+        "Minutes of easy cardio each week, against the common 150-minute guideline.",
         "The body",
         "data",
         "/api/zone2",
@@ -166,7 +166,7 @@ REGISTRY = [
     (
         "habits",
         "Habits",
-        "The daily adherence layer the Consistency pillar is built on.",
+        "The daily habits he tracks, and how many he kept.",
         "Mind & accountability",
         "data",
         "/api/habits",
@@ -833,7 +833,7 @@ PILLARS = [
         "nav_key": "data",
         "kicker": "the data · what the body &amp; mind report",
         "h1": "The Data",
-        "lede": "Every source the platform reads — the body, the mind, and the signals the engine finds across them. Live now and over time. Correlative, read-only, flagged when thin.",
+        "lede": "Weight, sleep, training, eating, blood tests — what his devices and apps record.",
         "groups": ["The body", "Mind & accountability", "The character"],
     },
     {

@@ -72,7 +72,7 @@ EVIDENCE_SECONDARY = {
     "training": ["/api/strength_benchmarks", "/api/weekly_physical_summary", "/api/workouts"],  # renderTraining
     "sleep": ["/api/circadian"],  # renderSleep (#487: /api/sleep_reconciliation retired)
     "glucose": ["/api/meal_glucose"],  # renderGlucose (#2327: /api/meal_responses retired)
-    "nutrition": ["/api/frequent_meals", "/api/protein_sources"],  # renderNutrition
+    "nutrition": ["/api/frequent_meals", "/api/protein_sources", "/api/meal_glucose"],  # renderNutrition · #4182 fold's blood-sugar line
     "habits": ["/api/habit_registry"],  # renderHabits
 }
 

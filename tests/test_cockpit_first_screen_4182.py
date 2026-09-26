@@ -132,11 +132,18 @@ def test_the_strip_replaces_the_card_on_both_doors():
 
 
 def test_the_card_definitions_moved_inline():
-    """The three definitions the cards carried now sit where each term first appears."""
-    assert "DATA_GLOSSES" in EVIDENCE_JS
-    for term in ('"Correlative"', '"read-only"', '"flagged when thin"'):
-        assert term in EVIDENCE_JS, term
-    assert "correlation, not proof" in EVIDENCE_JS and "Nothing here is medical advice" in EVIDENCE_JS
+    """The cockpit's definitions sit where each term first appears.
+
+    The Data door's half REVERSED by the L-DATA lane (#4182, the panel's promise ruling):
+    the /data/ promise now reads in plain words ("Weight, sleep, training, eating, blood
+    tests — what his devices and apps record."), so "Correlative" / "read-only" / "flagged
+    when thin" have no term left to gloss and DATA_GLOSSES is gone. The one definition that
+    still binds — not medical advice — moved to the bloodwork readout's note."""
+    assert "DATA_GLOSSES" not in EVIDENCE_JS
+    builder = (ROOT / "scripts/v4_build_evidence.py").read_text(encoding="utf-8")
+    assert '"lede": "Weight, sleep, training, eating, blood tests — what his devices and apps record."' in builder
+    body = (ROOT / "site/assets/js/evidence_body.js").read_text(encoding="utf-8")
+    assert "Nothing here is medical advice" in body
     for term in ("provisional", "recovery", "HRV"):
         assert f'dfn("{term}"' in TQ, term
 

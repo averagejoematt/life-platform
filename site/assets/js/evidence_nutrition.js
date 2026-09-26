@@ -5,6 +5,37 @@
 import { lineChart, barChart, stackedBar, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, ring } from "/assets/js/charts.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
 import { genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter
+
+// #4182 — the refusal, stated whole. When the engine declines to publish a deficit
+// (`deficit_published: false` — its model's estimate exceeds what it will vouch for),
+// every surface says THIS sentence, never a template with holes ("about a — kcal/day
+// (—%, )" was the audit's specimen).
+export const DEFICIT_REFUSED = "The engine does not publish a deficit — its estimate exceeds what it will vouch for.";
+const _int = (v) => Math.round(Number(v)).toLocaleString("en-US");
+const _kOfN = (k, n) => `${k} of ${n}`;
+
+// #4182 — the nutrition fold: days logged against the window, the latest complete day
+// named in words, the averages, the protein floor as "k of n" days, the deficit or its
+// refusal, and the blood-sugar absence (no sensor this cycle) read from /api/meal_glucose.
+export function nutritionFold(d, mg) {
+  const n = (d && d.nutrition) || {};
+  if (!Number(n.days_logged)) return null;
+  const trend = (d && d.nutrition_trend) || [];
+  const first = String((trend[0] || {}).date || "").slice(0, 10);
+  const last = String(n.latest_date || n.as_of || "").slice(0, 10);
+  const span = /^\d{4}-\d{2}-\d{2}$/.test(first) && /^\d{4}-\d{2}-\d{2}$/.test(last) ? Math.round((Date.parse(last) - Date.parse(first)) / 86400000) + 1 : null;
+  const bits = [span ? `Logged ${n.days_logged} of ${span} days.` : `Logged ${n.days_logged} days.`];
+  if (last && n.latest_calories != null) bits.push(`${calendarDay(last)}: ${_int(n.latest_calories)} calories${n.latest_protein_g != null ? `, ${_int(n.latest_protein_g)} g protein` : ""}.`);
+  if (n.avg_calories != null) {
+    const floor = n.protein_floor_g != null && n.protein_floor_hit_days != null ? `; the ${_int(n.protein_floor_g)} g protein floor cleared ${_kOfN(n.protein_floor_hit_days, n.days_logged)} days` : "";
+    bits.push(`Average ${_int(n.avg_calories)} calories${n.avg_protein_g != null ? ` and ${_int(n.avg_protein_g)} g protein` : ""} a day${floor}.`);
+  }
+  if (n.avg_deficit_published === false) bits.push(DEFICIT_REFUSED);
+  else if (n.avg_deficit != null && Number.isFinite(Number(n.avg_deficit))) bits.push(`Estimated deficit about ${_int(n.avg_deficit)} calories a day.`);
+  if (mg && mg.has_cgm === false) bits.push("Blood sugar — no sensor this cycle.");
+  return { text: bits.join(" "), through: last || null };
+}
 
 // The §0 verdict (P0.1): mono states the figures, serif judges the trade. Computed
 // only from the protein pct + avg_deficit — no fabricated mechanism, just the honest
@@ -23,16 +54,16 @@ export function nutritionVerdict(n) {
   const d = Number(n.avg_deficit), h = Number(hasFloor ? n.protein_floor_hit_pct : n.protein_hit_pct);
   const machine = [
     n.avg_calories != null ? `${fmt(n.avg_calories)} in` : null,
-    n.tdee != null ? `${fmt(n.tdee)} maintenance` : null,
+    n.tdee != null ? `${fmt(n.tdee)} estimated maintenance` : null,
     hasDef ? `${d >= 0 ? "−" : "+"}${fmt(Math.abs(Math.round(d)))} kcal/day` : null,
-    hasHit ? `protein ${hasFloor ? "floor" : "target"} ${fmt(h)}%` : null,
+    hasHit ? `protein ${hasFloor ? "floor" : "target"} ${_hitPhrase(n, hasFloor, h)}` : null,
   ].filter(Boolean).join(" · ");
   const realDeficit = hasDef && d >= 250;
   const line = hasFloor ? "floor" : "target"; // which line h actually grades
   let human;
   if (!hasDef) {
     human = h === 0 ? `Protein's under the ${line} every logged day — it isn't being cleared yet.`
-      : `Protein clears the ${line} about ${fmt(h)}% of days. An expenditure read is needed before the deficit half of the story lands.`;
+      : `Protein clears the ${line} on ${_hitPhrase(n, hasFloor, h)}. ${n.avg_deficit_published === false ? DEFICIT_REFUSED : "An expenditure read is needed before the deficit half of the story lands."}`;
   } else if (!realDeficit) {
     human = "No real deficit on the logged days — this reads closer to maintenance than a cut right now.";
   } else if (!hasHit || h === 0) {
@@ -47,12 +78,22 @@ export function nutritionVerdict(n) {
   return { machine, human };
 }
 
+// #4182: a share of days carries its n — below 30 days it reads "7 of 20 days", never "35%".
+function _hitPhrase(n, hasFloor, h) {
+  const k = hasFloor ? n.protein_floor_hit_days : n.protein_hit_days;
+  const days = Number(n.days_logged);
+  if (k != null && days > 0) return days < 30 ? `${_kOfN(k, days)} days` : `${fmt(h)}% of ${days} days`;
+  return `${fmt(h)}% of days`;
+}
+
 // §0 Hero — one measuring-rule spine (0→maintenance, intake + maintenance ticks,
 // deficit gap shaded) + the two-voice verdict. Replaces the old neutral big-number tiles;
 // calories / TDEE / deficit fold in here.
 export function nutritionHero(n) {
   if (n.avg_calories == null && n.tdee == null && n.avg_deficit == null && n.protein_hit_pct == null) return "";
-  const spine = (n.avg_calories != null && n.tdee != null)
+  // #4182: when the engine refuses to publish a deficit, the spine can't shade one either —
+  // its "N kcal/day deficit (shaded)" caption was the refused number, drawn anyway.
+  const spine = (n.avg_calories != null && n.tdee != null && n.avg_deficit_published !== false)
     ? intakeSpine(n.avg_calories, n.tdee, { label: "30-day average intake vs estimated maintenance" })
     : "";
   const v = nutritionVerdict(n);
@@ -77,6 +118,8 @@ export function nutritionProteinLead(n) {
   const low = h < 100; // the floor is daily — anything under 100% is missed days
   const days = n.days_logged;
   const hitDays = hasFloor ? n.protein_floor_hit_days : n.protein_hit_days;
+  // #4182: below 30 days the lead figure is the count itself ("7 of 20"), never a bare %.
+  const leadV = hitDays != null && Number(days) > 0 && Number(days) < 30 ? _kOfN(hitDays, days) : `${fmt(h)}%`;
   const sub = [
     n.avg_protein_g != null ? `${fmt(n.avg_protein_g)} g avg` : null,
     hasFloor ? `floor ${fmt(n.protein_floor_g)} g` : null,
@@ -86,22 +129,22 @@ export function nutritionProteinLead(n) {
       : null,
   ].filter(Boolean).join(" · ");
   return `<section class="rd-sec nut-lead ${low ? "lead-warn" : "lead-ok"}">` +
-    `<div class="lead-fig"><span class="lead-v mono">${fmt(h)}%</span>` +
-    `<span class="lead-k label">protein ${hasFloor ? "floor" : "target"} hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
+    `<div class="lead-fig"><span class="lead-v mono">${esc(leadV)}</span>` +
+    `<span class="lead-k label">days at the protein ${hasFloor ? "floor" : "target"}${low ? " — under it on the rest" : " — cleared every day"}</span></div>` +
     `<p class="lead-sub mono">${esc(sub)}</p></section>`;
 }
 
 // §1 loss-rate readout (P0.9) — target rate → required deficit → actual deficit → gap,
 // with the deficit-intensity flag, the rate and the protein status on ONE sightline.
 // Two-voice: mono states the chain, serif surfaces the (contested) read honestly.
-export function nutritionLossRate(lr) {
+export function nutritionLossRate(lr, n) {
   if (!lr || lr.target_rate_lb_wk == null) return "";
   const chain = [
     `target ${fmt(lr.target_rate_lb_wk)} lb/wk`,
     lr.required_deficit_kcal != null ? `needs −${fmt(lr.required_deficit_kcal)} kcal/day` : null,
-    lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : "running — (needs an expenditure read)",
+    lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : lr.deficit_published === false ? "actual deficit not published" : "actual deficit unknown until an expenditure read lands",
     lr.gap_kcal != null ? `gap ${lr.gap_kcal >= 0 ? "+" : "−"}${fmt(Math.abs(lr.gap_kcal))}` : null,
-    (lr.protein_floor_hit_pct ?? lr.protein_hit_pct) != null ? `protein floor ${fmt(lr.protein_floor_hit_pct ?? lr.protein_hit_pct)}%` : null,
+    (lr.protein_floor_hit_pct ?? lr.protein_hit_pct) != null ? `protein floor ${n ? _hitPhrase(n, lr.protein_floor_hit_pct != null, lr.protein_floor_hit_pct ?? lr.protein_hit_pct) : `${fmt(lr.protein_floor_hit_pct ?? lr.protein_hit_pct)}% of days`}` : null,
   ].filter(Boolean).join(" → ");
   const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";
   // "The floor" here means the real floor (170) the coaches grade against, not the
@@ -220,13 +263,31 @@ export function nutritionDeficitSustainability(ds) {
       `<span class="dsx-status label">${esc(statusWord)}</span></div>`;
   }).join("");
   const sevTone = (ds.severity === "warning" || ds.severity === "critical") ? "dsx-sev-attn" : "dsx-sev-ok";
-  const defLine = def.in_deficit
-    ? `Running ~${fmt(def.avg_intake_kcal)} kcal against an estimated ${fmt(def.tdee)} TDEE — about a <strong>${fmt(def.deficit_kcal)} kcal/day (${fmt(def.deficit_pct)}%, ${esc(def.label)})</strong> deficit (TDEE is estimated, so read the % as a ballpark).`
-    : "No active deficit in the window.";
+  // #4182: a refused or unpublished deficit reads as the refusal, never as "about a — kcal/day (—%, )".
+  const intake = def.avg_intake_kcal != null && def.tdee != null ? `Eating ~${_int(def.avg_intake_kcal)} calories a day against an estimated ${_int(def.tdee)} to maintain (TDEE, total daily energy expenditure). ` : "";
+  const defLine = !def.in_deficit
+    ? "No active deficit in the window."
+    : def.deficit_published === false || def.deficit_kcal == null
+      ? `${intake}The deficit itself is not published.`
+      : `${intake}That is about a <strong>${_int(def.deficit_kcal)} calorie/day deficit${def.deficit_pct != null ? ` (${fmt(def.deficit_pct)}%${def.label ? `, ${esc(def.label)}` : ""})` : ""}</strong> — maintenance is estimated, so read it as a ballpark.`;
   return sec("Is the cut costing you? — the five-channel read",
     `<div class="dsx-verdict ${sevTone}"><span class="dsx-count mono">${ds.degraded_count}/5</span><span class="dsx-vtext">${esc(ds.verdict || "")}</span></div>` +
     `<div class="dsx-rows">${rows}</div>` +
     `<p class="rd-meta label">${defLine} The five channels — HRV, sleep quality, recovery, habit adherence, training output — are watched together: a deficit that's working shows up as the weight falling while these <em>hold</em>; one that's costing too much shows up as three or more slipping at once. A single strained channel is noise, not a verdict. Correlative, n=1 — an early signal, never alarm.</p>`);
+}
+
+// #4182 — the weekday/weekend split with labels a reader can read (the kvtable printed
+// the raw field names: "Avg Protein G 154.3 · Protein Hit Pct 7"). A share of days
+// carries its n: "1 of 15 days", derived from the served pct × days.
+const WW_ROWS = [["avg_calories", "calories a day", (v) => _int(v)], ["avg_protein_g", "protein a day", (v) => `${_int(v)} g`], ["avg_carbs_g", "carbs a day", (v) => `${_int(v)} g`], ["avg_fat_g", "fat a day", (v) => `${_int(v)} g`], ["avg_fiber_g", "fiber a day", (v) => `${_int(v)} g`]];
+export function weekdayWeekendTable(ww) {
+  const a = ww.weekday || {}, b = ww.weekend || {};
+  const cell = (o, key, f) => (o[key] != null ? esc(f(o[key])) : "—");
+  const hit = (o) => (o.protein_hit_pct != null && Number(o.days) > 0 ? _kOfN(Math.round((Number(o.protein_hit_pct) / 100) * Number(o.days)), o.days) + " days" : "—");
+  const rows = WW_ROWS.map(([k, label, f]) => `<tr><td class="rd-name">${label}</td><td class="num">${cell(a, k, f)}</td><td class="num">${cell(b, k, f)}</td></tr>`).join("") +
+    `<tr><td class="rd-name">days logged</td><td class="num">${fmt(a.days)}</td><td class="num">${fmt(b.days)}</td></tr>` +
+    `<tr><td class="rd-name">hit the protein target</td><td class="num">${hit(a)}</td><td class="num">${hit(b)}</td></tr>`;
+  return `<table class="rd-tbl"><thead><tr><th></th><th>weekdays</th><th>weekends</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 export async function renderNutrition(d) {
@@ -248,8 +309,9 @@ export async function renderNutrition(d) {
   // vs the macrofactor threshold in source_registry) — when stalled, say it plainly.
   if (n.as_of && n.stalled) {
     parts.push(`<p class="rd-meta label nut-asof nut-stalled">Nutrition logging <strong>stopped ${esc(fmtShort(n.as_of))}</strong> — ${fmt(n.lag_days)} days dark. Everything below reads from that last logged stretch, not the present.</p>`);
-  } else if (n.as_of) {
-    parts.push(`<p class="rd-meta label nut-asof">Nutrition reflects complete days — through <strong>${esc(fmtShort(n.as_of))}</strong>${n.today_pending ? ". Today's intake uploads after the day ends." : "."}</p>`);
+  } else if (n.as_of && n.today_pending) {
+    // #4182: ONE freshness line per page — the fold's "Data through" carries the date.
+    parts.push(`<p class="rd-meta label nut-asof">Complete days only — today's meals upload after the day ends.</p>`);
   }
   // ── §2 lead — the protein miss as THE weighted signal (P0.2).
   const lead = nutritionProteinLead(n);
@@ -259,7 +321,7 @@ export async function renderNutrition(d) {
   if (dsx) parts.push(dsx);
   // The one latest-day figure kept as "news".
   const news = figs([
-    n.latest_calories != null && fig(fmt(n.latest_calories), `latest logged${n.latest_date ? " · " + fmtShort(n.latest_date) : ""}`),
+    n.latest_calories != null && fig(fmt(n.latest_calories), `calories${n.latest_date ? " · " + fmtShort(n.latest_date) : ""}`),
     n.latest_protein_g != null && fig(fmt(n.latest_protein_g) + "g", "protein that day"),
   ]);
   if (news.includes("fig-v")) parts.push(news);
@@ -276,7 +338,7 @@ export async function renderNutrition(d) {
   if (trend.length) {
     parts.push(sec("Energy — the deficit story",
       lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." }) +
-      nutritionLossRate(d && d.loss_rate)));
+      nutritionLossRate(d && d.loss_rate, n)));
     parts.push(sec("Protein vs target",
       lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target", spine: true }) +
       nutritionProteinAnnotation(n) +
@@ -360,7 +422,7 @@ export async function renderNutrition(d) {
   const wdN = (ww.weekday && ww.weekday.days) || 0;
   const weN = (ww.weekend && ww.weekend.days) || 0;
   if (DAYS >= TWO_WEEKS && wdN > 0 && weN > 0) {
-    parts.push(sec("Weekday vs weekend", kvtable(ww)));
+    parts.push(sec("Weekday vs weekend", weekdayWeekendTable(ww)));
   } else if (wdN > 0 || weN > 0) {
     parts.push(sec("Weekday vs weekend", empty(`The weekday/weekend split fills in at 2+ weeks of logging — ${DAYS} day${DAYS === 1 ? "" : "s"} so far.`)));
   }
@@ -409,8 +471,8 @@ export async function renderNutrition(d) {
   if ((n.days_logged || 0) > 0) {
     parts.push(sec("Can I hold this? — hunger & energy",
       `<div class="nut-coming"><p class="rd-archive">A daily 1–5 hunger and energy check-in isn't being captured yet. Once it is, this becomes a sparkline of how holdable the deficit actually feels day to day — the subjective side of "sustainable" that HRV and recovery can't see. <span class="confidence conf-low">needs capture</span></p></div>`));
-    // §8 CGM × meals — designed empty state (no live binding).
-    parts.push(cgmEmptyState());
+    // #4182: the CGM ghost left this readout — the fold's one line ("Blood sugar — no
+    // sensor this cycle.") is the honest absence; /data/glucose/ keeps the designed state.
   }
   if (meals.length)
     parts.push(
