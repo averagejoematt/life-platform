@@ -1,0 +1,182 @@
+// tests/js/v7_coaches.test.mjs — #4182: "The coaches" (v7 page 5) pure functions.
+//
+// The fixtures are the live shapes captured 2026-09-26 (scratchpad b2) trimmed to what each
+// function reads; `latest_checked` (#4230) is hand-made in the served shape because the
+// capture predates it. Nothing here reads the wall clock.
+import "./support/loader.mjs";
+import test from "node:test";
+import assert from "node:assert/strict";
+
+const V = await import("../../site/assets/js/v7_coaches.js");
+
+test("ids: dashboard/calibration short ids map to the persona id; the lead and persona ids pass through", () => {
+  assert.equal(V.personaId("sleep"), "sleep_coach");
+  assert.equal(V.personaId("sleep_coach"), "sleep_coach");
+  assert.equal(V.personaId("eli_marsh"), "eli_marsh");
+  assert.equal(V.shortId("nutrition_coach"), "nutrition");
+});
+
+test("numbers in words to ninety-nine, numerals past", () => {
+  assert.equal(V.numberWords(0), "zero");
+  assert.equal(V.numberWords(17), "seventeen");
+  assert.equal(V.numberWords(37), "thirty-seven");
+  assert.equal(V.numberWords(84), "eighty-four");
+  assert.equal(V.numberWords(147), "147");
+  assert.equal(V.numberWords("x"), "");
+});
+
+test("the written time is words, Pacific: Park's 17:01:48Z read is one minute past ten in the morning", () => {
+  assert.equal(V.timeInWords("2026-09-25T17:01:48.880845+00:00"), "Friday, September 25, at one minute past ten in the morning, Pacific time");
+  assert.equal(V.timeInWords("2026-09-24T03:10:00Z"), "Wednesday, September 23, at ten minutes past eight in the evening, Pacific time");
+  assert.equal(V.timeInWords("2026-09-24T17:00:00Z"), "Thursday, September 24, at ten in the morning, Pacific time");
+  assert.equal(V.timeInWords("garbage"), "");
+});
+
+test("the ledger line (#4230): a value call quotes the actual; a directional call says the direction came true and never quotes the slope", () => {
+  const value = { claim: "Recovery lands near 60", created_date: "2026-09-10", outcome_date: "2026-09-24", metric: "recovery_score", eval_type: "interval", condition: "gte", threshold: 60, actual_value: 24, status: "refuted" };
+  const l = V.ledgerLine(value, "Dr. Lisa Park");
+  assert.equal(l.verdict, "wrong");
+  assert.equal(l.text, "On Thursday, September 10, Park said the night’s recovery would be at or above 60 — it came in at 24.");
+  assert.equal(l.checked, "Checked Thursday, September 24.");
+  assert.equal(l.claim, "Recovery lands near 60");
+  const dir = { claim: null, created_date: "2026-09-17", outcome_date: "2026-09-24", metric: "recovery_score", eval_type: "directional", condition: "up", threshold: null, actual_value: 0.1439, status: "confirmed" };
+  const d = V.ledgerLine(dir, "Dr. Max Reyes");
+  assert.equal(d.verdict, "right");
+  assert.equal(d.text, "On Thursday, September 17, Reyes said the night’s recovery would go up over the checked window — the direction came true.");
+  assert.ok(!d.text.includes("0.14"), "the slope must never print as a level");
+  assert.equal(d.claim, "");
+  // null → no line (the page prints "No checked call yet.")
+  assert.equal(V.ledgerLine(null, "x"), null);
+  assert.equal(V.ledgerLine({ status: "pending", metric: "hrv" }, "x"), null);
+});
+
+test("the recent list: the grader's reason strings become right/wrong lines, whole list, tallied", () => {
+  const recent = [
+    { date: "2026-09-25", status: "confirmed", metric: "recovery_score", reason: "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6158 (±1 SD…); |Δ|=6.10 → within tolerance" },
+    { date: "2026-09-24", status: "refuted", metric: "sleep_duration_hours", reason: "sleep_duration_hours trend=up (slope=0.0247), predicted=down" },
+    { date: "2026-09-10", status: "refuted", metric: "total_calories_kcal_7day_avg", reason: "dispute docket resolved: total_calories_kcal_7day_avg >= 2200 on 2026-08-10" },
+    { date: "2026-09-09", status: "pending", metric: "hrv", reason: "" },
+  ];
+  const lines = V.recentLines(recent, "Dr. Lisa Park");
+  assert.equal(lines.length, 3, "a pending row is not a checked call");
+  assert.equal(lines[0].text, "For Saturday, September 12, Park said the night’s recovery would land near 52.9, give or take 18.6 — it came in at 59.");
+  assert.equal(lines[0].checked, "Checked Friday, September 25.");
+  assert.equal(lines[1].text, "Park said the night’s sleep, in hours would go down over the checked window — it went up.");
+  assert.ok(!lines[1].text.includes("0.0247"));
+  assert.equal(lines[2].text, "A disagreement settled by code: total calories kcal 7day avg >= 2200 on 2026-08-10.");
+  assert.deepEqual(V.tally(lines), { right: 1, wrong: 2, n: 3 });
+});
+
+test("the standing ask is a keyword count over recent_outputs (one producer) and the newest pending commitment", () => {
+  const outs = [
+    { date: "2026-09-25", summary: "Log four words each morning before checking the app: three words for sleep quality…" },
+    { date: "2026-09-24", summary: "Provide a two-word morning check immediately upon waking…" },
+    { date: "2026-09-12", summary: "Two predictions from yesterday are sitting open and resolve today." },
+    { date: "2026-09-06", summary: "Share your subjective sleep experience and any hard constraints on sleep timing." },
+  ];
+  assert.deepEqual(V.askCount(outs), { asks: 2, mornings: 4, first: "2026-09-06", last: "2026-09-25" });
+  assert.deepEqual(V.askCount([]), { asks: 0, mornings: 0, first: "", last: "" });
+  const ask = V.standingAsk([
+    { date: "2026-09-20", text: "older", status: "pending", due_date: "2026-09-27" },
+    { date: "2026-09-25", text: "Log subjective sleep quality each morning", status: "pending", due_date: "2026-10-02" },
+    { date: "2026-09-26", text: "kept one", status: "kept" },
+  ]);
+  assert.equal(ask.text, "Log subjective sleep quality each morning");
+  assert.equal(V.standingAsk([]), null);
+});
+
+test("a coach whose instrument is dark is named, not quoted: cgm.dark → glucose_coach; a paused source darkens its coach", () => {
+  const fresh = {
+    sources: [
+      { id: "apple_health", status: "fresh", datatypes: [{ key: "cgm", dark: true }, { key: "state_of_mind", dark: true }] },
+      { id: "whoop", status: "fresh" },
+      { id: "hevy", status: "paused" },
+    ],
+  };
+  const dark = V.darkCoaches(fresh);
+  assert.ok(dark.has("glucose_coach"));
+  assert.ok(dark.has("physical_coach"));
+  assert.ok(!dark.has("sleep_coach"));
+  assert.equal(V.darkCoaches(null).size, 0);
+});
+
+test("the docket row: yes/no sides, the engine's last seven nightly readings between them, settled-by in words; a dark side keeps its claim off the page", () => {
+  const item = {
+    topic: "Recovery rebound interpretation: mean reversion vs. corrective action",
+    coach_a: "mind_coach", coach_b: "sleep_coach",
+    claims: { mind_coach: "regression toward baseline", sleep_coach: "genuine architectural improvement" },
+    criterion: { condition: "gte", metric: "recovery_score_7day_avg", threshold: 80.0, description: "recovery_score_7day_avg >= 80 on 2026-10-07" },
+    sides: { mind_coach: false, sleep_coach: true }, resolution_date: "2026-10-07", opened_date: "2026-09-23",
+  };
+  const trend = ["2026-09-18", "2026-09-19", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26"].map((d, i) => ({ date: d, recovery_score: [70, 98, 90, 78, 80, 86, 99, 77][i] }));
+  const sleep = { sleep_trend: trend, sleep_detail: { avg_recovery_window: 73.9, avg_window_days: 21 } };
+  const names = { mind_coach: "Dr. Nathan Reeves", sleep_coach: "Dr. Lisa Park" };
+  const r = V.docketRow(item, names, new Set(), sleep);
+  assert.equal(r.yes.name, "Dr. Lisa Park");
+  assert.equal(r.no.name, "Dr. Nathan Reeves");
+  assert.deepEqual(r.engine.readings, ["98", "90", "78", "80", "86", "99", "77"]);
+  assert.equal(r.engine.span, "September 19 to September 26");
+  assert.equal(r.engine.avg, "73.9");
+  assert.equal(r.settled, "Code, on Wednesday, October 7: the seven-night average recovery at or above 80 and Dr. Lisa Park wins. The loser’s miss stays on the record.");
+  // a dark instrument: named, not quoted
+  const glucose = { ...item, coach_a: "glucose_coach", coach_b: "nutrition_coach", sides: { glucose_coach: false, nutrition_coach: true }, claims: { glucose_coach: "secret", nutrition_coach: "calories" }, criterion: { condition: "lt", metric: "recovery_score", threshold: 70 } };
+  const g = V.docketRow(glucose, { glucose_coach: "Dr. Amara Patel", nutrition_coach: "Dr. Marcus Webb" }, new Set(["glucose_coach"]), sleep);
+  assert.equal(g.no.dark, true);
+  assert.equal(g.no.claim, "");
+  assert.equal(g.yes.claim, "calories");
+  const html = V.docketHTML([g]);
+  assert.ok(!html.includes("secret"), "a dark coach's words never reach the page");
+  assert.ok(html.includes("named, not quoted"));
+  // a non-recovery criterion prints no series
+  assert.equal(V.engineNumber({ metric: "weight_lbs" }, sleep), null);
+});
+
+test("the record is K of N so far / all time from platform.strata.coaches — never a percentage; per-coach K of N only where served, n in words", () => {
+  const cal = {
+    as_of: "2026-09-26",
+    platform: { strata: { coaches: { n: 37, confirmed: 18 } }, lifetime: { strata: { coaches: { n: 84, confirmed: 31 } } } },
+    coaches: [
+      { coach_id: "sleep", n: 17, confirmed: 7, accuracy_pct: 41.2, retired: false },
+      { coach_id: "labs", n: 1, confirmed: 1, accuracy_pct: 100, retired: false },
+      { coach_id: "training", n: 0, confirmed: 0, retired: true },
+    ],
+  };
+  const rec = V.platformRecord(cal);
+  assert.deepEqual(rec, { soFar: { k: 18, n: 37 }, allTime: { k: 31, n: 84 }, through: "2026-09-26" });
+  const html = V.recordHTML(rec);
+  assert.ok(html.includes("18 of 37") && html.includes("31 of 84") && html.includes("all time"));
+  assert.ok(!/%|percent/.test(html));
+  const roster = { coaches: [
+    { persona_id: "eli_marsh", name: "Dr. Eli Marsh", domain: "orchestration", tier: "lead" },
+    { persona_id: "sleep_coach", name: "Dr. Lisa Park", domain: "sleep_science", tier: "staff" },
+    { persona_id: "labs_coach", name: "Dr. James Okafor", domain: "clinical_pathology", tier: "staff" },
+    { persona_id: "explorer_coach", name: "Dr. Henning Brandt", domain: "biostatistics_n1_research", tier: "staff" },
+  ] };
+  const rows = V.rosterRows(roster, cal, "sleep_coach");
+  assert.deepEqual(rows.map((r) => r.id), ["eli_marsh", "labs_coach", "explorer_coach"], "the coach at the top is not repeated");
+  assert.equal(rows[1].record, "1 of one checked call right so far");
+  assert.equal(rows[2].record, "", "no served n → no K of N");
+  assert.equal(rows[0].role, "runs the program — makes no checked calls");
+  assert.equal(V.platformRecord(null).soFar, null);
+});
+
+test("readHTML: the ledger line opens the read; a null latest_checked is absence; guarded slots only; no cycle/reset/attempt word", () => {
+  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of September 23 the strap logged 86.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record", reason: "chosen: the best checked record since Day 1 — 7 of 17 held up" };
+  const profile = {
+    latest_checked: { claim: null, created_date: "2026-09-12", outcome_date: "2026-09-25", metric: "recovery_score", eval_type: "interval", condition: "gte", threshold: 52.9, actual_value: 59, status: "confirmed" },
+    report_card: { track_record: { recent: [{ date: "2026-09-25", status: "confirmed", metric: "recovery_score", reason: "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6" }] } },
+    recent_outputs: [{ date: "2026-09-25", summary: "Log four words each morning" }, { date: "2026-09-24", summary: "Note two words each morning" }],
+    dossier: { commitments: [{ date: "2026-09-25", text: "Log sleep quality each morning", status: "pending", due_date: "2026-10-02" }] },
+    daily: "",
+  };
+  const html = V.readHTML(pick, profile, new Date("2026-09-26T16:46:00Z"));
+  assert.ok(html.indexOf("latest_checked") < html.indexOf("position_summary"), "the ledger line comes before the read");
+  assert.ok(html.includes("it came in at 59"));
+  assert.ok(html.includes("data-src=\"api_coach_sleep_coach.recent_outputs (count)\">2</b> of two mornings"));
+  assert.ok(html.includes("Log sleep quality each morning"));
+  assert.ok(!html.includes("as served</summary>"), "an empty daily slot renders no details block");
+  assert.ok(!/\b(cycle|reset|attempt)s?\b/i.test(html));
+  const bare = V.readHTML(pick, { latest_checked: null }, new Date());
+  assert.ok(bare.includes("No checked call yet."));
+  assert.ok(!bare.includes("v7c-thread"));
+});

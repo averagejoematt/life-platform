@@ -48,6 +48,7 @@ sys.path.insert(0, HERE)
 
 import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
+from v7 import coaches  # noqa: E402 — page 5's template (#4182)
 
 SITE_DIR = os.path.join(ROOT, "site")
 
@@ -68,6 +69,12 @@ PAGES = (
 
 SITE_NAME = "averagejoematt"
 
+# Per-page templates (each lands with its page's lane): page path -> module with head()/body(base)/tail().
+# A page with no entry renders the scaffold placeholder.
+TEMPLATES = {
+    "coaching/": coaches,
+}
+
 
 def _esc(s: str) -> str:
     return html.escape(s, quote=True)
@@ -82,6 +89,10 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
     bar = v4_chrome.doors_nav(current_door=page)
     foot = v4_chrome.site_footer()
     canonical = f"https://averagejoematt.com{base}{page}"
+    tpl = TEMPLATES.get(page)
+    extra_head = tpl.head() if tpl else ""
+    body = tpl.body(base) if tpl else f'    <p class="v7-placeholder">Not built yet — {_esc(due)} of the build week.</p>\n'
+    extra_tail = tpl.tail() if tpl else ""
     return (
         "<!DOCTYPE html>\n"
         '<html lang="en" class="v7">\n'
@@ -96,6 +107,7 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         '  <link rel="stylesheet" href="/assets/css/fonts.css">\n'
         '  <link rel="stylesheet" href="/assets/css/tokens.css">\n'
         '  <link rel="stylesheet" href="/assets/css/v7.css">\n'
+        f"{extra_head}"
         '  <script src="/assets/js/boot_theme.js"></script>\n'
         "</head>\n"
         '<body class="v7-body">\n'
@@ -105,11 +117,12 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         f'  <main id="main" class="v7-main">\n'
         f"    <h1>{_esc(title)}</h1>\n"
         f'    <p class="v7-job">{_esc(job)}</p>\n'
-        f'    <p class="v7-placeholder">Not built yet — {_esc(due)} of the build week.</p>\n'
+        f"{body}"
         "  </main>\n"
         f"  {foot}\n"
         f"  {bar}\n"
         '  <script type="module" src="/assets/js/v7_shell.js"></script>\n'
+        f"{extra_tail}"
         "</body>\n"
         "</html>\n"
     )

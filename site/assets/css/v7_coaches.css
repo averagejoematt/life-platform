@@ -1,0 +1,167 @@
+/* v7_coaches.css — "The coaches" (#4182, plan §2a row 5), Prototype C screen II on the v7
+   shell. Tokens from tokens.css ONLY (no raw hex, no font-size literal; breakpoints from
+   DESIGN_SYSTEM_V5 §10.1) — tests/test_css_tokens.py sweeps this sheet like the others.
+   Type: C's Newsreader → Fraunces (--font-serif), Plex Sans → Instrument Sans (--font-sans),
+   Plex Mono exact (--font-mono). C's one red margin rule is the ember rule: the frame's
+   spine, where the date lives, and it carries no claim. "Right" is the only earned colour. */
+
+.v7c-intro {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-6);
+}
+
+/* ── an entry: the date in the margin, the body beside it ── */
+.v7c-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  gap: 0 var(--sp-2);
+  padding: var(--sp-5) 0 var(--sp-6);
+  border-top: 1px solid var(--rule);
+}
+.v7c-entry::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0; left: 2.7rem; width: 1px;
+  background: var(--ember-line);
+}
+.v7c-m {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--lh-snug);
+  color: var(--ink-muted);
+  padding-top: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+}
+.v7c-m .v7c-d { display: block; font-size: var(--fs-h3); color: var(--ink); line-height: var(--lh-tight); }
+.v7c-m .v7c-mo { display: block; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.v7c-m .v7c-w { display: none; }
+.v7c-body { min-width: 0; }
+
+.v7c-h {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 var(--sp-3);
+}
+.v7c-dated { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-muted); margin: 0 0 var(--sp-1); }
+.v7c-note { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); line-height: var(--lh-body); margin: var(--sp-2) 0 0; }
+.v7c-absent { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-muted); margin: 0 0 var(--sp-3); }
+.v7c-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── the voice line ── */
+.v7c-voice { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3); margin: 0 0 var(--sp-3); }
+.v7c-who { font-family: var(--font-serif); font-weight: 500; font-size: var(--fs-h3); line-height: var(--lh-snug); color: var(--ink); }
+.v7c-role { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-muted); }
+
+/* ── the ledger ── */
+.v7c-ledger { margin: 0 0 var(--sp-3); padding: 0; list-style: none; }
+.v7c-ledger li {
+  padding: var(--sp-2) 0;
+  border-top: 1px dashed var(--rule);
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.v7c-ledger li:first-child { border-top: 0; padding-top: 0; }
+.v7c-ledger .v7c-g { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); display: block; }
+.v7c-ledger .v7c-claim { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-muted); }
+.v7c-tag {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  color: var(--ink-faint);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-xs);
+  padding: 0 var(--sp-1);
+  margin-right: var(--sp-2);
+  vertical-align: 1px;
+  text-transform: lowercase;
+}
+.v7c-tag.v7c-hit { color: var(--ember); border-color: var(--ember); }
+
+/* ── the read, quoted ── */
+.v7c-coach {
+  margin: 0 0 var(--sp-3);
+  padding: 0 0 0 var(--sp-4);
+  border-left: 2px solid var(--rule-strong);
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+}
+
+/* ── the counted thread ── */
+.v7c-thread {
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  padding: var(--sp-3) var(--sp-4);
+  margin: var(--sp-3) 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.v7c-thread p { margin: 0; }
+.v7c-thread .v7c-t {
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: var(--sp-1);
+}
+.v7c-thread .v7c-late { color: var(--alert); font-weight: 600; }
+.v7c-thread q { font-style: italic; }
+
+/* ── tables ── */
+.v7c-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-3);
+}
+.v7c-table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  vertical-align: top;
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) 0;
+  border-bottom: 1px solid var(--rule);
+  width: 28%;
+}
+.v7c-table td { vertical-align: top; padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+.v7c-table tr.v7c-engine td, .v7c-table tr.v7c-engine th { background: var(--surface-2); }
+.v7c-rec td.v7c-k2 { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; padding-right: var(--sp-3); }
+
+/* ── details ── */
+.v7c-details { border-top: 1px solid var(--rule); padding-top: var(--sp-2); margin-top: var(--sp-3); }
+.v7c-details summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ember);
+  padding: var(--sp-1) 0 var(--sp-2);
+  list-style: none;
+  min-height: 44px;
+  display: flex; align-items: center;
+}
+.v7c-details summary::-webkit-details-marker { display: none; }
+.v7c-details summary::before { content: "+ "; font-family: var(--font-mono); margin-right: var(--sp-1); }
+.v7c-details[open] summary::before { content: "– "; }
+
+@media (min-width: 601px) {
+  .v7c-entry { grid-template-columns: 6rem 1fr; }
+  .v7c-entry::before { left: 5.4rem; }
+  .v7c-m .v7c-w { display: block; }
+}

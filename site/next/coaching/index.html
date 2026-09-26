@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_coaches.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body class="v7-body">
@@ -25,10 +26,43 @@
   <main id="main" class="v7-main">
     <h1>The coaches</h1>
     <p class="v7-job">The witnesses, on the record.</p>
-    <p class="v7-placeholder">Not built yet — Tuesday of the build week.</p>
+    <p class="v7c-intro">Eight AI characters — software, not people — read his numbers each morning. Every dated claim they make is checked later by code, and the misses stay on the record. <span id="v7c-through" data-src="api_calibration.as_of"></span></p>
+    <section class="v7c-entry" id="v7c-read" aria-labelledby="v7c-read-h">
+      <div class="v7c-m" id="v7c-read-m" aria-hidden="true"></div>
+      <div class="v7c-body">
+        <h2 id="v7c-read-h" class="v7c-h">Today’s read</h2>
+        <div id="v7c-read-body">
+          <p class="v7c-absent">No read is served today.</p>
+        </div>
+      </div>
+    </section>
+    <section class="v7c-entry" id="v7c-docket" aria-labelledby="v7c-docket-h">
+      <div class="v7c-m" id="v7c-docket-m" aria-hidden="true"></div>
+      <div class="v7c-body">
+        <h2 id="v7c-docket-h" class="v7c-h">Where two of them disagree</h2>
+        <div id="v7c-docket-body">
+          <p class="v7c-absent">No open disagreement on the record.</p>
+        </div>
+      </div>
+    </section>
+    <section class="v7c-entry" id="v7c-record" aria-labelledby="v7c-record-h">
+      <div class="v7c-m" id="v7c-record-m" aria-hidden="true"></div>
+      <div class="v7c-body">
+        <h2 id="v7c-record-h" class="v7c-h">The record</h2>
+        <div id="v7c-record-body">
+          <p class="v7c-absent">No checked call yet.</p>
+        </div>
+        <p class="v7c-note">Per-coach hit rates are not printed here yet: three scorekeepers disagree on the same day. What is printed above is each checked call, one by one, from the coach’s own ledger — a list a reader can count, not a rate the site cannot yet stand behind.</p>
+        <details class="v7c-details" id="v7c-roster">
+          <summary id="v7c-roster-sum">The staff</summary>
+          <div id="v7c-roster-body"><p class="v7c-absent">No roster is served.</p></div>
+        </details>
+      </div>
+    </section>
   </main>
   <footer class="v7-foot"><nav aria-label="More"><a href="/next/protocols/">What he’s trying</a><a href="/next/story/about/">Who he is</a><a href="/next/method/">Under the hood</a><a href="/next/subscribe/">Follow</a><a href="/privacy/">Privacy</a></nav></footer>
   <nav class="v7-bar" aria-label="Pages"><a href="/next/">Home</a><a href="/next/cockpit/">Today</a><a href="/next/story/">This week</a><a href="/next/data/">His numbers</a><a href="/next/coaching/" aria-current="page">The coaches</a></nav>
   <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_coaches.js"></script>
 </body>
 </html>
