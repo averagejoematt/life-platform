@@ -1,0 +1,51 @@
+{
+  "id": "2026-09-21-eli-weekly-106.9g-316.9lb",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "specimen",
+  "surface": "/api/coaching-dashboard .weekly_priority.text (served as the door's top read 09-26)",
+  "coach_id": "explorer_coach",
+  "date": "2026-09-21",
+  "captured_at": "2026-09-26T19:31:00Z",
+  "verbatim": true,
+  "slot": null,
+  "text": "Matthew has logged 29 training sessions in 30 days with zero missed workouts and perfect habit tracking—the kind of mechanical consistency that has to happen before anything else matters in a 12-month cut. At 316.9 pounds after 16 experiment days, he's losing 3.7 pounds per week, which is aggressive and on-target for the Foundation phase. His sleep has stabilized into a predictable rhythm, and his calorie and fiber targets are holding steady. The signal I'm watching most closely right now is protein: his average intake has dropped to 106.9 grams across 14 logged days, well short of the 170-gram floor that preserves lean mass during a deficit. I've asked him to spend the next week identifying which meals are the protein leak and locking one concrete change—a source swap or portion shift—to rebuild density without expanding calories. The infrastructure is solid; now it needs to carry the right load.",
+  "served_facts": {
+    "days_logged": 20,
+    "latest_date": "2026-09-25",
+    "lag_days": 1,
+    "stalled": false,
+    "avg_protein_g": 153.3,
+    "pro_7d_avg": 159.8,
+    "protein_floor_g": 170.0,
+    "protein_target_g": 190.0,
+    "protein_floor_hit_days": 7,
+    "avg_calories": 1577,
+    "cal_7d_avg": 1627,
+    "latest_protein_g": 182.0,
+    "latest_calories": 1761,
+    "avg_fiber_g": 32.6,
+    "last_food_log_date": "2026-09-25",
+    "current_weight_lbs": 313.8,
+    "weekly_rate_lbs": -4.36,
+    "weekly_rate_ci_low": -4.74,
+    "weekly_rate_ci_high": -2.75,
+    "last_weighin_date": "2026-09-26",
+    "day_n": 21,
+    "weighin_count": 13
+  },
+  "served_facts_source": [
+    "/api/nutrition_overview .nutrition (fetched 2026-09-26 19:32Z)",
+    "/api/journey .journey (fetched 2026-09-26 19:32Z)"
+  ],
+  "expected_findings": [
+    "unit_number_not_served"
+  ],
+  "expected_claims": {
+    "unit_number_not_served": [
+      106.9,
+      316.9
+    ]
+  },
+  "note": "106.9 g matches no served field (engine avg_protein_g 153.3 over 20 d); 316.9 lb vs journey 313.8. Serve-side data_through labelling is NOT in this PR."
+}

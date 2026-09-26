@@ -1,0 +1,47 @@
+{
+  "id": "2026-09-26-nutrition-six-day-gap-on-20-of-20",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "specimen",
+  "surface": "/api/coach_analysis?domain=nutrition .public_read",
+  "coach_id": "nutrition_coach",
+  "date": "2026-09-26",
+  "captured_at": "2026-09-26T19:34:15Z",
+  "verbatim": true,
+  "slot": null,
+  "text": "The six-day logging gap since September 19th is blocking my directional read, but today's log tells a clear story: 182g protein, 1,761 kcal, with the steak dinner anchoring 106g in a single sitting. The meal architecture is working when dinner shows up. Before the glucose coach's CGM data matures, I'm placing a guardrail: any carb reduction has to be calorie-neutral, not a straight cut. He's running a deep deficit at 1,596 kcal EWMA against a 2,362 kcal Mifflin BMR, and his recovery on the night of 2026-09-24 was 99% — that's not a number to gamble with by under-fueling. One flag: fiber came in at 16.7g, below baseline. With Zone 2 training starting next week, I've asked him to add a vegetable serving at lunch and restart logging tomorrow.",
+  "served_facts": {
+    "days_logged": 20,
+    "latest_date": "2026-09-25",
+    "lag_days": 1,
+    "stalled": false,
+    "avg_protein_g": 153.3,
+    "pro_7d_avg": 159.8,
+    "protein_floor_g": 170.0,
+    "protein_target_g": 190.0,
+    "protein_floor_hit_days": 7,
+    "avg_calories": 1577,
+    "cal_7d_avg": 1627,
+    "latest_protein_g": 182.0,
+    "latest_calories": 1761,
+    "avg_fiber_g": 32.6,
+    "last_food_log_date": "2026-09-25"
+  },
+  "served_facts_source": [
+    "/api/nutrition_overview .nutrition (fetched 2026-09-26 19:32Z)"
+  ],
+  "expected_findings": [
+    "absence_premise",
+    "unit_number_not_served",
+    "unlabeled_window_figure",
+    "raw_instant",
+    "banned_term"
+  ],
+  "expected_claims": {
+    "unit_number_not_served": [
+      2362,
+      1596
+    ]
+  },
+  "note": "20 of 20 days logged, lag 1, a row for every day 09-20..09-25 — the 'six-day logging gap since September 19th' is refuted by the served record."
+}

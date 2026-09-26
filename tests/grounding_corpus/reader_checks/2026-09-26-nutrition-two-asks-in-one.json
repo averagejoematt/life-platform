@@ -1,0 +1,21 @@
+{
+  "id": "2026-09-26-nutrition-two-asks-in-one",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "specimen",
+  "surface": "/api/coach/nutrition_coach .recent_outputs[0].summary (read as public_ask)",
+  "coach_id": "nutrition_coach",
+  "date": "2026-09-26",
+  "captured_at": "2026-09-26T19:31:04Z",
+  "verbatim": true,
+  "slot": "public_ask",
+  "text": "Restart logging tomorrow to close the diagnostic gap, and add a vegetable serving at lunch to close the fiber shortfall before Zone 2 volume increases.",
+  "served_facts": {},
+  "served_facts_source": [],
+  "expected_findings": [
+    "first_sentence",
+    "ask_cardinality"
+  ],
+  "expected_claims": {},
+  "note": "two imperatives in the one served ask (restart logging AND add a vegetable serving). Bare imperative, no 'you' — so audience_violation (second person / vocative) correctly does not fire; the commanded register is §2.1B's prompt ask."
+}

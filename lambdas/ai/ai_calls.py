@@ -1217,6 +1217,18 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
                 payload["passed"] = False
         except Exception as _cbv_e:
             print(f"[COACH-QUALITY-GATE:{coach_id}] cycle-boundary check unavailable (non-blocking): {_cbv_e}")
+        # #4185: the deterministic reader CHECK classes (absence premise, unit number not
+        # served, unlabeled window figure, raw instant, banned term; + the reader-slot
+        # classes when the brief names a slot) — merged into the SAME report, so they ride
+        # this regenerate-or-hold path beside #1973. Each finding is named by `check` under
+        # `reader_check_findings`, and its correction is appended to `suggestions`, which
+        # `_quality_gate_correction_note` already renders into the regeneration note.
+        try:
+            from coach.reader_checks import merge_into_report as _rc_merge
+
+            _rc_merge(payload, output_text, generation_brief)
+        except Exception as _rc_e:
+            print(f"[COACH-QUALITY-GATE:{coach_id}] reader checks unavailable (non-blocking): {_rc_e}")
         return payload
     except Exception as e:
         print(f"[COACH-QUALITY-GATE:{coach_id}] sync invoke failed (fail-open, not blocking): {e}")

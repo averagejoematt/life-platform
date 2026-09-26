@@ -1,0 +1,29 @@
+{
+  "id": "2026-09-22-labs-171-days-since-april-3",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "specimen",
+  "surface": "/api/coach/labs_coach .recent_outputs[4].summary",
+  "coach_id": "labs_coach",
+  "date": "2026-09-22",
+  "captured_at": "2026-09-26T19:31:00Z",
+  "verbatim": true,
+  "slot": null,
+  "text": "It is now 171 days since your April 3rd draw. Not \"a while.\" Not \"a few months.\" One hundred and seventy-one days, and three specific things I asked for are still in future tense: you haven't…",
+  "served_facts": {
+    "days_since_last_draw": 172,
+    "last_draw_date": "2026-04-03"
+  },
+  "served_facts_source": [
+    "days_since_last_draw 172 per the spec's served figure (2026-04-03 -> 2026-09-22 is 172 days)"
+  ],
+  "expected_findings": [
+    "unit_number_not_served"
+  ],
+  "expected_claims": {
+    "unit_number_not_served": [
+      171
+    ]
+  },
+  "note": "the model counted days itself and got 171; the served count is 172."
+}

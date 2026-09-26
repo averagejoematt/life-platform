@@ -1,0 +1,38 @@
+{
+  "id": "control-2026-09-26-webb-after",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "control",
+  "surface": "§2.6 Webb after",
+  "coach_id": "nutrition_coach",
+  "date": "2026-09-26",
+  "verbatim": true,
+  "slot": "public_summary",
+  "text": "Matthew has logged food on all 20 days of this attempt; Friday, September 25 was a good one — 182 g of protein, 1,761 calories, 106 g of it from one steak dinner. Over those 20 days he averages 153 g a day and cleared the 170 g floor on 7 of them. I've asked him to add one vegetable serving at lunch this week; Friday's fiber was 16.7 g. If blood-sugar advice cuts carbs, the calories go back in as protein or fat — at 1,577 a day he has no room below.",
+  "served_facts": {
+    "days_logged": 20,
+    "latest_date": "2026-09-25",
+    "last_food_log_date": "2026-09-25",
+    "lag_days": 1,
+    "latest_protein_g": 182.0,
+    "latest_calories": 1761,
+    "avg_protein_g": 153.3,
+    "protein_floor_g": 170.0,
+    "protein_floor_hit_days": 7,
+    "avg_calories": 1577,
+    "latest_fiber_g": 16.7,
+    "largest_meal_protein_g": 106,
+    "latest_recovery_pct": 99,
+    "avg_recovery_window": 73.9,
+    "avg_window_days": 21
+  },
+  "served_facts_source": [
+    "/api/nutrition_overview .nutrition (fetched 2026-09-26 19:32Z)",
+    "latest_fiber_g / largest_meal_protein_g: the 09-25 food log the coach was given"
+  ],
+  "expected_findings": [
+    "first_sentence"
+  ],
+  "expected_claims": {},
+  "note": "§2.6 illustration, verbatim. As written it breaks the spec's OWN §2.3 first-sentence rule (sentence 1 is over 25 words), so it is a control for every class EXCEPT first_sentence — a spec inconsistency surfaced, not papered over."
+}

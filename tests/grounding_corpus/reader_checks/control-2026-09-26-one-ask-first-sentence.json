@@ -1,0 +1,35 @@
+{
+  "id": "control-2026-09-26-one-ask-first-sentence",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "control",
+  "surface": "§2.6 Brandt after, sentence 2 alone (a compliant public_ask)",
+  "coach_id": "explorer_coach",
+  "date": "2026-09-26",
+  "verbatim": true,
+  "slot": "public_ask",
+  "text": "I've asked him to keep logging every meal through Friday, October 2.",
+  "served_facts": {
+    "days_logged": 20,
+    "latest_date": "2026-09-25",
+    "last_food_log_date": "2026-09-25",
+    "lag_days": 1,
+    "latest_protein_g": 182.0,
+    "latest_calories": 1761,
+    "avg_protein_g": 153.3,
+    "protein_floor_g": 170.0,
+    "protein_floor_hit_days": 7,
+    "avg_calories": 1577,
+    "latest_fiber_g": 16.7,
+    "largest_meal_protein_g": 106,
+    "latest_recovery_pct": 99,
+    "avg_recovery_window": 73.9,
+    "avg_window_days": 21
+  },
+  "served_facts_source": [
+    "illustrative"
+  ],
+  "expected_findings": [],
+  "expected_claims": {},
+  "note": "the full positive control: passes all eight classes, including first_sentence and ask_cardinality."
+}

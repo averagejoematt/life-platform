@@ -184,6 +184,28 @@ def numbers_in_text(text: str) -> set:
     return out
 
 
+# #4185 (§2.5 check 3): a number that carries a UNIT is a claim about a measurement,
+# not a count of things, so the small-count exemption above does not cover it — "33g
+# below", "4 pounds a week", "6 days without logs" are each a figure a reader believes.
+# The unit set is the one the reader-check spec names; "%" is matched without a word
+# boundary because it has none.
+_UNIT_NUMBER_RE = re.compile(
+    r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)(?:\s?%|\s?(?:g|grams?|kcal|calories|lbs?|pounds?|ms|bpm|days?|hours?|hrs?)\b)",
+    re.IGNORECASE,
+)
+
+
+def unit_bearing_numbers(text: str) -> set:
+    """Distinct values in ``text`` that are written WITH a unit (g, kcal, lb, %, ms, bpm, days, hours)."""
+    out = set()
+    for m in _UNIT_NUMBER_RE.finditer(text or ""):
+        try:
+            out.add(round(float(m.group(1).replace(",", "")), 4))
+        except ValueError:
+            pass
+    return out
+
+
 def allowed_numbers(*sources) -> set:
     """The allow-list: every number present in what the model was given.
 
@@ -233,16 +255,22 @@ def _is_restatement(x: float, a: float) -> bool:
     return any(abs(x - round(a, d)) <= _ROUNDING_EPS for d in range(_MAX_ROUNDING_PRECISION + 1))
 
 
-def fabricated_numbers(text: str, allowed: set, *, tolerance: float = NUMBER_TOLERANCE_TOLERANT) -> list:
+def fabricated_numbers(text: str, allowed: set, *, tolerance: float = NUMBER_TOLERANCE_TOLERANT, unit_voids_benign: bool = False) -> list:
     """Numbers in the output that appear nowhere in the input (minus benign).
 
     ``tolerance`` is the half-window a number may sit from an allowed one and still count
     as grounded. Pass ``NUMBER_TOLERANCE_EXACT`` on a surface where the gate IS the honesty
     claim being made to a reader (ADR-104) — see the module note above and #2290.
+
+    ``unit_voids_benign`` (#4185): when True, a small number written WITH a unit ("6 days",
+    "4 lb") no longer rides the benign-small-count exemption — it must be on the allow-list
+    like any other measurement. Off by default so every pre-#4185 caller is unchanged; the
+    reader checks (``coach.reader_checks``) turn it on.
     """
+    with_unit = unit_bearing_numbers(text) if unit_voids_benign else set()
     out = []
     for x in sorted(numbers_in_text(text)):
-        if x in _BENIGN_NUMBERS:
+        if x in _BENIGN_NUMBERS and x not in with_unit:
             continue
         if tolerance > 0 and any(abs(x - a) < tolerance for a in allowed):
             continue
@@ -744,6 +772,7 @@ def grounding_findings(
     evaluated_predictions=None,
     nightly_vitals=None,
     number_tolerance: float = NUMBER_TOLERANCE_TOLERANT,
+    unit_voids_benign: bool = False,
 ) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
@@ -757,6 +786,8 @@ def grounding_findings(
       every existing caller's behaviour; a reader-facing surface whose refusal copy IS
       an honesty claim should pass ``NUMBER_TOLERANCE_EXACT``, which still accepts a
       rounding of an allowed number but refuses a corrupted trailing decimal.
+      ``unit_voids_benign`` (#4185) removes the small-count exemption from a number
+      written with a unit — see ``fabricated_numbers``.
     - "fabricated_date": a full calendar date is cited in the output that appears in
       no supplied legitimate date — #1242, fabricated_dates(). Checked ONLY when
       ``allowed_dates`` is passed (an empty set means "no dates are legitimate");
@@ -788,7 +819,7 @@ def grounding_findings(
     if facts:
         findings.extend(band_adjective_findings(text, facts))
     if allowed is not None:
-        for x in fabricated_numbers(text, allowed, tolerance=number_tolerance):
+        for x in fabricated_numbers(text, allowed, tolerance=number_tolerance, unit_voids_benign=unit_voids_benign):
             findings.append(
                 {
                     "type": "fabricated_number",

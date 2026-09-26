@@ -1,0 +1,25 @@
+{
+  "artifact": "tests/grounding_corpus/reader_checks/*.json",
+  "algorithm": "sha256",
+  "count": 11,
+  "caught": 0,
+  "open": 0,
+  "files": {
+    "2026-09-20-mind-stance-second-person.json": "eb02db6c45efcbf78aef2dd0b8204dd6cbacbc5a59e2394c530d858c69da5736",
+    "2026-09-21-eli-weekly-106.9g-316.9lb.json": "06573a930270763b8d0acae3f8c251fc0a2bb1103d3bd8eb07e57993067a4cf4",
+    "2026-09-22-labs-171-days-since-april-3.json": "6fa18c170df9811afd1a1fc9fbbf580d0d7a3b4ad1e271bf300e344ef64943c2",
+    "2026-09-26-nutrition-six-day-gap-on-20-of-20.json": "fdbf8fb5f56800d4f5b2dcb4d17330d1a645a51c3ca3d68efa0172b8dcd1f958",
+    "2026-09-26-nutrition-two-asks-in-one.json": "15ff09f702d9212f8c2a8f6dd3dc862243a170a4881168635c4b06e235ff4785",
+    "2026-09-26-physical-33g-below-190-ewma-36pct.json": "198620f189058d17a64a3e77562f6e408815f157a35f853839b38653864fa7af",
+    "2026-09-26-sleep-cross-domain-0445Z-as-445am.json": "3d33f7b0cafada3d6ea8c985680c30db656572382fe4cd8efe0f5e5240a20d8d",
+    "control-2026-09-26-brandt-after.json": "87e6080928dcccab6499b9307ae7c383fc345197b432237fb64d4f07f6a4f224",
+    "control-2026-09-26-one-ask-first-sentence.json": "54b18b28a0519ddbc5fa165932fd632f3b67435ebbe75cea15fec787444d8c5f",
+    "control-2026-09-26-reeves-after.json": "dab5d6ca4e35bde39f64a22fc4ac152c1e55f86a44adc4cc3b825a3799071578",
+    "control-2026-09-26-webb-after.json": "fc3ad04a510e4f6b086510ab9d89d79f4d10e3be8d1b9ef5205a0d4a2b1fef45"
+  },
+  "corpus_sha256": "edc975a1dc6425600c4535915e473e8b195ad719ece34d2e71f4b860ab09c18b",
+  "first_stamped_at": "2026-09-26T19:58:38.045718+00:00",
+  "stamped_at": "2026-09-26T19:58:38.045718+00:00",
+  "amended": [],
+  "verify": "tests/test_reader_checks_gate_wire_4185.py::test_corpus_is_sealed"
+}

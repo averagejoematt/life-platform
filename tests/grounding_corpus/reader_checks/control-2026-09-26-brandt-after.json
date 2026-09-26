@@ -1,0 +1,39 @@
+{
+  "id": "control-2026-09-26-brandt-after",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "control",
+  "surface": "§2.6 Brandt after",
+  "coach_id": "explorer_coach",
+  "date": "2026-09-26",
+  "verbatim": false,
+  "verbatim_note": "the spec's {window} placeholder is filled with the served avg_window_days (21)",
+  "slot": "public_summary",
+  "text": "Matthew's recovery averaged 74 % over the last 21 days and hit 99 % on the night of Thursday, September 24, with a food log for every one of the 20 days behind it — so protein and recovery can now be read side by side. I've asked him to keep logging every meal through Friday, October 2. If blood-sugar advice trims carbs and his recovery holds, carbs mattered; if it drops, protein did. Twenty-one days is enough to watch, not to conclude.",
+  "served_facts": {
+    "days_logged": 20,
+    "latest_date": "2026-09-25",
+    "last_food_log_date": "2026-09-25",
+    "lag_days": 1,
+    "latest_protein_g": 182.0,
+    "latest_calories": 1761,
+    "avg_protein_g": 153.3,
+    "protein_floor_g": 170.0,
+    "protein_floor_hit_days": 7,
+    "avg_calories": 1577,
+    "latest_fiber_g": 16.7,
+    "largest_meal_protein_g": 106,
+    "latest_recovery_pct": 99,
+    "avg_recovery_window": 73.9,
+    "avg_window_days": 21
+  },
+  "served_facts_source": [
+    "/api/nutrition_overview .nutrition (fetched 2026-09-26 19:32Z)",
+    "/api/sleep_detail avg_recovery_window 73.9 / avg_window_days 21"
+  ],
+  "expected_findings": [
+    "first_sentence"
+  ],
+  "expected_claims": {},
+  "note": "§2.6 illustration, verbatim. As written it breaks the spec's OWN §2.3 first-sentence rule (sentence 1 is over 25 words), so it is a control for every class EXCEPT first_sentence — a spec inconsistency surfaced, not papered over."
+}

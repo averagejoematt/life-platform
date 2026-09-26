@@ -1,0 +1,56 @@
+{
+  "id": "2026-09-26-physical-33g-below-190-ewma-36pct",
+  "issue": "#4185",
+  "spec": "COACH_VOICE_REDTEAM.md §2.5/§2.7 (Session AV, 2026-09-26)",
+  "kind": "specimen",
+  "surface": "/api/coach_analysis?domain=physical .analysis (paragraphs 2-3)",
+  "coach_id": "physical_coach",
+  "date": "2026-09-26",
+  "captured_at": "2026-09-26T19:33:00Z",
+  "verbatim": false,
+  "verbatim_note": "paragraphs 2 and 3 of the served .analysis, byte for byte; paragraphs 1 and 4 omitted",
+  "slot": null,
+  "text": "Now the commitment I owe you an accounting on. On 2026-09-18 I flagged the step contraction as a DUE item — I committed to revisiting the explanation explicitly this cycle. Your step EWMA has moved from 2,083 to 1,865 over the past seven days, a 36% contraction from the baseline range, and the slope is still negative. Garmin is paused as a source, so the figure comes from Apple Health, which I'm using as the available record. What I cannot determine from the data alone is whether this contraction is deliberate recovery, a logistical disruption, or a baseline shift in your movement pattern. Those three explanations carry completely different responses. I need you to tell me directly: which is it? The answer gates everything downstream. Zone 2 escalation remains on hold until step etiology is resolved and protein stabilizes at 170g or above for seven consecutive days — both conditions remain unmet.\n\nOn protein: the EWMA has moved from 152.9g to 157.3g, which is directionally right. But 157.3g against a 190g target is still a 33g structural gap, and the dinner dependency is the load-bearing fragility point. If that meal doesn't land — one disrupted evening, one skipped dinner — the daily total collapses. That's not a protocol with margin; it's a protocol with a single point of failure. At 313.1 lbs and a weekly rate of -4.3 lbs, you're losing weight fast. The body composition question is whether that weight is fat or lean mass. At 1,596 kcal EWMA and 157g of protein against a 190g target, the lean mass liquidation risk is real and ongoing. I cannot give you a lean mass number today — DEXA would settle it — but the inputs are pointing in a direction I don't like.",
+  "served_facts": {
+    "days_logged": 20,
+    "latest_date": "2026-09-25",
+    "lag_days": 1,
+    "stalled": false,
+    "avg_protein_g": 153.3,
+    "pro_7d_avg": 159.8,
+    "protein_floor_g": 170.0,
+    "protein_target_g": 190.0,
+    "protein_floor_hit_days": 7,
+    "avg_calories": 1577,
+    "cal_7d_avg": 1627,
+    "latest_protein_g": 182.0,
+    "latest_calories": 1761,
+    "avg_fiber_g": 32.6,
+    "last_food_log_date": "2026-09-25",
+    "current_weight_lbs": 313.8,
+    "weekly_rate_lbs": -4.36,
+    "weekly_rate_ci_low": -4.74,
+    "weekly_rate_ci_high": -2.75,
+    "last_weighin_date": "2026-09-26",
+    "day_n": 21,
+    "weighin_count": 13
+  },
+  "served_facts_source": [
+    "/api/nutrition_overview .nutrition (fetched 2026-09-26 19:32Z)",
+    "/api/journey .journey (fetched 2026-09-26 19:32Z)"
+  ],
+  "expected_findings": [
+    "unit_number_not_served",
+    "unlabeled_window_figure",
+    "raw_instant",
+    "banned_term"
+  ],
+  "expected_claims": {
+    "unit_number_not_served": [
+      36,
+      157.3,
+      1596
+    ]
+  },
+  "note": "36% matches no served step figure; 157.3 g and 1,596 kcal are not served figures (pro_7d_avg 159.8, avg_calories 1577). KNOWN LIMIT: '33g below' (190 - 157.3, computed by the model) is NOT caught — the allow-list is value-only and 33 is a rounding of the served avg_fiber_g 32.6; a unit-aware allow-list is the follow-up."
+}
