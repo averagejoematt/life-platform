@@ -86,6 +86,8 @@ DERIVED = "DERIVED"
 
 DECISIONS = {
     "lambdas/emails/coach_panel_podcast_lambda.py": DERIVED,
+    # #4188: the lead read's day number and genesis come from build_experiment_phase_context.
+    "lambdas/coach/lead_daily_read.py": DERIVED,
     "lambdas/content/review_pack_ranker.py": (
         "NOT A PROMPT. The matching string is a FINDING detail — genesis_mismatch's "
         '"generated {gen_date}, BEFORE the current genesis {start_date_iso}" — emitted by the '

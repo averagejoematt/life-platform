@@ -63,9 +63,35 @@ export function pickTodaysRead(coaches) {
 //      n = 1 — so those coaches are ineligible, however high. Ties -> the newer read. The
 //      reason prints "<confirmed> of <n> held up", never a bare percentage (ADR-105).
 //   3. the freshest read.
+//   0. (#4188) today's lead read — the head coach's DAILY grounded read (/api/coaching-dashboard
+//      `lead_daily`, every figure in its `cited` block), when it is served and under 24 h old.
+//      It is written each morning from the day's facts, so it outranks a staff read chosen by
+//      rule. Older, or absent, and the chain below decides exactly as before.
 export const RECORD_MIN_N = 10;
 export const SAME_BATCH_HOURS = 24;
-export function chooseTodaysRead(coaches, openActions, calibration) {
+export const LEAD_DAILY_MAX_HOURS = 24;
+
+// The served lead read as a coach-shaped entry, so the door renders it through the same
+// byline / stamp / text path as a staff read. The text is the served text, untouched.
+export function leadAsCoach(lead) {
+  return {
+    coach_id: String(lead.coach_id || "eli_marsh"),
+    persona_id: String(lead.coach_id || "eli_marsh"),
+    name: String(lead.coach_name || ""),
+    title: String(lead.coach_title || ""),
+    color: "",
+    position_summary: String(lead.text),
+    analysis_generated_at: lead.generated_at,
+    cited: Array.isArray(lead.cited) ? lead.cited : [],
+    lead: true,
+  };
+}
+
+export function chooseTodaysRead(coaches, openActions, calibration, leadDaily, now) {
+  if (leadDaily && String(leadDaily.text || "").trim() && now != null) {
+    const h = ageHours(leadDaily.generated_at, now);
+    if (h != null && h >= 0 && h < LEAD_DAILY_MAX_HOURS) return { coach: leadAsCoach(leadDaily), rule: "lead", reason: "chosen: today's lead read" };
+  }
   const servable = (Array.isArray(coaches) ? coaches : []).filter(
     (c) => c && String(c.position_summary || "").trim() && toDate(c.analysis_generated_at),
   );

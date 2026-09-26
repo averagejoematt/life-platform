@@ -517,9 +517,11 @@ async function renderToday(mount) {
   // /api/calibration is fetched only when rule 1 cannot decide (no other code on this
   // page reads it, so this is the one added request).
   const hasAsk = (d.open_actions || []).some((a) => a && String(a.text || "").trim());
-  const calib = hasAsk ? null : await tryOnce("/api/calibration");
-  let pick = chooseTodaysRead(coaches, d.open_actions, calib);
-  if (pick && pick.rule !== "ask" && hasAsk) pick = chooseTodaysRead(coaches, d.open_actions, await tryOnce("/api/calibration"));
+  const leadFirst = chooseTodaysRead([], [], null, d.lead_daily, now); // #4188 rule 0 needs no calibration
+  const calib = hasAsk || leadFirst ? null : await tryOnce("/api/calibration");
+  // #4188: rule 0 — the head coach's daily lead read, when served and under 24 h old.
+  let pick = chooseTodaysRead(coaches, d.open_actions, calib, d.lead_daily, now);
+  if (pick && pick.rule !== "ask" && pick.rule !== "lead" && hasAsk) pick = chooseTodaysRead(coaches, d.open_actions, await tryOnce("/api/calibration"));
   const chosen = pick ? pick.coach : null;
   const wp = d.weekly_priority || {};
   const wpText = String(wp.text || "").trim();
@@ -538,7 +540,7 @@ async function renderToday(mount) {
 
   // 1) TODAY'S READ
   if (chosen && readTier !== "old") {
-    const pid = `${chosen.coach_id}_coach`;
+    const pid = chosen.persona_id || `${chosen.coach_id}_coach`; // #4188: the lead's anchor is his persona id
     const banner = readTier === "stale" ? sinceBanner(chosen.analysis_generated_at, now, weights, nutrition) : "";
     const text = String(chosen.position_summary);
     const clipped = /…$|\.\.\.$/.test(text.trim());

@@ -954,9 +954,18 @@ def _dispatch_route(event, path, method):
                 else None
             )
 
+            # #4188: the head coach's DAILY lead read (coach.lead_daily_read) — what the door
+            # opens on when it is under 24 h old; absent (None) until the first row lands.
+            from coach import lead_daily_read as _cd_lead_mod
+
+            _cd_lead_daily = _cd_lead_mod.latest_served(table)
+            if _cd_lead_daily:
+                _cd_lead_daily.update(coach_name=_cd_lead_name, coach_title=_cd_lead_title)
+
             return _ok(
                 {
                     "weekly_priority": _cd_priority,
+                    "lead_daily": _cd_lead_daily,
                     "open_actions": _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,

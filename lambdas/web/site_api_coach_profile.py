@@ -25,6 +25,7 @@ from coach import (
     coach_derived_prose,  # #2418: the derived-prose read seam — a held condensation falls back to gated `content`
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
+    lead_daily_read,  # #4188: the head coach's daily grounded lead read (LEAD_DAILY# rows)
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
@@ -617,6 +618,7 @@ def handle_coach(event, *, _g):
         if not p or not (p.get("operational") or is_lead):
             return _error(404, "Unknown coach")
         weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
+        lead_daily = lead_daily_read.latest_served(_g["table"]) if is_lead else None
         if is_lead:
             # No weight-band ladder config exists for the lead and the opinion
             # engine writes him no weekly stance — the staff ladder fallback would
@@ -665,7 +667,11 @@ def handle_coach(event, *, _g):
                 # #1387: the dossier — what this coach knows, verbatim from COACH#
                 # memory (privacy-filtered, correction-aware, no LLM in the path).
                 "dossier": _dossier_block(pid),
-                "daily": _coach_daily(pid),
+                # #4188: the lead's daily read lives in its own LEAD_DAILY# row (the CC-08
+                # reflection batch covers staff only). `daily` keeps its string type for
+                # every consumer; `lead_daily` carries the text WITH its cited block.
+                "daily": (lead_daily or {}).get("text") if is_lead else _coach_daily(pid),
+                "lead_daily": lead_daily,
                 "memoir": _coach_memoir(pid),
             },
             cache_seconds=300,
