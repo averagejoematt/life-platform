@@ -40,8 +40,13 @@ test("the retired flag on the served rows puts the training seat in its own grou
   assert.deepEqual(scorecardSeats({ by_coach: { ...BY_COACH, training: { ...BY_COACH.training, retired: true } }, predictions: [] }).retired, ["training"]);
 });
 
-test("the label says why she still has calls — sealed, from the pre-registration", () => {
-  assert.equal(retiredSeatNote("training", DATA), "retired seat · 2 sealed calls from this cycle's pre-registration, graded like any other");
+test("the label says why she still has calls — sealed, from the pre-registration, dated (never 'cycle')", () => {
+  assert.equal(retiredSeatNote("training", DATA), "retired seat · 2 sealed calls from the pre-registration on September 6, graded like any other");
+  // no served stamp → the date drops, never guessed; reader text never says "cycle"
+  const noStamp = { ...DATA, predictions: PREDICTIONS.map((p) => ({ ...p, pre_registered_at: undefined })) };
+  assert.equal(retiredSeatNote("training", noStamp), "retired seat · 2 sealed calls from the pre-registration, graded like any other");
+  assert.equal(retiredSeatNote("training", { by_coach: { training: { total: 2 } }, predictions: [] }), "retired seat · 2 calls on the board, graded like any other");
+  for (const d of [DATA, noStamp]) assert.ok(!/cycle|reset/i.test(retiredSeatNote("training", d)));
   assert.equal(retiredSeatNote("training", { by_coach: { training: { total: 0 } }, predictions: [] }), "retired seat · career record kept on file");
 });
 

@@ -16,6 +16,8 @@
   list render — and tests/js/coaching_prestart_3517.test.mjs pins both directions.
 */
 
+import { dayInWords } from "/assets/js/entry_age.js"; // #4215 — the seal's date, in words
+
 /**
  * Roster list entries for the By-Coach / Team tabs.
  *
@@ -76,17 +78,24 @@ export function scorecardSeats(data) {
   return { live: ids.filter((c) => !retired.has(c)), retired: ids.filter((c) => retired.has(c)) };
 }
 
-/** Why a retired seat still has rows: "retired seat · 2 sealed calls from this cycle's
- *  pre-registration, graded like any other" — or, with no calls this season, the career
- *  record that stays on file. */
+/** Why a retired seat still has rows: "retired seat · 2 sealed calls from the
+ *  pre-registration on September 6, graded like any other" — or, with no calls on the
+ *  board, the career record that stays on file. The date is the served
+ *  `pre_registered_at`'s calendar date (the seal's UTC date — the experiment's Day-1
+ *  date, not the Pacific evening it was written); dropped when not served. Reader text
+ *  never says "cycle" (owner ruling 2026-09-26: the public frame is the experiment and
+ *  the day). */
 export function retiredSeatNote(cid, data) {
   const byc = (data && data.by_coach) || {};
   const c = byc[cid] || {};
-  const sealed = ((data && data.predictions) || []).filter((p) => p && p.coach_id === cid && p.pre_registered === true).length;
+  const rows = ((data && data.predictions) || []).filter((p) => p && p.coach_id === cid && p.pre_registered === true);
+  const sealed = rows.length;
   const n = sealed || c.total || 0;
   if (n > 0) {
-    const what = sealed ? "sealed call" : "call";
-    return `retired seat · ${n} ${what}${n === 1 ? "" : "s"}${sealed ? " from this cycle's pre-registration" : " this cycle"}, graded like any other`;
+    const stamps = rows.map((p) => String(p.pre_registered_at || "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const on = stamps.length ? dayInWords(stamps[0], { weekday: false }) : "";
+    const from = sealed ? ` from the pre-registration${on ? ` on ${on}` : ""}` : " on the board";
+    return `retired seat · ${n} ${sealed ? "sealed call" : "call"}${n === 1 ? "" : "s"}${from}, graded like any other`;
   }
   return "retired seat · career record kept on file";
 }
