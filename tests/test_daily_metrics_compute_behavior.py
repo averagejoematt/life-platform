@@ -1019,6 +1019,69 @@ class TestAssembleData:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# #4184 — the weight-trajectory RATE is experiment-scoped
+#
+# `fetch_range` is deliberately cross-phase for every RAW_TIMESERIES window in this
+# module (see its own docstring) — but `weight_trend.weight_trajectory`'s RATE is a
+# derived claim about *this experiment*, not a raw reading, so the 28-day window that
+# feeds it must not reach across the genesis into the prior cycle. A flat window that
+# does so silently clears the 21-day provisional floor on borrowed pre-genesis data
+# (the live incident: home page served a firm goal date the record didn't support).
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestWeightTrajectoryGenesisWindow:
+    def test_the_trajectory_series_excludes_pre_genesis_weighins(self, table, frozen_clock, monkeypatch):
+        """Genesis 2026-04-20; the flat 28-day fetch (today - 28d = 2026-04-12) would
+        have reached back to 2026-04-14 — a real weigh-in, but from before this
+        experiment started. The fix clamps the fetch start to genesis, so it never
+        reaches the read at all."""
+        monkeypatch.setattr(dmc, "EXPERIMENT_START_DATE", "2026-04-20")
+        seed(
+            table,
+            _date_row("withings", "2026-04-14", weight_lbs=Decimal("210.0")),  # pre-genesis, inside the flat 28d window
+            _date_row("withings", "2026-04-21", weight_lbs=Decimal("200.0")),
+            _date_row("withings", "2026-04-28", weight_lbs=Decimal("195.0")),
+            _date_row("withings", "2026-05-05", weight_lbs=Decimal("190.0")),
+            _date_row("withings", "2026-05-09", weight_lbs=Decimal("187.0")),
+        )
+        data, _, _ = dmc.assemble_data(YESTERDAY, _profile())
+        traj = data["weight_traj"]
+        # span the post-genesis rows alone give (2026-04-21 -> 2026-05-09), not the
+        # 25-day span the pre-genesis row would have stretched it to.
+        assert traj["weighin_span_days"] == 18
+        assert traj["rate_provisional"] is True, "18 real post-genesis days is still under the 21-day floor"
+        assert traj["weekly_rate_lbs"] == -5.04
+        assert traj["projected_goal_date"] is None, "provisional must suppress the projection"
+
+        # the request the fix actually issued was bounded at genesis, not today-28d
+        withings_queries = [q for q in table.queries if q["ExpressionAttributeValues"][":pk"] == dmc.USER_PREFIX + "withings"]
+        assert any(q["ExpressionAttributeValues"][":s"] == "DATE#2026-04-20" for q in withings_queries)
+
+    def test_mutation_control_the_flat_window_flips_provisional_false(self):
+        """The same fixture, fed to the real shared computation WITHOUT the genesis
+        clamp — i.e. what daily_metrics_compute_lambda served before #4184. The
+        pre-genesis 2026-04-14 row stretches the span from 18 to 25 days, clearing
+        the 21-day provisional floor and un-suppressing a firm projected goal date on
+        data the experiment hadn't earned. This is the control: if the clamp in
+        daily_metrics_compute_lambda is ever reverted, the test above must go red
+        exactly this way."""
+        from health import weight_trend
+
+        flat_series = [
+            ("2026-04-14", 210.0),  # pre-genesis — the row the #4184 clamp now excludes
+            ("2026-04-21", 200.0),
+            ("2026-04-28", 195.0),
+            ("2026-05-05", 190.0),
+            ("2026-05-09", 187.0),
+        ]
+        traj = weight_trend.weight_trajectory(flat_series, 187.0, 185.0, ref_dt=FROZEN_NOW)
+        assert traj["weighin_span_days"] == 25
+        assert traj["rate_provisional"] is False, "the flat window is exactly the bug #4184 fixed"
+        assert traj["projected_goal_date"] is not None, "the un-suppressed projection this incident was found from"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Ledger sweeps — fail-soft contract
 # ──────────────────────────────────────────────────────────────────────────────
 
