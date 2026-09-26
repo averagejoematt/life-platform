@@ -114,13 +114,13 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `notion`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
 
-### system_state (19)
+### system_state (20)
 
-`coach_gen_cache`, `composite_scores`, `deletion_log`, `dropbox_tracker`, `email_digest`, `email_log`, `experiment_suggestions`, `google_calendar`, `health_check`, `hevy_id_map`, `ingest_liveness`, `journal_analysis`, `named_human_contact`, `pending_writes`, `personal_baselines`, `qa_hook_matrix`, `qa_predict_dark`, `routine_index`, `sleep_unified`
+`coach_gen_cache`, `composite_scores`, `deletion_log`, `dropbox_tracker`, `email_digest`, `email_log`, `experiment_suggestions`, `google_calendar`, `health_check`, `hevy_id_map`, `ingest_liveness`, `journal_analysis`, `named_human_contact`, `pending_writes`, `personal_baselines`, `qa_hook_matrix`, `qa_predict_dark`, `reader_feedback`, `routine_index`, `sleep_unified`
 
 ## 3. Consumer Edges (module → partition)
 
-713 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+714 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -207,6 +207,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `protocols` | — | site_api_protocols.py |
 | `qa_hook_matrix` | hook_liveness_qa.py | — |
 | `qa_predict_dark` | qa_smoke_lambda.py | qa_smoke_lambda.py |
+| `reader_feedback` | site_api_social_engage.py | — |
 | `recall_embeddings` | — | — |
 | `recap_cards` | recap_card_lambda.py | recap_card_lambda.py |
 | `rewards` | — | — |
@@ -501,7 +502,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1241 total · 887 resolved · 354 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1242 total · 888 resolved · 354 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

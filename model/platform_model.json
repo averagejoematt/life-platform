@@ -5072,6 +5072,13 @@
       "via": "pk"
     },
     {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_engage.py",
+      "partition": "reader_feedback",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_social_engage.py",
@@ -7357,11 +7364,11 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 713,
+      "edges": 714,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
-      "partitions": 111,
+      "partitions": 112,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 17,
@@ -7372,8 +7379,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 354,
-        "sites_resolved": 887,
-        "sites_total": 1241
+        "sites_resolved": 888,
+        "sites_total": 1242
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7846,6 +7853,11 @@
       "privacy_tier": "public"
     },
     "qa_predict_dark": {
+      "class": "system_state",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "reader_feedback": {
       "class": "system_state",
       "ingestion": false,
       "privacy_tier": "public"
