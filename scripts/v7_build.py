@@ -48,8 +48,15 @@ sys.path.insert(0, HERE)
 
 import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
+from v7 import home  # noqa: E402
 
 SITE_DIR = os.path.join(ROOT, "site")
+
+# The per-page body templates (scripts/v7/<page>.py — each exposes HEAD, SCRIPTS and
+# body(base)), keyed by page path. A page with no entry still gets the scaffold placeholder.
+TEMPLATES = {
+    "": home,
+}
 
 # The nine, in CONCEPT §3 order. (page path under the base, title, the one job, build day)
 # The job lines are the reader's words — no ruled glossary term appears in them, and the
@@ -82,6 +89,18 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
     bar = v4_chrome.doors_nav(current_door=page)
     foot = v4_chrome.site_footer()
     canonical = f"https://averagejoematt.com{base}{page}"
+    tpl = TEMPLATES.get(page)
+    head_extra = tpl.HEAD if tpl else ""
+    scripts_extra = tpl.SCRIPTS if tpl else ""
+    main_inner = (
+        tpl.body(base)
+        if tpl
+        else (
+            f"    <h1>{_esc(title)}</h1>\n"
+            f'    <p class="v7-job">{_esc(job)}</p>\n'
+            f'    <p class="v7-placeholder">Not built yet — {_esc(due)} of the build week.</p>\n'
+        )
+    )
     return (
         "<!DOCTYPE html>\n"
         '<html lang="en" class="v7">\n'
@@ -97,19 +116,19 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         '  <link rel="stylesheet" href="/assets/css/tokens.css">\n'
         '  <link rel="stylesheet" href="/assets/css/v7.css">\n'
         '  <script src="/assets/js/boot_theme.js"></script>\n'
+        f"{head_extra}"
         "</head>\n"
         '<body class="v7-body">\n'
         '  <a class="skip" href="#main">Skip to the page</a>\n'
         f"{notice}"
         f"  {mast}\n"
         f'  <main id="main" class="v7-main">\n'
-        f"    <h1>{_esc(title)}</h1>\n"
-        f'    <p class="v7-job">{_esc(job)}</p>\n'
-        f'    <p class="v7-placeholder">Not built yet — {_esc(due)} of the build week.</p>\n'
+        f"{main_inner}"
         "  </main>\n"
         f"  {foot}\n"
         f"  {bar}\n"
         '  <script type="module" src="/assets/js/v7_shell.js"></script>\n'
+        f"{scripts_extra}"
         "</body>\n"
         "</html>\n"
     )

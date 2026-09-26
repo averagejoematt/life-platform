@@ -238,3 +238,29 @@ def test_v7_committed_preview_shells_match_a_fresh_build():
         text=True,
     )
     assert proc.returncode == 0, f"v7 shells drifted — run scripts/v7_build.py --base /next/ and commit:\n{proc.stdout}\n{proc.stderr}"
+
+
+def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
+    """#4182 — the v7 Home (scripts/v7/home.py) is Prototype C's screen I: the eight dated
+    entries in the design order, the honest photo frame, the page's own sheet and module,
+    the cut-over proof anchor — and NO number in the static HTML (every figure is poured
+    from a served field at runtime, so the shell can never go stale) and none of the
+    owner-ruled words (no earlier starts, attempts, cycles or resets)."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    import site_text  # noqa: E402
+
+    html = (SITE / "next" / "index.html").read_text(encoding="utf-8")
+    for slot in ["v7h-fold", "v7h-weighins", "v7h-words", "v7h-okay", "v7h-record", "v7h-how", "v7h-next", "v7h-follow"]:
+        assert f'id="{slot}"' in html, f"Home shell missing the {slot} entry"
+    order = [
+        html.index(f'id="{s}"')
+        for s in ["v7h-fold", "v7h-weighins", "v7h-words", "v7h-okay", "v7h-record", "v7h-how", "v7h-next", "v7h-follow"]
+    ]
+    assert order == sorted(order), "the entries are out of the design order"
+    assert 'href="/assets/css/v7_home.css"' in html and 'src="/assets/js/v7_home.js"' in html
+    assert "<!-- home-proof:start -->" in html and "<!-- home-proof:end -->" in html
+    assert "No photo yet." in html
+    text = site_text.main_text("site/next/index.html")
+    assert not re.search(r"\d", text), f"a number in the static Home shell: {text[:200]!r}"
+    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
+    assert (SITE / "assets" / "css" / "v7_home.css").exists() and (SITE / "assets" / "js" / "v7_home.js").exists()
