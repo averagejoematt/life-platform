@@ -12,3 +12,4 @@ The research and artefacts behind [../../SITE_TRANSFORMATION_V7.md](../../SITE_T
 - `prototype_c_the_logbook_investigation.html` — the pick, built: B's frame with A's type and voice and the red team's five fixes.
 - `R5_PROTOTYPE_C_SCORE.md` — the personas' re-score of C (36 of 50) and the three fixes left for the build week.
 - `R6_BUILT_PAGES_REDTEAM.md` — the personas' scores of the first three built pages on `/next/` (Home 36 · This week 34 · The coaches 28) and the fixes before the coaches page ships.
+- `BUILD_WEEK_BRIEF.md` — **the next session starts here**: the state of the nine pages, the waves re-cut for the ~15-hour window, one complete lane brief per remaining unit of work, the driver's per-merge checklist, the cut-over criteria and how each is measured, the owner-gated questions, the three risks.
