@@ -16,24 +16,24 @@ WITHOUT a gloss (<dfn>/<abbr title>) anywhere on the page — the gloss is what 
 move down without the word leaving.
 """
 
-MEASURED_AT = "2026-09-26 · main 44c77f11c"
+MEASURED_AT = "2026-09-26 · main a0d2afd0b (re-measured with <noscript> bakes excluded — the first landing at 44c77f11c counted them)"
 
 BASELINE = {
-    "reset": 33,
+    "reset": 31,
     "correlation": 2,
     "cockpit": 20,
     "chronicle": 14,
     "model": 13,
-    "as of": 12,
-    "cycle": 8,
+    "as of": 3,
+    "cycle": 6,
     "Third Wall": 9,
     "pillar": 5,
-    "protocol": 2,
+    "protocol": 1,
     "gate": 5,
     "HRV": 3,
     "glucose": 2,
     "Whoop": 3,
-    "character level": 5,
+    "character level": 4,
 }
 
 # The static-reach ratchet (ruling vi): reader pages reachable from "/" by <a href> links in
