@@ -248,7 +248,10 @@ BASELINE = {
     # unchanged. 132 lines came out; 26 of them (a fifth — the #2610 earned-headroom rule)
     # are banked so the re-bill fix and the #3084 budget-stop clause have room, and 106 are
     # handed back. Measured 2264. Terminal cure is still under 1200 and pruning this line.
-    "lambdas/ai/ai_calls.py": 1677,
+    # 2026-09-26 (#4185): 1677 → 1668. The fresh-path coach-state-updater invoke moved to
+    # coach_brief_input_gate.record_output (the one writer the reuse path already used);
+    # 15 logical lines came out, 3 (a fifth, #2610) are banked, 12 are handed back.
+    "lambdas/ai/ai_calls.py": 1668,
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.

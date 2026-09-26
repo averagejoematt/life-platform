@@ -480,6 +480,28 @@ def upstream_parts(
     }
 
 
+def record_output(lambda_client, coach_id: str, output_type: str, text: str, generation_date: str, **fields) -> None:
+    """Hand a published coach read to `coach-state-updater` (async) — the OUTPUT# writer.
+
+    The ONE call both the fresh path (`ai_calls._run_coach_v2_pipeline` Step 7) and the
+    reuse path (`serve_reuse`) make, so the payload cannot drift between them (#4185 moved
+    the fresh copy here to carry `data_through` without growing the size-ratcheted
+    `ai_calls`). `fields` are the optional extras — `data_through` (#4185: the last data
+    day the read was written from) and, on a reuse, `unchanged_since`. Never raises: a
+    failed record must never block serving the text.
+    """
+    try:
+        lambda_client.invoke(
+            FunctionName="coach-state-updater",
+            InvocationType="Event",
+            Payload=json.dumps(
+                {"coach_id": coach_id, "output_text": text, "output_type": output_type, "generation_date": generation_date, **fields}
+            ).encode(),
+        )
+    except Exception as e:  # noqa: BLE001 — never block serving a coach read
+        print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
+
+
 def serve_reuse(
     lambda_client,
     table,
@@ -493,6 +515,7 @@ def serve_reuse(
     *,
     surface: str,
     cache_output_type: Optional[str] = None,
+    data_through: Optional[str] = None,
 ) -> str:
     """Everything a cache HIT owes the rest of the platform, then return `text`.
 
@@ -508,22 +531,8 @@ def serve_reuse(
     """
     _gc.record_reuse(table, coach_id, cache_output_type or output_type, today)
     _gc.emit_skip_metric(cw, namespace, coach_id, surface=surface)
-    try:
-        lambda_client.invoke(
-            FunctionName="coach-state-updater",
-            InvocationType="Event",
-            Payload=json.dumps(
-                {
-                    "coach_id": coach_id,
-                    "output_text": text,
-                    "output_type": output_type,
-                    "generation_date": today,
-                    "unchanged_since": unchanged_since,
-                }
-            ).encode(),
-        )
-    except Exception as e:  # noqa: BLE001 — never block serving a reused output
-        print(f"[COACH-V2:{coach_id}] State updater invoke (reuse) failed (non-blocking): {e}")
+    # #4185: a hit means today's inputs are unchanged, so today's data day is the reused read's too.
+    record_output(lambda_client, coach_id, output_type, text, today, data_through=data_through, unchanged_since=unchanged_since)
     return text
 
 
@@ -542,7 +551,7 @@ class BriefCacheGate:
     decide must never decide "unchanged".
     """
 
-    def __init__(self, lambda_client, table, cw, namespace: str, coach_id: str, output_type: str):
+    def __init__(self, lambda_client, table, cw, namespace: str, coach_id: str, output_type: str, data_through: Optional[str] = None):
         # `table` is constructed by the caller, not here, so a test can hand in a fake
         # and this stays hermetic — a gate that reaches for its own DDB resource is a
         # gate whose tests either hit the network or never exercise it.
@@ -552,6 +561,7 @@ class BriefCacheGate:
         self.namespace = namespace
         self.coach_id = coach_id
         self.output_type = output_type
+        self.data_through = data_through  # #4185 — stamped on the OUTPUT# row a reuse writes
         self.upstream_type = upstream_output_type(output_type)
         self.up_fp: Optional[str] = None
         self.up_parts: Optional[dict] = None
@@ -577,6 +587,7 @@ class BriefCacheGate:
             today,
             surface=surface,
             cache_output_type=output_type,
+            data_through=self.data_through,
         )
         return fingerprint, text
 
