@@ -112,6 +112,8 @@ test("the docket row: yes/no sides, the engine's last seven nightly readings bet
   const sleep = { sleep_trend: trend, sleep_detail: { avg_recovery_window: 73.9, avg_window_days: 21 } };
   const names = { mind_coach: "Dr. Nathan Reeves", sleep_coach: "Dr. Lisa Park" };
   const r = V.docketRow(item, names, new Set(), sleep);
+  assert.equal(r.question, "Will the seven-night average recovery be 80 or better on Wednesday, October 7?", "the question comes from the criterion, not the served topic prose");
+  assert.equal(r.topic, item.topic);
   assert.equal(r.yes.name, "Dr. Lisa Park");
   assert.equal(r.no.name, "Dr. Nathan Reeves");
   assert.deepEqual(r.engine.readings, ["98", "90", "78", "80", "86", "99", "77"]);
@@ -179,4 +181,47 @@ test("readHTML: the ledger line opens the read; a null latest_checked is absence
   const bare = V.readHTML(pick, { latest_checked: null }, new Date());
   assert.ok(bare.includes("No checked call yet."));
   assert.ok(!bare.includes("v7c-thread"));
+});
+
+test("R6 fix 2: the public-text lint flags an ISO date, a percent sign or a brand; a hit folds the read under details, never rewritten", () => {
+  assert.deepEqual(V.lintPublic("On the night of 2026-09-23, Whoop logged 86% recovery"), ["an ISO date", "a percent sign", "a device brand"]);
+  assert.deepEqual(V.lintPublic("On the night of September 23 the strap logged a recovery of 86."), []);
+  assert.deepEqual(V.lintPublic(""), []);
+  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
+  const html = V.readHTML(pick, { latest_checked: null }, new Date(), null);
+  assert.ok(html.includes("as served</summary>"), "the linted read is under details");
+  assert.ok(html.includes("Whoop logged 86%"), "the served text is not rewritten");
+  assert.ok(html.includes("an ISO date, a percent sign, a device brand"));
+  assert.ok(!/<blockquote[^>]*>On the night of 2026/.test(html.split("<details")[0]), "nothing raw on the main screen");
+});
+
+test("R6 fix 2: the docket question from the criterion, each condition in words", () => {
+  assert.equal(V.docketQuestion({ metric: "recovery_score", condition: "lt", threshold: 70 }, "2026-09-30"), "Will the night’s recovery be under 70 on Wednesday, September 30?");
+  assert.equal(V.docketQuestion({ metric: "recovery_score_7day_avg", condition: "gte", threshold: 80 }, "2026-10-07"), "Will the seven-night average recovery be 80 or better on Wednesday, October 7?");
+  assert.equal(V.docketQuestion({ metric: "weight_lbs", condition: "lte", threshold: 310 }, ""), "Will his weight be 310 or lower?");
+  assert.equal(V.docketQuestion({}, "2026-10-07"), "");
+});
+
+test("R6 fix 1: 'No checked call yet.' prints only when the ledger line is null AND the recent list is empty", () => {
+  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "A clean read.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
+  const withRecent = { latest_checked: null, report_card: { track_record: { recent: [{ date: "2026-09-25", status: "confirmed", metric: "recovery_score", reason: "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6" }] } } };
+  const html = V.readHTML(pick, withRecent, new Date(), null);
+  assert.ok(!html.includes("No checked call yet."), "a null ledger line above a checked list would contradict the list");
+  assert.ok(html.includes("it came in at 59"));
+  assert.ok(V.readHTML(pick, { latest_checked: null }, new Date(), null).includes("No checked call yet."));
+});
+
+test("R6 fix 3: the reason is a sentence with its producer; the late line names the missing channel", () => {
+  const cal = { coaches: [{ coach_id: "sleep", n: 17, confirmed: 7 }] };
+  const rec = V.reasonSentence({ rule: "record", coach: { coach_id: "sleep" } }, cal);
+  assert.equal(rec.text, "At the top for the best checked record since Day 1: 7 of seventeen calls held up.");
+  assert.equal(rec.src, "api_calibration.coaches[sleep]");
+  assert.equal(V.reasonSentence({ rule: "lead" }, null).src, "api_coaching-dashboard.lead_daily");
+  assert.equal(V.reasonSentence({ rule: "ask" }, null).text, "At the top because the open ask is this coach’s.");
+  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "A clean read.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record" };
+  const profile = { latest_checked: null, recent_outputs: [{ date: "2026-09-25", summary: "Log four words each morning" }, { date: "2026-09-24", summary: "Note two words each morning" }], dossier: { commitments: [{ date: "2026-09-25", text: "Log sleep quality each morning", status: "pending", due_date: "2026-10-02" }] } };
+  const html = V.readHTML(pick, profile, new Date(), cal);
+  assert.ok(html.includes("Nothing has come back yet, and there is no channel yet to receive one."));
+  assert.ok(!html.includes("chosen:"), "no debug line");
+  assert.ok(html.includes("7 of seventeen calls held up"));
 });

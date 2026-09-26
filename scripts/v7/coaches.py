@@ -7,11 +7,11 @@ down. Every figure is poured by `site/assets/js/v7_coaches.js` from the served e
 (`/api/coaching-dashboard`, `/api/coach/<id>`, `/api/coach_docket`, `/api/calibration`,
 `/api/sleep_detail`, `/api/source_freshness`, `/api/coaches`) and carries `data-src`.
 
-WHAT THE STATIC SHELL SAYS. Only the frame and each block's honest ABSENCE sentence — the
-words the page shows when the endpoint serves nothing (no read, no open disagreement, no
-checked call). Nothing here is a number and nothing is a placeholder for one: the JS
-replaces a block only when it has the served fact, so an empty slot renders as absence
-(ADR-104). No ruled glossary term appears in this text (tests/test_site_vocabulary_registry.py
+WHAT THE STATIC SHELL SAYS. Only the frame and, in each block, "Loading the numbers…" plus
+one <noscript> line — never an absence sentence, because a static "No checked call yet."
+would ASSERT on JS-off or a 404 (R6 red team, fix 1). The JS writes each block's honest
+state from the served fact: the fact, its absence ("No checked call yet."), or "not served
+right now" on a null fetch (ADR-104). No ruled glossary term appears in this text (tests/test_site_vocabulary_registry.py
 sweeps site/next/** like any reader page) and no "cycle"/"reset"/"attempt" word (owner
 ruling 2026-09-26: the public frame is the experiment and the day).
 
@@ -34,13 +34,14 @@ def body(base: str) -> str:  # noqa: ARG001 — the base is the builder's; this 
         '    <p class="v7c-intro">Eight AI characters — software, not people — read his numbers each morning. '
         "Every dated claim they make is checked later by code, and the misses stay on the record. "
         '<span id="v7c-through" data-src="api_calibration.as_of"></span></p>\n'
+        '    <noscript><p class="v7c-absent">This page pours its numbers with JavaScript; with it off, nothing here is a claim.</p></noscript>\n'
         # ── (1) today's read: one coach, opened by the ledger line ──
         '    <section class="v7c-entry" id="v7c-read" aria-labelledby="v7c-read-h">\n'
         '      <div class="v7c-m" id="v7c-read-m" aria-hidden="true"></div>\n'
         '      <div class="v7c-body">\n'
         '        <h2 id="v7c-read-h" class="v7c-h">Today’s read</h2>\n'
         '        <div id="v7c-read-body">\n'
-        '          <p class="v7c-absent">No read is served today.</p>\n'
+        '          <p class="v7c-absent">Loading the numbers…</p>\n'
         "        </div>\n"
         "      </div>\n"
         "    </section>\n"
@@ -50,7 +51,7 @@ def body(base: str) -> str:  # noqa: ARG001 — the base is the builder's; this 
         '      <div class="v7c-body">\n'
         '        <h2 id="v7c-docket-h" class="v7c-h">Where two of them disagree</h2>\n'
         '        <div id="v7c-docket-body">\n'
-        '          <p class="v7c-absent">No open disagreement on the record.</p>\n'
+        '          <p class="v7c-absent">Loading the numbers…</p>\n'
         "        </div>\n"
         "      </div>\n"
         "    </section>\n"
@@ -60,14 +61,14 @@ def body(base: str) -> str:  # noqa: ARG001 — the base is the builder's; this 
         '      <div class="v7c-body">\n'
         '        <h2 id="v7c-record-h" class="v7c-h">The record</h2>\n'
         '        <div id="v7c-record-body">\n'
-        '          <p class="v7c-absent">No checked call yet.</p>\n'
+        '          <p class="v7c-absent">Loading the numbers…</p>\n'
         "        </div>\n"
         '        <p class="v7c-note">Per-coach hit rates are not printed here yet: three scorekeepers disagree on the same day. '
         "What is printed above is each checked call, one by one, from the coach’s own ledger — a list a reader can count, "
         "not a rate the site cannot yet stand behind.</p>\n"
         '        <details class="v7c-details" id="v7c-roster">\n'
         '          <summary id="v7c-roster-sum">The staff</summary>\n'
-        '          <div id="v7c-roster-body"><p class="v7c-absent">No roster is served.</p></div>\n'
+        '          <div id="v7c-roster-body"><p class="v7c-absent">Loading the numbers…</p></div>\n'
         "        </details>\n"
         "      </div>\n"
         "    </section>\n"

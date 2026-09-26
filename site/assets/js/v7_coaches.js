@@ -114,6 +114,35 @@ const surname = (name) => {
   return w.length ? w[w.length - 1] : "";
 };
 
+// ── the public-text lint (R6 fix 2) ─────────────────────────────────────────────
+// A served slot is printed on the main screen only when it reads as public prose: no ISO
+// date, no percent sign, no device brand. A hit is not rewritten — it is folded under
+// <details> "as served", where the reader opens it knowingly. Returns the reasons ([] = clean).
+const BRANDS = /\b(Whoop|Hevy|Eight ?Sleep|Withings|Garmin|MacroFactor|Strava|Oura|Apple Health|Habitify|Todoist)\b/;
+export function lintPublic(text) {
+  const t = String(text || "");
+  const why = [];
+  if (/\d{4}-\d{2}-\d{2}/.test(t)) why.push("an ISO date");
+  if (/\d\s?%/.test(t)) why.push("a percent sign");
+  if (BRANDS.test(t)) why.push("a device brand");
+  return why;
+}
+
+// "Will the seven-night average recovery be 80 or better on Wednesday, October 7?" — the
+// question from the docket's CRITERION (engine fields), never from the served topic prose.
+const Q_COND = { gte: "or better", ge: "or better", gt: "or more", lte: "or lower", le: "or lower", lt: "under", eq: "exactly" };
+export function docketQuestion(criterion, resolutionDate) {
+  const c = criterion || {};
+  if (!c.metric || c.threshold == null) return "";
+  const what = metricWords(c.metric);
+  const cond = String(c.condition || "").toLowerCase();
+  const thr = fmtNum(c.threshold);
+  const when = dayInWords(resolutionDate);
+  const on = when ? ` on ${when}` : "";
+  if (cond === "lt" || cond === "gt") return `Will ${what} be ${cond === "lt" ? "under" : "over"} ${thr}${on}?`;
+  return `Will ${what} be ${thr} ${Q_COND[cond] || ""}${on}?`.replace(/\s+\?/, "?");
+}
+
 // ── the ledger line (#4230) ─────────────────────────────────────────────────────
 // {claim, created_date, outcome_date, metric, eval_type, condition, threshold, actual_value, status}
 // → { verdict: "right"|"wrong", text, checked } — or null (no checked call yet).
@@ -268,7 +297,8 @@ export function docketRow(item, names, dark, sleepDetail) {
   const rule = crit.threshold != null ? `${metricWords(crit.metric)} ${conditionWords(crit.condition)} ${fmtNum(crit.threshold)}` : String(crit.description || "").replace(/_/g, " ");
   const claims = item.claims || {};
   return {
-    question: String(item.topic || ""),
+    question: docketQuestion(crit, item.resolution_date) || String(item.topic || "").replace(/_/g, " "),
+    topic: String(item.topic || ""),
     yes: { id: yes, name: nm(yes), dark: dark.has(yes), claim: dark.has(yes) ? "" : String(claims[yes] || "") },
     no: { id: no, name: nm(no), dark: dark.has(no), claim: dark.has(no) ? "" : String(claims[no] || "") },
     engine: engineNumber(crit, sleepDetail),
@@ -322,7 +352,21 @@ const marginHTML = (ymd) => {
 };
 const lineHTML = (l) => `<li><span class="v7c-tag${l.verdict === "right" ? " v7c-hit" : ""}">${l.verdict}</span>${esc(l.text)}${l.checked ? ` <span class="v7c-g">${esc(l.checked)}</span>` : ""}</li>`;
 
-export function readHTML(pick, profile, now) {
+// The reason a coach is at the top, as a sentence with its producer (R6 fix 3).
+export function reasonSentence(pick, calibration) {
+  if (!pick) return "";
+  if (pick.rule === "lead") return { text: "Today’s lead read, written this morning from the day’s facts.", src: "api_coaching-dashboard.lead_daily" };
+  if (pick.rule === "ask") return { text: "At the top because the open ask is this coach’s.", src: "api_coaching-dashboard.open_actions[0]" };
+  if (pick.rule === "record") {
+    const sid = shortId(pick.coach && pick.coach.coach_id);
+    const r = (calibration && Array.isArray(calibration.coaches) ? calibration.coaches : []).find((x) => x && x.coach_id === sid);
+    const kn = r ? `${Number(r.confirmed) || 0} of ${numberWords(r.n)}` : "";
+    return { text: `At the top for the best checked record since Day 1${kn ? `: ${kn} calls held up` : ""}.`, src: `api_calibration.coaches[${sid}]` };
+  }
+  return { text: "At the top as the freshest read on the board.", src: "api_coaching-dashboard.coaches[].analysis_generated_at" };
+}
+
+export function readHTML(pick, profile, now, calibration) {
   const c = pick && pick.coach;
   if (!c) return "";
   const pid = personaId(c.coach_id);
@@ -331,23 +375,29 @@ export function readHTML(pick, profile, now) {
   const parts = [who];
   // the ledger line opens the read
   const lc = profile && profile.latest_checked ? ledgerLine(profile.latest_checked, name) : null;
+  const recent = recentLines(profile && profile.report_card && profile.report_card.track_record && profile.report_card.track_record.recent, name);
   if (lc) {
     parts.push(`<p class="v7c-dated">The last call of ${esc(surname(name))}’s that code checked:</p>`);
     parts.push(`<ul class="v7c-ledger" data-src="api_coach_${esc(pid)}.latest_checked">${lineHTML(lc)}${lc.claim ? `<li class="v7c-claim">In the coach’s words, as served: “${esc(lc.claim)}”</li>` : ""}</ul>`);
-  } else {
+  } else if (!recent.length) {
+    // absence only when the profile served NOTHING checked — a null ledger line above a
+    // list of checked calls would contradict the list (R6 fix 1)
     parts.push(`<p class="v7c-absent" data-src="api_coach_${esc(pid)}.latest_checked">No checked call yet.</p>`);
   }
-  const recent = recentLines(profile && profile.report_card && profile.report_card.track_record && profile.report_card.track_record.recent, name);
   if (recent.length) {
     const t = tally(recent);
     parts.push(`<p class="v7c-dated">The last ${numberWords(t.n)} checked call${t.n === 1 ? "" : "s"}, newest first — ${numberWords(t.right)} right, ${numberWords(t.wrong)} wrong:</p>`);
     parts.push(`<ul class="v7c-ledger" data-src="api_coach_${esc(pid)}.report_card.track_record.recent">${recent.map(lineHTML).join("")}</ul>`);
   }
-  // the read itself: the guarded slot, or absence
+  // the read itself: the guarded slot, linted; a hit folds under <details>, never rewritten
   const text = String(c.position_summary || "").trim();
-  if (text) parts.push(`<blockquote class="v7c-coach" data-src="${c.lead ? "api_coaching-dashboard.lead_daily.text" : "api_coaching-dashboard.coaches[].position_summary"}">${esc(text)}</blockquote>`);
+  const src = c.lead ? "api_coaching-dashboard.lead_daily.text" : "api_coaching-dashboard.coaches[].position_summary";
+  const why = lintPublic(text);
+  if (text && !why.length) parts.push(`<blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote>`);
+  else if (text) parts.push(`<details class="v7c-details"><summary>What ${esc(surname(name))} wrote to Matthew, as served</summary><blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote><p class="v7c-note">Kept off the main screen: it carries ${esc(why.join(", "))}. Served without edits.</p></details>`);
   else parts.push(`<p class="v7c-absent">No public read is served for today.</p>`);
-  if (pick.reason) parts.push(`<p class="v7c-note">${esc(pick.reason)}.</p>`);
+  const reason = reasonSentence(pick, calibration);
+  if (reason) parts.push(`<p class="v7c-note" data-src="${esc(reason.src)}">${esc(reason.text)}</p>`);
   // the standing ask, counted
   const ask = standingAsk(profile && profile.dossier && profile.dossier.commitments);
   const n = askCount(profile && profile.recent_outputs);
@@ -358,7 +408,7 @@ export function readHTML(pick, profile, now) {
       `<div class="v7c-thread" data-src="api_coach_${esc(pid)}.recent_outputs"><div class="v7c-t">The standing ask — the thread, counted</div>` +
         `<p>On <b data-src="api_coach_${esc(pid)}.recent_outputs (count)">${n.asks}</b> of ${esc(numberWords(n.mornings))} mornings${first ? ` since ${esc(first)}` : ""}, by a keyword count of the mornings (${esc(ASK_RULE)}), ${esc(surname(name))} has asked him for the same thing. ` +
         `The latest form, asked ${esc(dayInWords(ask.date))}${due ? `, is due ${esc(due)}` : ""}: <q data-src="api_coach_${esc(pid)}.dossier.commitments[].text">${esc(ask.text)}</q>.` +
-        `${ask.outcome ? "" : ' <span class="v7c-late">Nothing has come back yet.</span>'}</p></div>`,
+        `${ask.outcome ? "" : ' <span class="v7c-late">Nothing has come back yet, and there is no channel yet to receive one.</span>'}</p></div>`,
     );
   }
   const daily = profile && typeof profile.daily === "string" ? profile.daily.trim() : "";
@@ -386,7 +436,7 @@ export function docketHTML(rows) {
         `<tr class="v7c-engine"><th>The number between them</th><td>${eng}</td></tr>` +
         `<tr><th>Settled by</th><td data-src="api_coach_docket.open[].resolution_date">${esc(r.settled)}</td></tr>` +
         `</table>` +
-        `<details class="v7c-details"><summary>What each wrote, as served</summary>${served}</details>` +
+        `<details class="v7c-details"><summary>What each wrote, as served</summary>${r.topic ? `<p class="v7c-dated">The docket’s own wording of the question, as served: ${esc(r.topic)}</p>` : ""}${served}</details>` +
         (r.opened ? `<p class="v7c-note">Opened ${esc(r.opened)}.</p>` : "")
       );
     })
@@ -419,6 +469,8 @@ const setHTML = (id, html) => {
   if (el && html) el.innerHTML = html;
 };
 
+const NOT_SERVED = (what) => `<p class="v7c-absent">${what} not served right now.</p>`;
+
 export async function run(doc) {
   const d = doc || (typeof document !== "undefined" ? document : null);
   if (!d || !d.getElementById("v7c-read-body")) return;
@@ -436,13 +488,15 @@ export async function run(doc) {
   const through = d.getElementById("v7c-through");
   if (through && rec.through) through.textContent = dataThrough(rec.through);
 
-  // (1) today's read
+  // (1) today's read — a null fetch says so; an empty served board is absence
   const pick = dash ? chooseTodaysRead(dash.coaches, dash.open_actions, cal, dash.lead_daily, now) : null;
   let topPid = "";
-  if (pick && pick.coach) {
+  if (!dash) setHTML("v7c-read-body", NOT_SERVED("The coaches’ reads are"));
+  else if (!pick || !pick.coach) setHTML("v7c-read-body", `<p class="v7c-absent">No read is served today.</p>`);
+  else {
     topPid = personaId(pick.coach.coach_id);
     const profile = await getJSON(`/api/coach/${encodeURIComponent(topPid)}`);
-    setHTML("v7c-read-body", readHTML(pick, profile, now));
+    setHTML("v7c-read-body", readHTML(pick, profile, now, cal));
     setHTML("v7c-read-m", marginHTML(ptDate(pick.coach.analysis_generated_at)));
   }
 
@@ -451,18 +505,23 @@ export async function run(doc) {
   for (const c of coachesApi && Array.isArray(coachesApi.coaches) ? coachesApi.coaches : []) if (c && c.persona_id) names[c.persona_id] = String(c.name || "");
   const dark = darkCoaches(fresh);
   const rows = (docket && Array.isArray(docket.open) ? docket.open : []).map((it) => docketRow(it, names, dark, sleep)).filter(Boolean);
-  if (rows.length) {
+  if (!docket) setHTML("v7c-docket-body", NOT_SERVED("The docket is"));
+  else if (!rows.length) setHTML("v7c-docket-body", `<p class="v7c-absent">No open disagreement on the record.</p>`);
+  else {
     setHTML("v7c-docket-body", docketHTML(rows));
     setHTML("v7c-docket-m", marginHTML(rows[0].resolution_date));
   }
 
   // (3) the record + the roster
-  if (rec.soFar) {
+  if (!cal) setHTML("v7c-record-body", NOT_SERVED("The record is"));
+  else if (!rec.soFar) setHTML("v7c-record-body", `<p class="v7c-absent">No checked call yet.</p>`);
+  else {
     setHTML("v7c-record-body", recordHTML(rec));
     setHTML("v7c-record-m", marginHTML(rec.through));
   }
   const roster = rosterRows(coachesApi, cal, topPid);
-  if (roster.length) {
+  if (!coachesApi) setHTML("v7c-roster-body", NOT_SERVED("The roster is"));
+  else if (roster.length) {
     setHTML("v7c-roster-body", rosterHTML(roster));
     const sum = d.getElementById("v7c-roster-sum");
     if (sum) sum.textContent = `${topPid ? "The rest of the staff" : "The staff"} (${roster.length})`;
