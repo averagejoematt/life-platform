@@ -65,6 +65,30 @@ def test_cycle1_genesis_literal_allowed_on_cycle_compare():
     assert any(label == "Cycle-1 genesis literal" for label, _ in lts.check_body("/cockpit/", body))
 
 
+def test_tool_call_residue_flags_a_page_containing_it():
+    """#4190 AC3: the exact tail measured live on the 2026-09-08 log_decision
+    record — the residue token list must catch it on ANY page, not just
+    /api/decisions."""
+    body = 'Committed to Hevy as Foundation - Push - 3 - 11.</decision>\n<parameter name="followed">true'
+    hits = lts.check_body("/protocols/experiments/", body)
+    assert any(label == "Tool-call XML residue" for label, _ in hits)
+
+
+def test_tool_call_residue_does_not_flag_ordinary_markup():
+    """The sweep scans full page HTML, which is legitimately full of `<div>`/
+    `<span>` tags — only the literal tool-call forms are unambiguous (unlike
+    common.text_guards' bare-`<` catch-all, which only ever sees one isolated
+    argument string, never a whole page)."""
+    hits = lts.check_body("/cockpit/", "<div class='rd-card'><span>all good</span></div>")
+    assert not any(label == "Tool-call XML residue" for label, _ in hits)
+
+
+def test_api_decisions_is_in_the_json_endpoints_swept():
+    """The endpoint the live leak was actually measured on must be in the swept
+    set — a token addition with nothing pointed at it catches nothing."""
+    assert "/api/decisions" in lts.JSON_ENDPOINTS
+
+
 def test_day_30_plus_counter_flags_stale_day_count():
     hits = lts.check_body("/cockpit/", "<p>Day 45 of the experiment</p>")
     assert any(label == "Day-30+ counter" for label, _ in hits)

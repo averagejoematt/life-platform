@@ -55,6 +55,9 @@ JSON_ENDPOINTS = [
     "/api/cycle_compare",
     "/panelcast/episodes.json",
     "/journal/posts.json",
+    # #4190: the endpoint a stored log_decision record's tool-call XML residue
+    # actually leaked through — see the "Tool-call XML residue" token below.
+    "/api/decisions",
 ]
 
 # Endpoints that may legitimately return 503 before that day's compute cycle
@@ -103,6 +106,21 @@ FORBIDDEN_TOKENS = [
     ),
     # Tombstone JSON leaking to the public (would mean a tombstoned record made it through)
     ("Tombstone leak", re.compile(r'"tombstone"\s*:\s*true'), []),
+    # #4190: tool-call XML residue — an MCP client's OWN <function_calls>/<invoke>/
+    # <parameter> tool-call envelope, echoed back into a string argument it was
+    # assembling (a client-side parsing bug), later stored and served verbatim. A
+    # 2026-09-08 log_decision record's `decision` field ended
+    # `…</decision>\n<parameter name="followed">true` and rendered as prose on
+    # /protocols/experiments/. Deliberately NOT a bare `<` here (unlike
+    # common.text_guards.TOOL_CALL_RESIDUE_RE, the write-time/serve-time guard this
+    # sweep backstops) — this sweep scans full page HTML, which is legitimately
+    # full of `<div>`/`<span>` markup; only the literal tool-call forms are
+    # unambiguous on a rendered page or a JSON body alike.
+    (
+        "Tool-call XML residue",
+        re.compile(r"</decision>|<parameter\s+name\s*=|</parameter>|<invoke\b|</invoke>|<function_calls\b|</function_calls>"),
+        [],
+    ),
 ]
 
 # The subset of FORBIDDEN_TOKENS that only makes sense while the CURRENT cycle
