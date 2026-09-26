@@ -1285,3 +1285,31 @@ a.mb-row:hover .mb-row-k { color: var(--ember); }
 @media (max-width: 600px) {
   .ct-read { padding: var(--sp-3) var(--sp-4); }
 }
+
+/* #4182 — the Story door reads first on a phone: at ≤760px the reader renders ABOVE the
+   entry list, so the fold is the latest write-up (week · date → title → first paragraph
+   → "Read the full piece" → "Next write-up"), not six titles. A section with no list
+   (who he is, timeline, broadcast) drops the rail that only restated its kicker. */
+@media (max-width: 760px) {
+  [data-door="story"] .dx-layout .dx-read { order: -1; }
+}
+.dx-layout.dx-layout--solo { grid-template-columns: minmax(0, 1fr); }
+.dx-layout--solo .dx-list { display: none; }
+.dx-next { color: var(--ink-muted); margin-top: var(--sp-3); }
+.dx-byline { color: var(--ink-faint); margin-top: var(--sp-5); display: flex; align-items: center; gap: var(--sp-2); }
+/* One edge, a slimmer hero on a phone (the cockpit's #578/#4182 precedent): .dx-main
+   already carries the gutter, so the hero's own gutter doubled it; and the decorative
+   rule bands step aside at ≤760px so the write-up — not the ornament — fills the fold. */
+.dx-main > .page-hero { padding-inline: 0; }
+@media (max-width: 760px) {
+  .dx-main { padding-top: var(--sp-3); }
+  .dx-main > .page-hero { padding-block: var(--sp-3) var(--sp-2); }
+  .page-hero .art-hub, .dx-read .art-chapter { display: none; }
+  .dx-tabs { margin-top: var(--sp-3); }
+  .dx-layout { margin-top: var(--sp-4); }
+  .dx-read .dx-readmore { margin-top: var(--sp-4); }
+  .dx-layout.dx-layout--solo { margin-top: var(--sp-3); }
+  .dx-layout--solo .dx-title { margin-top: 0; }
+  .dx-layout--solo .dx-prose { margin-top: var(--sp-3); }
+  .dx-layout--solo .dx-readmore { margin-top: var(--sp-3); }
+}

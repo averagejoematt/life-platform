@@ -241,7 +241,7 @@ REGISTRY = [
     (
         "supplements",
         "Supplements",
-        "The daily stack — what's in it, why, and what the evidence actually supports.",
+        "What he takes every day, what each one should move, and what the evidence supports.",
         "Protocol & experiments",
         "data",
         "/api/supplements",
@@ -261,7 +261,7 @@ REGISTRY = [
     (
         "experiments",
         "Experiments",
-        "The N=1 instrument: hypotheses run as read-only proof.",
+        "What he'd try next, what it should move, and how we'd know it worked.",
         "Protocol & experiments",
         "data",
         "/api/experiments",
@@ -842,9 +842,9 @@ PILLARS = [
         "door": "protocols",
         "title": "Protocols",
         "nav_key": "protocols",
-        "kicker": "the protocols · the levers you pull",
+        "kicker": "the protocols · what he takes and tries",
         "h1": "The Protocols",
-        "lede": "The levers — supplements, experiments, challenges, and the discoveries they chase. What gets changed to move the data, and whether it moved.",
+        "lede": "Supplements and experiments — each with what it should move, and how that's measured.",
         "groups": ["Protocol & experiments"],
     },
     {
@@ -854,8 +854,9 @@ PILLARS = [
         "title": "Method",
         "nav_key": "data",  # footer-tier: no door of its own; nav keeps 5 doors
         "kicker": "the method · under the hood",
+        "lead": "wrong",
         "h1": "The Method",
-        "lede": "Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.",
+        "lede": "How every number here is made, and every time the machine was wrong — shown, not summarised.",
         "groups": ["How it holds up", "The machine", "The reset log"],
     },
 ]
@@ -992,8 +993,15 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
     # assets/js/page_data.js — the hardened CSP has no 'unsafe-inline'.
     # "</" is escaped inside the payload so no JSON string can close the tag.
     judge_cal = judge_calibration_block() if any(s.get("slug") == "calibration" for s in registry_json(pillar["groups"])) else None
+    registry = registry_json(pillar["groups"])
+    lead = pillar.get("lead")
+    if lead:
+        # #4182: the lead topic is the rail's first tile, so its group becomes the first
+        # tab (the group tabs follow first appearance); every other tile keeps its
+        # registry order.
+        registry = [e for e in registry if e["slug"] == lead] + [e for e in registry if e["slug"] != lead]
     page_data = {
-        "registry": registry_json(pillar["groups"]),
+        "registry": registry,
         "start": start_slug,
         "base": pillar["base"],
         "door": pillar["door"],
@@ -1085,6 +1093,11 @@ def main() -> int:
         # in" placeholders made the worst first impression on the page. Other pillars
         # keep registry order. Hash deep-links still win in evidence.js.
         first = "physical" if (pillar["dir"] == "data" and "physical" in slugs) else slugs[0]
+        # #4182: a pillar may name a `lead` topic — the hub opens on it and the rail
+        # starts with it (the Method hub leads with "The wrong page": every time the
+        # machine was wrong is the promise its lede makes).
+        if pillar.get("lead") in slugs:
+            first = pillar["lead"]
         # #1395: the Data + Protocols HUBS get a <noscript> static core (real headline
         # numbers + as-of) and a data-driven OG override, so the crawler / no-JS / unfurl
         # view is real content, not a blank shell. Method is footer-tier (no unfurl

@@ -10,7 +10,7 @@
 */
 import { pageData } from "/assets/js/page_data.js"; // #3048 — per-page start section, JSON island
 import { initTheme } from "/assets/js/theme.js";
-import { enhanceCoachNames, stampGenesis, preStart, genesisCount } from "/assets/js/coach_popover.js"; // + #931 pre-start countdown
+import { enhanceCoachNames, stampGenesis, preStart, genesisCount, GENESIS_ISO } from "/assets/js/coach_popover.js"; // + #931 pre-start countdown
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait, wireSpeakingAudio } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 semantic states
@@ -21,7 +21,7 @@ import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-articl
 import { quotesArchiveHTML } from "/assets/js/journal_quotes.js"; // #1568 — consent-per-line pull-quotes (ADR-142)
 import { sortChronicleNewestFirst, postForDate } from "/assets/js/chronicle_order.js";
 import { cleanExcerpt, statsRow, stripStatParagraphs } from "/assets/js/chronicle_text.js"; // #4191 — the excerpt opens on its first sentence, the stat line reads as words // #1988 — same-date part-sequence tie-break, shared with the server manifest; #3525 — the milestone→installment rule, pure + unit-tested
-import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with story.js
+import { ptDaysAgo, dayInWords, nextWriteUpText } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with story.js · #4182 dates in words
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -33,16 +33,19 @@ import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calend
 // Matt's OWN blog: a separate, Matt-authored source (/journal/blog.json), honestly
 // empty until he writes one — never the AI-written chronicle content.
 const SECTIONS = [
-  { key: "chronicle", label: "Chronicle", icon: "chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/journal/posts.json" },
-  { key: "panel", label: "Podcast", icon: "podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
-  { key: "journal", label: "In my own words", kicker: "Matt's own blog", kind: "posts", url: "/journal/blog.json" },
-  { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
+  // #4182: the tab labels are the reader's words — the weekly write-up, the podcast, in
+  // his own words, who he is. Timeline + Broadcast left the tab bar (the 25-page reach
+  // set, owner-delegated panel 2026-09-26); both stay in SECTIONS so their URLs render.
+  { key: "chronicle", label: "The weekly write-up", icon: "chronicle", kicker: "written weekly by Elena Voss, the site's AI journalist", kind: "posts", url: "/journal/posts.json" },
+  { key: "panel", label: "The podcast", icon: "podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
+  { key: "journal", label: "In his own words", kicker: "Matthew's own writing", kind: "posts", url: "/journal/blog.json" },
+  { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline", unlisted: true },
   // #1672 (The Social Membrane, epic #1668): the Broadcast feed — Matthew's own public
   // voice, self-hosted. Facade cards (thumbnail + caption + link-out; no third-party
   // iframe → zero CSP change). The feed shows CLEARED, origin:human posts only — the
   // membrane (#1670) + the fail-closed sensitivity gate (#1673) filter server-side in
   // /api/broadcast, so the client renders exactly what it's given.
-  { key: "broadcast", label: "Broadcast", kicker: "Matthew's own posts, self-hosted", kind: "broadcast", url: "/api/broadcast" },
+  { key: "broadcast", label: "Broadcast", kicker: "Matthew's own posts, self-hosted", kind: "broadcast", url: "/api/broadcast", unlisted: true },
   // #1679 (epic #1668 S11): the bidirectional membrane — what I said, where it went,
   // what came back, with the origin membrane as the visible join. `unlisted` for the
   // same reason as the build log: it's the provenance/engineering view of the feed
@@ -58,7 +61,7 @@ const SECTIONS = [
   // which links /story/build/ directly). The section stays in SECTIONS/BYKEY so the
   // unchanged URL still renders — only the tab bar filters it out.
   { key: "build", label: "Build log", kicker: "what the machine shipped — merged work only", kind: "build", url: "/story/build/beats.json", unlisted: true },
-  { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
+  { key: "about", label: "Who he is", kicker: "who he is", kind: "about" },
 ];
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 
@@ -123,13 +126,26 @@ async function secFetch(s) { if (!s.url) return null; if (cache[s.key]) return c
 // kept within the §11 editorial guardrails (no employer/industry/role specifics) and
 // free of hard tool/lambda counts (those live in Evidence, to avoid drift). Pending
 // Matt's review of the voice before deploy.
-const ABOUT = `
-  <p class="dx-kicker label">the experiment, in context</p>
-  <h2 class="dx-title">An ordinary person, rebuilt in public — with AI.</h2>
-  <p class="dx-prose">I've spent two decades making complicated systems reliable and getting people to actually use them. In early 2026 I turned that same thinking on myself — not a challenge, not a 30-day hack, but a proper system: the wearables already on my body, an AI that reads the numbers back to me every morning, and the discipline to publish the down weeks too.</p>
+// #4182 — "who he is": his own paragraphs, first person (the site's one first-person
+// page, by name). Two builder words re-worded to the glossary's reader forms (Third Wall
+// → what the AI said, and how it felt; the chronicle → the weekly write-up). No photo
+// placeholder: a portrait lands only when #3761 does. The next step is "Start from Day 1".
+const ABOUT_TITLE = `<h2 class="dx-title">An ordinary person, rebuilt in public — with AI.</h2>`;
+const ABOUT_FIRST = `<p class="dx-prose">I've spent two decades making complicated systems reliable and getting people to actually use them. In early 2026 I turned that same thinking on myself — not a challenge, not a 30-day hack, but a proper system: the wearables already on my body, an AI that reads the numbers back to me every morning, and the discipline to publish the down weeks too.</p>`;
+const ABOUT_REST = `
   <p class="dx-prose">This isn't Blueprint. No million-dollar lab, no team of doctors, no superhuman protocol — just consumer devices, Claude, and a commitment to keep it honest. Every number here is real; every failure is included. The bet is simple: <strong>numbers <em>and</em> meaning, kept personal.</strong> The anti-Blueprint.</p>
-  <p class="dx-prose">A board of named AI experts each reads my data differently; Elena Voss writes the weekly chronicle; the Third Wall is where the machine's read meets how it actually felt. Everything here is correlative, never causal — patterns, flagged when thin, never dressed up as proof.</p>
+  <p class="dx-prose">A board of named AI experts each reads my data differently; Elena Voss writes the weekly write-up; and next to what the AI said sits how the week actually felt. Everything here is correlative, never causal — patterns, flagged when thin, never dressed up as proof.</p>
   <p class="dx-prose">The throughline I keep coming back to: <strong>you could do this too</strong>. The cockpit and the data pages hold the live data; this is the why. If something here resonates — you're going through something similar, or just curious — I'd genuinely love to hear from you: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a>.</p>`;
+
+// "Start from Day 1 →" — the first write-up of THIS start (the earliest installment dated
+// on/after genesis), from the same posts.json the write-up tab reads. No post yet → the
+// door itself, never a dead anchor.
+async function aboutHTML() {
+  const pj = await tryJSON("/journal/posts.json");
+  const posts = ((pj && pj.posts) || []).filter((p) => p && p.date && p.date >= GENESIS_ISO).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const href = posts.length ? `/story/#${encodeURIComponent(posts[0].date)}` : "/story/";
+  return ABOUT_TITLE + ABOUT_FIRST + `<p class="dx-readmore"><a class="dx-startday1" href="${esc(href)}">Start from Day 1 →</a></p>` + ABOUT_REST;
+}
 
 function entriesFor(s, data) {
   if (!data) return [];
@@ -183,7 +199,7 @@ function entriesFor(s, data) {
 // coaching door (coaching.js) when /story/coaches/ was retired — see /coaching/team/.
 async function renderRead(s, id) {
   const read = $("[data-dx-read]");
-  if (s.kind === "about") { read.innerHTML = ABOUT; return; }
+  if (s.kind === "about") { read.innerHTML = await aboutHTML(); return; }
   if (s.kind === "podcast") {
     const data = await secFetch(s);
     const all = entriesFor(s, data);
@@ -619,9 +635,11 @@ async function renderRead(s, id) {
   if (!ent) { read.innerHTML = `<p class="dx-prose">Pick an entry to read it here.</p>`; return; }
   // Honest read-time from the real word count (~220 wpm) — replaces nothing, adds truth.
   const readMins = ent.word_count ? Math.max(1, Math.round(Number(ent.word_count) / 220)) : null;
+  // #4182: the served word count reads as a number ("1,414", never "1414.0").
+  const words = Number(ent.word_count) > 0 ? Math.round(Number(ent.word_count)).toLocaleString("en-US") : "";
   const readmore = ent.url
-    ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words · ~${readMins} min)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
-    : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words · ~${readMins} min</p>` : "");
+    ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${words ? ` (${esc(words)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
+    : (words ? `<p class="dx-foot label">${esc(words)} words · ~${readMins} min</p>` : "");
   const episode = s.key === "chronicle" ? await podcastEpisode(ent) : null;
   // Duration: trust the real duration_sec first; the byte estimate must be WAV-aware
   // (24kHz·16-bit·mono ≈ 48000 B/s) — the old MP3-only guess labeled a 12.9 MB WAV
@@ -665,9 +683,26 @@ async function renderRead(s, id) {
   // carrying nothing but its ISO date, which reads (and was judged) as today's. The age
   // comes from the shared entry_age helper so Home's teaser and this reader can never
   // disagree about the same entry, and so the PT-calendar arithmetic lives in one place.
-  read.innerHTML = chapterArt + art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:var(--coach-elena)">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : s.key === "chronicle" && ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}${entryAgeSuffix(ent.date)}` : ""}</p>` +
-    `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
-    prevRail + `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
+  // #4182 — the fold, in reading order: "Week 3 · Tuesday, September 22" → the title →
+  // the first paragraph → "Read the full piece (1,114 words)" → "Next write-up:
+  // Wednesday, September 30". The byline, the audio, the stat line, the photo and the
+  // "previously" rail follow it. The age still says so once the piece is 2+ days old
+  // (#2957), in words; the storage slug (`week-06`) never prints — the label is the
+  // genesis-anchored one entriesFor derives.
+  const ago = ent.date ? ptDaysAgo(ent.date) : null;
+  const age = ago == null || ago < 0 ? "" : ago === 0 ? " · today" : ago === 1 ? " · yesterday" : ` · ${ago} days ago`;
+  const when = ent.date ? dayInWords(ent.date) : "";
+  const kickBits = [ent.label || "", when].filter(Boolean).join(" · ");
+  const kicker = `<p class="dx-kicker label">${s.key === "chronicle" ? "" : "his own words · "}${esc(kickBits)}${esc(age)}</p>`;
+  const byline = s.key === "chronicle"
+    ? `<p class="dx-byline label">${elenaMark ? `<span class="coach-mark" style="--coach:var(--coach-elena)">${elenaMark}</span>` : ""}by Elena Voss, the site's AI journalist</p>`
+    : "";
+  const next = s.key === "chronicle" ? await nextWriteUpLine() : "";
+  read.innerHTML = chapterArt + kicker +
+    `<h2 class="dx-title">${esc(ent.title)}</h2>` +
+    `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + next +
+    byline + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") + art +
+    prevRail + dispatchFoot(s, ent, all);
   read.querySelectorAll(".dx-prevlink").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   const rf = read.querySelector(".dx-readfull");
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
@@ -715,20 +750,21 @@ function dispatchFoot(s, ent, all) {
   // same URL RSS + the sitemap point at — one content identity, one shareable URL.
   // Falls back to the in-app deep link when a post has no permalink page yet.
   const permalink = ent.url ? (location.origin + ent.url) : (location.origin + `/story/${s.key}/#${ent.id}`);
-  // #949: a Prologue post's sequential slug (…/week-03/) contradicts its own label
-  // ("Prologue · Part III") — the URL still works and shares fine, but the raw
-  // slug text stays out of the reader's face for pre-genesis installments.
-  const showSlug = !/^Prologue/i.test(String(ent.label || ""));
+  // #949 → #4182: the permalink's slug is a storage ordinal (…/week-06/ on the Week 3
+  // installment) — it contradicted its own label for Prologue posts (#949) and for
+  // every genesis-counted week since. The label displays; the slug never prints. The
+  // URL still shares fine: it rides the button's data-url, and the text span below
+  // stays hidden unless the clipboard fallback has to reveal it.
   const share = `
     <p class="dx-share">
-      <button type="button" class="dx-share-btn" data-url="${esc(permalink)}" data-title="${esc(ent.title || "")}">Share this dispatch</button>
-      ${showSlug ? `<span class="dx-share-link label" aria-hidden="true">${esc(permalink.replace(/^https?:\/\//, ""))}</span>` : ""}
+      <button type="button" class="dx-share-btn" data-url="${esc(permalink)}" data-title="${esc(ent.title || "")}">Share this write-up</button>
+      <span class="dx-share-link label" hidden>${esc(permalink.replace(/^https?:\/\//, ""))}</span>
     </p>`;
   return share + `
     <aside class="dx-subscribe" aria-label="Follow the experiment">
       <p class="dx-sub-h">Follow the experiment as it's written.</p>
-      <p class="dx-sub-p">New dispatches land here first — the down weeks included. No selling, unsubscribe anytime.</p>
-      <p class="dx-sub-cta"><a class="dx-sub-btn" href="/subscribe/">Subscribe by email</a><a class="dx-sub-rss" href="/rss.xml">or follow via RSS</a></p>
+      <p class="dx-sub-p">New write-ups land here first — the down weeks included. No selling, unsubscribe anytime.</p>
+      <p class="dx-sub-cta"><a class="dx-sub-btn" href="/subscribe/">Follow by email</a><a class="dx-sub-rss" href="/rss.xml">or follow via RSS</a></p>
       ${socialRow()}
       ${startLink}
     </aside>`;
@@ -750,7 +786,7 @@ async function shareDispatch(btn) {
     setTimeout(() => { btn.textContent = prev; btn.classList.remove("is-copied"); btn.disabled = false; }, 2000);
   } catch (e) {
     const link = btn.parentElement && btn.parentElement.querySelector(".dx-share-link");
-    if (link) link.removeAttribute("aria-hidden");  // reveal the copyable URL as a last resort
+    if (link) link.hidden = false;  // reveal the copyable URL as a last resort
   }
 }
 
@@ -778,6 +814,16 @@ async function loadFull(btn, target, excerptEl) {
   }
 }
 
+// #4182 — the write-up's return trigger, the LAST line of the reader's fold (the text
+// rule lives in entry_age.js::nextWriteUpText, unit-tested).
+async function nextWriteUpLine() {
+  const pj = cache.chronicle || null;
+  const cad = pj && pj.pending && pj.pending.display ? null : await tryJSON("/api/content_cadence");
+  const t = nextWriteUpText(cad, pj && pj.pending);
+  return t ? `<p class="dx-next label">${esc(t)}</p>` : "";
+}
+
+
 // #803/#1972: an honest "when's the next one" notice for the chronicle AND
 // podcast list rails. Precedence: an existing event-driven `pending` marker
 // (wednesday_chronicle_lambda writes it onto /journal/posts.json when a draft
@@ -792,7 +838,10 @@ async function loadFull(btn, target, excerptEl) {
 // nothing to report.
 async function cadenceNoteHTML(key, data, entries) {
   const bits = [];
-  if (data && data.pending && data.pending.display) {
+  if (key === "chronicle") {
+    // #4182: the chronicle's "when's the next one" line moved into the reader (the
+    // fold's last line — nextWriteUpLine); the list rail keeps only the gap note below.
+  } else if (data && data.pending && data.pending.display) {
     bits.push(`<li class="dx-empty">${esc(data.pending.display)}</li>`);
   } else {
     const cad = await tryJSON("/api/content_cadence");
@@ -838,13 +887,18 @@ async function selectSection(key, preId, push = true) {
   if (push) { try { history.pushState({ sec: key }, "", `/story/${key}/`); } catch (e) {} }
   document.title = `${s.label} — The Story — averagejoematt`;
   const listEl = $("[data-dx-list]");
-  if (s.kind === "about" || s.kind === "timeline" || s.kind === "broadcast" || s.kind === "membrane") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
+  // #4182: a section with no entry list (about/timeline/broadcast/membrane) reads solo —
+  // the rail that only restated its kicker is hidden, so the reading starts at the top.
+  const solo = s.kind === "about" || s.kind === "timeline" || s.kind === "broadcast" || s.kind === "membrane";
+  const layout = document.querySelector(".dx-layout");
+  if (layout) layout.classList.toggle("dx-layout--solo", solo);
+  if (solo) { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   const data = await secFetch(s);
   const entries = entriesFor(s, data);
   if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-empty">Nothing to read yet. The first entries land once the experiment is underway — check back after Day 1.</p>`; if (s.key === "journal") injectJournalQuotes(listEl); return; }
   const noteHTML = (s.key === "chronicle" || s.key === "panel") ? await cadenceNoteHTML(s.key, data, entries) : "";
-  listEl.innerHTML = noteHTML + entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
+  listEl.innerHTML = noteHTML + entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(dayInWords(e.date, { weekday: false }) || e.date || "")}</span></button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   // #1568 (ADR-142): the pull-quote archive on the "In my own words" section —
   // only lines Matthew marked publishable, one by one; nothing marked ⇒ nothing

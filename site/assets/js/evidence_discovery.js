@@ -6,6 +6,7 @@ import { dumbbell, nDots } from "/assets/js/charts.js";
 import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, warmup, evClass, kvtable, postJSON, voteFollowRow, wireVoteButtons, wireFollowForms } from "/assets/js/evidence_shared.js";
+import { dayInWords, instantDayInWords, countWord } from "/assets/js/entry_age.js"; // #4182 — dates + small counts in words
 
 // #1569 — the widened Third Wall: Matthew's verbatim voice beside the machine's read.
 // The SAME two-voice pattern the lab-notes field note uses (voice / who / what),
@@ -14,7 +15,8 @@ import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, warmup
 // server already content-filters the text; this only escapes + tags + dates it.
 function hisWordsBlock(text, at, tag) {
   if (!text || isBad(text)) return "";
-  const d = at ? String(at).slice(0, 10) : "";
+  // #4182: the date in words ("Tuesday, September 23"), never the ISO stamp.
+  const d = at ? dayInWords(String(at).slice(0, 10)) : "";
   const who = tag || "Matthew · in his words";
   return `<div class="voice human his-words"><span class="who">${esc(who)}</span><p class="what">${esc(text)}</p>${d ? `<p class="his-words-date label">${esc(d)}</p>` : ""}</div>`;
 }
@@ -339,7 +341,20 @@ export async function renderExperiments(d) {
   // many live runs state their own justification (why now / hoped outcome / measured
   // by). An honest completeness count, not a claim — unannotated runs render nothing.
   const withJust = running.filter((x) => (x.why_now && !isBad(x.why_now)) || (x.hoped_outcome && !isBad(x.hoped_outcome)) || (x.measurement && !isBad(x.measurement))).length;
-  const head = figs([fig(running.length, "running"), running.length ? fig(`${withJust}/${running.length}`, "with stated justification") : "", avail.length ? fig(avail.length, "ready to run") : "", fig(backlog.length, "in backlog")]);
+  // #4182 — the fold is one sentence from the served status counts (origin/status per
+  // entry), counts in words where they are small: "Nothing is running yet. Four
+  // experiments are ready to start; 63 ideas are waiting." Then ONE freshness line.
+  const runLead = running.length
+    ? `${countWord(running.length, { capital: true })} experiment${running.length === 1 ? " is" : "s are"} running${withJust < running.length ? ` (${fmt(withJust)} of ${fmt(running.length)} with a stated reason)` : ""}.`
+    : "Nothing is running yet.";
+  const queue = [
+    avail.length ? `${countWord(avail.length)} experiment${avail.length === 1 ? " is" : "s are"} ready to start` : "",
+    backlog.length ? `${countWord(backlog.length)} idea${backlog.length === 1 ? " is" : "s are"} waiting` : "",
+  ].filter(Boolean).join("; ");
+  const queueSentence = queue ? ` ${queue.charAt(0).toUpperCase()}${queue.slice(1)}.` : "";
+  const servedDay = instantDayInWords(d && d._meta && d._meta.generated_at);
+  const head = `<p class="rd-primary rd-fold">${esc(runLead + queueSentence)}</p>` +
+    (servedDay ? `<p class="rd-meta label rd-fresh">${esc(`Data through ${servedDay}.`)}</p>` : "");
   // P2.1 — running cards carry their served-but-never-drawn instrumentation:
   // the progress bar, the primary metric, the mechanism, compliance; completed
   // runs become "receipt" cards — baseline→result drawn (the effect size), the
@@ -475,35 +490,70 @@ export async function renderExperiments(d) {
     // Reader participation: vote for which pipeline experiment runs next + get
     // notified when it does — wired to experiment_vote/experiment_follow.
     const votes = voteMap ? voteMap[x.id] : (x.votes != null ? x.votes : null);
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${meta}${link}</p>${x.id ? voteFollowRow("experiment", "library_id", x.id, votes) : ""}</article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status === "backlog" ? "waiting" : x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${meta}${link}</p>${x.id ? voteFollowRow("experiment", "library_id", x.id, votes) : ""}</article>`;
   };
-  const runSec = sec("Running now", running.length ? `<div class="rd-cards">${running.map(runCard).join("")}</div>` : empty("Nothing running yet this cycle — the experiment just started."));
+  // #4182 — a ready-to-start entry reads as the triad a friend asks about: what he'd
+  // try (the entry itself, with its served planned length), what it should move (the
+  // served hypothesis, verbatim), and how we'd know (the served measurement — the
+  // library entries carry none today, so that row renders nothing rather than a guess).
+  const readyCard = (x) => {
+    const [tc, tl] = x.evidence_tier ? evClass(x.evidence_tier) : [null, null];
+    const days = Number(x.planned_duration_days);
+    const how = x.measurement && !isBad(x.measurement) ? x.measurement : x.primary_metric && !isBad(x.primary_metric) ? x.primary_metric : "";
+    const votes = voteMap ? voteMap[x.id] : (x.votes != null ? x.votes : null);
+    const src = x.source_url ? `<a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">the evidence ↗</a>` : "";
+    return `<article class="rd-card rd-card--ready"><p class="rd-try label">what he'd try</p><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3>` +
+      `<span class="rd-badge">${Number.isFinite(days) && days > 0 ? `${fmt(days)} days` : "ready"}</span></header>` +
+      `<div class="supp-loop">` +
+      (x.hypothesis && !isBad(x.hypothesis) ? `<p class="rd-line supp-hope"><span class="label">what it should move</span> ${esc(x.hypothesis)}</p>` : "") +
+      (how ? `<p class="rd-line supp-measure"><span class="label">how we'd know</span> ${esc(how)}</p>` : "") +
+      `</div>` +
+      `<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>` : ""}${tc && src ? "  ·  " : ""}${src}</p>` +
+      `${x.id ? voteFollowRow("experiment", "library_id", x.id, votes) : ""}</article>`;
+  };
+  const runSec = running.length ? sec("Running now", `<div class="rd-cards">${running.map(runCard).join("")}</div>`) : "";
+  const readySec = avail.length ? sec(`Ready to start (${avail.length})`, `<div class="rd-cards">${avail.map(readyCard).join("")}</div>`) : "";
   // #1569 the widened Third Wall, decisions half: logged decisions Matthew chose to
   // publish (a verbatim note), each shown as the platform's recommendation (machine)
   // beside his own words (human), dated. The server returns ONLY decisions carrying a
   // note — no note, no row — so an empty/absent feed renders NOTHING here (no nag).
   const dec = await tryJSON("/api/decisions");
   const decisions = (dec && Array.isArray(dec.decisions)) ? dec.decisions.filter((r) => r && r.note && !isBad(r.note)) : [];
+  // #4190: `source` names the channel that made the recommendation; "mcp" is the
+  // transport a coaching chat calls through, so it gets a reader-facing label and the
+  // raw name never prints. (Same map as #4196 — one wording on both branches.)
+  const SOURCE_LABELS = { mcp: "logged from the coaching chat" };
+  const sourceLabel = (src) => SOURCE_LABELS[src] || ("from the " + String(src).replace(/_/g, " "));
+  // A served recommendation cut mid-sentence ("…6-WEEK LOCK: no struct") says so.
+  const clipped = (t) => (/[.!?)"'’”]$/.test(String(t).trim()) ? String(t) : `${String(t).trim()}…`);
+  // #4182 — "His calls, in his words": the card leads with HIS words and his call
+  // (followed / went his own way), dated in words. The platform's side — the
+  // recommendation and the stated reason — is one tap away, collapsed, never deleted.
   const decCard = (r) => {
-    const rec = r.decision && !isBad(r.decision)
-      ? `<div class="voice machine"><span class="who">the platform recommended</span><p class="what">${esc(r.decision)}</p></div>`
-      : "";
-    const stance = r.followed === true ? "followed" : r.followed === false ? "overrode it" : null;
+    const stance = r.followed === true ? "he followed the platform" : r.followed === false ? "he went his own way" : null;
+    const day = dayInWords(String(r.date || "").slice(0, 10));
     const why = r.followed === false && r.override_reason && !isBad(r.override_reason)
-      ? `<p class="rd-line"><span class="label">why he went his own way</span> ${esc(r.override_reason)}</p>` : "";
-    const meta = [r.source && !isBad(r.source) && "from the " + String(r.source).replace(/_/g, " "), stance].filter(Boolean).map(esc).join("  ·  ");
-    return `<article class="rd-card">${rec}${why}${hisWordsBlock(r.note, r.note_at || r.date, "Matthew · his call")}${meta ? `<p class="rd-meta label">${meta}</p>` : ""}</article>`;
+      ? `<p class="rd-line"><span class="label">the stated reason</span> ${esc(clipped(r.override_reason))}</p>` : "";
+    const rec = r.decision && !isBad(r.decision)
+      ? `<div class="voice machine"><span class="who">the platform recommended</span><p class="what">${esc(clipped(r.decision))}</p></div>`
+      : "";
+    const src = r.source && !isBad(r.source) ? sourceLabel(r.source) : "";
+    const theirs = rec || why
+      ? `<details class="dec-more"><summary class="label">what the platform had recommended${src ? ` · ${esc(src)}` : ""}</summary>${rec}${why}</details>`
+      : "";
+    const meta = [day, stance].filter(Boolean).map(esc).join("  ·  ");
+    return `<article class="rd-card">${meta ? `<p class="rd-meta label">${meta}</p>` : ""}${hisWordsBlock(r.note, null, "Matthew · his call")}${theirs}</article>`;
   };
   const decSec = decisions.length
-    ? sec("His calls, in his words", `<div class="rd-cards">${decisions.map(decCard).join("")}</div>` + note("The platform's recommendation, and what he actually decided — verbatim, dated. Only decisions he chose to publish appear here."))
+    ? sec("His calls, in his words", `<div class="rd-cards">${decisions.map(decCard).join("")}</div>` + note("What he decided, in his own words, dated — the platform's recommendation sits under each one. Only decisions he chose to publish appear here."))
     : "";
-  const pipeline = [...avail, ...backlog];
+  const pipeline = backlog; // #4182: the ready entries render first, above, as their own section
   // #2151 — the header count and the rendered list must derive from the SAME
   // array so they can never drift again: a `pipeline.slice(0, 60)` here used to
   // silently drop the tail (7 of 67 entries, including a no-direct-study marker)
   // while the header above still printed the full length. Render every entry —
   // 67 cards is not a real perf/URL problem for a static page.
-  const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.map(libCard).join("")}</div>`) : "";
+  const pipeSec = pipeline.length ? sec(`Ideas waiting (${pipeline.length})`, `<div class="rd-cards">${pipeline.map(libCard).join("")}</div>`) : "";
   // Reader participation: suggest the next experiment — a moderated idea queue
   // (POST /api/experiment_suggest), not auto-published.
   const suggestSec = sec("Suggest an experiment", `<p class="rd-meta label">What should the platform test next? Matthew reviews every idea before it enters the pipeline.</p>` +
@@ -511,7 +561,7 @@ export async function renderExperiments(d) {
     `<textarea id="sg-idea" data-suggest-idea placeholder="e.g. cold shower before bed vs deep sleep %" maxlength="500" required></textarea>` +
     `<label class="label" for="sg-source">Name or site (optional)</label><input id="sg-source" type="text" data-suggest-source maxlength="100">` +
     `<button class="part-btn" type="submit">Send</button><p class="part-msg" data-suggest-msg></p></form>`);
-  return arcBand + head + runSec + decSec + pipeSec + suggestSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
+  return head + runSec + readySec + arcBand + decSec + pipeSec + suggestSec + note("One person, one experiment at a time. “Ready to start” and “Ideas waiting” are the experiment library — candidates not yet run.");
 }
 
 // Wired after renderExperiments mounts: the shared vote/follow controls on
