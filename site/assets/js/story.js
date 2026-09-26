@@ -12,6 +12,7 @@
 */
 
 import { initTheme } from "/assets/js/theme.js";
+import { cleanExcerpt, statsRow } from "/assets/js/chronicle_text.js"; // #4191 — the home teaser opens on the chronicle's first sentence
 import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount, preStart } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth (+ #931 pre-start)
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
@@ -664,7 +665,7 @@ function dxEntries(src, data) {
   // the old insertion-order scramble). `id` prefers the unique `sequence` field so
   // two same-date Prologue parts (which can share `week`, e.g. both 0) never
   // collide on master-detail selection.
-  return sortChronicleNewestFirst(posts).map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.sequence ?? p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
+  return sortChronicleNewestFirst(posts).map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.sequence ?? p.week, label: lbl, title: p.title || lbl, date: p.date, meta: statsRow(p.stats_line), excerpt: cleanExcerpt(p.excerpt, p.title), word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
 }
 
 
