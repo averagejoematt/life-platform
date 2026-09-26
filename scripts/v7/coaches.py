@@ -27,16 +27,10 @@ CSS = "/assets/css/v7_coaches.css"
 JS = "/assets/js/v7_coaches.js"
 
 
-def head() -> str:
-    return f'  <link rel="stylesheet" href="{CSS}">\n'
-
-
-def tail() -> str:
-    return f'  <script type="module" src="{JS}"></script>\n'
-
-
 def body(base: str) -> str:  # noqa: ARG001 — the base is the builder's; this body links nothing under it
     return (
+        "    <h1>The coaches</h1>\n"
+        '    <p class="v7-job">The witnesses, on the record.</p>\n'
         '    <p class="v7c-intro">Eight AI characters — software, not people — read his numbers each morning. '
         "Every dated claim they make is checked later by code, and the misses stay on the record. "
         '<span id="v7c-through" data-src="api_calibration.as_of"></span></p>\n'

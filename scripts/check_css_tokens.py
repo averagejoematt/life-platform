@@ -122,6 +122,7 @@ SWEPT = [
     "section_toc.css",
     "subscribe.css",
     "v7.css",
+    "v7_week.css",
     "v7_coaches.css",
 ]
 

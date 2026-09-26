@@ -91,6 +91,20 @@ ALLOWED_JS_DATED_CALLS: dict[str, str] = {
         "rendering can never change again. The assertion is assert.equal on the WHOLE "
         "string including the suffix, which is what #3479's `^`-anchored sibling was not."
     ),
+    "v7_coaches.test.mjs:V.timeInWords:2026-09-25T17:01:48.880845+00:00": (
+        "timeInWords is a pure instant FORMATTER (v7_coaches.js, #4182) — it renders the "
+        "Pacific day and clock time in words ('Friday, September 25, at one minute past ten "
+        "in the morning, Pacific time') and makes no comparison against any clock. The file "
+        "is in scope only because v7_coaches.js reads `new Date()` in run(), the page "
+        "composer, which this call does not reach."
+    ),
+    "v7_coaches.test.mjs:V.timeInWords:2026-09-24T03:10:00Z": (
+        "same pure formatter as the entry above; 03:10Z is 20:10 PDT the evening before, the "
+        "instant that tells the Pacific frame from UTC ('in the evening')."
+    ),
+    "v7_coaches.test.mjs:V.timeInWords:2026-09-24T17:00:00Z": (
+        "same pure formatter as the entries above; the on-the-hour branch ('at ten in the morning')."
+    ),
     "evidence_shared.test.mjs:fmtShort:2026-03-05T00:00:00": (
         "fmtShort is a pure date FORMATTER (evidence_shared.js) — it parses the string "
         "and renders 'Mar 5'; it makes no comparison against any clock. The file is in "
