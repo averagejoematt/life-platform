@@ -3,7 +3,7 @@
 Per registered term in site/data/glossary.json: the number of reader pages whose STATIC
 main content still carried it when the guard landed. Measured 2026-09-26 at main 44c77f11c
 by tests/test_site_vocabulary_registry.py's own census (word-bounded, case-insensitive,
-"as of" also matching as_of). Ratchet semantics, the same as tests/test_module_size_guard.py:
+"as of" also matching as_of; a keep-with-gloss term counts only pages with no <dfn>/<abbr title>). Ratchet semantics, the same as tests/test_module_size_guard.py:
 
   * a term's page count may only go DOWN — a new reader page using a cut/renamed term, or an
     old page gaining it, reds the guard with the pages named;
@@ -20,19 +20,19 @@ MEASURED_AT = "2026-09-26 · main 44c77f11c"
 
 BASELINE = {
     "reset": 33,
-    "correlation": 4,
-    "cockpit": 23,
+    "correlation": 2,
+    "cockpit": 20,
     "chronicle": 14,
     "model": 13,
     "as of": 12,
-    "cycle": 10,
+    "cycle": 8,
     "Third Wall": 9,
     "pillar": 5,
     "protocol": 2,
     "gate": 5,
-    "HRV": 7,
-    "glucose": 6,
-    "Whoop": 5,
+    "HRV": 3,
+    "glucose": 2,
+    "Whoop": 3,
     "character level": 5,
 }
 

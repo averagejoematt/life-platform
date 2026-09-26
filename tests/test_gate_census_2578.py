@@ -938,7 +938,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4075ws.py defining LIFT_TSS_PER_HOUR; baseline 18 passed |
         # mutated 1 failed :: test_the_lift_rate_and_the_per_rep_tempo_live_in_one_module | reverted 18 passed). Unproven
         # stays 540; one entrant. MEASURED on the lane with gate_census.build_census(): {proven 197, unproven 540, 6, 5}.
-        <= 197
+        # Upper bound 197 -> 212 (2026-09-26, #4182): the 15 registry entries of tests/site_vocabulary_residue.py::BASELINE
+        # arrive PROVEN (REGISTRY_PROOFS, one in-process ledger mutation each, watched 2026-09-26); unproven stays 540.
+        <= 212
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
