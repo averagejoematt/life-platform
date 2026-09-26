@@ -10,8 +10,8 @@ the loop around it. These tests hold the three properties the issue actually bou
 2. **One position, one signal** — the station the wayfinder marks is the door the page's
    own doors nav marks. Nav, `.loop-forward` close and footer are keyed off one detected
    value in `v4_apply_chrome.py`, so they can never disagree about where the reader is.
-3. **No regression to link coverage** — the redesign moved and re-keyed the mega-menu
-   columns; the frozen pre-#1475 href inventory below pins that it removed nothing.
+3. **The footer pour is pinned** — since #4182 the mega-menu is exactly the 23 page links
+   of the 25-page reach set (the pre-#1475 "removed nothing" subset pin was reversed then).
 
 Plus the two invariants that fail SILENTLY if broken: the station cycle must stay in step
 with `v4_chrome.NEXT_STATION` (otherwise the map and the close propose different next
@@ -37,51 +37,47 @@ FOOT_RE = re.compile(r'<footer class="site-foot".*?</footer>', re.DOTALL)
 WAYFINDER_RE = re.compile(r'<nav class="wayfinder".*?</nav>', re.DOTALL)
 HERE_STOP_RE = re.compile(r'<span class="wf-stop is-here[^"]*" data-station="([^"]+)"')
 
-# The complete footer link inventory as it stood immediately before #1475 (39 hrefs, 38
-# distinct). The wayfinding redesign re-ordered and re-keyed the columns; it must not
-# have dropped a destination — a footer link is the only route to several pages
-# (`/data/ledger/`, `/story/agents/`, `/gear/`), which `tests/test_site_orphans.py`
-# depends on. Adding links is fine; this is a subset assertion.
-FOOTER_LINKS_BEFORE_1475 = {
-    "/",
-    "/coaching/",
-    "/coaching/by-coach/",
-    "/coaching/lab-notes/",
-    "/coaching/scorecard/",
-    "/coaching/team/",
-    "/data/",
-    "/data/labs/",
-    "/data/ledger/",
+# The footer's page links since #4182 (the 2026-09-26 panel ruling: the reach set is 25,
+# the footer 42 → 23 page links in five columns under the new door labels + FOLLOW). This
+# REVERSES #1475's "never drop a destination" pin on purpose: the pages the pour cut
+# (/data/ledger/, /coaching/team/, /story/timeline/, /story/agents/, /method/platform/, …)
+# stay served at their URLs, unlinked — `tests/test_site_nav_reach_ratchet.py` holds the
+# reachable count. An exact set, not a subset: adding a footer link is an IA decision
+# that must move this pin and the reach ceiling together.
+FOOTER_LINKS_4182 = {
+    # the numbers
+    "/data/physical/",
     "/data/sleep/",
     "/data/training/",
-    "/gear/",
-    "/method/",
-    "/method/ask/",
-    "/method/cost/",
-    "/method/pipeline/",
-    "/method/platform/",
-    "/privacy/",
+    "/data/nutrition/",
+    "/data/labs/",
+    # the coaches
+    "/coaching/",
+    "/coaching/by-coach/",
+    "/coaching/scorecard/",
+    "/coaching/lab-notes/",
+    # what he tries
     "/protocols/",
-    "/protocols/challenges/",
     "/protocols/experiments/",
-    "/protocols/supplements/",
-    "/rss.xml",
-    "/story/about/",
-    "/story/agents/",
-    "/story/attempts/",
-    "/story/build/",
-    "/story/chronicle/",
+    # the story
+    "/story/",
     "/story/journal/",
     "/story/panel/",
-    "/story/timeline/",
+    "/story/attempts/",
+    "/story/about/",
+    # how it's built
+    "/method/",
+    "/story/build/",
+    "/gear/",
+    "/method/character/",
+    # follow
     "/subscribe/",
-    "https://bsky.app/profile/averagejoematt.bsky.social",
-    "https://www.instagram.com/averagejoematt/",
-    "https://www.reddit.com/user/averagejoematt/",
-    "https://www.tiktok.com/@averagejoematt",
-    "https://www.youtube.com/@averagejoematt",
-    "https://x.com/averagejoematt_",
+    "/rss.xml",
+    "/privacy/",
 }
+# The outbound follow marks (#1620) ride in FOLLOW too; they are not pages.
+SOCIAL_HREFS = {href for href, _ in v4_chrome.SOCIAL_LINKS}
+MENU_RE = re.compile(r'<nav class="site-foot-cols".*?</nav>', re.DOTALL)
 
 
 def _non_legacy_pages():
@@ -135,11 +131,31 @@ def test_column_stations_are_the_four_causal_stages():
 
 
 def test_wayfinding_kept_every_footer_link():
-    """#1475 re-poured the mega-menu; it must not have dropped a destination."""
-    foot = v4_chrome.site_footer()
-    hrefs = set(HREF_RE.findall(foot))
-    missing = FOOTER_LINKS_BEFORE_1475 - hrefs
-    assert not missing, f"the wayfinding redesign dropped footer links: {sorted(missing)}"
+    """The mega-menu carries exactly the 23 page links of the #4182 pour (plus the social marks)."""
+    menu = MENU_RE.search(v4_chrome.site_footer()).group(0)
+    hrefs = HREF_RE.findall(menu)
+    pages = [h for h in hrefs if h not in SOCIAL_HREFS]
+    assert len(pages) == len(set(pages)) == 23, f"the footer pour must be 23 distinct page links, got {len(pages)}: {pages}"
+    assert set(pages) == FOOTER_LINKS_4182, (
+        f"footer drifted from the #4182 pour — added {sorted(set(pages) - FOOTER_LINKS_4182)}, "
+        f"dropped {sorted(FOOTER_LINKS_4182 - set(pages))}"
+    )
+    assert SOCIAL_HREFS <= set(hrefs), "the outbound follow marks (#1620) left the footer"
+    headings = re.findall(r'<p class="sf-h label">([^<]+)</p>', menu)
+    assert headings == ["The numbers", "The coaches", "What he tries", "The story", "How it&#x27;s built", "Follow"], headings
+
+
+def test_door_labels_are_the_readers_words():
+    """#4182: nav, wayfinder and loop-forward close name the doors in ONE vocabulary."""
+    labels = [label for _, label, _, _ in v4_chrome.DOORS]
+    assert labels == ["today", "the numbers", "the coaches", "what he tries", "the story"]
+    assert [name.lower() for _, _, name, _ in v4_wayfinding.STATIONS] == labels
+    for href, (_nxt, label, _hook) in v4_chrome.NEXT_STATION.items():
+        assert label in labels, f"{href}: loop-forward names a door the nav doesn't ({label!r})"
+    assert v4_chrome.DEFAULT_NEXT[1] == "today"
+    nav = v4_chrome.doors_nav()
+    for old in ("the cockpit", "the data", "the coaching", "the protocols"):
+        assert f"</svg>{old}</a>" not in nav
 
 
 def test_the_wayfinder_adds_the_first_footer_route_to_the_cockpit():

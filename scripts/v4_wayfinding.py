@@ -64,12 +64,14 @@ import html
 #   (key, href, name, role)
 # `role` is the station's loop role from docs/SITE_MAP_AND_INTENT.md, compressed to the
 # few words that fit a footer card — the ribbon is a map, not a paragraph.
+# Names are the doors nav's own labels and roles are plain words (#4182, the owner's
+# 2026-09-26 pick) — the footer map and the top nav say one thing in one vocabulary.
 STATIONS = [
-    ("cockpit", "/cockpit/", "Now", "today's slice"),
-    ("data", "/data/", "Data", "the engine"),
-    ("coaching", "/coaching/", "Coaching", "AI reads the data"),
-    ("protocols", "/protocols/", "Protocols", "the levers"),
-    ("story", "/story/", "Story", "narrates the loop"),
+    ("cockpit", "/cockpit/", "Today", "one screen"),
+    ("data", "/data/", "The numbers", "what his devices record"),
+    ("coaching", "/coaching/", "The coaches", "what the AI makes of it"),
+    ("protocols", "/protocols/", "What he tries", "what he takes and tests"),
+    ("story", "/story/", "The story", "the weekly write-up"),
 ]
 
 # Door href (what the doors nav marks `aria-current`) → station key. Identical set by

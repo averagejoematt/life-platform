@@ -166,7 +166,8 @@ export function askLine(dash) {
   const who = isBad(a.coach_name) ? "" : String(a.coach_name);
   const asked = fmtDay(a.asked_on), due = fmtDay(a.due);
   const meta = [who, asked, due ? `due ${due}` : ""].filter(Boolean).join(", ");
-  return `<span class="tq-ask-k">The one ask:</span> “${esc(String(a.text).trim())}”${meta ? ` — ${esc(meta)}` : ""}.`;
+  // data-verbatim (#4182): the coach's own words — the runtime gloss pass never splices into them
+  return `<span class="tq-ask-k">The one ask:</span> “<span data-verbatim>${esc(String(a.text).trim())}</span>”${meta ? ` — ${esc(meta)}` : ""}.`;
 }
 
 /* ── The single freshness line ───────────────────────────────────────────── */
