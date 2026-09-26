@@ -2397,3 +2397,46 @@ REGISTRY_PROOFS.update(
         for page in _GLOSS_SKIPPED_PAGE_ENTRIES
     }
 )
+
+
+# ── #4182 — the reader-facing vocabulary ledger (tests/site_vocabulary_residue.py::BASELINE) ──
+# One registry gate per ruled term. Proved 2026-09-26 by lowering each term's ledger value to
+# (live count − 1) in-process and calling the parametrized ratchet test for that term; every
+# one failed with the pages named, and the reverted ledger passed (20 passed). The live counts
+# are the guard's own census (tests/site_text.py, static main content, word-bounded).
+_VOCAB_LEDGER_LIVE = {
+    "reset": 33,
+    "correlation": 2,
+    "cockpit": 20,
+    "chronicle": 14,
+    "model": 13,
+    "as of": 12,
+    "cycle": 8,
+    "Third Wall": 9,
+    "pillar": 5,
+    "protocol": 2,
+    "gate": 5,
+    "HRV": 3,
+    "glucose": 2,
+    "Whoop": 3,
+    "character level": 5,
+}
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/site_vocabulary_residue.py::BASELINE::{term}": {
+            "gate_name": f"BASELINE[{term}]",
+            "command": f"python3 -m pytest tests/test_site_vocabulary_registry.py -q -p no:cacheprovider -k 'ratchets_down and {term.split()[0]}'",
+            "mutation": f"BASELINE[{term!r}] lowered to {max(n - 1, 0)} (live count {n} − 1) in-process, the same test function called for that term.",
+            "observed": (
+                f"MUTATED: 1 failed — AssertionError: {term!r} now on {n} reader pages (ledger {max(n - 1, 0)}): builder vocabulary "
+                "may only leave reader pages, with the page URLs listed. REVERTED: 20 passed. Watched 2026-09-26."
+            ),
+            "scope": (
+                "Static HTML main content only (tests/site_text.py's stated limit): a term JS injects at runtime is not "
+                "seen; a keep-with-gloss term is counted only on pages with no <dfn>/<abbr title>."
+            ),
+            "proved_on": "2026-09-26",
+        }
+        for term, n in _VOCAB_LEDGER_LIVE.items()
+    }
+)

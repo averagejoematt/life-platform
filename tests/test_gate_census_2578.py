@@ -938,13 +938,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1: an untracked lambdas/training/_census_probe_4075ws.py defining LIFT_TSS_PER_HOUR; baseline 18 passed |
         # mutated 1 failed :: test_the_lift_rate_and_the_per_rep_tempo_live_in_one_module | reverted 18 passed). Unproven
         # stays 540; one entrant. MEASURED on the lane with gate_census.build_census(): {proven 197, unproven 540, 6, 5}.
-        # Upper bound 197 -> 198 (2026-09-26, #4182): structural::test_coaching_first_screen_4182.py — the site/coaching/**
-        # rglob that keeps "Third Wall" out of every coaching page's <main> — arrives PROVEN via the re-runnable harness
-        # (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: an untracked site/coaching/_census_probe_4182/index.html naming the
-        # Third Wall; baseline 5 passed | mutated 1 failed :: test_third_wall_is_absent_from_every_coaching_page_main |
-        # reverted 5 passed). Unproven stays 540; one entrant. MEASURED by id-set diff against a real `git clone` of
-        # origin/main at 0e83e4cad: lane {proven 198, unproven 540, 6, 5} vs main {197, 540, 6, 5}.
-        <= 198
+        # Upper bound 197 -> 212 (2026-09-26, #4182): the 15 registry entries of tests/site_vocabulary_residue.py::BASELINE
+        # arrive PROVEN (REGISTRY_PROOFS, one in-process ledger mutation each, watched 2026-09-26); unproven stays 540.
+        # Upper bound 212 -> 213 (2026-09-26, #4182, merged on top of #4198's 212): structural::test_coaching_first_screen_4182.py
+        # — the site/coaching/** rglob that keeps "Third Wall" out of every coaching page's <main> — arrives PROVEN via the
+        # re-runnable harness (MutationSpec + STRUCTURAL_PROOFS, ARMED 1/1: an untracked site/coaching/_census_probe_4182/index.html
+        # naming the Third Wall; baseline 5 passed | mutated 1 failed :: test_third_wall_is_absent_from_every_coaching_page_main |
+        # reverted 5 passed). Unproven stays 540; one entrant. MEASURED by id-set diff on the MERGE tree against a real
+        # `git clone` of origin/main at 8a6637365 (#4198's a0d2afd0b + its reconcile commit): lane {proven 213, unproven 540, 6, 5} vs
+        # main {212, 540, 6, 5}.
+        <= 213
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
