@@ -41,3 +41,4 @@ registration and leave the line as record (or supersede it with a dated note).
 
 - 2026-07-18 | js | site/sw.js | service worker must live at the site root for scope; already present pre-gate, parse-covered by the deploy-time node gate in deploy/sync_site_to_s3.sh
 - 2026-07-19 | route | /api/character_receipt | #1373 progression receipts — new route ships in the same PR with a dated `_exemptions.json` capture-failed entry (route not deployed yet, no live shape to snapshot); post-deploy the driver runs deploy/capture_api_schemas.py, commits the real baseline, and drops the JSON exemption
+- 2026-09-26 | route | /api/page_feedback | #4182 POST-only write door (the two-question reader form) — there is no GET shape to snapshot; covered instead by the `write-path` entry in tests/api_schemas/_exemptions.json + deploy/capture_api_schemas.py WRITE_PATH_EXEMPT (the same disposition as every other capture door), with behaviour pinned in tests/test_page_feedback_4182.py
