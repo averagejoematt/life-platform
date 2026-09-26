@@ -26,7 +26,7 @@ import urllib.parse
 import uuid
 from typing import Any, cast
 
-from common.text_guards import strip_tool_call_residue  # #4190 — shared, bundled (#781)
+from common.text_guards import has_tool_call_residue, strip_tool_call_residue  # #4190 — shared, bundled (#781)
 
 from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
@@ -386,10 +386,9 @@ def _sanitize_write_arguments(name: str, arguments: dict) -> dict:
     def _walk(v):
         nonlocal stripped_any
         if isinstance(v, str):
-            cleaned = strip_tool_call_residue(v)
-            if cleaned != v:
+            if has_tool_call_residue(v):
                 stripped_any = True
-            return cleaned
+            return strip_tool_call_residue(v)
         if isinstance(v, dict):
             return {k: _walk(x) for k, x in v.items()}
         if isinstance(v, list):

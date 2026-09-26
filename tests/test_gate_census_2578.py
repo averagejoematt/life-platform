@@ -947,6 +947,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # reverted 5 passed). Unproven stays 540; one entrant. MEASURED by id-set diff on the MERGE tree against a real
         # `git clone` of origin/main at 8a6637365 (#4198's a0d2afd0b + its reconcile commit): lane {proven 213, unproven 540, 6, 5} vs
         # main {212, 540, 6, 5}.
+        # Upper bound 213 -> 213 (2026-09-26, #4190, merged on top of #4182's 213): guard::lambdas/common/text_guards.py —
+        # the tool-call-XML-residue strip/detect pair — arrives PROVEN via a GUARD_PROOFS record in scripts/gate_census_proofs.py
+        # (`strip_tool_call_residue` neutered to a bare `return text` in the real tracked module; MUTATED 33 failed / 68 passed
+        # against tests/test_mcp_tool_call_residue_guard_4190.py; REVERTED — md5 restored to the pre-mutation hash — 101 passed).
+        # Unproven stays 540; one entrant. MEASURED by id-set diff against a disposable `git archive origin/main` export at
+        # 4066c80eb: lane {proven 213, unproven 540, not-applicable 6, attempted-unproven 5} vs main {212, 540, 6, 5}. The bound
+        # was already 213 from the concurrent #4182 merge above, so this entrant needed no numeric raise — recorded here rather
+        # than silently absorbed.
         <= 213
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
