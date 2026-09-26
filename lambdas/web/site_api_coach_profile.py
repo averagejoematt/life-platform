@@ -25,6 +25,7 @@ from coach import (
     coach_derived_prose,  # #2418: the derived-prose read seam — a held condensation falls back to gated `content`
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
+    latest_checked,  # E1 / #4182: the ledger line — the coach's most recent GRADED call, audience-guarded
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
@@ -554,6 +555,7 @@ def handle_coaches(event, *, _g):
                     "board_role": p.get("board_role"),
                     "headline_stat": headline,
                     "tier": "staff",
+                    "latest_checked": latest_checked.for_coach(_g["table"], pid),
                 }
             )
         coaches.sort(key=lambda c: order.index(c["persona_id"]) if c["persona_id"] in order else 99)
@@ -574,6 +576,7 @@ def handle_coaches(event, *, _g):
                     "board_role": lead.get("board_role"),
                     "headline_stat": "runs the program",
                     "tier": "lead",
+                    "latest_checked": None,  # E1: the lead makes no graded calls — null, never a placeholder
                 },
             )
         return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
@@ -647,6 +650,8 @@ def handle_coach(event, *, _g):
                 # cast sheet, labelled as authored fiction-design by its own disclosure.
                 "trait_scores": coach_traits.traits_for(pid),
                 "working_hypotheses": _working_hypotheses(pid),
+                # E1 / #4182: "On <date> I said <claim> — it came in at <value>" (null when none graded).
+                "latest_checked": latest_checked.for_coach(_g["table"], pid),
                 "stance": stance,
                 "stance_history": _stance_history(pid),
                 # The lead has no generation voice spec (config/coaches/{id}.json) —

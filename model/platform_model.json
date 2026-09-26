@@ -873,6 +873,16 @@
       "producer": "intelligence.ai_expert_analyzer_lambda::generate_and_cache"
     },
     {
+      "consumer": "coach.latest_checked::for_coach",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 5,
+      "name": "coach PREDICTION# graded row -> ledger line (latest_checked)",
+      "note": "E1 / epic #4182 (v7 rebuild): 'On <date> I said <claim> \u2014 it came in at <value>'. The grade lives on the PREDICTION# row itself (status/outcome_date/outcome_notes, written by _update_prediction_status); the LEARNING# row is a second write of the same grade and is deliberately not joined.",
+      "partition": null,
+      "producer": "coach.coach_prediction_evaluator::_update_prediction_status"
+    },
+    {
       "consumer": "experiment.canonical_facts::build_canonical_facts",
       "enrolled": true,
       "floor": true,
@@ -7360,10 +7370,10 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 8,
-      "contracts_enrolled": 8,
-      "contracts_known": 8,
-      "contracts_ratchet": 8,
+      "contracts": 9,
+      "contracts_enrolled": 9,
+      "contracts_known": 9,
+      "contracts_ratchet": 9,
       "edges": 714,
       "lambdas": 106,
       "mcp_tool_modules": 34,
