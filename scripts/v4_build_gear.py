@@ -468,7 +468,7 @@ def render(entries: list[dict]) -> str:
       </div>
       <section class="rd-sec">
         <h2 class="rd-h">How this list stays honest</h2>
-        <p class="rd-prose">This isn&rsquo;t a recommendations page dressed up as data — it&rsquo;s the literal input list. Each card below is generated from <code>lambdas/source_registry.py</code>, the same registry that drives the <a href="/method/pipeline/">live pipeline board</a> and the <a href="/data/">data pillar</a>. Where two devices measure the same thing, they&rsquo;re cross-checked against each other on the <a href="/method/verify/">verify page</a> — that accountability stays separate from this page&rsquo;s affiliate links on purpose.</p>
+        <p class="rd-prose">This isn&rsquo;t a recommendations page dressed up as data — it&rsquo;s the literal input list. Each card below is generated from <code>lambdas/source_registry.py</code>, the same registry that drives the <a href="/method/pipeline/">live pipeline board</a> and the <a href="/data/">data archive</a>. Where two devices measure the same thing, they&rsquo;re cross-checked against each other on the <a href="/method/verify/">verify page</a> — that accountability stays separate from this page&rsquo;s affiliate links on purpose.</p>
       </section>
       {"".join(sections)}
       {others_html}

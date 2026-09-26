@@ -63,8 +63,8 @@ function coachRefreshNote(generatedAt, paused) {
   const d = generatedAt ? new Date(generatedAt) : null;
   const valid = d && !isNaN(d.getTime());
   const date = valid ? d.toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }) : "";
-  if (paused) return date ? `as of ${date} — refresh paused (budget guard)` : "refresh paused (budget guard)";
-  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${date} — next refresh pending`;
+  if (paused) return date ? `written ${date} — refresh paused (budget guard)` : "refresh paused (budget guard)";
+  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `written ${date} — next refresh pending`;
   return "";
 }
 

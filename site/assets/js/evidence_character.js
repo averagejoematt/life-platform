@@ -102,12 +102,12 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
   return `<section class="rd-sec ch-hero" data-tier="${esc(tier.toLowerCase())}" data-state="${esc(state)}">
     <div class="ch-stage">
       <div class="ch-figwrap">
-        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven pillar ring around the body silhouette — each arc fills with its pillar's score" data-cpts="${esc(JSON.stringify(pillarRingCpts(ringPillars, { size: RING })))}" data-cpts-hit="xy">${pillarRing(ringPillars, { size: RING })}${center}</svg>
+        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven areas ring around the body silhouette — each arc fills with its area's score" data-cpts="${esc(JSON.stringify(pillarRingCpts(ringPillars, { size: RING })))}" data-cpts-hit="xy">${pillarRing(ringPillars, { size: RING })}${center}</svg>
         <div class="ch-legend label">${legend}</div>
       </div>
       <div class="ch-id">
         <div class="ch-emblem">${tierEmblem(tier, level)}</div>
-        <p class="ch-class label">${tt}${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · as of ${esc(String(ch.as_of_date))}` : ""}</p>
+        <p class="ch-class label">${tt}${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · written ${esc(String(ch.as_of_date))}` : ""}</p>
         ${moodLine}
         <p class="ch-idnote">One character, seven pillars — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's pillar scores; the emblem evolves with the tier.</p>
         ${
@@ -178,11 +178,11 @@ export function chWhy(p) {
   // is below any leveling threshold). "Not yet instrumented" is the honest
   // reason; "levels frozen" would undersell it as a temporary data gap.
   if (chUnmeasured(p)) {
-    return p.not_instrumented_note || "Not yet instrumented — no data source feeds this pillar yet.";
+    return p.not_instrumented_note || "Not yet instrumented — no data source feeds this area yet.";
   }
   if (p.coverage_hold) {
     const cov = p.data_coverage != null ? `${Math.round(Number(p.data_coverage) * 100)}%` : "too little";
-    return `Levels frozen — only ${cov} of this pillar's data exists right now. The engine won't judge on gaps: no data can't climb, and no data can't crash.`;
+    return `Levels frozen — only ${cov} of this area's data exists right now. The engine won't judge on gaps: no data can't climb, and no data can't crash.`;
   }
   const bits = [];
   // #913: atrophy is a state, not a footnote — name it first, with the gap.
@@ -210,10 +210,10 @@ export function chStatHtml(pillars, hist) {
     // #913: the atrophy chip — same badge grammar as `held`, muted ember, so a
     // decaying pillar is visibly different from a frozen or healthy one.
     const atrophy = !notInstrumented && p.neglect_decay && p.neglect_decay.applied
-      ? `<span class="ch-hold ch-atrophy" title="a sustained quiet stretch is decaying this pillar's level score — floored at what the day itself measured">atrophy</span>`
+      ? `<span class="ch-hold ch-atrophy" title="a sustained quiet stretch is decaying this area's level score — floored at what the day itself measured">atrophy</span>`
       : "";
     const lvBadge = (notInstrumented
-      ? `<span class="ch-hold" title="not yet instrumented — no data source feeds this pillar">n/a</span>`
+      ? `<span class="ch-hold" title="not yet instrumented — no data source feeds this area">n/a</span>`
       : (p.coverage_hold ? `<span class="ch-hold" title="levels frozen — not enough data to judge">held</span>` : "")) + atrophy;
     const bar = notInstrumented
       ? `<i class="ch-rbar-none"></i>`
@@ -382,7 +382,7 @@ export async function renderCharacter(d) {
         <div class="ch-gate"><span class="label">level down</span>${tick(gates.down, "dn")}</div>
       </div>
       <p class="rd-why">In ${esc(tier)}, a level-up takes <strong>${esc(String(gates.up))} sustained days</strong> above the line — but a level-down takes ${esc(String(gates.down))}. The asymmetry is deliberate: an "up" is earned, a "down" needs real decline, and a single day can never swing either.</p>
-      ${bottleneckHeld}${bottlenecks.length ? `<p class="rd-prose">The bottlenecks right now: ${bottlenecks.map((p) => `<strong>${esc(ttl(p.name))}</strong> (${fmt(p.raw_score)}/100 — a level here moves the character +${((weights[p.name] || 1 / 7) / wTotal).toFixed(2)} weighted)`).join(" and ")}. The fastest route to the next character level runs through the weakest pillar, not the strongest.</p>` : ""}`);
+      ${bottleneckHeld}${bottlenecks.length ? `<p class="rd-prose">The bottlenecks right now: ${bottlenecks.map((p) => `<strong>${esc(ttl(p.name))}</strong> (${fmt(p.raw_score)}/100 — a level here moves the character +${((weights[p.name] || 1 / 7) / wTotal).toFixed(2)} weighted)`).join(" and ")}. The fastest route to raising the engine's score runs through the weakest area, not the strongest.</p>` : ""}`);
 
     /* 7 · The XP economy — the bands ladder, today's pillars placed on it. */
     const bands = (cfg.xp_bands || []).slice().sort((a, b) => (b.min_raw_score || 0) - (a.min_raw_score || 0));
@@ -440,11 +440,11 @@ export async function renderCharacter(d) {
         <span class="ch-fx-fit label">${e.fit_status === "fitted" ? "✓ " : ""}${esc(badge)}</span>
       </div>`;
     }).join("");
-    const effects = fxChips ? sec("Cross-pillar effects", `<div class="ch-fxgrid">${fxChips}</div>
+    const effects = fxChips ? sec("Cross-area effects", `<div class="ch-fxgrid">${fxChips}</div>
       <p class="rd-why">The pillars aren't independent — the engine models the physiology: poor sleep drags training and mind; strong nutrition and movement compound into metabolic health; everything above the line at once earns an alignment bonus. Active effects are evaluated from today's real scores. Each effect also wears its evidence status: these started life as authored priors, and every quarter the engine re-fits them against the lived data (lagged pairs, bootstrap CI, FDR-corrected) — an effect only earns "fitted" when its interval excludes no-effect, and a prior that fails to confirm is published on <a href="/method/wrong/">the wrong page</a>.</p>`) : "";
 
     /* 9 · What feeds each pillar — component weights + targets, disclosure per pillar. */
-    const feeds = Object.keys(cfg.pillars || {}).length ? sec("What feeds each pillar", `<div class="ch-feeds">` +
+    const feeds = Object.keys(cfg.pillars || {}).length ? sec("What feeds each area", `<div class="ch-feeds">` +
       pillars.map((p) => {
         const pc = (cfg.pillars || {})[p.name] || {};
         const comps = Object.entries(pc.components || {});
@@ -456,7 +456,7 @@ export async function renderCharacter(d) {
         }).join("");
         return `<details class="ch-feed"><summary><span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>${esc(ttl(p.name))} <span class="label">· ${Math.round(((weights[p.name] || 0) / wTotal) * 100)}% of the character</span></summary><div class="ch-feed-body">${compRows}</div></details>`;
       }).join("") + `</div>
-      <p class="rd-why">Every pillar is a weighted blend of measurable components with explicit targets — nothing subjective, nothing self-reported where a sensor exists. The weights are live from the engine's own config: change the config, and this page changes with it.</p>`) : "";
+      <p class="rd-why">Every area is a weighted blend of measurable components with explicit targets — nothing subjective, nothing self-reported where a sensor exists. The weights are live from the engine's own config: change the config, and this page changes with it.</p>`) : "";
 
     mechanics = nextlvl + economy + effects + feeds;
   }
@@ -491,7 +491,7 @@ export async function renderCharacter(d) {
   let heat = "";
   if (hist.length) {
     const weeks = hist.slice(-12);
-    heat = `<div class="ch-heat" role="img" aria-label="Weekly pillar scores, ${weeks.length} weeks">` +
+    heat = `<div class="ch-heat" role="img" aria-label="Weekly area scores, ${weeks.length} weeks">` +
       `<div class="ch-heat-row ch-heat-head"><span></span>${weeks.map((w) => `<span class="label">${esc(w.week_label || "")}</span>`).join("")}</div>` +
       pillars.map((p) => `<div class="ch-heat-row"><span class="ch-heat-lbl" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>` +
         weeks.map((w) => {
@@ -549,9 +549,9 @@ export async function renderCharacter(d) {
   /* 10 · The math — prose interpolated from the live config so it can never lie. */
   const lvv = (cfg && cfg.leveling) || null;
   const math = lvv
-    ? sec("The math", `<p class="rd-prose">Each pillar scores 0–100 nightly from weighted components (above). Components that measure a <strong>behavior</strong> — logging food, journaling, training — score zero when the behavior doesn't happen; components that measure a <strong>sensor</strong> simply go quiet, and the engine won't judge what it can't see${lvv.level_change_min_coverage != null ? ` (below ${esc(String(Math.round(Number(lvv.level_change_min_coverage) * 100)))}% data coverage, levels freeze in both directions)` : ""}. An exponential moving average (λ = ${esc(String(lvv.ema_lambda))} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate, a level-up also requires the day itself to have scored at the new level, and crossing a tier boundary demands a longer streak still. Bigger honest gaps move in bigger steps, so pillars converge to what the data earns instead of marching in lockstep. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. Neglect is modeled, not ignored: after ${esc(String((lvv.neglect_decay && lvv.neglect_decay.n_grace_days) || 3))} dark days of manual-logging silence, behavioral pillars <strong>atrophy</strong> — a small daily decay on the smoothed score, floored at what each day actually measured — and XP below zero shows as visible <strong>debt</strong> instead of a silent floor. The character level is the weighted average of the seven pillar levels, floored — so it understates, never flatters.</p>
+    ? sec("The math", `<p class="rd-prose">Each area scores 0–100 nightly from weighted components (above). Components that measure a <strong>behavior</strong> — logging food, journaling, training — score zero when the behavior doesn't happen; components that measure a <strong>sensor</strong> simply go quiet, and the engine won't judge what it can't see${lvv.level_change_min_coverage != null ? ` (below ${esc(String(Math.round(Number(lvv.level_change_min_coverage) * 100)))}% data coverage, levels freeze in both directions)` : ""}. An exponential moving average (λ = ${esc(String(lvv.ema_lambda))} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate, a level-up also requires the day itself to have scored at the new level, and crossing a tier boundary demands a longer streak still. Bigger honest gaps move in bigger steps, so pillars converge to what the data earns instead of marching in lockstep. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. Neglect is modeled, not ignored: after ${esc(String((lvv.neglect_decay && lvv.neglect_decay.n_grace_days) || 3))} dark days of manual-logging silence, behavioral pillars <strong>atrophy</strong> — a small daily decay on the smoothed score, floored at what each day actually measured — and XP below zero shows as visible <strong>debt</strong> instead of a silent floor. The engine's score is the weighted average of the seven areas' levels, floored — so it understates, never flatters.</p>
       <p class="rd-archive">The full rulebook — every weight, target, streak gate, and honest-absence rule, generated from the engine's actual config — is <a href="/method/game/">The Game, Explained</a>; the plain-language version lives on <a href="/method/character/">the character explainer</a>. The engine itself runs nightly in the platform's compute layer, and every number in this section is read live from its config.</p>`)
-    : `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented in full in <a href="/method/game/">The Game, Explained</a> (generated from the engine's actual config) and in plain language on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
+    : `<p class="rd-archive">How the engine works — the area weights, the XP economy, the streak gates — is documented in full in <a href="/method/game/">The Game, Explained</a> (generated from the engine's actual config) and in plain language on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
 
   return hero + quiet + scrub + statblock + calCard + ladder + mechanics + record + badges + sub + math +
     note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
@@ -599,7 +599,7 @@ export function renderBadges(d) {
   }).join("");
 
   const how = sec("How a mark is earned",
-    `<p class="rd-prose">Every badge is computed from the same records the rest of the site reads — habit streaks, the character level, weigh-ins, completed experiments and challenges. There are no participation trophies: a mark either has a record behind it or it stays locked, with what unlocks it written underneath. The level and streak marks ride the <a href="/data/character/">character sheet</a>'s engine (<a href="/method/character/">how levels work</a>); the day-to-day view is the <a href="/cockpit/">cockpit</a>'s Journey lens.</p>`);
+    `<p class="rd-prose">Every badge is computed from the same records the rest of the site reads — habit streaks, the engine's score, weigh-ins, completed experiments and challenges. There are no participation trophies: a mark either has a record behind it or it stays locked, with what unlocks it written underneath. The level and streak marks ride the <a href="/data/character/">character sheet</a>'s engine (<a href="/method/character/">how levels work</a>); the day-to-day view is the <a href="/cockpit/">cockpit</a>'s Journey lens.</p>`);
 
   return lead + stats + zero + sec("The wall", groups) + how +
     note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");

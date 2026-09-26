@@ -180,7 +180,7 @@ export function vitalsNarrative(p, comps) {
 export function scopeStamp(o, opts = {}) {
   if (!o || o.scope !== "multi_year") return "";
   const asOf = opts.asOf !== false && o.as_of ? ` · as of ${esc(o.as_of)}` : "";
-  return `<div class="rd-meta label rd-scope" style="margin-bottom:.5rem">multi-year history · not reset with the experiment${asOf}</div>`;
+  return `<div class="rd-meta label rd-scope" style="margin-bottom:.5rem">multi-year history · carries across every fresh start${asOf}</div>`;
 }
 
 // #421 (VIT-03) — VO2max arc. The longevity gold-standard fitness number, a slow-moving arc
@@ -217,7 +217,7 @@ export function vitalsFitnessAge(fa) {
   if (!fa || !fa.available) return "";
   return sec("Fitness age — a complementary age lens",
     ciWhisker(fa.estimate, fa.range_low, fa.range_high, { unit: " yrs", label: "Fitness age", caption: `≈ ${fa.estimate} (${fa.range_low}–${fa.range_high}), the age at which your VO₂max is the male-population median. The band is your own recent VO₂max spread — ${fa.n} reading${fa.n === 1 ? "" : "s"}, not a guessed interval.` }) +
-    `<div class="rd-meta label" style="margin-top:.4rem">${nDots(fa.n, { unit: "VO₂max readings" })} · basis VO₂max ${fmt(fa.basis_vo2max, 1)} ml/kg/min · as of ${esc(fa.as_of)}${fa.scope === "multi_year" ? `<span class="rd-scope"> · from the multi-year VO₂max record — not reset with the experiment</span>` : ""}</div>` +
+    `<div class="rd-meta label" style="margin-top:.4rem">${nDots(fa.n, { unit: "VO₂max readings" })} · basis VO₂max ${fmt(fa.basis_vo2max, 1)} ml/kg/min · as of ${esc(fa.as_of)}${fa.scope === "multi_year" ? `<span class="rd-scope"> · from the multi-year VO₂max record — carries across every fresh start</span>` : ""}</div>` +
     `<p class="rd-meta label">${esc(fa.method)} It's a complementary lens beside PhenoAge, not a replacement — and like every age on this site it follows the privacy line: your <strong>real age is never used or shown</strong>, and no age-gap is derivable. ${esc(fa.citation)}. Vascular age stays deferred — no validated formula in-repo, and the provider-scrape figure is gated on sign-off.</p>`);
 }
 
