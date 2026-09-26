@@ -564,7 +564,7 @@ _THIRD_WALL_COACHING_HTML = (
 
 # #4035 box 2: a site page carrying a bare, unregistered, un-glossed capitalised acronym
 # in reader-visible prose — the exact gate-(b) defect the glossary's two-sided gate exists
-# to catch (`site/config/glossary.json` has no entry, `v4_glossary.GLOSS_ALLOWLIST` has no
+# to catch (`site/data/glossary.json` has no entry, `v4_glossary.GLOSS_ALLOWLIST` has no
 # dated exemption). Needs a nav/footer chrome marker so `_non_legacy_content_pages()` (the
 # gate's own scan population) picks the page up at all.
 _UNGLOSSED_ACRONYM_HTML = (
@@ -1758,9 +1758,11 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
     ),
     "structural::test_glossary_4035.py": _proof(
         "structural::test_glossary_4035.py",
-        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 9 passed in 0.37s | mutated: 2 failed, 7 passed in 0.47s "
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 64 passed in 0.60s | mutated: 2 failed, 62 passed in 0.84s "
         ":: tests/test_glossary_4035.py::test_apply_chrome_check_is_green_for_glossary; "
-        "tests/test_glossary_4035.py::test_no_unregistered_acronym_coinage | reverted: 9 passed in 0.37s",
+        "tests/test_glossary_4035.py::test_no_unregistered_acronym_coinage | reverted: 64 passed in 1.16s "
+        "(re-watched 2026-09-26 after #4182 moved the registry to site/data/glossary.json, switched the wrap to "
+        "<dfn class=gloss>, added word-ci terms and the skipped contexts)",
         "Covers gate (b): every non-legacy site/**/*.html carrying a nav-doors or footer-site-foot chrome "
         "marker (_non_legacy_content_pages(), filesystem rglob — an untracked page is in scope), scanned "
         "outside head/script/style/svg/nav/footer/loop-forward for a bare 2-6 letter ALL-CAPS token that "
@@ -1769,8 +1771,9 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "marker with no head-chrome anchor still enters the glossary re-application pass and the drift "
         "check sees the unglossed acronym as a would-change page. STILL INVISIBLE, stated: a Title-Case "
         "coinage (the ACRONYM_RE heuristic is bare ALL-CAPS only — a follow-up named in v4_glossary.py's "
-        "own docstring), and the JS-rendered JSON tile-blurb residual v4_glossary.py's docstring declares.",
-        proved_on="2026-09-23",
+        "own docstring), and JS-rendered text — since #4182 glossed at runtime by gloss_runtime.js, which "
+        "no Python gate watches (tests/test_glossary_4035.py pins its registry copy and the data-verbatim fence).",
+        proved_on="2026-09-26",
     ),
     "structural::test_rate_n_contract_4035.py": _proof(
         "structural::test_rate_n_contract_4035.py",

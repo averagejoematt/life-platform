@@ -620,10 +620,15 @@ if [[ "$QUICK" != "--quick" ]]; then
 
   # Home: cinematic landing + the three doors + interactive constellation
   check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"' "$BASE/"
-  check_body_contains "Home: door · the cockpit"      "$HOME_FILE"  'the cockpit'           "$BASE/"
-  check_body_contains "Home: door · the story"        "$HOME_FILE"  'the story'             "$BASE/"
-  check_body_contains "Home: door · the data"         "$HOME_FILE"  'the data'              "$BASE/"
-  check_body_contains "Home: door · the protocols"    "$HOME_FILE"  'the protocols'         "$BASE/"
+  # #4182: the doors nav speaks the reader's words (TODAY · THE NUMBERS · THE COACHES ·
+  # WHAT HE TRIES · THE STORY). Anchored on the label's own `</svg>…</a>` so page prose that
+  # happens to say "the story" can never pass for the nav; the old builder labels must be gone.
+  check_body_contains "Home: door · today"            "$HOME_FILE"  '</svg>today</a>'         "$BASE/"
+  check_body_contains "Home: door · the numbers"      "$HOME_FILE"  '</svg>the numbers</a>'   "$BASE/"
+  check_body_contains "Home: door · the coaches"      "$HOME_FILE"  '</svg>the coaches</a>'   "$BASE/"
+  check_body_contains "Home: door · what he tries"    "$HOME_FILE"  '</svg>what he tries</a>' "$BASE/"
+  check_body_contains "Home: door · the story"        "$HOME_FILE"  '</svg>the story</a>'     "$BASE/"
+  check_body_not_contains "Home: old door labels gone" "$HOME_FILE" '</svg>the \(cockpit\|data\|coaching\|protocols\)</a>' "$BASE/"
   # Cockpit: live data wiring
   check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'             "$BASE/cockpit/"
   check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'    "$BASE/cockpit/"

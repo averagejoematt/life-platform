@@ -165,8 +165,8 @@ def build_archive_notice(cycle: int | None, genesis: str, baseline_lbs: float) -
         f"Its numbers are preserved exactly as filed and have not been revised. The experiment restarted on "
         f"{human_date(genesis)} ({attempt}) and now runs on a starting weight of {baseline_lbs} lbs. Read what "
         f"follows as the record of the attempt it was written in — the live numbers are in "
-        f'<a href="/cockpit/" style="color:inherit;">the cockpit</a>, and the current writing is at '
-        f'<a href="/story/journal/" style="color:inherit;">the story door</a>.</p>\n'
+        f'<a href="/cockpit/" style="color:inherit;">today</a>, and the current writing is in '
+        f'<a href="/story/journal/" style="color:inherit;">the story</a>.</p>\n'
         f"</aside>\n"
     )
 

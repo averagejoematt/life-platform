@@ -1313,7 +1313,7 @@ async function renderReading() {
     const author = isBad(b.author) ? "" : b.author;
     now.innerHTML = title
       ? `<span class="rl-title">${escapeHTML(title)}</span>${author ? `<span class="rl-author"> · ${escapeHTML(author)}</span>` : ""}`
-      : `<span class="rl-title">the shelf →</span>`;
+      : ""; // #4182: no "the shelf →" link-text — the line is no longer a link (/data/reading/ is unlisted)
   }
   const st = bind("reading-streak");
   if (st) st.textContent = streak ? `${streak} day${streak === 1 ? "" : "s"} in a row` : "";

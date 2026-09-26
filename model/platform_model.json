@@ -4550,13 +4550,6 @@
       "direction": "read",
       "lambda": "life-platform-site-api",
       "module": "lambdas/web/site_api_lambda.py",
-      "partition": "coach_actions",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-site-api",
-      "module": "lambdas/web/site_api_lambda.py",
       "partition": "whoop",
       "via": "pk"
     },
@@ -7364,7 +7357,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 714,
+      "edges": 713,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7378,9 +7371,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 355,
-        "sites_resolved": 888,
-        "sites_total": 1243
+        "sites_dynamic": 354,
+        "sites_resolved": 887,
+        "sites_total": 1241
       },
       "schedule_resolution": {
         "dynamic": 0,

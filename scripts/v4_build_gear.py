@@ -242,6 +242,17 @@ GEAR: dict[str, dict] = {
         "affiliate_url": "",
         "note": "A behavioural signal logged by hand, not a device — here for completeness.",
     },
+    # #3669 gave labs a registry row, which this page's coverage gate then refused to build
+    # without (found by #4182's regeneration). Owner ruling 2026-09-06, from the registry:
+    # "labs i just do every 6 months or so and upload" — a clinic draw, nothing to buy.
+    "labs": {
+        "kind": "other",
+        "product": "Blood tests",
+        "vendor": "a clinic lab draw",
+        "icon": "vitals",
+        "affiliate_url": "",
+        "note": "Drawn at a lab roughly every six months and uploaded by hand — nothing to buy.",
+    },
     "supplements": {
         "kind": "other",
         "product": "Supplements & medication",
@@ -376,7 +387,10 @@ def _card(reg: dict, aug: dict) -> str:
     if acc:
         fields.append(
             '<div class="gr-field"><dt>Held to account by</dt>'
-            f'<dd>{acc["text"]} <a href="{esc(acc["href"])}">See how &rarr;</a></dd></div>'
+            # #4182: text only — /method/verify/ and /method/pipeline/ are served but off the
+            # 25-page reach set, so the card states the check without linking out to it.
+            # `href` stays in GEAR as the record of WHERE the check lives.
+            f'<dd>{acc["text"]}</dd></div>'
         )
     note = f'<p class="gr-note">{aug["note"]}</p>' if aug.get("note") else ""
     return (
@@ -468,7 +482,7 @@ def render(entries: list[dict]) -> str:
       </div>
       <section class="rd-sec">
         <h2 class="rd-h">How this list stays honest</h2>
-        <p class="rd-prose">This isn&rsquo;t a recommendations page dressed up as data — it&rsquo;s the literal input list. Each card below is generated from <code>lambdas/source_registry.py</code>, the same registry that drives the <a href="/method/pipeline/">live pipeline board</a> and the <a href="/data/">data archive</a>. Where two devices measure the same thing, they&rsquo;re cross-checked against each other on the <a href="/method/verify/">verify page</a> — that accountability stays separate from this page&rsquo;s affiliate links on purpose.</p>
+        <p class="rd-prose">This isn&rsquo;t a recommendations page dressed up as data — it&rsquo;s the literal input list. Each card below is generated from <code>lambdas/source_registry.py</code>, the same registry that drives the live pipeline board and <a href="/data/">the numbers</a>. Where two devices measure the same thing, they&rsquo;re cross-checked against each other — that accountability stays separate from this page&rsquo;s affiliate links on purpose.</p>
       </section>
       {"".join(sections)}
       {others_html}

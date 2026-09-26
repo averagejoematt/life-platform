@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 const tq = await import("../../site/assets/js/three_questions.js");
-const { orientStripHTML, dfn } = await import("../../site/assets/js/orient.js");
+const { orientStripHTML, dfn, findTerm } = await import("../../site/assets/js/orient.js");
 
 const JOURNEY_ENVELOPE = {
   _meta: { generated_at: "2026-09-26T04:40:00.680387+00:00" },
@@ -144,8 +144,17 @@ test("no level name on the first screen — the tier is not a field any builder 
 });
 
 test("glosses are <dfn class=gloss title=…> and the strip is one line with a dismiss button", () => {
-  assert.match(dfn("HRV", "a \"quoted\" def"), /^<dfn class="gloss" tabindex="0" title="a &quot;quoted&quot; def">HRV<\/dfn>$/);
+  // #4182: data-gloss carries the definition for the tap reveal (tokens.css dfn.gloss:focus::after)
+  assert.match(dfn("HRV", "a \"quoted\" def"), /^<dfn class="gloss" tabindex="0" title="a &quot;quoted&quot; def" data-gloss="a &quot;quoted&quot; def">HRV<\/dfn>$/);
   const strip = orientStripHTML("today, in one screen");
   assert.equal(text(strip).replace("&times;", "").trim(), "New here? This page is today, in one screen. Terms are explained where they appear.");
   assert.match(strip, /<button class="orient-x" type="button"/);
+});
+
+test("findTerm (#4182 runtime gloss): word-bounded, case-insensitive only when asked", () => {
+  assert.equal(findTerm("the Cockpit reads", "cockpit", true), 4);
+  assert.equal(findTerm("the Cockpit reads", "cockpit", false), -1);
+  assert.equal(findTerm("cockpits and cockpit", "cockpit", true), 13);
+  assert.equal(findTerm("hrv_ms then HRV", "HRV", false), 12);
+  assert.equal(findTerm("no match here", "HRV", false), -1);
 });

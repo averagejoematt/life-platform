@@ -2441,3 +2441,40 @@ REGISTRY_PROOFS.update(
         for term, n in _VOCAB_LEDGER_LIVE.items()
     }
 )
+
+
+# ── #4190: the tool-call XML residue guard (lambdas/common/text_guards.py) ─────────────
+# Proved by neutering the strip side of the guard — `strip_tool_call_residue` replaced
+# with a straight `return text` in the REAL tracked module — which fails it open at both
+# defence-in-depth call sites (mcp/handler.py's write-tool dispatch guard and the
+# site-api decisions serializer) without touching `has_tool_call_residue` or the regex
+# itself, since a mutation that also breaks detection would not isolate which half failed.
+GUARD_PROOFS.update(
+    {
+        "guard::lambdas/common/text_guards.py": {
+            "gate_name": "lambdas/common/text_guards.py",
+            "command": "python3 -m pytest tests/test_mcp_tool_call_residue_guard_4190.py -q   # 101 tests, baseline 101 passed",
+            "mutation": (
+                "`strip_tool_call_residue` body replaced with a single `return text` in the real tracked "
+                "module — every string, residue or not, now passes through unchanged. `has_tool_call_residue` "
+                "and TOOL_CALL_RESIDUE_RE were left untouched, so detection still fires; only the strip side "
+                "is neutered."
+            ),
+            "observed": (
+                "2026-09-26. BASELINE 101 passed. MUTATED: 33 failed, 68 passed — every "
+                "test_every_write_tool_is_sanitized_by_the_dispatch_guard[<tool>] case (17 write tools), "
+                "test_dispatch_guard_walks_nested_dicts_and_lists, and "
+                "test_log_decision_end_to_end_strips_residue_via_real_dispatch, each on the residue surviving "
+                "into the cleaned/stored value it should have been truncated out of. REVERTED (md5 restored to "
+                "28c26ca6fa2eed8326286ef09b289df7, matching pre-mutation): 101 passed."
+            ),
+            "scope": (
+                "This proves the strip half only. The detect half (`has_tool_call_residue` / "
+                "TOOL_CALL_RESIDUE_RE) is exercised by the same suite's clean-string and residue-fixture cases "
+                "but was not itself mutated here — regex-pattern drift (a form the live incident didn't cover "
+                "silently stops matching) is a separate, unproven risk this record does not close."
+            ),
+            "proved_on": "2026-09-26",
+        }
+    }
+)
