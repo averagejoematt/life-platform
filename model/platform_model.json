@@ -1065,6 +1065,13 @@
     },
     {
       "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_input_facts.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
       "lambda": "coach-narrative-orchestrator",
       "module": "lambdas/coach/coach_narrative_orchestrator.py",
       "partition": "challenges",
@@ -7374,7 +7381,7 @@
       "contracts_enrolled": 9,
       "contracts_known": 9,
       "contracts_ratchet": 9,
-      "edges": 714,
+      "edges": 715,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
