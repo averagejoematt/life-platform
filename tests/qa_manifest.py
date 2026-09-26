@@ -837,7 +837,9 @@ _CURATED = [
         "visual": {
             "wait_for": ".ev-app",
             "checks": [
-                {"selector": ".ev-tile", "min_count": 3, "desc": "archive tiles render after the redirect"},
+                # #4182 (PR #4221): the data rail is cut to the 25-page reach set and /data/reading/ is unlisted, so
+                # its own page renders one tile (itself, railTiles) — the redirect landed; the readout check below is the proof.
+                {"selector": ".ev-tile", "min_count": 1, "desc": "the rail renders (its own tile) after the redirect"},
                 {"selector": ".readout, .ev-main", "min_count": 1, "desc": "the reading readout mounts"},
             ],
         },
