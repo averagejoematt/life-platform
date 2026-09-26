@@ -38,6 +38,8 @@ _INTERNAL = (
     "chronicle_editor",
     "eyeball_estimate",
     "conversation_enrichment",  # #1577: conversational-corpus Haiku sweep — analysis layer, pauses first
+    "comprehension_qa",  # #4182 M4: advisory newcomer-comprehension judge — a triage signal, not a reader
+    # surface and not the operator-truth CI gates below, so it pauses with the rest of band 1
 )
 _READER_NARRATIVE = (
     "coach_narrative",

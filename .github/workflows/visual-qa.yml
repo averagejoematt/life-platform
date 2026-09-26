@@ -253,6 +253,22 @@ jobs:
             echo "::warning::no qa-screenshots/report.json — perf-trend persist skipped (sweep produced no report)"
           fi
 
+      # #4182 M4 — the newcomer-comprehension judge (advisory): a blind Haiku reader +
+      # a text-only grader over the six flagship doors, graded against each door's
+      # declared intent (tests/qa_manifest.py). Reuses tests/visual_ai_qa.py's Bedrock
+      # plumbing (attribution, image prep, the shared unreadable-verdict retry) rather
+      # than a second copy. `continue-on-error: true` — it never gates this run, and
+      # is ADVISORY until the 2026-10-10 floor-ratchet date named in #4182's M4 (the
+      # floor ratchet itself is not built yet). Writes qa-screenshots/comprehension.json,
+      # which rides the EXISTING "Upload screenshots + report" step below — same
+      # directory, no second upload step needed. The step itself fails ONLY when that
+      # artifact could not be written at all (comprehension_qa.main()'s own contract) —
+      # a judge that produced no output must never look like a clean skip.
+      - name: Comprehension judge — six doors, blind reader + grader (#4182 M4, advisory)
+        if: always() && steps.dial.outputs.level != 'off'
+        continue-on-error: true
+        run: python3 tests/comprehension_qa.py
+
       - name: Upload screenshots + report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
