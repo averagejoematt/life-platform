@@ -6,6 +6,7 @@ import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, 
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, figs, sec, empty, note, evClass, kvtable, socialContextSection } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #978 pre-start signal · #1252 genesis for carry-forward markers
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter ("Friday Sep 25")
 
 // #1940 — the correction, stated rather than applied quietly.
 // #1892 withdrew citations that pointed at papers which did not support the claims
@@ -129,7 +130,70 @@ function drawsScope(L) {
   return typeof n === "number" ? `${scope} · ${n} this cycle` : scope;
 }
 
-export function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws", drawsScope(L)), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw", (L.latest_draw_archival || {}).pre_cycle ? "before this cycle" : null)]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
+// #4182 — lab names arrive title-cased from their codes ("Apob Cardio Iq"). De-code the
+// NAME only — acronyms back to their spelling, a handful of compound names in words. No
+// medical meaning text, by the panel's ruling: the reference range is the lab's own.
+const LAB_NAMES = {
+  "Apob Cardio Iq": "ApoB (Cardio IQ method)", "Apob Apoa1 Ratio": "ApoB / ApoA1 ratio", "Chol Hdl Ratio": "Cholesterol / HDL ratio",
+  "Cholesterol Total": "Total cholesterol", "Ldl C": "LDL cholesterol", "Non Hdl C": "Non-HDL cholesterol", "Hdl Large": "Large HDL particles",
+  "Ldl Medium": "Medium LDL particles", "Ldl Small": "Small LDL particles", "C Peptide": "C-peptide", "Crp Hs": "hs-CRP",
+  "Lp Pla2 Activity": "Lp-PLA2 activity", "Vitamin D 25Oh": "Vitamin D (25-OH)", "Lipoprotein A": "Lipoprotein(a)",
+  "Insulin Intact Lcms": "Insulin, intact (LC-MS)", "Hdlfx Pcad Score": "HDL-FX pCAD score", "Hdlfx Pcec": "HDL-FX PCEC",
+  "Psa Pct Free": "Free PSA (%)", "Omega 3 Total Pct": "Omega-3 total (%)", "Omega 6 Total Pct": "Omega-6 total (%)",
+  "Omega 6 Omega 3 Ratio": "Omega-6 / omega-3 ratio", "Arachidonic Epa Ratio": "Arachidonic acid / EPA ratio",
+  "Iron Saturation Pct": "Iron saturation (%)", "Nfl Neurofilament Light Chain": "Neurofilament light chain (NfL)",
+  "Magnesium Rbc": "Magnesium (red blood cell)",
+};
+const LAB_TOKENS = {
+  Apob: "ApoB", Apoa1: "ApoA1", Aalp: "AALP", Hdl: "HDL", Ldl: "LDL", Crp: "CRP", Hba1C: "HbA1c", Tmao: "TMAO", Mch: "MCH", Mchc: "MCHC",
+  Mcv: "MCV", Mpv: "MPV", Rbc: "RBC", Rdw: "RDW", Wbc: "WBC", Alt: "ALT", Ast: "AST", Ggt: "GGT", Bun: "BUN", Egfr: "eGFR", Tsh: "TSH",
+  Dhea: "DHEA", Fsh: "FSH", Lh: "LH", Shbg: "SHBG", Psa: "PSA", Abo: "ABO", Ige: "IgE", Ana: "ANA", Dha: "DHA", Dpa: "DPA", Epa: "EPA",
+  Ph: "pH", Iq: "IQ", T3: "T3", T4: "T4",
+};
+export function labName(raw) {
+  const s = String(raw || "").trim();
+  if (LAB_NAMES[s]) return LAB_NAMES[s];
+  return s.split(/\s+/).map((w) => LAB_TOKENS[w] || w).join(" ")
+    .replace(/^Allergy (.+)$/, "Allergy — $1")
+    .replace(/\bOmega (3|6)\b/g, "Omega-$1");
+}
+
+const _labFlagged = (b) => !!b.flag && String(b.flag).toLowerCase() !== "null";
+const _labFlagWord = (f) => ({ H: "high", L: "low" })[String(f).toUpperCase()] || String(f);
+const _labRow = (b) => {
+  const f = _labFlagged(b);
+  return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(labName(b.name))}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}${f ? ` <span class="rd-flagmark">${esc(_labFlagWord(b.flag))}</span>` : ""}</td><td class="rd-range">${esc(b.range || "—")}</td></tr>`;
+};
+const _labTable = (rows) => `<table class="rd-tbl rd-tbl--labs"><thead><tr><th>marker</th><th>result</th><th>reference range</th></tr></thead><tbody>${rows.map(_labRow).join("")}</tbody></table>`;
+
+// #4182 — the labs fold: the last draw dated in words, the served counts, and the honest
+// absence of a next one (no schedule field exists — the page says so instead of implying one).
+export function labsFold(d) {
+  const L = (d && (d.labs || d)) || {};
+  const bm = L.biomarkers || [];
+  if (!bm.length || !L.latest_draw_date) return null;
+  const flagged = L.flagged_count ?? bm.filter(_labFlagged).length;
+  const pre = (L.latest_draw_archival || {}).pre_cycle;
+  return {
+    text: `Last blood test: ${calendarDay(L.latest_draw_date)}${pre ? " — before this cycle" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
+    through: null, // the draw date is IN the sentence — a second freshness line would repeat it
+  };
+}
+
+// #4182 — flagged rows FIRST (the reader's question is "what's wrong?"), the full panel
+// collapsed under its served row count. The flag rides in the result cell as a word
+// ("high"/"low"), so there is no narrow FLAG column left to clip at 390px.
+export function renderLabs(d) {
+  const L = d.labs || d; const bm = L.biomarkers || [];
+  if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added.");
+  const flagged = bm.filter(_labFlagged);
+  const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b);
+  const panel = Object.entries(by).map(([cat, rows]) => `<h3 class="hb-group label">${esc(cat)}</h3>${_labTable(rows)}`).join("");
+  return (flagged.length ? sec(`Outside the reference range — ${flagged.length} of ${bm.length}`, _labTable(flagged)) : "") +
+    `<section class="rd-sec"><details class="lab-full"><summary class="pa-sum label">The full panel — ${bm.length} rows</summary><div class="lab-full-body">${panel}</div></details></section>` +
+    figs([fig(L.total_draws ?? "—", "draws", drawsScope(L))]) +
+    note("Reference ranges are the lab's own; a flag marks a result outside them. Nothing here is medical advice.");
+}
 
 // ── /data/physical/ — two tiers: the weight cockpit (daily) + the composition arc
 // (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.
@@ -143,6 +207,52 @@ export function weighinStaleness(j) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(lw)) return { lw: "", days: null, silent: false };
   const days = Math.round((Date.parse(todayPT()) - Date.parse(lw)) / 86400000);
   return { lw, days, silent: days > WEIGHIN_STALE_DAYS };
+}
+
+// #4182 — the fold. One served fact, dated in words, on the first screen of /data/ and
+// /data/physical/. Every number is a /api/journey field; the weekday comes from the same
+// calendarDay() formatter that dates everything else, never a second one.
+const _one = (v) => (Math.round(Number(v) * 10) / 10).toFixed(1);
+const _minus = (v) => (Number(v) < 0 ? "−" : "") + _one(Math.abs(Number(v)));
+const _daysBetween = (a, b) => { const x = Date.parse(a), y = Date.parse(b); return Number.isFinite(x) && Number.isFinite(y) ? Math.round((y - x) / 86400000) : null; };
+
+export function weightFoldLine(j, today = todayPT()) {
+  if (!j || j.pre_start || j.current_weight_lbs == null || !/^\d{4}-\d{2}-\d{2}/.test(String(j.last_weighin_date || ""))) return "";
+  const lw = String(j.last_weighin_date).slice(0, 10);
+  const age = _daysBetween(lw, today);
+  // Inside a week the weekday alone is unambiguous ("Saturday's weigh-in"); past it, the date joins.
+  const when = age != null && age >= 0 && age <= 6 ? `${calendarDay(lw).split(" ")[0]}'s weigh-in` : `the ${calendarDay(lw)} weigh-in`;
+  let s = `${_one(j.current_weight_lbs)} lb at ${when}`;
+  if (j.lost_lbs != null && j.start_weight_lbs != null && j.started_date) {
+    s += ` — ${Number(j.lost_lbs) >= 0 ? "down" : "up"} ${_one(Math.abs(Number(j.lost_lbs)))} lb from ${_one(j.start_weight_lbs)} on ${calendarDay(String(j.started_date).slice(0, 10))}`;
+  }
+  if (Number(j.weighin_count) > 0 && Number(j.weighin_span_days) > 0) s += `, ${j.weighin_count} weigh-ins in ${j.weighin_span_days} days`;
+  return s + ".";
+}
+
+// The goal half (the /data/physical/ fold, not the hub): goal, what's left, the rate WITH
+// its interval and its provisional flag, and the projection only when the engine dates one.
+export function weightGoalLine(j) {
+  if (!j || j.goal_weight_lbs == null) return "";
+  const bits = [`Goal ${fmt(j.goal_weight_lbs)}${j.remaining_lbs != null ? `; ${_one(j.remaining_lbs)} lb to go` : ""}.`];
+  const r = j.weekly_rate_lbs;
+  if (r != null && Number(r) !== 0) {
+    const ci = j.weekly_rate_ci_low != null && j.weekly_rate_ci_high != null ? ` — the likely range is ${_minus(j.weekly_rate_ci_low)} to ${_minus(j.weekly_rate_ci_high)}` : "";
+    bits.push(`Weekly rate about ${_minus(r)} lb${j.rate_provisional ? ", provisional" : ""}${ci}.`);
+  }
+  const lo = j.projected_goal_date_earliest, hi = j.projected_goal_date_latest;
+  if (!j.projected_goal_date) bits.push("No dated projection yet.");
+  else if (lo && hi && lo !== hi) bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} between ${calendarDay(lo)} and ${calendarDay(hi)}.`);
+  else bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} around ${calendarDay(j.projected_goal_date)}.`);
+  return bits.join(" ");
+}
+
+export async function physicalFold(hub) {
+  const wj = await tryJSON("/api/journey");
+  const j = (wj && wj.journey) || {};
+  const line = weightFoldLine(j);
+  if (!line) return null;
+  return { text: hub ? line : `${line} ${weightGoalLine(j)}`.trim(), through: String(j.last_weighin_date || "").slice(0, 10) };
 }
 
 // P0.1 — trend-weight hero (dual-layer). Faint raw daily dots + a confident ember smoothed
@@ -285,7 +395,7 @@ export function physicalRateTempo(readings, j) {
     { k: "7-day", days: 7, pts: since(7), flag: "early = water" },
     { k: "30-day", days: 30, pts: since(30) },
     { k: "90-day", days: 90, pts: since(90) },
-    { k: "since genesis", pts: ws.filter((p) => p.d >= PHYS_GENESIS), sub: `${genDays}d` },
+    { k: "since Day 1", pts: ws.filter((p) => p.d >= PHYS_GENESIS), sub: `${genDays}d` },
   ];
   // Honest windows (truth-audit Phase 4b): with only ~13 days of data the 30/90-day
   // windows hold the SAME points and render identical bars. Label a window that doesn't
@@ -389,7 +499,7 @@ export function physicalDexaBaseline(d, journey) {
   const other = Number.isFinite(total) ? total - lean - fat : NaN;
   const segs = [{ label: "lean mass", value: lean, tone: "ember" }, { label: "fat mass", value: fat, tone: "ink" }];
   if (Number.isFinite(other) && other > 0) segs.push({ label: "bone/other", value: other, tone: "faint" });
-  const bar = stackedBar(segs, { label: `Lean vs fat · ${esc(x.scan_date)}`, unit: " lb", showPct: false });
+  const bar = stackedBar(segs, { label: `Lean vs fat · ${esc(calendarDay(x.scan_date) || x.scan_date)}`, unit: " lb", showPct: false });
   // #3526: pre-start, "this is where the cut started ... shows where it is now" is
   // a temporal premise the scan can't back — nothing has started yet. Branch on the
   // SAME /api/journey.pre_start the other doors' banners use (v4_proof.py's home
@@ -399,7 +509,7 @@ export function physicalDexaBaseline(d, journey) {
     ? `This is the pre-cut baseline — the cut starts ${esc(_physShortDate(journey.start_date))}.`
     : `This is where the cut <em>started</em>; the weight cockpit above shows where it is now.`;
   return sec("DEXA baseline — lean vs fat (one scan, dated)",
-    bar + `<p class="rd-meta label"><strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. ${cutClause} Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
+    bar + `<p class="rd-meta label"><strong>Scanned ${esc(calendarDay(x.scan_date) || x.scan_date)}${age != null ? ` · ~${age} days ago` : ""} · pre-cut baseline.</strong> A snapshot, not a trend${bfp ? ` — ${esc(bfp)}` : ""}. ${cutClause} Lean (ember) is the asset the cut is trying to keep while the fat comes off — proven only when scan two lands.</p>`);
 }
 
 // P1.3 — visceral fat callout (dated). The fat around the organs — a better predictor of
@@ -436,7 +546,7 @@ export function physicalVisceralCallout(d) {
     `<div class="vf-wrap"><div class="vf-fig"><span class="vf-v mono">${esc(fig6)}</span><span class="vf-band label vf-${band}">${esc(band)}</span></div>` +
     `<div class="vf-gauge" role="img" aria-label="${scaleAria}"><span class="vf-zone vf-z1"></span><span class="vf-zone vf-z2"></span><span class="vf-zone vf-z3"></span><span class="vf-mark${offScale ? " vf-mark-offscale" : ""}" style="left:${pos.toFixed(1)}%"></span></div>` +
     `<div class="vf-scale label"><span>0</span><span>low · moderate · elevated</span><span>${maxS}${offScale ? "+" : ""} lb</span></div></div>` +
-    `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early.${offScale ? ` This reading is past the drawn scale's ${maxS} lb edge — still elevated, just off the chart.` : ""} Dated <strong>${esc(x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
+    `<p class="rd-meta label">Visceral fat wraps the organs and drives metabolic risk more than total body-fat % does — it's the number to actually watch, and the one a cut moves early.${offScale ? ` This reading is past the drawn scale's ${maxS} lb edge — still elevated, just off the chart.` : ""} Dated <strong>${esc(calendarDay(x.scan_date) || x.scan_date)}${age != null ? ` · ~${age} days ago` : ""}</strong>, pre-cut. The bands are directional only — DEXA systems disagree on exact cutoffs, so this reads the zone, never a diagnosis.</p>`);
 }
 
 // P1.4 — lean / ALMI longevity context, demoted. Appendicular lean mass index is the
@@ -455,7 +565,7 @@ export function physicalLeanLongevity(d) {
       Number.isFinite(pct) && fig(fmt(pct) + "th", "percentile"),
       Number.isFinite(lean) && fig(dualWeight(lean, "lb"), "appendicular + trunk lean"),
     ]) +
-    `<p class="rd-meta label">Appendicular lean mass — the muscle on the arms and legs — is the body-comp figure that best predicts how well you age: it's the buffer against sarcopenia and frailty. ${Number.isFinite(almi) ? `At ${fmt(almi, 1)} kg/m²${Number.isFinite(pct) ? `, ${fmt(pct)}th percentile,` : ""} that's ${clear != null && clear > 0 ? `~${fmt(clear)} clear of` : "near"} the ~${FLOOR} sarcopenia floor.` : ""} The cut's whole job is to keep this while the fat comes off — confirmed only when scan two lands. Dated <strong>${esc(x.scan_date)}</strong>, pre-cut.</p>`);
+    `<p class="rd-meta label">Appendicular lean mass — the muscle on the arms and legs — is the body-comp figure that best predicts how well you age: it's the buffer against sarcopenia and frailty. ${Number.isFinite(almi) ? `At ${fmt(almi, 1)} kg/m²${Number.isFinite(pct) ? `, ${fmt(pct)}th percentile,` : ""} that's ${clear != null && clear > 0 ? `~${fmt(clear)} clear of` : "near"} the ~${FLOOR} sarcopenia floor.` : ""} The cut's whole job is to keep this while the fat comes off — confirmed only when scan two lands. Dated <strong>${esc(calendarDay(x.scan_date) || x.scan_date)}</strong>, pre-cut.</p>`);
 }
 
 // P1.5 — PhenoAge (transparent), Option A privacy. Shows the phenotypic ("biological") age +
@@ -532,8 +642,8 @@ export function physicalFullScanExpander(d) {
     (Object.keys(sf).length ? `<h3 class="hb-group label">Segmental fat %</h3>${kvtable(sf)}` : "") +
     (Object.keys(sl).length ? `<h3 class="hb-group label">Segmental lean</h3>${kvtable(sl)}` : "");
   return sec("The full scan — everything else, dated",
-    `<details class="fs-exp"><summary class="pa-sum label">Open the full ${esc(x.scan_date || "DEXA")} scan — indices, segmental, bone</summary><div class="fs-body">${inner}</div></details>` +
-    note(`Every figure here is from the single ${esc(x.scan_date || "")} pre-cut scan — a dated snapshot, not a trend. Composition velocity unlocks at scan two.`));
+    `<details class="fs-exp"><summary class="pa-sum label">Open the full ${esc(calendarDay(x.scan_date) || "DEXA")} scan — indices, segmental, bone</summary><div class="fs-body">${inner}</div></details>` +
+    note(`Every figure here is from the single ${esc(calendarDay(x.scan_date))} pre-cut scan — a dated snapshot, not a trend. Composition velocity unlocks at scan two.`));
 }
 
 // #1119 — the two-tier structure made explicit: a labeled group-head for the fluid
@@ -588,7 +698,12 @@ export async function renderPhysical(d) {
     const ratePerWeek = slope != null ? Math.round(slope * 7 * 100) / 100 : (j.weekly_rate_lbs ?? null);
     const last6 = ws6[ws6.length - 1];
     const rungList = []; for (let w = Math.floor((last6.w - 5) / 10) * 10; w > goal; w -= 10) rungList.push(w);
-    parts.push(sec("Projection to 185 — the cone, not a line",
+    // #4182 (S15): the title and caption say what the chart DRAWS. With no dated
+    // projection (or a provisional rate) it is a point trajectory, not a cone — the old
+    // "the cone, not a line" title contradicted its own chart.
+    const _band = !j.rate_provisional && j.weekly_rate_ci_low != null && j.weekly_rate_ci_high != null;
+    const _projTitle = j.projected_goal_date ? `Toward ${fmt(goal)} — the projection, with its range` : `Toward ${fmt(goal)} — no dated projection yet`;
+    parts.push(sec(_projTitle,
       projectionCone({ date: last6.d, w: last6.w }, goal, ratePerWeek, {
         provisional: !!j.rate_provisional, rungs: rungList, label: "Projected weight → 185",
         // #551 — the fan edges bind to the REAL block-bootstrap slope CI, and the dated bet
@@ -597,7 +712,9 @@ export async function renderPhysical(d) {
         goalDateRange: { earliest: j.projected_goal_date_earliest, latest: j.projected_goal_date_latest },
         confidence: j.projection_confidence,
       }) +
-      `<p class="rd-meta label">A forecast is a cone, never a line. The band is the real ${j.projection_confidence != null ? Math.round(Number(j.projection_confidence) * 100) + "% " : ""}confidence interval on the loss slope — wide because the rate is young, tightening as weigh-ins accrue. The dated bet is the backend's own goal-date range, held honestly and checked against what actually happens.</p>`));
+      (_band
+        ? `<p class="rd-meta label">The band is the real ${j.projection_confidence != null ? Math.round(Number(j.projection_confidence) * 100) + "% " : ""}confidence interval on the loss slope — wide because the rate is young, tightening as weigh-ins accrue.${j.projected_goal_date ? " The dated range is the engine's own, checked against what actually happens." : " No date is attached until the engine will stand behind one."}</p>`
+        : "")));  // no band: the chart's own caption already says there is no dated projection
   }
   parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
   // ── TIER 2 — the composition arc (episodic) — the checkpoint block, grouped and
@@ -668,7 +785,7 @@ export function trainingVolumeRamp(workouts) {
       chart + `<p class="rd-meta label">Last session ${esc(_physShortDate(lastDate))} — the line above is the last active stretch, not the current week.</p>` +
       `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machineL)}</p><p class="tv-human">${esc(serifL)}</p></div>`);
   }
-  const machine = [`${sess.length} sessions`, `${fmt(Math.round(first))} → ${fmt(Math.round(last))} kg`, ratio ? `×${rmult} so far` : null, wow != null ? `WoW ${wow >= 0 ? "+" : ""}${wow}%` : null, "ACWR needs ~4 wks"].filter(Boolean).join(" · ");
+  const machine = [`${sess.length} sessions`, `${fmt(Math.round(first))} → ${fmt(Math.round(last))} kg`, ratio ? `×${rmult} so far` : null, wow != null ? `week over week ${wow >= 0 ? "+" : ""}${wow}%` : null, "the weekly load gauge needs ~4 weeks"].filter(Boolean).join(" · ");
   const serif = `Session volume roughly ${rmult}×'d ${weeks.length <= 1 ? "this week" : "over the window"} — ${fmt(Math.round(first))} → ${fmt(Math.round(last))} kg. That's how a foundation gets built, but it's also the kind of jump where connective tissue — which adapts slower than muscle — starts writing cheques the joints have to cash. Nothing here says too much yet; only that the rate is worth watching. The acute:chronic load ratio that would flag it properly needs ~4 weeks of history — until then this is watched, not judged.`;
   const note2 = `<p class="rd-meta label">${weeks.length < 2 ? "Week-over-week fills in next week · " : ""}ACWR (acute:chronic load) unlocks at ~4 weeks.</p>`;
   return sec("The volume ramp — building, with the load watched",
@@ -737,10 +854,10 @@ export function trainingRPE(workouts) {
   const series = sess.map((s) => ({ date: s.date, value: Math.round(s.avg * 10) / 10 }));
   const last = series[series.length - 1].value;
   const chart = series.length >= 4
-    ? lineChart(series, { valueKey: "value", unit: " RPE", label: "Avg working-set RPE per session", spine: true })
-    : `<p class="rd-meta label">Latest session RPE ${last} · ${series.length} session${series.length === 1 ? "" : "s"} — the trend draws in at 4+.</p>`;
-  return sec("Effort — RPE (autoregulation)",
-    chart + `<p class="rd-meta label">Average working-set RPE per session — how hard the work actually felt. The autoregulation read; it feeds session sRPE → honest internal load.</p>`);
+    ? lineChart(series, { valueKey: "value", unit: "", label: "Average effort per session, 1–10 (RPE, rate of perceived exertion)", spine: true })
+    : `<p class="rd-meta label">Latest session effort ${last} of 10 · ${series.length} session${series.length === 1 ? "" : "s"} — the trend draws in at 4+.</p>`;
+  return sec("How hard each session felt",
+    chart + `<p class="rd-meta label">The average effort Matthew logs for his working sets, on the 1–10 RPE scale (rate of perceived exertion) — how hard the work actually felt. It feeds the session load below.</p>`);
 }
 
 // P1.2 — Internal load: session sRPE = session RPE × duration (min). The honest input for ACWR.
@@ -758,9 +875,9 @@ export function trainingSRPE(workouts) {
   if (!sess.length) return "";
   sess.sort((a, b) => (a.date < b.date ? -1 : 1));
   const rows = sess.map((s) => ({ label: fmtShort(s.date).split(" ")[1] || "", value: s.srpe }));
-  return sec("Internal load — session sRPE",
-    barChart(rows, { valueKey: "value", labelKey: "label", label: "sRPE (RPE × minutes) per session" }) +
-    `<p class="rd-meta label">Internal training load = session RPE × duration. The honest input for ACWR — which unlocks at ~4 weeks (P2.2), not before.</p>`);
+  return sec("Load per session — effort × minutes",
+    barChart(rows, { valueKey: "value", labelKey: "label", label: "Session load (effort 1–10 × minutes)" }) +
+    `<p class="rd-meta label">Session load = how hard it felt × how long it lasted (sports scientists call it sRPE). It is the input for the weekly load gauge, which unlocks at ~4 weeks, not before.</p>`);
 }
 
 /* #3523 (ADR-104) — "This week — daily movement", as a PURE builder so the three
@@ -785,4 +902,30 @@ export function movementWeekBody(days) {
   return `<table class="rd-tbl"><thead><tr><th>day</th><th>steps</th><th>active min</th></tr></thead><tbody>${rows}</tbody></table>` + note;
 }
 
-export async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo, ph, sc] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts"), tryJSON("/api/pulse_history"), tryJSON("/api/social_context?route=training")]); const ctxSec = socialContextSection((sc && sc.items) || [], "From the broadcast — training posts"); const ramp = trainingVolumeRamp((wo && wo.workouts) || []); const rhrHero = trainingRHRHero((ph && ph.pulse_history) || []); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const _cardioHR = (d.cardio_sessions || []).filter((c) => c.avg_hr != null && c.minutes); const hrSec = _cardioHR.length ? sec("HR of the engine — is the easy work staying easy?", barChart(_cardioHR.slice(0, 12).map((c) => ({ label: String(c.sport || "—").slice(0, 8), value: Math.round(Number(c.avg_hr)) })), { valueKey: "value", labelKey: "label", label: "Avg HR per cardio session (bpm)" }) + `<p class="rd-meta label">Easy aerobic work should sit low (≈ under 129 bpm, ~70% of max) — proof the base stays base. Lifting HR isn't shown: Whoop returns 0 HR-zone minutes for lifts, so that's an honest gap an HR strap would fill — never a 0 bar.</p>`) : ""; const z2v = t.z2_weekly_avg_min, z2t = t.z2_target_min || 150, z2cur = t.z2_trailing_7d_min; const z2CurLine = z2cur != null ? `<p class="rd-meta label">This week (trailing 7 days): <strong>${fmt(Math.round(z2cur))} min</strong> vs the ${fmt(z2t)}-min target${z2v != null && z2v >= z2t && z2cur < z2t * 0.5 ? " — the 30-day average above is history carrying a quiet current week, not the present pace" : ""}.</p>` : ""; const z2Sec = z2v != null ? sec("The engine — Zone-2 base", targetSpine(z2v, z2t, { valueLabel: "Z2/wk · 30d avg", targetLabel: "150 target", unit: " min", label: "Zone-2 minutes per week · 30-day average" }) + z2CurLine + `<p class="rd-meta label">Counts steady aerobic work across sources — Strava, Whoop zones, AND Hevy bike/elliptical. The easy work that builds the engine. The spine is a 30-day average — the current week is stated above it, honestly.</p>`) : ""; const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("The Lift Index — load trend, not max-testing", liftIndex(lifts) + `<p class="rd-meta label">Estimated from working sets (Epley) — a direction, not a 1RM goal. Foundation block: building the engine, not chasing PRs.</p>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", movementWeekBody(days)) : ""; const rpeSec = trainingRPE((wo && wo.workouts) || []); const srpeSec = trainingSRPE((wo && wo.workouts) || []); const hrStrapSec = sec("Lifting HR zones — coming online", `<div class="nut-coming"><p class="rd-archive">Whoop returns 0 HR-zone minutes for lifting, so the cardiovascular cost of the lifts is a gap. A chest HR strap worn during sessions would fill it — turning "how hard did the lift tax the engine" from blank into data. <span class="confidence conf-low">needs HR strap</span></p></div>`); const ruckSec = sec("Rucking load & incline — coming online", `<div class="nut-coming"><p class="rd-archive">Walking is the primary engine, but it's logged flat — no pack weight or grade. Capturing rucking load / incline would make the walk progressible (same minutes, more stimulus) instead of a fixed floor. <span class="confidence conf-low">needs capture</span></p></div>`); const acwrSec = sec("Load gauge (ACWR) — coming online", `<div class="nut-coming"><p class="rd-archive">The acute:chronic workload ratio — this week's load against the rolling 4-week baseline — is the standard read on whether the ramp is sustainable or tipping into the danger zone. It needs ~3–4 weeks of history before it means anything; computing it at week one would be noise dressed as a verdict. The inputs (session sRPE, volume) are already accruing. <span class="confidence conf-low">unlocks ~4 weeks</span></p></div>`); const _strainDays = ((ph && ph.pulse_history) || []).map((h) => ({ date: h.date, value: Number(h.strain) })).filter((x) => Number.isFinite(x.value) && x.value > 0); const strainSec = _strainDays.length ? sec("Absorbing the work — daily strain", barChart(_strainDays.map((x) => ({ label: fmtShort(x.date).split(" ")[1] || "", value: Math.round(x.value * 10) / 10 })), { valueKey: "value", labelKey: "label", label: "Whoop day strain (0–21)" }) + `<p class="rd-meta label">Day-by-day cardiovascular load, not a single average headline. The strain-vs-recovery overlay fills in (P2.1).</p>`) : ""; const _phRec = ((ph && ph.pulse_history) || []).map((h) => ({ date: h.date, rec: Number(h.recovery_pct), str: Number(h.strain) })); const _recS = _phRec.filter((x) => Number.isFinite(x.rec)).map((x) => ({ date: x.date, value: x.rec })); const _strS = _phRec.filter((x) => Number.isFinite(x.str)).map((x) => ({ date: x.date, value: Math.round(x.str * 100 / 21) })); const overlaySec = (_recS.length >= 4 && _strS.length >= 4) ? sec("Strain vs recovery", dualLineChart(_recS, _strS, { aLabel: "recovery %", bLabel: "strain ·scaled", label: "does the load cost next-day recovery?", showGap: false }) + `<p class="rd-meta label">Recovery % (ember) against day strain scaled to 100 (muted dashed). Observation only — n=1, no coefficient drawn (needs ≥2 weeks).</p>`) : ""; const _sessDates = ((wo && wo.workouts) || []).map((w) => String(w.date || "").slice(0, 10)).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)).sort(); const _lastSess = _sessDates[_sessDates.length - 1]; const _daysSinceSess = _lastSess ? Math.round((Date.parse(todayPT()) - Date.parse(_lastSess)) / 86400000) : null; const _layoffWks = _daysSinceSess != null && _daysSinceSess > 7 ? Math.max(1, Math.floor(_daysSinceSess / 7)) : 0; const _mvFreeze = _layoffWks ? `<p class="rd-meta label">Last trained <strong>${esc(_physShortDate(_lastSess))}</strong> — ${_daysSinceSess} days ago: the current rate is 0 sets/wk for every muscle, ${_layoffWks} week${_layoffWks > 1 ? "s" : ""} running. The bars show the last active window, frozen, not this week's work.</p>` : ""; const _mv = d.muscle_volume || []; const mvSec = _mv.length ? sec("Per-muscle volume vs landmarks", landmarkBars(_mv, { label: "MEV = minimum effective · MAV = optimal range · MRV = max recoverable." }) + _mvFreeze + `<p class="rd-meta label">Weekly working sets per muscle against the volume landmarks (Israetel). Ember = in the optimal MEV–MAV band; muted = under or over. Week-one sets/week are extrapolated from a short window.</p>`) : ""; const bodyMapSec = _mv.length ? muscleBodyMap(_mv) : ""; const _tbp = d.training_blueprint; const blueprintSec = (_tbp && _tbp.public) ? sec("Present vs the proven blueprint", `<p class="rd-meta label">Present training vs the proven loss-period blueprint${_tbp.confidence ? ` · ${esc(_tbp.confidence)} confidence` : ""}. <span class="confidence conf-low">private — blueprint</span></p>`) : ""; const _ppl = { Push: 0, Pull: 0, Legs: 0 }; for (const w of (wo && wo.workouts) || []) { const ti = String(w.title || "").toLowerCase(); const cat = ti.includes("push") ? "Push" : ti.includes("pull") ? "Pull" : (ti.includes("leg") || ti.includes("squat")) ? "Legs" : null; if (!cat) continue; let vol = w.total_volume_kg; if (vol == null) { vol = 0; for (const e of w.exercises || []) for (const s of e.sets || []) vol += (Number(s.reps) || 0) * (Number(s.weight_kg) || 0); } _ppl[cat] += Number(vol) || 0; } const _pplRows = Object.entries(_ppl).filter(([, v]) => v > 0).map(([k, v]) => ({ label: k, value: Math.round(v) })); const pplSec = _pplRows.length ? sec("Push / Pull / Legs balance", barChart(_pplRows, { valueKey: "value", labelKey: "label", label: "Working-set volume by split (kg)" }) + `<p class="rd-meta label">Is one pattern carrying the others? Working-set volume tagged from Hevy session titles.</p>`) : ""; const _mod = (d.daily_modality_minutes_30d || []).map((m) => ({ date: m.date, lift: m.strength_min || 0, cardio: (m.walking_min || 0) + (m.cycling_min || 0) + (m.hiking_min || 0) + (m.soccer_min || 0) + (m.other_min || 0), mob: (m.stretching_min || 0) + (m.breathwork_min || 0) })); const modSec = _mod.some((m) => m.lift + m.cardio + m.mob > 0) ? sec("Training time — where the minutes go", stackedDayColumns(_mod, [{ key: "lift", label: "lift", tone: "lift" }, { key: "cardio", label: "walk/cardio", tone: "cardio" }, { key: "mob", label: "mobility", tone: "mob" }], { label: "minutes by modality · per day" }) + `<p class="rd-meta label">Is the engine work happening, or getting crowded out? Mobility gets its own lane here instead of hiding in the cardio list.</p>`) : ""; const _stepsTrend = (d.walking && d.walking.daily_steps_trend) || []; const wlk = d.walking || {}; const walkSec = _stepsTrend.length ? sec("Walking — the primary engine", figs([wlk.avg_daily_steps != null && fig(fmt(wlk.avg_daily_steps), "avg daily steps"), wlk.total_miles_30d != null && fig(fmt(wlk.total_miles_30d) + " mi", "walked · 30d"), wlk.avg_pace_min_per_mi != null && fig(fmt(wlk.avg_pace_min_per_mi) + "/mi", "avg pace")]) + heatStrip(_stepsTrend, { valueKey: "steps", label: "Daily steps", unit: " steps" })) : ""; const _MOBRE = /stretch|yoga|mobility|foam|recovery|\brest\b/i; const cardio = (d.cardio_sessions || []).filter((w) => w.modality !== "mobility" && !_MOBRE.test(String(w.sport || ""))); const _km = (mi) => (mi != null ? (mi * 1.60934).toFixed(1) : null); const sessSec = cardio.length ? sec("Recent cardio", `<table class="rd-tbl"><thead><tr><th>date</th><th>activity</th><th>distance</th><th>min</th><th>avg HR</th></tr></thead><tbody>${cardio.slice(0, 20).map((w) => `<tr><td class="rd-name">${esc(String(w.date || "").slice(0, 10))}</td><td>${esc(ttl(w.sport || "—"))}</td><td class="num rd-range">${w.distance_mi != null ? `${fmt(w.distance_mi, 1)} mi · ${_km(w.distance_mi)} km` : "—"}</td><td class="num">${fmt(w.minutes)}</td><td class="num">${fmt(w.avg_hr)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Strength log — per-exercise sets", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", w.total_volume_kg != null && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type && s.type.toLowerCase() !== "normal" ? s.type : "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${s.weight_kg != null ? dualWeight(s.weight_kg, "kg") : (s.distance_m != null ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!ramp && !rhrHero && !head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return ramp + rhrHero + head + z2Sec + hrSec + walkSec + strSec + pplSec + mvSec + bodyMapSec + blueprintSec + modSec + strainSec + overlaySec + rpeSec + srpeSec + acwrSec + hrStrapSec + ruckSec + logSec + sessSec + wkSec + ctxSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }
+// #4182 — the training fold: the 30-day count split the way the reader thinks about it
+// (gym sessions vs walks), distance, steps with the days behind the average, and the
+// latest day named in words. Split only when the parts sum to the served total — else
+// "including", never a split that doesn't add up.
+export function trainingFold(d, wo) {
+  const t = (d && d.training) || {}, w = (d && d.walking) || {};
+  if (t.workouts_30d == null) return null;
+  const n = Number(t.workouts_30d), gym = t.strength_sessions_30d, walks = w.total_walks_30d;
+  let s = `${n} session${n === 1 ? "" : "s"} in 30 days`;
+  if (gym != null && walks != null) s += Number(gym) + Number(walks) === n ? ` — ${gym} in the gym, ${walks} walks` : ` — including ${gym} in the gym and ${walks} walks`;
+  const bits = [s + "."];
+  const move = [
+    w.total_miles_30d != null && `${fmt(w.total_miles_30d)} miles walked`,
+    w.avg_daily_steps != null && `${Number(w.avg_daily_steps).toLocaleString("en-US")} steps a day${w.avg_daily_steps_n ? `, averaged over ${w.avg_daily_steps_n} days` : ""}`,
+  ].filter(Boolean);
+  if (move.length) bits.push(move.join("; ") + ".");
+  const gymDates = ((wo && wo.workouts) || []).map((x) => String(x.date || "").slice(0, 10)).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
+  const walkDates = (d.cardio_sessions || []).filter((c) => /walk/i.test(String(c.sport || ""))).map((c) => String(c.date || "").slice(0, 10));
+  const latest = [...gymDates, ...walkDates].sort().pop();
+  if (latest) {
+    const kinds = [gymDates.includes(latest) && "a gym session", walkDates.includes(latest) && "a walk"].filter(Boolean);
+    bits.push(`Latest: ${kinds.join(" and ")}, ${calendarDay(latest)}.`);
+  }
+  return { text: bits.join(" "), through: latest || null };
+}
+
+export async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo, ph, sc] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts"), tryJSON("/api/pulse_history"), tryJSON("/api/social_context?route=training")]); const ctxSec = socialContextSection((sc && sc.items) || [], "From the broadcast — training posts"); const ramp = trainingVolumeRamp((wo && wo.workouts) || []); const rhrHero = trainingRHRHero((ph && ph.pulse_history) || []); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const _cardioHR = (d.cardio_sessions || []).filter((c) => c.avg_hr != null && c.minutes); const hrSec = _cardioHR.length ? sec("Heart rate on cardio — is the easy work staying easy?", barChart(_cardioHR.slice(0, 12).map((c) => ({ label: String(c.sport || "—").slice(0, 8), value: Math.round(Number(c.avg_hr)) })), { valueKey: "value", labelKey: "label", label: "Avg HR per cardio session (bpm)" }) + `<p class="rd-meta label">Easy aerobic work should sit low (≈ under 129 bpm, ~70% of max) — proof the base stays base. Lifting HR isn't shown: Whoop returns 0 HR-zone minutes for lifts, so that's an honest gap an HR strap would fill — never a 0 bar.</p>`) : ""; const z2v = t.z2_weekly_avg_min, z2t = t.z2_target_min || 150, z2cur = t.z2_trailing_7d_min; const z2CurLine = z2cur != null ? `<p class="rd-meta label">This week (trailing 7 days): <strong>${fmt(Math.round(z2cur))} min</strong> vs the ${fmt(z2t)}-min target${z2v != null && z2v >= z2t && z2cur < z2t * 0.5 ? " — the 30-day average above is history carrying a quiet current week, not the present pace" : ""}.</p>` : ""; const z2Sec = z2v != null ? sec("Easy cardio — minutes a week in Zone 2", targetSpine(z2v, z2t, { valueLabel: "Zone 2 min/wk · 30-day avg", targetLabel: "150 target", unit: " min", label: "Zone-2 minutes per week · 30-day average" }) + z2CurLine + `<p class="rd-meta label">Zone 2 is easy, conversational-pace cardio. This counts steady aerobic work across sources — Strava, Whoop zones, AND Hevy bike/elliptical. The easy work that builds the engine. The spine is a 30-day average — the current week is stated above it, honestly.</p>`) : ""; const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("Strength — is the load going up?", liftIndex(lifts) + `<p class="rd-meta label">Each lift's one-rep max (1RM) is estimated from its working sets with the Epley formula — a direction, not a goal. Foundation block: building the engine, not chasing PRs.</p>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", movementWeekBody(days)) : ""; const rpeSec = trainingRPE((wo && wo.workouts) || []); const srpeSec = trainingSRPE((wo && wo.workouts) || []); const hrStrapSec = sec("Lifting HR zones — coming online", `<div class="nut-coming"><p class="rd-archive">Whoop returns 0 HR-zone minutes for lifting, so the cardiovascular cost of the lifts is a gap. A chest HR strap worn during sessions would fill it — turning "how hard did the lift tax the engine" from blank into data. <span class="confidence conf-low">needs HR strap</span></p></div>`); const ruckSec = sec("Rucking load & incline — coming online", `<div class="nut-coming"><p class="rd-archive">Walking is the primary engine, but it's logged flat — no pack weight or grade. Capturing rucking load / incline would make the walk progressible (same minutes, more stimulus) instead of a fixed floor. <span class="confidence conf-low">needs capture</span></p></div>`); const acwrSec = sec("Weekly load — coming online", `<div class="nut-coming"><p class="rd-archive">The acute:chronic workload ratio (ACWR) — this week's load against the rolling 4-week baseline — is the standard read on whether the ramp is sustainable or tipping into the danger zone. It needs ~3–4 weeks of history before it means anything; computing it at week one would be noise dressed as a verdict. The inputs (session sRPE, volume) are already accruing. <span class="confidence conf-low">unlocks ~4 weeks</span></p></div>`); const _strainDays = ((ph && ph.pulse_history) || []).map((h) => ({ date: h.date, value: Number(h.strain) })).filter((x) => Number.isFinite(x.value) && x.value > 0); const strainSec = _strainDays.length ? sec("Absorbing the work — daily strain", barChart(_strainDays.map((x) => ({ label: fmtShort(x.date).split(" ")[1] || "", value: Math.round(x.value * 10) / 10 })), { valueKey: "value", labelKey: "label", label: "Whoop day strain (0–21)" }) + `<p class="rd-meta label">Day-by-day cardiovascular load, not a single average headline. The strain-vs-recovery overlay fills in (P2.1).</p>`) : ""; const _phRec = ((ph && ph.pulse_history) || []).map((h) => ({ date: h.date, rec: Number(h.recovery_pct), str: Number(h.strain) })); const _recS = _phRec.filter((x) => Number.isFinite(x.rec)).map((x) => ({ date: x.date, value: x.rec })); const _strS = _phRec.filter((x) => Number.isFinite(x.str)).map((x) => ({ date: x.date, value: Math.round(x.str * 100 / 21) })); const overlaySec = (_recS.length >= 4 && _strS.length >= 4) ? sec("Strain vs recovery", dualLineChart(_recS, _strS, { aLabel: "recovery %", bLabel: "strain ·scaled", label: "does the load cost next-day recovery?", showGap: false }) + `<p class="rd-meta label">Recovery % (ember) against day strain scaled to 100 (muted dashed). Observation only — n=1, no coefficient drawn (needs ≥2 weeks).</p>`) : ""; const _sessDates = ((wo && wo.workouts) || []).map((w) => String(w.date || "").slice(0, 10)).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)).sort(); const _lastSess = _sessDates[_sessDates.length - 1]; const _daysSinceSess = _lastSess ? Math.round((Date.parse(todayPT()) - Date.parse(_lastSess)) / 86400000) : null; const _layoffWks = _daysSinceSess != null && _daysSinceSess > 7 ? Math.max(1, Math.floor(_daysSinceSess / 7)) : 0; const _mvFreeze = _layoffWks ? `<p class="rd-meta label">Last trained <strong>${esc(_physShortDate(_lastSess))}</strong> — ${_daysSinceSess} days ago: the current rate is 0 sets/wk for every muscle, ${_layoffWks} week${_layoffWks > 1 ? "s" : ""} running. The bars show the last active window, frozen, not this week's work.</p>` : ""; const _mv = d.muscle_volume || []; const mvSec = _mv.length ? sec("Sets per muscle, each week", landmarkBars(_mv, { label: "MEV = minimum effective · MAV = optimal range · MRV = max recoverable." }) + _mvFreeze + `<p class="rd-meta label">Weekly working sets per muscle against the volume landmarks (Israetel). Ember = in the optimal MEV–MAV band; muted = under or over. Week-one sets/week are extrapolated from a short window.</p>`) : ""; const bodyMapSec = _mv.length ? muscleBodyMap(_mv) : ""; const _tbp = d.training_blueprint; const blueprintSec = (_tbp && _tbp.public) ? sec("Present vs the proven blueprint", `<p class="rd-meta label">Present training vs the proven loss-period blueprint${_tbp.confidence ? ` · ${esc(_tbp.confidence)} confidence` : ""}. <span class="confidence conf-low">private — blueprint</span></p>`) : ""; const _ppl = { Push: 0, Pull: 0, Legs: 0 }; for (const w of (wo && wo.workouts) || []) { const ti = String(w.title || "").toLowerCase(); const cat = ti.includes("push") ? "Push" : ti.includes("pull") ? "Pull" : (ti.includes("leg") || ti.includes("squat")) ? "Legs" : null; if (!cat) continue; let vol = w.total_volume_kg; if (vol == null) { vol = 0; for (const e of w.exercises || []) for (const s of e.sets || []) vol += (Number(s.reps) || 0) * (Number(s.weight_kg) || 0); } _ppl[cat] += Number(vol) || 0; } const _pplRows = Object.entries(_ppl).filter(([, v]) => v > 0).map(([k, v]) => ({ label: k, value: Math.round(v) })); const pplSec = _pplRows.length ? sec("Push / Pull / Legs balance", barChart(_pplRows, { valueKey: "value", labelKey: "label", label: "Working-set volume by split (kg)" }) + `<p class="rd-meta label">Is one pattern carrying the others? Working-set volume tagged from Hevy session titles.</p>`) : ""; const _mod = (d.daily_modality_minutes_30d || []).map((m) => ({ date: m.date, lift: m.strength_min || 0, cardio: (m.walking_min || 0) + (m.cycling_min || 0) + (m.hiking_min || 0) + (m.soccer_min || 0) + (m.other_min || 0), mob: (m.stretching_min || 0) + (m.breathwork_min || 0) })); const modSec = _mod.some((m) => m.lift + m.cardio + m.mob > 0) ? sec("Training time — where the minutes go", stackedDayColumns(_mod, [{ key: "lift", label: "lift", tone: "lift" }, { key: "cardio", label: "walk/cardio", tone: "cardio" }, { key: "mob", label: "mobility", tone: "mob" }], { label: "minutes by modality · per day" }) + `<p class="rd-meta label">Is the engine work happening, or getting crowded out? Mobility gets its own lane here instead of hiding in the cardio list.</p>`) : ""; const _stepsTrend = (d.walking && d.walking.daily_steps_trend) || []; const wlk = d.walking || {}; const walkSec = _stepsTrend.length ? sec("Walking — the primary engine", figs([wlk.avg_daily_steps != null && fig(fmt(wlk.avg_daily_steps), "avg daily steps"), wlk.total_miles_30d != null && fig(fmt(wlk.total_miles_30d) + " mi", "walked · 30d"), wlk.avg_pace_min_per_mi != null && fig(fmt(wlk.avg_pace_min_per_mi) + "/mi", "avg pace")]) + heatStrip(_stepsTrend, { valueKey: "steps", label: "Daily steps", unit: " steps" })) : ""; const _MOBRE = /stretch|yoga|mobility|foam|recovery|\brest\b/i; const cardio = (d.cardio_sessions || []).filter((w) => w.modality !== "mobility" && !_MOBRE.test(String(w.sport || ""))); const _km = (mi) => (mi != null ? (mi * 1.60934).toFixed(1) : null); const sessSec = cardio.length ? sec("Recent cardio", `<table class="rd-tbl"><thead><tr><th>date</th><th>activity</th><th>distance</th><th>min</th><th>avg HR</th></tr></thead><tbody>${cardio.slice(0, 20).map((w) => `<tr><td class="rd-name">${esc(fmtShort(w.date) || String(w.date || "").slice(0, 10))}</td><td>${esc(ttl(w.sport || "—"))}</td><td class="num rd-range">${w.distance_mi != null ? `${fmt(w.distance_mi, 1)} mi · ${_km(w.distance_mi)} km` : "—"}</td><td class="num">${fmt(w.minutes)}</td><td class="num">${fmt(w.avg_hr)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Every gym session — sets and weights", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[calendarDay(String(w.date || "").slice(0, 10)) || w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", Number(w.total_volume_kg) > 0 && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type && s.type.toLowerCase() !== "normal" ? s.type : "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${Number(s.weight_kg) > 0 ? dualWeight(s.weight_kg, "kg") : (Number(s.distance_m) > 0 ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!ramp && !rhrHero && !head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return ramp + rhrHero + head + z2Sec + hrSec + walkSec + strSec + pplSec + mvSec + bodyMapSec + blueprintSec + modSec + strainSec + overlaySec + rpeSec + srpeSec + acwrSec + hrStrapSec + ruckSec + logSec + sessSec + wkSec + ctxSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }

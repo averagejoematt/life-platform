@@ -20,21 +20,22 @@ import { mountAsk } from "/assets/js/ask.js";
 import { esc, getJSON, tryJSON, isBad, sec, empty, note } from "/assets/js/evidence_shared.js";
 import { indexRegistry, resolveSlugFromPath } from "/assets/js/evidence_router.js";
 import { enhanceProvenance } from "/assets/js/provenance_popover.js";
-import { renderSupplements, renderLabs, renderPhysical, renderTraining } from "/assets/js/evidence_body.js";
+import { renderSupplements, renderLabs, renderPhysical, renderTraining, physicalFold, trainingFold, labsFold } from "/assets/js/evidence_body.js";
 import { wireCharacter, renderCharacter, renderBadges } from "/assets/js/evidence_character.js";
 import { wireDataFigure, moveTrendMarker } from "/assets/js/evidence_datafigure.js";
 import { renderDiscoveries, renderGenome, renderChallenges, renderProtocols, renderExperiments, wireChallenges, wireExperiments, wireDiscoveries } from "/assets/js/evidence_discovery.js";
 import { renderHabits, renderLedger } from "/assets/js/evidence_habits.js";
 import { renderResults, renderPostmortems, renderSurvival, renderVoiceFidelity, renderScenarios, renderWrong, renderCycles, renderCorrelations, renderCalibration, renderPredictions, renderBenchmarks } from "/assets/js/evidence_intelligence.js";
 import { renderBoard, renderPlatform, renderState, renderCost, renderData, renderTools, renderInference, renderReceipts, renderPipeline, renderAsk, renderExplorer, renderVerify, renderGeneric, ASK_CHIPS } from "/assets/js/evidence_meta.js";
-import { renderNutrition, renderGlucose } from "/assets/js/evidence_nutrition.js";
+import { renderNutrition, renderGlucose, nutritionFold } from "/assets/js/evidence_nutrition.js";
 import { renderReading } from "/assets/js/evidence_reading.js";
 import { renderWall } from "/assets/js/evidence_wall.js"; // #1379 — the all-attempts fingerprint field
-import { renderSleep, renderMind, renderVices } from "/assets/js/evidence_sleep.js";
+import { renderSleep, renderMind, renderVices, sleepFold } from "/assets/js/evidence_sleep.js";
 import { renderPulse } from "/assets/js/evidence_vitals.js";
 import { renderAutonomic, renderZone2 } from "/assets/js/evidence_autonomic.js";
 import { mountSectionToc } from "/assets/js/section_toc.js";
-import { mountOrientStrip, glossFirst } from "/assets/js/orient.js"; // #4182 — the one-line strip + inline glosses
+import { mountOrientStrip } from "/assets/js/orient.js"; // #4182 — the one-line strip
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter
 
 const PAGE_DATA = pageData();
 
@@ -137,7 +138,9 @@ const $ = (s) => document.querySelector(s);
 // #1015 — the deepest readouts (~19 screens for labs, ~15 for character at 390px)
 // get the sticky mobile section-TOC (section_toc.js). Allowlisted: the other
 // topics are shallow enough to thumb-scroll, and the /data/ hub keeps its rail.
-const TOC_SLUGS = new Set(["labs", "character"]);
+// #4182: labs left the set — its readout opens on the flagged rows with the full panel
+// collapsed, so it is no longer a deep page.
+const TOC_SLUGS = new Set(["character"]);
 
 let current = PAGE_DATA.start || window.__START_SLUG__ || (LISTED[0] && LISTED[0].slug);
 
@@ -189,7 +192,7 @@ function setList(open) {
   const btn = document.querySelector("[data-railtoggle]");
   if (btn) {
     btn.setAttribute("aria-expanded", String(open));
-    btn.querySelector("[data-railtoggle-label]").textContent = open ? "close the index" : `all ${LISTED.length} topics`;
+    btn.querySelector("[data-railtoggle-label]").textContent = open ? "Close the list" : `All ${LISTED.length} topics`;
   }
   buildSide();
 }
@@ -215,7 +218,7 @@ function mountRailbar() {
   const bar = document.createElement("div");
   bar.className = "ev-railbar";
   bar.setAttribute("data-railbar", "");
-  bar.innerHTML = `<button class="ev-railbar-toggle" type="button" data-railtoggle aria-expanded="false" aria-controls="${side.id}"><span data-railtoggle-label>all ${LISTED.length} topics</span></button><span class="ev-railbar-pos" data-railpos aria-hidden="true"></span>`;
+  bar.innerHTML = `<button class="ev-railbar-toggle" type="button" data-railtoggle aria-expanded="false" aria-controls="${side.id}"><span data-railtoggle-label>All ${LISTED.length} topics</span></button><span class="ev-railbar-pos" data-railpos aria-hidden="true"></span>`;
   side.insertAdjacentElement("beforebegin", bar);
   bar.querySelector("[data-railtoggle]").addEventListener("click", () => setList(!listOpen));
   let raf = 0;
@@ -270,12 +273,15 @@ async function renderCenter({ scrollToTop = false } = {}) {
   const deeper = main.querySelector("[data-deeper]");
   { const staleToc = main.querySelector(".stoc"); if (staleToc) staleToc.remove(); } // #1015 — never carry a TOC across topics
   deeper.innerHTML = "";   // no link-outs to /legacy — everything lives inline in v4 now
+  if (t.mode !== "data" || !t.endpoint) renderFold(t, Promise.resolve(null), my); // clears a previous topic's fold
   if (t.mode === "editorial") { ro.innerHTML = t.editorial || empty("—"); return; }
   if (t.mode === "interactive") { ro.innerHTML = (RENDERERS[t.slug] || renderGeneric)({}, t); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro); return; }
   if (t.mode !== "data" || !t.endpoint) { ro.innerHTML = empty(t.archive_note || "This section lives in the archive while it's rebuilt."); return; }
   ro.innerHTML = skeletonReadout();
+  const dataP = getJSON(t.endpoint);
+  renderFold(t, dataP.catch(() => null), my);
   try {
-    const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t);
+    const data = await dataP; const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t);
     if (my !== renderSeq) return; // superseded by a newer topic selection
     ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro);
     if (TOC_SLUGS.has(t.slug)) mountSectionToc(main, { content: ro, before: ro }); // #1015 — after the race guard, never on a superseded paint
@@ -312,18 +318,73 @@ window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.sl
 
 const INTRO_KEY = "ajm-data-intro-v1";
 
-const DATA_GLOSSES = [
-  ["Correlative", "N=1: a pattern seen in one person's data. It shows things moving together — correlation, not proof that one causes the other."],
-  ["read-only", "The numbers are the real ones, shown as recorded. Nothing here is medical advice."],
-  ["flagged when thin", "Labels like \u201cpreliminary\u201d or a small n mean early signal from few days of data — flagged, never faked."],
-];
-
+// #4182: the promise now reads in plain words ("Weight, sleep, training, eating, blood
+// tests — what his devices and apps record."), so the three inline definitions the card
+// carried ("Correlative", "read-only", "flagged when thin") have no term left to sit on.
+// "Not medical advice" moved to where it binds — the bloodwork readout's note.
 function wireFirstRun() {
   if (DOOR !== "data") return;
   const hero = $(".page-hero");
-  const promise = hero && hero.querySelector(".ph-promise");
-  for (const [term, def] of DATA_GLOSSES) glossFirst(promise, term, def);
   mountOrientStrip({ key: INTRO_KEY, what: "his numbers", anchor: hero && hero.querySelector(".ph-kicker") });
+}
+
+/* ── The fold (#4182, A-grade rubric 2/4/5/6) ────────────────────────────────
+   One served fact with its date, in the first screen at 390px: a short paragraph above
+   the tile rail, ONE "Data through <day>" line (the day in words via calendarDay — the
+   one formatter; >48 h old says how old), and the Data door's return trigger. Each topic
+   module owns its own fold builder next to its renderer (the SAME payload, fetched once
+   — renderCenter hands the endpoint's promise over); the hub and /data/physical/ read
+   /api/journey. A topic without a fold, or a failed fetch, leaves the slot empty —
+   never a template with holes. */
+const FOLDS = {
+  physical: async () => physicalFold(location.pathname === BASE),
+  sleep: async (data) => sleepFold(data),
+  training: async (data) => trainingFold(data, await tryJSON("/api/workouts")),
+  nutrition: async (data) => nutritionFold(data, await tryJSON("/api/meal_glucose")),
+  labs: async (data) => labsFold(data),
+};
+// The Data door's return trigger. "Most mornings", not "every": the weight cadence the
+// API serves is ~5 weigh-ins a week, and no labs payload carries a next draw date.
+const DATA_RETURN = "He weighs in most mornings · no blood test scheduled";
+
+export function throughLine(ymd, today) {
+  const day = calendarDay(ymd);
+  if (!day) return "";
+  const age = Math.round((Date.parse(today) - Date.parse(ymd)) / 86400000);
+  return `Data through ${day}${Number.isFinite(age) && age >= 2 ? ` — ${age} days ago` : ""}`;
+}
+
+function foldSlot() {
+  let el = document.querySelector("[data-fold]");
+  if (el || DOOR !== "data") return el;
+  const hero = $(".page-hero");
+  if (!hero) return null;
+  el = document.createElement("section");
+  el.className = "ev-fold";
+  el.setAttribute("data-fold", "");
+  el.setAttribute("aria-label", "In short");
+  el.hidden = true;
+  hero.insertAdjacentElement("afterend", el);
+  return el;
+}
+
+async function renderFold(t, dataP, seq) {
+  const el = foldSlot();
+  if (!el) return;
+  const build = FOLDS[t.slug];
+  if (!build) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.classList.add("is-loading");
+  let f = null;
+  try { const data = await dataP; f = await build(data); } catch (e) { f = null; }
+  if (seq !== renderSeq) return; // a newer topic owns the slot
+  el.classList.remove("is-loading");
+  if (!f || !f.text) { el.hidden = true; el.innerHTML = ""; return; }
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const through = f.through ? throughLine(f.through, today) : "";
+  el.innerHTML = `<p class="ev-fold-k label">${esc(t.title)}</p><p class="ev-fold-t">${esc(f.text)}</p>` +
+    (through ? `<p class="ev-fold-through label">${esc(through)}</p>` : "") +
+    `<p class="ev-fold-next label">${esc(DATA_RETURN)}</p>`;
 }
 
 initTheme();
