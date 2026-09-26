@@ -1253,7 +1253,10 @@ a.mb-row:hover .mb-row-k { color: var(--ember); }
 .ct-read .provenance { margin-top: var(--sp-1); }
 .ct-text { margin-top: var(--sp-3); }
 .ct-full { margin: var(--sp-2) 0 0; }
-.ct-full a, .ct-record a { color: var(--ember); text-decoration: none; }
+/* #4202 follow-up (2026-09-26): a link inside running text must be distinguishable without
+   colour (axe link-in-text-block, serious) — the same ember rule the front door's doors use. */
+.ct-full a, .ct-record a { color: var(--ember); text-decoration: underline; text-decoration-color: var(--ember-line); text-underline-offset: 0.15em; }
+.ct-full a:hover, .ct-record a:hover { text-decoration-color: var(--ember); }
 .ct-terms { margin: var(--sp-3) 0 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
 .ct-terms dfn { font-style: normal; color: var(--ink); }
 .ct-ask { margin: var(--sp-3) 0 0; padding-top: var(--sp-3); border-top: var(--border-hair); font-size: var(--fs-body); line-height: 1.5; }
