@@ -3699,6 +3699,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4198"
         }
       ]
+    },
+    {
+      "id": "2026-09-26-the-experiment-and-the-day",
+      "date": "2026-09-26",
+      "title": "The experiment and the day",
+      "shipped": "The five doors are now TODAY · THE NUMBERS · THE COACHES · WHAT HE TRIES · THE STORY, and builder words on every reader page carry a plain gloss the reader can tap, from one registry the build step applies. Every page ends on a dated return line instead of 'follow by email for the next entry'. A reader form at the foot of every page asks 'did this page make sense?' and writes to a DynamoDB door. A blind first-time reader (a small model) now grades each door nightly on whether it understood what the page is for — its first run scored the six doors 8 of 12. The data door and its topic pages, the protocols, story and subscribe doors each open on one served fact with its day. The wrong page's cards say what was actually measured instead of printing a trend slope as a score. And the first shells of the next site are on the preview path at /next/: nine pages, one generator, unlinked and noindex until they earn the cut-over.",
+      "why_it_mattered": "Three weeks in, the site's subject had not opened it and friends were overwhelmed. A day of page-by-page polish moved the 25 reachable pages to 3 A · 12 B · 2 C · 8 D on a ten-second rubric, and a five-persona red team (r/loseit, Hacker News, his mother, the subject on a Tuesday morning) still scored it 20 of 50 — zero photographs of him on 25 pages, the home page fourteen phone screens long, every honest receipt buried under the site describing its own metaphor. So the afternoon became the design phase of a rebuild: three research passes, two competing prototypes, a red-team pick, a third prototype the same personas scored 36 of 50. The site will be one serialised investigation on nine pages, the human first, the coaches last and short.",
+      "gotcha": "Cutting the data rail to the reachable set redded the post-deploy visual gate: a probe on the old /mind/ redirect counted three or more rail tiles, and the unlisted reading page now renders one. The auto-rollback restored a build that still carried the change, so the fix was the probe, forward — and every site deploy waited on it. Concurrent lanes each bumping the gate census or touching the same date helper went into conflict one after another; the driver serialised them and told every open lane the new ceilings.",
+      "honest_miss": "The by-coach page will show empty slots where the coaches' private letters used to be, until the coaches' next morning run writes public text — an honest blank, but a blank. The reader form was silent for most of the day: its one IAM line could not be deployed by the assistant (the permission classifier refuses infrastructure changes outright) and waited for the owner's own terminal. And the site still has no photograph of its subject; the first is due on day 30.",
+      "prs": [
+        {
+          "label": "PR #4211",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4211"
+        },
+        {
+          "label": "PR #4210",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4210"
+        },
+        {
+          "label": "PR #4207",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4207"
+        },
+        {
+          "label": "PR #4221",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4221"
+        },
+        {
+          "label": "PR #4226",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4226"
+        },
+        {
+          "label": "PR #4228",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4228"
+        }
+      ]
     }
   ]
 }
