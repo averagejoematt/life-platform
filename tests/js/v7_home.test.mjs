@@ -52,7 +52,16 @@ const docket = [
     resolution_date: "2026-10-07",
   },
 ];
-const strip = (html) => html.replace(/<[^>]+>/g, "");
+// Tags stripped to a fixpoint (CodeQL js/incomplete-multi-character-sanitization: one pass
+// can leave a tag behind); this is a test-side text extractor, never a sanitizer on the site.
+const strip = (html) => {
+  let s = String(html);
+  for (;;) {
+    const next = s.replace(/<[^>]*>/g, "");
+    if (next === s) return s;
+    s = next;
+  }
+};
 
 test("the lead sentence: the day-only branches, and the day in words", () => {
   const before = strip(H.leadSentence(journey, 8));
@@ -171,7 +180,7 @@ test("every number carries its served field, dates are words not ISO, and the ru
   assert.doesNotMatch(text, /\d{4}-\d{2}-\d{2}/, "no ISO date reaches the reader");
   // The fold's figures each name their field.
   for (const f of ["journey.current_weight_lbs", "journey.lost_lbs", "journey.day_n", "journey.start_weight_lbs", "journey.weighin_count", "journey.weekly_rate_lbs"]) {
-    assert.match(all, new RegExp(`data-src="${f.replace(/\./g, "\\.")}"`), `${f} is cited`);
+    assert.match(all, new RegExp(`data-src="${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `${f} is cited`);
   }
   assert.match(all, /data-src="receipts\.month_to_date_usd"/);
   assert.match(all, /data-src="sub_count\.count"/);
