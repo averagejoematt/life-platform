@@ -231,8 +231,13 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         "site_api_social_engage.py",
         "site_api_social_experiments.py",
     }, f"expected _is_blocked_vice call sites in exactly these 11 modules, got {found_files}"
-    assert len(sites) == 26, (
-        f"expected 26 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221), "
+    # 26 -> 27 by #4182: `_handle_page_feedback` screens its one free-text field
+    # (`looking_for`) at the door with an immediate `return _error(400, ...)`;
+    # behaviourally mutation-proved in tests/test_page_feedback_4182.py
+    # (test_a_blocked_vice_answer_is_refused_with_no_write).
+    assert len(sites) == 27, (
+        f"expected 27 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
+        f"+ 1 from #4182), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )

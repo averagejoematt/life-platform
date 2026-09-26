@@ -161,6 +161,7 @@ DOOR_FIELDS = [
     ("/api/submit_finding", "metric_a"),
     ("/api/board_question", "question"),
     ("/api/predict_week", "week_id"),
+    ("/api/page_feedback", "page"),  # #4182 — `page` is validated raw (isinstance + path regex)
 ]
 
 NON_STRING_VALUES = [999, [1, 2], {"nested": "object"}, True, 3.5]

@@ -9,6 +9,7 @@ Endpoints:
   /api/sub_count          — public subscriber count
   /api/nudge              — track in-page nudge clicks
   /api/submit_finding     — reader-submitted experiment findings (S3)
+  /api/page_feedback      — the two-question reader door, every page (DynamoDB, #4182)
   /api/experiment_library, /api/experiment_vote, /api/experiment_follow,
   /api/experiment_detail, /api/experiment_suggest
   /api/challenge_catalog, /api/challenges, /api/current_challenge,
@@ -192,6 +193,7 @@ NUDGE_LABELS = {
     "you_got_this": "You've got this 💪",
 }
 FINDING_RATE_LIMIT = 3  # per IP per hour
+PAGE_FEEDBACK_RATE_LIMIT = 5  # per IP per hour — /api/page_feedback (#4182)
 FOLLOW_RATE_LIMIT = 10  # per IP per hour — shared by the experiment and challenge follow doors
 # A run is DONE (not still running) in any of these terminal states. Read by BOTH the
 # library pillar stats and the experiment-detail page so the two can't disagree (#2221).
@@ -400,6 +402,11 @@ def _handle_nudge(event: dict) -> dict:
 def _handle_submit_finding(event: dict) -> dict:
     """POST /api/submit_finding — thin entrypoint; logic in the engage split module."""
     return _engage._handle_submit_finding(event, _g=globals())
+
+
+def _handle_page_feedback(event: dict) -> dict:
+    """POST /api/page_feedback (#4182) — thin entrypoint; logic in the engage split module."""
+    return _engage._handle_page_feedback(event, _g=globals())
 
 
 def handle_experiment_library() -> dict:

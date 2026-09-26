@@ -390,3 +390,84 @@ def test_an_unclassified_s3_error_still_reaches_the_callers_503():
 
     with pytest.raises(RuntimeError):
         put_capture_record(_Down(), "b", "k.json", {"id": "k"}, "{}", door="t")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Half 3 — the DynamoDB capture doors (site-api)
+# ══════════════════════════════════════════════════════════════════════════════
+# The S3 `DOORS` rows above are shaped by a key PREFIX because an S3 capture record's
+# identity IS its object key. A DynamoDB door's identity is (pk, sk) instead, and its
+# replay contract is `ConditionExpression="attribute_not_exists(sk)"` rather than
+# `IfNoneMatch` — so these rows name the partition + sort-key prefix, and the same four
+# properties are asserted against the harness's `E2ETable`, whose `put_item` refuses a
+# conditional put on an existing key (fixture = wire). `/api/experiment_suggest` was the
+# model the S3 doors were fixed toward (#2682) but was never listed here; #4182's
+# `/api/page_feedback` is the second DynamoDB door.
+
+SUGGESTION = {"idea": "e2e-test idea: two weeks of 10pm lights-out against the HRV baseline", "source": "reader"}
+PAGE_FEEDBACK = {"page": "/data/", "made_sense": "partly", "looking_for": "e2e-test: where the sleep numbers come from"}
+
+DDB_DOORS = [
+    # (path, body, pk, sk_prefix, id_field, field a genuinely-new submission varies, fresh status)
+    ("/api/experiment_suggest", SUGGESTION, "USER#matthew#SOURCE#experiment_suggestions", "SUGGEST#", "id", "idea", "pending"),
+    ("/api/page_feedback", PAGE_FEEDBACK, "USER#matthew#SOURCE#reader_feedback", "FEEDBACK#", "id", "looking_for", "unread"),
+]
+_DDB_IDS = ["experiment_suggest", "page_feedback"]
+
+
+def _rows(wp, pk):
+    return {sk: it for (p, sk), it in wp.table.store.items() if p == pk}
+
+
+@pytest.mark.parametrize("path,body,pk,sk_prefix,id_field,vary,fresh", DDB_DOORS, ids=_DDB_IDS)
+def test_a_ddb_capture_key_carries_no_clock(wp, path, body, pk, sk_prefix, id_field, vary, fresh):
+    status, first = wp.call(path, body=body)
+    assert status == 200
+    assert set(_rows(wp, pk)) == {f"{sk_prefix}{first[id_field]}"}
+
+
+@pytest.mark.parametrize("path,body,pk,sk_prefix,id_field,vary,fresh", DDB_DOORS, ids=_DDB_IDS)
+def test_a_ddb_retry_across_the_utc_boundary_lands_on_the_same_row(wp, monkeypatch, path, body, pk, sk_prefix, id_field, vary, fresh):
+    from datetime import datetime, timedelta
+
+    status, first = wp.call(path, body=body)
+    assert status == 200
+    before = _rows(wp, pk)
+    later = _e2e._FROZEN_DT + timedelta(days=40)
+
+    class _Later(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return later.astimezone(tz) if tz else later.replace(tzinfo=None)
+
+    monkeypatch.setattr(wp.social, "datetime", _Later)
+    monkeypatch.setattr(wp.social, "_FALLBACK_RATE_STORE", {})
+    status, second = wp.call(path, body=body)
+    assert status == 200
+    assert second[id_field] == first[id_field] and second["duplicate"] is True
+    assert _rows(wp, pk) == before, "a boundary-crossing retry minted a second row or rewrote the first"
+
+
+@pytest.mark.parametrize("path,body,pk,sk_prefix,id_field,vary,fresh", DDB_DOORS, ids=_DDB_IDS)
+def test_a_ddb_replay_cannot_reset_an_already_read_row(wp, path, body, pk, sk_prefix, id_field, vary, fresh):
+    """Mutation-proved: the stored row is moved to a decided state between the two
+    identical submissions; the replay must leave it exactly as decided."""
+    assert wp.call(path, body=body)[0] == 200
+    (sk,) = _rows(wp, pk)
+    wp.table.store[(pk, sk)].update({"status": "read", "note": "owner triaged"})
+
+    status, replay = wp.call(path, body=body)
+    assert status == 200
+    assert replay["duplicate"] is True
+    assert wp.table.store[(pk, sk)]["status"] == "read", "the replay reset the owner's decision"
+    assert wp.table.store[(pk, sk)]["note"] == "owner triaged"
+
+
+@pytest.mark.parametrize("path,body,pk,sk_prefix,id_field,vary,fresh", DDB_DOORS, ids=_DDB_IDS)
+def test_a_genuinely_new_ddb_submission_still_lands(wp, path, body, pk, sk_prefix, id_field, vary, fresh):
+    assert wp.call(path, body=body)[0] == 200
+    status, second = wp.call(path, body=dict(body, **{vary: body[vary] + " (a different observation entirely)"}))
+    assert status == 200 and second["duplicate"] is False
+    rows = _rows(wp, pk)
+    assert len(rows) == 2
+    assert {it["status"] for it in rows.values()} == {fresh}

@@ -12,6 +12,7 @@ so there is no import cycle.
 
 import hashlib as _hashlib
 import os as _os
+import re as _re
 
 from common.secret_cache import get_secret as _get_secret
 
@@ -387,6 +388,107 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
             "remaining": remaining,
         },
     )
+
+
+# ── #4182: the page-feedback door ─────────────────────────────────────────────
+# Two questions a reader can answer on ANY page ("did this page make sense?" /
+# "what were you looking for?"). A DynamoDB door, not an S3 capture record: the
+# row is tiny, owner-read only, and carries no email — so it needs neither the
+# reader_input/ S3 prefix (#3559) nor `put_capture_record`. The guard ORDER is
+# `_handle_submit_finding`'s; the write is `_handle_experiment_suggest`'s
+# (content-hash sk + attribute_not_exists → a replay is a true no-op).
+PAGE_FEEDBACK_PK = "USER#matthew#SOURCE#reader_feedback"
+PAGE_FEEDBACK_ANSWERS = ("yes", "partly", "no")
+# A site pathname only: lowercase slugs and slashes. Anything else (a query string,
+# a full URL, markup) is a 400 — the client sends `location.pathname`.
+_PAGE_PATH_RE = _re.compile(r"^/[a-z0-9/_-]{0,80}$")
+
+
+def _handle_page_feedback(event: dict, *, _g) -> dict:
+    """POST /api/page_feedback (#4182)
+
+    Body: {"page": "/data/", "made_sense": "yes"|"partly"|"no", "looking_for": str (optional, ≤500)}
+    Stores one row per distinct (reader, page, answer, text) in
+    `USER#matthew#SOURCE#reader_feedback` / `FEEDBACK#{id}` for Matthew's weekly read.
+    Rate limit: PAGE_FEEDBACK_RATE_LIMIT per IP per hour. No email is accepted or stored.
+    """
+    PAGE_FEEDBACK_RATE_LIMIT = _g["PAGE_FEEDBACK_RATE_LIMIT"]
+    _envelope = _g["_envelope"]
+    _error = _g["_error"]
+    _is_blocked_vice = _g["_is_blocked_vice"]
+    _rate_check = _g["_rate_check"]
+    _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
+    datetime = _g["datetime"]
+    extract_client_ip = _g["extract_client_ip"]
+    extract_idempotency_identity = _g["extract_idempotency_identity"]
+    hashlib = _g["hashlib"]
+    json = _g["json"]
+    logger = _g["logger"]
+    table = _g["table"]
+    timezone = _g["timezone"]
+
+    # 1. Salted ip_hash, fail-closed (#3620) — the rate-limit identity.
+    ip_hash = _salted_ip_hash(extract_client_ip(event), _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
+
+    # 2. Rate limit before any parsing work.
+    allowed, _remaining, _retry = _rate_check("page_feedback", ip_hash, limit=PAGE_FEEDBACK_RATE_LIMIT, window_seconds=3600)
+    if not allowed:
+        return _rate_limited("page_feedback", f"Rate limit reached. {PAGE_FEEDBACK_RATE_LIMIT} per hour.", retry_after=3600)
+
+    # 3. Parse; a well-formed non-object body is a 400, never a 5xx (#2679).
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON")
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
+
+    # 4. Fields. `page` and `made_sense` are validated RAW (type + shape) rather than
+    # through `_sanitise_text`, which would coerce 999 → "999" and truncate an
+    # over-long path into a matching one.
+    page = body.get("page")
+    if not isinstance(page, str) or not _PAGE_PATH_RE.fullmatch(page):
+        return _error(400, "page must be a site path like /data/")
+    made_sense = body.get("made_sense")
+    if not isinstance(made_sense, str) or made_sense not in PAGE_FEEDBACK_ANSWERS:
+        return _error(400, "made_sense must be one of: yes, partly, no")
+    looking_for = _sanitise_text(body.get("looking_for"), 500)
+
+    # 5. Blocked-vice screen on the only free text, before anything is stored (#2221).
+    if _is_blocked_vice(looking_for):
+        return _error(400, "That feedback can't be submitted.")
+
+    # 6. Content-hash id on the IDEMPOTENCY identity (#2932), never the clock (#2682).
+    id_hash = hashlib.sha256(extract_idempotency_identity(event).encode()).hexdigest()[:16]
+    feedback_id = hashlib.sha256(f"{id_hash}:{page}:{made_sense}:{looking_for}".encode()).hexdigest()[:12]
+    submitted_at = datetime.now(timezone.utc).isoformat()
+
+    # 7. Conditional write: a replay is a no-op on the existing row (#2682/#3118).
+    duplicate = False
+    try:
+        table.put_item(
+            Item={
+                "pk": PAGE_FEEDBACK_PK,
+                "sk": f"FEEDBACK#{feedback_id}",
+                "id": feedback_id,
+                "page": page,
+                "made_sense": made_sense,
+                "looking_for": looking_for,
+                "status": "unread",
+                "submitted_at": submitted_at,
+            },
+            ConditionExpression="attribute_not_exists(sk)",
+        )
+    except Exception as e:
+        if "ConditionalCheckFailedException" not in str(e):
+            logger.error(f"[page_feedback] write failed: {e}")
+            return _error(503, "Unable to store feedback. Try again later.")
+        duplicate = True
+    logger.info(f"[page_feedback] {'Replay' if duplicate else 'Stored'}: page={page} made_sense={made_sense}")
+    return _envelope(200, {"ok": True, "id": feedback_id, "duplicate": duplicate})
 
 
 def _handle_ritual_log(event: dict, *, _g) -> dict:

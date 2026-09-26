@@ -502,6 +502,10 @@ SOURCE_CLASS: dict[str, str] = {
     # unfiltered (the same reasoning as experiment_suggestions above); SYSTEM_STATE is the class the
     # phase machinery ignores entirely. Resolved rows self-expire via `ttl`; open rows never do.
     "pending_writes": SYSTEM_STATE,
+    # #4182: /api/page_feedback rows (FEEDBACK#<content-hash>) — reader answers to "did this page make
+    # sense? / what were you looking for?", read weekly by Matthew. Audience state about the SITE, not a
+    # fact about the experiment — kept across resets like experiment_suggestions; never phase-filtered.
+    "reader_feedback": SYSTEM_STATE,
 }
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;
