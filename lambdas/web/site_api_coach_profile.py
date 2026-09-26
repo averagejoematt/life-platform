@@ -21,8 +21,8 @@ the split, and it is why nothing here imports the facade — no import cycle.
 
 from boto3.dynamodb.conditions import Key
 from coach import (
+    audience_guard,  # #4213: the by-coach slots serve the public twin or nothing
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
-    coach_derived_prose,  # #2418: the derived-prose read seam — a held condensation falls back to gated `content`
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
     latest_checked,  # E1 / #4182: the ledger line — the coach's most recent GRADED call, audience-guarded
@@ -345,7 +345,9 @@ def _coach_daily(coach_id, *, _g):
     _load_s3_json = _g["_load_s3_json"]
     doc = _load_s3_json("generated/coach_daily.json", "coach_daily")
     r = (doc.get("reflections") or {}).get(coach_id)
-    return r.get("text") if isinstance(r, dict) else None
+    # #4213: served to visitors — an owner-directed reflection (an artifact written
+    # before the producer's third-person rule, or a drift) is withheld, never served.
+    return audience_guard.reader_safe(r.get("text")) if isinstance(r, dict) else None
 
 
 def _coach_memoir(coach_id, *, _g):
@@ -376,7 +378,9 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
             out.append(
                 {
                     "date": it.get("sk", "").replace("OUTPUT#", "").split("#")[0],
-                    "summary": coach_derived_prose.served_summary(it),
+                    # #4213: the public ask / public read — NEVER served_summary's
+                    # key_recommendation→content chain (the imperative owner register).
+                    "summary": audience_guard.public_timeline_summary(it),
                     "themes": it.get("themes", []),
                 }
             )
