@@ -113,7 +113,7 @@ JS_DIR = REPO / "site" / "assets" / "js"
 TOKENS = CSS_DIR / "tokens.css"
 # The CONSUMER sheets — swept for hex / font-size / undefined-var. tokens.css is the
 # definitions/allowlist source (never swept — it *is* where the scale and palette live).
-SWEPT = ["story.css", "evidence.css", "cockpit.css", "mind.css", "fonts.css", "section_toc.css", "subscribe.css"]
+SWEPT = ["story.css", "evidence.css", "cockpit.css", "mind.css", "fonts.css", "section_toc.css", "subscribe.css", "v7.css"]
 
 # DESIGN_SYSTEM_V5 §10.1: the six canonical max-width boundaries + their min-width
 # token+1 pairs. These nine numbers are the ONLY breakpoints allowed in the CSS.
