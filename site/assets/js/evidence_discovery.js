@@ -484,6 +484,13 @@ export async function renderExperiments(d) {
   // note — no note, no row — so an empty/absent feed renders NOTHING here (no nag).
   const dec = await tryJSON("/api/decisions");
   const decisions = (dec && Array.isArray(dec.decisions)) ? dec.decisions.filter((r) => r && r.note && !isBad(r.note)) : [];
+  // #4190: `source` names the digest/channel that made the recommendation — a reader
+  // has no reason to know "mcp" is the MCP transport a coaching chat calls through, so
+  // that one value gets a reader-facing label instead of the generic "from the <source>"
+  // fallback. Every other source keeps the generic form (daily_brief -> "from the daily
+  // brief", etc.) since those already read as plain English.
+  const SOURCE_LABELS = { mcp: "logged from the coaching chat" };
+  const sourceLabel = (src) => SOURCE_LABELS[src] || ("from the " + String(src).replace(/_/g, " "));
   const decCard = (r) => {
     const rec = r.decision && !isBad(r.decision)
       ? `<div class="voice machine"><span class="who">the platform recommended</span><p class="what">${esc(r.decision)}</p></div>`
@@ -491,7 +498,7 @@ export async function renderExperiments(d) {
     const stance = r.followed === true ? "followed" : r.followed === false ? "overrode it" : null;
     const why = r.followed === false && r.override_reason && !isBad(r.override_reason)
       ? `<p class="rd-line"><span class="label">why he went his own way</span> ${esc(r.override_reason)}</p>` : "";
-    const meta = [r.source && !isBad(r.source) && "from the " + String(r.source).replace(/_/g, " "), stance].filter(Boolean).map(esc).join("  ·  ");
+    const meta = [r.source && !isBad(r.source) && sourceLabel(r.source), stance].filter(Boolean).map(esc).join("  ·  ");
     return `<article class="rd-card">${rec}${why}${hisWordsBlock(r.note, r.note_at || r.date, "Matthew · his call")}${meta ? `<p class="rd-meta label">${meta}</p>` : ""}</article>`;
   };
   const decSec = decisions.length

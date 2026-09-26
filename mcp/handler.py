@@ -26,6 +26,8 @@ import urllib.parse
 import uuid
 from typing import Any, cast
 
+from common.text_guards import strip_tool_call_residue  # #4190 — shared, bundled (#781)
+
 from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
 from mcp.core import (
@@ -94,6 +96,11 @@ def handle_tools_call(params):
     if validation_error:
         logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
+    # #4190: strip tool-call XML residue before a WRITE tool ever sees its arguments
+    # (and before this line logs them, or the #753 audit hook hashes them) — one
+    # chokepoint ahead of every classified write tool, not a per-tool sprinkle a
+    # 27th write tool could land without.
+    arguments = _sanitize_write_arguments(name, arguments)
     logger.info(f"Calling tool '{name}' with args: {arguments}")
     # R13-F12: Rate limit write tools before execution
     rate_err = _check_write_rate_limit(name)
@@ -360,6 +367,65 @@ def _emit_tool_metric(tool_name: str, duration_ms: float, success: bool) -> None
         print(json.dumps(emf))
     except Exception as e:
         logger.warning(f"[COST-2] Failed to emit EMF metric for '{tool_name}': {e}")
+
+
+# ── #4190: tool-call XML residue guard ──────────────────────────────────────
+# Every classified WRITE tool (mcp/audit.py::is_write_tool — the same registry-
+# derived classification the #753 audit trail already uses) has its arguments
+# walked and cleaned before the tool function ever runs. A read tool is left
+# untouched: residue there can only affect what THIS call returns, never what
+# gets persisted, so guarding it would be scope creep on a storage-leak fix.
+def _sanitize_write_arguments(name: str, arguments: dict) -> dict:
+    """Strip tool-call XML residue from every string leaf of a WRITE tool's
+    arguments. Returns a NEW structure — the caller's own `arguments` dict is
+    untouched. Non-write tools pass through unchanged."""
+    if not mcp_audit.is_write_tool(name):
+        return arguments
+    stripped_any = False
+
+    def _walk(v):
+        nonlocal stripped_any
+        if isinstance(v, str):
+            cleaned = strip_tool_call_residue(v)
+            if cleaned != v:
+                stripped_any = True
+            return cleaned
+        if isinstance(v, dict):
+            return {k: _walk(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [_walk(x) for x in v]
+        return v
+
+    cleaned_arguments = _walk(arguments or {})
+    if stripped_any:
+        logger.warning(f"[#4190] tool-call XML residue stripped from arguments to '{name}'")
+        _emit_residue_metric(name)
+    return cleaned_arguments
+
+
+def _emit_residue_metric(tool_name: str) -> None:
+    """Emit EMF metric when tool-call XML residue is stripped from a write tool's
+    arguments (#4190) — same shape as the two emitters above/below.
+    Namespace: LifePlatform/MCP  |  Dimension: ToolName."""
+    try:
+        ts = int(time.time() * 1000)
+        emf = {
+            "_aws": {
+                "Timestamp": ts,
+                "CloudWatchMetrics": [
+                    {
+                        "Namespace": "LifePlatform/MCP",
+                        "Dimensions": [["ToolName"]],
+                        "Metrics": [{"Name": "ToolCallResidueStripped", "Unit": "Count"}],
+                    }
+                ],
+            },
+            "ToolName": tool_name,
+            "ToolCallResidueStripped": 1,
+        }
+        print(json.dumps(emf))
+    except Exception as e:
+        logger.warning(f"[#4190] Failed to emit residue metric for '{tool_name}': {e}")
 
 
 # ── SEC: Auth failure EMF metric ────────────────────────────────────────────
