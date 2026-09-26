@@ -533,21 +533,32 @@ def _live_0924_lower_ir() -> RoutineSpec:
             ExerciseBlock(movement_key="romanian_deadlift_barbell", sets=[Set()] * 3),
             ExerciseBlock(movement_key="leg_press", sets=[Set()] * 3),
             ExerciseBlock(movement_key="leg_curl", sets=[Set()] * 3),
-            ExerciseBlock(movement_key="calf_press_machine", sets=[Set()] * 3),
+            ExerciseBlock(movement_key="calf_raise_machine", sets=[Set()] * 3),
         ],
     )
 
 
+def _catalog_hint(movement_key: str) -> str:
+    """The performed template id FOR a planned key, read from the catalog the resolver reads —
+    never a hand-copied hint (#4176 remapped leg_curl/calf_raise_machine and a literal here went
+    red on main the same night)."""
+    import json
+
+    from common.repo_config import config_path
+
+    with open(config_path("movement_catalog.json")) as f:
+        return json.load(f)["movements"][movement_key]["hevy_template_id_hint"]
+
+
 def _live_0924_lower_performed() -> dict:
-    return {
-        "exercises": [
-            {"exercise_template_id": "D04AC939", "sets": _sets(7.0, 7.5, 8.5)},  # squat_barbell
-            {"exercise_template_id": "2B4B7310", "sets": _sets(7.5, 8.0, 8.5)},  # romanian_deadlift_barbell
-            {"exercise_template_id": "C7973E0E", "sets": _sets(7.5, 8.0, 8.5)},  # leg_press
-            {"exercise_template_id": "B8127AD1", "sets": _sets(8.5, 9.0, 9.5)},  # leg_curl
-            {"exercise_template_id": "91237BDD", "sets": _sets(8.5, 9.0, 9.5)},  # calf_press_machine
-        ]
+    rpes = {
+        "squat_barbell": (7.0, 7.5, 8.5),
+        "romanian_deadlift_barbell": (7.5, 8.0, 8.5),
+        "leg_press": (7.5, 8.0, 8.5),
+        "leg_curl": (8.5, 9.0, 9.5),
+        "calf_raise_machine": (8.5, 9.0, 9.5),
     }
+    return {"exercises": [{"exercise_template_id": _catalog_hint(k), "sets": _sets(*v)} for k, v in rpes.items()]}
 
 
 def test_named_routine_note_caps_only_the_named_movement():
@@ -565,7 +576,7 @@ def test_named_routine_note_caps_only_the_named_movement():
         ("romanian_deadlift_barbell", "program_default:anchor:hinge", 8.0),
         ("leg_press", "program_default:anchor:squat", 8.0),
         ("leg_curl", "program_default:accessory", 9.0),
-        ("calf_press_machine", "program_default:accessory", 9.0),
+        ("calf_raise_machine", "program_default:accessory", 9.0),
     ],
 )
 def test_named_routine_note_does_not_cap_the_other_movements(movement_key, expected_basis, expected_ceiling):

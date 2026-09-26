@@ -156,8 +156,8 @@ def test_a_named_movement_clause_caps_only_the_named_movement():
     [
         ("romanian_deadlift_barbell", "Romanian Deadlift (Barbell)"),
         ("leg_press", "Leg Press (Machine)"),
-        ("leg_curl", "Lying Leg Curl (Machine)"),
-        ("calf_press_machine", "Calf Press (Machine)"),
+        ("leg_curl", "Seated Leg Curl (Machine)"),
+        ("calf_raise_machine", "Calf Press (Machine)"),
     ],
 )
 def test_a_named_movement_clause_does_not_cap_a_different_movement(movement_key, title):
