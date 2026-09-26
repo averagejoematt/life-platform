@@ -76,6 +76,7 @@ charges a whole lifting session as work any more.
 import math
 from datetime import timedelta
 
+from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set duration key
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
 # ~200 W FTP → 720 kJ/h at threshold = 100 TSS-like points.
@@ -349,7 +350,7 @@ def hevy_session_load(workout, intervals=None):
             if str(st.get("type") or st.get("set_type") or "").strip().lower() in _WARMUP_SET_TYPES:
                 out["warmup_sets"] += 1
                 continue
-            dur = _num(st.get("duration_sec"))
+            dur = _num(st.get(SET_DURATION_FIELD))
             if dur is None:
                 dur = _num(st.get("duration_seconds"))  # the Hevy API wire name
             reps = _num(st.get("reps")) or 0.0

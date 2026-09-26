@@ -42,6 +42,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Iterable, Mapping, Optional, Tuple
 
+# #4158: the ONE stored Hevy set-duration key (`training.hevy_common._normalize_set`
+# is the schema owner; the constant lives in `common/`, not `training/`, because this
+# module reads no training/load model at all — see
+# tests/test_training_load_worked_set_4075.py::test_the_energy_targets_load_input_is_the_stored_tsb_not_a_recompute).
+# Pure — no boto3, no I/O — so importing it here does not break this module's
+# dependency-free contract (see the module docstring).
+from common.hevy_schema import SET_DURATION_FIELD
+
 #: The single method label every published target carries (ADR-105).
 #:
 #: **Renamed by #3931** from ``mifflin_bmr_plus_measured_7d_exercise``. The rename is
@@ -182,10 +190,15 @@ def _is_lifting(activity: Mapping[str, Any]) -> bool:
 def worked_set_seconds(hevy_workouts: Optional[Iterable[Mapping[str, Any]]]) -> dict:
     """Seconds of actual WORK in a Hevy set log — rest between sets excluded (#3931).
 
-    Reads the set rows as the Hevy wire writes them:
-    ``workout.exercises[].sets[] -> {type|set_type, weight_kg, reps, duration_seconds?}``
-    (the shape ``mcp/strength_helpers.normalize_hevy_items`` and
-    ``lambdas/training/hevy_compiler`` both speak). Per set:
+    Reads the set rows as they are STORED (``workout.exercises[].sets[] ->
+    {type|set_type, weight_kg, reps, duration_sec?}``) — ``SET_DURATION_FIELD``
+    (``duration_sec``), the key ``training.hevy_common._normalize_set`` actually
+    writes, never a second spelling (#4158: this used to read only the raw Hevy API
+    wire name ``duration_seconds``, a key no stored set row carries, so
+    ``sets_with_logged_duration`` read 0 on every real day and Hevy-logged cardio
+    — cycling/treadmill/walking, timed sets with no ``reps`` — earned zero exercise
+    energy). The raw wire name is still accepted as a fallback for a payload that
+    reaches this function pre-normalization. Per set:
 
       * a logged ``duration_seconds`` is MEASURED work and is used as-is;
       * a weight-rep set with no logged duration is charged the stated
@@ -211,7 +224,9 @@ def worked_set_seconds(hevy_workouts: Optional[Iterable[Mapping[str, Any]]]) -> 
         touched = False
         for ex in exercises:
             for st in ex.get("sets") or []:
-                dur = _num(st.get("duration_seconds"))
+                dur = _num(st.get(SET_DURATION_FIELD))
+                if dur is None:
+                    dur = _num(st.get("duration_seconds"))  # raw Hevy API wire name (pre-normalization)
                 reps = _num(st.get("reps")) or 0.0
                 if dur is not None and dur > 0:
                     measured += dur
