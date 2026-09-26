@@ -77,3 +77,33 @@ test("the answer does not depend on the host timezone", () => {
     else process.env.TZ = before;
   }
 });
+
+// ── #4182 — dates in words, and the write-up's return trigger ───────────────────
+const { dayInWords, dataThrough, countWord, nextWriteUpText } = await import("../../site/assets/js/entry_age.js");
+
+test("#4182 dayInWords spells a served date the one way, never ISO", () => {
+  assert.equal(dayInWords("2026-09-22"), "Tuesday, September 22");
+  assert.equal(dayInWords("2026-09-22", { weekday: false }), "September 22");
+  assert.equal(dayInWords("not-a-date"), "");
+  assert.equal(dataThrough("2026-09-25"), "Data through Friday, September 25.");
+  assert.equal(dataThrough(""), "");
+  assert.equal(countWord(4, { capital: true }), "Four");
+  assert.equal(countWord(63), "63");
+});
+
+test("#4182 next write-up: built from next_date, the review clause never prints", () => {
+  const served = {
+    chronicle: {
+      paused: false,
+      next_date: "2026-09-30",
+      display: "Next Chronicle installment drafted Wednesday, September 30 — publishes once Matthew reviews and approves the draft.",
+    },
+  };
+  assert.equal(nextWriteUpText(served, null), "Next write-up: Wednesday, September 30");
+  // No next_date → the served display, with the process clause cut client-side.
+  const noDate = { chronicle: { paused: false, display: served.chronicle.display } };
+  assert.equal(nextWriteUpText(noDate, null), "Next Chronicle installment drafted Wednesday, September 30.");
+  // A held draft is the news — its own served words win.
+  assert.equal(nextWriteUpText(served, { display: "This week's draft is held." }), "This week's draft is held.");
+  assert.equal(nextWriteUpText(null, null), "");
+});

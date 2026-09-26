@@ -14,6 +14,7 @@
 
 import "/assets/js/svgtype.js";
 import { seasonBand } from "/assets/js/texture.js"; // #1471 — a season banner per attempt
+import { dayInWords } from "/assets/js/entry_age.js"; // #4182 — dates in words, never ISO
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -66,7 +67,7 @@ function overlaySVG(cycles) {
       : c.collapse_day
         ? `<text class="att-death" x="${x(c.collapse_day)}" y="${y + 4}" text-anchor="middle">×</text>`
         : `<text class="att-censor" x="${x(alive) + 4}" y="${y + 4}">↺</text>`;
-    return `<text class="att-label" x="${PADL - 8}" y="${y + 4}" text-anchor="end">#${esc(String(c.cycle))} · ${esc(c.genesis)}</text>${bar}${end}`;
+    return `<text class="att-label" x="${PADL - 8}" y="${y + 4}" text-anchor="end">#${esc(String(c.cycle))} · ${esc(dayInWords(c.genesis, { weekday: false }) || c.genesis)}</text>${bar}${end}`;
   }).join("");
 
   const legend =
@@ -82,7 +83,7 @@ function logCards(cycles, byN, collapseDef) {
     const m = byN[c.cycle] || {};
     const next = cycles.find((x) => x.cycle === c.cycle + 1);
     const changed = c.is_current ? "" : next
-      ? ` What changed: restarted ${esc(next.genesis)} as attempt #${n(next.cycle)}.`
+      ? ` What changed: restarted ${esc(dayInWords(next.genesis, { weekday: false }) || next.genesis)} as attempt #${n(next.cycle)}.`
       : "";
     const stats = [
       m.weight_delta_lbs != null ? `weight ${m.weight_delta_lbs > 0 ? "+" : ""}${n(m.weight_delta_lbs)} lb in the window` : null,
@@ -95,7 +96,7 @@ function logCards(cycles, byN, collapseDef) {
       // and the ember beads count the real attempt number.
       `<div class="art-band art-season" aria-hidden="true">${seasonBand(c.cycle, { seed: "attempt:" + c.cycle + ":" + (c.genesis || "") })}</div>` +
       `<p class="att-head"><span class="att-no num">Attempt #${n(c.cycle)}</span> ` +
-      `<span class="label">${esc(c.genesis)} · showed up ${n(c.engaged_days)} of ${n(c.window_days)} day${c.window_days === 1 ? "" : "s"}</span></p>` +
+      `<span class="label">${esc(dayInWords(c.genesis, { weekday: false }) || c.genesis)} · showed up ${n(c.engaged_days)} of ${n(c.window_days)} day${c.window_days === 1 ? "" : "s"}</span></p>` +
       `<p class="att-fate">${fateLine(c, collapseDef)}.${changed}</p>` +
       (stats ? `<p class="att-stats label">${stats}</p>` : "") +
       `<p class="att-strip" aria-label="Engagement, day by day">${esc(c.strip || "")}</p>` +
@@ -120,7 +121,7 @@ async function boot() {
   // count comes from the same /api/survival record the log below renders from —
   // every start that actually happened, including the live one once it exists.
   const startsEl = $("[data-att-starts]");
-  if (startsEl) startsEl.textContent = `${n(cycles.length)} start${cycles.length === 1 ? "" : "s"} and counting`;
+  if (startsEl) startsEl.textContent = `${n(cycles.length)} start${cycles.length === 1 ? "" : "s"}`;
 
   const closed = cycles.filter((c) => !c.is_current);
   const live = cycles.find((c) => c.is_current) || null;
@@ -155,6 +156,11 @@ async function boot() {
 
   $("[data-att-overlay]").innerHTML = overlaySVG(cycles);
   $("[data-att-log]").innerHTML = logCards(cycles, byN, sv.collapse_definition);
+  // #4182 — the post-mortem one-liners live on this page now (the /method/ survival +
+  // post-mortem pages left the reader's path): each card's fate line is its post-mortem,
+  // and the live start's own served note says why it has none yet.
+  const liveNote = $("[data-att-live]");
+  if (liveNote) liveNote.textContent = sv.in_progress_note || "";
   const method = $("[data-att-method]");
   // #3549: the method AND the confidence line (n, reached) ride together — the
   // method names how censored attempts are treated, the confidence line carries
