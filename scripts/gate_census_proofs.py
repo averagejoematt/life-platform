@@ -2441,3 +2441,43 @@ REGISTRY_PROOFS.update(
         for term, n in _VOCAB_LEDGER_LIVE.items()
     }
 )
+
+
+# ── #4182 M4 — the comprehension judge's own CI step ─────────────────────────
+# CI-step proofs live directly in `gate_census.PROVEN_CAN_FAIL` for every other
+# family-1 record (see e.g. "ci::ci-cd.yml::visual-qa::4" there); this one is
+# recorded here instead purely for the #1665 line-ceiling reason gate_census.py
+# itself states at its own family-2 import (19 lines of headroom at the time this
+# was written) — `gate_census.py` still `.update()`s it into the SAME dict.
+CI_PROOFS: dict[str, dict[str, Any]] = {
+    "ci::visual-qa.yml::visual-qa::10": {
+        "gate_name": "visual-qa / Comprehension judge — six doors, blind reader + grader (#4182 M4, advisory)",
+        "command": "python3 -m pytest tests/test_comprehension_qa.py -k main_returns -v",
+        "mutation": (
+            "The step's whole failure contract collapses to `comprehension_qa.main()`'s own "
+            "logic (the step is a bare `python3 tests/comprehension_qa.py`, so the step's exit "
+            "code IS this function's return value) — planted directly in the real tracked file: "
+            "main()'s body replaced with a bare `return 0`, deleting the "
+            "`if not os.path.exists(_ARTIFACT_PATH): ... return 1` check entirely. Bedrock/AWS "
+            "are monkeypatched out in every case (assess_doors() itself is stubbed) — no live "
+            "call, no network, matching this file's stated bar for a test-level record."
+        ),
+        "observed": (
+            "BASELINE: 3 passed (test_main_returns_zero_when_the_artifact_was_written, "
+            "test_main_returns_one_when_the_artifact_is_missing, "
+            "test_main_returns_one_when_assess_doors_raises_before_writing). MUTATED: 2 failed / "
+            "1 passed — both '...is_missing' and '...raises_before_writing' asserted `main() == 1` "
+            "and got 0, i.e. the planted defect makes a missing artifact look like a clean run, "
+            "exactly the failure mode #4182 M4 names ('a judge that produced no output must never "
+            "look like a clean skip'). REVERTED: 3 passed again, byte-identical to baseline."
+        ),
+        "scope": (
+            "Proves the STEP'S OWN exit-code contract (fails only when the artifact is missing), "
+            "not the judge's grading quality — whether a live run's reader/grader calls behave is "
+            "unobserved here by design (this module never runs live Bedrock); that half is "
+            "ADVISORY (continue-on-error) and unproven by the same posture as every other "
+            "declared-advisory CI step in this census."
+        ),
+        "proved_on": "2026-09-26",
+    },
+}

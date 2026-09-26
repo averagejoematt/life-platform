@@ -130,4 +130,14 @@ def test_ci_gate_call_sites_are_actually_wired():
 
 def test_allowlist_matches_the_wired_labels():
     """Registry and call sites cannot drift apart (charter primitive 1)."""
-    assert bedrock_client.ATTRIBUTABLE_FEATURES == frozenset({"visual-ai-qa", "reader-truth-qa"})
+    assert bedrock_client.ATTRIBUTABLE_FEATURES == frozenset({"visual-ai-qa", "reader-truth-qa", "comprehension_qa"})
+
+
+def test_comprehension_judge_call_site_is_actually_wired():
+    """#4182 M4 — the same instrument-must-be-attached class as the two CI gates above."""
+    harness = os.path.join(os.path.dirname(os.path.abspath(__file__)), "comprehension_qa.py")
+    with open(harness, encoding="utf-8") as fh:
+        src = fh.read()
+    assert (
+        "_attributed_invoke(bedrock, _BUDGET_FEATURE)" in src or '_attributed_invoke(bedrock, "comprehension_qa")' in src
+    ), "the comprehension judge no longer labels its spend"
