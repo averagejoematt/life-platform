@@ -64,6 +64,7 @@ from web.site_api_cadence import handle_content_cadence  # #1972 — cron-derive
 
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
+    _dossier_block,  # #4187 — the SAME reader /api/coach/{id} serves dossier.commitments from
     _integrator_digest,
     _lead_byline,  # #1986 — the ONE board-lead byline, resolved from the persona registry
     _regeneration_paused,
@@ -96,7 +97,6 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
     EXPERIMENT_START,
     S3_REGION,
     SITE_API_ORIGIN_SECRET,
-    USER_PREFIX,
     _decimal_to_float,
     _error,
     _ok,
@@ -767,29 +767,45 @@ def _dispatch_route(event, path, method):
             except Exception:
                 pass
 
-            # 2. Open actions from coach_actions source
+            # 2. Open actions — every coach's PENDING dossier commitment, roster from
+            # the registry-derived `_cd_coach_display`/`_cd_coach_id_map` above (built
+            # from persona_registry.display_map, never a hand list).
+            #
+            # #4187: this used to query a `coach_actions` partition that never carried
+            # a single record, so the door's "what should I do" slot always served []
+            # while ≥9 commitments sat pending one endpoint over
+            # (/api/coach/{id}.dossier.commitments). Reused here via `_dossier_block`
+            # — the EXACT function /api/coach/{id} calls (web.site_api_coach) — so
+            # this is not a second reader of the COMMITMENT# rows; the privacy pass,
+            # corrections/retractions and phase filtering all apply identically.
             _cd_actions = []
             try:
-                _cd_act_resp = table.query(
-                    **with_phase_filter(
-                        {  # ADR-058: hide pilot coach actions
-                            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}coach_actions"),
-                            "Limit": 50,
-                        }
-                    )
-                )
-                for _act in _cd_act_resp.get("Items", []):
-                    _act = _decimal_to_float(_act)
-                    if _act.get("status") == "open":
+                for _cd_domain, _cd_info in _cd_coach_display.items():
+                    _cd_full_id = _cd_coach_id_map[_cd_domain]
+                    try:
+                        _cd_dossier = _dossier_block(_cd_full_id)
+                    except Exception:
+                        continue  # one coach's dossier failing must not blank the board
+                    for _cd_commit in _cd_dossier.get("commitments", []) or []:
+                        if _cd_commit.get("status") != "pending":
+                            continue
                         _cd_actions.append(
                             {
-                                "coach_id": _act.get("coach_id", ""),
-                                "domain": _act.get("domain", ""),
-                                "action_text": _act.get("action_text", _act.get("action", "")),
-                                "issued_date": _act.get("issued_date", _act.get("sk", "").replace("DATE#", "")),
-                                "status": "open",
+                                "coach_id": _cd_domain,
+                                "coach_name": _cd_info.get("name", ""),
+                                "text": _cd_commit.get("text", ""),
+                                "asked_on": _cd_commit.get("date"),
+                                "due": _cd_commit.get("due_date"),
+                                "status": _cd_commit.get("status"),
+                                "check": _cd_commit.get("check"),
+                                "evidence_link": _cd_commit.get("evidence_link"),
                             }
                         )
+                # Soonest-due first — a commitment with no due date is unscheduled,
+                # never treated as "sooner" than one that has a date. Cap at 10: this
+                # slot is the door's FIRST screen, not the full dossier.
+                _cd_actions.sort(key=lambda a: (a.get("due") is None, a.get("due") or ""))
+                _cd_actions = _cd_actions[:10]
             except Exception:
                 pass
 
