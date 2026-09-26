@@ -2443,6 +2443,20 @@ REGISTRY_PROOFS.update(
 )
 
 
+# #4182 A-grade sweep: "Hevy" (keep-with-gloss) lands at ledger 0, so the lower-by-one mutation
+# above cannot apply — the mutation is the gloss instead: strip gear's one <dfn> around it.
+REGISTRY_PROOFS["registry::tests/site_vocabulary_residue.py::BASELINE::Hevy"] = {
+    "gate_name": "BASELINE[Hevy]",
+    "command": "python3 -m pytest tests/test_site_vocabulary_registry.py -q -p no:cacheprovider -k 'ratchets_down and Hevy'",
+    "mutation": 'site/gear/index.html\'s <dfn class="gloss" … data-gloss="a workout-logging app">Hevy</dfn> stripped to plain text.',
+    "observed": (
+        "MUTATED: 1 failed — AssertionError: 'Hevy' now on 1 reader pages (ledger 0): builder vocabulary may only leave "
+        "reader pages. Pages: ['/gear/']. REVERTED: 1 passed. Watched 2026-09-26."
+    ),
+    "scope": "Static HTML main content only; the runtime gloss pass (gloss_runtime.js) covers JS-rendered Hevy and is not seen here.",
+    "proved_on": "2026-09-26",
+}
+
 # ── #4182 M4 — the comprehension judge's own CI step ─────────────────────────
 # CI-step proofs live directly in `gate_census.PROVEN_CAN_FAIL` for every other
 # family-1 record (see e.g. "ci::ci-cd.yml::visual-qa::4" there); this one is
