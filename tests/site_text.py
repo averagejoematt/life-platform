@@ -3,7 +3,7 @@
 Two pure helpers over the STATIC HTML under site/ (legacy/ excluded by standing policy):
 
   reader_pages()        every site/**/index.html a reader can be served
-  main_text(path)       that page's main-content text — <script>/<style>/<svg> dropped,
+  main_text(path)       that page's main-content text — <script>/<style>/<svg>/<noscript> dropped,
                         <nav>/<header>/<footer> and the chrome classes (wayfinder, doors,
                         mega, menu, app-bar, loop-forward) excluded, everything else kept
   static_reach()        the set of reader pages reachable from "/" by following <a href>
@@ -26,7 +26,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(_HERE)
 SITE = os.path.join(REPO, "site")
 
-HARD_SKIP_TAGS = {"script", "style", "svg"}
+# `noscript` is a baked copy of SERVED content (scripts/v4_proof.py writes the live dashboard,
+# coach quotes included, into the no-JS fallback at build time). A coach saying "the clinical
+# gate I set" is served text the site never edits (#4182 panel ruling, §4-6), so it cannot be
+# builder vocabulary; counting it made every shell rebuild trip the ratchet (PR #4199). The
+# authored page copy a reader meets is what this census measures.
+HARD_SKIP_TAGS = {"script", "style", "svg", "noscript"}
 CHROME_TAGS = {"nav", "header", "footer"}
 CHROME_CLASS_KEYWORDS = ("wayfinder", "doors", "mega", "menu", "app-bar", "loop-forward")
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
