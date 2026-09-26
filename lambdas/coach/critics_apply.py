@@ -17,14 +17,17 @@ PURE: no I/O, and no import of `coach.critics` (which imports this module).
 
 from __future__ import annotations
 
-import copy
 import re
 from typing import Any, Callable
 
 # `change` grammar — the only fields a critic may move, and the only ones `apply_changes`
 # knows how to move. Anything else is recorded as `unapplied` and never silently dropped.
 CHANGE_FIELD_RE = re.compile(r"^(exercises\[(\d+)\]\.(weight_lbs|set_count|reps|drop)|session\.total_sets)$")
-MAX_ADDED_SETS = 3  # the advocate may add, never more than this in one pass
+# #4161 RULING (the 2026-09-24 red team, owner-approved: "drop" was its primary recommendation): NO critic adds
+# sets. The rate advocate's "+1 set" is DROPPED, not restricted — in a deficit 20 vs 12 sets/week gave identical
+# lean-mass retention (Roth 2023 SJMSS 33(1):20 doi:10.1111/sms.14237), so an added set buys nothing the evidence
+# can see. Was 3 (#4149). A `session.total_sets` change ABOVE the draft is refused by name, never applied.
+MAX_ADDED_SETS = 0
 _LBS_PER_KG = 2.2046226218
 
 
@@ -117,14 +120,8 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
         if target == current:
             return False, f"total_sets already {current}"
         if target > current:
-            # the advocate's lane: ADD sets, bounded at +MAX_ADDED_SETS, cloned from the last working set
-            if not exercises or not exercises[-1].sets:
-                return False, "no exercise to add sets to"
-            target = min(target, current + MAX_ADDED_SETS)
-            while current < target:
-                exercises[-1].sets.append(_clone(exercises[-1].sets[-1]))
-                current += 1
-            return True, None
+            # #4161: the advocate's add-sets lane is closed — MAX_ADDED_SETS is 0 (Roth 2023)
+            return False, f"refused: no critic adds sets ({current} -> {target}; MAX_ADDED_SETS={MAX_ADDED_SETS}, #4161 — Roth 2023)"
         # LIVE FINDING 2026-09-20 (routine 73bc228c v2): trimming from the LAST exercise backwards
         # took a 22 -> 18 cut entirely out of face pulls and hammer curls (3 -> 1 each) and left
         # the two 4-set anchors untouched — a deload shape no coach would write. Round-robin:
@@ -161,13 +158,10 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
         n = int(to)
         if n < 1:
             return False, "set_count below 1"
+        if n > len(ex.sets):
+            # #4161: MAX_ADDED_SETS = 0 is structural — a set_count ABOVE the draft is an addition, refused by name
+            return False, f"refused: no critic adds sets (set_count {len(ex.sets)} -> {n}; MAX_ADDED_SETS={MAX_ADDED_SETS}, #4161)"
         while len(ex.sets) > n:
             ex.sets.pop()
-        while len(ex.sets) < n and ex.sets:
-            ex.sets.append(_clone(ex.sets[-1]))
         return len(ex.sets) == n, None
     return False, "unreachable"
-
-
-def _clone(s: Any) -> Any:
-    return copy.deepcopy(s)

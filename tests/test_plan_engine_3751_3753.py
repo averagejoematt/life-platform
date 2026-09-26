@@ -38,11 +38,11 @@ sys.path.insert(0, str(REPO / "lambdas"))
 from common.pacific_time import shift_day_key  # noqa: E402
 from training import owner_redlines, plan_engine, training_context_registry  # noqa: E402
 
-WEEK_7 = "2026-11-04"  # #4098: a date in program week 7, given WEEK_7_ROWS (#4110: the week follows completed sessions)
-# 6 program weeks of completed loaded sessions from the block start, one a day (#4147 v0.4: 4 a week -> 24)
+WEEK_7 = "2026-11-06"  # #4098: a date in program week 7, given WEEK_7_ROWS
+# #4161: weeks are HYBRID (4 sessions AND >= 7 days) — lifting daily from the block start, week 7 opens on day 42 (11-05)
 WEEK_7_ROWS = [
     {"date": shift_day_key("2026-09-24", i), "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]}
-    for i in range(24)
+    for i in range(43)
 ]
 
 _FULL = dict(
@@ -209,7 +209,7 @@ def test_approved_redlines_are_reported_active_not_proposed():
     assert not any("redlines are PROPOSED" in line for line in block["honesty"])
     assert any("NOT evaluated by this" in line for line in block["honesty"])
     assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-23"
-    assert owner_redlines.REDLINES_VERSION == "3.2"  # #4147: v0.4 moved sets_per_muscle_wk and the volume ceiling with it
+    assert owner_redlines.REDLINES_VERSION == "3.3"  # #4161: the deload and ruling "B" (the protein-gated rate target)
 
 
 def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
@@ -220,7 +220,7 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     assert "rate_band_pct_bw_per_wk" not in summ["unresolved"]
     assert owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"].startswith("RESOLVED as a schedule")
     assert "2026-09-21" in owner_redlines.REDLINES["rate_band_pct_bw_per_wk"]["resolution"]
-    assert summ["active"] is True and summ["version"] == "3.2" and summ["last_reviewed_by_owner"] == "2026-09-23"
+    assert summ["active"] is True and summ["version"] == "3.3" and summ["last_reviewed_by_owner"] == "2026-09-23"
     # #4147: the plan is v0.4 (owner-private, written by the driver); v0.3's prose stays as PLAN_V0_3
     assert summ["plan"].endswith("TRAINING_PROGRAM_v0.4.md") and owner_redlines.PLAN_V0_3.endswith("TRAINING_PROGRAM_v0.3.md")
     assert summ["red_team_record"].endswith("TRAINING_PROGRAM_v0.3_redteam.md")

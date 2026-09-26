@@ -11,6 +11,14 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _safe(fn, *a, **kw):
+    """Call a tool defensively — a reader that fails yields None, never a default. (Moved from tools_plan, #4161.)"""
+    try:
+        return fn(*a, **kw)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _union_evidence_rows(performed: list[dict[str, Any]], draft: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Performed movements UNION the draft's, keyed by template id (#4051).
 

@@ -85,9 +85,8 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, self_added_volume, training_context_registry
 
-ENGINE_VERSION = (
-    "plan-engine@1.7.0"  # #4110/#4147: the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
-)
+ENGINE_VERSION = "plan-engine@1.8.0"  # #4161: hybrid weeks, the lock-anchored −40 % deload, the protein-gated rate target
+# plan-engine@1.7.0 (#4110/#4147): the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
 # plan-engine@1.6.0 (#4081): self_added_volume evaluated from adherence's set counts; 1.5.0 #4098: `not_before_week` enforced + rolling e1RM anchor drop
 # plan-engine@1.4.0 (#4072): every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
 
@@ -243,7 +242,7 @@ def anchor_drop_tripped(drop_pct: float | None, sessions_below: int | None) -> b
 # `anchor_lift_strength_drop` declares `not_before_week: 6` ("the ramp is still under 85 % of
 # band e1RM"). Before #4098 nothing read it: the tripwire was live in the ramp weeks, comparing
 # a detraining return with a best from before the break. The week is the program's session
-# sequence's (`session_sequence.program_week`, #4110): completed loaded sessions // sessions_per_week (v0.4: 4), + 1.
+# sequence's (`session_sequence.program_week`, #4110): HYBRID since #4161 — 4 completed sessions AND >= 7 days per week.
 def program_week(day: str, block_workouts: list[dict[str, Any]] | None = None) -> int | None:
     """THE program week for `day` — 0 before the block start, None when the Hevy record since the
     block start was not read (an unknown week never arms a gated tripwire) or the day key is bad."""
@@ -622,6 +621,8 @@ def constraint_block(
     days_since_movement: dict[str, int] | None = None,
     reference: dict[str, Any] | None = None,
     protein_days_missed_7d: int | None = None,
+    protein_days_measured_7d: int | None = None,
+    protein_window: dict[str, str] | None = None,
     readiness_low_streak_days: int | None = None,
     anchor_lift_drop_pct: float | None = None,
     anchor_lift_drop_sessions: int | None = None,
@@ -820,11 +821,17 @@ def constraint_block(
         # #4064/#4110 — WHAT the program serves on this date: the next UNDONE session of the
         # sequence (v0.4, #4147: upper-heavy -> lower-heavy -> upper-volume -> lower-volume, from
         # lower-heavy on 2026-09-24; it advances only on a completed loaded Hevy session; deload
-        # every 6th program week) and its session — anchors with their sets and reps,
+        # at the later of week 6 or the block lock, #4161) and its session — anchors with their sets and reps,
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
-        "rate_target": owner_redlines.rate_target_lb_per_wk(weight_lb),
+        # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
+        "rate_target": owner_redlines.rate_target_lb_per_wk(
+            weight_lb,
+            protein_missed_7d=protein_days_missed_7d,
+            protein_measured_7d=protein_days_measured_7d,
+            protein_window_days=protein_window,
+        ),
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
         "recovery_tier": recovery_tier,

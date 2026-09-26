@@ -63,7 +63,9 @@ def _routine():
 
 def _fixture_evidence(*, pain0=False):
     ev = _evidence(pain0=pain0)  # weeks_in_block=0 -> the historian's squat flag is a `change`
-    ev["loaded_lifting_streak"] = 5  # the info flag the joints critic escalates on (#4067: upper tail)
+    # #4161: the joints cut is driven by the fatigue trigger now (readiness below the floor 2 days
+    # running — `_run` patches the readiness reader), not the retired loaded-streak escalation.
+    ev["loaded_lifting_streak"] = 5
     rows = [dict(ev["exercises"][0])]
     rows += [
         {
@@ -98,7 +100,7 @@ def _model(body):
         return _reply(
             {
                 "verdict": "change",
-                "metric": "loaded_lifting_streak",
+                "metric": "fatigue_trigger",
                 "value": 5,
                 "field": "session.total_sets",
                 "to": to,
@@ -124,6 +126,7 @@ def _run(ir, *, override=None, evidence=None, ledger=None, ledger_error=None):
         for cm in _stage2_patches(ir, evidence or _fixture_evidence(), invoke=_model):
             st.enter_context(cm)
         st.enter_context(patch("mcp.tools_plan._record_override_correction", side_effect=record))
+        st.enter_context(patch("mcp.tools_plan._readiness_low_streak", return_value=(2, {"state": "measured"})))  # #4161
         out = tp.tool_plan_next_session(args)
     return out, ledger
 

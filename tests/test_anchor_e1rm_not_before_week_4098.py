@@ -46,12 +46,12 @@ DB_SP = ("878CD1D0", "Shoulder Press (Dumbbell)")
 
 
 def _week_start(week: int) -> str:
-    """The first day of program `week` when he lifts every day from the block start (#4110: the
-    week follows COMPLETED sessions — `sessions_per_week` of them, 4 under v0.4 — not the calendar)."""
-    from common.pacific_time import shift_day_key
+    """The first day of program `week` when he lifts every day from the block start. #4161: the week is
+    HYBRID (4 completed sessions AND >= 7 days since the previous advance), so daily lifting opens a week
+    every 7 days — read off the sequence's own ledger, never re-derived here."""
+    from training import session_sequence
 
-    per = int(program_structure.SESSION_SEQUENCE["sessions_per_week"])
-    return shift_day_key(program_structure.SESSION_SEQUENCE["block_start"], per * (week - 1))
+    return next(p["date"] for p in session_sequence.preview(7 * week + 7) if p["week"] == week)
 
 
 def _block_rows(date: str) -> list[dict[str, Any]]:
@@ -299,7 +299,8 @@ def test_one_computation_ast_guard():
     """Derivation guard: the anchor drop is WRITTEN in exactly one function and its threshold is
     APPLIED in exactly one — the engine row, the tools_plan trend and the critic only read them."""
     engine_src = (REPO / "lambdas/training/plan_engine.py").read_text()
-    plan_src = (REPO / "mcp/tools_plan.py").read_text()
+    # #4161: `_anchor_trend` moved with the stage-2 evidence to `mcp/plan_draft_evidence.py` (re-exported by tools_plan)
+    plan_src = (REPO / "mcp/plan_draft_evidence.py").read_text()
     # #4112: build_muscle_defense_packet moved to this cohesive sibling when critics.py hit
     # its size ceiling — the re-export in critics.py carries no logic, so this guard reads it.
     critic_src = (REPO / "lambdas/coach/critics_muscle_defense.py").read_text()

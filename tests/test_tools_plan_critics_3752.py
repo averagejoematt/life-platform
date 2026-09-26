@@ -601,17 +601,17 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
             to = sent["draft"]["total_sets"] - 4
             reply = {
                 "verdict": "change",
-                "metric": "loaded_lifting_streak",
-                "value": 5,
+                "metric": "fatigue_trigger",
+                "value": True,
                 "field": "session.total_sets",
                 "to": to,
-                "sentence": f"Streak; trim to {to}.",
+                "sentence": f"Fatigue; trim to {to}.",
             }
             return {"content": [{"type": "text", "text": json.dumps(reply)}], "stop_reason": "end_turn"}
         return _approving(body)
 
     ev = _evidence()
-    ev["loaded_lifting_streak"] = 5  # info flag on the metric the model cites (#4067: upper tail)
+    ev["loaded_lifting_streak"] = 5  # context only since #4161 — the cut below is the fatigue trigger's
     ev["exercises"] = [
         {
             "idx": i,
@@ -624,11 +624,15 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
         }
         for i in range(5)
     ]
-    out1, _, _ = _run(ir, ev, invoke=cut_by_4)
-    # #4149: the cut is the owner's −30 % deload computed in code (20 -> 14), not the model's -4;
+    # #4161: readiness below the floor 2 days running fires the fatigue trigger (the streak no longer flags)
+    low = patch("mcp.tools_plan._readiness_low_streak", return_value=(2, {"state": "measured"}))
+    with low:
+        out1, _, _ = _run(ir, ev, invoke=cut_by_4)
+    # #4149: the cut is the owner's −30 % computed in code (20 -> 14), not the model's -4;
     # the relative fake still matters — it is what compounded live, and it must not leak in.
     assert out1["critics"]["recheck"]["total_sets"] == 14
     assert len(out1["critics"]["draft_exercises"]) == 5 and sum(len(e["sets"]) for e in out1["critics"]["draft_exercises"]) == 20
-    out2, _, _ = _run(ir, ev, invoke=cut_by_4)
+    with low:
+        out2, _, _ = _run(ir, ev, invoke=cut_by_4)
     assert out2["critics"]["recheck"]["total_sets"] == 14, "a re-run must land on the same cut, not cut again"
     assert sum(len(e.sets) for e in ir.exercises) == 14

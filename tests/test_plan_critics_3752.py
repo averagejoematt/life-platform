@@ -328,26 +328,25 @@ def test_the_model_may_escalate_one_step_on_a_flagged_metric_and_a_veto_needs_a_
     assert all(v["verdict"] == "approve" for v in vs if v["critic"] != "muscle_defense")
 
 
-def test_the_advocate_may_add_sets_when_every_tripwire_is_clear_and_never_vetoes():
+def test_the_advocate_argues_but_never_adds_sets_and_never_vetoes():
+    """#4161 RULING: the advocate's "+1 set" is dropped (Roth 2023). All-clear is still SAID (a
+    governed info flag); a model veto on it is discarded, and nothing is applied."""
     d = c.draft_summary(_ir())
     P = _packets(d, tripwires=[{"id": "a", "state": "clear"}, {"id": "b", "state": "clear"}])
     assert any(f["metric"] == "tripwires_clear" for f in P["rate_advocate"]["flags"])
     vs = c.run_critics(P, d, invoke=_model("veto", "tripwires_clear", field="session.total_sets", to=8), model_allowed=True)
     a = next(v for v in vs if v["critic"] == "rate_advocate")
-    # #4149: the model asked for 8; the change applied is the code quantum (5 + ADVOCATE_ADD_SETS)
-    assert a["verdict"] == "change" and a["field"] == "session.total_sets" and a["to"] == 5 + c.ADVOCATE_ADD_SETS
-    assert "never applied" in a["model_numbers_not_applied"]
+    assert a["verdict"] == "approve" and "governs" in a["discarded"]
     ir = _ir()
-    rec = c.apply_changes(ir, vs)
-    assert rec == [{"critic": "rate_advocate", "field": "session.total_sets", "to": 6, "applied": True, "why": None}]
-    assert sum(len(e.sets) for e in ir.exercises) == 6
+    assert all(r["applied"] is False for r in c.apply_changes(ir, vs))
+    assert sum(len(e.sets) for e in ir.exercises) == 5
 
 
-def test_the_advocate_addition_is_bounded():
+def test_an_addition_from_any_critic_is_refused():
     ir = _ir()  # 5 sets
     rec = c.apply_changes(ir, [{"critic": "rate_advocate", "verdict": "change", "field": "session.total_sets", "to": 40}])
-    assert rec[0]["applied"] is True
-    assert sum(len(e.sets) for e in ir.exercises) == 5 + c.MAX_ADDED_SETS
+    assert rec[0]["applied"] is False and "no critic adds sets" in rec[0]["why"]
+    assert sum(len(e.sets) for e in ir.exercises) == 5 + c.MAX_ADDED_SETS == 5
 
 
 # ── 6. the model layer: parse, pause, failure ────────────────────────────────

@@ -833,7 +833,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         return _non_lifting_pair(inputs, archetype, week_cfg, landmarks, catalog, day_entry=day_entry)
     if day_entry.get("session_role") in program_structure.SESSION_TEMPLATES:
         # #4064/#4147 — a program role (v0.4: upper/lower heavy/volume) is the program's session
-        # (anchors at heavy/moderate/volume, fixed accessories, deload every 6th program week),
+        # (anchors at heavy/moderate/volume, fixed accessories, the #4161 deload at the later of week 6 or the block lock),
         # not a muscle-budget session with a role label on it. Only the module grid carries a
         # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines

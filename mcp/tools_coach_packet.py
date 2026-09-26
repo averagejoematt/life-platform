@@ -25,7 +25,7 @@ import the counting / estimating primitives themselves):
                            #4030/#4032), normalised by `training.muscle_volume.normalize_hevy_items`,
                            typed by `training.routine_title.resolve_archetype` (the performed-type
                            resolver the routine counters use), its program role from the v0.4
-                           session sequence (`session_sequence.completed_sessions` + `position`,
+                           session sequence (`session_sequence.completed_positions` (the #4161 ledger),
                            #4110), loaded-or-not by
                            `training_streaks.is_loaded_session` (#4067).
   nutrition_7d             `get_nutrition` view=summary over plan_next_session's protein window,
@@ -62,7 +62,7 @@ SOURCES: dict[str, str] = {
     "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window",
     "last_session_by_type": (
         "tools_strength._read_hevy_all_phases + training.muscle_volume.normalize_hevy_items; type = "
-        "training.routine_title.resolve_archetype, role = session_sequence.completed_sessions/position (#4110), loaded = training_streaks.is_loaded_session"
+        "training.routine_title.resolve_archetype, role = session_sequence.completed_positions (#4110/#4161), loaded = training_streaks.is_loaded_session"
     ),
     "nutrition_7d": "get_nutrition view=summary + tools_plan._protein_days_7d (plan_next_session's protein window)",
     "walking_hours_7d": "tools_plan._walking_volume_last_7d -> mcp.shared_quantities.walking_layer (#4068/#4105)",
@@ -158,7 +158,7 @@ def _session_row(item: dict[str, Any], archetype: str | None, role: str | None) 
 
 def _sequence_positions(target_date: str) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
     """{day: the program position the session sequence credited to that day's session}, through
-    `target_date` inclusive — `session_sequence.completed_sessions` + `position` (#4110), over the
+    `target_date` inclusive — `session_sequence.completed_positions` (#4110; weeks per #4161's ledger), over the
     planner's own block read (`plan_hevy_windows._block_workouts`). The role is the SEQUENCE's,
     never a weekday calendar's (v0.3's lives in `training.program_v03`, SUPERSEDED)."""
     from training import session_sequence
@@ -169,10 +169,10 @@ def _sequence_positions(target_date: str) -> tuple[dict[str, dict[str, Any]], di
     after = shift_day_key(target_date, 1)
     try:
         rows = _block_workouts(after)
-        done = session_sequence.completed_sessions(rows, after)
+        done = session_sequence.completed_positions(rows, after)  # #4161: the ledger's hybrid week, one definition
     except Exception as e:  # noqa: BLE001 — roles go unassigned and say why; the sessions still read
         return {}, {"state": "read_failed", "error": error_label(e)}
-    out = {c["date"]: {**session_sequence.position(c["sequence_index"]), "workout_id": c.get("workout_id")} for c in done}
+    out = {c["date"]: {k: v for k, v in c.items() if k not in ("title", "start_time", "loaded_logs_that_day")} for c in done}
     return out, {"state": "measured", "block_start": session_sequence.block_start(), "sessions_credited": len(done)}
 
 

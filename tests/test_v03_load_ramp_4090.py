@@ -177,8 +177,9 @@ def test_moderate_anchors_ride_the_same_ramp():
 
 # ── 3. week 9 ────────────────────────────────────────────────────────────────
 def test_week_9_is_capped_at_85_percent():
-    # #4147: 35 completed -> index 35 = week 9's fourth session, upper-heavy (4 a week, from lower-heavy)
-    ideal = _generate("2026-11-18", block_workouts=_done(35))[0]
+    # #4161: weeks are hybrid (4 sessions AND >= 7 days) — lifting daily, week 9 opens on day 56 (11-19);
+    # index 59 (11-22) is upper-heavy (4 a week, from lower-heavy)
+    ideal = _generate("2026-11-22", block_workouts=_done(59))[0]
     assert ideal.inputs_snapshot["calendar"]["week"] == 9 and ideal.title.startswith("UPPER-HEAVY")
     for key in HEAVY_ANCHORS:
         top = _top(ideal, key)

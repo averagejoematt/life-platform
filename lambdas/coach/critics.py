@@ -12,8 +12,9 @@ THE FOUR CRITICS AND WHAT EACH ONE HOLDS
 
   muscle_defense       anchor-lift strength trend + protein vs the floor
   joints_tendons       pain flags per movement, novelty (days since), the loaded-lifting streak
-                       (rest-day ask) beside the active-day streak (context only, #4067)
-  rate_advocate        the owner's redlines + which tripwires are CLEAR — argues for MORE
+                       beside the active-day streak (both context only since #4161), the fatigue trigger
+                       (performance or readiness, `critics_fatigue`) and the 48 h same-region guard
+  rate_advocate        the owner's redlines + which tripwires are CLEAR — argues for MORE, adds no sets (#4161)
   blueprint_historian  the weight-band reference + the #3717 attestation, LABELLED
 
 `test_the_four_packets_are_pairwise_disjoint` holds the packets apart: a metric name may
@@ -64,9 +65,12 @@ import json
 import re
 from typing import Any, Callable
 
-from training import owner_redlines, training_context_registry, training_streaks
+from training import owner_redlines, training_context_registry
 
-CRITICS_VERSION = "critics@1.4.0"  # #4149: every numeric change computed in code; critic loads clamped to the subtract-only floor
+from coach import critics_fatigue
+
+CRITICS_VERSION = "critics@1.5.0"  # #4161: gap-scaled stale cap, performance/readiness fatigue trigger, the advocate adds nothing
+# critics@1.4.0 (#4149): every numeric change computed in code; critic loads clamped to the subtract-only floor
 CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
@@ -115,9 +119,17 @@ from coach.critics_apply import (  # noqa: E402,F401
     apply_changes,
 )
 
-# #4149: the advocate's escalation is a code-computed quantum, not a model-chosen total — one
-# set per pass (INTERPRETATION RECORDED: the smallest step; MAX_ADDED_SETS stays the bound).
-ADVOCATE_ADD_SETS = 1
+# #4161 RULING: the advocate's "+1 set" escalation (#4149's ADVOCATE_ADD_SETS = 1) is DROPPED — the
+# red team's primary recommendation, owner-approved 2026-09-24 (Roth 2023 SJMSS 33(1):20
+# doi:10.1111/sms.14237: 20 vs 12 sets/week, identical lean-mass retention in a deficit). Its
+# `tripwires_clear` flag is now governed info: an argument the model may cite, never a handle to
+# add volume. `critics_apply.MAX_ADDED_SETS` is 0, so no other critic can add sets either.
+ADVOCATE_RULING = {
+    "adds_sets": 0,
+    "was": "+1 set when every armed tripwire was clear (#4149)",
+    "provenance": "owner",
+    "stated": "2026-09-24",
+}
 
 
 # ── the draft, summarised the same way for every critic ───────────────────────────────
@@ -204,8 +216,15 @@ def build_joints_packet(
     loaded_lifting_streak: int | None,
     pain_layer_status: str | None,
     dismissals: list[dict[str, Any]] | None = None,
+    stale_by_idx: dict[int, dict[str, Any]] | None = None,
+    fatigue: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pain flags on the draft's movements, novelty, and where he is in the week.
+
+    #4161: `stale_by_idx` is `critics_fatigue.stale_exposure` per drafted lift (the gap and the
+    exposure number — the stale-lift cap scales with both); `fatigue` is `critics_fatigue.assess`
+    (the performance / readiness trigger that replaced the loaded-streak flag, plus the 48 h
+    same-region guard). Both None read as unknown and change nothing.
 
     Carries the ONLY vetoes a critic can issue without the owner having signed #3753: the
     calibration doc's own §4 rules, which are his.
@@ -217,7 +236,7 @@ def build_joints_packet(
     critic must argue from what happened, not from a cleaned-up version of it. A note dated
     AFTER the dismissal re-arms the veto on its own (`training_context_registry`, one rule,
     shared with `plan_engine`)."""
-    # #4067: TWO streaks, both named. The rest-day ask keys on the LOADED one alone — the old
+    # #4067: TWO streaks, both named (#4161: both context now). The rest-day ask keyed on the LOADED one — the old
     # single `consecutive_training_days` counted Engine (cardio-only) and walk days, read 16
     # against a loaded streak of 4 and asked for rest. The active streak is context, carried in
     # `numbers` and deliberately never flagged: a flag is the model's escalation handle.
@@ -232,15 +251,11 @@ def build_joints_packet(
     layer_ok = pain_layer_status not in (None, "dark", "unknown")
     if active_day_streak is None:
         unknown.append("active_day_streak")
-    streak_flag = training_streaks.loaded_streak_flag(loaded_lifting_streak)
     if loaded_lifting_streak is None:
         unknown.append("loaded_lifting_streak")
-    elif streak_flag:
-        # #4149: the upper-tail line is an escalation handle; if the model takes it, the cut is
-        # the owner's own signed deload (`lifting_sessions_per_wk.deload.sets_pct`, loads held),
-        # computed here — live, the model had picked 18, 14 and 2 total sets for one signal.
-        esc = {} if streak_flag[0] != "info" else {"field": "session.total_sets", "to": _deload_total_sets(draft)}
-        flags.append(_flag("loaded_lifting_streak", *streak_flag, provenance=training_streaks.CALIBRATION["provenance"], **esc))
+    # #4161: the loaded streak is CONTEXT now (numbers only, never a flag) — a day count is not a
+    # validated fatigue signal. The trigger is performance or readiness, and the 48 h guard.
+    _fatigue_flags(draft, fatigue, numbers, flags, unknown)
     heavy_axial_cold: list[dict[str, Any]] = []
     dismissed_rows: list[dict[str, Any]] = []  # #4036 — every owner dismissal this packet met
     for ex in draft["exercises"]:
@@ -249,12 +264,18 @@ def build_joints_packet(
         dk = f"days_since_movement[{i}]"
         numbers[dk] = ds
         novel = ds is None or ds >= NOVEL_AGAIN_DAYS
-        if ds is None:
+        stale = (stale_by_idx or {}).get(i)
+        if stale is not None:
+            numbers[f"stale_exposure[{i}]"] = stale.get("exposure")
+            numbers[f"stale_gap_days[{i}]"] = stale.get("gap_days")
+        if stale is not None and critics_fatigue.stale_cap(stale) is not None:
+            flags.append(_novel_again_flag(ex, dk, ds, stale))  # #4161: the cap scales with the gap, over exposures 1–3
+        elif ds is None:
             flags.append(
                 _flag(dk, "info", f"{ex['label']}: no performed history in the window — treated as novel-again", provenance="owner-history")
             )
-        elif novel:
-            flags.append(_novel_again_flag(ex, dk, ds))
+        elif stale is None and novel:
+            flags.append(_novel_again_flag(ex, dk, ds, None))
         if novel and ex.get("to_failure"):
             violations.append(
                 {
@@ -337,27 +358,66 @@ def build_joints_packet(
 
 
 def _deload_total_sets(draft: dict[str, Any]) -> int:
-    """The session's total sets under the owner's signed deload cut (−30 % sets as of v3), >= 1."""
-    pct = float(owner_redlines.REDLINES["lifting_sessions_per_wk"]["deload"]["sets_pct"])
+    """The session's total sets under the fatigue response (−30 % sets, loads held — `critics_fatigue`, #4161), >= 1."""
+    pct = float(critics_fatigue.FATIGUE_RESPONSE["sets_pct"])
     return max(1, int(round(int(draft.get("total_sets") or 0) * (1 + pct / 100.0))))
 
 
-def _novel_again_flag(ex: dict[str, Any], dk: str, ds: int) -> dict[str, Any]:
-    """The days-since rule, answered in code (#4149 — the ruling at NOVEL_AGAIN_MAX_WORKING_SETS).
+def _fatigue_flags(draft: dict[str, Any], fatigue: dict[str, Any] | None, numbers: dict[str, Any], flags: list, unknown: list) -> None:
+    """#4161: the performance/readiness trigger and the 48 h same-region guard, each a governed
+    `change` to the one-session −30 % cut (loads held) — the number computed here, never the model's."""
+    if fatigue is None:
+        numbers["fatigue_trigger"] = None
+        unknown.append("fatigue_trigger")
+        return
+    numbers["fatigue_trigger"] = bool(fatigue.get("triggered"))
+    unknown.extend(f"fatigue.{k}" for k in fatigue.get("unknown") or [])
+    region = fatigue.get("same_region_48h") or {}
+    numbers["same_region_48h"] = None if region.get("state") in (None, "unknown") else region.get("state") == "triggered"
+    prov = critics_fatigue.FATIGUE_PROVENANCE["provenance"]
+    cut = {"field": "session.total_sets", "to": _deload_total_sets(draft), "governed": True}
+    tail = "−30 % sets, loads held, THIS session only — then re-test (#4161)"
+    resp = fatigue.get("response") or {}
+    numbers["fatigue_cut_superseded_by_deload"] = bool(resp.get("superseded_by_deload"))
+    if resp.get("superseded_by_deload") and (fatigue.get("triggered") or region.get("state") == "triggered"):
+        # never stack: the served deload's cut is the larger one, so it is the cut — no second one on top
+        why = "; ".join(fatigue.get("reasons") or []) or f"{region.get('region')} loaded under the 48 h guard"
+        msg = f"{why} — inside the deload ({resp.get('deload_sets_pct')} % sets), the larger cut is taken, not both (#4161)"
+        flags.append(_flag("fatigue_trigger", "info", msg, provenance=prov, governed=True))
+    elif fatigue.get("triggered"):
+        flags.append(_flag("fatigue_trigger", "change", "; ".join(fatigue.get("reasons") or []) + f" — {tail}", provenance=prov, **cut))
+    elif region.get("state") == "triggered":
+        why = f"{region.get('region')} loaded on {', '.join(region.get('loaded_on') or [])} — under the {critics_fatigue.SAME_REGION_MIN_HOURS} h same-region guard"
+        flags.append(_flag("same_region_48h", "change", f"{why} — {tail}", provenance=prov, **cut))
 
-    A LOADED movement last performed >= NOVEL_AGAIN_DAYS ago with more working sets than the cap
-    draws a `change` to the cap; at or under the cap the rule is already met and the flag is
-    `info`. Either way the flag is `governed`: the model cannot re-escalate it into a load cut
-    or a different set count, so one (signal, value) gives one answer on every run."""
-    cap = NOVEL_AGAIN_MAX_WORKING_SETS
-    reason = f"{ex['label']}: last performed {ds} days ago — novel-again pattern, tendons lag muscle"
+
+def _novel_again_flag(ex: dict[str, Any], dk: str, ds: int | None, stale: dict[str, Any] | None) -> dict[str, Any]:
+    """The stale-lift rule, answered in code (#4149 determinism; #4161: the cap scales with the gap).
+
+    `stale` (from `critics_fatigue.stale_exposure`) names the exposure and the gap class; its cap is
+    `critics_fatigue.STALE_CAPS`. Without it (an older caller) the #4149 reading stands: exposure 1,
+    capped at NOVEL_AGAIN_MAX_WORKING_SETS. A LOADED movement over the cap draws a `change` to the cap;
+    at or under it the flag is `info`. Either way the flag is `governed`: the model cannot re-escalate
+    it into a load cut or a different set count, so one (signal, value) gives one answer on every run."""
+    cap = critics_fatigue.stale_cap(stale) if stale is not None else NOVEL_AGAIN_MAX_WORKING_SETS
+    if stale is not None:
+        gap = (
+            f"back after {stale['gap_days']} days"
+            if stale.get("gap_days") is not None
+            else "not performed in the window read (> 6 months or never)"
+        )
+        reason = (
+            f"{ex['label']}: exposure {stale['exposure']} {gap} — cap {cap} working sets ({stale['gap_class']} gap; Nosaka 2001, Chen 2012)"
+        )
+    else:
+        reason = f"{ex['label']}: last performed {ds} days ago — novel-again pattern, tendons lag muscle"
     loaded = ex.get("top_weight_lbs") is not None
     if loaded and (ex.get("n_working_sets") or 0) > cap:
         warmups = (ex.get("n_sets") or 0) - (ex.get("n_working_sets") or 0)
         return _flag(
             dk,
             "change",
-            f"{reason}: {ex['n_working_sets']} -> {cap} working sets on session 1 (load stays the entry ramp's, never cut here)",
+            f"{reason}: {ex['n_working_sets']} -> {cap} working sets (load stays the entry ramp's, never cut here)",
             provenance="owner-history",
             field=f"exercises[{ex['idx']}].set_count",
             to=warmups + cap,
@@ -404,8 +464,8 @@ def build_rate_advocate_packet(
 ) -> dict[str, Any]:
     """The owner's redlines and which tripwires are CLEAR. This critic argues for MORE.
 
-    Its deterministic layer never vetoes: an advocate is not a gate. Its `change` is bounded
-    to adding sets, and only where every readable tripwire is clear. `current_rate_lb_wk` is
+    Its deterministic layer never vetoes: an advocate is not a gate. Since #4161 it never
+    changes the session either — it ARGUES (walking, rate, tripwires); it adds no sets. `current_rate_lb_wk` is
     THE loss rate (`mcp.shared_quantities`, #4068); a `rate_provisional` one argues nothing."""
     tw = tripwires or []
     clear = [t["id"] for t in tw if t.get("state") == "clear"]
@@ -446,9 +506,7 @@ def build_rate_advocate_packet(
                 f"all {len(clear)} armed tripwires clear — nothing in the data argues for holding back"
                 + (f" ({len(inactive)} not yet active: {', '.join(inactive)})" if inactive else ""),
                 provenance="owner",
-                # #4149: what a grounded escalation adds, computed here — never the model's total
-                field="session.total_sets",
-                to=int(draft.get("total_sets") or 0) + ADVOCATE_ADD_SETS,
+                governed=True,  # #4161: the advocate adds nothing — see ADVOCATE_RULING
             )
         )
     if tripped:

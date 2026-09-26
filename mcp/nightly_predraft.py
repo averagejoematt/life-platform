@@ -286,7 +286,9 @@ def run(target_date: str | None = None) -> dict[str, Any]:
     out: dict[str, Any] = {"job": JOB["name"], "target_date": target, "run_at": run_at, "engine": ENGINE_VERSION}
 
     session = scheduled_session(target) or {}
-    out["session"] = {k: session.get(k) for k in ("label", "archetype", "session_role", "optional", "source", "week", "note")}
+    # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too
+    keys = ("label", "archetype", "session_role", "optional", "source", "week", "deload", "week_basis", "advance_blocked_by", "note")
+    out["session"] = {k: session.get(k) for k in keys}
     if not is_lifting_session(session):
         out.update(
             outcome=NO_SESSION,

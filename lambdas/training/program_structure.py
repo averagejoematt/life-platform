@@ -550,14 +550,26 @@ BLOCK_LOCK: dict[str, Any] = {
     "block_start": "2026-09-24",
     "locked_until": "2026-11-04",
     "rule": "no STRUCTURAL edits to v0.4 (split, order, templates, accessories) before this date; loads and deloads run as written",
+    # #4161: enforced — `session_sequence.block_lock_state` compares the live structure with this, recorded at the lock
+    "structure_fingerprint": "000ffceefa732c6e",
+    # every re-record carries this note — `session_sequence.fingerprint_record_problems` reds a bare edit (#4161 review)
+    "structure_fingerprint_record": {
+        "fingerprint": "000ffceefa732c6e",
+        "provenance": "owner",
+        "stated": "2026-09-24",
+        "ref": "#4161 (owner-approved red team: enforce the lock) over origin/main 7218b187, the block as locked by DECISION#2026-09-24T03:10:59",
+    },
     "provenance": "owner",
     "stated": "2026-09-23",
     "decision_sk": DECISION_SK,
 }
-"""The owner's 6-week lock on the v0.4 block (~2026-11-04). A test holds the date."""
+"""The owner's 6-week lock on the v0.4 block (~2026-11-04). A test holds the date; since #4161 the engine reads it as a guard."""
 
 DELOAD_RULE: dict[str, Any] = {
-    "rule": "every 6th PROGRAM week (4 completed v0.4 sessions each, #4110/#4147): −30 % sets (rounded to whole sets, accessories and back-offs first), loads held",
+    "rule": (
+        "one pre-planned deload at the LATER of program week 6 (hybrid weeks: 4 sessions AND >= 7 days, #4161) or the block lock "
+        "(2026-11-04): −40 % sets for 7 days (rounded to whole sets, accessories and back-offs first), loads held, never a week off"
+    ),
     "provenance": "owner",
     "one_home": "owner_redlines.REDLINES['lifting_sessions_per_wk']['deload']",
 }
@@ -574,7 +586,7 @@ def _deload_cfg() -> dict[str, Any]:
 # I audible a change" — the sessions are an ORDER, not dates. Owner, 2026-09-23 (#4147): v0.4
 # is Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume, repeating. The position advances
 # only on a completed LOADED Hevy session (a walk or an Engine day postpones, never skips). Four
-# completed sessions are one program week; deload every 6th program week (`owner_redlines`).
+# completed sessions AND >= 7 days are one program week (#4161); the deload is `owner_redlines` (later of week 6 / the lock).
 #
 # The sequence STARTS at Lower-heavy: that is the first v0.4 session, already committed from chat
 # (`first_session`). Counting starts on `block_start`, the first Pacific day after the decision
