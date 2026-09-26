@@ -23,7 +23,7 @@ BASELINE = {
     "correlation": 2,
     "cockpit": 20,
     "chronicle": 13,
-    "model": 11,
+    "model": 10,
     "as of": 3,
     "cycle": 6,
     "Third Wall": 0,
