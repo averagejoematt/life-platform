@@ -274,7 +274,9 @@ function drawConstellation(pillars, coupling, activeEffects) {
 // P0.1 — genesis math now lives in coach_popover.js (one source of truth). Home/Story keep
 // their "watch it happen" suffix; the day/week numbers come from the shared util so no door
 // can drift (the bug that had Home on Week 1 while Story/Coaching were on Week 2).
-const STORY_GENESIS_SUFFIX = " — a transformation you can watch happen in real time.";
+// #4182 — the "a transformation you can watch happen in real time" suffix is struck (owner's
+// panel, 2026-09-26: it reads as a promise; the north star is proof, not promises).
+const STORY_GENESIS_SUFFIX = "";
 function renderNumbers(journey, pre) {
   // #3524 — EVERY figure in this row is bound in EVERY state, from ONE decision
   // (journeyFigures, pure + unit-tested). Before this, `current` was written only

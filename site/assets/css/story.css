@@ -816,6 +816,19 @@ body { overflow-x: hidden; }
    (ADR-104). Warm, low-quant: one serif lead sentence + a soft status row + an "as of"
    stamp. Ember is earned — only the "on the up" pillars get the accent rule. ── */
 .okay-card { margin-top: var(--sp-4); }
+/* ── issue 4182, the front door: the friends' read sits directly under the claim ──
+   .arc-lead reuses the arc measure so the first beat is not full-bleed; the beat's
+   own hairline is dropped (it follows the hero, not another beat). The three doors
+   are sentences, not tiles — restraint; ember only on the link rule. ── */
+.arc-lead { padding-top: 0; }
+.arc-lead .okay-first { border-top: 0; padding-top: var(--sp-4); }
+.okay-coaches { margin-top: var(--sp-5); color: var(--ink-muted); max-width: var(--measure); }
+.okay-doors { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.okay-doors a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ember-line); font-family: var(--font-serif); font-size: var(--fs-body-lg); }
+.okay-doors a:hover { color: var(--ember); border-bottom-color: var(--ember); }
+.okay-doors a:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.stage-h { margin: 0 0 var(--sp-5); }
+
 .okay-lead { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); max-width: var(--measure); }
 .okay-lead strong { color: var(--ink); font-weight: var(--weight-med); }
 .okay-chips { list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-4) 0 0; padding: 0; }
