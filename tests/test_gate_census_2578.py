@@ -970,7 +970,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 215 -> 216 (2026-09-26, #4182 A-grade sweep, PR #4221): registry::tests/site_vocabulary_residue.py::
         # BASELINE::Hevy arrives PROVEN via a REGISTRY_PROOFS record (gear's Hevy <dfn> stripped -> 1 failed naming /gear/;
         # restored -> 1 passed). Unproven stays 540; one entrant.
-        <= 216
+        # Upper bound 216 -> 224 (2026-09-26, #4185 the reader CHECK classes, merged on top of #4221's 216): the eight entries
+        # of registry::lambdas/coach/reader_checks.py::_CHECKS arrive PROVEN via REGISTRY_PROOFS records (each entry deleted
+        # from the real file -> its tests/test_reader_check_<class>_4185.py FAILED; restored byte-identical -> passed).
+        # Unproven stays 540; eight entrants. MEASURED by id-set diff on the MERGE tree against a `git archive origin/main`
+        # export at 33aa0f474: lane {proven 224, unproven 540, 6, 5} vs main {216, 540, 6, 5}.
+        <= 224
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
