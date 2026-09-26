@@ -2183,29 +2183,12 @@ Write your {domain_label} coaching section now."""
         except Exception as _qa_e:  # noqa: BLE001 — the archive is never load-bearing
             print(f"[COACH-V2:{coach_id}] qa_archive failed (non-blocking): {_qa_e}")
 
-        # Step 7: Invoke state updater (async) — records the final, gate-passed text.
-        try:
-            lambda_client.invoke(
-                FunctionName="coach-state-updater",
-                InvocationType="Event",
-                Payload=json.dumps(
-                    {
-                        "coach_id": coach_id,
-                        "output_text": output,
-                        "output_type": output_type,
-                        # #2815: OUTPUT# frame, converted atomically with its whole writer/
-                        # consumer set — coach_state_updater.py's own no-generation_date
-                        # fallback, inter_coach_dialogue_lambda.py's writer, and
-                        # coach_quality_gate.py's same-day self-exclusion all resolve the
-                        # SAME `common.pacific_time.pacific_today()` now, so the sk this
-                        # writes and the sk that read matches against never desync.
-                        "generation_date": pacific_today(),
-                        "data_through": _ci.data_through(data),  # #4185: the last data day this read was written from
-                    }
-                ).encode(),
-            )
-        except Exception as e:
-            print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
+        # Step 7: Invoke state updater (async) — records the final, gate-passed text. #4185: through
+        # `coach_brief_input_gate.record_output`, the ONE state-updater writer this fresh path and
+        # the reuse path share (it carries `data_through`). #2815: `generation_date` is the OUTPUT#
+        # frame — `pacific_today()`, the SAME Pacific day coach_state_updater's own fallback,
+        # inter_coach_dialogue_lambda's writer and coach_quality_gate's self-exclusion resolve.
+        _in_gate.record_output(lambda_client, coach_id, output_type, output, pacific_today(), data_through=_gate.data_through)
 
         return output
 

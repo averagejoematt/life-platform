@@ -480,6 +480,28 @@ def upstream_parts(
     }
 
 
+def record_output(lambda_client, coach_id: str, output_type: str, text: str, generation_date: str, **fields) -> None:
+    """Hand a published coach read to `coach-state-updater` (async) — the OUTPUT# writer.
+
+    The ONE call both the fresh path (`ai_calls._run_coach_v2_pipeline` Step 7) and the
+    reuse path (`serve_reuse`) make, so the payload cannot drift between them (#4185 moved
+    the fresh copy here to carry `data_through` without growing the size-ratcheted
+    `ai_calls`). `fields` are the optional extras — `data_through` (#4185: the last data
+    day the read was written from) and, on a reuse, `unchanged_since`. Never raises: a
+    failed record must never block serving the text.
+    """
+    try:
+        lambda_client.invoke(
+            FunctionName="coach-state-updater",
+            InvocationType="Event",
+            Payload=json.dumps(
+                {"coach_id": coach_id, "output_text": text, "output_type": output_type, "generation_date": generation_date, **fields}
+            ).encode(),
+        )
+    except Exception as e:  # noqa: BLE001 — never block serving a coach read
+        print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
+
+
 def serve_reuse(
     lambda_client,
     table,
@@ -509,25 +531,8 @@ def serve_reuse(
     """
     _gc.record_reuse(table, coach_id, cache_output_type or output_type, today)
     _gc.emit_skip_metric(cw, namespace, coach_id, surface=surface)
-    try:
-        lambda_client.invoke(
-            FunctionName="coach-state-updater",
-            InvocationType="Event",
-            Payload=json.dumps(
-                {
-                    "coach_id": coach_id,
-                    "output_text": text,
-                    "output_type": output_type,
-                    "generation_date": today,
-                    "unchanged_since": unchanged_since,
-                    # #4185: the last data day the reused read was re-validated against — a
-                    # hit means today's inputs are unchanged, so it is today's data day too.
-                    "data_through": data_through,
-                }
-            ).encode(),
-        )
-    except Exception as e:  # noqa: BLE001 — never block serving a reused output
-        print(f"[COACH-V2:{coach_id}] State updater invoke (reuse) failed (non-blocking): {e}")
+    # #4185: a hit means today's inputs are unchanged, so today's data day is the reused read's too.
+    record_output(lambda_client, coach_id, output_type, text, today, data_through=data_through, unchanged_since=unchanged_since)
     return text
 
 
