@@ -275,7 +275,7 @@ def test_quiet_source_is_rehomed_out_of_the_amber_stale_list():
     assert "Data Status" in amber and "whoop" in amber
     assert "macrofactor" not in amber and "MacroFactor" not in amber
     assert "MacroFactor" in quiet_block
-    assert "nothing logged since 2026-06-24 (45 days)" in quiet_block
+    assert "nothing logged since Wednesday, June 24 (45 days)"  # #4182: dates in words in quiet_block
     assert "not an outage" in quiet_block and "#2326" in quiet_block
 
 
@@ -287,7 +287,7 @@ def test_quiet_notice_renders_without_any_stale_source():
 def test_stale_banner_unchanged_when_nothing_is_quiet():
     html = bds.build_data_status_banner_html([_STALE_WHOOP], [])
     assert "Data Status — 1 source stale" in html
-    assert "whoop — last update 2026-08-04 (5d ago)" in html
+    assert "whoop — last update Tuesday, August 4 (5 days ago)"  # #4182: dates in words in html
     assert "Quiet inputs" not in html
 
 
