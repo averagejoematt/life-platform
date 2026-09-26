@@ -35,6 +35,37 @@ Falls back to the routine-level notes when an exercise names no intensity of its
 prescription for the day). Basis is always reported alongside the number, so a
 consumer can tell an exercise-specific ceiling from a session-wide fallback.
 
+A ROUTINE NOTE CAN NAME A MOVEMENT (#4160). "Squat novel-again: exposure 1 of 3, RPE 7
+max." (live, 09-24, `b1b9960468f374e30dcdeca8630dd18f`) used to be read as a
+SESSION-WIDE ceiling — every other movement in that session (RDL, leg press, leg curl,
+calf press) was graded against RPE 7 too, because `resolve_ceiling` only ever handed
+`routine_notes` to `read_ceiling` as one undifferentiated block.
+
+THE RULING (#4160): a routine-note clause that NAMES a movement is scoped to the
+movements it names. Only a clause that names none stays session-wide. Grammar, applied
+clause-by-clause (`routine_notes` split on `.`/`;`/newline):
+
+  * a clause is SCOPED when it opens with a short leading phrase (<=4 words) followed
+    immediately by `:` or a dash (`-`/`–`/`—`) — "Squat novel-again: … RPE 7 max.",
+    "OHP - RPE 8 max." The leading phrase is the named movement.
+  * a clause with no such leading name-then-separator shape is UNSCOPED and reads
+    session-wide, exactly as before this change — "Pull, RPE 8 hard cap." has a comma,
+    not a name separator, so "Pull" is prose, not a scope.
+  * a SCOPED clause's ceiling applies only to a movement whose catalog title (the
+    caller's own resolved title — see `movement_title` below) shares a word with the
+    named phrase (matched longest-phrase-first, so "Squat novel-again" matches "Squat
+    (Barbell)" on "squat" once the descriptive suffix fails to match in full). A movement
+    whose title does NOT share a word is excluded from that clause's ceiling — it is
+    never treated as session-wide by a clause that named someone else.
+
+`resolve_ceiling`'s new `movement_title` parameter carries the name to scope against.
+It is the CALLER's job to resolve a movement_key to its catalog title (reusing the
+catalog lookup the caller already has — `adherence_calc._movement_title_for_classification`,
+built for #4073) and pass it in; this module stays pure/stdlib-only and never reads the
+catalog itself, so there is no second movement-name matcher. Passing no `movement_title`
+(the pre-#4160 call shape) reads `routine_notes` as one block exactly as before —
+existing callers are unaffected.
+
 MOST-PERMISSIVE WINS, deliberately. A block of prose can name several intensities
 ("Target 3 RIR. PERFORMANCE-GATED: if set 1 moves at 4+ RIR, climb…"). Taking the
 HIGHEST implied RPE ceiling is the conservative read: it minimises false
@@ -73,6 +104,15 @@ _RPE_RE = re.compile(rf"\brpe\s*(?:{_CEILING_WORD}\s+)?@?\s*({_NUM})(?:\s*(?:[-�
 # "3 RIR", "4+ RIR", "2-3 RIR", "1-2 RIR"
 _RIR_RE = re.compile(rf"\b({_NUM})\s*(?:\+\s*)?(?:(?:[-–—]|\s+to\s+)\s*({_NUM})\s*\+?\s*)?rir\b", re.IGNORECASE)
 
+# #4160 — a routine note is read clause-by-clause so a movement-naming clause can be
+# scoped rather than session-wide. Split on sentence/clause boundaries.
+_CLAUSE_SPLIT_RE = re.compile(r"[.\n;]+")
+# A clause opens with a short leading phrase (<=4 words) immediately followed by a
+# colon or dash: "Squat novel-again: …", "OHP - …". A comma does not count ("Pull, RPE
+# 8 hard cap." is prose, not a name) — that distinction is deliberate, it is what keeps
+# every pre-#4160 session-wide note reading session-wide.
+_SCOPE_NAME_RE = re.compile(r"^\s*([A-Za-z][\w/&()'+]*(?:\s+[\w/&()'+-]+){0,3}?)\s*[:\-–—]\s*\S")
+
 
 def _clamp(v: float) -> float:
     return max(RPE_MIN, min(RPE_MAX, v))
@@ -110,6 +150,86 @@ def read_ceiling(text: str | None) -> tuple[float | None, str | None]:
     return max(found), form
 
 
+def _normalize_words(s: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+
+def _strip_parenthetical(s: str | None) -> str:
+    return re.sub(r"\([^)]*\)", " ", s or "")
+
+
+def _extract_scope_name(clause: str) -> str | None:
+    """The leading movement-name phrase of one clause, or None when the clause has no
+    name-then-separator shape (#4160 grammar, see module docstring)."""
+    m = _SCOPE_NAME_RE.match(clause)
+    if not m:
+        return None
+    name = m.group(1).strip()
+    # A colon after the ceiling word itself ("RPE: 7") must not be read as a name.
+    if not name or _RPE_RE.search(name) or _RIR_RE.search(name):
+        return None
+    return name
+
+
+def _name_matches_title(name: str, title: str | None) -> bool:
+    """Does the routine note's named phrase name this movement's catalog title?
+
+    Longest-phrase-first: try the whole normalized name, then progressively drop the
+    trailing word. "Squat novel-again" fails whole ("squat novel again" is not in
+    "squat barbell") and then matches on "squat" alone — the trailing words are the
+    note's own exposure/set prose, not part of the movement's name, and this is how a
+    single-word name still resolves without requiring the note to spell the title out
+    in full. A multi-word catalog title ("Leg Press") matches whole when the note names
+    it in full, so two different movements sharing one generic word ("leg") are never
+    both claimed by a name that only ever offers the word "leg" alone.
+    """
+    title_n = _normalize_words(_strip_parenthetical(title))
+    words = _normalize_words(name).split()
+    if not words or not title_n:
+        return False
+    for n in range(len(words), 0, -1):
+        candidate = " ".join(words[:n])
+        if re.search(rf"\b{re.escape(candidate)}\b", title_n):
+            return True
+    return False
+
+
+def _routine_notes_ceiling(routine_notes: str | None, movement_title: str | None) -> tuple[float | None, str | None]:
+    """The routine-note ceiling for ONE movement (#4160).
+
+    `movement_title` is None for callers that predate the scoping feature (or that
+    could not resolve a title): the whole block reads exactly as `read_ceiling` always
+    has, unscoped. When a title IS given, each clause is read on its own — a clause
+    that names a movement contributes its ceiling only when the name matches this
+    movement's title (`_name_matches_title`); a clause that names no movement (or that
+    names a DIFFERENT one) is excluded rather than defaulting to session-wide, because a
+    routine note that explicitly names another movement is not silent about this one —
+    it is silent BY EXCLUSION, and #4073's program-default fallback is what should apply.
+    Most-permissive-wins still holds across whatever remains, same as `read_ceiling`.
+    """
+    if not routine_notes:
+        return None, None
+    if movement_title is None:
+        return read_ceiling(routine_notes)
+
+    caps: list[float] = []
+    forms: set[str] = set()
+    for clause in _CLAUSE_SPLIT_RE.split(routine_notes):
+        cap, form = read_ceiling(clause)
+        if cap is None:
+            continue
+        name = _extract_scope_name(clause)
+        if name is not None and not _name_matches_title(name, movement_title):
+            continue  # named a DIFFERENT movement — excluded, not session-wide
+        caps.append(cap)
+        forms.add(form)
+
+    if not caps:
+        return None, None
+    form = "rpe+rir" if len(forms) > 1 else next(iter(forms))
+    return max(caps), form
+
+
 def _branch_ceiling(branches: Any, movement_key: str) -> float | None:
     """GREEN's `rpe_cap` for one movement out of a stashed recovery_branches dict.
 
@@ -130,6 +250,7 @@ def resolve_ceiling(
     exercise_notes: str | None,
     routine_notes: str | None = None,
     recovery_branches: Any = None,
+    movement_title: str | None = None,
 ) -> dict[str, Any]:
     """Resolve ONE movement's prescribed RPE ceiling. Precedence: structured branch →
     the exercise's own notes → the session-level routine notes.
@@ -138,6 +259,12 @@ def resolve_ceiling(
     from ("recovery_branches:green", "exercise_notes:rir", "routine_notes:rpe", …) so a
     reader can tell a movement-specific ceiling from a session-wide fallback — and so a
     `None` ceiling is legible as "the plan never said", not as "compliant".
+
+    `movement_title` (#4160) is this movement's catalog title, supplied by the caller so
+    a routine-note clause that NAMES a movement ("Squat novel-again: … RPE 7 max.")
+    scopes to that movement instead of every movement in the session — see the module
+    docstring for the ruling and grammar. Omit it (the pre-#4160 call shape) to read
+    `routine_notes` as one undifferentiated block, unchanged.
     """
     cap = _branch_ceiling(recovery_branches, movement_key)
     if cap is not None:
@@ -147,7 +274,7 @@ def resolve_ceiling(
     if cap is not None:
         return {"rpe": cap, "basis": f"exercise_notes:{form}"}
 
-    cap, form = read_ceiling(routine_notes)
+    cap, form = _routine_notes_ceiling(routine_notes, movement_title)
     if cap is not None:
         return {"rpe": cap, "basis": f"routine_notes:{form}"}
 

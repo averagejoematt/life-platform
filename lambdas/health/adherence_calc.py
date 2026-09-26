@@ -75,6 +75,18 @@ gets no default: ADR-104 absence semantics still apply where the program truly h
 to say. `intensity["basis"]` names a defaulted ceiling `"program_default:accessory"` /
 `"program_default:anchor:<family>"` so a reader can always tell an inherited program number
 from the routine's own words.
+
+ROUTINE-NOTE CEILINGS ARE SCOPED TO THE MOVEMENT THEY NAME (#4160). A routine note that
+names a specific movement — "Squat novel-again: exposure 1 of 3, RPE 7 max." (live,
+09-24) — used to be read by `resolve_ceiling` as a SESSION-WIDE cap: every other
+movement in that session (RDL, leg press, leg curl, calf press) was graded against RPE 7
+too, instead of falling through to its own or the #4073 program-default ceiling. This
+module resolves each exercise's catalog title (`_movement_title_for_classification`,
+the SAME lookup #4073 already built) and hands it to `resolve_ceiling` as
+`movement_title` so the note's parser (`training.intensity_prescription`, which stays
+catalog-free on purpose) can tell a clause that names THIS movement from a clause that
+names a different one or none at all. See that module's docstring for the ruling and
+grammar. Only an unscoped clause still reads session-wide.
 """
 
 from __future__ import annotations
@@ -405,7 +417,12 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     for ex in ir.exercises:
         tid = _ir_movement_to_template(catalog, ex.movement_key, cache)
         sets = len(ex.sets)
-        ceiling = resolve_ceiling(ex.movement_key, getattr(ex, "notes", "") or "", routine_notes, recovery_branches)
+        # #4160 — the title a routine-note clause naming a movement is matched against
+        # (SAME lookup #4073 already resolves through; no second matcher).
+        movement_title = _movement_title_for_classification(ex.movement_key, catalog, alias_titles) or None
+        ceiling = resolve_ceiling(
+            ex.movement_key, getattr(ex, "notes", "") or "", routine_notes, recovery_branches, movement_title=movement_title
+        )
         if ceiling["rpe"] is None:
             # #4073 — the routine's own words named no ceiling; fall back to the program's
             # class-level default (accessory / anchor pattern) before calling it ungraded.

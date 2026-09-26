@@ -509,6 +509,90 @@ def test_a_tmpl_movement_the_catalog_knows_by_template_id_gets_the_default_and_i
     assert result["per_muscle"] == {"quadriceps": 100.0}, result["per_muscle"]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# #4160 — a routine note that NAMES a movement scopes to it, not the whole session.
+#
+# LIVE SPECIMEN (verbatim, 09-24, routine `b1b9960468f374e30dcdeca8630dd18f`, Hevy
+# workout `3ca1117e…`): "Upper/Lower blk 1 - Lower-heavy. Squat novel-again: exposure 1
+# of 3, RPE 7 max." Before this fix `resolve_ceiling` read the whole block as a
+# SESSION-WIDE RPE-7 ceiling: RDL, leg press, leg curl and calf press were all graded
+# against 7 instead of their own program-default ceiling (v0.3 accessories default to
+# RPE 9 per #4102/#4073; the hinge/squat anchor families default to RPE 8), and the
+# session read 15 sets over ceiling and 11.8% adherence.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _live_0924_lower_ir() -> RoutineSpec:
+    return RoutineSpec(
+        routine_id="b1b9960468f374e30dcdeca8630dd18f",
+        target_date="2026-09-24",
+        archetype="lower",
+        notes="Upper/Lower blk 1 - Lower-heavy. Squat novel-again: exposure 1 of 3, RPE 7 max.",
+        exercises=[
+            ExerciseBlock(movement_key="squat_barbell", sets=[Set()] * 3),
+            ExerciseBlock(movement_key="romanian_deadlift_barbell", sets=[Set()] * 3),
+            ExerciseBlock(movement_key="leg_press", sets=[Set()] * 3),
+            ExerciseBlock(movement_key="leg_curl", sets=[Set()] * 3),
+            ExerciseBlock(movement_key="calf_press_machine", sets=[Set()] * 3),
+        ],
+    )
+
+
+def _live_0924_lower_performed() -> dict:
+    return {
+        "exercises": [
+            {"exercise_template_id": "D04AC939", "sets": _sets(7.0, 7.5, 8.5)},  # squat_barbell
+            {"exercise_template_id": "2B4B7310", "sets": _sets(7.5, 8.0, 8.5)},  # romanian_deadlift_barbell
+            {"exercise_template_id": "C7973E0E", "sets": _sets(7.5, 8.0, 8.5)},  # leg_press
+            {"exercise_template_id": "B8127AD1", "sets": _sets(8.5, 9.0, 9.5)},  # leg_curl
+            {"exercise_template_id": "91237BDD", "sets": _sets(8.5, 9.0, 9.5)},  # calf_press_machine
+        ]
+    }
+
+
+def test_named_routine_note_caps_only_the_named_movement():
+    """The squat — the movement the clause names — keeps the routine's own RPE 7 cap."""
+    result = calculate_adherence(_live_0924_lower_ir(), _live_0924_lower_performed())
+    squat = next(m for m in result["movements"] if m["movement_key"] == "squat_barbell")
+    assert squat["intensity"]["basis"] == "routine_notes:rpe"
+    assert squat["intensity"]["ceiling_rpe"] == 7.0
+    assert squat["intensity"]["sets_over_ceiling"] == 2  # 7.5 and 8.5; the 7.0 set is AT cap, not over
+
+
+@pytest.mark.parametrize(
+    "movement_key,expected_basis,expected_ceiling",
+    [
+        ("romanian_deadlift_barbell", "program_default:anchor:hinge", 8.0),
+        ("leg_press", "program_default:anchor:squat", 8.0),
+        ("leg_curl", "program_default:accessory", 9.0),
+        ("calf_press_machine", "program_default:accessory", 9.0),
+    ],
+)
+def test_named_routine_note_does_not_cap_the_other_movements(movement_key, expected_basis, expected_ceiling):
+    """MUTATION CONTROL: this is the regression #4160 fixes. If the routine-note clause
+    is ever made session-wide again (the name dropped, or the scoping check removed),
+    EVERY one of these movements reads `basis: "routine_notes:rpe"` and
+    `ceiling_rpe: 7.0` instead of its own program-default ceiling — this test goes red
+    the moment that happens."""
+    result = calculate_adherence(_live_0924_lower_ir(), _live_0924_lower_performed())
+    movement = next(m for m in result["movements"] if m["movement_key"] == movement_key)
+    assert movement["intensity"]["basis"] == expected_basis, movement
+    assert movement["intensity"]["ceiling_rpe"] == expected_ceiling, movement
+    assert movement["intensity"]["sets_over_ceiling"] == 1  # only the top-end set (8.5 / 9.5) is over ITS OWN ceiling
+
+
+def test_named_routine_note_session_rollup_reflects_the_scoped_ceilings():
+    """Before #4160: 14 of 15 sets read "over ceiling" (session-wide RPE 7), ~6.7%
+    adherence. After: only the sets over each movement's OWN ceiling are flagged."""
+    result = calculate_adherence(_live_0924_lower_ir(), _live_0924_lower_performed())
+    intensity = result["intensity_adherence"]
+    assert intensity["status"] == "graded"
+    assert intensity["sets_graded"] == 15
+    assert intensity["sets_over_ceiling"] == 6  # 2 (squat) + 1 each (RDL, leg press, leg curl, calf press)
+    assert intensity["pct"] == 60.0
+    assert result["as_prescribed"]["verdict"] == "no"
+
+
 def test_the_template_id_lookup_is_exact_and_case_insensitive():
     catalog = {"movements": {"leg_extension_machine": {"title": "Leg Extension (Machine)", "hevy_template_id_hint": "75A4F6C4"}}}
     assert adherence_calc._catalog_entry_for("tmpl:75a4f6c4", catalog)["title"] == "Leg Extension (Machine)"
