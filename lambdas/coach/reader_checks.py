@@ -508,16 +508,36 @@ def _brief_inputs(generation_brief: Any) -> tuple:
     return allowed, (facts if isinstance(facts, dict) else {}), generation_brief.get(READER_SLOT_KEY)
 
 
-def merge_into_report(payload: dict, output_text: str, generation_brief: Any) -> list:
-    """Fold the reader findings into a quality-gate report (ADR-108 regenerate-or-hold).
+def merge_into_report(
+    payload: dict, output_text: str, generation_brief: Any, cycle_boundary: Optional[Callable[[str], list]] = None
+) -> list:
+    """Fold the deterministic findings into a quality-gate report (ADR-108 regenerate-or-hold).
 
-    Any finding sets ``passed=False``, lands under ``reader_check_findings`` (each named by
-    ``check``), and appends its correction to ``suggestions`` — which
-    ``ai_calls._quality_gate_correction_note`` already renders into the regeneration note.
-    Returns the findings (empty = nothing merged, the report untouched).
+    ``cycle_boundary`` (the #1973 ``board_quality_gate.cycle_boundary_violations``, passed
+    in by ``ai_calls._invoke_quality_gate_sync``) is applied first, exactly as that caller
+    used to inline it: findings under ``cycle_boundary_violations`` and ``passed=False``.
+
+    Then the reader classes: any finding sets ``passed=False``, lands under
+    ``reader_check_findings`` (each named by ``check``), and appends its correction to
+    ``suggestions`` — which ``ai_calls._quality_gate_correction_note`` already renders into
+    the regeneration note. Each half fails soft on its own (logged, never raised), so a
+    defect in one can never silence the other or turn the gate's verdict into a fail-open.
+    Returns the reader findings (empty = nothing merged by this half).
     """
-    allowed, facts, slot = _brief_inputs(generation_brief)
-    findings = reader_findings(output_text, facts=facts, allowed=allowed, slot=slot)
+    if cycle_boundary is not None:
+        try:
+            cb_findings = cycle_boundary(output_text)
+            if cb_findings:
+                payload["cycle_boundary_violations"] = cb_findings
+                payload["passed"] = False
+        except Exception as e:  # noqa: BLE001 — the #1973 half is non-blocking, as it was inline
+            print(f"[COACH-QUALITY-GATE] cycle-boundary check unavailable (non-blocking): {e}")
+    try:
+        allowed, facts, slot = _brief_inputs(generation_brief)
+        findings = reader_findings(output_text, facts=facts, allowed=allowed, slot=slot)
+    except Exception as e:  # noqa: BLE001 — a reader-check defect must not fail the whole gate open
+        print(f"[COACH-QUALITY-GATE] reader checks unavailable (non-blocking): {e}")
+        return []
     if findings:
         payload[REPORT_KEY] = findings
         payload["passed"] = False
