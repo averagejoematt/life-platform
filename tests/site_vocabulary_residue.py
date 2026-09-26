@@ -37,6 +37,8 @@ BASELINE = {
 }
 
 # The static-reach ratchet (ruling vi): reader pages reachable from "/" by <a href> links in
-# the static HTML. 39 at landing (of 91 pages). The owner's cap (24 proposed) is set by
-# lowering this number; until then the count may only fall.
-NAV_REACH_CEILING = 39
+# the static HTML. 39 at landing (of 91 pages); 25 since the 2026-09-26 panel ruling (#4182 —
+# the footer pour + registry "unlisted" flags + body links retargeted; no page deleted, no URL
+# moved), measured 25 by tests/site_text.static_reach() on the PR that set it. Going below 25
+# needs the owner to strike pages; until then the count may only fall.
+NAV_REACH_CEILING = 25

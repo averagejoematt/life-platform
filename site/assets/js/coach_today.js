@@ -203,12 +203,11 @@ export function recordLine(overall) {
 // Plain-English glosses for the three terms the coaches use most (panel table, ruling
 // vii). Rendered as chrome UNDER a coach's read, only for terms the served text actually
 // uses — the text itself is never touched. HRV's and EWMA's lines are the site glossary's
-// own (site/config/glossary.json, #4035 — tests/js/coach_today_4182.test.mjs pins them
-// equal, one definition per term). "recovery" is not a registry term (the registry is
-// exact-case acronyms; the word is everyday English everywhere else on the site), so its
-// panel wording lives here.
+// own (site/data/glossary.json, the one registry since #4182 — tests/js/coach_today_4182.test.mjs
+// pins them equal, one definition per term). "recovery" is not a registry term (the word is
+// everyday English everywhere else on the site), so its panel wording lives here.
 export const READER_GLOSS = [
-  { term: "HRV", re: /\bHRV\b/, plain: "Heart rate variability — the millisecond-level variation between heartbeats; a higher number usually signals a better-recovered autonomic nervous system." },
+  { term: "HRV", re: /\bHRV\b/, plain: "heart-rate variability — a nightly nervous-system reading; higher is usually better rested" },
   { term: "recovery", re: /\brecovery\b/i, plain: "Whoop's 0–100 morning score of how rested his body looks." },
   { term: "EWMA", re: /\bEWMA\b/, plain: "Exponentially weighted moving average — a running average that counts recent days more than older ones, so a trend reacts to change without chasing one noisy day." },
 ];
