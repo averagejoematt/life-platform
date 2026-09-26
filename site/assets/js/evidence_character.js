@@ -109,7 +109,7 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
         <div class="ch-emblem">${tierEmblem(tier, level)}</div>
         <p class="ch-class label">${tt}${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · written ${esc(String(ch.as_of_date))}` : ""}</p>
         ${moodLine}
-        <p class="ch-idnote">One character, seven pillars — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's pillar scores; the emblem evolves with the tier.</p>
+        <p class="ch-idnote">One character, seven areas — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's area scores; the emblem evolves with the tier.</p>
         ${
           // DIL-049 D4 (score-transparency, cheap half): composite_score renders
           // identically whether it averaged 7 pillars or 3 — /method/game states the
@@ -167,7 +167,7 @@ export function chBottlenecks(pillars) {
 /* The honest replacement copy — says WHICH of the two conditions is missing. */
 export function chBottleneckNote(pillars) {
   const measured = (pillars || []).filter((p) => !chUnmeasured(p)).length;
-  return `No bottleneck yet — ${measured < 2 ? "the pillars have no measured days behind them" : "every measured pillar is sitting at the same score"}, so there is nothing to rank. The weakest-pillar route appears once the scores separate.`;
+  return `No bottleneck yet — ${measured < 2 ? "the areas have no measured days behind them" : "every measured area is sitting at the same score"}, so there is nothing to rank. The weakest-area route appears once the scores separate.`;
 }
 
 export function chWhy(p) {
@@ -241,8 +241,8 @@ export function chStatHtml(pillars, hist) {
   // one surface that could not see an absence drew it as a vertex at 0 (or at the
   // engine's placeholder 50).
   const radar = radarChart(pillars.map((p) => ({ key: p.name, label: CH_ABBR[p.name] || p.name, value: p.raw_score, not_instrumented: chUnmeasured(p) })));
-  return sec("The seven pillars", `<div class="ch-statgrid"><div class="ch-rows">${rows}</div>${radar}</div>
-    <p class="rd-why">Each pillar scores 0–100 nightly from its own real data (wearables, the food log, habits, labs), then an EMA smooths it and a streak gate decides level moves — one great day can't swing a level, and a level-up also needs the day itself to have been lived at that level. Behaviors that didn't happen score zero; a missing sensor reading doesn't. XP is the daily currency: strong days earn it, weak days bleed it.</p>`);
+  return sec("The seven areas", `<div class="ch-statgrid"><div class="ch-rows">${rows}</div>${radar}</div>
+    <p class="rd-why">Each area scores 0–100 nightly from its own real data (wearables, the food log, habits, labs), then an EMA smooths it and a streak gate decides level moves — one great day can't swing a level, and a level-up also needs the day itself to have been lived at that level. Behaviors that didn't happen score zero; a missing sensor reading doesn't. XP is the daily currency: strong days earn it, weak days bleed it.</p>`);
 }
 
 export async function renderCharacter(d) {
