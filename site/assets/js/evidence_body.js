@@ -6,6 +6,7 @@ import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, 
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, figs, sec, empty, note, evClass, kvtable, socialContextSection } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #978 pre-start signal · #1252 genesis for carry-forward markers
+import { dataThrough, countWord } from "/assets/js/entry_age.js"; // #4182 — dates + small counts in words, one spelling
 
 // #1940 — the correction, stated rather than applied quietly.
 // #1892 withdrew citations that pointed at papers which did not support the claims
@@ -29,7 +30,11 @@ function withdrawnCount(d) {
 function correctionNotice(d) {
   const n = withdrawnCount(d);
   if (!n) return "";
-  return `<aside class="supp-correction" role="note"><p class="supp-correction-h label">Correction &middot; 2 August 2026 &middot; updated 4 August 2026</p>` +
+  // #4182 — the correction is still stated, never removed, but it no longer opens the
+  // page: seven weeks on it sits UNDER the cards, collapsed to one dated line a reader
+  // can open. The count in the summary is the same payload derivation as the body.
+  return `<details class="supp-correction" role="note"><summary class="supp-correction-h label">A correction, August 2 &mdash; ${n} citations withdrawn</summary>` +
+    `<p class="supp-correction-dates label">Correction &middot; 2 August 2026 &middot; updated 4 August 2026</p>` +
     `<p><strong>${n} citations on this page were withdrawn.</strong> They pointed to papers that did not support the claims ` +
     `they were attached to &mdash; they were never verified when they were written. Two more were withdrawn from the ` +
     `experiments registry the same day. On 4 August 2026 one of those two (Tongkat Ali) was re-resolved to a real ` +
@@ -37,22 +42,43 @@ function correctionNotice(d) {
     `<p>Nothing was removed quietly: each withdrawn claim now reads &ldquo;Open question&rdquo; below, and the affected ` +
     `compounds&rsquo; evidence ratings were downgraded to match what is actually cited &mdash; in two cases, nothing. ` +
     `Every citation that survives now stores the resolved title of the paper it points to, and a test re-resolves each one ` +
-    `against PubMed, so a citation that does not say what it claims fails the build instead of sitting on the page.</p></aside>`;
+    `against PubMed, so a citation that does not say what it claims fails the build instead of sitting on the page.</p></details>`;
+}
+
+// #4182 — the door's return trigger: what's queued next, from the SAME /api/experiments
+// payload /protocols/experiments/ renders (a status count, never a typed number).
+// Fail-soft: no payload, no line.
+async function queuedLine() {
+  const ex = await tryJSON("/api/experiments");
+  const xs = (ex && ex.experiments) || [];
+  if (!xs.length) return "";
+  const running = xs.filter((x) => x.origin !== "library").length;
+  const ready = xs.filter((x) => x.origin === "library" && x.status === "available").length;
+  if (running) return `<p class="rd-meta rd-return"><a href="/protocols/experiments/">${countWord(running, { capital: true })} experiment${running === 1 ? "" : "s"} running now &rarr;</a></p>`;
+  if (!ready) return "";
+  return `<p class="rd-meta rd-return"><a href="/protocols/experiments/">${countWord(ready, { capital: true })} experiment${ready === 1 ? "" : "s"} ready &mdash; none scheduled &rarr;</a></p>`;
 }
 
 export function renderSupplements(d) {
   const g = d.groups || {};
   const allItems = Object.values(g).flatMap((x) => x.items || []);
-  // #1116 — the loop station: how many entries state their hypothesis. An honest
-  // completeness count, not a claim — unannotated entries simply render nothing.
-  const withLoop = allItems.filter((s) => s.hoped_outcome || s.measured_by).length;
   // #1252: an "as of" date earlier than the current cycle's genesis is a deliberately
   // carried-forward stack (cross_phase, ADR-077), not a staleness bug — co-render a
   // "carried from prep" marker so a pre-genesis date reads as intentional. Genesis is
   // the shared client literal (re-anchors on reset), never a new hardcoded date.
   const asof = String(d.as_of_date || "").slice(0, 10);
   const asofCarried = /^\d{4}-\d{2}-\d{2}$/.test(asof) && /^\d{4}-\d{2}-\d{2}$/.test(GENESIS_ISO) && asof < GENESIS_ISO;
-  const head = figs([fig(d.total_count ?? allItems.length, "compounds"), allItems.length ? fig(`${withLoop}/${allItems.length}`, "with stated hypotheses") : null, d.as_of_date && fig(d.as_of_date, "as of", asofCarried ? "carried from prep" : null)]);
+  // #4182 — the fold is one sentence a friend can read, from the served stack: how many
+  // he takes, how many are paused (`paused` per item), and ONE freshness line in words.
+  // (The old "N/M with stated hypotheses" figure left the fold: the cards below still
+  // render every stated loop, and an unannotated card still renders nothing.)
+  const pausedN = allItems.filter((s) => s && s.paused).length;
+  const takingN = allItems.length - pausedN;
+  const through = dataThrough(asof);
+  const head = allItems.length
+    ? `<p class="rd-primary rd-fold">What he takes: ${fmt(takingN)} in the current stack${pausedN ? `, ${fmt(pausedN)} paused` : ""}.</p>` +
+      (through ? `<p class="rd-meta label rd-fresh">${esc(through)}${asofCarried ? " Carried over from before this start." : ""}</p>` : "")
+    : "";
   // #978 — cycle-aware framing. Before genesis this catalog is the plan going in, not a
   // progress report; say so, keyed off the same pre-start signal every door uses. Once
   // the experiment starts, preStart() returns null and the frame drops away.
@@ -108,13 +134,15 @@ export function renderSupplements(d) {
       // Honest-empty per ADR-104: an entry without a stated hypothesis renders
       // NOTHING here — no placeholder prose, ever.
       const loop = (s.hoped_outcome && !isBad(s.hoped_outcome)) || (s.measured_by && !isBad(s.measured_by))
-        ? `<div class="supp-loop">${s.hoped_outcome && !isBad(s.hoped_outcome) ? `<p class="rd-line supp-hope"><span class="label">hoped outcome</span> ${esc(s.hoped_outcome)}</p>` : ""}${s.measured_by && !isBad(s.measured_by) ? `<p class="rd-line supp-measure"><span class="label">measured by</span> ${esc(s.measured_by)}</p>` : ""}</div>`
+        ? `<div class="supp-loop">${s.hoped_outcome && !isBad(s.hoped_outcome) ? `<p class="rd-line supp-hope"><span class="label">what it should move</span> ${esc(s.hoped_outcome)}</p>` : ""}${s.measured_by && !isBad(s.measured_by) ? `<p class="rd-line supp-measure"><span class="label">how we'd know</span> ${esc(s.measured_by)}</p>` : ""}</div>`
         : "";
       return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}${loop}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div>${adherence}${more}${snpChips}<p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || (srcs[0] || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (srcs[0] || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`;
     }).join("");
     return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`;
   }).join("");
-  return head + frame + correctionNotice(d) + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
+  // Returns a promise (evidence.js awaits every renderer) so the return line can read the
+  // experiments payload; the correction sits under the cards now, collapsed.
+  return queuedLine().then((queued) => head + queued + frame + secs + correctionNotice(d) + note("Evidence strength is the published research consensus — not a claim about Matthew."));
 }
 
 // #3728: the draws count is a LIFETIME figure — labs is CROSS_PHASE, so no restart

@@ -132,3 +132,18 @@
 .lr-selfcert:focus-visible, .lr-cta:focus-visible, .ladder-prov summary:focus-visible {
   outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);
 }
+
+/* #4182 — the ask is the fold: head → the email field → what lands in the inbox. On a
+   phone the form sits right under the one-line promise; on desktop the rows sit under
+   the head and the form keeps its sticky right column. */
+.sub-main { grid-template-areas: "head" "form" "pitch" "ladder"; row-gap: var(--sp-5); }
+.sub-head { grid-area: head; }
+.sub-form { grid-area: form; }
+.sub-pitch { grid-area: pitch; }
+.sub-main > .ladder { grid-area: ladder; }
+@media (min-width: 901px) {
+  .sub-main { grid-template-areas: "head form" "pitch form" "ladder ladder"; }
+  .sub-form { align-self: start; }
+}
+.sub-pitch .wyg { margin-top: 0; }
+.sub-field--opt { margin-top: var(--sp-2); }

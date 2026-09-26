@@ -45,10 +45,10 @@ OUT = Path("site/story")
 # assets/js/dispatches.js — the two must carry the same keys (a shell whose key the JS
 # doesn't know renders the default section).
 SECTIONS = [
-    ("chronicle", "Chronicle", "The weekly chronicle, written by Elena Voss."),
+    ("chronicle", "The weekly write-up", "The weekly write-up, by Elena Voss, the site's AI journalist."),
     # "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20).
-    ("panel", "Podcast", "A weekly two-host show — Elena and a rotating coach review the week."),
-    ("journal", "In my own words", "The daily journal, first-person."),
+    ("panel", "The podcast", "A weekly two-host show — Elena and a rotating coach review the week."),
+    ("journal", "In his own words", "Matthew's own writing, first-person."),
     ("timeline", "Timeline", "Level-ups and milestones — the journey so far."),
     # #1672 (The Social Membrane, epic #1668): the Broadcast feed — Matthew's own
     # public voice, self-hosted as facade cards (cleared, origin:human posts only).
@@ -64,7 +64,7 @@ SECTIONS = [
     # "The Technology" column links it); the entry stays HERE so /story/build/ keeps
     # regenerating (URL unchanged — pinned by tests/test_build_dispatches.py).
     ("build", "Build log", "Engineering dispatches — what shipped, why it mattered, the gotcha, the honest miss."),
-    ("about", "About", "The experiment, in context."),
+    ("about", "Who he is", "Who Matthew is, and why he is doing this — in his own words."),
 ]
 
 # #1237: per-section OG card. The og-image sweep (lambdas/web/og_image_lambda.py PAGES)
@@ -157,10 +157,10 @@ SHELL = """<!DOCTYPE html>
   </header>
   <main id="dx" class="dx-main">
     <div class="page-hero">
-      <p class="ph-kicker label">the story · the writing &amp; the context</p>
+      <p class="ph-kicker label">{kicker}</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
       <h1 class="ph-title">The Story</h1>
-      <p class="ph-promise">The chronicle, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/cockpit/">the cockpit</a> and <a href="/data/">the data</a>, the AI team in <a href="/coaching/">the coaching</a>; this is the why.</p>
+      <p class="ph-promise">{promise}</p>
       {ribbon}
     </div>
     {proof}
@@ -221,6 +221,15 @@ def _section_proof(key: str, chronicle_proof: str) -> str:
     return ""
 
 
+# #4182 — the door's kicker names what the page is for; the About section is "who he
+# is", everything else is the door's own promise.
+DOOR_KICKER = "the story · the weekly write-up, and who he is"
+KICKER_BY_SECTION = {"about": "the story · who he is"}
+DOOR_PROMISE = "An AI journalist writes up each week; Matthew writes in his own words."
+# About is the site's one first-person page — the promise names whose words they are.
+PROMISE_BY_SECTION = {"about": "Matthew, in his own words."}
+
+
 def write(path: Path, html_text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     _apply_chrome.write_page(path, html_text)  # #3721
@@ -243,13 +252,15 @@ def main() -> None:
         OUT / "index.html",
         SHELL.format(
             title="The Story — averagejoematt",
-            desc="The chronicle, the journal, the timeline, and the context behind the experiment.",
+            desc="An AI journalist writes up each week; Matthew writes in his own words.",
             canon="",
             start="chronicle",
             og_card="og-chronicle.png",  # #1395: the story hub leads with the chronicle card
             og_title=hub_og[("property", "og:title")],
             og_desc=hub_og[("property", "og:description")],
             proof=chronicle_proof,
+            kicker=DOOR_KICKER,
+            promise=DOOR_PROMISE,
         ),
     )
     # per-section sub-pages
@@ -266,6 +277,8 @@ def main() -> None:
                 og_title=section_title,
                 og_desc=desc,
                 proof=_section_proof(key, chronicle_proof),
+                kicker=KICKER_BY_SECTION.get(key, DOOR_KICKER),
+                promise=PROMISE_BY_SECTION.get(key, DOOR_PROMISE),
             ),
         )
     print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
