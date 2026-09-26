@@ -62,20 +62,46 @@
   <section class="hero hero-claim" aria-label="Introduction">
     <p class="kicker label">a measured life · proof, not promises</p>
     <h1 class="hero-h">An honest documentary of an <em>ordinary</em> life, rebuilt with AI.</h1>
-    <p class="hero-sub">One regular guy, the wearables he already owns, and an AI board reading every
-      number he produces — published either way, down weeks shown, not hidden. The whole site is one
-      feedback loop. Scroll it once and you know how everything here works.</p>
+    <p class="hero-sub">One regular guy, the wearables he already owns, and a staff of AI coaches reading every
+      number he produces — published either way, down weeks shown, not hidden.</p>
     <p class="hero-day label" data-bind="genesisStamp" hidden></p>
     <p class="hero-proof" data-bind="hero-proof" hidden></p>
     <p class="hero-quiet" data-bind="hero-quiet" hidden></p>
   </section>
+
+  <!-- #4182 — the front door answers the friend's question FIRST (owner, 2026-09-25: "friends who go
+       to it are overwhelmed with the layout, the content, what to do"). The plain-language weekly
+       read (#789) moves from three screens down to directly under the claim; the loop dial
+       follows as "How the pieces fit". This reverses the 2026-07-19 fold order (#1469 variant A,
+       "the dial owns the fold") on the owner's 2026-09-25 ruling; the panel record is in
+       docs/SITE_TRANSFORMATION_V6.md. Same renderer, same endpoints, no new fetch. -->
+  <div class="arc arc-lead">
+    <section class="beat beat-okay okay-first" id="okay" aria-label="Is he okay this week — the plain-language version">
+      <p class="beat-kicker label">for family &amp; friends · the short version</p>
+      <h2 class="beat-h">Is he okay this week?</h2>
+      <div class="okay-card" data-okay>
+        <p class="okay-fallback">A plain-language weekly status loads here. In the meantime, <a href="/cockpit/">the live cockpit</a> has the day's actual numbers.</p>
+      </div>
+      <!-- #4182 (the site-v6 front door, panel ruling 2026-09-26): the coaches, defined once in
+           the fold — software, not people — and the three doors as plain sentences. The
+           roster is not counted here on purpose (a number is registry vocabulary; the count
+           lives on /coaching/ where it is served). -->
+      <p class="okay-coaches">A staff of AI coaches — software, not people — reads his numbers every morning and writes him notes. Their calls get checked.</p>
+      <ul class="okay-doors" aria-label="Where to go next">
+        <li><a href="/cockpit/">Today, in one screen →</a></li>
+        <li><a href="/coaching/">What the coaches said →</a></li>
+        <li><a href="/story/">The story so far →</a></li>
+      </ul>
+    </section>
+  </div>
 
   <!-- The loop stage: the dial is code-drawn inline SVG on the design tokens; the
        station icons come from the shared sprite (icons.js vocabulary, §8.1). The
        scroll choreography is additive state — with JS off (or reduced motion) every
        element renders; nothing is hidden behind motion. #949: no hand-coded start
        weight — the close verse binds the live baseline. -->
-  <section class="stage" data-stage data-focus="data" aria-label="The loop, station by station">
+  <section class="stage" data-stage data-focus="data" aria-label="How the pieces fit — the loop, station by station">
+    <h2 class="stage-h beat-h">How the pieces fit</h2>
     <div class="stage-grid">
       <div class="dial-wrap">
         <figure class="dial" aria-label="The causal loop this site runs on: the data feeds the coaching, the coaching proposes the protocols, the protocols shift the data, and the story narrates all of it. The live day counter sits at the hub.">
@@ -239,15 +265,6 @@
           a clear pattern with the others yet. <strong>Tap a pillar to open its evidence.</strong>
         </figcaption>
       </figure>
-    </section>
-
-    <section class="beat beat-okay" id="okay" aria-label="Is he okay this week — the plain-language version">
-      <p class="beat-kicker label">for family &amp; friends · the short version</p>
-      <h2 class="beat-h">Is he okay this week?</h2>
-      <div class="okay-card" data-okay>
-        <p class="okay-fallback">A plain-language weekly status loads here. In the meantime, <a href="/cockpit/">the live cockpit</a> has the day's actual numbers.</p>
-      </div>
-      <p class="beat-deeper"><a href="/cockpit/" class="cta cta-quiet">See the full daily instrument →</a></p>
     </section>
 
     <!-- #1244 RETIRED at the 2026-09-06 launch re-anchor (owner decision, 2026-08-31 —

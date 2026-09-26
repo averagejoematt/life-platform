@@ -10,7 +10,8 @@
     By Coach             — a coach's read rendered ON TOP of their domain data
                            (observatory_week + coach_analysis) — the owner's ask.
     The Team             — roster · personalities · how they're built (reference).
-    AI lab notes         — the Third Wall (AI's weekly read ↔ Matthew's response).
+    What the AI said,    — the weekly lab notes: the AI's read ↔ how the week felt
+    and how it felt        (the "Third Wall" name was cut from reader surfaces, #4182 vii-8).
     Ask the board        — a reader's question → answered in an upcoming lab note.
 
   Pure surfacing of existing endpoints (/api/coaching-dashboard, /api/coach_team,
@@ -32,7 +33,7 @@
 */
 import { pageData } from "/assets/js/page_data.js"; // #3048 — per-page start section, JSON island
 import { initTheme } from "/assets/js/theme.js";
-import { enhanceCoachNames, stampGenesis, preStart } from "/assets/js/coach_popover.js"; // + #949 pre-start gate
+import { enhanceCoachNames, stampGenesis, preStart, genesisCount } from "/assets/js/coach_popover.js"; // + #949 pre-start gate; #4182 the kicker's Day N
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
 import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 stance-change sweep
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
@@ -40,6 +41,7 @@ import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — rea
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { rosterEntries } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
+import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -48,7 +50,8 @@ const SECTIONS = [
   // daily evaluator (confirmed/refuted/pending). Honest-empty until calls resolve.
   { key: "scorecard", label: "Scorecard", kicker: "the board's track record", kind: "scorecard", url: "/api/predictions" },
   { key: "team", label: "The Team", kicker: "who they are · how they're built", kind: "team", url: "/api/coaches" },
-  { key: "lab-notes", label: "AI lab notes", kicker: "the AI's read ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
+  // #4182 (panel ruling vii-8): "the Third Wall" is cut from reader surfaces; the URL stays.
+  { key: "lab-notes", label: "What the AI said, and how it felt", kicker: "the AI's read ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
   // Reader Q&A — ask a question (form) AND read the ones the board has answered
   // (PG-ENG-2 static feed published by scripts/publish_board_answer.py; empty-but-honest).
   { key: "qa", label: "Ask the Board", kicker: "you asked — the board answered", kind: "qa", url: "/board_answers/answers.json" },
@@ -62,7 +65,7 @@ const OBS_DOMAINS = new Set(["sleep", "training", "nutrition", "mind", "physical
 // tests/test_board_lead_single_character.py pins it equal to the registry's lead.
 const LEAD_BYLINE_FALLBACK = "Dr. Eli Marsh";
 const READ_SCOPES = [
-  { id: "today", title: "Today", date: "the board's read right now" },
+  { id: "today", title: "Today", date: "every coach's latest read" },
   { id: "week", title: "This week", date: "the week in each domain" },
   { id: "month", title: "This month", date: "the month's pattern" }, // #1115
   { id: "experiment", title: "The experiment", date: "the arc so far" },
@@ -72,6 +75,9 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
 async function tryJSON(p) { try { return await getJSON(p); } catch (e) { return null; } }
+// #4182: the first screen and the Read tab read the same payloads — one request each per load.
+const _once = {};
+const tryOnce = (p) => _once[p] || (_once[p] = tryJSON(p));
 const cache = {};
 async function secFetch(s) {
   if (!s.url) return null;
@@ -390,13 +396,15 @@ function coachLiveRecordHTML(d) {
 }
 
 // ── THE TENSIONS BAND — the board's disagreements (reused by The Read) ──
-function tensionsHTML(d) {
+function tensionsHTML(d, opts = {}) {
   // #2383 (ADR-104 honest dating) — every AI-authored band is datable: undated
   // argument prose refuses to render (datableTensions — the band shows its
   // honest-empty copy instead), and the band carries its own as-of stamp, so a
   // paused week's argument reads "as of <date>", never as today's live coaching.
   const _tt = datableTensions(d.tensions);
-  let h = `<section class="team-tension"><p class="dx-kicker label">where the board disagrees — the argument, not the headline</p>`;
+  // #4182: under the first screen's own "Where they disagree" heading the band drops its
+  // kicker (the same words twice, stacked).
+  let h = `<section class="team-tension">${opts.titled ? "" : `<p class="dx-kicker label">where the board disagrees — the argument, not the headline</p>`}`;
   if (_tt.length) {
     const _pretty = (id) => String(id || "").replace(/_coach$/, "").replace(/_/g, " ") || "a coach";
     const _strip = (s) => String(s || "").replace(/^[A-Za-z'’ .]{1,40}:\s*/, "");
@@ -410,7 +418,10 @@ function tensionsHTML(d) {
     }).join("")}</ul>`;
     // One band-level stamp — every tension comes from the same weekly integrator
     // digest, so they share one generated_at (#2383).
-    h += `<p class="tt-asof label">${esc(weeklyAsOf(_tt[0].generated_at))} · the integrator's weekly synthesis</p>`;
+    // #4182 (vocabulary ruling vii-6): the stamp is in words — "written Monday Sep 21" —
+    // never the machine "as of"; the class stays (the render gate pins it, #2383).
+    const _wd = writtenDay(_tt[0].generated_at);
+    h += `<p class="tt-asof label">${_wd ? `written ${esc(_wd)} · ` : ""}the integrator's weekly synthesis</p>`;
   } else {
     h += `<p class="dx-prose">No live disagreements right now — the board's aligned (or it's early and the threads haven't formed). When they pull in different directions, the tradeoff shows here.</p>`;
   }
@@ -472,6 +483,121 @@ function docketHTML(dk) {
   return h + `</section>`;
 }
 
+// ── #4182/#4188 THE FIRST SCREEN — one read, dated in words; the week's call labelled
+// weekly; where they disagree; the other coaches one line each. Mounted only on the hub
+// and /coaching/read/ (the builder emits [data-coach-today] there and nowhere else).
+//
+// Reverses #1115's "Today leads with the morning brief's line" on THIS surface only: the
+// door now opens on a coach's own read (the freshest served one), because the brief's line
+// is yesterday's data narrated, and the panel ruled the coaching door opens on a coach.
+// The brief's line keeps its slot on the Read tab below. Nothing here edits served text:
+// the page chooses, dates and glosses (panel §4 item 6).
+const _roleOf = (c) => String(c.title || "").toLowerCase();
+function glossHTML(text) {
+  const g = glossesFor(text);
+  if (!g.length) return "";
+  return `<p class="ct-terms">${g.map((x) => `<dfn class="gloss" title="${esc(x.plain)}">${esc(x.term)}</dfn>: ${esc(x.plain)}`).join(" ")}</p>`;
+}
+async function renderToday(mount) {
+  if (!mount || preStart()) return; // #949 — the countdown owns the pre-start door
+  const [d, team, preds, docket] = await Promise.all([
+    tryOnce("/api/coaching-dashboard"),
+    tryOnce("/api/coach_team"),
+    tryOnce("/api/predictions"),
+    tryOnce("/api/coach_docket"),
+  ]);
+  if (!d) return; // the Read tab below states the failure; the first screen stays quiet
+  const now = Date.now();
+  const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
+  // #4182: the deterministic selection chain (coach_today.chooseTodaysRead) — the open
+  // ask, else the best checked record at n >= 10 among today's batch, else the freshest.
+  // /api/calibration is fetched only when rule 1 cannot decide (no other code on this
+  // page reads it, so this is the one added request).
+  const hasAsk = (d.open_actions || []).some((a) => a && String(a.text || "").trim());
+  const calib = hasAsk ? null : await tryOnce("/api/calibration");
+  let pick = chooseTodaysRead(coaches, d.open_actions, calib);
+  if (pick && pick.rule !== "ask" && hasAsk) pick = chooseTodaysRead(coaches, d.open_actions, await tryOnce("/api/calibration"));
+  const chosen = pick ? pick.coach : null;
+  const wp = d.weekly_priority || {};
+  const wpText = String(wp.text || "").trim();
+  const readTier = chosen ? freshness(chosen.analysis_generated_at, now) : "unknown";
+  const wpTier = wpText ? freshness(wp.generated_at, now) : "unknown";
+  // The deltas behind a >48 h banner come from served series, never from the read — fetched
+  // only when some banner on this screen actually needs them.
+  let weights = null, nutrition = null;
+  if (readTier === "stale" || readTier === "old" || wpTier === "stale" || wpTier === "old") {
+    const [wpr, nov] = await Promise.all([tryOnce("/api/weight_progress"), tryOnce("/api/nutrition_overview")]);
+    weights = (wpr && wpr.weight_progress) || [];
+    nutrition = (nov && nov.nutrition) || null;
+  }
+  const paused = regenerationPaused(d);
+  let h = "";
+
+  // 1) TODAY'S READ
+  if (chosen && readTier !== "old") {
+    const pid = `${chosen.coach_id}_coach`;
+    const banner = readTier === "stale" ? sinceBanner(chosen.analysis_generated_at, now, weights, nutrition) : "";
+    const text = String(chosen.position_summary);
+    const clipped = /…$|\.\.\.$/.test(text.trim());
+    h += `<section class="ct-read" aria-labelledby="ct-read-h" style="--coach:${esc(chosen.color || "")}">`;
+    if (banner) h += `<p class="ct-banner">${esc(banner)}</p>`;
+    h += `<h2 class="ct-kicker label" id="ct-read-h">today's read</h2>` +
+      `<p class="ct-who"><span class="ct-name">${esc(chosen.name || "")}</span>${_roleOf(chosen) ? ` <span class="ct-role label">· ${esc(_roleOf(chosen))}</span>` : ""}</p>` +
+      `<p class="provenance"><span class="pv-src${readTier === "stale" ? " pv-stale" : ""}">${esc(writtenStamp(chosen.analysis_generated_at, now))}</span>` +
+      `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
+      `<p class="provenance ct-why"><span>${esc(pick.reason)}</span></p>` +
+      `<div class="prose ct-text"><p>${esc(text)}</p></div>` +
+      `<p class="ct-full label"><a href="/coaching/by-coach/#${esc(pid)}">${clipped ? "full read" : "more from this coach"} →</a></p>` +
+      glossHTML(text);
+    const ask = pickAsk(d.open_actions, chosen.coach_id);
+    if (ask) {
+      h += `<p class="ct-ask"><span class="label">the ask</span> ${esc(ask.text)}` +
+        `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}</span></p>`;
+    }
+    const rec = recordLine(preds && preds.overall);
+    if (rec) h += `<p class="ct-record label">The board's record this cycle: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>`;
+    h += `</section>`;
+  } else if (chosen) {
+    // > 7 days: no read on the first screen. Say why, then the standing stances.
+    h += `<section class="ct-read ct-old" aria-labelledby="ct-read-h"><h2 class="ct-kicker label" id="ct-read-h">today's read</h2>` +
+      `<p class="ct-banner">${esc(sinceBanner(chosen.analysis_generated_at, now, weights, nutrition))} That is too old to put first, so no coach read leads this page today.</p>`;
+    const huddle = ((team && team.huddle) || []).filter((x) => x && x.read_of_him);
+    if (huddle.length) {
+      h += `<p class="ct-kicker label">where each coach has him — their standing stance, not a daily read</p><ul class="ct-stances">` +
+        huddle.map((x) => `<li><span class="ct-name">${esc(x.name || "")}</span> <span class="prose">${esc(x.read_of_him)}</span></li>`).join("") + `</ul>`;
+    }
+    h += `</section>`;
+  }
+
+  // 2) THE WEEK'S CALL — labelled weekly, below today's read, never as the current read.
+  if (wpText) {
+    const banner = wpTier === "stale" || wpTier === "old" ? sinceBanner(wp.generated_at, now, weights, nutrition) : "";
+    h += `<section class="ct-week" aria-labelledby="ct-week-h">` +
+      `<h2 class="ct-kicker label" id="ct-week-h">${esc(weekCallLabel(wp.generated_at))}${wp.coach_name ? ` · ${esc(wp.coach_name)}` : ""}</h2>` +
+      (banner ? `<p class="ct-banner">${esc(banner)}</p>` : "") +
+      `<details class="coach-more ct-week-more"><summary class="label">read the week's call</summary><div class="prose"><p>${esc(wpText)}</p></div></details>` +
+      `</section>`;
+  }
+
+  // 3) WHERE THEY DISAGREE — uncollapsed: it is the page's return trigger (the chair's
+  // amendment to ruling 2(iv)); the docket carries resolution dates.
+  const dis = (team ? tensionsHTML(team, { titled: true }) : "") + docketHTML(docket);
+  if (dis) h += `<section class="ct-disagree" aria-labelledby="ct-dis-h"><h2 class="ct-h" id="ct-dis-h">Where they disagree</h2>${dis}</section>`;
+
+  // 4) THE OTHER COACHES — one line each with its written stamp, collapsed.
+  const others = coaches.filter((c) => c !== chosen);
+  if (others.length) {
+    h += `<details class="coach-more ct-others"><summary class="label">the other ${esc(others.length)} coaches · one line each</summary><ul class="ct-olist">` +
+      others.map((c) => `<li><a class="ct-o" href="/coaching/by-coach/#${esc(c.coach_id)}_coach">` +
+        `<span class="ct-o-top"><span class="ct-name">${esc(c.name || "")}</span> <span class="label">${esc(_roleOf(c))} · ${esc(writtenStamp(c.analysis_generated_at, now))}</span></span>` +
+        `<span class="ct-o-say">${esc(c.position_summary)}</span></a></li>`).join("") +
+      `</ul></details>`;
+  }
+  mount.innerHTML = h;
+  mount.hidden = !h;
+  enhanceCoachNames(mount);
+}
+
 // ── THE READ (default) — Today / This week / The experiment ──
 // #949 pre-start: until Day 1 exists, the stored board read narrates the WIPED
 // prior cycle (the exact leak cockpit.js guards its verdict slot against) — the
@@ -491,13 +617,17 @@ async function renderReadToday(read) {
   // morning by the daily brief) — never the integrator's weekly priority, which
   // lives on the This-week lens. Same sentence, two labels = the exact defect.
   const [d, team, stats, docket] = await Promise.all([
-    tryJSON("/api/coaching-dashboard"),
-    tryJSON("/api/coach_team"), // for the tensions band + disclosure
+    tryOnce("/api/coaching-dashboard"),
+    tryOnce("/api/coach_team"), // for the tensions band + disclosure
     tryJSON("/public_stats.json"),
-    tryJSON("/api/coach_docket"), // #1386 — the Dispute Docket band (empty until the first docket opens)
+    tryOnce("/api/coach_docket"), // #1386 — the Dispute Docket band (empty until the first docket opens)
   ]);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load the board's read just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">the board's read on you · right now</p><h2 class="dx-title">What the board is saying</h2>`;
+  // #4182: third person — the friend and the owner read one page ("about you" on a public
+  // page was a B1 finding). The disagreements moved to the first screen's "Where they
+  // disagree" when that mount exists, so this tab doesn't print them twice.
+  const firstScreen = !!document.querySelector("[data-coach-today]");
+  let h = `<p class="dx-kicker label">the board · every coach's latest read</p><h2 class="dx-title">What each coach is saying</h2>`;
   const daily = stats && stats.elena_hero_line;
   if (daily) {
     // #1995 — never a render-day "today" kicker: the brief's deictics are anchored
@@ -506,8 +636,10 @@ async function renderReadToday(read) {
     h += `<section class="read-priority"><p class="dx-kicker label">${BRIEF_LINE_KICKER}</p>` +
       `<blockquote class="rp-text">${esc(daily)}</blockquote></section>`;
   }
-  if (team) h += tensionsHTML(team);
-  h += docketHTML(docket); // #1386 — renders "" until the first docket opens
+  if (!firstScreen) {
+    if (team) h += tensionsHTML(team);
+    h += docketHTML(docket); // #1386 — renders "" until the first docket opens
+  }
   // The stacked all-coach digest — each coach's LIVE read (position_summary), domain-labeled, deep-linking into By Coach.
   const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
   // #1971 (completes #802 on the door's first screen): the dashboard now carries
@@ -950,7 +1082,7 @@ async function renderTeamCoach(read, id) {
   enhanceCoachNames(read);
 }
 
-// ── AI LAB NOTES (the Third Wall) ──
+// ── WHAT THE AI SAID, AND HOW IT FELT (the weekly lab notes; #4182 cut "the Third Wall") ──
 async function renderFieldNote(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the field note…</span></p>`;
   try {
@@ -960,10 +1092,12 @@ async function renderFieldNote(read, id) {
     const mattVoice = mattText
       ? `<div class="voice human"><span class="who">Matthew</span><p class="what">${esc(mattText)}</p></div>`
       : `<div class="voice human voice-pending"><span class="who">Matthew</span>` +
-        `<p class="what pending-lead">The other half of the wall — Matthew's reply — is held open for this week.</p>` +
+        `<p class="what pending-lead">The other half — Matthew's reply — is held open for this week.</p>` +
         `<p class="pending-sub label">He answers the AI on his own time; an empty slot is honest, not a gap. When he writes back, it lands right here, beside the machine's read.</p></div>`;
     const hasAny = ai.length || mattText;
+    // #4182 (ruling vii-8): the section's own title, in words — "the Third Wall" is cut.
     read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)} · the AI's read ↔ Matthew's response${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
+      `<h2 class="dx-title">What the AI said, and how it felt</h2>` +
       (hasAny ? ai.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") + mattVoice
         : `<p class="dx-prose">No field note recorded for this week yet.</p>`);
   } catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this field note just now.</p>`; }
@@ -1528,7 +1662,17 @@ function build() {
   const start = startRaw && BYKEY[startRaw] ? startRaw : "read";
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);
+  renderToday(document.querySelector("[data-coach-today]"));
   wireMachineryRibbon(tabsEl);
+}
+
+// #4182: the hero kicker reads "the coaching · Day N" — the SAME PT clock as the
+// genesisStamp binding (genesisCount), so the two can't disagree.
+function stampKickerDay() {
+  const el = document.querySelector('[data-bind="coachingDay"]');
+  if (!el || preStart()) return;
+  const { dayN } = genesisCount();
+  if (dayN >= 1) { el.textContent = ` · Day ${dayN}`; el.hidden = false; }
 }
 
 // ── The machinery ribbon (uplevel P3) — the elite AI machinery (live tensions +
@@ -1542,7 +1686,10 @@ async function wireMachineryRibbon(tabsEl) {
     // #949 pre-start: tensions + the record are prior-cycle artifacts until Day 1 —
     // the ribbon stays honestly absent rather than quoting a wiped board.
     if (preStart()) return;
-    const [team, preds] = await Promise.all([tryJSON("/api/coach_team"), tryJSON("/api/predictions")]);
+    // #4182: where the first screen is mounted it carries both bits (the disagreements
+    // and the record) itself — the ribbon would say them a second time.
+    if (document.querySelector("[data-coach-today]")) return;
+    const [team, preds] = await Promise.all([tryOnce("/api/coach_team"), tryOnce("/api/predictions")]);
     const bits = [];
     const tension = ((team && team.tensions) || []).find((t) => t && (t.topic || t.summary));
     if (tension) {
@@ -1552,13 +1699,14 @@ async function wireMachineryRibbon(tabsEl) {
     // #3046: observational claims are on the record but not falsifiable — say the
     // falsifiable count, and say when the first verdict is actually due.
     const falsifiable = Math.max(0, (o.total || 0) - (o.observational || 0));
+    // #4182 (B1 fix #4): counts in words — "33 predictions checked, 17 came true" —
+    // replaces "153 falsifiable calls · 33 decided · 51.5% held up".
     if (falsifiable) {
-      const tally = o.decided
-        ? `${o.decided} decided · ${o.accuracy_pct != null ? o.accuracy_pct + "% held up" : ""}`
-        : (o.due && !o.due.due_now && o.due.earliest_due
-          ? `none due before ${o.due.earliest_due} — graded daily as windows close`
-          : "none decided yet — graded daily as windows close");
-      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(String(falsifiable))} falsifiable calls · ${esc(tally)} →</button>`);
+      const tally = recordLine(o) ||
+        (o.due && !o.due.due_now && o.due.earliest_due
+          ? `none checked yet — the first comes due ${o.due.earliest_due}`
+          : "none checked yet — each is checked once its window closes");
+      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(tally)} →</button>`);
     }
     if (!bits.length) return;
     const rib = document.createElement("div");
@@ -1572,4 +1720,5 @@ window.addEventListener("popstate", (e) => { const sec = (e.state && e.state.sec
 
 initTheme();
 build();
+stampKickerDay();
 stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)

@@ -10,6 +10,7 @@
     "MCP": "Model Context Protocol — the interface that lets an AI assistant query this platform's own data directly, tool by tool.",
     "XP": "Experience points — the character sheet's leveling currency, earned from real daily pillar scores, not from playing a game.",
     "FDR": "False discovery rate — the statistical correction applied so a batch of correlation tests isn't overstated by chance.",
-    "Brier": "Brier score — a 0 (perfect) to 1 (worst) grade for how well a forecast's stated probability matched what actually happened."
+    "Brier": "Brier score — a 0 (perfect) to 1 (worst) grade for how well a forecast's stated probability matched what actually happened.",
+    "EWMA": "Exponentially weighted moving average — a running average that counts recent days more than older ones, so a trend reacts to change without chasing one noisy day."
   }
 }

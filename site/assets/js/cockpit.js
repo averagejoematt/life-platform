@@ -11,6 +11,15 @@
                             day altitude; the integrator's weekly call lives on the
                             Week lens of /coaching/, never here
     /api/coach_analysis?domain=<pillar>   lazy per-pillar read on disclosure
+    /api/routine            the session on the sheet (shared by the three questions +
+                            the levers strip — one memoized request)
+    /api/nutrition_overview #4182 — yesterday's protein + the floor-hit count
+    /api/coaching-dashboard #4182 — open_actions[0], "the one ask" (omitted when empty)
+
+  #4182 (panel ruling 2(ii)/(iii), 2026-09-25): the first screen is THE THREE QUESTIONS
+  (three_questions.js) — how's the week, last night, today — in plain third-person
+  words. The engine's level + seven areas moved below the rings and the daily line,
+  collapsed under a keyed heading; the level NAME and XP are off the reader surface.
 
   Two jobs (LOCKED): the glance answers "am I winning + the one thing"; a pillar
   view answers "why it's here, where it's heading, what to do". Detail opens in
@@ -28,6 +37,8 @@ import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #931 pre
 import { cohortAheadPercent } from "/assets/js/cohort_math.js"; // #1820 — direction-aware cohort percentile
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { coachPayloadRead, deterministicPillarRead, isDark } from "/assets/js/absence_read.js"; // #2388 — real payload fields + no trend verb on a dark source
+import { mountOrientStrip } from "/assets/js/orient.js"; // #4182 — the one-line newcomer strip (replaces the PG-02 card)
+import { weekLine, nightLine, sessionLine, proteinLine, askLine, freshLine, nutritionPillarNote, unwrap, fmtDay } from "/assets/js/three_questions.js"; // #4182 — the first screen
 
 const API = "/api";
 
@@ -44,7 +55,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const bind = (name, root = document) => root.querySelector(`[data-bind="${name}"]`);
 const rows = (name) => document.querySelector(`[data-rows="${name}"]`);
 
-const state = { scope: "today", pillars: {}, coachCache: {} };
+const state = { scope: "today", pillars: {}, coachCache: {}, nutrition: null, timeTravel: false };
 
 /* ── fetch helpers ───────────────────────────────────────────────────────── */
 /* #2673: tag TRANSPORT failures so the empty state can tell "nothing has been
@@ -82,7 +93,10 @@ const MARK = { up: "▲", down: "▼", flat: "›" };
 function renderHub(character) {
   const lvl = Math.round(character.level ?? 1);
   bind("level").textContent = lvl;
-  bind("tier").textContent = character.tier || "Foundation";
+  // #4182 (ruling 2(iii)): the level NAME ("Foundation") is off the reader surface —
+  // the number stays, keyed in plain words; the name lives on /method/character/.
+  const ed = bind("engine-date");
+  if (ed) ed.textContent = character.as_of_date ? `Scored for ${fmtDay(character.as_of_date)}.` : "";
 
   // Spine carries the day index of the experiment.
   if (character.as_of_date && character.started_date) {
@@ -156,9 +170,12 @@ function renderHeroInstruments({ character = null, readiness = null, vitals = nu
       tone: slp == null ? "muted" : slp >= 7 ? "ember" : slp >= 5.5 ? "muted" : "alert" },
     // The stored readiness band's own rule is "worded, never red" — so its ring
     // is ember on green, muted otherwise (a red band is worded below, not glowed).
-    { value: rdy != null ? String(Math.round(rdy)) : "—", label: "readiness",
+    // #4182 (Tyrell's amendment): while readiness is NOT SERVED the ring is omitted,
+    // not drawn blank — absence is absence (ADR-104), not a dash in a ring. Pre-start
+    // keeps the staged "—" so the Day-1 strip still reads as instruments waiting.
+    ...(rdy != null || pre ? [{ value: rdy != null ? String(Math.round(rdy)) : "—", label: "readiness",
       fill: rdy != null ? Math.max(0, Math.min(1, rdy / 100)) : 0,
-      tone: rdy != null && band === "green" ? "ember" : "muted" },
+      tone: rdy != null && band === "green" ? "ember" : "muted" }] : []),
     { value: con != null ? String(Math.round(con)) : "—", label: "consistency",
       fill: con != null ? Math.max(0, Math.min(1, con / 100)) : 0, tone: "muted" },
   ];
@@ -390,6 +407,7 @@ function renderDomains() {
   const bodyRows = rows("body"), mindRows = rows("mind");
   bodyRows.replaceChildren(...BODY.filter((k) => state.pillars[k]).map(pillarRow));
   mindRows.replaceChildren(...MIND.filter((k) => state.pillars[k]).map(pillarRow));
+  renderPillarNotes();
 
   const c = state.pillars.consistency;
   if (c) {
@@ -409,6 +427,25 @@ function renderDomains() {
       else cv.removeAttribute("title");
     }
   }
+}
+
+/* #4182 (ruling 2(iii)): where the engine marks a pillar absent / near-zero and the page
+   ALREADY holds a served same-day count that says otherwise, print both side by side —
+   today that is the nutrition pillar vs /api/nutrition_overview.days_logged. Present-
+   tense only (the count is today's, so it is never set beside a time-travelled sheet). */
+function renderPillarNotes() {
+  document.querySelectorAll(".pillar-note").forEach((n) => n.remove());
+  if (state.timeTravel) return;
+  const row = document.querySelector('.row[data-pillar="nutrition"]');
+  const text = nutritionPillarNote(state.pillars.nutrition, state.nutrition);
+  if (!row || !text) return;
+  const note = document.createElement("p");
+  note.className = "pillar-note label";
+  note.textContent = text;
+  // After an open disclosure, never between the row and it (collapse() reads the
+  // row's next sibling as its detail).
+  const next = row.nextElementSibling;
+  (next && next.classList.contains("pillar-detail") ? next : row).insertAdjacentElement("afterend", note);
 }
 
 /* ── Band: last night → today (readiness from raw vitals) ──────────────────────
@@ -543,7 +580,6 @@ async function togglePillar(btn, key) {
     (read.action ? `<p class="pd-action">→ ${escapeHTML(read.action)}</p>` : "") +
     `<p class="pd-meta">` +
       `<span class="pd-conf">score ${Math.round(p.raw_score ?? 0)}${sdTxt}</span>` +
-      `<span class="pd-conf">${p.tier || ""}</span>` +
       `<span class="pd-conf">${read.confidence}</span>` +
       (read.asOf ? `<span class="pd-conf">${escapeHTML(read.asOf)}</span>` : "") +
     `</p>`;
@@ -905,6 +941,57 @@ function _weekdaySince(iso) {
   } catch (e) { return ""; }
 }
 
+// ONE shared /api/routine read — the levers strip and the three questions (#4182) both
+// consume it; memoized so the page never asks the same endpoint twice.
+let _routineReq = null;
+function fetchRoutine() {
+  if (!_routineReq) _routineReq = getJSON(`${API}/routine`).catch(() => null);
+  return _routineReq;
+}
+
+/* ── #4182: the three questions — the first screen ────────────────────────────
+   How's the week? · Last night? · Today? — each answered from served fields with its
+   own date / n / interval (three_questions.js holds the pure sentence builders). A
+   block whose fields are all absent is hidden, never a dash-wall; the whole section
+   hides pre-start and in time travel (it speaks only in the present). Two fetches are
+   new here (/api/nutrition_overview, /api/coaching-dashboard); vitals + journey ride
+   the snapshot the page already has, and /api/routine is shared with the levers. */
+async function renderThreeQuestions(snapV, pre) {
+  const sec = $("[data-three-q]");
+  if (!sec) return;
+  if (pre || !snapV) { sec.hidden = true; return; }
+  const journey = unwrap(snapV.journey, "journey");
+  const vitals = unwrap(snapV.vitals, "vitals");
+  const [rt, nut, dash] = await Promise.all([
+    fetchRoutine(),
+    getJSON(`${API}/nutrition_overview`).catch(() => null),
+    getJSON(`${API}/coaching-dashboard`).catch(() => null),
+  ]);
+  if (state.timeTravel) return; // a scrub landed while we were fetching
+  state.nutrition = nut;
+  const put = (key, html) => {
+    const el = bind(key);
+    if (!el) return false;
+    const block = el.closest(".tq-block");
+    if (html) { el.innerHTML = html; if (block) block.hidden = false; return true; }
+    el.innerHTML = "";
+    if (block) block.hidden = true;
+    return false;
+  };
+  const a = put("tq-week", weekLine(journey));
+  const b = put("tq-night", nightLine(vitals));
+  const today = [sessionLine(rt), proteinLine(nut)].filter(Boolean).join(" ");
+  const c = put("tq-today", today);
+  const ask = askLine(dash);
+  const askEl = bind("tq-ask");
+  if (askEl) { askEl.innerHTML = ask; askEl.hidden = !ask; }
+  if (ask && !c) { const blk = askEl.closest(".tq-block"); if (blk) blk.hidden = false; }
+  const fresh = bind("tq-fresh");
+  if (fresh) fresh.textContent = freshLine({ journey, vitals, nutrition: nut });
+  sec.hidden = !(a || b || c || ask);
+  renderPillarNotes();
+}
+
 // ONE shared /api/presence read (#975) — the lull line and the inputs row both
 // consume it; memoized so the cockpit never fetches the same endpoint twice.
 let _presenceReq = null;
@@ -1081,7 +1168,7 @@ async function renderLevers(pre) {
   const [supp, exp, rt] = await Promise.all([
     getJSON(`${API}/supplements`).catch(() => null),
     getJSON(`${API}/experiments`).catch(() => null),
-    getJSON(`${API}/routine`).catch(() => null),
+    fetchRoutine(),
   ]);
   const out = [];
 
@@ -1203,7 +1290,7 @@ async function renderFingerprint() {
   try { d = await getJSON(`${API}/fingerprint`); } catch (e) { return; }
   const fp = d && d.fingerprint;
   if (!fp || !fp.svg) return;
-  const cap = fp.warming_up ? "today's mark · warming up" : "today's mark · earned glow";
+  const cap = fp.warming_up ? "today's mark · warming up" : "today's mark";
   mount.innerHTML = `<a class="cfp-link" href="/data/wall/" aria-label="Today's fingerprint — see the whole wall of attempts">${fp.svg}<span class="cfp-cap label">${cap}</span></a>`;
   mount.hidden = false;
 }
@@ -1391,7 +1478,10 @@ function applyScope(scope) {
     x.setAttribute("aria-pressed", String(on));
   });
   state.scope = scope;
-  if (btn) bind("scopeLabel").textContent = btn.textContent.toLowerCase();
+  // #4182: the level's cap no longer carries a scope word ("level · today" sat under
+  // "Scored for <yesterday>"); the scope buttons' own pressed state says which lens is on.
+  const sl = bind("scopeLabel");
+  if (btn && sl) sl.textContent = btn.textContent.toLowerCase();
   const wv = document.querySelector("[data-weekview]"); if (wv) wv.hidden = true;
   const mv = document.querySelector("[data-monthview]"); if (mv) mv.hidden = true;
   if (scope === "journey") renderJourney();
@@ -1428,65 +1518,17 @@ function wireScope() {
   });
 }
 
-/* ── First-run orientation (PG-02) ───────────────────────────────────────────
-   A dismissible "what am I looking at" card for first-time visitors. Shown once
-   (localStorage), non-modal, sits above the panel — never blocks the dense view
-   the pilot uses daily. Confidence framing is preserved, not simplified away. */
+/* ── First-run orientation → one line (#4182, panel ruling 2(v)) ─────────────
+   PG-02 shipped a full-viewport "NEW HERE?" card here; on a phone it WAS the first
+   screen (B1 newcomer audit, 2026-09-25). It is now one dismissible line under the
+   kicker — same localStorage key, so a reader who dismissed the card never sees the
+   strip. The card's definitions moved inline to where each term appears: the daily
+   line's kicker, "provisional" / "recovery" / "HRV" in the three questions, and the
+   engine section's key (score · level · "absent"). The #807 level hint is folded into
+   that key — it is no longer a separate dismiss-once sentence. */
 const INTRO_KEY = "ajm-cockpit-intro-v1";
 function wireFirstRun() {
-  let seen;
-  try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
-  if (seen) return;
-  const main = $("#cockpit");
-  if (!main) return;
-
-  const intro = document.createElement("aside");
-  intro.className = "cockpit-intro";
-  intro.setAttribute("aria-label", "What you're looking at");
-  intro.innerHTML = `
-    <button class="cockpit-intro__x" type="button" aria-label="Dismiss orientation">&times;</button>
-    <p class="cockpit-intro__k label">new here?</p>
-    <h2 class="cockpit-intro__h">This is one life, measured — live.</h2>
-    <ul class="cockpit-intro__list">
-      <li><strong>The big number</strong> is today's whole-life score: seven pillars rolled into one, recomputed every morning.</li>
-      <li><strong>The daily line</strong> is the morning brief&rsquo;s one-sentence read of yesterday; an AI coach panel reads each pillar underneath. Labels like <em>preliminary &middot; n=9</em> mean early signal, not proof.</li>
-      <li><strong>Today &middot; Week &middot; Month &middot; Journey</strong> (top right) change the time scope; tap any pillar to open its detail.</li>
-    </ul>
-    <button class="cockpit-intro__go" type="button">Got it &mdash; show me the cockpit</button>
-    <p class="cockpit-intro__note label">Shown once. It won't interrupt again.</p>`;
-
-  const onKey = (e) => { if (e.key === "Escape") dismiss(); };
-  function dismiss() {
-    try { localStorage.setItem(INTRO_KEY, "1"); } catch (e) {}
-    document.removeEventListener("keydown", onKey);
-    intro.remove();
-  }
-  intro.querySelector(".cockpit-intro__x").addEventListener("click", dismiss);
-  intro.querySelector(".cockpit-intro__go").addEventListener("click", dismiss);
-  document.addEventListener("keydown", onKey);
-  main.insertBefore(intro, main.firstChild);
-}
-
-/* ── #807: first-visit context for the bare level number ─────────────────────
-   The hub opens with "character level · today" and a bare number — a first-time
-   visitor doesn't know if 12 is good. One muted inline sentence (markup lives in
-   the HTML, hidden by default) shown until dismissed (localStorage); a returning
-   visitor never sees it. Private mode → never shown, mirroring wireFirstRun(). */
-const HINT_KEY = "ajm-level-hint-v1";
-function wireLevelHint() {
-  const hint = document.querySelector("[data-hub-hint]");
-  if (!hint) return;
-  let seen;
-  try { seen = localStorage.getItem(HINT_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
-  if (seen) return;
-  hint.hidden = false;
-  const x = hint.querySelector(".hub-hint-x");
-  if (x) {
-    x.addEventListener("click", () => {
-      try { localStorage.setItem(HINT_KEY, "1"); } catch (e) {}
-      hint.hidden = true;
-    });
-  }
+  mountOrientStrip({ key: INTRO_KEY, what: "today, in one screen", anchor: $(".cockpit-hero .ph-kicker") });
 }
 
 /* ── load + orchestrate ──────────────────────────────────────────────────── */
@@ -1509,6 +1551,11 @@ async function load(dateStr) {
       state.pillars = {};
       for (const p of charBody?.pillars || []) state.pillars[p.name] = p;
       if (!character || !Object.keys(state.pillars).length) throw new Error("no sheet for that date");
+      // #4182: the three questions speak only in the present; a past morning IS the
+      // engine's sheet, so the collapsed engine section opens itself.
+      state.timeTravel = true;
+      { const tq = $("[data-three-q]"); if (tq) tq.hidden = true; }
+      { const en = $("[data-engine]"); if (en) en.open = true; }
       renderHub(character);
       renderDomains();
       // Real readings from that date (renderReadiness self-hides if the date has none).
@@ -1542,6 +1589,10 @@ async function load(dateStr) {
     // floor if the cached client fallback lags a re-anchor.
     const apiGenesis = snapV && (snapV.start_date || (snapV.journey && snapV.journey.started_date));
     if (apiGenesis) configureScrub(String(apiGenesis).slice(0, 10));
+    // #4182: the three questions first — they need no character sheet, so they render
+    // (fire-and-forget) even when today's score hasn't computed.
+    state.timeTravel = false;
+    renderThreeQuestions(snapV, pre);
     const charBody = snapV?.character || null;   // handle_character body (or {error} on 503)
     const character = charBody?.character || (charBody && !charBody.error ? charBody : null);
     const pillarList = charBody?.pillars || character?.pillars || [];
@@ -1606,7 +1657,6 @@ async function load(dateStr) {
     // #931: pre-start with no sheet at all is still a countdown, not a shrug.
     const preC = preStart();
     bind("level").textContent = "—";
-    bind("tier").textContent = "";
     bind("day").textContent = preC ? `T−${preC.daysUntil}` : "";
     gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
     gone("[data-readiness]"); gone(".cap-today");
@@ -1744,9 +1794,8 @@ function wireScrub() {
 wireScope();
 initTheme();
 wireFirstRun();
-wireLevelHint();
 wireScrub();
-bind("scopeLabel").textContent = "today";
+{ const sl = bind("scopeLabel"); if (sl) sl.textContent = "today"; } // #4182: the node may be absent
 const _deepDate = new URLSearchParams(location.search).get("date");
 // #2672: a shared /cockpit/?scope=week must OPEN on that scope. Seed the history
 // entry so the first Back has somewhere to return to, then apply it — `applyScope`

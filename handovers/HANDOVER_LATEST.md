@@ -1,92 +1,58 @@
-# Handover — Session AU: the nightly closed its first issue; your machines, your rulings (2026-09-25 18:10 PT → ~21:30 PT)
+# Handover — Session AV: the site night — a site a friend can read (2026-09-25 21:30 PT → 2026-09-26 ~01:10 PT)
 
-**Opus, attended.** The driver was the approved plan `~/.claude/plans/zippy-orbiting-teacup.md`, with this standing authority:
-- merge own green PRs through `safe_merge.sh` (`Refs`, never `Fixes`);
-- fleet-deploy from a clean worktree at origin/main;
-- lanes for #4160, #4164 and #4158;
-- close only on live or rehearsal proof, with residuals as `not-work — <reason>` or a carrier;
-- ask first for CDK, `aws lambda invoke`, backfills, Hevy, and private `config/`.
+**Fable 5.1.** Booted as "planning only — a worktree, no merges" while AU landed #4179/#4181. At ~21:35 PT the owner re-scoped it in one message: *"I don't like averagejoematt.com. I have not used it in the 3 weeks of this experiment, and friends who go to it are overwhelmed with the layout, the content, what to do, and even some of the words … and 'AI coaches' isn't all making sense. I have 85% of Fable usage for the week and I want all of that power to evolve this website."* Then, before sleeping: merge authority on site PRs — yes; the pillars call — "you decide and red team"; the interview questions — "use board personas or pretend elite people". Standing rules kept: engine PRs open, never merged; no `aws s3` on `config/`; no `aws lambda invoke`; no CDK.
 
-**Rulings the owner gave live this session:**
-- **Protein gate → report-only** at ≥ 40 % body fat. This followed an evidence read he asked for: Hall 2007 / Forbes, Heymsfield 2014, Sardeli 2018, Wycherley 2012. The body-fat-scaled tiers and a week-8 DXA override are #4166.
-- The three platform-placed v0.4 sessions are **ratified** (#4175).
-- `machine_crunch` is kept as a new lift.
-- Telegram "remember this" → option (b): refuse and route, no queue (#4170).
-- #4158 → option A: Zone-1 MET rate.
-- Approvals: the fleet deploy while away; CDK `LifePlatformIngestion`; one read-only Hevy GET; the `config/hevy_template_cache.json` read, backup and two-entry edit.
-- Merge the Dependabot bumps if green.
+## What shipped (merged AND deployed — all under epic #4182)
 
-**Open count: 37 → 36 (REST).** 10 closed on live proof, 9 filed. Most of the filings are real defects that the owner's own Claude-chat proof run and my stage-2 reads turned up.
+| PR | slice | live proof |
+|---|---|---|
+| #4195 | **the front door** — the #789 "Is he okay this week?" read moves from ~2,250 px down to directly under the claim; one-sentence setup; the coaches defined once (software, not people); three doors as sentences; the loop dial retitled "How the pieces fit"; the "transformation you can watch happen in real time" suffix struck; the eating chip no longer claims "some days went unlogged" on a 20/20-logged week | deploy `0e83e4c` 06:12Z, smoke ✓ visual+AI QA ✓ no rollback; read back 06:16Z at 390 px: the read sits at char 504 under the claim, zero JS errors |
+| #4197 | **the chronicle opens on its first sentence** — `chronicle_text.js` strips the re-embedded title + the `[Weight: … \| T0 Streak: …]` line at the entry boundary; the stat line renders as words | deploy `091d752d9`, all gates ✓; `/story/` and `/` carry zero `[Weight` (comment on #4191) |
+| #4198 + #4201 | **the registries** — `site/data/glossary.json` (15 ruled terms) + the shrink-only vocabulary guard + the static-reach ratchet (39); #4201 excludes `<noscript>` bakes (served coach text is never builder vocabulary) and tightens the ledger | tests + one JSON; 15 registry gates PROVEN in the census (ceilings 748→763 / 197→212) |
+| #4200 | **the cockpit** opens on "How's the week? / Last night? / Today?" from served fields; the level demoted to a collapsed, plain-keyed section (tier name + XP off the reader surface); the "NEW HERE?" cards on the cockpit and every `/data/*` page → a one-line strip with inline `<dfn>` glosses; the null readiness ring removed | deploy `a013d5e50` 06:35Z: live read 06:59Z — three questions rendered, `data-state=ready`, zero errors; the gate's own check red (see Incidents) |
+| #4199 | **the coaching door** — today's read chosen by a stated chain (open ask → best checked record at n ≥ 10 → freshest; tonight Dr. Lisa Park, 7 of 16 held up, the reason printed), written-time in words, the weekly call labelled weekly, >48 h banner with engine deltas, "Third Wall" cut, `/method/board/` states its weekly cadence (the open half of #4163, comment there) | deploy `a19d915` 06:59Z: live read 07:05Z — Day 21, the read + the reason, "Third Wall" ×0, zero errors |
+| #4203 + #4204 | **the gate fixes-forward** — a collapsed `<details>` element is not empty (`tests/visual_qa.py`); the record link gets a real underline (axe `link-in-text-block`) | #4204's deploy (`459aa84fc`) is the run recording green — see `**Main:**` and the Incidents row |
 
-## What shipped (merged + deployed)
+**Engine PRs opened, NOT merged (outside the grant — morning ask 7):** #4192 (`open_actions` from the dossier reader), #4193 (the genesis-bounded weight-trajectory window), #4194 (the #4180 trend classifier + coach-vs-coach / coach-vs-engine legs, 29 tests), #4196 (tool-call residue guard on every registry-classified write door + serve-time strip + sweep tokens). Each green-checked, each `Refs`.
 
-- **PRs merged:**
-  - #4165 (#4163 reader-truth two week systems);
-  - #4167 (#4164 PII card arm scoped by JSON path);
-  - #4162 (#4161 hybrid weeks, lock deload, critic rules, protein gate + report-only);
-  - #4173 (#4160 routine-note RPE scoped to the named lift);
-  - #4175 (sessions ratified);
-  - #4176 (#4169 catalog → Seated Leg Curl `11A123F3`, Calf Press `91237BDD`);
-  - Dependabot #4050, #4048, #3826.
-- **Armed, not yet merged at wrap:** #4168 (#4158 TDEE: `duration_sec`, HR-overlap discount, Compendium MET 3.5 / 4.0) and #4179 (main fix, below).
-- **Fleet:** `13b39d6e` → `04608925` → **`836e2696`**, each 107/0. `build_info` was read back from the deployed zips (MCP, site-api, qa-smoke, hevy-backfill), all `dirty=false`.
-- **CDK `LifePlatformIngestion`** 02:59Z, owner-approved. The diff was code-only, plus CDK's log-retention helper runtime nodejs24 → 22. It ran from a scratch venv on the **pinned aws-cdk-lib 2.270.0**; the local install was 2.244.0 and would have synthesized drift.
-- **Private S3:** `config/hevy_template_cache.json` had the `leg_curl` / `calf_raise_machine` entries pinned to the old ids. They were removed after a verified backup (`config/backups/hevy_template_cache_4169_2026-09-26.json`), 27 → 25 entries, only those two.
+## The method (it worked; reuse it)
 
-## Verified live (instants on the issues)
+Four read-only audit lanes in parallel (B1 newcomer/friend, 60 screenshots · B2 the subject's morning screen from served JSON · B3 vocabulary census + coach-vs-coach · B4 the #4163 triage) → the driver re-verified every truth claim live → a Fable red-team panel (Product Board personas + Matthew/a friend/his mother/an editor) produced the rulings, the final ≤120-word first screens, a nine-item "not tonight" list and a dissent register → Opus lanes for the two front-end slices, Sonnet for engine → every PR rendered with a local harness that routes `/api/*` + `posts.json` to saved live JSON (`scratchpad/harness/render.py`; `pr_render_gate.py` is empty-mock and structurally blind to data-driven layout). The end-to-end plan is `docs/SITE_TRANSFORMATION_V6.md`; the rule it sets is ADR-156.
 
-- **The nightly closed an issue by itself:** 09-25 18:31:37Z, `#4134` via its body probe. → #4022 → epic #3592.
-- **#4161 (02:24:01Z):**
-  - `week_basis`: 2 sessions, `next_advance_earliest 2026-10-01`;
-  - `protein_gate`: gated 6/7, **mode report_only, applied false**, target 3.5.
-- **#4160 (03:0xZ):** ceilings squat 7, RDL 8, leg press 8, leg curl 9, calf 9.
-- **#4169 / #4112 (03:54:17Z):**
-  - accessory tier `tracked` (Calf Press, n 6);
-  - `days_since` for the remapped lifts now 2;
-  - leg curl loads from Thursday.
-- **#4149 (02:06Z):** two identical stage-2 verdict sets and a committable draft. It stays open for a stale-lift draft.
-- **Owner's Claude chat:** #4077 (a memory write reaches stage 1), #4078 (queue → approve → written), #4066 (a `REDTEAM_BINDING` refusal; nothing pushed to Hevy).
+## Truth defects found live (all verified by the driver)
+
+- Two loss rates: `public_stats` −4.36 firm with a 2027-04-20 goal date vs `/api/journey` −4.58 provisional — daily-metrics-compute's flat 28-day window crosses the genesis (#4184, PR #4193).
+- The nutrition coach's "six days without logs" against 20/20 days logged (139–186 g each); five protein figures on one page; "4:45 AM onset" is 04:45Z (#4185).
+- `open_actions` `[]` with ≥9 commitments pending (#4187, PR #4192); no daily lead read (#4188); no morning-note ingest (#4189).
+- A raw tool-call tag served in `/api/decisions` and rendered as prose (#4190, PR #4196); the chronicle's bracketed stat line (#4191, site side live).
+- The QA leg compares coach-to-cockpit only (#4186, PR #4194); the vitals leg fails trend sentences (#4180, same PR — what keeps `qa-smoke-failures` red).
+- 24 pre-genesis orphan drafts keep `qa-smoke-warnings` lit; the 09-21 citation expired 09-22 (#4183; the citation now cites it).
+- #4163: NOT time-of-day (my first comment was wrong, corrected on the issue) — same-day judge fixes between the morning schedule and the evening dispatch.
 
 ## Gotchas
 
-- **Two green PRs, red together.** #4173's fixture hand-copied catalog hints that #4176 remapped, and main went red at `836e2696` (incident row). #4179 now derives the fixture from the catalog.
-- **`safe_merge.sh` false positive.** It refused #4168 because the PR body *quoted* the trailer-check grep. The line was reworded and the PR re-armed.
-- **The Telegram coach has no tools**, yet said "Got it. / Noted." to "remember this" (#4170). The owner's chat steps must run in a Claude chat with the connector.
-- **Same-day memory overwrite.** `write_platform_memory` overwrote the same-day record, erasing the injury note (#4171); the chat restored it as one merged record.
-- **The adherence action matches a routine by date.** Re-grading Thursday's session graded Friday's (#4177).
-- **Direct push unavailable for the wrap.** The primary checkout holds `main` with someone's uncommitted `site/` edits, so the wrap lands as a PR, not an `agent_commit.sh --push`.
+- **`safe_merge.sh` does not exist** (named in AU's handover; nowhere in the repo or its history). Merged via `scripts/assert_pr_green.py` + `closingIssuesReferences` + a trailer grep + squash.
+- **`lane_worktree.py` resolves its parent from the invoked script's path** — run it by the main checkout's absolute path, or lanes nest under `worktrees/av-plan/` (two did; released and removed).
+- **`gh pr checks` cannot see a queued workflow run** — a "nothing pending" watcher declared PRs terminal while `PR checks` was queued; the run-level watcher (`actions/runs?head_sha=`) is the honest one.
+- **The gate census names a registry gate `BASELINE[<entry>]`** and refuses a proof whose `gate_name` differs; every new `BASELINE`/`*_EXEMPT` dict entry is a gate that must arrive PROVEN (`observed` must say "failed"); every `BASELINE_TOTAL_GATES` bump conflicts across concurrent PRs (three bumped it tonight; lanes merged `main` in, never rebased). A tree-sweeping test also needs a `tests/conftest.py` pre-merge classification (#2372) and a `MutationSpec`.
+- **One lane force-pushed its own lane branch** (`--force-with-lease`, only its own commits) after I wrote "rebase" in a brief — my wording invited a breach of the no-force-push rule. Lanes merge `main` in; "rebase" is not a word for a lane brief.
+- **The visual gate's `not_empty` read hidden text as empty** (fixed, #4203); **CodeQL flags a single-pass `<tag>` regex strip even in a test helper** (loop to a fixed point); **the doc-index gate accepts only `canonical|generated|log|superseded|archive`**; **the harness's `_main.txt` reads `<main>` only** — content promoted above it needs the body dump; **the vocabulary census must skip `<noscript>` bakes** (#4201). The memory backup `aws s3 sync` and any `config/` read were NOT run unattended (the AR stall class) — ask 8 below.
 
 ## Residual / next picks
 
-- #4168: lands once CI is green. Then one fleet deploy, then the live read on the next Hevy cardio day, per #4158's acceptance (`sets_with_logged_duration > 0`, MET basis).
-- #4179: the main fix. Merge, then confirm main green.
-- #4180: `qa-smoke-failures` is red on a checker false positive (a coach's recovery EWMA trend "from 71.7 % to 82" read as the current night). The alarm is re-cited to it.
-- #4178: Strava walks still earn 6 kcal/kg/h.
-- #4177: the adherence action should use the ingestion matcher. Its proof is the re-graded Thursday sets-over-ceiling count.
-- #4171, #4172, #4174, #4170: the chat-found defects.
-- #4166: the body-fat-scaled protein gate + DXA override. First real evaluation at the week-8 DXA, ~11-01.
-- #4065: the next heavy-day commit (Upper-heavy, ~09-27/28).
-- #4076: the first real critic veto the owner overrides.
-- #4149: the next stage-2 run on a lift unused for ≥ 28 days.
-- #3552 and #3712: body probes fire Sunday 09-27 (#3712 grades 10-04).
-- #4111: read Sunday's digest email by hand. The report is email-only, so no probe exists.
-- #3754: an audit story, not machine-probeable. It needs a session read.
-- #4034: its remaining conditions are the post-CDK smoke, the second `signal_ledger.json` merge and the monthly `[pages]` close (~10-01). The census condition is met live (`drift-log/latest.json` `producer_census: clean`).
-- #3528: the first real `[direct-push-gate]` pass or refusal. Not proven this session, because the wrap went by PR.
-- #4163: auto-closes on the next green `visual-qa-standalone` run (#4165 fixed its main red). The `/method/board/` weekly-read finding may still fire.
-- #4164: closes itself after 14 green scheduled PII sweeps.
-- #3607 and #3593: the full review, 10-06.
-- #2978: 10-19.
-- #3761: photos (owner).
+- **Owner's morning list** (`docs/SITE_TRANSFORMATION_V6.md` §7, one numbered list): door labels · the home headline · the level name off reader pages (shipped in #4200; the one-line revert is named in its body) · the page cap number (24) · unlink glucose · the subscriber counter · merge + deploy the four engine PRs (#4192 #4193 #4194 #4196 — one fleet deploy + `deploy_site_api.sh`) · the 09-08 DDB record scrub (#4190) + the published chronicle bracket (#4191) · photos #3761 · run the memory backup sync (`not-work — an unattended aws write; the owner runs it`).
+- **This week's site work — stories to file after the owner's review, under #4182:** the data and protocols door copy + one number in each fold; the story fold + the "next write-up Wednesday" return trigger; the vocabulary passes door by door against `site/data/glossary.json`; the nav labels once picked; `/subscribe/` field-in-fold + the "Measured Life" title; the glucose honest state (`not-work — filed as stories once the owner rules on §7; the epic carries the list`).
+- **Live proofs to read:** #4180 + #4186 after the qa-smoke deploy (the next nightly); #4184 after the next daily-metrics-compute run; #4187 (`open_actions` carrying the 10-02 commitment); #4188 stays open on the daily lead read; #4191 write side; #4202 auto-resolves on #4204's green run; #4163 auto-closes on the next green scheduled visual-qa.
+- Everything AU listed stays as AU left it: #4168's cardio-day read (#4158), #4177, #4178, #4172, #4174, #4171, #4170, #4166, #4065, #4076, #4149, Sunday's probes (#3552, #3712, #4111), #4034, #3607/#3593 (10-06), #2978 (10-19).
 
-**Build beat:** 2026-09-25-the-machines-he-actually-uses
-**Docs:** docs/INCIDENT_LOG.md (+1 row, Patterns regenerated) · docs/alarm_citations.json (qa-smoke-failures re-cited to #4180) · docs/engines/READINESS.md is re-verified inside PR #4168 · CLAUDE.md status block
-**Decisions:** none needed — every change implements an owner ruling recorded on its issue or PR (#4161, #4162, #4169, #4170, #4158) or an existing ADR
-**Main:** red — CI/CD at 836e2696 failed 3 fixture tests from the #4173 × #4176 collision; fix-forward PR #4179 armed (incident row added)
-**Incidents:** 1 row added — main's full suite red on two same-session PRs each green alone (a hand-copied fixture), fixed forward by PR #4179
+**Build beat:** 2026-09-26-a-site-a-friend-can-read
+**Docs:** docs/SITE_TRANSFORMATION_V6.md (new, indexed) · docs/SITE_MAP_AND_INTENT.md (three doors' must-deliver amended, Verified bumped) · docs/CONVENTIONS.md §9 (+2 gate rows, in #4198) · docs/DECISIONS.md (ADR-156 + index) · docs/INCIDENT_LOG.md (+2 rows, Patterns regenerated) · docs/alarm_citations.json (qa-smoke-warnings → #4183) · docs/PROPORTIONALITY.md (+1 row) · docs/OPERATING_KNOWLEDGE_LEDGER.md (+3 rows, snapshot) · CLAUDE.md status block
+**Decisions:** ADR-156 filed — the reader's three questions come before the loop on every door's first screen
+**Main:** red — CI/CD at `459aa84fc` (#4204's merge) was still in progress at the wrap; the previous completed run's red is the #4199×#4200 census/sweeper collisions fixed forward in the same PRs; the site-deploy runs for `a013d5e50`, `a19d91567` and the `d0d07296e` dispatch are red on the two gate defects fixed by #4203/#4204 (rollback declined each time; live content correct throughout)
+**Incidents:** 2 rows added — the visual gate's check-side false red on #4200's deploy (rollback declined, #4202); the real `link-in-text-block` a11y red on #4199's deploy (fixed forward #4204)
 **Stash/hooks:** clean
-**Closures:** #4022 #3592 #4075 #4077 #4078 #4066 #4161 #4160 #4169 #4112 commented (Shipped / Outcome / Live proof / Residual) · DoD: scanned=10 window=closed>=2026-09-26 hits=0 findings=0 dispositioned=0 mode=warn blocking=none (after the #4075/#4161 residual lines were inlined)
-**Backlog:** Now live at 15; no stale Later issues; hygiene 0 violations, 10 advisories (proof_probe × 8, grandfathered × 1, instrument-filed × 1); epics re-covered (#3742 +#4166 #4169 #4170 #4171 #4172 #4174 #4177; #3495 +#4178; #3493 +#4180)
-**Alarms:** 1 red, cited — qa-smoke-failures → #4180 (cause cross_surface:vitals, observed 2026-09-25)
-**CI warnings:** unverified — the newest main CI/CD run is red (#4179 in flight), so there is no green run to read annotations from
-**Ledger:** none — no standing machinery shipped
+**Closures:** none — no issues closed this session · DoD: scanned=10 window=closed>=2026-09-26 hits=0 findings=0 dispositioned=0 mode=warn blocking=none
+**Backlog:** Now live at 15 stories; no stale Later issues; hygiene 0 violations after the three epics' `## Stories` rows (#4183 → #3493; #4184 #4185 → #3495; #4190 #4191 → #4182); 12 filed tonight (#4182–#4191, #4202 auto), 0 closed; open count 36 → 48 via REST
+**Alarms:** 3 red >72h, all cited — `qa-smoke-failures` → #4180 (PR #4194 open), `qa-smoke-warnings` → #4183 (re-cited tonight; the 09-21 citation had expired), `freshness-interior-gap` → the dated self-clearing citation (expires 09-29)
+**CI warnings:** unverified — the newest main CI/CD run was in progress at the wrap (#4204's merge), so there was no green run to read annotations from
+**Ledger:** Site vocabulary registry + static-reach ratchet row added

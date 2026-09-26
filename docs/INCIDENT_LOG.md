@@ -24,6 +24,8 @@ Last updated: 2026-09-26 Session AU Opus wrap (#1332 gate; +1 row — main's ful
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-09-26 | **P3** (site-deploy post-deploy visual gate red on a CHECK defect; the rollback DECLINED by its scope verdict; the live site was correct throughout) | **PR #4200's deploy (`a013d5e50`, 06:35Z) failed `Visual + AI-vision QA` on one deterministic check — `/cockpit/`: `All '[data-bind='level']' empty/placeholder` — reproduced on the confirm re-probe; #4202 auto-filed. A live 390 px read at 06:59Z: the new first screen rendered, `data-state=ready`, zero errors.** | #4200 moved the character level into a collapsed `<details>` by design (#4182 ruling iii); `tests/visual_qa.py`'s `not_empty` check reads `inner_text()`, which is `""` for anything hidden. A false red of the gate, not the page. Fixed forward by PR #4203 (an element inside a closed `<details>` is read by `text_content()`), proved live with the mutation control (main's check reds the same live page). | ~20 min (the run's own verdict) | ~35 min to the fix PR; green run recorded by the #4204 deploy | No |
+| 2026-09-26 | **P3** (site-deploy visual gate red on a REAL a11y defect + the same check defect; rollback DECLINED; fixed forward within the hour) | **PR #4199's deploy (`a19d91567`, 06:59Z) failed on `/coaching/` and `/coaching/read/` — a NEW serious axe `link-in-text-block` violation (the `.ct-record` "the scorecard →" link distinguishable only by colour) — plus the #4202 cockpit check; 91/94 pages passed.** | The coaching slice styled the record link `text-decoration: none` in running text. PR #4204 gives it a real underline (axe recognises an underline, not a border). The rollback correctly declined (live content was right; the a11y defect was cosmetic-serious, not a break). | ~18 min | ~25 min to the fix PR | No |
 | 2026-09-26 | **P4** (main's full suite red from 03:46Z until PR #4179 merges; no reader impact, all three fleet deploys content-verified) | **CI/CD at `836e2696` failed `test / Unit Tests` on 3 tests in `tests/test_adherence_calc.py`: two PRs from the same session, each green alone, merged minutes apart.** #4173 (#4160) added a fixture that hand-copied the catalog's `leg_curl` hint `B8127AD1` and the `calf_press_machine` key; #4176 (#4169) remapped `leg_curl` → `11A123F3` and removed `calf_press_machine` (its `91237BDD` now belongs to `calf_raise_machine`). Neither PR's CI saw the other. | A test fixture that copies a data file's values instead of reading the file, plus concurrent merges with no re-test of the second against the first (the per-PR check runs on the merge ref at the time it ran). | At the wrap's (e2) gate (~20 min). | PR #4179: the fixture derives every performed template id from `config/movement_catalog.json` via `common.repo_config`; no production code touched (the only `calf_press_machine` references were these tests). | No. |
 | 2026-09-24 | **P3** (autonomy lost ~6.5 h; no reader impact) | **An overnight `aws lambda invoke --function-name hevy-backfill …` (a training-note re-extract for #4151), issued ~05:35Z, waited on a permission prompt until the owner woke; the driver's next event was 12:11Z.** Two green PRs (#4120 v0.4, #4159) sat unmerged and the planned 00:00 and 03:30 PT deploy windows were lost; the background lanes and CI kept running. `deploy_fleet.sh`, `cdk_deploy.sh`, python-boto3 S3 writes and `gh` ran unprompted the same night. | A never-before-run command class issued unattended; a pending prompt never times out and nothing routes around it (the AP/AQ/AR class, fourth session running). The invoke was not needed that night. | ~6.5 h (read at the 12:11Z heartbeat). | Merged and deployed at 13:15–14:42Z once attended. Reflex: before the owner sleeps, list every command class the overnight plan needs that has not yet run unprompted this session, and pre-approve it or defer it. | No. |
 | 2026-09-24 | **P4** (main's CI/CD badge red ~26 h on the IAM-review gate; no reader impact, nothing undeployed) | **CI/CD run 36010082207 at `7218b187` (14:13Z): `Plan deployments` failed on the #2834 IAM additive gate, which read `LifePlatformMcp` as OWNER-REQUIRED (the #4152 nightly pre-draft rule + warmer grants), and `Deploy` was SKIPPED.** The owner-approved `bash deploy/cdk_deploy.sh LifePlatformMcp` ran from the same tip at 14:42Z, and the fleet was already on `7218b187` via `deploy_fleet.sh`. So production matched main within 29 min, but no later push re-ran Plan and the badge stayed red until this wrap. | Working as designed (R8-ST6, #1901 class): an IAM change outside the additive shape strands CI's deploy until the owner deploys the stack. The residue is that a stranded badge does not clear itself after the manual deploy. | At the wrap's (e2) gate. | The stack deployed 14:42Z; the wrap push re-runs Plan against the now-matching live template. | No. |
@@ -274,7 +276,7 @@ Last updated: 2026-09-26 Session AU Opus wrap (#1332 gate; +1 row — main's ful
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 228 dated rows, 193 post-June** (newest row 2026-09-26):
+**Distribution — 230 dated rows, 195 post-June** (newest row 2026-09-26):
 
 | month | rows |
 |---|---|
@@ -285,18 +287,18 @@ Last updated: 2026-09-26 Session AU Opus wrap (#1332 gate; +1 row — main's ful
 | 2026-06 | 2 |
 | 2026-07 | 36 |
 | 2026-08 | 126 |
-| 2026-09 | 31 |
+| 2026-09 | 33 |
 
-**By severity:** P1 6 · P2 34 · P3 84 · P4 99 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 34 · P3 86 · P4 99 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 30 match none):
 
 | n | class |
 |---|---|
-| 143 | deployment error |
+| 145 | deployment error |
 | 58 | stale config / literal drift |
-| 44 | QA-oracle false positive |
+| 45 | QA-oracle false positive |
 | 41 | QA false positive — deploy-race (#2978) |
 | 34 | lane-subset / union-breach main red |
 | 33 | deploy-plane wedge / strand / race |
@@ -318,7 +320,7 @@ than one, and 30 match none):
 > 2026-08-22: 14 rows in July (1 per 2.2 days), 15 in 2026-08-01→22 (1 per 1.5 days).
 
 <!-- INCIDENT-PATTERNS:TOPCLASSES:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-The three classes the old list omitted entirely — **QA-oracle false positives (44)**, **lane-subset/union-breach main reds (34)** and **deploy-plane wedges/strands/races (33)** — are now the 3rd, 5th and 6th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
+The three classes the old list omitted entirely — **QA-oracle false positives (45)**, **lane-subset/union-breach main reds (34)** and **deploy-plane wedges/strands/races (33)** — are now the 3rd, 5th and 6th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
 <!-- INCIDENT-PATTERNS:TOPCLASSES:END -->
 
 ### Silence is an axis, not a class
@@ -331,17 +333,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**53 of 228 rows are silent.**
+**53 of 230 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 53 | 175 |
-| TTD parseable | 40 | 117 |
+| rows | 53 | 177 |
+| TTD parseable | 40 | 119 |
 | median TTD | **29 min** | 20 min |
-| mean TTD | 1,795 min | 1,485 min |
+| mean TTD | 1,795 min | 1,460 min |
 | exceeded 1 day | 6 (15% of parsed) | 9 (8% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.9× more likely to run past a day**. But the *means* are only 17% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **71 of 228 TTD cells (31%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.4× longer to detect at the median** and are **~1.9× more likely to run past a day**. But the *means* are only 19% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **71 of 230 TTD cells (31%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -352,7 +354,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August and 31 in September. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August and 33 in September. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)
