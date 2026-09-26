@@ -509,9 +509,15 @@ PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in STRUCTURAL_PROOF
 
 # Family 2 (guard-script) + family 5 hand-records that did not fit above — this module
 # sits at its 1,200-line ceiling (#1665) and the rule is extraction, never a raise (#2610).
-from gate_census_proofs import GUARD_PROOFS, QA_PROOFS, REGISTRY_PROOFS, STRUCTURAL_HAND_PROOFS  # noqa: E402 — families 2, 3, 5, registry
+from gate_census_proofs import (
+    CI_PROOFS,
+    GUARD_PROOFS,
+    QA_PROOFS,
+    REGISTRY_PROOFS,
+    STRUCTURAL_HAND_PROOFS,
+)  # noqa: E402 — families 1,2,3,5,registry
 
-for _extracted in (GUARD_PROOFS, QA_PROOFS, REGISTRY_PROOFS, STRUCTURAL_HAND_PROOFS):
+for _extracted in (CI_PROOFS, GUARD_PROOFS, QA_PROOFS, REGISTRY_PROOFS, STRUCTURAL_HAND_PROOFS):
     PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in _extracted.items()})
 
 

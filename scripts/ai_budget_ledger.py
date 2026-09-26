@@ -180,6 +180,17 @@ LEDGER: dict[str, dict] = {
         note="hosted by journal-enrichment AND journal-analyzer, both of which run other AI — "
         "per-feature dollars not separable; Aug journal-enrichment $0.01",
     ),
+    "comprehension_qa": _row(
+        owner="tests/comprehension_qa.py",
+        attribution=EXCLUSIVE,
+        attribution_keys=("comprehension_qa",),
+        founding_usd=0.00,
+        monthly_budget_usd=1.00,
+        note="#4182 M4: the newcomer-comprehension judge — a blind Haiku reader + a text-only "
+        "grader over the six flagship doors, once per visual-qa.yml fire. Did not exist in the "
+        "founding window, so $0 stamped; dedicated allowlisted CI label (#2888), same pattern as "
+        "visual_ai_qa/reader_truth_qa above but band 1 (advisory triage signal, not a deploy gate)",
+    ),
     # ── band 2: reader narrative ─────────────────────────────────────────────
     "coach_narrative": _row(
         owner="lambdas/coach/coach_narrative_orchestrator.py",

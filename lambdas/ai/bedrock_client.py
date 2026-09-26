@@ -111,6 +111,11 @@ ATTRIBUTABLE_FEATURES: frozenset = frozenset(
         # variable wins and the row stays `life-platform-qa-smoke`, so the CI copy
         # and the nightly Lambda copy of the SAME gate stop being summed together.
         "reader-truth-qa",
+        # tests/comprehension_qa.py (#4182, M4) — the newcomer-comprehension judge:
+        # a blind reader + a text-only grader over the six flagship doors. Advisory
+        # (never gates the deploy), so its spend is metered separately from the two
+        # deploy-gating judges above rather than falling into the "unknown" residual.
+        "comprehension_qa",
     }
 )
 

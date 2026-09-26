@@ -129,6 +129,14 @@ _FEATURE_CUTOFF = {
     # verbatim records remain fully stored either way (enrichment just resumes and
     # backfills when the tier drops). ~a few short Haiku calls/day.
     "conversation_enrichment": 1,
+    # comprehension_qa (#4182, M4): the newcomer-comprehension judge — a blind Haiku
+    # reader + a text-only grader over the six flagship doors, ADVISORY-ONLY (it never
+    # gates a deploy, unlike reader_truth_qa/visual_ai_qa below, which is why it sits in
+    # a different band from them despite the naming similarity). It pauses FIRST, with
+    # the rest of the internal/dev tier: a comprehension score is a triage signal for a
+    # human to read later, not a reader-facing surface and not the operator's deploy-safety
+    # verdict, so it has no claim to outlive coach narratives or the two CI truth gates.
+    "comprehension_qa": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.
