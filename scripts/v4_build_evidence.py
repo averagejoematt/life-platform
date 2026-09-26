@@ -209,7 +209,7 @@ REGISTRY = [
     (
         "character",
         "The character sheet",
-        "The live RPG sheet — 7 pillars, XP, streak-gated levels, and the figure drawn from the real numbers.",
+        "The live RPG sheet — the seven areas, XP, streak-gated levels, and the figure drawn from the real numbers.",
         "The character",
         "data",
         "/api/character",
@@ -330,7 +330,7 @@ REGISTRY = [
     (
         "character",
         "The character",
-        "What the Character Level means — 7 pillars, 100 levels, 5 tiers, and why level-ups are rare.",
+        "What the Character Level means — the seven areas, 100 levels, 5 tiers, and why level-ups are rare.",
         # Inline (not via _REGROUP): the slug also names the /data/ live sheet.
         "How it holds up",
         "editorial",
@@ -665,6 +665,14 @@ _REGROUP = {
 }
 REGISTRY = [(s, t, b, _REGROUP.get(s, g), *rest) for (s, t, b, g, *rest) in REGISTRY]
 
+# #4182 (A-grade sweep): the rails show only the 25-page reach set (docs/SITE_TRANSFORMATION_V6.md
+# ruling vi). Every other entry takes the existing "unlisted" flag — served at its URL, off the
+# tile rail / group tabs / "All N topics" count. No page deleted, no URL moved.
+_REACH_SET_TOPICS = {("physical", "The body"), ("labs", "The body"), ("sleep", "The body"), ("training", "The body")}
+_REACH_SET_TOPICS |= {("nutrition", "The body"), ("experiments", "Protocol & experiments")}
+_REACH_SET_TOPICS |= {("character", "How it holds up"), ("wrong", "How it holds up")}
+REGISTRY = [e if (e[0], e[3]) in _REACH_SET_TOPICS or "unlisted" in e[8:] else (*e, "unlisted") for e in REGISTRY]
+
 GROUP_ORDER = [
     "The body",
     "Mind & accountability",
@@ -708,7 +716,7 @@ EDITORIAL = {
         '<p class="correlative">The model never computes in prose — it interprets pre-computed numbers only. <span class="confidence conf-low">N=1</span></p>'
     ),
     "character": (
-        '<p class="rd-lede">The experiment has one number that tries to answer "is this actually working?" — a single RPG-style Character Level built from everything else. Here\'s what it means.</p>'
+        '<p class="rd-lede">The experiment has one number that tries to answer "is this actually working?" — the engine\'s score (he calls it the Character Level, a game-style level from 1 to 100), built from the seven areas of his life. Here\'s what it means.</p>'
         '<section class="rd-sec"><h2 class="rd-h">One level, seven pillars</h2>'
         '<p class="rd-prose">Every day the engine scores seven pillars of the life — <strong>Sleep, Movement, Nutrition, Metabolic health, Mind, Relationships, and Consistency</strong> — each from its own real data (wearables, the food log, habits, labs). Those seven are weighted and rolled into one overall <strong>Character Level</strong> from 1 to 100. It\'s the closest thing to a single answer to the only question that matters over months: is the whole life trending up, or just one corner of it?</p></section>'
         '<section class="rd-sec"><h2 class="rd-h">Five tiers</h2>'

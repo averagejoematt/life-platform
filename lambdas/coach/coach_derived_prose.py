@@ -48,7 +48,9 @@ from coach.reading_date_fidelity import SUMMARY_DAY_CORRESPONDENCE_RULE
 # seam). It joins THIS set so the ADR-104 grounding gate, the HOLD and the recondense
 # cover it like the other three; it deliberately does NOT join
 # SERVED_SUMMARY_PREFERENCE below, whose consumers are owner/coach-register surfaces.
-DERIVED_PROSE_FIELDS = ("observatory_summary", "key_recommendation", "elena_quote", "public_summary")
+# #4213 added `public_ask` — the ONE ask, reported in the third person, that the by-coach
+# timeline serves (audience_guard.public_timeline_summary); same set, same reasons.
+DERIVED_PROSE_FIELDS = ("observatory_summary", "key_recommendation", "elena_quote", "public_summary", "public_ask")
 
 # The read preference every serving path already used, made explicit so the six sites
 # cannot drift apart. `content` is the coach's full narrative — the artifact that
@@ -56,7 +58,7 @@ DERIVED_PROSE_FIELDS = ("observatory_summary", "key_recommendation", "elena_quot
 SERVED_SUMMARY_PREFERENCE = ("key_recommendation", "observatory_summary")
 
 RECONDENSE_SYSTEM_PROMPT = (
-    "You rewrite the four short reader-facing condensations of an AI coach's output. "
+    "You rewrite the five short reader-facing condensations of an AI coach's output. "
     "The coach's full narrative is the ONLY source of truth: every number, every date "
     "and every claim you write must already be present in it. You may shorten, "
     "paraphrase and round; you may not introduce.\n\n"
@@ -72,7 +74,12 @@ RECONDENSE_SYSTEM_PROMPT = (
     '  - "public_summary": the coach\'s read rewritten for visitors to the public '
     "website (2 short paragraphs, ~120-180 words): first person for the coach, "
     "strictly THIRD person for the subject (his first name or 'he'/'his') — never "
-    "'you'/'your', never a name-as-salutation, never an imperative aimed at him.\n\n" + SUMMARY_DAY_CORRESPONDENCE_RULE + "\n"
+    "'you'/'your', never a name-as-salutation, never an imperative aimed at him. Every "
+    "figure carries its day or window in words; first sentence at most 25 words; plain "
+    "words (never EWMA, autocorrelation, etiology, gate).\n"
+    '  - "public_ask": the ONE thing the coach asked him to do this week, at most 25 '
+    'words, third person ("I\'ve asked him to …"), no undated figure — or null if '
+    "nothing was asked.\n\n" + SUMMARY_DAY_CORRESPONDENCE_RULE + "\n"
     "A sleep, recovery, HRV or resting-HR figure that does not say which night it "
     "belongs to cannot be checked by a reader or by the grounding gate — name the "
     "night or drop the figure. Dropping a figure is always allowed; inventing one is "
@@ -144,7 +151,7 @@ def recondense_message(coach_id, source_text, extraction, correction) -> str:
             "",
             str(correction or ""),
             "",
-            "Rewrite all four fields. Return ONLY the JSON object.",
+            "Rewrite all five fields. Return ONLY the JSON object.",
         ]
     )
 

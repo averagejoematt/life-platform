@@ -205,10 +205,11 @@ async function renderRead(s, id) {
     const all = entriesFor(s, data);
     // The pipeline can skip a week (e.g. the chronicle isn't written yet); it records
     // a `pending` marker so we say WHY instead of going silent (matches the show's honesty).
-    const pendingHTML = data && data.pending && data.pending.display
-      ? `<aside class="panel-pending"><p class="dx-kicker label">next episode</p><p class="dx-prose">${esc(data.pending.display)}</p></aside>`
-      : "";
     const ent = all.find((x) => String(x.id) === String(id)) || all[0];
+    const _next = panelNextLine(data && data.pending, all[0]);
+    const pendingHTML = _next
+      ? `<aside class="panel-pending"><p class="dx-kicker label">next episode</p><p class="dx-prose">${esc(_next)}</p></aside>`
+      : "";
     if (!ent) { read.innerHTML = pendingHTML + `<p class="dx-prose">No episodes yet — the first weekly review drops here once the chronicle's been running a week.</p>`; return; }
     const isWav = /\.wav$/i.test(ent.url || "");
     const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 10000));  // WAV=24kHz·16-bit·mono; else 80kbps MP3 (#1018)
@@ -271,13 +272,14 @@ async function renderRead(s, id) {
     const _wk = ent.week ?? ent.id;
     const _pj = _wk != null ? await tryJSON("/journal/posts.json") : null;
     const _wkPost = _pj && _pj.posts ? _pj.posts.find((p) => String(p.week) === String(_wk)) : null;
-    const chronLink = _wkPost ? `<p class="dx-xlink"><a href="/story/chronicle/#${esc(_wkPost.date)}">Read Week ${esc(_wk)}'s chronicle →</a></p>` : "";
+    // #4182 sweep fix 10: the write-up lives at /story/ (the door's default tab), in the reader's word.
+    const chronLink = _wkPost ? `<p class="dx-xlink"><a href="/story/">Read Week ${esc(_wk)}'s write-up →</a></p>` : "";
     read.innerHTML =
       pendingHTML +
       cover +
       `<p class="dx-kicker label">the podcast · weekly review · two AI voices</p>` +
       `<h2 class="dx-title">${esc(ent.title)}</h2>` +
-      (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
+      (ent.date && dayInWords(ent.date) ? `<p class="dx-stats label">${esc(dayInWords(ent.date))}</p>` : "") +
       `<div class="dx-listen">${hostsHTML}<audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
       chronLink +
@@ -836,11 +838,29 @@ async function nextWriteUpLine() {
 // no Week 2) is worth flagging regardless of what the cadence line says.
 // Never invents a cause beyond what the data says; returns "" when there's
 // nothing to report.
+// #4182 (A-grade sweep fix 10): the podcast's "next episode" line from the served
+// /panelcast/episodes.json `pending` marker — dated when it carries an `expected_date`,
+// otherwise the plain truth that nothing is scheduled (a held episode says so by week,
+// never "in final review — as soon as it clears the quality bar", which promised a
+// time the data does not hold). The newest episode's date follows in words.
+function panelNextLine(pending, latest) {
+  if (!pending) return "";
+  const when = pending.expected_date ? dayInWords(pending.expected_date) : "";
+  let line = when ? `Next episode: ${when}.` : "No next episode is scheduled.";
+  if (!when && pending.reason === "held_for_review" && pending.week != null) line += ` Week ${pending.week}'s is held for review.`;
+  const last = latest && latest.date ? dayInWords(latest.date) : "";
+  if (last) line += ` The latest below is from ${last}.`;
+  return line;
+}
+
 async function cadenceNoteHTML(key, data, entries) {
   const bits = [];
   if (key === "chronicle") {
     // #4182: the chronicle's "when's the next one" line moved into the reader (the
     // fold's last line — nextWriteUpLine); the list rail keeps only the gap note below.
+  } else if (key === "panel" && data && data.pending) {
+    const line = panelNextLine(data.pending, entries[0]);
+    if (line) bits.push(`<li class="dx-empty">${esc(line)}</li>`);
   } else if (data && data.pending && data.pending.display) {
     bits.push(`<li class="dx-empty">${esc(data.pending.display)}</li>`);
   } else {

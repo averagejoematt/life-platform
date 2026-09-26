@@ -89,11 +89,15 @@ const NODES = {
   consistency:  { x: 180, y: 185, label: "Hold" },
 };
 // Each pillar links into its deeper Data page (the story → sub-pages).
+// #4182 (A-grade sweep fix 17): metabolic and mind link nowhere — /data/glucose/ and
+// /data/reading/ are unlisted by the panel's ruling (docs/SITE_TRANSFORMATION_V6.md);
+// metabolic says the honest state instead of "open →" (NODE_NOTE).
 const NODE_LINK = {
   sleep: "/data/sleep/", movement: "/data/training/", nutrition: "/data/nutrition/",
-  metabolic: "/data/glucose/", mind: "/data/reading/", relationships: "/data/mind/",
+  relationships: "/data/mind/",
   consistency: "/data/habits/",
 };
+const NODE_NOTE = { metabolic: "Blood sugar — no sensor this cycle" };
 // Icon key per pillar for the hover door affordance (domainIcon maps to icons.js).
 const NODE_ICON = {
   sleep: "sleep", movement: "training", nutrition: "nutrition", metabolic: "glucose",
@@ -230,7 +234,7 @@ function drawConstellation(pillars, coupling, activeEffects) {
     fo.appendChild(ico);
     const cue = document.createElementNS(SVGNS, "text");
     cue.setAttribute("class", "door-cue"); cue.setAttribute("x", pos.x); cue.setAttribute("y", pos.y + r + 24);
-    cue.textContent = "open →";
+    cue.textContent = NODE_LINK[name] ? "open →" : NODE_NOTE[name] || "";
     door.append(fo, cue);
     g.append(hit, c, tScore, tLab, door);
     const href = NODE_LINK[name];
@@ -241,6 +245,7 @@ function drawConstellation(pillars, coupling, activeEffects) {
       a.appendChild(g);
       nodeG.appendChild(a);
     } else {
+      if (NODE_NOTE[name]) g.setAttribute("aria-label", `${pos.label} — ${NODE_NOTE[name]}`);
       nodeG.appendChild(g);
     }
   }
@@ -997,7 +1002,7 @@ load();
 // of the home beat rather than its self-hiding window.
 
 mountAsk(document.querySelector("[data-home-ask]"), {
-  chips: ["Is my sleep actually improving?", "What moves the glucose most?", "Is the weight loss on track?"],
+  chips: ["Is my sleep actually improving?", "How is he eating this week?", "Is the weight loss on track?"],
   note: "AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour); may pause under the budget guard.",
 });
 

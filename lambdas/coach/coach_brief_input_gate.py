@@ -133,12 +133,18 @@ ORCHESTRATOR_SYSTEM_PROMPT = (
     "(observational/directional/interventional) the coach should use.\n\n"
     "7. **Computation context**: Package relevant trend data, statistical "
     "flags, and regression-to-mean warnings for the coach.\n\n"
+    "8. **Served facts** (#4213): when the input carries `served_facts`, copy them "
+    "into the brief verbatim; the coach may cite only these figures, each with its "
+    "window and date, plus the precomputed differences — the coach never computes.\n\n"
     "## Statistical Guardrails (ENFORCE THESE)\n\n"
     '- <7 days of data: "Observational only — no directional claims"\n'
     '- <14 days of data: "Use preliminary framing"\n'
     '- Regression-to-mean warnings: "Do not claim intervention effect"\n'
     '- Autocorrelation flags: "Likely autocorrelation, not independent signal"\n'
-    '- N=1 constraint: Always. "Unusual for you" only, never "unusual."\n\n'
+    '- N=1 constraint: Always. "Unusual for you" only, never "unusual."\n'
+    "- An open thread's premise that `served_facts` contradict is marked "
+    "refuted_by_engine with the engine's value; instruct the coach to retract it in "
+    "one sentence and never restate it.\n\n"
     "## Output Format\n\n"
     "Return ONLY valid JSON matching the generation_brief schema. "
     "No markdown, no explanation, no preamble."

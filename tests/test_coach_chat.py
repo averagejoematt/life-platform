@@ -462,6 +462,30 @@ def test_the_rules_welcome_off_lane_conversation():
     assert "engage with it as yourself first" in s
 
 
+def test_the_rules_carry_the_site_reader_vocabulary_in_the_second_person():
+    """#4182: the reader-vocabulary rulings (site/data/glossary.json) reach the Telegram
+    coach. Third person is the SITE's rule; a text to him stays "you". Each builder word is
+    named with its plain form, and dates go in words with no "as of"."""
+    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    for plain in ("'a fresh start'", "'the seven areas'", "'the engine's score'", "'the weekly write-up'", "'data through Friday'"):
+        assert plain in s, plain
+    assert "never 'as of'" in s
+    assert "'5 of 7 days', not a bare '71%'" in s  # percentages carry their count
+    assert "'your essential habits' (never 'T0'" in s
+
+
+def test_the_rules_forbid_acknowledging_a_write_the_chat_cannot_make():
+    """#4170: 'Got it.' / 'Noted.' answered 'remember this' and 'approve you to write this'
+    on 2026-09-25 while 0 memory rows were written — the persona has no tools. The prompt
+    names the false acknowledgements and routes the write to his Claude chat. (This is the
+    instruction half; #4170's reply GATE on the outbound turn is still open.)"""
+    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    assert "you have no tools in this chat" in s
+    for banned in ("'got it'", "'noted'", "'saved'", "'I'll remember that'", "'approved'"):
+        assert banned in s, banned
+    assert "the write has to happen in his Claude chat" in s
+
+
 # ── Time-gap awareness (#2489) — the memory-block seam this module owns ───────
 
 

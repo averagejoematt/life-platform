@@ -331,12 +331,17 @@ class TestTheOrderingThatMakesTheMapReal:
         assert bl.available_logs_from_presence(stale, _gen_day()) == bl.LogAvailability.none()
         assert _cron("coach-prediction-evaluator") < _cron("adaptive-mode-compute")
 
-    def test_the_stance_prompt_is_still_a_second_person_surface_about_matthew(self):
-        """The #1699 class only checks a second-person completed-action claim, and five
-        of the census's remaining exemptions are exactly "`you` is not Matthew here".
-        This surface qualifies BY PROMPT RULE — if that rule ever changes, the arming
-        decision has to be revisited rather than left running on a stale premise."""
-        assert "Address him as 'you'" in chs.STANCE_SYSTEM_PROMPT
+    def test_the_stance_prompt_is_now_a_third_person_surface_about_matthew(self):
+        """The #1699 class only checks a second-person completed-action claim. This
+        surface qualified BY PROMPT RULE ("Address him as 'you'") until #4213 moved the
+        stance to the public register — it is served to site visitors on
+        /coaching/by-coach/, so it now refers to Matthew in the third person. The rule
+        changed, so the arming decision was revisited as this test demanded: the class
+        stays wired (a slipped second-person sentence is still checked), but a
+        third-person "Matthew logged his meals today" is NOT seen by it — the widening
+        of the #1699 subject set to he/his/Matthew is the named follow-up in the #4213 PR."""
+        assert "Address him as 'you'" not in chs.STANCE_SYSTEM_PROMPT
+        assert "THIRD person" in chs.STANCE_SYSTEM_PROMPT
         assert "Matthew" in chs.STANCE_SYSTEM_PROMPT
 
     def test_the_prose_blob_the_gate_reads_still_carries_the_narrative_fields(self):

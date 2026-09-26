@@ -33,6 +33,7 @@ BASELINE = {
     "HRV": 3,
     "glucose": 2,
     "Whoop": 3,
+    "Hevy": 0,  # #4182 A-grade sweep: keep-with-gloss ("a workout-logging app"), glossed everywhere it appears at landing
     "character level": 3,
 }
 

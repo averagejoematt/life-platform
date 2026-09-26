@@ -18,6 +18,7 @@ import os
 from datetime import datetime
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import day_in_words  # #4182: dates in words on a human surface
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from ingestion import source_registry
 
@@ -126,8 +127,8 @@ def build_data_status_banner_html(stale, quiet, compute_partial=None):
             if _age is None:
                 _detail = "no data"
             else:
-                _last = _s.get("last_date", "?")
-                _detail = f"last update {_last} ({_age}d ago)"
+                _last = day_in_words(_s.get("last_date", "?"))
+                _detail = f"last update {_last} ({_age} days ago)"
             _row_parts.append(f'<li style="margin:2px 0">{_src_name} — {_detail}</li>')
         _banner_rows = "".join(_row_parts)
         html_parts.append(
@@ -146,8 +147,8 @@ def build_data_status_banner_html(stale, quiet, compute_partial=None):
             if _q["age_days"] is None:
                 _detail = "no record on file"
             else:
-                _detail = f"nothing logged since {_q['last_date']} ({_q['age_days']} days)"
-            _q_parts.append(f'<li style="margin:2px 0">{_q["label"]} — {_detail} ' f'(notice line: {_q["quiet_after_days"]}d)</li>')
+                _detail = f"nothing logged since {day_in_words(_q['last_date'])} ({_q['age_days']} days)"
+            _q_parts.append(f'<li style="margin:2px 0">{_q["label"]} — {_detail} ' f'(noticed after {_q["quiet_after_days"]} days)</li>')
         html_parts.append(
             '<div style="background:#eef2ff;border-left:4px solid #6366f1;padding:14px 18px;'
             'margin:0 0 16px;font-family:-apple-system,sans-serif;font-size:13px;color:#312e81">'
