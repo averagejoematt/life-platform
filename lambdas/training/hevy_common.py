@@ -70,6 +70,7 @@ except ImportError:
 # `except ImportError: ZoneInfo(...)` fallback was a second Pacific frame that
 # could silently diverge, and it is dead under the one-bundle rule (#781, the
 # whole lambdas/ tree is staged at the zip root in every function bundle).
+from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set duration key
 from common.pacific_time import PACIFIC, parse_iso_utc
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -237,15 +238,18 @@ def _normalize_set(s: dict, unit_hint: str) -> dict:
         weight = _lbs_to_kg(float(s["weight"]))
     elif weight is None and s.get("weight") is not None:
         weight = float(s["weight"])
-    return {
+    normalized = {
         "set_index": s.get("index", s.get("set_index", 0)),
         "weight_kg": weight,
         "reps": s.get("reps"),
         "rpe": s.get("rpe"),
         "type": s.get("type", "normal"),
-        "duration_sec": s.get("duration_seconds") or s.get("duration_sec"),
         "distance_m": s.get("distance_meters") or s.get("distance_m"),
     }
+    # #4158: SET_DURATION_FIELD ("duration_sec") is the ONE stored spelling; the raw
+    # Hevy API wire field (`duration_seconds`) is accepted on input and renamed here.
+    normalized[SET_DURATION_FIELD] = s.get("duration_seconds") or s.get("duration_sec")
+    return normalized
 
 
 def _normalize_exercise(ex: dict, unit_hint: str) -> dict:
