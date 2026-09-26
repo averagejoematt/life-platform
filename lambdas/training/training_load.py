@@ -76,7 +76,10 @@ charges a whole lifting session as work any more.
 import math
 from datetime import timedelta
 
-from common import activity_overlap  # #4158: the ONE HR-covered-interval / overlap derivation
+from common import (
+    activity_overlap,  # #4158: the ONE HR-covered-interval / overlap derivation
+    met_energy,  # #4158: the ONE walk-pace/cardio-modality classification
+)
 from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set duration key
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
@@ -132,12 +135,14 @@ HR_MODEL = "banister_trimp_above_z1_ceiling_v1"
 SECONDS_PER_REP = 3.0
 # Where the per-rep time came from — carried on every stored basis (ADR-105).
 SECONDS_PER_REP_SOURCE = "acsm_2009_moderate_tempo_midpoint_1-2s_concentric_1-2s_eccentric"
-# A logged cardio block at or below this average speed is walking pace (7.2 km/h).
-WALK_PACE_MAX_MS = 2.0
+# The walk-pace classification (name fragments + speed threshold) moved to
+# `common.met_energy` (#4158 review item 1) so `health.tdee`'s MET-rate cardio split
+# and this module's own TSS-point cardio split can never classify the SAME Hevy block
+# differently. Re-bound under the original names for this module's own callers/tests.
+WALK_PACE_MAX_MS = met_energy.WALK_PACE_MAX_MS
 # Hevy exercise-name fragments that mark MOBILITY work: charged 0.
 _MOBILITY_NAMES = ("stretch", "mobility", "yoga", "foam", "massage", "breath", "meditat")
-# Hevy exercise-name fragments that mark walking-type locomotion.
-_WALK_NAMES = ("walk", "treadmill", "hike", "stair")
+_WALK_NAMES = met_energy.WALK_NAME_FRAGMENTS
 # The Hevy set type the ruling excludes.
 _WARMUP_SET_TYPES = {"warmup", "warm_up", "warm-up"}
 # The label of the Hevy half of #4075.
@@ -275,9 +280,7 @@ def _is_mobility(name):
 
 
 def _cardio_rate(name, secs, distance_m):
-    n = str(name or "").lower()
-    speed = (distance_m / secs) if secs > 0 else 0.0
-    if any(k in n for k in _WALK_NAMES) and speed <= WALK_PACE_MAX_MS:
+    if met_energy.is_walk_pace(name, secs, distance_m):
         return WALK_TSS_PER_HOUR
     return DEFAULT_CARDIO_TSS_PER_HOUR
 

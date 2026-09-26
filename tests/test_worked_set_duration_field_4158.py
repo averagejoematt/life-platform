@@ -30,6 +30,7 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
+from common import met_energy  # noqa: E402
 from common.hevy_schema import SET_DURATION_FIELD  # noqa: E402
 from health import tdee  # noqa: E402
 
@@ -139,10 +140,13 @@ def test_a_hevy_cycling_block_with_the_stored_duration_key_contributes_its_energ
     assert ws["seconds"] == float(CYCLING_SECONDS)
 
     out = tdee.lifting_energy([_cycling_session()], WEIGHT_KG)
-    assert out["basis"] == "worked_set_time_from_hevy_set_log"
+    # #4158 owner ruling 2026-09-25: a Hevy cardio block is charged at its MODALITY's
+    # MET rate, never the lifting proxy — "Cycling" is not a walk-name fragment, so it
+    # takes CARDIO_LIGHT_MET_KCAL_PER_KG_HOUR (4.0), not PROXY_KCAL_PER_KG_HOUR (6.0).
+    assert out["basis"] == "worked_set_time_from_hevy_set_log_plus_light_cardio_at_4.0_met"
     assert out["kcal"] > 0
-    # 6 kcal/kg/hour x 80 kg x (1800/3600) h = 240 kcal exactly.
-    assert out["kcal"] == 240.0
+    # 4.0 kcal/kg/hour x 80 kg x (1800/3600) h = 160 kcal exactly.
+    assert out["kcal"] == 160.0
 
 
 def test_mutation_control_a_reader_put_back_on_duration_seconds_alone_goes_red():
@@ -217,8 +221,10 @@ def test_a_hevy_cardio_block_is_discounted_by_an_overlapping_hr_activity():
     assert ws["measured_seconds"] == float(UNCOVERED_SECONDS)
 
     lift = tdee.lifting_energy([_treadmill_workout()], WEIGHT_KG, covered_intervals=intervals)
-    assert lift["basis"] == "worked_set_time_from_hevy_set_log_cardio_hr_covered_discounted"
-    assert lift["kcal"] == round(tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
+    # #4158 owner ruling 2026-09-25: "Treadmill" is a walk-name fragment -> WALK_MET
+    # (3.5), never PROXY_KCAL_PER_KG_HOUR (6.0, the lifting/moderate-cycling rate).
+    assert lift["basis"] == "worked_set_time_from_hevy_set_log_plus_walk_pace_cardio_at_3.5_met_cardio_hr_covered_discounted"
+    assert lift["kcal"] == round(met_energy.WALK_MET_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
 
 
 def test_mutation_control_ignoring_overlap_reproduces_the_double_count():
@@ -245,8 +251,11 @@ def test_exercise_energy_does_not_double_count_an_hr_covered_hevy_cardio_block()
     }
     out = tdee.exercise_energy([day], WEIGHT_KG, [_treadmill_workout()])
     assert out["lifting"]["cardio_seconds_hr_covered"] == float(WHOOP_COVERED_SECONDS)
+    # The WHOOP walk's own proxy charge is untouched (still PROXY_KCAL_PER_KG_HOUR — that
+    # is `exercise_energy`'s residual, #4158 review item 2, not changed by this PR). The
+    # Hevy side's uncovered treadmill seconds take WALK_MET, not the lifting proxy.
     expected_proxy = tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (WHOOP_COVERED_SECONDS / 3600.0)
-    expected_lift = round(tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
+    expected_lift = round(met_energy.WALK_MET_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
     assert out["lifting"]["kcal"] == expected_lift
     assert out["kcal"] == round(expected_proxy + expected_lift, 0)
 
@@ -260,3 +269,49 @@ def test_mutation_control_the_double_count_would_charge_the_full_block_a_second_
     fixed = tdee.lifting_energy([_treadmill_workout()], WEIGHT_KG, covered_intervals=intervals)
     broken = tdee.lifting_energy([_treadmill_workout()], WEIGHT_KG)  # overlap ignored: the bug
     assert broken["kcal"] > fixed["kcal"] * 10
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Owner ruling 2026-09-25 (option A): uncovered Hevy cardio takes a Compendium MET
+#    rate, never PROXY_KCAL_PER_KG_HOUR (the lifting/moderate-cycling proxy).
+# ══════════════════════════════════════════════════════════════════════════════
+
+OWNER_FIXTURE_WEIGHT_KG = 143.0
+
+
+def _uncovered_treadmill_block(seconds: int = TREADMILL_SECONDS) -> dict:
+    """A Hevy treadmill block with NO overlapping HR activity at all — the owner's own
+    fixture spec (2026-09-25 review item 4)."""
+    return {
+        "start_time": "2026-09-19T18:00:00Z",
+        "end_time": "2026-09-19T19:00:00Z",
+        "exercises": [
+            {
+                "name": "Treadmill",
+                "sets": [{"type": "normal", "reps": None, "distance_m": 4800.0, SET_DURATION_FIELD: seconds}],
+            }
+        ],
+    }
+
+
+def test_an_uncovered_treadmill_block_charges_the_walk_met_not_the_lifting_proxy():
+    """THE ACCEPTANCE (owner ruling 2026-09-25, option A). A 3,600 s uncovered
+    treadmill block at 143 kg charges ~3.5 kcal/kg/h (~500 kcal), NOT 6 (~858 kcal) —
+    the owner's own stated fixture and expected number."""
+    out = tdee.lifting_energy([_uncovered_treadmill_block()], OWNER_FIXTURE_WEIGHT_KG)
+    assert out["basis"] == "worked_set_time_from_hevy_set_log_plus_walk_pace_cardio_at_3.5_met"
+    # 3.5 * 143 = 500.5 -> rounds to 500 or 501 depending on rounding mode; assert the
+    # EXACT arithmetic (round-half-to-even at .5) rather than a hand-typed literal.
+    expected = round(met_energy.WALK_MET_KCAL_PER_KG_HOUR * OWNER_FIXTURE_WEIGHT_KG * (TREADMILL_SECONDS / 3600.0), 0)
+    assert out["kcal"] == expected
+    assert 495 <= out["kcal"] <= 505, out["kcal"]  # the owner's own stated ~500 kcal
+
+
+def test_mutation_control_the_6_kcal_per_kg_hour_rate_reds():
+    """Mutation control (owner's own instruction): reverting the walk-pace rate to
+    `PROXY_KCAL_PER_KG_HOUR` (6.0, moderate cycling/lifting) must fail this fixture."""
+    out = tdee.lifting_energy([_uncovered_treadmill_block()], OWNER_FIXTURE_WEIGHT_KG)
+    six_kcal_per_kg_hour_result = round(tdee.PROXY_KCAL_PER_KG_HOUR * OWNER_FIXTURE_WEIGHT_KG * (TREADMILL_SECONDS / 3600.0), 0)
+    assert six_kcal_per_kg_hour_result == 858.0  # 6 * 143 — the retired, too-high number
+    assert out["kcal"] != six_kcal_per_kg_hour_result
+    assert out["kcal"] < six_kcal_per_kg_hour_result
