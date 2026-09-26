@@ -48,7 +48,9 @@ from typing import Any, Iterable, Mapping, Optional, Tuple
 # tests/test_training_load_worked_set_4075.py::test_the_energy_targets_load_input_is_the_stored_tsb_not_a_recompute).
 # Pure — no boto3, no I/O — so importing it here does not break this module's
 # dependency-free contract (see the module docstring).
+from common.activity_overlap import hr_intervals, overlap_seconds  # #4158: the ONE HR-covered-interval derivation
 from common.hevy_schema import SET_DURATION_FIELD
+from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC) — pure, no clock read
 
 #: The single method label every published target carries (ADR-105).
 #:
@@ -92,6 +94,16 @@ ASSUMED_AGE_YEARS = 35
 #: Applied to time the body was actually MOVING. Applying it to rest between sets
 #: double-charges that time: a minute sitting on a bench is already inside the 24-hour
 #: BMR term, and charging it again at ~6x resting is the #3931 inflation.
+#:
+#: **ONE rate, two call sites (#4158).** ``exercise_energy``'s own proxy branch (below)
+#: and ``lifting_energy``'s Hevy-cardio term (a timed Hevy set with ``distance_m`` —
+#: cycling/treadmill/walking) both charge THIS constant, never a second cardio-specific
+#: rate — a Hevy-logged cardio block is the same kind of continuous movement Strava's
+#: own Run/Ride/Walk/Elliptical proxy already prices, so it is priced identically. What
+#: #4158 changed is which SECONDS reach either formula (the stored-key fix) and that a
+#: Hevy cardio block's seconds are net of whatever an HR-bearing Strava/Whoop activity
+#: already scored over the same window (``common.activity_overlap`` — #4157's own
+#: overlap derivation, shared rather than re-implemented) — never the rate itself.
 PROXY_KCAL_PER_KG_HOUR = 6.0
 
 #: **The stated assumption** (#3931). A Hevy set row carries ``reps`` and, for
@@ -187,20 +199,28 @@ def _is_lifting(activity: Mapping[str, Any]) -> bool:
     return False
 
 
-def worked_set_seconds(hevy_workouts: Optional[Iterable[Mapping[str, Any]]]) -> dict:
+def worked_set_seconds(
+    hevy_workouts: Optional[Iterable[Mapping[str, Any]]],
+    covered_intervals: Optional[Iterable[Tuple[datetime, datetime]]] = None,
+) -> dict:
     """Seconds of actual WORK in a Hevy set log — rest between sets excluded (#3931).
 
     Reads the set rows as they are STORED (``workout.exercises[].sets[] ->
-    {type|set_type, weight_kg, reps, duration_sec?}``) — ``SET_DURATION_FIELD``
+    {type|set_type, weight_kg, reps, duration_sec?, distance_m?}``) — ``SET_DURATION_FIELD``
     (``duration_sec``), the key ``training.hevy_common._normalize_set`` actually
     writes, never a second spelling (#4158: this used to read only the raw Hevy API
     wire name ``duration_seconds``, a key no stored set row carries, so
-    ``sets_with_logged_duration`` read 0 on every real day and Hevy-logged cardio
-    — cycling/treadmill/walking, timed sets with no ``reps`` — earned zero exercise
-    energy). The raw wire name is still accepted as a fallback for a payload that
-    reaches this function pre-normalization. Per set:
+    ``sets_with_logged_duration`` read 0 on every real day). The raw wire name is
+    still accepted as a fallback for a payload that reaches this function
+    pre-normalization. Per set:
 
-      * a logged ``duration_seconds`` is MEASURED work and is used as-is;
+      * a timed set carrying ``distance_m`` (cycling, treadmill, walking) is a
+        **cardio block** — MEASURED work, discounted by ``covered_intervals``
+        (below) so a minute an HR-bearing Strava/Whoop activity already scored is
+        never charged twice;
+      * a timed set with no distance (a hold: plank, sled, machine interval) is
+        MEASURED work, used as-is — nothing else records these minutes, so no
+        overlap discount applies;
       * a weight-rep set with no logged duration is charged the stated
         ``WORK_SECONDS_PER_REP_SET`` assumption (40 s) — counted separately so the
         payload can say how much of the total is measured and how much is assumed;
@@ -210,11 +230,31 @@ def worked_set_seconds(hevy_workouts: Optional[Iterable[Mapping[str, Any]]]) -> 
     warmups — a warmup set moves a load and costs energy. Calling the term
     "worked-set time" rather than "working-set time" is deliberate for that reason.
 
+    **The double-count this fixes (#4158, found on the 09-08..09-22 replay):** before
+    this discount, a Hevy-logged Treadmill/Cycling block counted its full duration
+    here as lifting-side energy AND, whenever a Strava/Whoop activity with average
+    HR covered the same window (a WHOOP walk echoing the same treadmill session —
+    09-19's specimen: a 3,600 s Hevy Treadmill block against a WHOOP walk carrying HR
+    over 3,539 s of it), the SAME minutes a second time through ``exercise_energy``'s
+    own duration proxy. ``covered_intervals`` — the merged HR-covered spans from
+    ``common.activity_overlap.hr_intervals``, the identical derivation
+    ``training.training_load.hevy_session_load`` (#4075) uses on the TSB-load side —
+    is looked up against each WORKOUT's own ``[start_time, end_time]`` (Hevy carries
+    no per-set timestamps, so the discount is workout-level, exactly as #4075's is),
+    capped at that workout's own cardio seconds, and subtracted before this function's
+    cardio total is ever charged. Passing ``None`` (the default) applies no discount —
+    every existing caller/fixture that predates this parameter keeps its old answer.
+
     Returns ``{"seconds", "sets", "measured_seconds", "assumed_seconds",
-    "sets_with_logged_duration", "workouts"}``. Everything zero means the log carried
-    nothing, which the caller must treat as ABSENCE, not as a measurement of zero work.
+    "sets_with_logged_duration", "workouts", "cardio_seconds", "cardio_seconds_hr_covered"}``.
+    ``measured_seconds`` already has the HR-covered cardio share removed;
+    ``cardio_seconds``/``cardio_seconds_hr_covered`` are reported so a caller can audit the
+    discount itself. Everything zero means the log carried nothing, which the caller must
+    treat as ABSENCE, not as a measurement of zero work.
     """
-    measured = 0.0
+    hold_measured = 0.0
+    cardio_gross = 0.0
+    cardio_covered = 0.0
     assumed = 0.0
     n_sets = 0
     n_logged = 0
@@ -222,23 +262,35 @@ def worked_set_seconds(hevy_workouts: Optional[Iterable[Mapping[str, Any]]]) -> 
     for w in hevy_workouts or []:
         exercises = w.get("exercises") or w.get("workout_exercises") or []
         touched = False
+        workout_cardio_secs = 0.0
         for ex in exercises:
             for st in ex.get("sets") or []:
                 dur = _num(st.get(SET_DURATION_FIELD))
                 if dur is None:
                     dur = _num(st.get("duration_seconds"))  # raw Hevy API wire name (pre-normalization)
                 reps = _num(st.get("reps")) or 0.0
+                distance = _num(st.get("distance_m")) or 0.0
                 if dur is not None and dur > 0:
-                    measured += dur
                     n_sets += 1
                     n_logged += 1
                     touched = True
+                    if distance > 0:
+                        cardio_gross += dur
+                        workout_cardio_secs += dur
+                    else:
+                        hold_measured += dur
                 elif reps > 0:
                     assumed += WORK_SECONDS_PER_REP_SET
                     n_sets += 1
                     touched = True
         if touched:
             n_workouts += 1
+        if workout_cardio_secs > 0 and covered_intervals:
+            start = parse_iso_utc(w.get("start_time"))
+            end = parse_iso_utc(w.get("end_time"))
+            cardio_covered += min(overlap_seconds(start, end, covered_intervals), workout_cardio_secs)
+    cardio_net = max(0.0, cardio_gross - cardio_covered)
+    measured = hold_measured + cardio_net
     return {
         "seconds": round(measured + assumed, 1),
         "sets": n_sets,
@@ -246,6 +298,8 @@ def worked_set_seconds(hevy_workouts: Optional[Iterable[Mapping[str, Any]]]) -> 
         "assumed_seconds": round(assumed, 1),
         "sets_with_logged_duration": n_logged,
         "workouts": n_workouts,
+        "cardio_seconds": round(cardio_gross, 1),
+        "cardio_seconds_hr_covered": round(cardio_covered, 1),
     }
 
 
@@ -253,20 +307,29 @@ def lifting_energy(
     hevy_workouts: Optional[Iterable[Mapping[str, Any]]],
     weight_kg: float,
     logged_duration_seconds: float = 0.0,
+    covered_intervals: Optional[Iterable[Tuple[datetime, datetime]]] = None,
 ) -> dict:
-    """Energy for the LIFTING portion of a window — rest time excluded (#3931).
+    """Energy for the LIFTING + Hevy-cardio portion of a window — rest time excluded
+    (#3931) and HR-covered Hevy cardio minutes excluded (#4158).
 
     Preference order, each branch naming itself in ``basis``:
 
       1. **Hevy set log present** -> ``worked_set_seconds`` x the same ~6 kcal/kg/hour
-         rate the rest of the model uses. Same rate, correct denominator.
+         duration-proxy rate ``exercise_energy`` already charges its own non-kJ cardio at
+         (``PROXY_KCAL_PER_KG_HOUR`` — ONE constant, not a second lifting-specific rate;
+         see the module-level note on that constant). Same rate, correct denominator, and
+         (#4158) a Hevy cardio block's seconds are net of whatever an HR-bearing
+         Strava/Whoop activity already scored over the same window — ``covered_intervals``
+         passes straight through to ``worked_set_seconds``, which is where the discount
+         happens.
       2. **No set log but Strava logged lifting duration** -> that duration x the stated
          ``LIFTING_WORK_FRACTION_FALLBACK``.
       3. **Neither** -> 0 kcal, ``no_lifting_in_window``.
 
-    Returns ``{"kcal", "basis", "worked_seconds", "logged_seconds", ...}``.
+    Returns ``{"kcal", "basis", "worked_seconds", "logged_seconds", "cardio_seconds",
+    "cardio_seconds_hr_covered", ...}``.
     """
-    ws = worked_set_seconds(hevy_workouts)
+    ws = worked_set_seconds(hevy_workouts, covered_intervals=covered_intervals)
     logged = max(0.0, _num(logged_duration_seconds) or 0.0)
     if ws["sets"] > 0:
         secs = ws["seconds"]
@@ -276,6 +339,8 @@ def lifting_energy(
             basis = "worked_set_time_from_hevy_set_log_assumed_40s_per_unlogged_set"
         else:
             basis = "worked_set_time_from_hevy_set_log_mixed_logged_and_assumed_40s_per_unlogged_set"
+        if ws["cardio_seconds_hr_covered"] > 0:
+            basis += "_cardio_hr_covered_discounted"
     elif logged > 0:
         secs = logged * LIFTING_WORK_FRACTION_FALLBACK
         basis = "lifting_duration_x0.25_no_set_log"
@@ -289,6 +354,8 @@ def lifting_energy(
         "logged_seconds": round(logged, 1),
         "sets": ws["sets"],
         "sets_with_logged_duration": ws["sets_with_logged_duration"],
+        "cardio_seconds": ws["cardio_seconds"],
+        "cardio_seconds_hr_covered": ws["cardio_seconds_hr_covered"],
     }
 
 
@@ -329,6 +396,7 @@ def exercise_energy(
     lifting_s = 0.0
     unsplit_days = 0
     days = 0
+    all_acts: list = []
     for d in rows:
         day_kj = _num(d.get("total_kilojoules")) or 0.0
         day_time = _num(d.get("total_moving_time_seconds")) or 0.0
@@ -347,6 +415,7 @@ def exercise_energy(
         covered = max(0.0, min(covered, day_time))
 
         acts = d.get("activities") or []
+        all_acts.extend(acts)
         if not acts and day_time > 0:
             unsplit_days += 1
         # #3931: the ONLY new subtraction — the logged duration of lifting activities,
@@ -363,7 +432,12 @@ def exercise_energy(
         lifting_s += lifting
         proxy_s += max(0.0, day_time - covered - lifting)
 
-    lift = lifting_energy(hevy_workouts, weight_kg, logged_duration_seconds=lifting_s)
+    # #4158: the SAME HR-covered-interval derivation `training.training_load.hevy_session_load`
+    # (#4075) uses on the TSB-load side, so a Hevy cardio block already scored by an
+    # HR-bearing Strava/Whoop activity (09-19's specimen: a 3,600 s Hevy Treadmill block
+    # against a WHOOP walk carrying HR over 3,539 s of it) is not charged twice here.
+    covered_intervals = hr_intervals(all_acts)
+    lift = lifting_energy(hevy_workouts, weight_kg, logged_duration_seconds=lifting_s, covered_intervals=covered_intervals)
     proxy_kcal = PROXY_KCAL_PER_KG_HOUR * weight_kg * (proxy_s / 3600.0)
 
     if total_kj <= 0:

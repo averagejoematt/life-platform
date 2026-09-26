@@ -163,3 +163,100 @@ def test_mutation_control_a_reader_put_back_on_duration_seconds_alone_goes_red()
     assert buggy_worked_set_seconds([_cycling_session()]) == 0
     # ...while the live (fixed) reader sees it.
     assert tdee.worked_set_seconds([_cycling_session()])["sets_with_logged_duration"] == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. The double-count driver review found (#4168 review, same issue #4158): a Hevy
+#    cardio block and an HR-bearing Strava/Whoop activity can describe the SAME
+#    wall-clock minutes twice. THE 09-19 SPECIMEN: a 3,600 s Hevy Treadmill block with
+#    a WHOOP walk carrying HR over 3,539 s of it.
+# ══════════════════════════════════════════════════════════════════════════════
+
+TREADMILL_SECONDS = 3600
+WHOOP_COVERED_SECONDS = 3539
+UNCOVERED_SECONDS = TREADMILL_SECONDS - WHOOP_COVERED_SECONDS  # 61 s
+
+
+def _treadmill_workout() -> dict:
+    """The 09-19 specimen's Hevy side: one timed cardio set, no other device's numbers
+    baked in — the discount is computed from `covered_intervals`, not hand-subtracted
+    here."""
+    return {
+        "start_time": "2026-09-19T18:00:00Z",
+        "end_time": "2026-09-19T19:00:00Z",  # exactly TREADMILL_SECONDS wall-clock
+        "exercises": [
+            {
+                "name": "Treadmill",
+                "sets": [{"type": "normal", "reps": None, "distance_m": 4800.0, SET_DURATION_FIELD: TREADMILL_SECONDS}],
+            }
+        ],
+    }
+
+
+def _whoop_walk_activity() -> dict:
+    """The 09-19 specimen's Strava/Whoop side: an HR-bearing, non-echo walk covering
+    WHOOP_COVERED_SECONDS of the SAME window."""
+    return {
+        "sport_type": "Walk",
+        "type": "Walk",
+        "average_heartrate": 92.0,
+        "start_date": "2026-09-19T18:00:00Z",
+        "moving_time_seconds": WHOOP_COVERED_SECONDS,
+        "device_name": "whoop",
+    }
+
+
+def test_a_hevy_cardio_block_is_discounted_by_an_overlapping_hr_activity():
+    """THE FIX. `covered_intervals` (from `common.activity_overlap.hr_intervals`, the
+    SAME derivation `training.training_load.hevy_session_load` (#4075) uses) subtracts
+    the WHOOP-covered share of the Hevy treadmill block before it is charged."""
+    intervals = tdee.hr_intervals([_whoop_walk_activity()])
+    ws = tdee.worked_set_seconds([_treadmill_workout()], covered_intervals=intervals)
+    assert ws["cardio_seconds"] == float(TREADMILL_SECONDS)
+    assert ws["cardio_seconds_hr_covered"] == float(WHOOP_COVERED_SECONDS)
+    assert ws["measured_seconds"] == float(UNCOVERED_SECONDS)
+
+    lift = tdee.lifting_energy([_treadmill_workout()], WEIGHT_KG, covered_intervals=intervals)
+    assert lift["basis"] == "worked_set_time_from_hevy_set_log_cardio_hr_covered_discounted"
+    assert lift["kcal"] == round(tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
+
+
+def test_mutation_control_ignoring_overlap_reproduces_the_double_count():
+    """If a future edit drops the `covered_intervals` wiring, THIS is the number it
+    would silently reproduce — proving the discounted assertion above is a real
+    regression pin, not a coincidence. `covered_intervals` omitted == overlap ignored."""
+    intervals = tdee.hr_intervals([_whoop_walk_activity()])
+    fixed = tdee.worked_set_seconds([_treadmill_workout()], covered_intervals=intervals)
+    broken = tdee.worked_set_seconds([_treadmill_workout()])  # no covered_intervals: the bug
+    assert broken["cardio_seconds_hr_covered"] == 0.0
+    assert broken["measured_seconds"] == float(TREADMILL_SECONDS)  # the full, double-counted block
+    assert fixed["measured_seconds"] == float(UNCOVERED_SECONDS)
+    assert fixed["measured_seconds"] < broken["measured_seconds"]
+
+
+def test_exercise_energy_does_not_double_count_an_hr_covered_hevy_cardio_block():
+    """Integration: the 09-19 shape through the FULL `exercise_energy` pipeline — proves
+    `covered_intervals` is actually wired from `strava_items` into `lifting_energy`, not
+    only supported by the unit function in isolation."""
+    day = {
+        "date": "2026-09-19",
+        "total_moving_time_seconds": WHOOP_COVERED_SECONDS,
+        "activities": [_whoop_walk_activity()],
+    }
+    out = tdee.exercise_energy([day], WEIGHT_KG, [_treadmill_workout()])
+    assert out["lifting"]["cardio_seconds_hr_covered"] == float(WHOOP_COVERED_SECONDS)
+    expected_proxy = tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (WHOOP_COVERED_SECONDS / 3600.0)
+    expected_lift = round(tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
+    assert out["lifting"]["kcal"] == expected_lift
+    assert out["kcal"] == round(expected_proxy + expected_lift, 0)
+
+
+def test_mutation_control_the_double_count_would_charge_the_full_block_a_second_time():
+    """Without the discount, `lifting_energy` would charge the FULL 3,600 s of Hevy
+    cardio on top of the walk's own ~3,539 s proxy charge — the double count the driver
+    review found. Asserts the broken number is nearly 60x the discounted one, so the
+    fixed test above cannot pass by coincidence."""
+    intervals = tdee.hr_intervals([_whoop_walk_activity()])
+    fixed = tdee.lifting_energy([_treadmill_workout()], WEIGHT_KG, covered_intervals=intervals)
+    broken = tdee.lifting_energy([_treadmill_workout()], WEIGHT_KG)  # overlap ignored: the bug
+    assert broken["kcal"] > fixed["kcal"] * 10

@@ -76,6 +76,7 @@ charges a whole lifting session as work any more.
 import math
 from datetime import timedelta
 
+from common import activity_overlap  # #4158: the ONE HR-covered-interval / overlap derivation
 from common.hevy_schema import SET_DURATION_FIELD  # #4158: the ONE stored-set duration key
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
@@ -148,10 +149,14 @@ LOAD_MODEL = "trimp_above_z1_plus_hevy_worked_set_v2"
 
 # Strava sports scored at the walk rate.
 _WALK_SPORTS = {"walk", "hike"}
-# Strava sports that duplicate a Hevy session when one exists that day.
-_LIFT_SPORTS = {"weighttraining"}
-# Strava `device_name` of an activity Hevy itself pushed to Strava (#4075).
-_HEVY_DEVICE = "hevy"
+# Strava sports that duplicate a Hevy session when one exists that day (#4075), and the
+# Strava `device_name` of an activity Hevy itself pushed to Strava — both moved to
+# `common.activity_overlap` (#4158) so `health.tdee` shares the ONE echo/overlap
+# derivation without importing the `training` package; re-bound here under their
+# original names so this module's own callers (and `tl._LIFT_SPORTS`/`tl._HEVY_DEVICE`
+# in tests) are unaffected.
+_LIFT_SPORTS = activity_overlap.LIFT_SPORTS
+_HEVY_DEVICE = activity_overlap.HEVY_DEVICE
 
 # Banister time constants (fitness 42 d, fatigue 7 d) over a 60-day window —
 # identical to every implementation this module replaces.
@@ -160,8 +165,10 @@ ATL_DAYS = 7
 WINDOW_DAYS = 60
 
 
-def _sport(act):
-    return str(act.get("sport_type") or act.get("type") or "").replace("_", "").lower()
+#: Moved to `common.activity_overlap` (#4158) so `health.tdee` shares the ONE
+#: sport/echo classification without importing `training`. Re-bound under the
+#: original name for this module's own callers (`activity_load`) and for tests.
+_sport = activity_overlap._sport
 
 
 def day_key(rec):
@@ -226,11 +233,10 @@ def activity_load(act):
     return hours * DEFAULT_CARDIO_TSS_PER_HOUR, "duration"
 
 
-def is_hevy_echo(act):
-    """True when this Strava activity is Hevy's own copy of a Hevy session."""
-    if _sport(act) in _LIFT_SPORTS:
-        return True
-    return str(act.get("device_name") or "").strip().lower() == _HEVY_DEVICE
+#: Moved to `common.activity_overlap` (#4158) — see the module-level note above
+#: `_sport`. Re-bound under the original name; `daily_training_load`'s own echo skip
+#: and `hr_intervals` below both still call it as `is_hevy_echo(act)`.
+is_hevy_echo = activity_overlap.is_hevy_echo
 
 
 def _lifting_work_fraction():
@@ -253,40 +259,14 @@ def _num(v):
     return f if f == f else None  # NaN → None
 
 
-def hr_intervals(activities):
-    """Merged UTC [start, end] intervals covered by HR-bearing, non-echo Strava activities.
-
-    These are the minutes an HR record already scored. A Hevy-logged cardio block
-    overlapping them is not charged again (``hevy_session_load``).
-    """
-    spans = []
-    for act in activities or []:
-        if not (_num(act.get("average_heartrate")) or 0) > 0 or is_hevy_echo(act):
-            continue
-        start = parse_iso_utc(act.get("start_date"))
-        secs = _num(act.get("elapsed_time_seconds")) or _num(act.get("moving_time_seconds")) or 0
-        if start is None or secs <= 0:
-            continue
-        spans.append((start, start + timedelta(seconds=secs)))
-    spans.sort()
-    merged = []
-    for a, b in spans:
-        if merged and a <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], b))
-        else:
-            merged.append((a, b))
-    return merged
-
-
-def _overlap_seconds(start, end, intervals):
-    if start is None or end is None or end <= start:
-        return 0.0
-    total = 0.0
-    for a, b in intervals or []:
-        lo, hi = max(a, start), min(b, end)
-        if hi > lo:
-            total += (hi - lo).total_seconds()
-    return total
+#: Moved to `common.activity_overlap` (#4158) — `health.tdee.worked_set_seconds` needs
+#: the identical merged-interval derivation to discount a Hevy cardio block already
+#: scored by an HR-bearing Strava/Whoop activity, and cannot import `training` to get
+#: it (ADR-152 / the boundary this doc note's own module docstring cites). Re-bound
+#: under the original names so `hevy_session_load` and every caller/test in this
+#: module (`tl.hr_intervals`, `tl._overlap_seconds`) are unaffected.
+hr_intervals = activity_overlap.hr_intervals
+_overlap_seconds = activity_overlap.overlap_seconds
 
 
 def _is_mobility(name):
