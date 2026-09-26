@@ -638,7 +638,14 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None, histor
             continue
         name = c.get("name") or c.get("persona_id") or "coach"
         prose = " ".join(str(c.get(k) or "") for k in _PROSE_FIELDS)
-        current, trend_end, trend_start = classify_claims(prose, _VITALS_PATTERNS, _VITALS_DOMAIN)
+        # `current` comes from `vitals_cited_in` (the frozen, current-only contract
+        # every pre-#4180 caller/test already relies on) rather than re-deriving it
+        # from `classify_claims`'s own `current` bucket — the two are byte-identical
+        # (`vitals_cited_in` is a thin wrapper over `classify_claims`), but routing
+        # through the named wrapper keeps it a live, exercised production caller
+        # instead of a def nothing but a unit test ever reaches.
+        current = vitals_cited_in(prose)
+        _, trend_end, trend_start = classify_claims(prose, _VITALS_PATTERNS, _VITALS_DOMAIN)
 
         for metric, cited in trend_start:
             if metric not in truth:
