@@ -9,6 +9,7 @@
  */
 
 import { initTheme } from "/assets/js/theme.js";
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — dates in words, never "as of <ISO>"
 
 const API = "/api";
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -186,7 +187,7 @@ async function renderOverview() {
   renderWheel(d ? d.wheel : null);
   renderHabit(d ? d.stats : null);
   const asof = bind("asof");
-  if (asof && d && d.as_of) asof.textContent = `as of ${d.as_of}`;
+  if (asof && d && d.as_of) asof.textContent = `written ${calendarDay(d.as_of) || d.as_of}`;
 }
 
 async function load() {

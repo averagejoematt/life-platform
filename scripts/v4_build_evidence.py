@@ -156,7 +156,7 @@ REGISTRY = [
     (
         "reading",
         "Reading",
-        "Books finished, what's on the shelf, and the ideas kept — the Mind pillar.",
+        "Books finished, what's on the shelf, and the ideas kept — the Mind area.",
         "Mind & accountability",
         "data",
         "/api/reading_overview",
@@ -166,7 +166,7 @@ REGISTRY = [
     (
         "habits",
         "Habits",
-        "The daily adherence layer the Consistency pillar is built on.",
+        "The daily adherence layer the Consistency area is built on.",
         "Mind & accountability",
         "data",
         "/api/habits",
@@ -620,7 +620,7 @@ REGISTRY = [
 # (how it's built & runs). And the reset-only pages (cycles / post-mortems / survival) move
 # to a footer-tier "The reset log" group — they're for Matt's own record, not readers.
 _REGROUP = {
-    "cycles": "The reset log",
+    "cycles": "The fresh starts",
     # Promoted out of the footer tier (2026-06-21): survival + post-mortems are the honesty
     # moat made literal — they show the collapses and handicap the attempt with small-n humility,
     # which is exactly the credibility a skeptic/clinician comes for. They belong in "How it holds up".
@@ -664,7 +664,7 @@ GROUP_ORDER = [
     "Protocol & experiments",
     "How it holds up",
     "The machine",
-    "The reset log",
+    "The fresh starts",
 ]
 
 # Authored editorial content (faithful to the preserved legacy + the locked docs).
@@ -855,8 +855,8 @@ PILLARS = [
         "nav_key": "data",  # footer-tier: no door of its own; nav keeps 5 doors
         "kicker": "the method · under the hood",
         "h1": "The Method",
-        "lede": "Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.",
-        "groups": ["How it holds up", "The machine", "The reset log"],
+        "lede": "Under the hood — how the numbers are made, how honest they are, and every fresh start along the way. The machine, how it holds up, and the fresh starts.",
+        "groups": ["How it holds up", "The machine", "The fresh starts"],
     },
 ]
 

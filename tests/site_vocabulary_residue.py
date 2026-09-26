@@ -19,21 +19,21 @@ move down without the word leaving.
 MEASURED_AT = "2026-09-26 · main a0d2afd0b (re-measured with <noscript> bakes excluded — the first landing at 44c77f11c counted them)"
 
 BASELINE = {
-    "reset": 31,
+    "reset": 1,
     "correlation": 2,
     "cockpit": 20,
-    "chronicle": 14,
-    "model": 13,
+    "chronicle": 13,
+    "model": 11,
     "as of": 3,
     "cycle": 6,
-    "Third Wall": 9,
-    "pillar": 5,
+    "Third Wall": 0,
+    "pillar": 1,
     "protocol": 1,
     "gate": 5,
     "HRV": 3,
     "glucose": 2,
     "Whoop": 3,
-    "character level": 4,
+    "character level": 3,
 }
 
 # The static-reach ratchet (ruling vi): reader pages reachable from "/" by <a href> links in
