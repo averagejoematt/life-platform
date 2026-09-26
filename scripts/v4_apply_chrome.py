@@ -269,6 +269,12 @@ def write_page(path, html: str) -> str:
     """
     path = os.fspath(path)
     rel = os.path.relpath(path, SITE_ROOT).replace(os.sep, "/")
+    if rel.startswith("../"):
+        # A generator pointed at another root (a test's tmp tree): the viewer path is
+        # whatever sits under that tree's own `site/` directory.
+        parts = rel.split("/")
+        if "site" in parts:
+            rel = "/".join(parts[len(parts) - parts[::-1].index("site") :])
     # #4182: rewrite() keys the loop-forward self-swap and the glossary's exempt pages off
     # the VIEWER path ("/method/registry/"); passing the file path ("method/registry/
     # index.html") silently glossed the two exempt pages at generation time, and main()'s
