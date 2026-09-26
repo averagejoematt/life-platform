@@ -647,8 +647,20 @@ _CURATED = [
         "content_class": "live-data",
         # #1386: the Read tab also renders the Dispute Docket band (graceful-empty
         # until the first docket opens).
-        "api_deps": ["/api/coaches", "/api/coach_team", "/api/coach_docket"],
-        "js_modules": ["coaching.js"],
+        # #4182: the first screen (coach_today.js) reads the dashboard + the record, the
+        # calibration record (the selection chain's rule 2), and —
+        # only when a read is > 48 h old — the weigh-ins and the 7-day protein average.
+        "api_deps": [
+            "/api/coaches",
+            "/api/coach_team",
+            "/api/coach_docket",
+            "/api/coaching-dashboard",
+            "/api/predictions",
+            "/api/calibration",
+            "/api/weight_progress",
+            "/api/nutrition_overview",
+        ],
+        "js_modules": ["coaching.js", "coach_today.js"],
         "visual": {
             "wait_for": "[data-dx-tabs]",
             "checks": [

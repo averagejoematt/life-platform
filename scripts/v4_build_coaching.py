@@ -9,12 +9,19 @@ Edit the doors nav / footer in `v4_chrome.py`, not here; the inline copy here wi
 normalized away.
 
 Promoted out of the Story tabs (2026-06-20, Option A) into its own top-level door:
-the AI team that reads the data — "My Team" → each coach (master-detail) → the AI
-lab notes (the Third Wall). Emits an app shell at site/coaching/index.html AND a
+the AI team that reads the data — "My Team" → each coach (master-detail) → the weekly
+lab notes ("What the AI said, and how it felt"). Emits an app shell at site/coaching/index.html AND a
 per-section shell at site/coaching/<section>/index.html (same app, pre-selected
 section) so sub-page URLs + old /story/coaches redirects resolve on static hosting.
 The section list lives in assets/js/coaching.js; the shell embeds
 window.__COACHING_START__. Reuses the dx- and coach- styles from story.css.
+
+#4182/#4188 (the first screen): the hub and /coaching/read/ carry a [data-coach-today]
+mount directly under the hero — coaching.js renders ONE coach read there, dated in words,
+then the week's call labelled weekly, where they disagree, and the other coaches one line
+each. The hero's promise is the 11-word definition, its numeral derived from the persona
+registry's operational roster (never typed); the portraits disclaimer sits below the
+first screen.
 
 Read-only; writes only under site/coaching/. Run from repo root:
     python3 scripts/v4_build_coaching.py
@@ -26,7 +33,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
+from coach import persona_registry  # noqa: E402 — #4182: the roster count the hero states
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 from v4_proof import (  # noqa: E402  — #729/#730/#804 static proof + #1395 data-driven OG
     coaching_og,
@@ -59,10 +68,11 @@ SECTIONS = [
         "The board's falsifiable track record — every call the coaches make, graded confirmed/refuted/open by a deterministic evaluator.",
     ),
     ("team", "The Team", "Who the coaches are — their personalities, voice, and how each one is built."),
+    # #4182 (panel ruling vii-8): "the Third Wall" is cut from reader surfaces; the URL stays.
     (
         "lab-notes",
-        "AI lab notes",
-        "What the AI saw each week, and how it actually felt — the Third Wall, the AI's read against Matthew's response.",
+        "What the AI said, and how it felt",
+        "What the AI read in each week's numbers, set beside how the week actually felt to Matthew.",
     ),
     (
         "qa",
@@ -124,14 +134,13 @@ SHELL = """<!DOCTYPE html>
   </header>
   <main id="dx" class="dx-main">
     <div class="page-hero">
-      <p class="ph-kicker label">the coaching · the AI team reading the data</p>
-      <p class="hero-day label" data-bind="genesisStamp" hidden></p>
+      <p class="ph-kicker label">the coaching<span data-bind="coachingDay" hidden></span></p>
       <h1 class="ph-title">The Coaching</h1>
-      <p class="ph-promise">A board of named AI coaches reads the data and offers different takes on it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/cockpit/">the cockpit</a> and <a href="/data/">the data</a>.</p>
+      <p class="ph-promise">{roster_word} AI characters, software not people, read his numbers every morning.</p>
       {ribbon}
-      <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
     </div>
-    {proof}
+    {proof}{today}
+    <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
     <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
     <div class="dx-layout">
       <ul class="dx-list" data-dx-list aria-label="Entries"></ul>
@@ -167,6 +176,31 @@ SHELL = """<!DOCTYPE html>
 # per-page .format() calls, so the spine can't drift from the other builders.
 SHELL = SHELL.replace("{ribbon}", loop_ribbon("coaching"))
 
+# #4182: the first-screen mount — emitted on the hub and /coaching/read/ only (the two
+# shells whose default view IS the read); every other section opens on its own content.
+TODAY_MOUNT = '\n    <div class="coach-today" data-coach-today aria-live="polite" hidden></div>'
+
+_NUMBER_WORDS = {n: w for n, w in enumerate("Zero One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve".split())}
+
+
+def roster_size() -> int:
+    """The served roster's size — the SAME composition /api/coaches serves
+    (site_api_coach_profile.handle_coaches): every operational persona, plus the lead who
+    chairs when the registry marks one. Derived, never typed: the panel's draft said
+    "seven" when the served roster was eight (#4182 §3)."""
+    ops = persona_registry.operational_personas()
+    lead = persona_registry.lead_persona()
+    has_lead = bool(lead.get("lead")) and persona_registry.LEAD_PERSONA_ID not in ops
+    return len(ops) + (1 if has_lead else 0)
+
+
+def roster_word() -> str:
+    """roster_size(), in words, for the hero's promise line."""
+    n = roster_size()
+    if n < 1:
+        raise SystemExit("v4_build_coaching: the persona registry has no operational roster — refusing to print a count")
+    return _NUMBER_WORDS.get(n, str(n))
+
 
 def write(path: Path, html_text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -189,6 +223,7 @@ def main() -> None:
     # the live read's stamp) instead of the generic boilerplate. Section shells keep the
     # topical title/desc + the generic home card.
     hub_og = coaching_og(read)
+    word = roster_word()
 
     write(
         OUT / "index.html",
@@ -198,6 +233,8 @@ def main() -> None:
             canon="",
             start="read",
             proof=read_proof,
+            today=TODAY_MOUNT,
+            roster_word=word,
             og_title=hub_og[("property", "og:title")],
             og_desc=hub_og[("property", "og:description")],
             og_image=hub_og[("property", "og:image")],
@@ -219,6 +256,8 @@ def main() -> None:
                 canon=f"{key}/",
                 start=key,
                 proof=proof,
+                today=TODAY_MOUNT if key == "read" else "",
+                roster_word=word,
                 og_title=section_title,
                 og_desc=desc,
                 og_image=_OG_HOME,
