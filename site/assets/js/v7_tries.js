@@ -197,9 +197,9 @@ function cardHtml(c, { whatLabel = "what", moveLabel = "should move", knowLabel 
   const dose = [c.dose, c.timing].filter(Boolean).join(" · ");
   const what =
     `<p class="tr-card-what"><span data-src="${esc(c.src)}.name">${esc(c.what)}</span>` +
-    (c.duration ? `<span class="num" data-src="${esc(c.src)}.planned_duration_days">${esc(c.duration)}</span>` : "") +
-    (dose ? `<span class="num" data-src="${esc(c.src)}.dose">${esc(dose)}</span>` : "") +
-    (c.paused ? `<span class="tr-card-flag" data-src="${esc(c.src)}.paused">paused</span>` : "") +
+    (c.duration ? ` <span class="num" data-src="${esc(c.src)}.planned_duration_days">${esc(c.duration)}</span>` : "") +
+    (dose ? ` <span class="num" data-src="${esc(c.src)}.dose">${esc(dose)}</span>` : "") +
+    (c.paused ? ` <span class="tr-card-flag" data-src="${esc(c.src)}.paused">paused</span>` : "") +
     `</p>`;
   const rows =
     (c.pausedReason ? `<div><dt>why paused</dt><dd data-src="${esc(c.src)}.pausedReason">${esc(c.pausedReason)}</dd></div>` : "") +
@@ -248,7 +248,7 @@ function renderTesting(exp) {
   const opts = { moveLabel: "should move", knowLabel: "how we’d know", tail: "Not named beyond the claim above." };
   if (split.running.length) html += `<p class="tr-group">Running</p><ul class="tr-cards">${split.running.map((r) => cardHtml(tryCard(r), opts)).join("")}</ul>`;
   if (split.ready.length) {
-    html += `<p class="tr-group"><span class="num" data-src="api_experiments.experiments[].status">${esc(countWord(split.ready.length, { capital: true }))}</span> ready to start — what he’d try, what it should move, how we’d know</p>`;
+    html += `<p class="tr-group"><span data-src="api_experiments.experiments[].status">${esc(countWord(split.ready.length, { capital: true }))}</span> ready to start — what he’d try, what it should move, how we’d know</p>`;
     html += `<ul class="tr-cards">${split.ready.map((r) => cardHtml(tryCard(r), opts)).join("")}</ul>`;
   } else {
     html += `<p class="tr-note" data-src="api_experiments.experiments[].status">Nothing is ready to start.</p>`;
