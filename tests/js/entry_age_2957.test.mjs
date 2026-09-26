@@ -118,3 +118,14 @@ test("#4182 next write-up: built from next_date, the review clause never prints"
   assert.equal(nextWriteUpText(served, { display: "This week's draft is held." }), "This week's draft is held.");
   assert.equal(nextWriteUpText(null, null), "");
 });
+
+// #4182 A-grade sweep fix 1: the loop close's return trigger on every page reads the SAME
+// served date as the story door's "Next write-up" line — only the sentence frame differs.
+const { loopReturnText } = await import("../../site/assets/js/entry_age.js");
+test("#4182 loop return trigger: dated from next_date, held/paused keep their served words", () => {
+  const served = { chronicle: { paused: false, next_date: "2026-09-30", display: "Next Chronicle installment drafted Wednesday, September 30 — publishes once Matthew reviews and approves the draft." } };
+  assert.equal(loopReturnText(served, null), "the write-up lands Wednesday, September 30");
+  assert.equal(loopReturnText(served, { display: "This week's draft is held." }), "This week's draft is held.");
+  // Nothing served → "" so the static fallback copy stands; never an invented date.
+  assert.equal(loopReturnText(null, null), "");
+});

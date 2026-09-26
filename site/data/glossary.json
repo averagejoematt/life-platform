@@ -31,6 +31,7 @@
     {"term": "HRV", "ruling": "keep-with-gloss", "reader_form": "HRV", "gloss": "heart-rate variability — a nightly nervous-system reading; higher is usually better rested", "match": "exact"},
     {"term": "glucose", "ruling": "keep-with-gloss", "reader_form": "blood sugar", "gloss": "blood sugar — no sensor this cycle", "match": "word-ci"},
     {"term": "Whoop", "ruling": "keep-with-gloss", "reader_form": "Whoop", "gloss": "a wrist band that scores sleep and recovery", "match": "word-ci"},
+    {"term": "Hevy", "ruling": "keep-with-gloss", "reader_form": "Hevy", "gloss": "a workout-logging app", "match": "exact"},
     {"term": "character level", "ruling": "rename", "reader_form": "the engine's score", "gloss": "how many weeks the seven areas have held up"},
     {"term": "DEXA", "kind": "acronym", "match": "exact", "gloss": "Dual-energy X-ray absorptiometry — the periodic full-body scan behind the body-composition numbers (fat mass, lean mass, bone density)."},
     {"term": "CGM", "kind": "acronym", "match": "exact", "gloss": "Continuous glucose monitor — a worn sensor that reads blood glucose every few minutes instead of one fingerstick at a time."},
