@@ -43,7 +43,14 @@ const NUTRITION = {
 const NUTRITION_PILLAR = { name: "nutrition", level: 1.0, raw_score: 1.5, tier: "Foundation",
   absent_behaviors: ["calorie_adherence", "protein_total", "protein_distribution", "consistency"], not_instrumented: false };
 
-const text = (html) => html.replace(/<[^>]+>/g, "").replace(/ /g, " ");
+// Tag-strip for assertions only (test-side, never shipped). Loops until no tag remains
+// so CodeQL's incomplete-multi-character-sanitization rule (a single-pass replace can
+// leave "<scr<script>ipt>") is satisfied even for a test helper.
+const text = (html) => {
+  let s = String(html);
+  for (let i = 0; i < 20 && /<[^>]*>/.test(s); i++) s = s.replace(/<[^>]*>/g, "");
+  return s.replace(/&nbsp;|\u00a0/g, " ");
+};
 const words = (html) => text(html).split(/\s+/).filter(Boolean).length;
 
 test("How's the week? — total, count, dated weight, and the provisional rate WITH its interval", () => {
