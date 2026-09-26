@@ -117,16 +117,39 @@ test("what resolves next: sorted by date, the docket in plain words, and the hon
     ["2026-09-27", "2026-09-30", "2026-10-05", "2026-10-07"],
   );
   assert.match(strip(rows[3].html), /Dr\. Lisa Park says the seven-night average recovery reads 80 or better that day; Dr\. Nathan Reeves says it won’t\. Graded by code\./);
-  const empty = strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches));
+  const empty = strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches, "2026-09-26"));
   assert.match(empty, /^Nothing is on the docket and no graded call is due\. The next weigh-in is due Sunday, September 27\.$/);
 });
 
 test("follow: the subscriber states and the next weigh-in as last + 1", () => {
-  assert.match(strip(H.followBlock({ count: 1, available: true }, cadence, journey)), /^One subscriber so far\. The next write-up is Wednesday, September 30; the next weigh-in is due Sunday, September 27\. matt@averagejoematt\.com$/);
-  assert.match(strip(H.followBlock({ count: 0, available: true }, cadence, journey)), /^No subscribers yet\./);
-  assert.match(strip(H.followBlock({ count: 12, available: true }, cadence, journey)), /^12 subscribers so far\./);
-  assert.match(strip(H.followBlock({ available: false }, cadence, journey)), /^The subscriber count is not available right now\./);
-  assert.match(strip(H.followBlock(null, { chronicle: { paused: true } }, journey)), /The next write-up is not yet scheduled/);
+  assert.match(strip(H.followBlock({ count: 1, available: true }, cadence, journey, "2026-09-26")), /^One subscriber so far\. The next write-up is Wednesday, September 30; the next weigh-in is due Sunday, September 27\. matt@averagejoematt\.com$/);
+  assert.match(strip(H.followBlock({ count: 0, available: true }, cadence, journey, "2026-09-26")), /^No subscribers yet\./);
+  assert.match(strip(H.followBlock({ count: 12, available: true }, cadence, journey, "2026-09-26")), /^12 subscribers so far\./);
+  assert.match(strip(H.followBlock({ available: false }, cadence, journey, "2026-09-26")), /^The subscriber count is not available right now\./);
+  assert.match(strip(H.followBlock(null, { chronicle: { paused: true } }, journey, "2026-09-26")), /The next write-up is not yet scheduled/);
+});
+
+test("the next weigh-in: due tomorrow, or the honest overdue line when that day has passed", () => {
+  assert.equal(strip(H.nextWeighinText(journey, "2026-09-26")), "the next weigh-in is due Sunday, September 27");
+  assert.equal(strip(H.nextWeighinText(journey, "2026-09-27")), "the next weigh-in is due Sunday, September 27");
+  assert.equal(strip(H.nextWeighinText(journey, "2026-09-29")), "the last weigh-in was Saturday, September 26; none since");
+  assert.match(strip(H.followBlock({ count: 1, available: true }, cadence, journey, "2026-09-29")), /; the last weigh-in was Saturday, September 26; none since\./);
+  assert.match(strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches, "2026-09-29")), /The last weigh-in was Saturday, September 26; none since\.$/);
+  assert.equal(H.nextWeighinText({}), "");
+});
+
+test("in his words: every note from the first evening, then the latest", () => {
+  const html = H.wordsBlock(
+    [
+      { date: "2026-09-23", note_at: "2026-09-24T03:10:59Z", note: "Yes lets switch to this." },
+      { date: "2026-09-08", note_at: "2026-09-07T04:02:58Z", note: "I am 320+lb. So I want tomorrow to be day 1." },
+      { date: "2026-09-06", note_at: "2026-09-07T03:31:14Z", note: "It was just bubbling up." },
+    ],
+    null,
+  );
+  const text = strip(html);
+  assert.match(text, /Sunday, September 6, 8:31 pm — the earliest note of his on file, to his coaches:“It was just bubbling up\.”Sunday, September 6, 9:02 pm — the same evening:“I am 320\+lb\. So I want tomorrow to be day 1\.”Wednesday, September 23, 8:10 pm — the most recent words of his on file:“Yes lets switch to this\.”/);
+  assert.match(html, /data-src="decisions\[1\]\.note"/);
 });
 
 test("is he okay: the refusals are kept verbatim and absence is stated as absence", () => {
@@ -142,6 +165,10 @@ test("is he okay: the refusals are kept verbatim and absence is stated as absenc
   assert.match(text, /He logged food every day from September 6 to Friday, September 25 — 20 days — averaging 1,577 calories and 153 g of protein\./);
   assert.match(text, /The site does not publish a calorie deficit: its estimate is larger than it is willing to vouch for\./);
   assert.match(text, /Friday: a 72-minute walk\. Saturday: rest day\. Steps are the weak spot: 2,245 a day, averaged over 20 days\./);
+  for (const f of ["nutrition_overview.nutrition.protein_floor_g", "nutrition_overview.nutrition.days_logged", "vitals.hrv_avg_window_days", "training_overview.training.strength_sessions_30d", "training_overview.walking.total_walks_30d", "training_overview.walking.avg_daily_steps_n"]) {
+    assert.ok(html.includes(`data-src="${f}"`), `${f} is cited`);
+  }
+  assert.ok(!/data-src="nutrition\./.test(html), "nutrition.* names the endpoint that is fetched");
   const bare = strip(H.okayBlock(null, null, null, null, null));
   assert.match(bare, /Last night’s sleep is not served\./);
   assert.match(bare, /No food log is served\./);
@@ -172,8 +199,8 @@ test("every number carries its served field, dates are words not ISO, and the ru
     H.weighinsBlock(progress, journey),
     H.wordsBlock([{ date: "2026-09-06", note_at: "2026-09-07T04:02:58Z", note: "I want tomorrow to be day 1." }], { pulse: { glyphs: { journal: { gap_days: 17 } } } }),
     H.howBlock({ summary: { fresh: 11, stale: 1, paused: 1, total: 13 } }, { count: 8 }, { month_to_date_usd: 102.74, as_of: "2026-09-26T04:30:36+00:00" }, { count: 1, available: true }),
-    H.nextBlock(docket, { overall: { due: { earliest_due: "2026-09-27" } } }, cadence, journey, coaches),
-    H.followBlock({ count: 1, available: true }, cadence, journey),
+    H.nextBlock(docket, { overall: { due: { earliest_due: "2026-09-27" } } }, cadence, journey, coaches, "2026-09-26"),
+    H.followBlock({ count: 1, available: true }, cadence, journey, "2026-09-26"),
   ].join("\n");
   const text = strip(all);
   assert.doesNotMatch(text, /\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of|chronicle|cockpit)\b/i);
