@@ -19,7 +19,8 @@ import { ruleBand } from "/assets/js/texture.js"; // #1471 — the editorial tex
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
 import { quotesArchiveHTML } from "/assets/js/journal_quotes.js"; // #1568 — consent-per-line pull-quotes (ADR-142)
-import { sortChronicleNewestFirst, postForDate } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest; #3525 — the milestone→installment rule, pure + unit-tested
+import { sortChronicleNewestFirst, postForDate } from "/assets/js/chronicle_order.js";
+import { cleanExcerpt, statsRow, stripStatParagraphs } from "/assets/js/chronicle_text.js"; // #4191 — the excerpt opens on its first sentence, the stat line reads as words // #1988 — same-date part-sequence tie-break, shared with the server manifest; #3525 — the milestone→installment rule, pure + unit-tested
 import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with story.js
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
@@ -173,7 +174,7 @@ function entriesFor(s, data) {
     // gap is a separate, deferred concern (noted, not fixed, by #1988 — fixing it
     // would mean re-keying every "#<date>" deep link across the site in one move).
     // The raw `week` repeated too (two "Week 1" shipped), so it's only the last resort.
-    return ps.map((p) => ({ id: p.date || String(p.week), week: p.week, label: labelOf(p), title: p.title || labelOf(p), date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url, image_url: p.image_url || "", image_credit: p.image_credit || "" }));
+    return ps.map((p) => ({ id: p.date || String(p.week), week: p.week, label: labelOf(p), title: p.title || labelOf(p), date: p.date, excerpt: cleanExcerpt(p.excerpt, p.title), meta: statsRow(p.stats_line), word_count: p.word_count, url: p.url, image_url: p.image_url || "", image_credit: p.image_credit || "" }));
   }
   return [];
 }
@@ -763,6 +764,7 @@ async function loadFull(btn, target, excerptEl) {
     const doc = new DOMParser().parseFromString(await r.text(), "text/html");
     const prose = doc.querySelector(".prose") || doc.querySelector(".post-body");
     if (!prose) throw new Error("no prose");
+    stripStatParagraphs(prose);  // #4191 — the bracketed stat line never renders as prose
     prose.querySelectorAll("script,style,iframe,link,noscript,.discord-community-card,.community-card-header,.community-card-body,.community-card-cta,.fp-cross-footer,.signature").forEach((e) => e.remove());
     target.innerHTML = prose.innerHTML;
     target.hidden = false;

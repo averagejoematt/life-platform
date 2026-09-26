@@ -7,7 +7,8 @@ import { sigil } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js";
 import { esc, tryJSON, isBad, fmt, ttl, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
 import { lineChart } from "/assets/js/charts.js";
-import { coachAsOf, regenerationPaused } from "/assets/js/coach_asof.js";
+import { regenerationPaused } from "/assets/js/coach_asof.js";
+import { weeklyCadenceLine } from "/assets/js/coach_today.js"; // #4188 — the weekly call says its cadence
 
 // The board — pick an expert, read their actual per-domain take + track record.
 // WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
@@ -66,8 +67,16 @@ export async function renderBoard(d) {
   // gating reader-truth judge on /method/board/ on 2026-08-27. Same helper, same copy,
   // same absent-is-unknown discipline as every other coach dateline on the site.
   const regenPaused = regenerationPaused(d);
-  const wpAsOf = coachAsOf(wp.generated_at, regenPaused, wp.as_of_day_n);
-  const chairStamp = wpAsOf ? `<p class="board-asof label${regenPaused ? " rd-paused" : ""}">${esc(wpAsOf)}</p>` : "";
+  // #4188/#4163: the dateline states the WRITER's cadence in words — "The integrator's
+  // read is weekly — written Mondays; this one is from Monday Sep 21, Day 16." — so a
+  // Monday read on a Friday reads as the week's call, not as today's. It keeps the day
+  // number (#3252) and stays ABOVE the prose. The daily 48 h "next refresh pending" tail
+  // coachAsOf appends is wrong for a weekly writer, so the pause disclosure is the only
+  // piece of it kept.
+  const cadence = weeklyCadenceLine(wp.generated_at, wp.as_of_day_n);
+  const chairStamp = cadence
+    ? `<p class="board-asof label${regenPaused ? " rd-paused" : ""}">${esc(cadence)}${regenPaused ? " New reads are paused by the budget guard." : ""}</p>`
+    : "";
   const chair = wp.text && !isBad(wp.text)
     ? `<div class="rd-obs"><p class="board-kicker label">the integrator's weekly read · ${esc(wp.coach_name || "")}</p>${chairStamp}<p class="rd-primary">${esc(wp.text)}</p></div>`
     : `<div class="rd-obs"><p class="rd-primary">The board's weekly read posts after the next briefing.</p></div>`;

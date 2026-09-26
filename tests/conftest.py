@@ -852,6 +852,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # identity lives ONLY in the private S3 config). Pure repo shape: a PR that adds the
         # contact to this PUBLIC tree must red on itself, before the merge publishes it.
         "test_named_human_contact_4063.py",
+        # #4182: rglob sweep of site/coaching/**/index.html — "Third Wall" is absent from
+        # every coaching page's <main>, the first-screen mount ships on the hub + read shells
+        # only, and the hero's roster numeral equals the persona registry's served roster.
+        # Pure repo shape on generator output: a PR that re-adds the phrase or hand-types
+        # the count is its own diff, and site/** auto-deploys on merge (#750).
+        "test_coaching_first_screen_4182.py",
     }
 )
 

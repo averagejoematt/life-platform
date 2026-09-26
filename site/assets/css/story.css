@@ -816,6 +816,19 @@ body { overflow-x: hidden; }
    (ADR-104). Warm, low-quant: one serif lead sentence + a soft status row + an "as of"
    stamp. Ember is earned — only the "on the up" pillars get the accent rule. ── */
 .okay-card { margin-top: var(--sp-4); }
+/* ── issue 4182, the front door: the friends' read sits directly under the claim ──
+   .arc-lead reuses the arc measure so the first beat is not full-bleed; the beat's
+   own hairline is dropped (it follows the hero, not another beat). The three doors
+   are sentences, not tiles — restraint; ember only on the link rule. ── */
+.arc-lead { padding-top: 0; }
+.arc-lead .okay-first { border-top: 0; padding-top: var(--sp-4); }
+.okay-coaches { margin-top: var(--sp-5); color: var(--ink-muted); max-width: var(--measure); }
+.okay-doors { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.okay-doors a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ember-line); font-family: var(--font-serif); font-size: var(--fs-body-lg); }
+.okay-doors a:hover { color: var(--ember); border-bottom-color: var(--ember); }
+.okay-doors a:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.stage-h { margin: 0 0 var(--sp-5); }
+
 .okay-lead { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); max-width: var(--measure); }
 .okay-lead strong { color: var(--ink); font-weight: var(--weight-med); }
 .okay-chips { list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-4) 0 0; padding: 0; }
@@ -1223,3 +1236,52 @@ a.mb-row:hover .mb-row-k { color: var(--ember); }
 .mb-row-v { color: var(--ink-faint); font-family: var(--font-mono); white-space: nowrap; }
 .mb-foot { margin: var(--sp-5) 0 0; color: var(--ink-faint); font-family: var(--font-mono);
   line-height: 1.5; }
+
+/* ── #4182/#4188 the coaching door's first screen — ONE read, dated in words; the week's
+   call labelled weekly; where they disagree (open — the return trigger); the other coaches
+   one line each (collapsed). The coach's text sits in .prose (v5 kit: injected text), its
+   stamp in .provenance; the >48 h banner is plain ink on the surface, not a glow. */
+.coach-today { margin-top: var(--sp-5); display: grid; gap: var(--sp-5); max-width: var(--measure); }
+.coach-today[hidden] { display: none; }
+.ct-read { padding: var(--sp-4) var(--sp-5); border-left: 3px solid var(--coach, var(--ember)); background: var(--surface);
+  border-radius: var(--radius-sm); }
+.ct-kicker { margin: 0; color: var(--ink-faint); font-weight: normal; }
+.ct-h { margin: 0; font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h3); line-height: var(--lh-snug); }
+.ct-who { margin: var(--sp-2) 0 0; }
+.ct-name { font-family: var(--font-serif); font-size: var(--fs-body-lg); color: var(--ink); }
+.ct-role { color: var(--ink-faint); }
+.ct-read .provenance { margin-top: var(--sp-1); }
+.ct-text { margin-top: var(--sp-3); }
+.ct-full { margin: var(--sp-2) 0 0; }
+/* #4202 follow-up (2026-09-26): a link inside running text must be distinguishable without
+   colour (axe link-in-text-block, serious) — the same ember rule the front door's doors use. */
+.ct-full a, .ct-record a { color: var(--ember); text-decoration: underline; text-decoration-color: var(--ember-line); text-underline-offset: 0.15em; }
+.ct-full a:hover, .ct-record a:hover { text-decoration-color: var(--ember); }
+.ct-terms { margin: var(--sp-3) 0 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.ct-terms dfn { font-style: normal; color: var(--ink); }
+.ct-ask { margin: var(--sp-3) 0 0; padding-top: var(--sp-3); border-top: var(--border-hair); font-size: var(--fs-body); line-height: 1.5; }
+.ct-ask > .label:first-child { color: var(--ink-faint); margin-right: var(--sp-2); }
+.ct-ask-meta { color: var(--ink-faint); }
+.ct-record { margin: var(--sp-3) 0 0; color: var(--ink-muted); }
+.ct-banner { margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm);
+  color: var(--ink); font-size: var(--fs-small); line-height: 1.5; }
+.ct-week .ct-banner { margin-top: var(--sp-2); }
+.ct-week-more, .ct-others { margin-top: var(--sp-2); }
+/* list-item (not flex) so the native disclosure triangle stays — it is the only cue
+   that the line opens; min-height keeps the 44px tap floor (§10.4). */
+.ct-week-more > summary, .ct-others > summary { color: var(--ink-muted); min-height: 44px; padding-block: var(--sp-3); box-sizing: border-box; }
+.ct-week-more .prose { margin-top: var(--sp-2); }
+.ct-disagree .team-tension { margin-top: var(--sp-2); }
+.ct-olist, .ct-stances { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.ct-o { display: block; padding: var(--sp-2) 0; border-bottom: var(--border-hair); color: inherit; text-decoration: none; min-height: 44px; }
+.ct-o:hover .ct-name, .ct-o:focus-visible .ct-name { color: var(--ember); }
+.ct-o-top { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); align-items: baseline; }
+.ct-o-top .label { color: var(--ink-faint); }
+/* One line each — the served text is clipped VISUALLY (never rewritten); "full read"
+   is the tap. */
+.ct-o-say { display: block; margin-top: var(--sp-1); color: var(--ink-muted); font-size: var(--fs-small);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-stances li { font-size: var(--fs-small); line-height: 1.5; }
+@media (max-width: 600px) {
+  .ct-read { padding: var(--sp-3) var(--sp-4); }
+}

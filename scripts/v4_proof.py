@@ -441,17 +441,16 @@ def cockpit_block_html(ch: dict) -> str:
     if not ch or ch.get("level") is None:
         return ""
     level = int(ch["level"])
-    tier = ch.get("tier", "")
     as_of = ch.get("as_of", "")
     pillars = ch.get("pillars", {}) or {}
 
-    head = f"Character level {level}"
-    if tier:
-        head += f" · {_esc(tier)}"
+    # #4182 (panel ruling 2(iii)): the level NUMBER stays, keyed in plain words; the level
+    # NAME ("Foundation") is off the reader surface — no-JS readers included.
     lines = [
         '<noscript><section class="proof-static dx-prose" aria-label="Cockpit summary">',
-        f'<p class="label">The cockpit — one life, measured live · as of {_esc(as_of)}</p>',
-        f"<p><strong>{head}</strong> — a 1–100 score of the whole day: seven pillars, each from real data, rolled into one.</p>",
+        f'<p class="label">The cockpit — today, in one screen · the engine\'s score as of {_esc(as_of)}</p>',
+        f"<p><strong>Character level {level}</strong> — 1 to 100; it climbs only after a run of sustained days. "
+        "Each area below is the engine's 0–100 for that day.</p>",
     ]
 
     body_roll = _rollup(pillars, COCKPIT_BODY)
@@ -472,8 +471,7 @@ def cockpit_block_html(ch: dict) -> str:
         p = pillars.get(key)
         if not p or not isinstance(p.get("raw_score"), (int, float)):
             continue  # honest absence — the pillar row is omitted, never a fake 0
-        tier_txt = f" · {_esc(p['tier'])}" if p.get("tier") else ""
-        rows.append(f"<li>{_esc(PILLAR_LABELS.get(key, key))} {_js_round(p['raw_score'])}{tier_txt}</li>")
+        rows.append(f"<li>{_esc(PILLAR_LABELS.get(key, key))} {_js_round(p['raw_score'])}</li>")
     if rows:
         lines.append(f'<ul>{"".join(rows)}</ul>')
 
@@ -902,13 +900,13 @@ def home_og(journey: dict, char: dict) -> dict:
 
 
 def cockpit_og(char: dict) -> dict:
-    """Cockpit's data-driven OG: the live character level + tier."""
+    """Cockpit's data-driven OG: the live character level (#4182: the number, never the
+    tier NAME — the name is off the reader surface)."""
     char = char or {}
     level = char.get("level")
-    tier = char.get("tier", "")
     as_of = char.get("as_of", "") or _today()
     if level is not None:
-        lvl = f"level {int(level)}" + (f" · {tier}" if tier else "")
+        lvl = f"level {int(level)}"
         title = f"The Cockpit — character {lvl}"
         desc = (
             f"Am I winning, and what's the one thing right now? The daily instrument: seven pillars "

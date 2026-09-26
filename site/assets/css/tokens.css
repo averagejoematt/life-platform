@@ -1515,9 +1515,9 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
   /* Isolated icon/button controls — invisible hit overlay, visual unchanged. Expands
      VERTICALLY to 44px (width stays 100% of the control) so the overlay never pushes
      past the viewport — the app-bar toggle sits at the right edge, and a horizontal
-     overlay there would overflow the fixed bar. The intro "×" gets the same. */
-  .theme-toggle, .cockpit-intro__x, .ev-intro__x { position: relative; }
-  .theme-toggle::after, .cockpit-intro__x::after, .ev-intro__x::after {
+     overlay there would overflow the fixed bar. The orient strip's "×" (#4182) gets the same. */
+  .theme-toggle, .orient-x { position: relative; }
+  .theme-toggle::after, .orient-x::after {
     content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 100%; height: max(100%, 44px);
   }
@@ -1525,7 +1525,7 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
      the day/scrub selects: a taller box = a thumb-draggable/tappable target. */
   .scrub, .scrub-days, .df-scrub { min-height: 44px; }
   /* Text buttons ("got it" / "place me" / dismiss-go) — pad to the floor. */
-  .cockpit-intro__go, .ev-intro__go, .okay-cta, .place-btn { min-height: 44px; padding-block: 11px; }
+  .okay-cta, .place-btn { min-height: 44px; padding-block: 11px; }
   /* Checkbox: tap the whole label row (the input itself is a 13px replaced element). */
   .cv-all { min-height: 44px; display: inline-flex; align-items: center; gap: var(--sp-2); }
   .cv-all input[type="checkbox"] { width: 20px; height: 20px; }
@@ -1658,6 +1658,27 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
    dotted underline the same muted-ink weight as the rest of the type triad — never
    ember (the single-ember rule: this is a reading aid, not a call to action). */
 .gloss { border-bottom: 1px dotted var(--ink-faint); text-decoration: none; cursor: help; }
+/* #4182: the same gloss, rendered at runtime as <dfn class="gloss" title="…"> (orient.js)
+   where a JS-rendered term first appears — the definitions the old "NEW HERE?" cards
+   carried, now inline. dfn's UA italic is dropped: it is a reading aid, not emphasis. */
+dfn.gloss { font-style: normal; }
+dfn.gloss:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+
+/* ── .orient-strip — the one-line newcomer note (#4182, panel ruling 2(v)). Replaces the
+   full-viewport "NEW HERE?" cards on /cockpit/ and the /data/ door: one muted line under
+   the page kicker, dismissible (orient.js, same localStorage keys as the cards). No
+   ember ground, no shadow, no card — restraint over a tutorial. */
+.orient-strip {
+  margin: var(--sp-2) 0 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.45;
+}
+.orient-strip .orient-k { color: var(--ink); font-weight: var(--weight-med); }
+.orient-x {
+  appearance: none; cursor: pointer; background: transparent; border: 0; margin-left: var(--sp-1); vertical-align: baseline;
+  font-size: var(--fs-body-lg); line-height: 1; color: var(--ink-muted); padding: 2px 8px;
+  border-radius: var(--radius-xs); transition: color var(--dur-fast);
+}
+.orient-x:hover { color: var(--ink); }
+.orient-x:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 
 /* ── .tabset — accessible tab strip (Coaching profiles, Protocols sub-sections).
    Pair buttons (role=tab, aria-selected) with .tabpanel regions. */
@@ -2124,12 +2145,10 @@ li.wk-explain { list-style: none; }
 
 /* #3726 — every --ember-wash ground re-states the inks that sit on it. DERIVED:
    tests/test_ink_faint_on_wash_3726.py fails if a wash rule is missing from this list. */
-.cockpit-intro__go,
 .predict-btn,
 .cohort-btn,
 .rd-tbl tr.rd-flag td,
 .df-btn,
-.ev-intro__go,
 .ch-atrophy,
 .ch-rung.is-current,
 .ch-fx.is-active,
