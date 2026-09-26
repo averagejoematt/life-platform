@@ -252,7 +252,7 @@ def test_stance_block_prefers_stance(monkeypatch):
         capi,
         "_stance_latest",
         lambda cid: {
-            "headline_read": "Your base is solid.",
+            "headline_read": "His base is solid.",  # #4213: the public (third-person) register
             "focused_on_now": ["timing"],
             "set_aside_for_now": ["architecture"],
             "stage": {"label": "consistency"},
@@ -263,7 +263,7 @@ def test_stance_block_prefers_stance(monkeypatch):
     )
     sb = capi._stance_block("sleep_coach", 230)
     assert sb["source"] == "stance"
-    assert sb["headline_read"] == "Your base is solid."
+    assert sb["headline_read"] == "His base is solid."
     assert sb["stage"]["label"] == "consistency"
 
 

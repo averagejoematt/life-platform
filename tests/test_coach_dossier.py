@@ -199,6 +199,7 @@ def test_commitment_entry_is_verbatim_and_dated():
         "sk": "COMMITMENT#commit_20260722_screens",
         "created_date": "2026-07-22",
         "commitment_natural": "screens off by 10pm through Sunday",
+        "public_ask": "I've asked him to put screens away by 10 PM through Sunday.",  # #4213: the served text is the public twin
         "status": "kept",
         "due_date": "2026-07-27",
         "outcome": "kept",
@@ -208,11 +209,23 @@ def test_commitment_entry_is_verbatim_and_dated():
     }
     entry, status = cd.commitment_entry(item)
     assert status == cd.OK
-    assert entry["text"] == "screens off by 10pm through Sunday"  # exact bytes
+    assert entry["text"] == "I've asked him to put screens away by 10 PM through Sunday."  # exact bytes of the PUBLIC twin (#4213)
     assert entry["date"] == "2026-07-22"
     assert entry["check"] == {"metric": "sleep_efficiency", "direction": "up"}
     assert entry["evidence_link"] == "/data/sleep/"
     assert "surfaced_to_subject" not in entry
+
+
+def test_commitment_entry_never_serves_the_owner_imperative():
+    """#4213: `commitment_natural` is addressed to Matthew; with no reader-safe twin the
+    record keeps its date/status and serves an EMPTY text — never the owner register."""
+    base = {"sk": "COMMITMENT#c", "created_date": "2026-09-26", "commitment_natural": "Reflect on whether you felt it", "status": "pending"}
+    entry, status = cd.commitment_entry(base)
+    assert status == cd.OK and entry["text"] == "" and entry["date"] == "2026-09-26"
+    entry, _ = cd.commitment_entry(dict(base, public_ask="Log your mood before you check the app."))
+    assert entry["text"] == "", "an owner-directed public_ask must not be served"
+    entry, _ = cd.commitment_entry(dict(base, public_ask="I've asked him to log his mood before he checks the app."))
+    assert entry["text"] == "I've asked him to log his mood before he checks the app."
 
 
 def test_dateless_record_cannot_become_a_dossier_line():
@@ -426,6 +439,7 @@ def _seeded_table(corrections_rows=None, corrections_error=False, extra_commitme
                 "sk": "COMMITMENT#commit_20260722_screens",
                 "created_date": "2026-07-22",
                 "commitment_natural": "screens off by 10pm through Sunday",
+                "public_ask": "I've asked him to put screens away by 10 PM through Sunday.",
                 "status": "pending",
                 "due_date": "2026-07-27",
             },
@@ -515,7 +529,7 @@ def test_site_dossier_renders_verbatim_with_dates_and_evidence(monkeypatch):
     d = _dossier_via_api(monkeypatch)
     assert d["verbatim"] is True
     texts = [c["text"] for c in d["commitments"]]
-    assert texts == ["screens off by 10pm through Sunday"]  # verbatim, exact bytes
+    assert texts == ["I've asked him to put screens away by 10 PM through Sunday."]  # verbatim public twin, exact bytes (#4213)
     assert all(c["date"] for c in d["commitments"])
     assert d["learnings"][0]["date"] == "2026-07-19"
     assert d["learnings"][0]["evidence_link"] == "/coaching/scorecard/"
