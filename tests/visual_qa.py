@@ -1387,8 +1387,18 @@ def capture_page(
             if check.get("not_empty"):
                 empties = 0
                 for el in els:
+                    # #4182 (2026-09-26): an element inside a CLOSED <details> is collapsed
+                    # by design, not empty — inner_text() is "" for anything hidden, which
+                    # red-gated the cockpit's demoted level (`[data-bind='level']` inside the
+                    # "engine's score" disclosure) on a page that rendered correctly, and
+                    # the declined rollback filed #4202. Read the rendered text_content()
+                    # there; the visible-placeholder rule is unchanged everywhere else.
                     try:
-                        txt = (el.inner_text() or "").strip()
+                        collapsed = bool(el.evaluate("e => !!e.closest('details:not([open])')"))
+                    except Exception:
+                        collapsed = False
+                    try:
+                        txt = ((el.text_content() if collapsed else el.inner_text()) or "").strip()
                     except Exception:
                         txt = (el.text_content() or "").strip()
                     if txt in _EMPTY_SENTINELS:
