@@ -52,7 +52,7 @@ function boardSpanNote(span, paused) {
   const why = paused
     ? " Narrative regeneration is paused by the budget guard, so the members that haven't refreshed keep their earlier day."
     : " Each member refreshes on its own daily run.";
-  return `<p class="rd-meta label">The reads below were not all written on the same day — they span Day ${esc(lo)} to Day ${esc(hi)} of this cycle.${why}</p>`;
+  return `<p class="rd-meta label">The reads below were not all written on the same day — they span Day ${esc(lo)} to Day ${esc(hi)} of the experiment.${why}</p>`;
 }
 
 export async function renderBoard(d) {
@@ -459,7 +459,7 @@ export function renderPipeline(d) {
       .slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
       .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${feedsCell(s)}</td><td class="num rd-range">${lastUpdateCell(s)}</td><td>${statusCell(s)}</td></tr>`).join("")}</tbody></table>`)).join("");
   const carriedNote = (d.experiment && src.some((s) => s.carried))
-    ? ` carried = the newest record predates this cycle's genesis (${esc(d.experiment.genesis || "")}) — history from an earlier attempt, not a live outage.`
+    ? ` carried = the newest record predates Day 1 of the experiment (${esc(d.experiment.genesis || "")}) — history from before it, not a live outage.`
     : "";
   // #2798: the frame, explained in-page the moment it can be seen. Without this a reader
   // between 5pm and midnight Pacific sees a "last update" one day ahead of the date this

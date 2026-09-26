@@ -135,7 +135,7 @@ function entriesFor(s, data) {
     const reactions = (data.diary_reactions || []).map((r) => ({
       id: reactionId(r),
       title: `${r.coach_name || "A coach"} on ${r.kind === "social" ? "the post" : "the diary"}`,
-      date: (r.date || "") + (r.archival && r.archival.pre_cycle ? " · previous cycle" : ""),
+      date: (r.date || "") + (r.archival && r.archival.pre_cycle ? " · before this experiment" : ""),
     }));
     return reactions.concat(weeks);
   }
@@ -238,7 +238,7 @@ function coachDossierHTML(coach) {
   const commits = d.commitments || [];
   h += `<p class="cd-h label">commitments held</p>`;
   if (!commits.length) {
-    h += `<p class="dx-prose">${esc(first)} has held ${esc(cc.held || 0)} commitments this cycle.</p>`;
+    h += `<p class="dx-prose">${esc(first)} has held ${esc(cc.held || 0)} commitments since Day 1.</p>`;
   } else {
     // #3553: "not gradeable" is its own count. Folding it into "open" told the reader
     // a verdict was still coming on a record whose metric was never observed.
@@ -255,7 +255,7 @@ function coachDossierHTML(coach) {
   const learns = d.learnings || [];
   h += `<p class="cd-h label">learnings on the record</p>`;
   if (!learns.length) {
-    h += `<p class="dx-prose">${esc(first)} has 0 learnings on the record this cycle — they accrue as the evaluator grades real calls.</p>`;
+    h += `<p class="dx-prose">${esc(first)} has 0 learnings on the record since Day 1 — they accrue as the evaluator grades real calls.</p>`;
   } else {
     h += `<ul class="ce-trail">`;
     for (const l of learns.slice(0, 8)) {
@@ -362,14 +362,14 @@ function coachLiveRecordHTML(d) {
   // graded calls — the eight specialists do. His honest-empty states say THAT,
   // instead of promising engine records that are never written for him (ADR-104).
   const isLead = d.tier === "lead";
-  let h = `<section class="coach-live"><p class="dx-kicker label">the live record · this cycle</p>`;
+  let h = `<section class="coach-live"><p class="dx-kicker label">the live record · since Day 1</p>`;
   if (live) {
     h += coachStanceHTML(st);
     if (st.as_of) h += `<p class="cl-asof label">evidence-derived stance · as of ${esc(String(st.as_of).slice(0, 10))}</p>`;
   } else if (isLead) {
     h += `<p class="cl-empty dx-prose">No domain stance — the head coach reads the whole program, not one lane. The eight specialists hold the domain stances, on their own pages.</p>`;
   } else {
-    h += `<p class="cl-empty dx-prose">No evidence-derived stance yet this cycle — the opinion engine writes its first weekly read once the data accrues.` +
+    h += `<p class="cl-empty dx-prose">No evidence-derived stance yet — the opinion engine writes its first weekly read once the data accrues.` +
       (st.stage && st.stage.label ? ` Until then the authored starting scaffold has them at <strong>${esc(String(st.stage.label).replace(/[.\s]+$/, ""))}</strong>.` : "") + `</p>`;
   }
   const hyps = (d.working_hypotheses || []).filter((x) => x && x.claim);
@@ -390,7 +390,7 @@ function coachLiveRecordHTML(d) {
   } else if (isLead) {
     h += `<p class="cl-empty dx-prose">No dated output trail of his own — the head coach's synthesis surfaces through the staff's weekly reads and the board's one call for the phase.</p>`;
   } else {
-    h += `<p class="cl-empty dx-prose">No output trail yet this cycle — the coach's dated reads accumulate here as the engine runs.</p>`;
+    h += `<p class="cl-empty dx-prose">No output trail yet — the coach's dated reads accumulate here as the engine runs.</p>`;
   }
   return h + `</section>`;
 }
@@ -558,7 +558,7 @@ async function renderToday(mount) {
         `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}</span></p>`;
     }
     const rec = recordLine(preds && preds.overall);
-    if (rec) h += `<p class="ct-record label">The board's record this cycle: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>`;
+    if (rec) h += `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>`;
     h += `</section>`;
   } else if (chosen) {
     // > 7 days: no read on the first screen. Say why, then the standing stances.
@@ -1151,7 +1151,7 @@ function renderDiaryReaction(read, id) {
   // sentence when it has one; the fallback is the claim without the arithmetic, never
   // a guessed number.
   const arch = r.archival && r.archival.pre_cycle
-    ? `<p class="dx-archival label">${esc(r.archival.label || "From a previous cycle")} — kept on the record, not a reading of this cycle.</p>`
+    ? `<p class="dx-archival label">${esc(r.archival.label || "From before this experiment")} — kept on the record, not a reading of this experiment.</p>`
     : "";
   read.innerHTML =
     `<p class="dx-kicker label">${isSocial ? "post" : "diary"} reaction · ${esc(r.date || "")} · Matthew ↔ ${esc(r.coach_name || "the coach")}${r.tone ? ` · ${esc(r.tone)}` : ""}</p>` +
@@ -1397,7 +1397,7 @@ async function renderScorecard(read, id) {
     let h = `<p class="dx-kicker label">the scorecard · every call, graded</p><h2 class="dx-title">The board's track record</h2>`;
     h += `<p class="dx-prose">The coaches don't just talk — they make falsifiable calls, and a deterministic evaluator grades each one against the data once its window closes. This is the honest tally. <span class="label">Self-assessment of the board's own calls, not external validation.</span></p>`;
     // The headline tiles — this season.
-    h += `<p class="dx-kicker label sc-sub">this season${data.cycle ? ` · cycle ${esc(data.cycle)}` : ""}</p>`;
+    h += `<p class="dx-kicker label sc-sub">this season · since Day 1</p>`;
     h += `<div class="sc-tiles">` +
       `<div class="sc-tile"><span class="sc-n">${decided ? `${o.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${decided ? ` · ${decided} decided` : ""}</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
@@ -1420,20 +1420,20 @@ async function renderScorecard(read, id) {
       // #1376: a fresh cycle reads "fresh slate — career: n=X", never a bare
       // "none have resolved yet" that hides the record a reset didn't actually erase.
       const freshCareer = life.decided > 0
-        ? ` Fresh slate — career: n=${life.decided} decided (${life.accuracy_pct}% hit rate) across every cycle so far.`
+        ? ` Fresh slate — career: n=${life.decided} decided (${life.accuracy_pct}% hit rate) across the whole record so far.`
         : "";
       const falsifiableN = Math.max(0, (o.total || 0) - (o.observational || 0));
-      h += `<p class="dx-prose sc-note">The board has made <strong>${falsifiableN}</strong> falsifiable calls so far this cycle; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""}${freshCareer} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
+      h += `<p class="dx-prose sc-note">The board has made <strong>${falsifiableN}</strong> falsifiable calls so far in this experiment; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""}${freshCareer} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
     }
     // #3046: qualitative claims are on the record but have no deterministic
     // grading path — labeled, and never counted among the open calls above.
     if (o.observational) {
-      h += `<p class="dx-prose sc-note sc-obs label">${o.observational} further claim${o.observational === 1 ? "" : "s"} this cycle ${o.observational === 1 ? "is" : "are"} observational — no measurable metric + direction, so no grading path. ${o.observational === 1 ? "It stays" : "They stay"} on the record, labeled, and ${o.observational === 1 ? "is" : "are"} never counted as an open falsifiable call.</p>`;
+      h += `<p class="dx-prose sc-note sc-obs label">${o.observational} further claim${o.observational === 1 ? "" : "s"} since Day 1 ${o.observational === 1 ? "is" : "are"} observational — no measurable metric + direction, so no grading path. ${o.observational === 1 ? "It stays" : "They stay"} on the record, labeled, and ${o.observational === 1 ? "is" : "are"} never counted as an open falsifiable call.</p>`;
     }
     // The career tiles — every cycle, sports-card pattern (#1376). A reset wipes
     // this SEASON honestly to zero; it must never wipe the record from view too.
     if (life.total > 0) {
-      h += `<p class="dx-kicker label sc-sub">career · every cycle</p>`;
+      h += `<p class="dx-kicker label sc-sub">career · all time</p>`;
       h += `<div class="sc-tiles">` +
         `<div class="sc-tile"><span class="sc-n">${life.decided ? `${life.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${life.decided ? ` · ${life.decided} decided` : ""}</span></div>` +
         `<div class="sc-tile"><span class="sc-n">${life.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
@@ -1509,14 +1509,14 @@ async function renderScorecard(read, id) {
     `<div class="sc-tile"><span class="sc-n">${c.pending || 0}</span><span class="sc-l label">still open</span></div>` +
     `</div>`;
   if (!decidedC) {
-    const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${cl.hit_rate_pct}% hit rate) across every cycle so far.` : "";
+    const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${cl.hit_rate_pct}% hit rate) across the whole record so far.` : "";
     // #3046: count only falsifiable calls; observational claims are labeled in the list below.
     const falsifiableC = Math.max(0, (c.total || 0) - (c.observational || 0));
     const obsNote = c.observational ? ` ${c.observational} more ${c.observational === 1 ? "claim is" : "claims are"} observational — on the record, no grading path.` : "";
-    h += `<p class="dx-prose sc-note">${esc(name)} has ${falsifiableC} falsifiable call${falsifiableC === 1 ? "" : "s"} on the board this cycle; none have resolved yet. Each grades after its window closes.${obsNote}${freshCareer}</p>`;
+    h += `<p class="dx-prose sc-note">${esc(name)} has ${falsifiableC} falsifiable call${falsifiableC === 1 ? "" : "s"} on the board since Day 1; none have resolved yet. Each grades after its window closes.${obsNote}${freshCareer}</p>`;
   }
   if (cl.total > 0) {
-    h += `<p class="dx-kicker label sc-sub">career · every cycle</p>`;
+    h += `<p class="dx-kicker label sc-sub">career · all time</p>`;
     h += `<div class="sc-tiles">` +
       `<div class="sc-tile"><span class="sc-n">${cl.decided ? `${cl.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${cl.decided ? ` · ${cl.decided} decided` : ""}</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${cl.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
@@ -1553,7 +1553,7 @@ function commitmentLedgerHTML(cm) {
   // re-derivation — so the reader is told when it was last graded rather than being
   // shown a fresh-looking recomputation of a stale corpus.
   const asOf = cm.as_of ? ` · as of ${esc(String(cm.as_of).slice(0, 10))}` : "";
-  let h = `<p class="dx-kicker label sc-sub">follow-through · every cycle${asOf}</p>`;
+  let h = `<p class="dx-kicker label sc-sub">follow-through · all time${asOf}</p>`;
   h += `<p class="dx-prose">A commitment is a concrete action a coach pushed Matthew to take. Where it maps to a measurable metric, the same deterministic evaluator that grades the calls above grades the follow-through — kept or broken, against the data of the commitment's own window. <span class="label">Self-scored on Matthew's own data, n=1.</span></p>`;
   h += `<div class="sc-tiles">` +
     `<div class="sc-tile"><span class="sc-n">${n ? `${esc(life.follow_through_pct)}%` : "—"}</span><span class="sc-l label">${esc(rateLabel)}</span></div>` +
@@ -1574,8 +1574,8 @@ function commitmentLedgerHTML(cm) {
   ].filter(Boolean).join(" · ");
   if (openBits) h += `<p class="sc-note label">${esc(openBits)}.</p>`;
   h += season.graded
-    ? `<p class="sc-note label">This cycle: ${esc(season.kept || 0)} kept · ${esc(season.broken || 0)} broken (n=${esc(season.graded)}).</p>`
-    : `<p class="sc-note label">Nothing has been graded yet this cycle — commitments grade when their own window closes.</p>`;
+    ? `<p class="sc-note label">Since Day 1: ${esc(season.kept || 0)} kept · ${esc(season.broken || 0)} broken (n=${esc(season.graded)}).</p>`
+    : `<p class="sc-note label">Nothing has been graded yet since Day 1 — commitments grade when their own window closes.</p>`;
   return h;
 }
 function _scCallHTML(p, shareUrl) {

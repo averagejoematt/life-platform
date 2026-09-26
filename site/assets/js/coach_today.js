@@ -92,7 +92,7 @@ export function chooseTodaysRead(coaches, openActions, calibration) {
     return {
       coach: ranked[0],
       rule: "record",
-      reason: `chosen: the best checked record this cycle — ${Number(r.confirmed) || 0} of ${Number(r.n)} held up`,
+      reason: `chosen: the best checked record since Day 1 — ${Number(r.confirmed) || 0} of ${Number(r.n)} held up`,
     };
   }
   return { coach: pickTodaysRead(servable), rule: "freshest", reason: "chosen: the freshest read" };

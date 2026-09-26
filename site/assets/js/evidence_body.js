@@ -155,7 +155,7 @@ function drawsScope(L) {
   const scope = L.total_draws_scope;
   if (!scope) return null;
   const n = L.draws_this_cycle;
-  return typeof n === "number" ? `${scope} · ${n} this cycle` : scope;
+  return typeof n === "number" ? `${scope} · ${n} since Day 1` : scope;
 }
 
 // #4182 — lab names arrive title-cased from their codes ("Apob Cardio Iq"). De-code the
@@ -203,7 +203,7 @@ export function labsFold(d) {
   const flagged = L.flagged_count ?? bm.filter(_labFlagged).length;
   const pre = (L.latest_draw_archival || {}).pre_cycle;
   return {
-    text: `Last blood test: ${dayInWords(L.latest_draw_date)}${pre ? " — before this cycle" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
+    text: `Last blood test: ${dayInWords(L.latest_draw_date)}${pre ? " — before this experiment began" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
     through: null, // the draw date is IN the sentence — a second freshness line would repeat it
   };
 }

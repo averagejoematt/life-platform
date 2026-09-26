@@ -277,7 +277,7 @@ FOOTER_COLUMNS = (
         "story",
         "The story",
         '<a href="/story/">The weekly write-up</a><a href="/story/journal/">In his own words</a>'
-        '<a href="/story/panel/">The podcast</a><a href="/story/attempts/">Every start, counted</a>'
+        '<a href="/story/panel/">The podcast</a>'
         '<a href="/story/about/">Who he is</a>',
     ),
     (

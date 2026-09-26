@@ -233,4 +233,4 @@ def test_js_labels_section_as_carried_protocols():
 def test_js_states_no_current_cycle_discoveries():
     # Pre-start/early-cycle honesty (ADR-104): with no findings, the section
     # explicitly says no current-cycle discoveries exist yet.
-    assert "No discoveries from this cycle yet" in _JS
+    assert "No discoveries from this experiment yet" in _JS

@@ -25,7 +25,7 @@ BASELINE = {
     "chronicle": 4,
     "model": 10,
     "as of": 3,
-    "cycle": 6,
+    "cycle": 2,  # 6 → 2 on the 2026-09-26 cycle-count ruling (#4182): only unlisted /method/cycles/ + /method/registry/ remain
     "Third Wall": 0,
     "pillar": 1,
     "protocol": 1,
@@ -40,5 +40,7 @@ BASELINE = {
 # the static HTML. 39 at landing (of 91 pages); 25 since the 2026-09-26 panel ruling (#4182 —
 # the footer pour + registry "unlisted" flags + body links retargeted; no page deleted, no URL
 # moved), measured 25 by tests/site_text.static_reach() on the PR that set it. Going below 25
-# needs the owner to strike pages; until then the count may only fall.
-NAV_REACH_CEILING = 25
+# needs the owner to strike pages; until then the count may only fall. 24 since the owner's
+# 2026-09-26 14:10 PT ruling (#4182): the cycle count is internal, so /story/attempts/ left the
+# footer — the owner striking a page, served at its URL, unlinked.
+NAV_REACH_CEILING = 24

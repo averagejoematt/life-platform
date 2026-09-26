@@ -100,7 +100,7 @@ export async function renderDiscoveries(d) {
   const g = live && live.gates;
   const armingLine = g && g.min_data_days
     ? warmup(g.current_n, g.min_data_days, "complete days toward the engine's first bets") +
-      `<p class="rd-meta label">The engine forms its first falsifiable bets once ${fmt(g.min_data_days)} complete days of this cycle's data exist (a complete day has ≥${fmt(g.min_metrics_per_day || 5)} real metrics).</p>`
+      `<p class="rd-meta label">The engine forms its first falsifiable bets once ${fmt(g.min_data_days)} complete days of the experiment's data exist (a complete day has ≥${fmt(g.min_metrics_per_day || 5)} real metrics).</p>`
     : "";
   let hs;
   if (bets.length) {
@@ -114,7 +114,7 @@ export async function renderDiscoveries(d) {
     // pre-start they must never read as findings of an experiment that hasn't
     // produced any (ADR-104). Label them as what they are: carried protocols.
     const noneYet = !fs && !is
-      ? armingLine + `<p class="rd-meta label">No discoveries from this cycle yet — correlations and graded findings appear here as the data accrues.</p>`
+      ? armingLine + `<p class="rd-meta label">No discoveries from this experiment yet — correlations and graded findings appear here as the data accrues.</p>`
       : armingLine;
     const protoIntro = `<p class="rd-meta label">Standing supplement protocols, deliberately carried across cycle resets — long-horizon levers under continuous measurement, not findings of the current cycle.</p>`;
     // #1984: the library (this section's source) and the tracked supplement stack
@@ -152,7 +152,7 @@ export async function renderDiscoveries(d) {
     `<label class="label" for="fd-email">Email (optional — get notified if promoted)</label><input id="fd-email" type="email" data-finding-email maxlength="254">` +
     `<button class="part-btn" type="submit">Submit finding</button><p class="part-msg" data-finding-msg></p></form>`);
   if (!fs && !is && !hs)
-    return armingLine + findingSec + empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
+    return armingLine + findingSec + empty("No discoveries yet — real correlations and findings surface here as the data accrues. The experiment is only days old, so it needs more data first.");
   return fs + is + hs + findingSec + note("Correlative leads, not conclusions — N=1, FDR-corrected where computed, and n is small this early in the cycle.");
 }
 
@@ -271,14 +271,14 @@ export async function renderChallenges(d) {
   const evidenceStamp = (c) => {
     if (c.evidence_scope !== "personal" || !c.evidence_as_of) return "";
     const when = esc(String(c.evidence_as_of));
-    return ` <span class="rd-asof label">measured ${when}${c.evidence_prior_cycle ? " — a previous cycle, not this one" : ""}</span>`;
+    return ` <span class="rd-asof label">measured ${when}${c.evidence_prior_cycle ? " — before this experiment, not during it" : ""}</span>`;
   };
   const catCard = (c) => {
     const [tc, tl] = c.evidence_tier ? evClass(c.evidence_tier) : [null, null];
     const votes = voteMap ? voteMap[c.id] : null;
     return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${c.category ? `<span class="ch-ric">${domainIcon(c.category)}</span>` : ""}${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}${c.evidence_summary && !isBad(c.evidence_summary) ? `<p class="rd-line">${esc(c.evidence_summary)}${evidenceStamp(c)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${[c.category, c.difficulty, c.duration_days && c.duration_days + "d", c.board_recommender && "recommended by " + c.board_recommender].filter(Boolean).map(esc).join("  ·  ")}</p>${voteFollowRow("challenge", "catalog_id", c.id, votes)}</article>`;
   };
-  const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet this cycle."));
+  const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet."));
   // "Available now" vs "Backlog" was a distinction without a difference — both are
   // catalog ideas not yet taken on. One backlog.
   const candidates = avail.concat(backlog);

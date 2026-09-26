@@ -1291,7 +1291,7 @@ async function renderFingerprint() {
   const fp = d && d.fingerprint;
   if (!fp || !fp.svg) return;
   const cap = fp.warming_up ? "today's mark · warming up" : "today's mark";
-  mount.innerHTML = `<a class="cfp-link" href="/data/wall/" aria-label="Today's fingerprint — see the whole wall of attempts">${fp.svg}<span class="cfp-cap label">${cap}</span></a>`;
+  mount.innerHTML = `<a class="cfp-link" href="/data/wall/" aria-label="Today's fingerprint — see every day's mark on the wall">${fp.svg}<span class="cfp-cap label">${cap}</span></a>`;
   mount.hidden = false;
 }
 
@@ -1899,6 +1899,7 @@ setInterval(loadSync, 300_000);      // the data re-checks
    pre-start). Both the node and this renderer are gone: the cockpit is the live
    instrument for the run that is starting, not a scoreboard against earlier ones.
    /api/survival is unchanged and the same aliveDays semantics still drive
-   /story/attempts/, which keeps the whole record and stays linked from site-wide chrome.
+   /story/attempts/, which keeps the whole record — served at its URL, unlinked since #4182
+   (owner ruling 2026-09-26: the cycle count is internal; the public frame is the day).
    NB: no ISO genesis literal in this comment, deliberately — cockpit.js is asserted free
    of them so a re-anchor sweep never has to rewrite this file (#1088). */
