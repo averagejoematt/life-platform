@@ -313,11 +313,18 @@
       "anchor_family": "squat"
     },
     "leg_curl": {
-      "title": "Lying Leg Curl (Machine)",
-      "hevy_template_id_hint": "B8127AD1",
+      "title": "Seated Leg Curl (Machine)",
+      "hevy_template_id_hint": "11A123F3",
       "primary_muscle": "hamstrings",
-      "secondary_muscles": [],
+      "secondary_muscles": [
+        "calves"
+      ],
+      "volume_muscle": "Hamstrings",
+      "hevy_primary_muscle_group": "hamstrings",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
       "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
       "joint_friendly_score": 3,
       "default_rep_range": {
         "start": 10,
@@ -326,10 +333,11 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 12,
-      "first_done": "2022-08-31",
-      "last_done": "2024-11-29",
-      "anchor_family": null
+      "sessions": 30,
+      "first_done": "2021-04-12",
+      "last_done": "2026-09-22",
+      "anchor_family": null,
+      "notes": "Remapped 2026-09-26 (#4169): the hint pointed to Lying Leg Curl (Machine, B8127AD1), a machine the owner has not logged since 2024-11-29; his 4 most recent leg-curl sessions (09-09..09-24, 90 lb x10-12) are all Seated Leg Curl (Machine). The prior template is preserved, unclaimed, as `lying_leg_curl_machine`."
     },
     "machine_hip_thrust": {
       "title": "Hip Thrust (Machine)",
@@ -353,11 +361,16 @@
       "anchor_family": "hinge"
     },
     "calf_raise_machine": {
-      "title": "Standing Calf Raise (Machine)",
-      "hevy_template_id_hint": "E05C2C38",
+      "title": "Calf Press (Machine)",
+      "hevy_template_id_hint": "91237BDD",
       "primary_muscle": "calves",
       "secondary_muscles": [],
+      "volume_muscle": "Calves",
+      "hevy_primary_muscle_group": "calves",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
       "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
       "joint_friendly_score": 3,
       "default_rep_range": {
         "start": 12,
@@ -366,10 +379,11 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 38,
-      "first_done": "2021-04-12",
-      "last_done": "2025-05-14",
-      "anchor_family": null
+      "sessions": 6,
+      "first_done": "2023-05-29",
+      "last_done": "2026-09-22",
+      "anchor_family": null,
+      "notes": "Remapped 2026-09-26 (#4169): the hint pointed to Standing Calf Raise (Machine, E05C2C38), a machine the owner has not logged since 2025-05-14; his 6 most recent calf-raise sessions (09-09..09-24, 270-320 lb x15) are all Calf Press (Machine). The prior template is preserved, unclaimed, as `standing_calf_raise_machine`."
     },
     "machine_crunch": {
       "title": "Crunch (Machine)",
@@ -914,13 +928,11 @@
       "last_done": "2024-11-30",
       "anchor_family": "bench"
     },
-    "seated_leg_curl_machine": {
-      "title": "Seated Leg Curl (Machine)",
-      "hevy_template_id_hint": "11A123F3",
+    "lying_leg_curl_machine": {
+      "title": "Lying Leg Curl (Machine)",
+      "hevy_template_id_hint": "B8127AD1",
       "primary_muscle": "hamstrings",
-      "secondary_muscles": [
-        "calves"
-      ],
+      "secondary_muscles": [],
       "volume_muscle": "Hamstrings",
       "hevy_primary_muscle_group": "hamstrings",
       "hevy_type": "weight_reps",
@@ -935,10 +947,11 @@
       "equipment": "machine",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 30,
-      "first_done": "2021-04-12",
-      "last_done": "2026-09-22",
-      "anchor_family": null
+      "sessions": 12,
+      "first_done": "2022-08-31",
+      "last_done": "2024-11-29",
+      "anchor_family": null,
+      "notes": "#4169: the `leg_curl` catalog key's hint until 2026-09-26, when it was moved to `11A123F3` (Seated Leg Curl) because that is the machine the owner actually logs. This id is real logged history (12 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
     },
     "bicep_curl_barbell": {
       "title": "Bicep Curl (Barbell)",
@@ -2647,9 +2660,9 @@
       "last_done": "2023-01-03",
       "anchor_family": null
     },
-    "calf_press_machine": {
-      "title": "Calf Press (Machine)",
-      "hevy_template_id_hint": "91237BDD",
+    "standing_calf_raise_machine": {
+      "title": "Standing Calf Raise (Machine)",
+      "hevy_template_id_hint": "E05C2C38",
       "primary_muscle": "calves",
       "secondary_muscles": [],
       "volume_muscle": "Calves",
@@ -2666,10 +2679,11 @@
       "equipment": "machine",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 6,
-      "first_done": "2023-05-29",
-      "last_done": "2026-09-22",
-      "anchor_family": null
+      "sessions": 38,
+      "first_done": "2021-04-12",
+      "last_done": "2025-05-14",
+      "anchor_family": null,
+      "notes": "#4169: the `calf_raise_machine` catalog key's hint until 2026-09-26, when it was moved to `91237BDD` (Calf Press) because that is the machine the owner actually logs. This id is real logged history (38 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
     },
     "db_chest_supported_rows": {
       "title": "DB Chest Supported Rows",
