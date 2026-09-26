@@ -60,6 +60,7 @@ _WRITTEN_KEYS = [
     "EXPERIMENT_FOLLOWS",  # experiment follows
     "CHALLENGE_FOLLOWS",  # challenge follows
     "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
+    "USER#matthew#SOURCE#reader_feedback",  # #4182: /api/page_feedback
     "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
     "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap evening-ritual taps
     "COHORT#resting_heart_rate#2026-W30",  # #1394: anonymous cohort-strip submissions (COHORT#<metric>#<week>)
@@ -77,8 +78,8 @@ def test_write_call_site_canary():
     """If this count changes, a write was added/removed — verify its partition is in
     _WRITTEN_KEYS and the role's LeadingKeys before updating this baseline."""
     n = sum(len(re.findall(r"\.(put_item|update_item)\(", _read(f))) for f in _SOCIAL_FAMILY)
-    assert n == 16, (
-        f"site_api_social family write count is {n}, baseline 16 — a write was added/removed. "
+    assert n == 17, (
+        f"site_api_social family write count is {n}, baseline 17 — a write was added/removed. "
         "Confirm its partition is in the SEC-01 LeadingKeys allowlist + _WRITTEN_KEYS, then update this baseline."
     )
 

@@ -112,6 +112,7 @@ WRITE_PATH_EXEMPT = {
     "/api/experiment_vote": "POST-only — votes on an experiment (write)",
     "/api/nudge": "POST-only — evening nudge action (write)",
     "/api/submit_finding": "POST-only — reader-submitted finding, writes to S3 (write)",
+    "/api/page_feedback": "POST-only — #4182 two-question reader door (did this page make sense?), writes to DynamoDB (write)",
     "/api/ritual_log": (
         "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC "
         "token (ADR-124, #769) — no read-only variant exists; there is no safe way to "

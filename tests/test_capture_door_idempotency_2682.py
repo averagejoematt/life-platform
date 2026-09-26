@@ -207,6 +207,7 @@ CAPTURE_DOORS = [
     ("lambdas/web/site_api_social_experiments.py", "_handle_experiment_suggest"),
     ("lambdas/web/site_api_social_engage.py", "_handle_submit_finding"),
     ("lambdas/web/site_api_social_engage.py", "_handle_board_question"),
+    ("lambdas/web/site_api_social_engage.py", "_handle_page_feedback"),  # #4182 — DynamoDB door, FEEDBACK#<hash>
 ]
 
 

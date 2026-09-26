@@ -156,6 +156,20 @@ def test_two_identityless_readers_same_board_question_both_stored(wp):
     assert b1["id"] != b2["id"]
 
 
+def test_two_identityless_readers_same_page_feedback_both_stored(wp):
+    """#4182 — the DynamoDB page-feedback door keys FEEDBACK#<id> on the idempotency
+    identity too, so two identity-less readers' identical answers are two rows."""
+    body = {"page": "/data/", "made_sense": "partly", "looking_for": "where the sleep numbers come from"}
+    s1, b1 = _identityless(wp, "/api/page_feedback", body, "198.51.100.1")
+    s2, b2 = _identityless(wp, "/api/page_feedback", body, "198.51.100.2")
+    assert (s1, s2) == (200, 200)
+    rows = {sk: it for (pk, sk), it in wp.table.store.items() if pk == "USER#matthew#SOURCE#reader_feedback"}
+    assert len(rows) == 2, f"two readers' identical feedback collapsed onto {len(rows)} row(s) — the #2932 silent dedup"
+    assert b1["duplicate"] is False and b2["duplicate"] is False
+    for it in rows.values():
+        assert "198.51.100" not in json.dumps(it, default=str)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # The other caller's contract is UNCHANGED: rate limiting still fails CLOSED
 # ══════════════════════════════════════════════════════════════════════════════

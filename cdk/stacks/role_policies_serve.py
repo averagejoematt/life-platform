@@ -76,6 +76,7 @@ def site_api() -> list[iam.PolicyStatement]:
                         "CHALLENGE_FOLLOWS",  # challenge follows
                         "RATE#*",  # shared rate_limiter.py (per-endpoint per-IP counters)
                         "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
+                        "USER#matthew#SOURCE#reader_feedback",  # #4182: /api/page_feedback two-question reader door
                         "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
                         "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
                         "COHORT#*",  # #1394 (epic #1366): anonymous cohort-strip submissions (COHORT#<metric>#<week>)

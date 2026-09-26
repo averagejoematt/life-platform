@@ -214,6 +214,21 @@ def test_write_path_exemptions_cover_every_post_only_simple_route():
         assert exemptions[path]["category"] == "write-path", f"{path} is POST-only but exempted as {exemptions[path]['category']!r}"
 
 
+def test_every_post_only_simple_route_is_registered_in_the_capture_script():
+    """The test above reads the committed LEDGER; this one reads the script that
+    REWRITES it. A full `capture_api_schemas.py` run rebuilds `_exemptions.json`
+    wholesale from `WRITE_PATH_EXEMPT` (#3324) — a POST-only route present in the
+    ledger but absent from the script is GET-probed on the next full recapture,
+    answers 405, and lands as `capture-failed`, which reds the test above only
+    AFTER the ledger was clobbered. Pinning the script side keeps a full recapture
+    idempotent for every write door (#4182 added `/api/page_feedback`)."""
+    records = er.discover_endpoint_records()
+    post_only = sorted(p for p, r in records.items() if r.methods == {"POST"})
+    assert post_only, "expected at least one POST-only _SIMPLE_ROUTES entry in the live router"
+    missing = [p for p in post_only if p not in cas.WRITE_PATH_EXEMPT]
+    assert not missing, f"POST-only routes missing from deploy/capture_api_schemas.py WRITE_PATH_EXEMPT: {missing}"
+
+
 # ── shape/diff utility unit tests (deploy/capture_api_schemas.py) ───────────────
 
 
