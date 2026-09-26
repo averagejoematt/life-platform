@@ -236,8 +236,7 @@ def _grounding_findings(text: str, cited: list, data_through: str, today: str) -
         allowed_dates=gg.allowed_dates(shown),
         generation_date_iso=today,
         start_date_iso=EXPERIMENT_START_DATE,
-        number_tolerance=gg.NUMBER_TOLERANCE_EXACT,
-    )
+    )  # the default window: the exact rule is `uncited_numbers` in `check()`, not this call (#2290 keeps EXACT to /api/explain)
 
 
 def check(text: Optional[str], cited: list, data_through: str, today: str) -> list:
