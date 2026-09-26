@@ -376,8 +376,16 @@ def test_the_webb_draft_is_regenerated_then_held_by_the_quality_gate(monkeypatch
 
 
 def test_mutation_control_without_the_served_check_the_webb_draft_publishes(monkeypatch):
-    """MUTATION CONTROL: the pre-#4185 gate (the judge's report alone) publishes it."""
+    """MUTATION CONTROL: the pre-#4185 gate (the judge's report alone) publishes it.
+
+    #4214's reader checks (`coach.reader_checks.merge_into_report`, a sibling #4185 gate
+    that landed on main in parallel) also hold this draft here — on the allow-list class,
+    because this hermetic env serves no canonical facts. They are switched off too so the
+    control isolates THIS PR's served-fact check; with both live the draft is held twice over."""
+    from coach import reader_checks
+
     monkeypatch.setattr(ci, "served_fact_gate", lambda report, text, facts: report)
+    monkeypatch.setattr(reader_checks, "merge_into_report", lambda payload, text, brief, cycle_boundary=None: [])
     events, _prompts = _pipeline_env(monkeypatch, WEBB_0925, rows=ROWS_0925)
     data = {"date": BRIEF_DATA_DAY, "macrofactor": ROWS_0925[-1]}
     out = ai_calls._run_coach_v2_pipeline("nutrition_coach", ai_context._build_nutrition_data(data), "nutrition", data, "")
