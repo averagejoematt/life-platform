@@ -86,6 +86,21 @@ export function countWord(n, { capital = false } = {}) {
   return capital ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
 
+// #4182 — the compact date LABEL: "Fri Sep 25" (short weekday, short month). Where
+// dayInWords() is the prose spelling every fold SENTENCE uses, this is the one spelling
+// for compact chart labels, captions and kickers — same UTC-noon pin, so the two never
+// disagree about which calendar day a served date names. coach_today.js's calendarDay()
+// delegates here so its many callers keep one import path.
+export function dayLabel(dateStr) {
+  const iso = String(dateStr || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const d = new Date(_utcNoon(iso));
+  if (isNaN(d.getTime())) return "";
+  const wd = d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short" });
+  const md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+  return `${wd} ${md}`;
+}
+
 // #4182 — the weekly write-up's return trigger: "Next write-up: Wednesday, September 30",
 // from the served /api/content_cadence `chronicle.next_date`. The served display string
 // (lambdas/common/content_cadence.py) carries a process clause — "…publishes once Matthew

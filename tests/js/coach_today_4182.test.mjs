@@ -118,7 +118,9 @@ test("the ask: the chosen coach's own open action first, else the soonest-due; [
   assert.equal(T.pickAsk(acts, "explorer").coach_id, "sleep");
   assert.equal(T.pickAsk([], "physical"), null); // live until #4187 deploys
   assert.equal(T.pickAsk([{ coach_id: "x", text: "  " }], "x"), null);
-  assert.equal(T.calendarDay("2026-10-02"), "Friday Oct 2");
+  // #4182 D5: calendarDay() is now a thin wrapper over entry_age.js's dayLabel() — the
+  // ONE compact-label spelling ("Fri Oct 2"), never the doors' prose "Friday, October 2".
+  assert.equal(T.calendarDay("2026-10-02"), "Fri Oct 2");
   assert.equal(T.calendarDay("soon"), "");
 });
 

@@ -839,7 +839,7 @@ PILLARS = [
         "door": "data",
         "title": "Data",
         "nav_key": "data",
-        "kicker": "the data · what the body &amp; mind report",
+        "kicker": "the data · his numbers",
         "h1": "The Data",
         "lede": "Weight, sleep, training, eating, blood tests — what his devices and apps record.",
         "groups": ["The body", "Mind & accountability", "The character"],
@@ -1070,7 +1070,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
     {proof_slot}<nav class="ev-tabs" data-tabs aria-label="Sections"></nav>
     <div class="ev-layout">
       <aside class="ev-side" data-side aria-label="Topics"></aside>
-      <section class="ev-main" data-main>
+      <section class="ev-main" data-main data-slug="{esc(start_slug)}">
         <p class="ev-crumbs" data-crumb>{pf["crumb"]}</p>
         <h2 class="topic-h1" data-title>{pf["title"]}</h2>
         <p class="topic-lede" data-blurb>{pf["blurb"]}</p>
