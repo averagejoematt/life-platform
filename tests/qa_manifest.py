@@ -837,7 +837,9 @@ _CURATED = [
         "visual": {
             "wait_for": ".ev-app",
             "checks": [
-                {"selector": ".ev-tile", "min_count": 3, "desc": "archive tiles render after the redirect"},
+                # #4182 (PR #4221): the data rail is cut to the 25-page reach set and /data/reading/ is unlisted, so
+                # its own page renders one tile (itself, railTiles) — the redirect landed; the readout check below is the proof.
+                {"selector": ".ev-tile", "min_count": 1, "desc": "the rail renders (its own tile) after the redirect"},
                 {"selector": ".readout, .ev-main", "min_count": 1, "desc": "the reading readout mounts"},
             ],
         },
@@ -975,6 +977,7 @@ def private_rows():
 # its reason — the completeness gate treats anything else as unregistered.
 EXEMPT = {
     "/legacy/": "verbatim pre-v4 archive, private rollback surface — never QA-swept by policy (ADR-071)",
+    "/next/": "v7 preview subtree (#4182, plan §1b), noindex + unlinked from the live pages; struck at cut-over when the nine get real rows",
     "/index.html": "the '/' entry covers it (directory index)",
 }
 

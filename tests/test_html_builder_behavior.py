@@ -634,9 +634,11 @@ def test_render_whr_headline_numbers():
     # int(0.75 * 100) = 75 -> ">= 65 and < 85" -> "Mixed week"
     assert ">75<span" in html and "Mixed week" in html
     assert "2-day window" in html
-    assert ">1/2</p>" in html  # perfect days
-    # int(1 / 2 * 100) = 50
-    assert "perfect days (50%)" in html
+    # #4182 (percentages carry n; below n=30 a share renders as its count): the perfect-day
+    # share is "1 of 2", and the bare "(50%)" that used to follow it is gone.
+    assert ">1 of 2</p>" in html and ">perfect days</p>" in html
+    assert "perfect days (50%)" not in html
+    assert "Mixed week · over 2 days" in html
 
 
 def test_render_whr_band_labels():
@@ -672,7 +674,8 @@ def test_render_whr_unparseable_date_falls_back_to_a_positional_initial():
 
 def test_render_whr_zero_days_does_not_divide_by_zero():
     html = hb._render_weekly_habit_review(_whr(days=0, daily=[], perfect_days=0, t0_habits=[]))
-    assert "perfect days (0%)" in html
+    # #4182: the count form ("0 of 0") replaced the percentage, so there is no division left.
+    assert ">0 of 0</p>" in html
 
 
 def test_render_whr_a_zero_percent_day_draws_the_same_bar_as_a_low_one():
@@ -688,9 +691,10 @@ def test_render_whr_a_zero_percent_day_draws_the_same_bar_as_a_low_one():
 
 
 def test_render_whr_tier1_line_absent_when_the_average_is():
-    assert "Tier 1 avg" not in hb._render_weekly_habit_review(_whr(avg_t1_pct=None))
+    # #4182: "Tier 1 avg" is builder vocabulary; the reader form is "High-priority average".
+    assert "High-priority average" not in hb._render_weekly_habit_review(_whr(avg_t1_pct=None))
     # int(0.8 * 100) = 80 -> >= 75 -> green
-    assert "Tier 1 avg" in hb._render_weekly_habit_review(_whr(avg_t1_pct=0.8))
+    assert "High-priority average" in hb._render_weekly_habit_review(_whr(avg_t1_pct=0.8))
 
 
 def test_render_whr_synergy_chips_sorted_best_first():
@@ -711,7 +715,7 @@ def test_render_whr_percentages_round_rather_than_truncate():
     whr = hb._compute_weekly_habit_review(recs, _profile())
     assert whr["avg_t0_pct"] == 0.29  # the compute layer is correct
     html = hb._render_weekly_habit_review(whr)
-    assert '>29<span style="font-size:14px;">%</span> T0' in html
+    assert '>29<span style="font-size:14px;">% of essential habits</span>' in html  # #4182: "T0" -> "essential habits"
 
 
 def test_render_whr_escapes_habit_names():
@@ -824,11 +828,17 @@ def test_character_absent_sheet_renders_nothing():
 
 
 def test_character_level_and_tier_progress():
+    """#4182 reader-vocabulary ruling (site/data/glossary.json "character level" -> "the
+    engine's score", gloss inline once; "pillar" -> "the seven areas"; XP spelled out)."""
     html = hb._brief_character(_sheet(), [], [])
-    # ((21 - 1) % 20) + 1 = 1 -> "Level 1/20 in Momentum tier"
-    assert "Level 1/20 in Momentum tier" in html
-    assert "⚡ Level 21 — Momentum" in html
-    assert "4200 total XP" in html
+    # ((21 - 1) % 20) + 1 = 1 -> "1 of 20 in the Momentum tier"
+    assert "1 of 20 in the Momentum tier" in html
+    assert "THE ENGINE'S SCORE" in html
+    assert "⚡ 21 — Momentum" in html
+    assert "How many weeks the seven areas have held up." in html
+    assert ">The seven areas</p>" in html
+    assert "4200 experience points (XP)" in html
+    assert "Character Level" not in html and "CHARACTER SHEET" not in html
 
 
 def test_character_unknown_tier_falls_back_to_the_foundation_palette():
@@ -849,7 +859,7 @@ def test_character_level_event_variants():
         {"type": "pillar_level_down", "pillar": "mind", "old_level": 9, "new_level": 8},
     ]
     html = hb._brief_character(_sheet(level_events=events), [], [])
-    assert "Character Level 20 → 21" in html
+    assert "The engine's score 20 → 21" in html  # #4182: "character level" -> "the engine's score"
     assert "Sleep Tier: Foundation → Momentum" in html
     assert "↑ Mind Level 8 → 9" in html
     assert "↓ Mind Level 9 → 8" in html
@@ -869,7 +879,8 @@ def test_character_rewards_and_protocol_recs_render():
         [{"title": "New shoes", "description": "30 workouts logged"}],
     )
     assert "REWARD UNLOCKED: New shoes" in html and "30 workouts logged" in html
-    assert "PROTOCOL RECOMMENDATIONS" in html
+    assert "PROTOCOLS TO TRY" in html  # #4182: "protocol" is keep-with-gloss — the gloss rides once
+    assert "a rule followed on purpose, to see if a number moves" in html
     assert "No screens after 21:00" in html and "Magnesium" in html
     assert "↓ Sleep:" in html
 
@@ -947,7 +958,8 @@ def test_scorecard_colour_bands(score, colour):
 def test_scorecard_habit_tier_breakdown_and_vice_streaks():
     details = {"habits_mvp": {"tier0": {"done": 5, "total": 7}, "tier1": {"done": 2, "total": 4}}}
     html = _scorecards(component_details=details, vice_streaks={"Zzq": 12, "Grumbleflax": 0})
-    assert "T0 (non-neg): 5/7" in html and "T1 (high): 2/4" in html
+    # #4182: "T0/T1" are builder tiers; the reader form names the priority, with the count.
+    assert "Essential: 5 of 7" in html and "High-priority: 2 of 4" in html
     assert "Zzq: 12d streak avoided" in html
     assert "Grumbleflax" not in html  # a 0-day streak is not a streak
 
@@ -966,7 +978,7 @@ def test_scorecard_sleep_architecture_numbers():
 def test_scorecard_hrv_line_renders_with_the_trend():
     data = _data(hrv={"hrv_7d": 62, "hrv_30d": 58}, whoop={"hrv": 60.4})
     html = _scorecards(data=data)
-    assert "📡 HRV: " in html and "60ms yesterday" in html
+    assert "📡 HRV (heart-rate variability): " in html and "60ms yesterday" in html  # #4182: HRV glossed once
     assert "trending up" in html
 
 
@@ -985,7 +997,7 @@ def test_essential_seven_derives_its_rows_from_the_habit_registry():
     assert "Read" not in html and "Old habit" not in html
     assert "4d streak" in html
     # done_count 1 of 2 -> round(1/2*100) = 50
-    assert "1/2 complete" in html and "width:50%" in html
+    assert "1 of 2 done" in html and "width:50%" in html  # #4182: counts in words
 
 
 def test_essential_seven_falls_back_to_mvp_habits_when_the_registry_is_empty():
@@ -1007,7 +1019,7 @@ def test_essential_seven_reads_both_int_and_string_tier_keys():
     from_ddb = _scorecards(component_details={"habits_mvp": {"tier_status": {"0": {"Sleep 7h": True}}}}, profile=prof)
     assert "&#10003;" in in_memory  # check mark
     assert "&#10003;" in from_ddb
-    assert "1/1 complete" in in_memory and "1/1 complete" in from_ddb
+    assert "1 of 1 done" in in_memory and "1 of 1 done" in from_ddb
 
 
 def test_readiness_signal_labels():
@@ -1034,13 +1046,13 @@ def test_essential_seven_distinguishes_not_applicable_from_missed():
     # Saturday: only Sleep 7h was evaluated; Weekday lift is absent, not False.
     details = {"habits_mvp": {"tier_status": {0: {"Sleep 7h": True}}}}
     html = _scorecards(component_details=details, profile=_profile(habit_registry=reg))
-    assert "1/1 complete" in html  # honest; currently renders "1/2 complete"
+    assert "1 of 1 done" in html  # honest; used to render "1/2 complete"
 
 
 def test_scorecard_missing_hrv_block_is_reported_not_swallowed():
     data = {"date": DATE, "whoop": {"hrv": 60.4}}  # no "hrv" key at all
     html = _scorecards(data=data)
-    assert "📡 HRV:" in html or "section unavailable" in html
+    assert "📡 HRV (heart-rate variability):" in html or "section unavailable" in html
 
 
 def test_scorecard_a_measured_zero_deep_percentage_is_shown_as_zero():
@@ -1232,7 +1244,7 @@ def test_cgm_spotlight_numbers():
 
 
 def test_cgm_absent_says_so():
-    assert "No glucose data for yesterday." in _training()
+    assert "No blood-sugar readings for yesterday." in _training()  # #4182: glucose -> blood sugar
 
 
 def test_cgm_seven_day_trend_needs_three_days():
@@ -1270,8 +1282,9 @@ def test_habit_streaks_absent_says_start_today():
 
 def test_habit_streaks_render_both_counters():
     html = _training(mvp_streak=12, full_streak=3)
-    assert "T0 Streak (days)" in html and ">12</p>" in html
-    assert "T0+T1 Streak" in html and ">3</p>" in html
+    # #4182: "T0 Streak" is builder vocabulary; the reader form names the habits.
+    assert "Essential-habits streak (days)" in html and ">12</p>" in html
+    assert "Essential + high-priority streak (days)" in html and ">3</p>" in html
 
 
 def test_acwr_renders_when_given_the_field_names_this_module_reads():
@@ -1768,10 +1781,12 @@ def test_footer_budget_headroom_line_is_optional():
     assert "$12 left" in hb._brief_footer("", False, _data(), DATE, budget_headroom_line="$12 left")
 
 
-def test_footer_carries_the_medical_disclaimer_and_the_date():
+def test_footer_carries_the_medical_disclaimer_and_no_iso_date():
+    """#4182 (ONE freshness line per surface, dates in words): the footer used to repeat the
+    data date as ISO; the "Data through <day>" line at the top now owns freshness."""
     html = hb._brief_footer("", False, _data(), DATE)
     assert "not medical advice" in html
-    assert DATE in html
+    assert DATE not in html
     assert html.endswith("</div></body></html>")
 
 
@@ -1805,9 +1820,12 @@ def test_build_html_requires_a_date():
 
 
 def test_build_html_formats_the_day_label_from_the_date():
+    """#4182: the H1 names the morning the brief is read (data day + 1, the subject line's
+    day) and ONE freshness line names the data day — both in words, never ISO."""
     html = hb.build_html(**_build_kwargs())
-    # 2026-06-10 is a Wednesday
-    assert "Wednesday, Jun 10" in html
+    # 2026-06-10 is a Wednesday; the brief reads it Thursday morning
+    assert ">Thursday, June 11</h1>" in html
+    assert "Data through Wednesday, June 10" in html
 
 
 def test_build_html_unparseable_date_falls_back_to_the_raw_string():
@@ -1836,7 +1854,7 @@ def test_build_html_ignores_readiness_score_and_engagement_score():
 def test_build_html_defaults_reward_and_protocol_lists():
     """None must not reach the character section as a non-iterable."""
     html = hb.build_html(**_build_kwargs(character_sheet=_sheet(), triggered_rewards=None, protocol_recs=None))
-    assert "CHARACTER SHEET" in html
+    assert "THE ENGINE'S SCORE" in html  # #4182: "character level" -> "the engine's score"
     assert "section unavailable" not in html
 
 

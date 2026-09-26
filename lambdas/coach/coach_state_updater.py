@@ -551,8 +551,14 @@ def _gate_derived_prose(coach_id, date, output_text, extraction):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _write_output_record(coach_id, date, output_type, output_text, extraction):
-    """Write the OUTPUT# record with full content and extracted metadata."""
+def _write_output_record(coach_id, date, output_type, output_text, extraction, data_through=None):
+    """Write the OUTPUT# record with full content and extracted metadata.
+
+    #4185: `data_through` is the last data day (Pacific YYYY-MM-DD) the read was written
+    from, stamped beside `created_at` so the door can label a weekly or stale read as one
+    instead of serving it as current. Absent (None) on callers that do not know it — the
+    read sites then serve null, never a guess.
+    """
     word_count = len(output_text.split())
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -597,9 +603,13 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
         "elena_quote": extraction.get("elena_quote"),
         # #2972: the ONE public-audience field — owner-directed candidates are held (None) at write time.
         "public_summary": audience_guard.reader_safe(extraction.get("public_summary"), coach_id, logger),
+        # #4213: the ONE ask, reported in the third person — the by-coach timeline's line.
+        "public_ask": audience_guard.reader_safe(extraction.get("public_ask"), coach_id, logger),
         "word_count": word_count,
         "created_at": now_iso,
     }
+    if data_through:
+        item["data_through"] = str(data_through)[:10]
     # #2575: freeze what the cockpit served AT PUBLICATION (fail-soft no-op) — see coach/published_vitals.py.
     published_vitals.stamp_published_vitals(item, table, f"USER#{USER_ID}#SOURCE#")
     if extraction.get("derived_prose_held"):
@@ -943,6 +953,8 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
             "coach_id": coach_id,
             "created_date": generation_date,
             "commitment_natural": text,
+            # #4213: the reported, third-person twin — the ONLY text a visitor is served.
+            "public_ask": audience_guard.reader_safe(c.get("public_ask"), coach_id, logger),
             "action_check": action_check,  # {metric, direction} or None (qualitative)
             "window_days": window_days,
             "due_date": due_date,
@@ -1147,7 +1159,7 @@ def lambda_handler(event, context):
 
     # Write state updates
     # 1. OUTPUT# record
-    _write_output_record(coach_id, generation_date, output_type, output_text, extraction)
+    _write_output_record(coach_id, generation_date, output_type, output_text, extraction, data_through=event.get("data_through"))
 
     # 2. VOICE#state update
     _update_voice_state(coach_id, extraction)

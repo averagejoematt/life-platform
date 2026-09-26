@@ -65,6 +65,8 @@ from typing import Callable, Iterable, Optional
 from content import journal_quotes  # the house taboo gate (#1568/ADR-142) — reused, not forked
 from privacy import broadcast_sensitivity_gate  # the house PII detector (#1673) — reused, not forked
 
+from coach import audience_guard  # #4213: the public twin of a commitment, guarded
+
 # The item_ref.surface marker that scopes a #1689 corrections-ledger row to the
 # dossier. Shared between the read side (here) and the write side (the MCP tool).
 CORRECTION_SURFACE = "coach_dossier"
@@ -160,14 +162,19 @@ def commitment_entry(item: dict):
     date = _date_of(item.get("created_date"), item.get("created_at"))
     if not text or not date:
         return None, SKIP
-    if not dossier_safe(text, item.get("outcome_notes")):
+    if not dossier_safe(text, item.get("public_ask"), item.get("outcome_notes")):
         return None, WITHHELD
     check = item.get("action_check") if isinstance(item.get("action_check"), dict) else None
     entry = {
         "kind": "commitment",
         "record_id": item.get("sk"),
         "date": date,
-        "text": text,  # verbatim — the exact commitment the coach recorded
+        # #4213: served to visitors (by-coach + the door's open_actions), so the text is
+        # the commitment's PUBLIC twin — the ask REPORTED ("I've asked him to …"), verbatim
+        # from the record's `public_ask`. `commitment_natural` is the imperative addressed
+        # to Matthew and is never served; a record with no reader-safe twin (every row
+        # written before #4213) keeps its date/status/check and serves an EMPTY text.
+        "text": audience_guard.public_ask(item) or "",
         "status": item.get("status") or "pending",
         "due_date": _date_of(item.get("due_date")),
         "outcome": item.get("outcome"),

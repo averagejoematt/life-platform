@@ -185,7 +185,7 @@ export async function renderReading(d) {
       fallbackNote: "",
     }) +
     readingBookList("Finished — and what stuck", shelf && shelf.finished, {
-      emptyMsg: "No finishes yet this cycle — the shelf fills a book at a time.",
+      emptyMsg: "No finishes yet — the shelf fills a book at a time.",
       fallbackNote: "Kept on the shelf — a debrief adds the takeaway here.",
     }) +
     readingShelfBlock("Set down", shelf && shelf.set_down, "") +

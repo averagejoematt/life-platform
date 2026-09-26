@@ -10,6 +10,14 @@ import { lineChart } from "/assets/js/charts.js";
 import { regenerationPaused } from "/assets/js/coach_asof.js";
 import { weeklyCadenceLine } from "/assets/js/coach_today.js"; // #4188 — the weekly call says its cadence
 
+/* #4182 (owner ruling 2026-09-26): the cycle count is internal. The server's archival
+   sentence (site_api_phase_frame.archival_frame) says "from a previous cycle — N days
+   before this cycle began DATE"; the reader reads it in the experiment's frame. */
+const _dayFrame = (s) => String(s || "")
+  .replace(/from a previous cycle/i, "from before the experiment")
+  .replace(/before this cycle began/i, "before Day 1,")
+  .replace(/before cycle \d+ began/i, "before the run that began");
+
 // The board — pick an expert, read their actual per-domain take + track record.
 // WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
 // Reads /api/coach_team tensions: topic + the two coaches' positions head-to-head + the
@@ -52,7 +60,7 @@ function boardSpanNote(span, paused) {
   const why = paused
     ? " Narrative regeneration is paused by the budget guard, so the members that haven't refreshed keep their earlier day."
     : " Each member refreshes on its own daily run.";
-  return `<p class="rd-meta label">The reads below were not all written on the same day — they span Day ${esc(lo)} to Day ${esc(hi)} of this cycle.${why}</p>`;
+  return `<p class="rd-meta label">The reads below were not all written on the same day — they span Day ${esc(lo)} to Day ${esc(hi)} of the experiment.${why}</p>`;
 }
 
 export async function renderBoard(d) {
@@ -378,7 +386,7 @@ export function renderVerify(d) {
   const table = rows ? sec(`Whoop vs Garmin, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Garmin</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   const pausedNote = d.garmin_paused ? `<p class="rd-meta label">Garmin ingestion has been paused since ${esc(d.garmin_last_date)} (vendor anti-automation, ADR-074) — the window above is real history through that date, not a live feed.</p>` : "";
   const archivalNote = d.archival && d.archival.pre_cycle
-    ? `<p class="rd-meta label">${esc(d.archival.label)} — the comparison window itself, not only the Garmin pause.</p>`
+    ? `<p class="rd-meta label">${esc(_dayFrame(d.archival.label))} — the comparison window itself, not only the Garmin pause.</p>`
     : "";
   const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
   return sec("Cross-device agreement — the credibility signal", headFigs +
@@ -430,7 +438,7 @@ export function renderPipeline(d) {
     // not a live-cycle outage. Numbered server-side from the record's date against
     // the cycle-genesis ledger (no stamp dependency); null = predates cycle 1.
     if (s.carried) {
-      const from = s.carried_from_cycle != null ? `attempt ${esc(String(s.carried_from_cycle))}` : "a previous attempt";
+      const from = "before this experiment";
       html += ` <span class="rd-badge wu-carried">carried from ${from}</span>`;
     }
     return html;
@@ -459,7 +467,7 @@ export function renderPipeline(d) {
       .slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
       .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${feedsCell(s)}</td><td class="num rd-range">${lastUpdateCell(s)}</td><td>${statusCell(s)}</td></tr>`).join("")}</tbody></table>`)).join("");
   const carriedNote = (d.experiment && src.some((s) => s.carried))
-    ? ` carried = the newest record predates this cycle's genesis (${esc(d.experiment.genesis || "")}) — history from an earlier attempt, not a live outage.`
+    ? ` carried = the newest record predates Day 1 of the experiment (${esc(d.experiment.genesis || "")}) — history from before it, not a live outage.`
     : "";
   // #2798: the frame, explained in-page the moment it can be seen. Without this a reader
   // between 5pm and midnight Pacific sees a "last update" one day ahead of the date this

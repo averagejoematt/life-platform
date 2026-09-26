@@ -86,6 +86,8 @@ DERIVED = "DERIVED"
 
 DECISIONS = {
     "lambdas/emails/coach_panel_podcast_lambda.py": DERIVED,
+    # #4188: the lead read's day number and genesis come from build_experiment_phase_context.
+    "lambdas/coach/lead_daily_read.py": DERIVED,
     "lambdas/content/review_pack_ranker.py": (
         "NOT A PROMPT. The matching string is a FINDING detail — genesis_mismatch's "
         '"generated {gen_date}, BEFORE the current genesis {start_date_iso}" — emitted by the '
@@ -93,6 +95,14 @@ DECISIONS = {
         "`start_date_iso` argument, threaded from EXPERIMENT_START_DATE, never a date this module "
         "decides. The module's Bedrock body belongs to the separate Haiku critic, whose prompt carries "
         "no phase claim at all. Revisit if the critic prompt ever states the day or the cycle."
+    ),
+    "lambdas/coach/coach_chat.py": (
+        "NOT A PHASE CLAIM. The matching string is the #4182 vocabulary rule in the Telegram "
+        "coach's CONVERSATION RULES — \"'a fresh start' (never 'reset')\" — which NAMES the retired "
+        "builder word so the coach stops saying it; it states no day number, no start date and no "
+        "cycle. The chat's phase facts reach the model only through the facts block the caller "
+        "assembles (canonical facts + the CURRENT MOMENT line), never through this module's prose. "
+        "Revisit if a rule here ever states the day, the start date or the cycle."
     ),
     "lambdas/operational/reader_truth_qa.py": (
         "DELIBERATE, and it is the rubric rather than a narrative. `_phase_line` states the ground "

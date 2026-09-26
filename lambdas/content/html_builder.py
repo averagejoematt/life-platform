@@ -10,10 +10,9 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-from datetime import datetime
-
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.digest_utils import compute_confidence
+from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 
 _HAS_CONFIDENCE = True
 
@@ -109,7 +108,7 @@ def hrv_trend_str(hrv_7d, hrv_30d):
 # byte-identical output. See tests/test_daily_brief_golden.py.
 
 
-def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacation_fund, banner_color, day_label):
+def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacation_fund, banner_color, day_label, data_through=None):
     """Section group of the daily brief (extracted from build_html, ADR-pending).
 
     Returns the HTML fragment for these sections; behavior-preserving extraction.
@@ -173,6 +172,8 @@ def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacat
     out += (
         '<p style="color:#94a3b8;font-size:12px;margin:0 0 4px;">MORNING BRIEF</p>'
         '<h1 style="color:#ffffff;font-size:28px;font-weight:700;margin:0 0 4px;">' + day_label + "</h1>"
+        # #4182: ONE freshness line per surface, in words ("data through <day>", never "as of").
+        + ('<p style="color:#94a3b8;font-size:12px;margin:0 0 4px;">Data through ' + data_through + "</p>" if data_through else "")
     )
 
     # TL;DR line
@@ -283,14 +284,16 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                 "<!-- S:character_sheet -->"
                 '<div style="display:flex;justify-content:space-between;align-items:center;">'
                 "<div>"
-                '<p style="color:' + tc + ';font-size:10px;margin:0 0 2px;font-weight:700;letter-spacing:1px;">CHARACTER SHEET</p>'
+                '<p style="color:' + tc + ";font-size:10px;margin:0 0 2px;font-weight:700;letter-spacing:1px;\">THE ENGINE'S SCORE</p>"
                 '<p style="color:#e2e8f0;font-size:18px;font-weight:700;margin:0;">'
                 + cs_tier_emoji
-                + " Level "
+                + " "
                 + str(cs_level)
                 + " — "
                 + cs_tier
                 + "</p>"
+                # #4182 ruling "character level" -> "the engine's score", its gloss inline once.
+                '<p style="color:#9ca3af;font-size:10px;margin:2px 0 0;">How many weeks the seven areas have held up.</p>'
             )
 
             # XP bar
@@ -299,13 +302,13 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
             out += (
                 '<div style="margin-top:6px;background:#374151;border-radius:4px;height:6px;width:200px;">'
                 '<div style="background:' + tc + ";border-radius:4px;height:6px;width:" + str(xp_pct) + '%;"></div></div>'
-                '<p style="color:#9ca3af;font-size:10px;margin:2px 0 0;">Level '
+                '<p style="color:#9ca3af;font-size:10px;margin:2px 0 0;">'
                 + str(level_within_tier)
-                + "/20 in "
+                + " of 20 in the "
                 + cs_tier
                 + " tier · "
                 + str(cs_xp)
-                + " total XP</p>"
+                + " experience points (XP)</p>"
             )
 
             out += "</div>"
@@ -321,7 +324,10 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                 "relationships": "🤝",
                 "consistency": "🏆",
             }
-            out += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;">'
+            out += (
+                '<p style="color:#9ca3af;font-size:9px;margin:0 0 2px;text-align:center;">The seven areas</p>'
+                '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;">'
+            )
             for pn in pillar_names:
                 pd = character_sheet.get("pillar_" + pn, {})
                 # ADR-104: a pillar the character engine has never scored has no level.
@@ -357,7 +363,7 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                     new = ev.get("new_level") or ev.get("new_tier", "")
                     if "character" in ev_type:
                         out += (
-                            '<p style="color:#fbbf24;font-size:11px;margin:2px 0;">⭐ Character Level '
+                            '<p style="color:#fbbf24;font-size:11px;margin:2px 0;">⭐ The engine\'s score '
                             + str(old)
                             + " → "
                             + str(new)
@@ -433,7 +439,10 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
             # Protocol recommendations (pre-computed, passed in)
             if protocol_recs:
                 out += '<div style="padding:8px 24px 12px;background:rgba(0,0,0,0.15);border-top:1px solid #2d2d5e;">'
-                out += '<p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">PROTOCOL RECOMMENDATIONS</p>'
+                out += (
+                    '<p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">PROTOCOLS TO TRY</p>'
+                    '<p style="color:#64748b;font-size:10px;margin:0 0 4px;">A protocol is a rule followed on purpose, to see if a number moves.</p>'
+                )
                 for rec in protocol_recs:
                     pillar_name = (rec.get("pillar") or "").capitalize()
                     dropped = rec.get("dropped", False)
@@ -478,7 +487,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
             ("Nutrition", component_scores.get("nutrition"), "🥗"),
             ("Movement", component_scores.get("movement"), "⚡"),
             ("Habits", component_scores.get("habits_mvp"), "✅"),
-            ("Glucose", component_scores.get("glucose"), "📊"),
+            ("Blood sugar", component_scores.get("glucose"), "📊"),
             ("Hydration", component_scores.get("hydration"), "💧"),
             ("Journal", component_scores.get("journal"), "📓"),
         ]
@@ -516,15 +525,15 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
             t1_total = t1_data.get("total", 0) if t1_data else 0
             out += (
                 '<div style="grid-column:span 3;background:#1e293b;border-radius:8px;padding:8px 12px;">'
-                '<p style="color:#64748b;font-size:9px;margin:0 0 4px;">HABIT TIERS</p>'
+                '<p style="color:#64748b;font-size:9px;margin:0 0 4px;">HABITS BY PRIORITY</p>'
                 '<p style="color:#e2e8f0;font-size:11px;margin:0;">'
-                "T0 (non-neg): "
+                "Essential: "
                 + str(t0_done)
-                + "/"
+                + " of "
                 + str(t0_total)
-                + " &nbsp;·&nbsp; T1 (high): "
+                + " &nbsp;·&nbsp; High-priority: "
                 + str(t1_done)
-                + "/"
+                + " of "
                 + str(t1_total)
                 + "</p>"
             )
@@ -593,7 +602,11 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
         if hrv_val:
             out += (
                 '<p style="color:#64748b;font-size:10px;margin:8px 0 0;">'
-                '📡 HRV: <span style="color:#94a3b8;">' + str(round(hrv_val)) + "ms yesterday · " + trend_s + "</span></p>"
+                '📡 HRV (heart-rate variability): <span style="color:#94a3b8;">'
+                + str(round(hrv_val))
+                + "ms yesterday · "
+                + trend_s
+                + "</span></p>"
             )
 
         out += "</div><!-- /S:scorecard -->"
@@ -669,7 +682,7 @@ def _brief_scorecards(component_details, component_scores, data, mvp_streak, pro
                 '<div style="margin-top:8px;background:#1e293b;border-radius:4px;height:4px;">'
                 '<div style="background:' + bar_color + ";border-radius:4px;height:4px;width:" + str(bar_pct) + '%;"></div>'
                 "</div>"
-                '<p style="color:#475569;font-size:9px;margin:4px 0 0;">' + str(done_count) + "/" + str(total_count) + " complete</p>"
+                '<p style="color:#475569;font-size:9px;margin:4px 0 0;">' + str(done_count) + " of " + str(total_count) + " done</p>"
                 "</div><!-- /essential_seven -->"
             )
         out += "<!-- /S:essential_seven -->"
@@ -1051,7 +1064,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         out += "<!-- S:cgm -->"
         out += (
             '<div style="background:#16213e;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
-            '<p style="color:#64748b;font-size:10px;margin:0 0 12px;font-weight:700;letter-spacing:1px;">CGM SPOTLIGHT</p>'
+            '<p style="color:#64748b;font-size:10px;margin:0 0 12px;font-weight:700;letter-spacing:1px;">BLOOD SUGAR (CGM, A WORN SENSOR)</p>'
         )
 
         apple = data.get("apple") or {}
@@ -1128,7 +1141,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                     + ")</p>"
                 )
         else:
-            out += '<p style="color:#64748b;font-size:12px;margin:0;">No glucose data for yesterday.</p>'
+            out += '<p style="color:#64748b;font-size:12px;margin:0;">No blood-sugar readings for yesterday.</p>'
 
         out += "</div><!-- /S:cgm -->"
     except Exception as _e:
@@ -1186,13 +1199,13 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                 out += (
                     '<div style="text-align:center;">'
                     '<p style="color:#f59e0b;font-size:24px;font-weight:700;margin:0;">' + str(mvp_streak) + "</p>"
-                    '<p style="color:#475569;font-size:9px;margin:0;">T0 Streak (days)</p></div>'
+                    '<p style="color:#475569;font-size:9px;margin:0;">Essential-habits streak (days)</p></div>'
                 )
             if full_streak > 0:
                 out += (
                     '<div style="text-align:center;">'
                     '<p style="color:#22c55e;font-size:24px;font-weight:700;margin:0;">' + str(full_streak) + "</p>"
-                    '<p style="color:#475569;font-size:9px;margin:0;">T0+T1 Streak</p></div>'
+                    '<p style="color:#475569;font-size:9px;margin:0;">Essential + high-priority streak (days)</p></div>'
                 )
             out += "</div>"
         else:
@@ -1848,13 +1861,7 @@ def _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroo
     # burn that threatens the $75 ceiling is visible where Matthew already looks.
     if budget_headroom_line:
         out += '<p style="color:#64748b;font-size:9px;margin:0 0 4px;text-align:center;">' + budget_headroom_line + "</p>"
-    out += (
-        '<p style="color:#64748b;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; '
-        + date_str
-        + " &middot; "
-        + source_str
-        + "</p>"
-    )
+    out += '<p style="color:#64748b;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; ' + source_str + "</p>"
     out += '<p style="color:#475569;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>'
     out += "</div>"
     out += "</div></body></html>"
@@ -1909,11 +1916,9 @@ def build_html(
     """
 
     date_str = data["date"]
-    try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        day_label = dt.strftime("%A, %b %-d")
-    except Exception:
-        day_label = date_str
+    # #4182: the H1 names the morning the brief is read (the data day + 1, the subject
+    # line's day); the freshness line under it names the data day. Both in words.
+    day_label = day_in_words(shift_day_key(date_str, 1))
 
     # Defaults
     if triggered_rewards is None:
@@ -1928,7 +1933,9 @@ def build_html(
     elif brief_mode == "struggling":
         banner_color = "#1e1b4b"
 
-    html = _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacation_fund, banner_color, day_label)
+    html = _brief_header(
+        brief_mode, data, day_grade_score, grade, tldr_guidance, vacation_fund, banner_color, day_label, data_through=day_in_words(date_str)
+    )
     html += _brief_character(character_sheet, protocol_recs, triggered_rewards)
     html += _brief_scorecards(component_details, component_scores, data, mvp_streak, profile, readiness_colour, vice_streaks)
     html += _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrition)

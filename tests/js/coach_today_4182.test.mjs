@@ -179,7 +179,7 @@ test("chain (b): no ask -> the best record at n >= 10 in today's batch; n < 10 i
   const p = T.chooseTodaysRead(BATCH, [], CALIB);
   assert.equal(p.coach.coach_id, "sleep"); // 43.8 % at n=16 beats labs' 100 % at n=4
   assert.equal(p.rule, "record");
-  assert.equal(p.reason, "chosen: the best checked record this cycle — 7 of 16 held up");
+  assert.equal(p.reason, "chosen: the best checked record since Day 1 — 7 of 16 held up");
   assert.doesNotMatch(p.reason, /%/); // counts with their n, never a bare percentage (ADR-105)
   // a read outside the 24 h batch is not eligible however good its record
   const stale = BATCH.map((c) => (c.coach_id === "sleep" ? { ...c, analysis_generated_at: "2026-09-24T12:00:00Z" } : c));
@@ -195,4 +195,55 @@ test("chain (c): nothing qualifies -> the freshest read, labelled; nothing serva
   assert.equal(p.reason, "chosen: the freshest read");
   assert.equal(T.chooseTodaysRead(BATCH, [], null).rule, "freshest");
   assert.equal(T.chooseTodaysRead([{ coach_id: "x", position_summary: "", analysis_generated_at: "2026-09-25T17:00:00Z" }], [], CALIB), null);
+});
+
+// ── rule 0 (#4188): the head coach's DAILY lead read ─────────────────────────────────────
+// The shape /api/coaching-dashboard serves as `lead_daily` (coach.lead_daily_read.served +
+// the dashboard's byline). Every figure in `text` is in `cited`.
+const LEAD = {
+  text: "He weighed 313.1 lb on Friday, September 25, 14.2 lb down since September 6.",
+  generated_at: "2026-09-25T17:12:00+00:00", // Friday 10:12 AM PT
+  data_through: "2026-09-24",
+  coach_id: "eli_marsh",
+  coach_name: "Dr. Eli Marsh",
+  coach_title: "Head Coach",
+  cited: [
+    { metric: "latest weigh-in (lb)", value: "313.1", as_of: "2026-09-25", source_field: "withings.weight_lbs" },
+    { metric: "lost since the start (lb)", value: "14.2", as_of: "2026-09-25", source_field: "journey.lost_lbs" },
+  ],
+};
+
+test("chain (0): a lead read under 24 h old leads, ahead of the ask and the record, and says so", () => {
+  const now = new Date("2026-09-25T20:00:00Z"); // ~3 h after it was written
+  const p = T.chooseTodaysRead(BATCH, [{ coach_id: "labs", text: "Book the bloodwork." }], CALIB, LEAD, now);
+  assert.equal(p.rule, "lead");
+  assert.equal(p.reason, "chosen: today's lead read");
+  assert.equal(p.coach.coach_id, "eli_marsh");
+  assert.equal(p.coach.persona_id, "eli_marsh"); // the by-coach anchor, not "eli_marsh_coach"
+  assert.equal(p.coach.name, "Dr. Eli Marsh");
+  assert.equal(p.coach.position_summary, LEAD.text); // the served text, untouched
+  assert.equal(p.coach.analysis_generated_at, LEAD.generated_at);
+  assert.deepEqual(p.coach.cited, LEAD.cited);
+  // it leads even when no staff read is servable at all
+  assert.equal(T.chooseTodaysRead([], [], null, LEAD, now).rule, "lead");
+});
+
+test("chain (0): a lead read 24 h old or more, absent, empty or undatable falls through to the old chain", () => {
+  const at24h = new Date("2026-09-26T17:12:00Z");
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, LEAD, at24h).rule, "record"); // mutation control: the age bound decides
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, LEAD, new Date("2026-09-26T17:11:00Z")).rule, "lead");
+  const now = new Date("2026-09-25T20:00:00Z");
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, null, now).rule, "record");
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, { ...LEAD, text: "  " }, now).rule, "record");
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, { ...LEAD, generated_at: "" }, now).rule, "record");
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, { ...LEAD, generated_at: "2026-09-26T09:00:00Z" }, now).rule, "record"); // future-dated
+  // no clock passed -> rule 0 cannot judge age, so it never fires (the old 3-arg call is unchanged)
+  assert.equal(T.chooseTodaysRead(BATCH, [], CALIB, LEAD).rule, "record");
+  assert.equal(T.chooseTodaysRead(BATCH, [], null, null, now).rule, "freshest");
+});
+
+test("the door wires rule 0 from the served lead_daily with the page clock", () => {
+  const src = readFileSync(join(REPO, "site/assets/js/coaching.js"), "utf8");
+  assert.match(src, /chooseTodaysRead\(coaches, d\.open_actions, calib, d\.lead_daily, now\)/);
+  assert.match(src, /chosen\.persona_id \|\|/);
 });

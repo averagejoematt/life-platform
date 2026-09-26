@@ -154,7 +154,8 @@ def _render_weekly_habit_review(whr):
             overall_col = "#ef4444"
             overall_label = "Needs attention"
 
-    perfect_pct = pct_int(perfect / days) if days else 0
+    # #4182: the perfect-day share renders as its count ("3 of 7"), never a bare percentage
+    # of a sub-30 n — so no percentage is computed for it here.
 
     # ── Daily mini-bars (Mon-Sun) ────────────────────────────────────────────
     bar_cells = ""
@@ -261,13 +262,15 @@ def _render_weekly_habit_review(whr):
         t1_col = "#22c55e" if t1_pct_int >= 75 else "#f59e0b" if t1_pct_int >= 50 else "#94a3b8"
         t1_html = (
             '<p style="font-size:11px;color:#64748b;margin:6px 0 0;">'
-            'Tier 1 avg: <span style="color:' + t1_col + ';font-weight:700;">' + str(t1_pct_int) + "%</span></p>"
+            'High-priority average: <span style="color:' + t1_col + ';font-weight:700;">' + str(t1_pct_int) + "%</span></p>"
         )
 
-    # ADR-105: when the window contains unmeasured days, the mean ships its own n.
-    n_note = ""
+    # ADR-105 + #4182 (percentages carry n): the mean always names the days behind it, and
+    # when the window contains unmeasured days it says how many of them were measured.
     if measured_days is not None and measured_days != days:
-        n_note = " (n=" + str(measured_days) + " measured)"
+        n_note = " · over " + str(measured_days) + " measured days of " + str(days)
+    else:
+        n_note = " · over " + str(days) + (" day" if days == 1 else " days")
 
     html = (
         "<!-- S2-T1-10: Weekly Habit Review (Sunday only) -->"
@@ -281,13 +284,13 @@ def _render_weekly_habit_review(whr):
         + overall_col
         + ';margin:0;line-height:1.1;">'
         + t0_pct_str
-        + '<span style="font-size:14px;">%</span> T0</p>'
+        + '<span style="font-size:14px;">% of essential habits</span></p>'
         '<p style="font-size:11px;color:' + overall_col + ';margin:2px 0 0;">' + overall_label + n_note + "</p>"
         "</div>"
         '<div style="text-align:right;">'
         '<p style="font-size:10px;color:#64748b;margin:0 0 2px;">' + str(days) + "-day window</p>"
-        '<p style="font-size:20px;font-weight:700;color:#e2e8f0;margin:0;">' + str(perfect) + "/" + str(days) + "</p>"
-        '<p style="font-size:10px;color:#94a3b8;margin:2px 0 0;">perfect days (' + str(perfect_pct) + "%)</p>"
+        '<p style="font-size:20px;font-weight:700;color:#e2e8f0;margin:0;">' + str(perfect) + " of " + str(days) + "</p>"
+        '<p style="font-size:10px;color:#94a3b8;margin:2px 0 0;">perfect days</p>'
         "</div>"
         "</div>"
         # Daily bars
@@ -295,7 +298,7 @@ def _render_weekly_habit_review(whr):
         # Habit table
         + '<table style="width:100%;border-collapse:collapse;margin-top:8px;">'
         + '<tr><td colspan="2" style="padding:0 0 4px 12px;font-size:10px;color:#64748b;'
-        + 'text-transform:uppercase;letter-spacing:1px;">T0 Habits</td></tr>'
+        + 'text-transform:uppercase;letter-spacing:1px;">Essential habits</td></tr>'
         + habit_rows
         + "</table>"
         # T1 line

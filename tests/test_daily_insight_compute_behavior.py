@@ -665,10 +665,12 @@ class TestFetchExecutionMetrics:
         m = di._fetch_execution_metrics(YESTERDAY, self.PROFILE)
         assert m["exercise_sessions"] == 0
 
-    def test_the_sleep_start_is_reduced_to_a_wall_clock_time(self, table):
+    def test_the_sleep_start_is_reduced_to_a_labelled_pacific_wall_clock_time(self, table):
+        """#4185: the UTC instant 23:45Z is 4:45 PM PDT — the evaluator is handed the PT
+        clock with its zone named, never the bare UTC "23:45" (which it read as local)."""
         seed(table, _date_row("whoop", YESTERDAY, sleep_start="2026-05-09T23:45:00Z", recovery_score=61))
         m = di._fetch_execution_metrics(YESTERDAY, self.PROFILE)
-        assert m["sleep_start_time"] == "23:45" and m["recovery_score"] == 61
+        assert m["sleep_start_time"] == "4:45 PM PT" and m["recovery_score"] == 61
 
     def test_tier_zero_completion_is_a_percentage_of_the_day_total(self, table):
         """3 of 5 → 60%."""

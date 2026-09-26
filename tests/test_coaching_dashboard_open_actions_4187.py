@@ -62,6 +62,8 @@ _PHYSICAL_PENDING = {
     "sk": "COMMITMENT#commit_protein",
     "created_date": "2026-09-25",
     "commitment_natural": "reach 170 g protein per day for seven consecutive days",
+    # #4213: the reported, third-person twin is the ONLY text a visitor is served.
+    "public_ask": "I've asked him to reach 170 g of protein a day for seven days in a row.",
     "status": "pending",
     "due_date": "2026-10-02",
     "action_check": {"metric": "protein", "direction": "at_least"},
@@ -79,6 +81,7 @@ _NUTRITION_PENDING_NO_DUE = {
     "sk": "COMMITMENT#commit_undated",
     "created_date": "2026-09-20",
     "commitment_natural": "cut added sugar to under 25g on training days",
+    "public_ask": "I've asked him to keep added sugar under 25 g on training days.",
     "status": "pending",
 }
 _SLEEP_PENDING_SOONER = {
@@ -86,6 +89,7 @@ _SLEEP_PENDING_SOONER = {
     "sk": "COMMITMENT#commit_lights_out",
     "created_date": "2026-09-24",
     "commitment_natural": "lights off by 10pm through the weekend",
+    "public_ask": "I've asked him to turn the lights off by 10 PM through the weekend.",
     "status": "pending",
     "due_date": "2026-09-28",
 }
@@ -146,7 +150,7 @@ def test_open_actions_serves_the_pending_commitment_with_every_field(monkeypatch
     assert action == {
         "coach_id": "physical",
         "coach_name": "Dr. Max Reyes",
-        "text": "reach 170 g protein per day for seven consecutive days",
+        "text": "I've asked him to reach 170 g of protein a day for seven days in a row.",
         "asked_on": "2026-09-25",
         "due": "2026-10-02",
         "status": "pending",
@@ -198,7 +202,7 @@ def test_every_pending_commitment_the_coach_endpoint_serves_appears_in_open_acti
         assert resp["statusCode"] == 200, resp
         dossier = json.loads(resp["body"])["dossier"]
         for commitment in dossier["commitments"]:
-            if commitment.get("status") == "pending":
+            if commitment.get("status") == "pending" and commitment.get("text"):
                 expected.append((coach_id.replace("_coach", ""), commitment["text"]))
 
     assert expected, "fixture must seed at least one pending commitment"
@@ -209,3 +213,18 @@ def test_every_pending_commitment_the_coach_endpoint_serves_appears_in_open_acti
     served = [(a["coach_id"], a["text"]) for a in open_actions]
     for pair in expected:
         assert pair in served, f"{pair} served by /api/coach/{{id}} but missing from open_actions"
+
+
+def test_a_pending_commitment_with_no_public_twin_is_not_an_open_action(monkeypatch):
+    """#4213: `commitment_natural` is the imperative addressed to Matthew. A pending
+    commitment written before `public_ask` existed has no reader-safe text, so it is
+    not an ask a visitor can be shown — it is dropped from open_actions, never served
+    in the owner register."""
+    rows = {
+        "COACH#physical_coach": [dict(_PHYSICAL_PENDING, public_ask=None)],
+        "COACH#nutrition_coach": [],
+        "COACH#sleep_coach": [dict(_SLEEP_PENDING_SOONER, public_ask="Turn your lights off by 10 PM.")],
+    }
+    monkeypatch.setitem(globals(), "_ROWS_BY_PK", rows)
+    body = _dashboard_body(monkeypatch)
+    assert body["open_actions"] == []

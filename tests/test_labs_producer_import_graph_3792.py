@@ -216,8 +216,13 @@ def test_THE_LOAD_BEARING_ASSERTION_the_dashboard_producer_can_actually_reach_th
         "inert on /api/coaching-dashboard no matter what ships in the zip (#3792)"
     )
     # Name the route, so a regression says WHICH edge broke rather than just "unreachable".
+    # #4188: asserted EDGE BY EDGE, not as "the" shortest path — coach.lead_daily_read also
+    # reaches ai.ai_context from the brief at the same depth, and a BFS tie is broken by set
+    # order, so pinning the path pinned an iteration order rather than the route.
+    route = ["emails.daily_brief_lambda", "ai.ai_calls", "ai.ai_context", "intelligence.labs_facts"]
+    broken = [f"{a} -> {b}" for a, b in zip(route, route[1:]) if b not in edges.get(a, ())]
     path = _shortest_path("emails.daily_brief_lambda", "intelligence.labs_facts", edges)
-    assert path[:3] == ["emails.daily_brief_lambda", "ai.ai_calls", "ai.ai_context"], f"unexpected route to labs_facts: {path}"
+    assert not broken, f"the brief's route to labs_facts broke at {broken} (a shortest path today: {path})"
 
 
 def test_the_walker_itself_can_report_UNREACHABLE():

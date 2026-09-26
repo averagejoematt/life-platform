@@ -16,6 +16,8 @@
   list render — and tests/js/coaching_prestart_3517.test.mjs pins both directions.
 */
 
+import { dayInWords } from "/assets/js/entry_age.js"; // #4215 — the seal's date, in words
+
 /**
  * Roster list entries for the By-Coach / Team tabs.
  *
@@ -37,4 +39,63 @@ export function rosterEntries(coaches, opts) {
     sub: preStart ? "" : c._live || "",
     tier: c.tier,
   }));
+}
+
+/*
+  #4215 — the scorecard's retired seats. The training seat retired at the cycle-13
+  genesis (ADR-153), but the cycle-17 pre-registration sealed two calls in its name
+  about 18 hours before #3520's cast guard went live. Sealed calls cannot be edited
+  (#1378) and hiding them would break ADR-104, so the scorecard keeps them — labelled,
+  in their own group, never interleaved with the live cast. Before this, both
+  scorecard lists in coaching.js built every by_coach key into one list and a stranger
+  met "Dr. Sarah Chen" as a ninth current coach.
+
+  The page never decides who is retired: the flag is the persona registry's, served on
+  each /api/predictions row (and on by_coach once the server carries it, #4215's server
+  box). evidence_intelligence.js's `_retiredTag` reads the same flag from /api/calibration.
+*/
+
+/** The set of bare coach ids the served payload marks retired. */
+export function retiredSeats(data) {
+  const out = new Set();
+  const byc = (data && data.by_coach) || {};
+  for (const cid of Object.keys(byc)) if (byc[cid] && byc[cid].retired === true) out.add(cid);
+  for (const p of (data && data.predictions) || []) if (p && p.retired === true && p.coach_id) out.add(String(p.coach_id));
+  return out;
+}
+
+/**
+ * The scorecard's coach rows, split: `live` (the current cast, sorted by decided calls
+ * this season then career) and `retired` (same order, rendered apart and labelled).
+ * A coach with neither a season nor a career record is omitted, as before (#1376).
+ */
+export function scorecardSeats(data) {
+  const byc = (data && data.by_coach) || {};
+  const retired = retiredSeats(data);
+  const ids = Object.keys(byc)
+    .filter((c) => byc[c] && (byc[c].total || (byc[c].lifetime && byc[c].lifetime.total)))
+    .sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0) || ((byc[b].lifetime && byc[b].lifetime.decided) || 0) - ((byc[a].lifetime && byc[a].lifetime.decided) || 0));
+  return { live: ids.filter((c) => !retired.has(c)), retired: ids.filter((c) => retired.has(c)) };
+}
+
+/** Why a retired seat still has rows: "retired seat · 2 sealed calls from the
+ *  pre-registration on September 6, graded like any other" — or, with no calls on the
+ *  board, the career record that stays on file. The date is the served
+ *  `pre_registered_at`'s calendar date (the seal's UTC date — the experiment's Day-1
+ *  date, not the Pacific evening it was written); dropped when not served. Reader text
+ *  never says "cycle" (owner ruling 2026-09-26: the public frame is the experiment and
+ *  the day). */
+export function retiredSeatNote(cid, data) {
+  const byc = (data && data.by_coach) || {};
+  const c = byc[cid] || {};
+  const rows = ((data && data.predictions) || []).filter((p) => p && p.coach_id === cid && p.pre_registered === true);
+  const sealed = rows.length;
+  const n = sealed || c.total || 0;
+  if (n > 0) {
+    const stamps = rows.map((p) => String(p.pre_registered_at || "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const on = stamps.length ? dayInWords(stamps[0], { weekday: false }) : "";
+    const from = sealed ? ` from the pre-registration${on ? ` on ${on}` : ""}` : " on the board";
+    return `retired seat · ${n} ${sealed ? "sealed call" : "call"}${n === 1 ? "" : "s"}${from}, graded like any other`;
+  }
+  return "retired seat · career record kept on file";
 }

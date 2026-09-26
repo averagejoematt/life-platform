@@ -173,7 +173,9 @@ BASELINE = {
     # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
     # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.
-    "lambdas/emails/daily_brief_lambda.py": 1995,
+    # #4188: 1995 -> 1985 — the 16-line per-coach elif chain became one keyed write (-15), the
+    # lead-read call added 3, and 3 of the 15 extracted lines are kept as earned headroom (#2610 N/5).
+    "lambdas/emails/daily_brief_lambda.py": 1985,
     # site_api_social.py (2707 when #2515 ran) drained to a ~910-line facade — the handler
     # bodies now live in cohesive web/site_api_social_{experiments,challenges,membrane,
     # ladder,engage}.py, each well under the ceiling. The pure-subset ratchet forces the
@@ -246,7 +248,10 @@ BASELINE = {
     # unchanged. 132 lines came out; 26 of them (a fifth — the #2610 earned-headroom rule)
     # are banked so the re-bill fix and the #3084 budget-stop clause have room, and 106 are
     # handed back. Measured 2264. Terminal cure is still under 1200 and pruning this line.
-    "lambdas/ai/ai_calls.py": 1677,
+    # 2026-09-26 (#4185): 1677 → 1668. The fresh-path coach-state-updater invoke moved to
+    # coach_brief_input_gate.record_output (the one writer the reuse path already used);
+    # 15 logical lines came out, 3 (a fifth, #2610) are banked, 12 are handed back.
+    "lambdas/ai/ai_calls.py": 1668,
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.

@@ -12,11 +12,12 @@ system prompt, one message builder.
 `updater._build_extraction_message(...)` keep resolving exactly as before. Nothing
 monkeypatches them, which is what makes a re-export safe here.
 
-The twelve extraction tasks below are the contract between the coach pipeline and the
+The thirteen extraction tasks below are the contract between the coach pipeline and the
 COACH# state machine. Items 8-10 and 12 (`observatory_summary`, `key_recommendation`,
 `elena_quote`, `public_summary`) are the DERIVED READER PROSE — see
-`coach_derived_prose.py` for what guards them and why they are one set. Item 12 is the
-one field with a PUBLIC audience frame (#2972): third person for the subject, enforced
+`coach_derived_prose.py` for what guards them and why they are one set. Items 12 and 13
+(`public_summary`, `public_ask`) — plus each commitment's own `public_ask` in item 11 —
+carry the PUBLIC audience frame (#2972, #4213): third person for the subject, enforced
 downstream by `coach/audience_guard.py`, never by this prompt alone.
 """
 
@@ -118,7 +119,11 @@ EXTRACTION_SYSTEM_PROMPT = (
     "   - direction: 'up' or 'down' — which way action_check moves if he DID the "
     "thing (earlier bedtime -> resting_heart_rate 'down'; protein target -> "
     "total_protein_g 'up'). null if action_check is null.\n"
-    "   - timeframe_hint: when the coach should revisit it (e.g. 'this week').\n\n"
+    "   - timeframe_hint: when the coach should revisit it (e.g. 'this week').\n"
+    "   - public_ask: the SAME action reported for a site visitor, third person, "
+    "at most 25 words ('I've asked him to add a vegetable serving at lunch this week') — "
+    "never 'you', never an imperative, no undated figure. This is the only commitment "
+    "text a visitor sees.\n\n"
     "12. **public_summary**: The coach's read rewritten for VISITORS to the public "
     "website — an audience reading ABOUT the subject's experiment, not the subject "
     "himself (2 short paragraphs, ~120-180 words). Speak AS the coach in first "
@@ -127,8 +132,17 @@ EXTRACTION_SYSTEM_PROMPT = (
     "no name-as-salutation ('Matthew — …'), no imperatives aimed at him. Say what "
     "the data showed, what concerns or encourages you, and what you have asked him "
     "to do — reported ('I've asked him to…'), never commanded. Keep the most "
-    "important data point. This is the ONLY field served to site visitors; the "
-    "others speak to the subject directly.\n\n"
+    "important data point WITH ITS DAY OR WINDOW in words ('Friday, September 25', "
+    "never ISO; a figure the narrative did not date is dropped, never re-dated). "
+    "First sentence at most 25 words, carrying the finding-with-date or the ask. "
+    "Plain words — never EWMA, autocorrelation, etiology, gate, load-bearing, "
+    "contingent, interoception, slow-wave, n=; say 'running average', 'easy cardio', "
+    "'21 days of data'. Exactly one ask, as 'I've asked him to …'. This and "
+    "public_ask are the ONLY fields served to site visitors; the others speak to "
+    "the subject directly.\n\n"
+    "13. **public_ask**: the ONE thing the coach asked him to do this week, at most "
+    "25 words, third person ('I've asked him to add a vegetable serving at lunch this "
+    "week'), plain words, no undated figure. Null if nothing was asked.\n\n"
     "## Output Format\n\n"
     "Return ONLY valid JSON with the above fields. No markdown, "
     "no explanation, no preamble."
@@ -169,7 +183,7 @@ def build_extraction_message(coach_id, output_text, output_type, voice_spec):
         "Return ONLY valid JSON with fields: themes, structural_fingerprint, "
         "threads_opened, threads_referenced, predictions_made, commitments_made, "
         "decision_classes_used, anti_pattern_violations, observatory_summary, "
-        "key_recommendation, elena_quote, public_summary."
+        "key_recommendation, elena_quote, public_summary, public_ask."
     )
 
     return "\n".join(parts)

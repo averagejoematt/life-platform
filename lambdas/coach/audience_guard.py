@@ -128,15 +128,103 @@ def public_read(output_item):
     return value
 
 
+# Sentence boundary: terminal punctuation (optionally closed by a quote/bracket)
+# followed by whitespace. Deliberately simple — the producers write plain prose.
+_SENTENCE_END_RE = re.compile(r"(?<=[.!?])[\"'”’)\]]*\s+")
+
+# A first sentence longer than the card limit is served WHOLE up to this multiple of
+# the limit rather than cut mid-sentence (#4213 — "never mid-sentence"); beyond it the
+# prose is not a card blurb at all and the word-boundary cut is the lesser evil. The
+# producer's own first-sentence rule (≤ 25 words, task 12) is what keeps this rare.
+_WHOLE_SENTENCE_OVERRUN = 1.6
+
+
+def clip_at_sentence(text, limit=200) -> str:
+    """Clip `text` at the last sentence boundary at or before `limit` chars (#4213).
+
+    Never cuts mid-sentence: whole sentences are kept while they fit. A text already
+    within `limit` is returned stripped. When even the FIRST sentence is longer than
+    `limit`, that sentence is served whole if it fits `limit * 1.6`; only a runaway
+    first sentence past that falls back to the #1224 word-boundary cut.
+    """
+    if not text:
+        return ""
+    s = str(text).strip()
+    if len(s) <= limit:
+        return s
+    kept = ""
+    for m in _SENTENCE_END_RE.finditer(s):
+        candidate = s[: m.start()].strip()
+        if len(candidate) > limit:
+            break
+        kept = candidate
+    if kept:
+        return kept
+    first = _SENTENCE_END_RE.split(s, maxsplit=1)[0].strip()
+    if len(first) <= int(limit * _WHOLE_SENTENCE_OVERRUN):
+        return first
+    return truncate_at_word(s, limit)
+
+
 def public_blurb(output_item, limit=200) -> str:
-    """The card-sized public blurb: guard the FULL text first, truncate second.
+    """The card-sized public blurb: guard the FULL text first, clip second.
 
     Order is load-bearing — truncation can delete the very pronoun that makes a
     text an address, so a `check(truncate(x))` shape passes on a slice whose
-    source fails (#2972). Returns "" when no reader-safe text exists; the
-    front-ends' blurb renderers already drop empty entries honestly.
+    source fails (#2972). The clip is at a SENTENCE boundary (#4213), never
+    mid-sentence — see `clip_at_sentence`. Returns "" when no reader-safe text
+    exists; the front-ends' blurb renderers already drop empty entries honestly.
     """
     value = public_read(output_item)
     if not value:
         return ""
-    return truncate_at_word(value, limit)
+    return clip_at_sentence(value, limit)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4213 — the by-coach slots. #2972 guarded the door's blurb; one click deeper the
+# reader was served the owner's private letter in four more slots (the stance
+# `headline_read`, the daily read, the timeline summary, the commitment text). Each
+# now serves its PUBLIC twin or nothing — never the owner text.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def public_or_empty(text) -> str:
+    """A free-text slot served to a visitor: the text if reader-safe, else "".
+
+    For slots whose ONLY producer is now prompted for the public register (the
+    stance read, the daily read): a stored owner-directed value — a row written
+    before the prompt changed, or a drift — degrades to an empty slot.
+    """
+    return reader_safe(text) or ""
+
+
+def public_items(values) -> list:
+    """The list form of `public_or_empty`: owner-directed entries are dropped."""
+    if not isinstance(values, list):
+        return []
+    return [v for v in values if isinstance(v, str) and v.strip() and not is_owner_directed(v)]
+
+
+def public_ask(record):
+    """The record's PUBLIC ask (`public_ask`, extraction task 13 / task 11) or None.
+
+    Works for an OUTPUT# row (the ONE ask of that output) and a COMMITMENT# row (that
+    commitment's own reported twin). Reads ONLY `public_ask` — `key_recommendation`
+    and `commitment_natural` are the imperative owner register by design.
+    """
+    item = record or {}
+    return reader_safe(item.get("public_ask"))
+
+
+def public_timeline_summary(output_item, limit=200) -> str:
+    """The by-coach timeline line for one OUTPUT# row (#4213).
+
+    The public ask first (the timeline's line is "what the coach asked"), else the
+    sentence-clipped public read, else "" — `served_summary`'s `key_recommendation`
+    → `content` chain is the owner register and is never consulted here.
+    """
+    ask = public_ask(output_item)
+    if ask:
+        return clip_at_sentence(ask, limit)
+    return public_blurb(output_item, limit)

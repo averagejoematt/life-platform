@@ -148,9 +148,10 @@ def _stance_history(coach_id, limit=8, *, _g):
             out.append(
                 {
                     "as_of": it.get("as_of") or sk.replace("STANCE#", ""),
-                    "headline_read": it.get("headline_read", ""),
-                    "stage": it.get("stage", {}),
-                    "how_my_read_changed": it.get("how_my_read_changed", ""),
+                    # #4213: the trail is served to visitors — owner-directed reads degrade to "".
+                    "headline_read": audience_guard.public_or_empty(it.get("headline_read")),
+                    "stage": _public_stage(it.get("stage")),
+                    "how_my_read_changed": audience_guard.public_or_empty(it.get("how_my_read_changed")),
                 }
             )
     except Exception:
@@ -178,18 +179,32 @@ def _stance_held_since(coach_id, current_stage_label, *, _g):
     return held
 
 
+def _public_stage(stage):
+    """#4213: a stance `stage` dict with an owner-directed `rationale` blanked."""
+    stage = dict(stage) if isinstance(stage, dict) else {}
+    if "rationale" in stage:
+        stage["rationale"] = audience_guard.public_or_empty(stage.get("rationale"))
+    return stage
+
+
 def _stance_from_latest(latest):
     """Normalize a STANCE#latest record into the public stance shape (the
     evidence-derived branch of _stance_block; split out so the lead-tier coach
-    page (#1112) can prefer a real stance without the staff ladder fallback)."""
+    page (#1112) can prefer a real stance without the staff ladder fallback).
+
+    #4213: every prose field is served to site VISITORS on /coaching/by-coach/, so
+    each passes `audience_guard` — the producer (coach_history_summarizer's
+    STANCE_SYSTEM_PROMPT) now writes the third-person register, and a stored
+    second-person read ("You're still operating under…", a row written before
+    that) degrades to an empty slot, never the owner's letter."""
     return {
         "source": "stance",
-        "headline_read": latest.get("headline_read", ""),
-        "focused_on_now": latest.get("focused_on_now", []),
-        "set_aside_for_now": latest.get("set_aside_for_now", []),
-        "stage": latest.get("stage", {}) or {},
-        "how_my_read_changed": latest.get("how_my_read_changed", ""),
-        "confidence_note": latest.get("confidence_note", ""),
+        "headline_read": audience_guard.public_or_empty(latest.get("headline_read")),
+        "focused_on_now": audience_guard.public_items(latest.get("focused_on_now", [])),
+        "set_aside_for_now": audience_guard.public_items(latest.get("set_aside_for_now", [])),
+        "stage": _public_stage(latest.get("stage")),
+        "how_my_read_changed": audience_guard.public_or_empty(latest.get("how_my_read_changed")),
+        "confidence_note": audience_guard.public_or_empty(latest.get("confidence_note")),
         "as_of": latest.get("as_of"),
         "grounding_flag": bool(latest.get("grounding_flag")),
     }
@@ -221,10 +236,14 @@ def _stance_block(coach_id, weight_lbs, *, _g):
     rung = rung or {}
     return {
         "source": "ladder",
-        "headline_read": rung.get("read_of_him", ""),
-        "focused_on_now": rung.get("cares_most", []),
-        "set_aside_for_now": rung.get("cares_less_right_now", []),
-        "stage": {"label": rung.get("headline") or rung.get("stage_id"), "rationale": rung.get("read_of_him", "")},
+        # #4213: the authored ladder is guarded like the stance it stands in for.
+        "headline_read": audience_guard.public_or_empty(rung.get("read_of_him")),
+        "focused_on_now": audience_guard.public_items(rung.get("cares_most", [])),
+        "set_aside_for_now": audience_guard.public_items(rung.get("cares_less_right_now", [])),
+        "stage": {
+            "label": rung.get("headline") or rung.get("stage_id"),
+            "rationale": audience_guard.public_or_empty(rung.get("read_of_him")),
+        },
         "how_my_read_changed": "",
         "confidence_note": "",
         "as_of": None,

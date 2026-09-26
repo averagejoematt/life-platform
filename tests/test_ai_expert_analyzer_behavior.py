@@ -1409,7 +1409,9 @@ class TestGenerateSynthesis:
         p = m.prompts[0]
         assert f"experiment day_n = {DAY_N}" in p
         assert "logged training sessions (last 30d, Hevy + Strava) = 2" in p
-        assert "food-log days (last 30d) = 1" in p
+        # #4185: the food-log count is the SERVED logging record (health.nutrition_logging, the
+        # /api/nutrition_overview derivation) — its window and its last log, never a second counter.
+        assert f"food-log days since {GENESIS} = 1; last food log = {TODAY}" in p
 
     def test_the_counts_carry_an_explicit_no_arithmetic_rule(self, synth_env, model):
         m = model(SYNTH_JSON)

@@ -21,10 +21,12 @@ the split, and it is why nothing here imports the facade — no import cycle.
 
 from boto3.dynamodb.conditions import Key
 from coach import (
+    audience_guard,  # #4213: the by-coach slots serve the public twin or nothing
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
-    coach_derived_prose,  # #2418: the derived-prose read seam — a held condensation falls back to gated `content`
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
+    latest_checked,  # E1 / #4182: the ledger line — the coach's most recent GRADED call, audience-guarded
+    lead_daily_read,  # #4188: the head coach's daily grounded lead read (LEAD_DAILY# rows)
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
@@ -344,7 +346,9 @@ def _coach_daily(coach_id, *, _g):
     _load_s3_json = _g["_load_s3_json"]
     doc = _load_s3_json("generated/coach_daily.json", "coach_daily")
     r = (doc.get("reflections") or {}).get(coach_id)
-    return r.get("text") if isinstance(r, dict) else None
+    # #4213: served to visitors — an owner-directed reflection (an artifact written
+    # before the producer's third-person rule, or a drift) is withheld, never served.
+    return audience_guard.reader_safe(r.get("text")) if isinstance(r, dict) else None
 
 
 def _coach_memoir(coach_id, *, _g):
@@ -375,8 +379,14 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
             out.append(
                 {
                     "date": it.get("sk", "").replace("OUTPUT#", "").split("#")[0],
-                    "summary": coach_derived_prose.served_summary(it),
+                    # #4213: the public ask / public read — NEVER served_summary's
+                    # key_recommendation→content chain (the imperative owner register).
+                    "summary": audience_guard.public_timeline_summary(it),
                     "themes": it.get("themes", []),
+                    # #4185: every coach read carries when it was written AND the last data
+                    # day it was written from (null on records that predate the stamp).
+                    "generated_at": it.get("created_at"),
+                    "data_through": it.get("data_through"),
                 }
             )
     except Exception:
@@ -554,6 +564,7 @@ def handle_coaches(event, *, _g):
                     "board_role": p.get("board_role"),
                     "headline_stat": headline,
                     "tier": "staff",
+                    "latest_checked": latest_checked.for_coach(_g["table"], pid),
                 }
             )
         coaches.sort(key=lambda c: order.index(c["persona_id"]) if c["persona_id"] in order else 99)
@@ -574,6 +585,7 @@ def handle_coaches(event, *, _g):
                     "board_role": lead.get("board_role"),
                     "headline_stat": "runs the program",
                     "tier": "lead",
+                    "latest_checked": None,  # E1: the lead makes no graded calls — null, never a placeholder
                 },
             )
         return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
@@ -617,6 +629,7 @@ def handle_coach(event, *, _g):
         if not p or not (p.get("operational") or is_lead):
             return _error(404, "Unknown coach")
         weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
+        lead_daily = lead_daily_read.latest_served(_g["table"]) if is_lead else None
         if is_lead:
             # No weight-band ladder config exists for the lead and the opinion
             # engine writes him no weekly stance — the staff ladder fallback would
@@ -647,6 +660,8 @@ def handle_coach(event, *, _g):
                 # cast sheet, labelled as authored fiction-design by its own disclosure.
                 "trait_scores": coach_traits.traits_for(pid),
                 "working_hypotheses": _working_hypotheses(pid),
+                # E1 / #4182: "On <date> I said <claim> — it came in at <value>" (null when none graded).
+                "latest_checked": latest_checked.for_coach(_g["table"], pid),
                 "stance": stance,
                 "stance_history": _stance_history(pid),
                 # The lead has no generation voice spec (config/coaches/{id}.json) —
@@ -665,7 +680,11 @@ def handle_coach(event, *, _g):
                 # #1387: the dossier — what this coach knows, verbatim from COACH#
                 # memory (privacy-filtered, correction-aware, no LLM in the path).
                 "dossier": _dossier_block(pid),
-                "daily": _coach_daily(pid),
+                # #4188: the lead's daily read lives in its own LEAD_DAILY# row (the CC-08
+                # reflection batch covers staff only). `daily` keeps its string type for
+                # every consumer; `lead_daily` carries the text WITH its cited block.
+                "daily": (lead_daily or {}).get("text") if is_lead else _coach_daily(pid),
+                "lead_daily": lead_daily,
                 "memoir": _coach_memoir(pid),
             },
             cache_seconds=300,

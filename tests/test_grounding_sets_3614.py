@@ -282,7 +282,8 @@ def test_every_prompt_builder_with_its_own_phase_prose_is_decided():
 
 def test_the_census_finds_the_modules_it_is_supposed_to_find():
     """A census whose corpus is empty passes for free. Pin that it really does reach
-    the tree and really does classify — three members, measured 2026-09-18."""
+    the tree and really does classify — three members measured 2026-09-18, a fourth (coach_chat, a
+    vocabulary rule naming the retired word "reset", #4182) recorded 2026-09-26."""
     members = census.scan_tree()
     assert members, "the phase census found NO members — the scan is not reaching lambdas/"
     assert set(members) == set(census.DECISIONS), sorted(set(members) ^ set(census.DECISIONS))

@@ -532,8 +532,8 @@ def coaching_read_block_html(read: dict) -> str:
         return (
             '<noscript><section class="proof-static dx-prose" aria-label="The coaching — awaiting the first read">'
             f'<p class="label">The coaching — as of {_esc(read.get("as_of", ""))}</p>'
-            "<p>The cycle is under way, but the board hasn't published its first read of this run's data yet — "
-            "each coach reads only this cycle's numbers, and the first take lands once the daily computes have "
+            "<p>The experiment is under way, but the board hasn't published its first read of its data yet — "
+            "each coach reads only the experiment's own numbers, and the first take lands once the daily computes have "
             "something real to argue about.</p>"
             '<p>Meanwhile: <a href="/coaching/by-coach/">who the coaches are</a> · '
             '<a href="/coaching/scorecard/">how their calls get graded</a>.</p>'

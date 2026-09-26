@@ -220,6 +220,7 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 from ai import grounded_generation as _gg
 from ai.behavior_logs import available_logs_from_recency as _avail_logs  # #2056 — the #1699 map
 from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
+from coach import coach_input_facts as _ci  # #4185: the served logging record, PT sleep instants, the served-fact check
 from common.digest_utils import filter_day_rows  # #3442: day rows only — nights_tracked counted #WORKOUT# fragments
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
@@ -340,6 +341,8 @@ def gather_data_for_expert(expert_key):
             "days_tracked": len(items),
             "zero_calorie_days": zero_cal_days,
             "recency_note": _recency_note,
+            # #4185: the SERVED logging record (/api/nutrition_overview's own derivation) — authoritative over the counts above.
+            "logging_record": (_ci.served_run_facts({"date": today}, table=table, today=today) or {}).get("nutrition"),
         }
 
     elif expert_key == "training":
@@ -551,7 +554,7 @@ def gather_data_for_expert(expert_key):
             "avg_hrv": avg(hrv_vals),
             "avg_deep_pct": avg(deep_pcts),
             "avg_rem_pct": avg(rem_pcts),
-            "sleep_onset_times": sleep_starts[-7:],
+            "sleep_onset_times": _ci.localize_sleep_instants({"sleep_onset_times": sleep_starts[-7:]})["sleep_onset_times"],  # #4185: PT
         }
 
     return {"expert_key": expert_key, "note": "Unknown expert"}
@@ -1046,8 +1049,12 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
     if available_logs is None:
         available_logs = _presence_logs(gen_date_iso)
 
+    _served = _ci.served_run_facts(
+        {"date": gen_date_iso}, table=table, today=gen_date_iso
+    )  # #4185: cited protein/days-logged/gap vs served
+
     def _findings_fn(_t):
-        return _gg.grounding_findings(
+        return _ci.served_fact_findings(_t, _served) + _gg.grounding_findings(
             _t,
             facts=facts,
             allowed=allowed,
@@ -1417,7 +1424,11 @@ def generate_synthesis(all_coach_outputs):
         _d30 = max((_now - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
         _n_sessions = len(_query_source("hevy", _d30, _today_str)) + len(_query_source("strava", _d30, _today_str))
         _count_bits.append(f"logged training sessions (last 30d, Hevy + Strava) = {_n_sessions}")
-        _count_bits.append(f"food-log days (last 30d) = {len(_item_dates(_query_source('macrofactor', _d30, _today_str)))}")
+        _nr = (_ci.served_run_facts({"date": _today_str}, table=table, today=_today_str) or {}).get("nutrition")  # #4185: THE served record
+        if _nr:
+            _count_bits.append(
+                f"food-log days since {_nr.get('window_start')} = {_nr.get('days_logged')}; last food log = {_nr.get('latest_log_date')}"
+            )
         _sig = _load_engagement_signal()
         for _src, _det in sorted((_sig.get("channel_detail") or {}).items()):
             if not isinstance(_det, dict):
@@ -1489,6 +1500,7 @@ def generate_synthesis(all_coach_outputs):
             "cross_domain_notes": synthesis.get("cross_domain_notes", {}),
             "disagreements": synthesis.get("disagreements", []),
             "generated_at": now.isoformat(),
+            "data_through": pacific_today(),  # #4185: the last data day the weekly call read (its window ends today, PT)
             # #2811: week_number counts PACIFIC days since genesis (`now` stays UTC — it is an instant)
             "week_number": max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days // 7 + 1),
             "ttl": ttl,

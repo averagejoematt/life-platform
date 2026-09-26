@@ -10,8 +10,8 @@ the loop around it. These tests hold the three properties the issue actually bou
 2. **One position, one signal** — the station the wayfinder marks is the door the page's
    own doors nav marks. Nav, `.loop-forward` close and footer are keyed off one detected
    value in `v4_apply_chrome.py`, so they can never disagree about where the reader is.
-3. **The footer pour is pinned** — since #4182 the mega-menu is exactly the 23 page links
-   of the 25-page reach set (the pre-#1475 "removed nothing" subset pin was reversed then).
+3. **The footer pour is pinned** — since #4182 the mega-menu is exactly the 22 page links
+   of the 24-page reach set (/story/attempts/ left it 2026-09-26, the cycle-count ruling; the pre-#1475 "removed nothing" subset pin was reversed then).
 
 Plus the two invariants that fail SILENTLY if broken: the station cycle must stay in step
 with `v4_chrome.NEXT_STATION` (otherwise the map and the close propose different next
@@ -63,7 +63,7 @@ FOOTER_LINKS_4182 = {
     "/story/",
     "/story/journal/",
     "/story/panel/",
-    "/story/attempts/",
+    # "/story/attempts/" left the footer 2026-09-26 (#4182 owner ruling: the cycle count is internal)
     "/story/about/",
     # how it's built
     "/method/",
@@ -131,11 +131,11 @@ def test_column_stations_are_the_four_causal_stages():
 
 
 def test_wayfinding_kept_every_footer_link():
-    """The mega-menu carries exactly the 23 page links of the #4182 pour (plus the social marks)."""
+    """The mega-menu carries exactly the 22 page links of the #4182 pour (plus the social marks)."""
     menu = MENU_RE.search(v4_chrome.site_footer()).group(0)
     hrefs = HREF_RE.findall(menu)
     pages = [h for h in hrefs if h not in SOCIAL_HREFS]
-    assert len(pages) == len(set(pages)) == 23, f"the footer pour must be 23 distinct page links, got {len(pages)}: {pages}"
+    assert len(pages) == len(set(pages)) == 22, f"the footer pour must be 22 distinct page links, got {len(pages)}: {pages}"
     assert set(pages) == FOOTER_LINKS_4182, (
         f"footer drifted from the #4182 pour — added {sorted(set(pages) - FOOTER_LINKS_4182)}, "
         f"dropped {sorted(FOOTER_LINKS_4182 - set(pages))}"

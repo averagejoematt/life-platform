@@ -1,0 +1,155 @@
+{
+ "_provenance": "GET https://averagejoematt.com/api/nutrition_overview, served 2026-09-26T16:46:44Z (Session AV site audit, #4185). Trimmed to the fields #4185's fixtures read.",
+ "nutrition": {
+  "avg_protein_g": 153.3,
+  "days_logged": 20,
+  "latest_date": "2026-09-25",
+  "as_of": "2026-09-25",
+  "today_pending": true,
+  "lag_days": 1,
+  "stalled": false,
+  "pro_7d_avg": 159.8
+ },
+ "nutrition_trend": [
+  {
+   "date": "2026-09-06",
+   "calories": 2142,
+   "protein_g": 131.0,
+   "carbs_g": 160.0,
+   "fat_g": 108.0
+  },
+  {
+   "date": "2026-09-07",
+   "calories": 1463,
+   "protein_g": 141.0,
+   "carbs_g": 150.0,
+   "fat_g": 36.0
+  },
+  {
+   "date": "2026-09-08",
+   "calories": 1916,
+   "protein_g": 171.0,
+   "carbs_g": 201.0,
+   "fat_g": 73.0
+  },
+  {
+   "date": "2026-09-09",
+   "calories": 1703,
+   "protein_g": 170.0,
+   "carbs_g": 164.0,
+   "fat_g": 69.0
+  },
+  {
+   "date": "2026-09-10",
+   "calories": 1078,
+   "protein_g": 168.0,
+   "carbs_g": 60.0,
+   "fat_g": 18.0
+  },
+  {
+   "date": "2026-09-11",
+   "calories": 1588,
+   "protein_g": 116.0,
+   "carbs_g": 151.0,
+   "fat_g": 64.0
+  },
+  {
+   "date": "2026-09-12",
+   "calories": 1165,
+   "protein_g": 91.0,
+   "carbs_g": 156.0,
+   "fat_g": 24.0
+  },
+  {
+   "date": "2026-09-13",
+   "calories": 2011,
+   "protein_g": 245.0,
+   "carbs_g": 84.0,
+   "fat_g": 94.0
+  },
+  {
+   "date": "2026-09-14",
+   "calories": 1276,
+   "protein_g": 105.0,
+   "carbs_g": 110.0,
+   "fat_g": 53.0
+  },
+  {
+   "date": "2026-09-15",
+   "calories": 1116,
+   "protein_g": 90.0,
+   "carbs_g": 148.0,
+   "fat_g": 40.0
+  },
+  {
+   "date": "2026-09-16",
+   "calories": 1573,
+   "protein_g": 215.0,
+   "carbs_g": 102.0,
+   "fat_g": 46.0
+  },
+  {
+   "date": "2026-09-17",
+   "calories": 1293,
+   "protein_g": 139.0,
+   "carbs_g": 49.0,
+   "fat_g": 56.0
+  },
+  {
+   "date": "2026-09-18",
+   "calories": 1804,
+   "protein_g": 179.0,
+   "carbs_g": 114.0,
+   "fat_g": 80.0
+  },
+  {
+   "date": "2026-09-19",
+   "calories": 1656,
+   "protein_g": 147.0,
+   "carbs_g": 161.0,
+   "fat_g": 53.0
+  },
+  {
+   "date": "2026-09-20",
+   "calories": 1229,
+   "protein_g": 139.0,
+   "carbs_g": 77.0,
+   "fat_g": 48.0
+  },
+  {
+   "date": "2026-09-21",
+   "calories": 1829,
+   "protein_g": 146.0,
+   "carbs_g": 125.0,
+   "fat_g": 78.0
+  },
+  {
+   "date": "2026-09-22",
+   "calories": 1358,
+   "protein_g": 164.0,
+   "carbs_g": 45.0,
+   "fat_g": 63.0
+  },
+  {
+   "date": "2026-09-23",
+   "calories": 1925,
+   "protein_g": 186.0,
+   "carbs_g": 178.0,
+   "fat_g": 78.0
+  },
+  {
+   "date": "2026-09-24",
+   "calories": 1661,
+   "protein_g": 142.0,
+   "carbs_g": 115.0,
+   "fat_g": 77.0
+  },
+  {
+   "date": "2026-09-25",
+   "calories": 1761,
+   "protein_g": 182.0,
+   "carbs_g": 86.0,
+   "fat_g": 71.0
+  }
+ ]
+}

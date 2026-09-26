@@ -747,6 +747,114 @@ register(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PAIR 9 — the ledger line (E1, epic #4182)
+#   coach.prediction_emission.build_prediction_record
+#     + coach.coach_prediction_evaluator._update_prediction_status (the grade, in place)
+#   ->  coach.latest_checked.for_coach  (served as `latest_checked` on /api/coach/<id>
+#       and every /api/coaches roster entry)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class _GradingTable:
+    """Holds one PREDICTION# row and applies the evaluator's own ``update_item`` to it —
+    the SET values are the real grader's, only the storage is faked. ``query`` hands the
+    stored row back the way a Query page would (the consumer's status/phase filtering is
+    its own client-side re-check, so it is exercised here, not assumed)."""
+
+    _SET = {":status": "status", ":outcome": "outcome", ":odate": "outcome_date", ":notes": "outcome_notes"}
+
+    def __init__(self, row):
+        self.row = dict(row)
+
+    def update_item(self, Key=None, ExpressionAttributeValues=None, **_kw):  # noqa: N803
+        assert Key == {"pk": self.row["pk"], "sk": self.row["sk"]}, "the grader wrote to a different row"
+        for placeholder, attr in self._SET.items():
+            self.row[attr] = (ExpressionAttributeValues or {})[placeholder]
+        return {}
+
+    def query(self, **_kw):
+        return {"Items": [dict(self.row)]}
+
+
+def _produce_latest_checked():
+    from coach import coach_prediction_evaluator as ev
+    from coach.prediction_emission import build_prediction_record
+
+    day = _in_cycle_day(3)
+    graded_on = _in_cycle_day(17)
+    spec = {"type": "machine", "metric": "hrv_7day_avg", "condition": ">=", "threshold": 50, "window_days": 14}
+    row = build_prediction_record("sleep_coach", day, "Matthew's 7-day HRV average will reach 50 ms.", spec, 0.6, "coach_read")
+    table = _GradingTable(row)
+    real_table = ev.table
+    ev.table = table
+    try:
+        ev._update_prediction_status(
+            row,
+            {
+                "prediction_id": row["prediction_id"],
+                "status": "confirmed",
+                "evaluated_date": graded_on,
+                "actual_value": 51.73,
+                "reason": "r",
+            },
+        )
+    finally:
+        ev.table = real_table
+    assert table.row["status"] == "confirmed", "the grader's write-back did not land — no graded payload to contract on"
+    return table.row
+
+
+def _consume_latest_checked(row):
+    from coach import latest_checked
+
+    class _One:
+        def query(self, **_kw):
+            return {"Items": [dict(row)]}
+
+    return latest_checked.for_coach(_One(), "sleep_coach")
+
+
+def _agree_latest_checked(produced, consumed):
+    assert consumed is not None, "a graded row produced no ledger line"
+    notes = json.loads(produced["outcome_notes"])
+    assert consumed["prediction_id"] == produced["prediction_id"]
+    assert consumed["claim"] == produced["claim_natural"], "the guarded claim is not the coach's own words"
+    assert consumed["created_date"] == produced["created_date"]
+    assert consumed["outcome_date"] == produced["outcome_date"]
+    assert consumed["status"] == produced["status"]
+    assert consumed["metric"] == produced["evaluation"]["metric"]
+    assert consumed["eval_type"] == produced["evaluation"]["type"], "a slope must never be quoted as a level"
+    assert consumed["condition"] == produced["evaluation"]["condition"]
+    assert consumed["threshold"] == produced["evaluation"]["threshold"]
+    assert consumed["actual_value"] == notes["actual_value"], "the served value is not the grader's resolved value"
+
+
+register(
+    PairContract(
+        name="coach PREDICTION# graded row -> ledger line (latest_checked)",
+        producer="coach.coach_prediction_evaluator::_update_prediction_status",
+        consumer="coach.latest_checked::for_coach",
+        partition=None,  # COACH# rows are outside the ADR-077 USER#…#SOURCE# partition census
+        produce=_produce_latest_checked,
+        consume=_consume_latest_checked,
+        agree=_agree_latest_checked,
+        mutations=(
+            Mutation(("outcome_date",), "drop", why="the graded date — a row without it is not a checked call"),
+            Mutation(("status",), "retype", to="pending", why="an undecided call must never become a ledger line"),
+            Mutation(("claim_natural",), "rename", to="claim", why="the emitter's claim key the line quotes"),
+            Mutation(("outcome_notes",), "drop", why="the grader's JSON carrying actual_value"),
+            Mutation(("evaluation", "metric"), "drop", why="the metric the value is read against"),
+        ),
+        note=(
+            "E1 / epic #4182 (v7 rebuild): 'On <date> I said <claim> — it came in at <value>'. The grade lives on "
+            "the PREDICTION# row itself (status/outcome_date/outcome_notes, written by _update_prediction_status); "
+            "the LEARNING# row is a second write of the same grade and is deliberately not joined."
+        ),
+    )
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # THE FLOOR — pairs this platform KNOWS must agree.
 #
 # Sourced from the #2813 follow-up disposition and the two contracts built this
@@ -769,11 +877,13 @@ KNOWN_MUST_AGREE_PAIRS = (
     # now root-caused, fixed, and enrolled.
     "computed_metrics -> site-stats-refresh tier0_streak",
     "ai_analysis EXPERT# -> observatory card journaling prompt",
+    # E1 / #4182 — the v7 coaches page's ledger line.
+    "coach PREDICTION# graded row -> ledger line (latest_checked)",
 )
 
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 8
+ENROLLED_FLOOR = 9
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]

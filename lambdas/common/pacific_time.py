@@ -140,6 +140,29 @@ def pacific_date_of(iso_ts: str) -> str | None:
     return dt.astimezone(PACIFIC).strftime("%Y-%m-%d") if dt else None
 
 
+def pacific_clock_label(iso_ts, with_day: bool = False) -> str | None:
+    """A UTC (or offset) ISO INSTANT rendered as a labelled Pacific wall-clock time —
+    ``"9:45 PM PT"``, or ``"Sep 23, 9:45 PM PT"`` with ``with_day`` (#4185).
+
+    Why this exists: a Whoop ``sleep_start`` is a UTC instant, and a bedtime handed to a
+    model as ``2026-09-24T04:45:00Z`` (or its bare ``"04:45"`` clock) is read as a 4:45 AM
+    onset — the weekly integrator built a "median ~4:45 AM vs 11 PM anchor" tension out of
+    a 9:45 PM PT bedtime. The label names its zone, so it cannot be re-read as UTC.
+
+    Only an INSTANT is converted: a value with no time part (a bare ``YYYY-MM-DD`` day) is
+    a calendar day, not an instant, and returns None — as does anything unparseable. The
+    caller decides the fallback (the ``parse_iso_utc`` contract).
+    """
+    if not iso_ts or "T" not in str(iso_ts):
+        return None
+    dt = parse_iso_utc(iso_ts)
+    if dt is None:
+        return None
+    local = dt.astimezone(PACIFIC)
+    clock = f"{local.hour % 12 or 12}:{local.minute:02d} {'AM' if local.hour < 12 else 'PM'} PT"
+    return f"{local.strftime('%b')} {local.day}, {clock}" if with_day else clock
+
+
 def parse_day_key(date_str: str) -> date | None:
     """Parse a ``YYYY-MM-DD`` day key into a ``date``. THE calendar-day parse (#3741).
 
@@ -187,6 +210,22 @@ def shift_day_key(date_str: str, days: int) -> str:
     """
     d = parse_day_key(date_str)
     return (d + timedelta(days=days)).isoformat() if d else date_str
+
+
+def day_in_words(date_str: str, weekday: bool = True) -> str:
+    """A ``YYYY-MM-DD`` day key the way a person reads it: "Sunday, June 14" (#4182).
+
+    THE words form for a day key on a human surface (the daily brief, the data-status
+    banner). The reader-vocabulary ruling (``site/data/glossary.json``, "as of") is dates in
+    words, never ISO and never "as of"; this is the one server-side spelling so two lines of
+    the same email cannot disagree on the form. ``weekday=False`` drops the day name
+    ("June 14"). Returns ``date_str`` unchanged when it is not a parseable day key, matching
+    ``shift_day_key``'s day-key-in contract rather than raising into a render.
+    """
+    d = parse_day_key(date_str)
+    if d is None:
+        return date_str
+    return (d.strftime("%A") + ", " if weekday else "") + d.strftime("%B") + " " + str(d.day)
 
 
 def pacific_day_n(start_date: str, on_date: str | None = None) -> int:

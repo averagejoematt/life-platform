@@ -71,7 +71,7 @@ function overlaySVG(cycles) {
   }).join("");
 
   const legend =
-    `<text class="att-tick" x="${PADL}" y="${PADT - 14}">every attempt, aligned at day 1 — × collapsed · ↺ re-anchored · ▶ live</text>`;
+    `<text class="att-tick" x="${PADL}" y="${PADT - 14}">every attempt, aligned at day 1 — × ended · ↺ restarted · ▶ running</text>`;
 
   return `<svg class="att-svg" viewBox="0 0 ${W} ${H}" role="img" preserveAspectRatio="xMidYMid meet" ` +
     `aria-label="All attempts overlaid on the same day axis">${axis}${legend}${rows}</svg>`;

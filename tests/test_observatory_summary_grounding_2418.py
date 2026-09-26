@@ -52,7 +52,11 @@ DIRECT_READERS = frozenset(
 # The three that ended at `or ""` and now go through the shared read seam.
 HELPER_READERS = frozenset(
     {
-        "lambdas/web/site_api_coach_profile.py",
+        # site_api_coach_profile LEFT this set deliberately (#4213): its one read was the
+        # by-coach timeline's `recent_outputs[].summary`, served to site VISITORS — it now
+        # serves ONLY the audience-guarded public ask / public read
+        # (coach/audience_guard.public_timeline_summary). served_summary's
+        # key_recommendation → content chain is the owner register (#2972's class).
         "lambdas/emails/coach_panel_podcast_lambda.py",
         "lambdas/compute/coach_daily_reflection_lambda.py",
     }
@@ -129,10 +133,11 @@ class TestTheSixServingPaths:
             assert "coach_derived_prose.served_summary(" in source, f"{rel} no longer uses the shared derived-prose read seam"
             assert 'observatory_summary") or ""' not in source, f"{rel} still ends its chain at the empty string"
 
-    def test_the_census_is_five_paths(self):
+    def test_the_census_is_four_paths(self):
         # Six until #2972 moved site_api_lambda's dashboard blurb slot off
-        # observatory_summary entirely (see the DIRECT_READERS note above).
-        assert len(DIRECT_READERS | HELPER_READERS) == 5
+        # observatory_summary entirely (see the DIRECT_READERS note above); five until
+        # #4213 moved site_api_coach_profile's timeline slot to the public register.
+        assert len(DIRECT_READERS | HELPER_READERS) == 4
 
     def test_a_held_record_still_serves_the_gated_narrative(self):
         """The whole point of the fallback: HOLD degrades, it does not blank."""
@@ -275,9 +280,10 @@ class TestRegenerateOrHold:
 class TestTheHoldIsScopedToTheArtifact:
     def test_hold_nulls_only_the_derived_prose(self):
         held = coach_derived_prose.hold({"observatory_summary": "x", "key_recommendation": "y", "themes": ["a"], "content": "n"})
-        # The whole set — four since #2972 added public_summary — derived, not hand-counted.
+        # The whole set — four since #2972 added public_summary, five since #4213 added
+        # public_ask — derived, not hand-counted.
         assert [held[f] for f in coach_derived_prose.DERIVED_PROSE_FIELDS] == [None] * len(coach_derived_prose.DERIVED_PROSE_FIELDS)
-        assert len(coach_derived_prose.DERIVED_PROSE_FIELDS) == 4
+        assert len(coach_derived_prose.DERIVED_PROSE_FIELDS) == 5
         assert held["themes"] == ["a"] and held["content"] == "n"
 
     def test_hold_does_not_mutate_the_caller(self):

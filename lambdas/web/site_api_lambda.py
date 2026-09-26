@@ -757,6 +757,9 @@ def _dispatch_route(event, path, method):
                 "coach_title": _cd_lead_title,
                 "generated_at": None,
                 "as_of_day_n": None,
+                # #4185 / #4163: the last data day the weekly call was written from — the
+                # door labels a weekly read as weekly instead of serving it as current.
+                "data_through": None,
             }
             try:
                 _cd_int = _integrator_digest()  # #946: tombstone/phase-guarded
@@ -764,6 +767,7 @@ def _dispatch_route(event, path, method):
                     _cd_priority["text"] = _cd_int.get("analysis", "")
                     _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
                     _cd_priority["as_of_day_n"] = _as_of_day_n(_cd_priority["generated_at"], EXPERIMENT_START)
+                    _cd_priority["data_through"] = _cd_int.get("data_through")
             except Exception:
                 pass
 
@@ -787,7 +791,9 @@ def _dispatch_route(event, path, method):
                     except Exception:
                         continue  # one coach's dossier failing must not blank the board
                     for _cd_commit in _cd_dossier.get("commitments", []) or []:
-                        if _cd_commit.get("status") != "pending":
+                        # #4213: `text` is the commitment's PUBLIC twin (coach_dossier) — a
+                        # commitment with none is not an ask a visitor can be shown.
+                        if _cd_commit.get("status") != "pending" or not _cd_commit.get("text"):
                             continue
                         _cd_actions.append(
                             {
@@ -845,6 +851,9 @@ def _dispatch_route(event, path, method):
                 # None (unknown) until an OUTPUT# with a parseable timestamp is found;
                 # coachAsOf renders nothing for an unknown day, never a guess.
                 coach_entry["analysis_as_of_day_n"] = None
+                # #4185: the last data day the read was written from (OUTPUT#.data_through,
+                # coach_state_updater). None = the record predates the stamp — unknown.
+                coach_entry["analysis_data_through"] = None
 
                 # Latest output for position_summary
                 try:
@@ -882,6 +891,7 @@ def _dispatch_route(event, path, method):
                                 _cd_asof = _cd_sk_parts[1]
                         coach_entry["analysis_generated_at"] = _cd_asof
                         coach_entry["analysis_as_of_day_n"] = _as_of_day_n(_cd_asof, EXPERIMENT_START)
+                        coach_entry["analysis_data_through"] = _cd_out_item.get("data_through")
                         # #2575: the cockpit's reading AT PUBLICATION, frozen with the
                         # narrative (coach/published_vitals.py). Absent on records
                         # written before that stamp shipped — the nightly cross-surface
@@ -954,9 +964,18 @@ def _dispatch_route(event, path, method):
                 else None
             )
 
+            # #4188: the head coach's DAILY lead read (coach.lead_daily_read) — what the door
+            # opens on when it is under 24 h old; absent (None) until the first row lands.
+            from coach import lead_daily_read as _cd_lead_mod
+
+            _cd_lead_daily = _cd_lead_mod.latest_served(table)
+            if _cd_lead_daily:
+                _cd_lead_daily.update(coach_name=_cd_lead_name, coach_title=_cd_lead_title)
+
             return _ok(
                 {
                     "weekly_priority": _cd_priority,
+                    "lead_daily": _cd_lead_daily,
                     "open_actions": _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,

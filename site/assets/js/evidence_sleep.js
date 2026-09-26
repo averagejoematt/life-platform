@@ -185,7 +185,7 @@ export async function renderSleep(d) {
     let _stageNote = "";
     if (_stageDrawn && _stageN < 7) {
       _stageNote = _dayN <= 7
-        ? `<p class="rd-meta label">${_stageN} bars, not seven: this cycle is only ${_dayN} days old, so the window is clamped to it. It fills to a full week as the cycle runs.</p>`
+        ? `<p class="rd-meta label">${_stageN} bars, not seven: the experiment is only ${_dayN} days old, so the window is clamped to it. It fills to a full week as the experiment runs.</p>`
         : `<p class="rd-meta label">${_stageN} bars, not seven — the other nights in the window carry no stage data from Whoop. An absent night is left out rather than drawn as a zero.</p>`;
     }
     if (_stageN) parts.push(sec(_stageWindow, stackedDayColumns(_stageNights, [{ key: "deep", label: "deep", tone: "lift" }, { key: "rem", label: "REM", tone: "cardio" }, { key: "light", label: "light", tone: "mob" }], { label: "hours by stage · per night", legendUnit: "h", minPoints: 4, emptyMsg: "Stage composition draws in at 4+ nights." }) + _stageNote));
@@ -283,7 +283,7 @@ export function mindRestraint(vices, timeline) {
   const resetLine = reset.length
     ? `<p class="mr-reset label">${reset.length} restarting now — a reset isn't a failure shown in red, it's a restart; the cumulative days above still count.</p>` : "";
   return sec("Restraint — held, and held before",
-    `<div class="mr-cum"><span class="mr-cum-v num">${cumulative}</span><span class="mr-cum-k label">cumulative days of restraint held this cycle — a reset never erases them</span></div>` +
+    `<div class="mr-cum"><span class="mr-cum-v num">${cumulative}</span><span class="mr-cum-k label">cumulative days of restraint held since Day 1 — a reset never erases them</span></div>` +
     `<p class="rd-meta label">Across ${vices.length} private commitments (kept unnamed, on purpose), <strong>${held.length} held right now</strong>${longest ? `, the longest running ${longest} day${longest === 1 ? "" : "s"}` : ""}.</p>` +
     (heldChips ? `<div class="mr-chips">${heldChips}</div>` : "") +
     `<div class="mr-ladder" aria-label="restraint milestones">${ladder}</div>` +
@@ -300,7 +300,7 @@ export function mindInvitingAbsence(m) {
   if (moodN >= 4) return ""; // once mood accrues, the sparkline (P1/P2) takes over
   return sec("How it felt — the layer the machine can't see",
     `<div class="mi-absence"><p class="mi-lead">This is where how-it-felt goes. The machine has every number about the body this week — recovery, sleep, strain, the scale — and <em>nothing</em> about what any of it actually felt like.</p>` +
-    `<p class="mi-sub label">Nothing's logged this cycle yet, and that emptiness is the honest part of this page, not an error or a gap to scold. When there's a moment, one tap starts it — no streak to keep, no guilt for the days you don't.</p>` +
+    `<p class="mi-sub label">Nothing's logged since Day 1 yet, and that emptiness is the honest part of this page, not an error or a gap to scold. When there's a moment, one tap starts it — no streak to keep, no guilt for the days you don't.</p>` +
     `<div class="mi-entry"><button class="mi-cta" type="button" data-mind-entry>＋ note how today felt</button><span class="mi-entry-note label">the one-tap capture is being wired — this space is held for it</span></div></div>`);
 }
 

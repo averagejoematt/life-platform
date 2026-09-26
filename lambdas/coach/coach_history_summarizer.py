@@ -72,6 +72,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 # after it drifted to the RETIRED cast, but this hand-typed id LIST survived it;
 # tests/test_coach_roster_set_guard_2334.py now fails any module that grows its
 # own copy.
+from coach import audience_guard  # #4213: the stance read is a public-audience slot
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 
 ALL_COACH_IDS = list(OPERATIONAL_COACH_IDS)
@@ -1169,10 +1170,12 @@ STANCE_SYSTEM_PROMPT = (
     "previous stance — return an empty string.\n"
     "- 'stage' is a domain-appropriate sense of where he is in THIS domain's progression, derived "
     "from your read — NOT from his bodyweight.\n"
-    "- Write in the FIRST PERSON ('I'). Address him as 'you'. You ARE this coach.\n\n"
+    "- Write in the FIRST PERSON ('I'). You ARE this coach. This read is SERVED TO SITE VISITORS: refer to "
+    "him in the THIRD person (Matthew / he / his), never 'you', never a name-as-salutation. Plain words (no "
+    "EWMA, autocorrelation, etiology, gate). One paragraph; first sentence at most 25 words.\n\n"
     "## Output — return ONLY valid JSON, no markdown, no preamble:\n"
     "{\n"
-    '  "headline_read": "one tight paragraph: my current read of you, in my domain",\n'
+    '  "headline_read": "one tight paragraph: my current read of him, in my domain",\n'
     '  "focused_on_now": ["what I care most about right now (evidence-derived)"],\n'
     '  "set_aside_for_now": ["what I am deliberately not chasing yet"],\n'
     '  "stage": {"label": "short domain-appropriate stage name", "rationale": "why this stage, from my read"},\n'
@@ -1313,15 +1316,7 @@ def _sanitize_stance(stance, compressed, prior_stance):
 # excludes as_of/generated_at/coach_id/display_name/domain — those are
 # bookkeeping, not claims, and their timestamps (e.g. "12:34:56") would read as
 # fabricated numbers to a naive whole-dict scan.
-_STANCE_PROSE_FIELDS = (
-    "headline_read",
-    "focused_on_now",
-    "set_aside_for_now",
-    "stage",
-    "how_my_read_changed",
-    "confidence_note",
-    "evidence_basis",
-)
+_STANCE_PROSE_FIELDS = tuple(_STANCE_FIELDS)  # every stance field is prose (same keys, same order)
 
 
 def _stance_prose_blob(stance):
@@ -1340,8 +1335,8 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
     still cites an ungrounded number is never written over a good one.
 
     #2195: the #1699 ungrounded-behavioral class arms here too. The stance is a
-    second-person surface about Matthew BY PROMPT RULE ("Write in the FIRST PERSON
-    ('I'). Address him as 'you'"), and the prompt asks for "what I care most about
+    second-person surface about Matthew BY PROMPT RULE (until #4213 moved it to the
+    public third-person register — see the #1699 note in test_stance_behavioral_gate_2195), and the prompt asks for "what I care most about
     right now" — so a same-day completed-action claim ("you logged your meals today")
     is a shape this surface really can emit, and it is precisely the claim class no
     number or date gate can see. `presence_signal` is the engagement_state record the
@@ -1469,6 +1464,11 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
 
 def _write_stance(coach_id, stance):
     """Persist STANCE#{date} (immutable history) + STANCE#latest (the live pointer)."""
+    # #4213: `headline_read` is served to site visitors on /coaching/by-coach/, so it is
+    # persisted through the audience guard — an owner-directed read is held EMPTY. The
+    # guard runs HERE, at write, not before the ADR-104 gate: the gate must grade what
+    # the model actually wrote (the #1699 behavioral class reads second-person slips).
+    stance = dict(stance, headline_read=audience_guard.reader_safe(stance.get("headline_read"), coach_id, logger) or "")
     date = stance.get("as_of")
     ok_hist = _put_item({"pk": f"COACH#{coach_id}", "sk": f"STANCE#{date}", **stance})
     ok_latest = _put_item({"pk": f"COACH#{coach_id}", "sk": "STANCE#latest", **stance})

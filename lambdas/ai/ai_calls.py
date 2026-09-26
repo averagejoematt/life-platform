@@ -1208,15 +1208,22 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
         # callers (board_quality_gate.enforce) and the daily-brief caller
         # (_enforce_quality_gate below) route through this one function, so
         # the rule covers both surfaces from a single definition.
+        # #4185: the deterministic reader CHECK classes (absence premise, unit number not
+        # served, unlabeled window figure, raw instant, banned term; + the reader-slot
+        # classes when the brief names a slot) merge into the SAME report beside #1973.
+        # `merge_into_report` applies the cycle-boundary findings exactly as this block
+        # did inline (`cycle_boundary_violations` + passed=False), then the reader
+        # findings (`reader_check_findings`, each named by `check`, corrections appended
+        # to `suggestions`, which `_quality_gate_correction_note` already renders). The
+        # merge is total — each half fails soft on its own — and moved here to keep this
+        # size-ratcheted module (#1665) from growing.
         try:
+            from coach.reader_checks import merge_into_report as _rc_merge
             from web.board_quality_gate import cycle_boundary_violations as _cbv
 
-            _cb_findings = _cbv(output_text)
-            if _cb_findings:
-                payload["cycle_boundary_violations"] = _cb_findings
-                payload["passed"] = False
+            _rc_merge(payload, output_text, generation_brief, cycle_boundary=_cbv)
         except Exception as _cbv_e:
-            print(f"[COACH-QUALITY-GATE:{coach_id}] cycle-boundary check unavailable (non-blocking): {_cbv_e}")
+            print(f"[COACH-QUALITY-GATE:{coach_id}] cycle-boundary / reader checks unavailable (non-blocking): {_cbv_e}")
         return payload
     except Exception as e:
         print(f"[COACH-QUALITY-GATE:{coach_id}] sync invoke failed (fail-open, not blocking): {e}")
@@ -1259,6 +1266,11 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
+# #4185: coach inputs read the served facts (logging record, PT sleep instants), and the gate
+# below folds the served-fact check into the judge's report (`_ci.gated`). A late import, like
+# the one after it, so the size-ratcheted top-of-module block stays one line per module.
+from coach import coach_input_facts as _ci  # noqa: E402
+
 # #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
 # helper module beside it", not a baseline raise). Re-exported under its original name so
 # every caller and the #390 tests that monkeypatch `ai_calls._retain_coach_brief_flag`
@@ -1293,7 +1305,7 @@ def _enforce_quality_gate(
     named and #812's retention wiring missed (see `_retain_coach_brief_flag`).
     """
     original_draft = output_text
-    report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+    report = _ci.gated(_invoke_quality_gate_sync, lambda_client, coach_id, output_text, generation_brief)
     fired = not report.get("passed", True)
     attempts = 0
     while not report.get("passed", True) and attempts < max_regenerations:
@@ -1308,7 +1320,7 @@ def _enforce_quality_gate(
             print(f"[COACH-QUALITY-GATE:{coach_id}] regeneration attempt {attempts} returned empty — keeping prior draft")
             break
         output_text = regenerated
-        report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+        report = _ci.gated(_invoke_quality_gate_sync, lambda_client, coach_id, output_text, generation_brief)
 
     if not report.get("passed", True):
         print(
@@ -1611,7 +1623,10 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         except Exception as _tbl_e:
             print(f"[COACH-V2:{coach_id}] generation cache table unavailable (non-blocking): {_tbl_e}")
             _tbl = None
-        _gate = _in_gate.BriefCacheGate(lambda_client, _tbl, _cw, _CW_NAMESPACE, coach_id, output_type)
+        # #4185: THE input boundary — every coach's sleep instants in PT, the nutrition coach's
+        # logging record from the served derivation. Before the change-gate hashes domain_data.
+        domain_data = _ci.coach_inputs(coach_id, domain_data, data, table=_tbl)
+        _gate = _in_gate.BriefCacheGate(lambda_client, _tbl, _cw, _CW_NAMESPACE, coach_id, output_type, data_through=_ci.data_through(data))
         _reuse = _gate.check_upstream(
             domain_label, comp_results, domain_data, _data_inventory, corrections_block, voice_spec, pacific_today()
         )
@@ -1650,7 +1665,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         voice_rules = voice_spec.get("structural_voice_rules", {})
         decision_style = voice_spec.get("decision_style", {})
         anti_patterns = voice_spec.get("anti_pattern_detection", {})
-        brief = generation_brief.get("generation_brief", generation_brief)
+        brief = _ci.localize_sleep_instants(generation_brief.get("generation_brief", generation_brief))  # #4185: PT, never UTC
         voice_guidance = brief.get("voice_guidance", {})
 
         # #549: journal mood/connection signal — only present in the brief for the
@@ -1788,7 +1803,7 @@ AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
 DECISION CLASS CEILING: {brief.get('decision_class_ceiling', 'observational')}
 EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary framing.')}
 
-VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". Address Matthew directly as "you". Never refer to yourself in third person.
+VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". This narrative goes to Matthew alone — address him as "you" here. A reader-facing version is condensed from it and can add nothing, so obey the READER RULES now. Never refer to yourself in third person.
 
 MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
@@ -1817,6 +1832,13 @@ DATA INTERPRETATION RULES:
 - If a data source exists but values are null for today, it means today's sync hasn't completed — use the most recent available data
 - NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists in the payload below
 - Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin is available.
+READER RULES (a friend of Matthew's with no health background reads a condensed version):
+- Plain words. Never: EWMA, autocorrelation, etiology, mechanistic(ally), gate/ungate, load-bearing, contingent, interoception, gluconeogenesis, counter-regulatory, slow-wave, standard deviation, n=, slope, Zone 2 hold, catabolic, liquidation, subtherapeutic, BMR/Mifflin. Say: "running average", "the reason", "one good night tends to follow another", "easy cardio", "21 days of data".
+- Every figure carries its day or window IN THE SAME SENTENCE, in words, Pacific time: "182 g on Friday, September 25", "153 g a day over the last 20 logged days", "99 % on the night of Thursday, September 24". A figure with no day is dropped. No ISO dates.
+- Only figures given in the DATA below. Never subtract, divide, average, count days or convert a time — if the difference is not given, say "short of the 170 g floor" with no number.
+- Days logged / last log / silence: state only the given `days_logged`, `last_food_log_date`, `gap_days`, `journal_gap_days`. If none is given he is present — narrate no gap.
+- ONE ask, stated once, doable this week, in the first or last sentence. No list, no two-condition gate, no question he cannot act on.
+- First sentence at most 25 words, carrying the finding-with-date or the ask.
 {few_shot_block}
 
 Write 2-4 paragraphs of {domain_label} coaching for Matthew — target 300-450 words, and do not exceed 500 words (#3190: this was previously unbounded, which is why generation was truncating against max_tokens). Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""
@@ -2168,28 +2190,12 @@ Write your {domain_label} coaching section now."""
         except Exception as _qa_e:  # noqa: BLE001 — the archive is never load-bearing
             print(f"[COACH-V2:{coach_id}] qa_archive failed (non-blocking): {_qa_e}")
 
-        # Step 7: Invoke state updater (async) — records the final, gate-passed text.
-        try:
-            lambda_client.invoke(
-                FunctionName="coach-state-updater",
-                InvocationType="Event",
-                Payload=json.dumps(
-                    {
-                        "coach_id": coach_id,
-                        "output_text": output,
-                        "output_type": output_type,
-                        # #2815: OUTPUT# frame, converted atomically with its whole writer/
-                        # consumer set — coach_state_updater.py's own no-generation_date
-                        # fallback, inter_coach_dialogue_lambda.py's writer, and
-                        # coach_quality_gate.py's same-day self-exclusion all resolve the
-                        # SAME `common.pacific_time.pacific_today()` now, so the sk this
-                        # writes and the sk that read matches against never desync.
-                        "generation_date": pacific_today(),
-                    }
-                ).encode(),
-            )
-        except Exception as e:
-            print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
+        # Step 7: Invoke state updater (async) — records the final, gate-passed text. #4185: through
+        # `coach_brief_input_gate.record_output`, the ONE state-updater writer this fresh path and
+        # the reuse path share (it carries `data_through`). #2815: `generation_date` is the OUTPUT#
+        # frame — `pacific_today()`, the SAME Pacific day coach_state_updater's own fallback,
+        # inter_coach_dialogue_lambda's writer and coach_quality_gate's self-exclusion resolve.
+        _in_gate.record_output(lambda_client, coach_id, output_type, output, pacific_today(), data_through=_gate.data_through)
 
         return output
 

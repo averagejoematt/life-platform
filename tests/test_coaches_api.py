@@ -401,3 +401,114 @@ def test_predictions_serve_the_freeze_instant_beside_the_effective_date(monkeypa
     assert by_text["frozen"]["date"] == "2026-09-05"
     assert by_text["frozen"]["pre_registered_at"] == "2026-09-04T16:53:28+00:00"
     assert by_text["in-cycle"]["pre_registered_at"] is None
+
+
+# ── E1 / #4182: the ledger line (`latest_checked`) ───────────────────────────
+#
+# Rows are built by the REAL producers — `prediction_emission.build_prediction_record`
+# for the emitted PREDICTION# row and `prediction_grading.build_outcome_notes` for the
+# grader's write-back (the exact JSON `_update_prediction_status` stores) — never
+# hand-typed, so the fixture is the wire shape.
+
+
+def _emitted(coach_id, day, claim, metric="hrv_7day_avg", condition=">=", threshold=50):
+    from coach.prediction_emission import build_prediction_record
+
+    spec = {"type": "machine", "metric": metric, "condition": condition, "threshold": threshold, "window_days": 14}
+    return build_prediction_record(coach_id, day, claim, spec, 0.6, "coach_read")
+
+
+def _graded(row, status, graded_on, actual):
+    from coach.prediction_grading import build_outcome_notes
+
+    notes = build_outcome_notes({"status": status, "actual_value": actual, "reason": "r"}, "1.0")
+    return dict(row, status=status, outcome=status, outcome_date=graded_on, outcome_notes=notes)
+
+
+def _ledger_table(routes):
+    return FakeDdbTable(query_hook=lambda table, **kw: {"Items": list(routes.get(_fake_pk(kw), []))})
+
+
+def _fake_pk(kwargs):
+    expr = kwargs["KeyConditionExpression"].get_expression()
+    while expr["operator"] == "AND":
+        expr = expr["values"][0].get_expression()
+    return expr["values"][1]
+
+
+def _two_coach_routes():
+    older = _graded(_emitted("sleep_coach", "2026-09-06", "Matthew's HRV average will trend up."), "refuted", "2026-09-13", 41.2)
+    newest = _graded(
+        _emitted("sleep_coach", "2026-09-10", "Matthew's 7-day HRV average will reach 50 ms."), "confirmed", "2026-09-24", 51.73
+    )
+    pending_newer = _emitted("sleep_coach", "2026-09-25", "Matthew's sleep will hold 7.5 hours.")
+    nutrition_pending = _emitted("nutrition_coach", "2026-09-20", "Protein will average 180 g this week.", metric="protein_g")
+    return {
+        "COACH#sleep_coach": [pending_newer, newest, older],
+        "COACH#nutrition_coach": [nutrition_pending],
+    }
+
+
+def test_latest_checked_serves_the_most_recent_graded_call_and_null_otherwise(monkeypatch):
+    routes = _two_coach_routes()
+    monkeypatch.setattr(api, "table", _ledger_table(routes))
+
+    sleep = _body(api.handle_coach({"rawPath": "/api/coach/sleep_coach"}))["latest_checked"]
+    assert sleep == {
+        "prediction_id": routes["COACH#sleep_coach"][1]["prediction_id"],  # the producer's own id
+        "claim": "Matthew's 7-day HRV average will reach 50 ms.",
+        "created_date": "2026-09-10",
+        "pre_registered_at": None,
+        "outcome_date": "2026-09-24",
+        "metric": "hrv_7day_avg",
+        "eval_type": "machine",
+        "condition": ">=",
+        "threshold": 50,
+        "actual_value": 51.73,
+        "status": "confirmed",
+    }
+    # A coach whose only call is still pending has NO ledger line — null, never a placeholder.
+    assert _body(api.handle_coach({"rawPath": "/api/coach/nutrition_coach"}))["latest_checked"] is None
+
+    roster = {c["persona_id"]: c for c in _body(api.handle_coaches({}))["coaches"]}
+    assert roster["sleep_coach"]["latest_checked"] == sleep
+    assert roster["nutrition_coach"]["latest_checked"] is None
+    assert roster[api.persona_registry.LEAD_PERSONA_ID]["latest_checked"] is None
+    # Every staff roster entry carries the key (the site can tell absent from missing).
+    assert all("latest_checked" in c for c in roster.values())
+
+
+def test_latest_checked_claim_is_audience_guarded():
+    """#2972/#4213: the claim is born guarded — owner-register text never crosses; the
+    graded numbers still stand beside a null claim (nothing is rewritten)."""
+    from coach import latest_checked
+
+    addressed = _graded(_emitted("mind_coach", "2026-09-08", "You will sleep 7.5 hours on 5 of 7 nights."), "confirmed", "2026-09-15", 7.6)
+    vocative = _graded(_emitted("mind_coach", "2026-09-09", "Matthew, your HRV will climb."), "refuted", "2026-09-16", 38.0)
+    for row in (addressed, vocative):
+        block = latest_checked.to_block(row)
+        assert block["claim"] is None
+        assert block["actual_value"] is not None and block["status"] in ("confirmed", "refuted")
+    table = _ledger_table({"COACH#mind_coach": [addressed, vocative]})
+    served = latest_checked.for_coach(table, "mind_coach")
+    assert served["outcome_date"] == "2026-09-16"
+    import re
+
+    for block in (served, latest_checked.for_coach(_ledger_table(_two_coach_routes()), "sleep_coach")):
+        assert not re.search(r"\byou", block["claim"] or "", re.IGNORECASE), block["claim"]
+
+
+def test_latest_checked_skips_undecided_and_archived_rows_and_degrades_to_null():
+    from coach import latest_checked
+
+    base = _emitted("physical_coach", "2026-09-07", "Matthew's weight will fall.", metric="weight_lbs", condition="<", threshold=320)
+    inconclusive = _graded(base, "inconclusive", "2026-09-21", None)
+    expired = _graded(base, "expired", "2026-09-22", None)
+    archived = dict(_graded(base, "confirmed", "2026-09-23", 318.0), tombstone=True)
+    assert latest_checked.select_latest([inconclusive, expired, archived, base]) is None
+
+    class _Boom:
+        def query(self, **_kw):
+            raise RuntimeError("ddb down")
+
+    assert latest_checked.for_coach(_Boom(), "physical_coach") is None
