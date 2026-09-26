@@ -39,6 +39,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 evening nudge action (write)"
   },
+  "/api/page_feedback": {
+    "category": "write-path",
+    "reason": "POST-only \u2014 #4182 two-question reader door (did this page make sense?), writes to DynamoDB (write)"
+  },
   "/api/replicate_certify": {
     "category": "write-path",
     "reason": "POST-only \u2014 #1393 engagement-ladder Replicator self-cert; deduped per source, increments the VOTES#ladder_replicator aggregate counter (write)"

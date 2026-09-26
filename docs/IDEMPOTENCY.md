@@ -211,6 +211,7 @@ the dedup primitive (see the `rate_limiter` row).
 | `/api/challenge_vote`, `/api/experiment_vote`, `/api/predict_week`, `/api/replicate_certify` | Conditional put on `IP#{ip_hash}#…` (`attribute_not_exists(pk)`) gates the `ADD` counter; replay 429s or returns `counted: false` | **Y** |
 | `/api/challenge_follow`, `/api/experiment_follow` | Conditional put on `EMAIL#{email_hash}#…` → `already_following` | **Y** (the hourly rate counter double-spends, but fails *closed*) |
 | `/api/experiment_suggest` | Content hash **+** `ConditionExpression="attribute_not_exists(sk)"` → true no-op, `duplicate: true` | **Y** — the strongest door on the surface |
+| `/api/page_feedback` | Same as `experiment_suggest`: `FEEDBACK#{sha256(identity:page:made_sense:looking_for)[:12]}` **+** `attribute_not_exists(sk)` → true no-op, `duplicate: true` | **Y** — #4182; replay rows in `tests/test_replay_idempotency_3118.py`'s DynamoDB half |
 | `/api/challenge_checkin` | Read-modify-write dedup on `date` | **Y** for replay; races on truly simultaneous delivery |
 | `/api/cohort_submit`, `/api/ritual_log` | Natural-key overwrite (`SUBMIT#{ip_hash}`, `DATE#{date}`) | **Y** |
 | `/api/subscribe` | Natural key `EMAIL#{sha256}` — no duplicate row, but a resubmit mints a **new token** and re-sends the confirmation | **Partial** — accepted (#3113 §2b: a resubmit is a reader action, not a replay) |

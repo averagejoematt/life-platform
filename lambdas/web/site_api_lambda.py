@@ -201,6 +201,7 @@ from web.site_api_social import (
     _handle_experiment_suggest,
     _handle_experiment_vote,
     _handle_nudge,
+    _handle_page_feedback,
     _handle_predict_week,
     _handle_replicate_certify,
     _handle_ritual_log,
@@ -436,6 +437,7 @@ ROUTES = {
     "/api/verify_subscriber": None,
     "/api/board_ask": None,
     "/api/submit_finding": None,  # NEW-1: POST handler in lambda_handler
+    "/api/page_feedback": None,  # #4182: POST handler in _SIMPLE_ROUTES
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
     "/api/experiment_library": handle_experiment_library,
     "/api/experiment_vote": None,  # POST handler in lambda_handler
@@ -558,6 +560,7 @@ _SIMPLE_ROUTES = {
     "/api/predict_week": ({"GET", "POST"}, _route_predict_week),
     "/api/board_question": ({"POST"}, _handle_board_question),
     "/api/replicate_certify": ({"POST"}, _handle_replicate_certify),  # #1393 — Replicator self-cert
+    "/api/page_feedback": ({"POST"}, _handle_page_feedback),  # #4182 — the two-question reader door
 }
 
 

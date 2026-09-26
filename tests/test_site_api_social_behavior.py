@@ -1869,6 +1869,7 @@ _FLAG_DRIVERS = {
     "_handle_board_question": lambda: post({"question": "what should i read about zone 2"}),
     "_handle_nudge": lambda: post({"category": "watching"}),
     "_handle_submit_finding": lambda: post(GOOD_FINDING),
+    "_handle_page_feedback": lambda: post({"page": "/data/", "made_sense": "yes"}),  # #4182
     # #2239 — a GET, not a POST, but it goes through the same chokepoint and so
     # joins the derived sweep automatically. Driven with an address that is NOT on
     # the roster: the 404 branch is the one an enumerator actually uses.

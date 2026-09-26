@@ -2441,3 +2441,33 @@ REGISTRY_PROOFS.update(
         for term, n in _VOCAB_LEDGER_LIVE.items()
     }
 )
+
+
+# ── #4182: /api/page_feedback's write-path exemption in the capture script ─────────────────
+#
+# A POST-only door must be named in `deploy/capture_api_schemas.WRITE_PATH_EXEMPT`, or a full
+# recapture GET-probes it (405 → `capture-failed`) and rewrites the ledger around it (#3324).
+# The script side had no test of its own — only the committed ledger was checked — so the
+# entry arrives with one (`test_every_post_only_simple_route_is_registered_in_the_capture_script`)
+# and is watched failing without it.
+REGISTRY_PROOFS.update(
+    {
+        "registry::deploy/capture_api_schemas.py::WRITE_PATH_EXEMPT::/api/page_feedback": {
+            "gate_name": "WRITE_PATH_EXEMPT[/api/page_feedback]",
+            "command": "python3 -m pytest tests/test_api_schema_completeness.py -q -p no:cacheprovider -k registered_in_the_capture_script",
+            "mutation": (
+                "The `/api/page_feedback` line deleted from WRITE_PATH_EXEMPT in the REAL tracked file "
+                "(deploy/capture_api_schemas.py), restored from a pre-mutation copy afterwards."
+            ),
+            "observed": (
+                "MUTATED: 1 failed — AssertionError: POST-only routes missing from deploy/capture_api_schemas.py "
+                "WRITE_PATH_EXEMPT: ['/api/page_feedback']. REVERTED: 44 passed (the whole file). Watched 2026-09-26."
+            ),
+            "scope": (
+                "Checks the POST-only routes `endpoint_registry.discover_endpoint_records()` derives from the router; "
+                "a mixed-verb route (GET+POST) is not POST-only and is not held here."
+            ),
+            "proved_on": "2026-09-26",
+        }
+    }
+)
