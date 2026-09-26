@@ -179,7 +179,7 @@ test("chain (b): no ask -> the best record at n >= 10 in today's batch; n < 10 i
   const p = T.chooseTodaysRead(BATCH, [], CALIB);
   assert.equal(p.coach.coach_id, "sleep"); // 43.8 % at n=16 beats labs' 100 % at n=4
   assert.equal(p.rule, "record");
-  assert.equal(p.reason, "chosen: the best checked record this cycle — 7 of 16 held up");
+  assert.equal(p.reason, "chosen: the best checked record since Day 1 — 7 of 16 held up");
   assert.doesNotMatch(p.reason, /%/); // counts with their n, never a bare percentage (ADR-105)
   // a read outside the 24 h batch is not eligible however good its record
   const stale = BATCH.map((c) => (c.coach_id === "sleep" ? { ...c, analysis_generated_at: "2026-09-24T12:00:00Z" } : c));

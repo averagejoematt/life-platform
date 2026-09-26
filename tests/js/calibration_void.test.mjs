@@ -31,6 +31,6 @@ test("zero voided bets renders no void line (nothing invented)", () => {
 
 test("a payload without the voided field (older cache) still renders", () => {
   const html = ei.renderCalibration(BASE);
-  assert.match(html, /Career · every cycle/);
+  assert.match(html, /Career · all time/);
   assert.doesNotMatch(html, /voided at resets/);
 });

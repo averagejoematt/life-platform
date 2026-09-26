@@ -206,7 +206,7 @@ export function renderWrong(d) {
   const feed = obitCards
     ? sec("The obituaries — one card per graded failure", `<div class="wrong-feed">${obitCards}</div>`)
     : sec("The obituaries — one card per graded failure",
-      `<p class="rd-archive">No graded failures on the board yet — an empty slate right after a reset is honest, not flattering. Each refuted call earns its own card here as the evaluator grades it.</p>`);
+      `<p class="rd-archive">No graded failures on the board yet — an empty slate early in the experiment is honest, not flattering. Each refuted call earns its own card here as the evaluator grades it.</p>`);
   // #2957: the validator window runs 120 days back — well past the live genesis —
   // so a catch dated months before this cycle began sits in the same flat table as
   // one from yesterday. The producer decided per-row (site_api_foresight.wrong →
@@ -214,7 +214,7 @@ export function renderWrong(d) {
   // wears the same "· previous cycle" suffix the lab-notes list already uses for
   // the identical fact, so the two surfaces can't drift about what counts as old.
   const cr = (v.recent || []).map((c) =>
-    `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10) + (c.archival && c.archival.pre_cycle ? " · previous cycle" : ""))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
+    `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10) + (c.archival && c.archival.pre_cycle ? " · before this experiment" : ""))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
   const undetailedNote = undetailed
     ? `<p class="rd-archive">+ ${fmt(undetailed)} earlier ${undetailed === 1 ? "catch was" : "catches were"} logged count-only (before per-catch detail was recorded) — included in the total above.</p>`
     : "";
@@ -308,7 +308,7 @@ export async function renderCorrelations(d) {
       const thresholds = interp.moderate && interp.strong ? ` Strength labels are earned by sample size: n≥${fmt(interp.moderate)} before a pair may read "moderate", n≥${fmt(interp.strong)} for "strong".` : "";
       return betsLine +
         warmup(g.current_n, g.min_n, "days of data toward the first correlation matrix") +
-        empty(`No correlations yet — the honest state, not a broken pipeline. The weekly matrix computes its first pairs once ${fmt(g.min_n)} overlapping days of this cycle's data exist.${thresholds} The marks above fill as real days accrue.`);
+        empty(`No correlations yet — the honest state, not a broken pipeline. The weekly matrix computes its first pairs once ${fmt(g.min_n)} overlapping days of the experiment's data exist.${thresholds} The marks above fill as real days accrue.`);
     }
     return betsLine + empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
   }
@@ -343,7 +343,7 @@ function _sealBlock(seal) {
   if (!seal || !seal.sha256 || !seal.artifact_url) return "";
   return sec(
     "The frozen pre-registration — sealed before Day 1",
-    `<p class="rd-line">This cycle's predictions and hypotheses were locked and hash-sealed before any Day-1 data existed: ` +
+    `<p class="rd-line">This experiment's predictions and hypotheses were locked and hash-sealed before any Day-1 data existed: ` +
       `<a class="supp-ev-link" href="${esc(seal.artifact_url)}" target="_blank" rel="noopener">the frozen artifact ↗</a></p>` +
       `<p class="rd-line label">SHA-256</p><pre class="rd-code">${esc(seal.sha256)}</pre>` +
       (seal.verify
@@ -464,7 +464,6 @@ export function renderCalibration(d) {
   const life = p.lifetime || {};
   const coaches = (d && d.coaches) || [];
   const hyp = (d && d.hypotheses) || {};
-  const cycle = d && d.cycle;
   // True zero state: nothing has ever graded, this cycle or any before it.
   // The seal still renders here — a skeptic can verify the pre-registration
   // exists and is unedited even before the first forecast has come due.
@@ -480,9 +479,9 @@ export function renderCalibration(d) {
     );
 
   const seasonBody = p.n > 0
-    ? _calStatFigs(p, "this cycle")
-    : `<p class="cs-fresh">Fresh slate — career: n=${life.n}. Nothing has graded this cycle yet; the coaches' calls are already logged and resolve as their windows close.</p>`;
-  const careerBody = life.n > 0 ? _calStatFigs(life, "all cycles") : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
+    ? _calStatFigs(p, "since Day 1")
+    : `<p class="cs-fresh">Fresh slate — career: n=${life.n}. Nothing has graded since Day 1 yet; the coaches' calls are already logged and resolve as their windows close.</p>`;
+  const careerBody = life.n > 0 ? _calStatFigs(life, "all time") : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
   // #1893: the void ledger, made visible. A reset voids (never grades) every
   // still-open pre-registered bet; without this line the career n silently
   // reads as the whole record when ~85% of all bets were voided at resets.
@@ -495,8 +494,8 @@ export function renderCalibration(d) {
   // rest of the site's day-number arithmetic runs off.
   const since = (d && d.cycle_start) ? ` · since ${esc(d.cycle_start)}` : "";
   const pair = `<div class="cs-pair">` +
-    `<div class="cs-card"><h3 class="cs-h">This season${cycle ? ` · cycle ${esc(cycle)}` : ""}${since}</h3>${seasonBody}</div>` +
-    `<div class="cs-card"><h3 class="cs-h">Career · every cycle${since ? " · the record before this one included" : ""}</h3>${careerBody}${voidLine}</div>` +
+    `<div class="cs-card"><h3 class="cs-h">This season${since}</h3>${seasonBody}</div>` +
+    `<div class="cs-card"><h3 class="cs-h">Career · all time${since ? " · the record before this experiment included" : ""}</h3>${careerBody}${voidLine}</div>` +
     `</div>`;
 
   const bins = p.reliability_bins || [];

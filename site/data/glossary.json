@@ -29,7 +29,7 @@
     {"term": "protocol", "ruling": "keep-with-gloss", "reader_form": "protocol (the door) / what he's trying (cards)", "gloss": "a rule he follows on purpose, to see if a number moves", "match": "word-ci"},
     {"term": "gate", "ruling": "cut", "reader_form": "a check that has to pass before something ships", "gloss": "builder word; stays on /method/* and in essays"},
     {"term": "HRV", "ruling": "keep-with-gloss", "reader_form": "HRV", "gloss": "heart-rate variability — a nightly nervous-system reading; higher is usually better rested", "match": "exact"},
-    {"term": "glucose", "ruling": "keep-with-gloss", "reader_form": "blood sugar", "gloss": "blood sugar — no sensor this cycle", "match": "word-ci"},
+    {"term": "glucose", "ruling": "keep-with-gloss", "reader_form": "blood sugar", "gloss": "blood sugar — no sensor worn", "match": "word-ci"},
     {"term": "Whoop", "ruling": "keep-with-gloss", "reader_form": "Whoop", "gloss": "a wrist band that scores sleep and recovery", "match": "word-ci"},
     {"term": "Hevy", "ruling": "keep-with-gloss", "reader_form": "Hevy", "gloss": "a workout-logging app", "match": "exact"},
     {"term": "character level", "ruling": "rename", "reader_form": "the engine's score", "gloss": "how many weeks the seven areas have held up"},

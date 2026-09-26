@@ -33,7 +33,7 @@ export function nutritionFold(d, mg) {
   }
   if (n.avg_deficit_published === false) bits.push(DEFICIT_REFUSED);
   else if (n.avg_deficit != null && Number.isFinite(Number(n.avg_deficit))) bits.push(`Estimated deficit about ${_int(n.avg_deficit)} calories a day.`);
-  if (mg && mg.has_cgm === false) bits.push("Blood sugar — no sensor this cycle.");
+  if (mg && mg.has_cgm === false) bits.push("Blood sugar — no sensor right now.");
   return { text: bits.join(" "), through: last || null };
 }
 

@@ -487,7 +487,7 @@ export async function renderCharacter(d) {
       const rcpt = d ? `<details class="ch-rcpt" data-rcpt="${esc(d)}"><summary class="label">receipt</summary><div class="ch-feed-body" data-rcpt-body><p class="rd-archive">Pulling the receipt…</p></div></details>` : "";
       return `<li class="ch-tl-li${cls}"><span class="label">${esc(d)}</span><span class="ch-tl-ev">${isDown ? `<span class="ch-tl-dn label" aria-hidden="true">▾</span> ` : ""}${esc(e.event || "")}${annot}</span>${e.character_level != null ? `<span class="ch-tl-lv label">Lv ${esc(String(Math.round(e.character_level)))}</span>` : ""}${rcpt}</li>`;
     }).join("")}</ul>`
-    : `<p class="rd-archive">No level events yet this cycle — a level only moves after a sustained multi-day streak, so the first entries here are earned, not noise.</p>`;
+    : `<p class="rd-archive">No level events yet — a level only moves after a sustained multi-day streak, so the first entries here are earned, not noise.</p>`;
   let heat = "";
   if (hist.length) {
     const weeks = hist.slice(-12);
@@ -532,7 +532,7 @@ export async function renderCharacter(d) {
     }).join("");
     badges = sec("Unlocks — the map of what's ahead",
       figs([fig(String(earned.length), "earned"), fig(String(achList.length - earned.length), "still locked")]) +
-      (earned.length === 0 ? `<p class="rd-archive">Nothing earned yet this cycle — every mark below is drawn the moment it's unlocked, and the engine checks nightly. The wall isn't empty; it's the route.</p>` : "") +
+      (earned.length === 0 ? `<p class="rd-archive">Nothing earned yet — every mark below is drawn the moment it's unlocked, and the engine checks nightly. The wall isn't empty; it's the route.</p>` : "") +
       groups +
       // #1126: the wall's dedicated, linkable home.
       `<p class="rd-archive"><a href="/data/badges/">The full badge page — every mark, and what unlocks each →</a></p>`);
@@ -583,7 +583,7 @@ export function renderBadges(d) {
   ]);
 
   const zero = earned.length === 0
-    ? `<p class="rd-archive">Nothing earned yet this cycle — that's the honest read of a fresh start. The wall isn't empty; it's the route: streaks build a day at a time, the engine re-checks nightly, and the first marks land within weeks of consistent days.</p>`
+    ? `<p class="rd-archive">Nothing earned yet — that's the honest read of a fresh start. The wall isn't empty; it's the route: streaks build a day at a time, the engine re-checks nightly, and the first marks land within weeks of consistent days.</p>`
     : "";
 
   const cats = [...new Set(list.map((b) => b.category || "other"))];
@@ -644,7 +644,7 @@ export function wireCharacter() {
     slider.value = String(days);
     const dOf = (i) => new Date(t0 + i * 86400000).toISOString().slice(0, 10);
     const genesis = (_chCtx && _chCtx.genesis) || null;
-    const labelFor = (dd) => (dd === today ? "today" : `${dd}${genesis && dd < genesis ? " · prior cycle" : ""}`);
+    const labelFor = (dd) => (dd === today ? "today" : `${dd}${genesis && dd < genesis ? " · before this experiment" : ""}`);
     const redraw = async (dd) => {
       const heroEl = document.querySelector(".ch-hero");
       const rowsEl = document.querySelector(".ch-rows");

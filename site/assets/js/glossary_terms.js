@@ -6,7 +6,7 @@ export const GLOSSARY_TERMS = [
   {"term": "cycle", "gloss": "one attempt at this experiment, from a start date", "ci": true},
   {"term": "protocol", "gloss": "a rule he follows on purpose, to see if a number moves", "ci": true},
   {"term": "HRV", "gloss": "heart-rate variability — a nightly nervous-system reading; higher is usually better rested", "ci": false},
-  {"term": "glucose", "gloss": "blood sugar — no sensor this cycle", "ci": true},
+  {"term": "glucose", "gloss": "blood sugar — no sensor worn", "ci": true},
   {"term": "Whoop", "gloss": "a wrist band that scores sleep and recovery", "ci": true},
   {"term": "Hevy", "gloss": "a workout-logging app", "ci": false},
   {"term": "DEXA", "gloss": "Dual-energy X-ray absorptiometry — the periodic full-body scan behind the body-composition numbers (fat mass, lean mass, bone density).", "ci": false},

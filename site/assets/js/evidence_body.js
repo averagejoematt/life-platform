@@ -152,10 +152,12 @@ export function renderSupplements(d) {
 // in-cycle companion when the server sends one. Both fields are additive and may be
 // absent on an artifact written before the fix — degrade to no label, never to a guess.
 function drawsScope(L) {
-  const scope = L.total_draws_scope;
+  // #4182 (owner ruling 2026-09-26): the cycle count is internal — the API's lifetime
+  // scope word ("all cycles", site_api_phase_frame.lifetime_scope) reads as "all time" here.
+  const scope = L.total_draws_scope === "all cycles" ? "all time" : L.total_draws_scope;
   if (!scope) return null;
   const n = L.draws_this_cycle;
-  return typeof n === "number" ? `${scope} · ${n} this cycle` : scope;
+  return typeof n === "number" ? `${scope} · ${n} since Day 1` : scope;
 }
 
 // #4182 — lab names arrive title-cased from their codes ("Apob Cardio Iq"). De-code the
@@ -203,7 +205,7 @@ export function labsFold(d) {
   const flagged = L.flagged_count ?? bm.filter(_labFlagged).length;
   const pre = (L.latest_draw_archival || {}).pre_cycle;
   return {
-    text: `Last blood test: ${dayInWords(L.latest_draw_date)}${pre ? " — before this cycle" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
+    text: `Last blood test: ${dayInWords(L.latest_draw_date)}${pre ? " — before this experiment began" : ""}. ${bm.length} markers; ${flagged} outside their reference range. No next test scheduled.`,
     through: null, // the draw date is IN the sentence — a second freshness line would repeat it
   };
 }

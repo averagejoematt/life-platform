@@ -523,8 +523,8 @@ def wrong(*, _g) -> dict:
                 "effect_fits": effect_fits,  # #1411: null fits are findings, not footnotes
                 "note": (
                     "Uncurated. The validator audits every coach claim against the data it cites; "
-                    "the evaluator scores every dated prediction. A thin refuted column right after "
-                    "a reset means the slate is young, not that the model is right — inconclusive "
+                    "the evaluator scores every dated prediction. A thin refuted column early in "
+                    "the experiment means the slate is young, not that the model is right — inconclusive "
                     "and expired are claims that could not be proven either. The character engine's "
                     "cross-pillar effects are re-fitted quarterly: an authored prior the data failed "
                     "to confirm is published here, badge and all."
