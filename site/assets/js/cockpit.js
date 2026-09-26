@@ -916,7 +916,7 @@ async function renderForecast() {
   const preFx = preStart(d);
   const cov = d.coverage;
   bind("fx-cov").textContent = preFx
-    ? " · the model's warm-up — physiology expectations only; the finish-line math begins with Day 1's weigh-in"
+    ? " · the forecast's warm-up — physiology expectations only; the finish-line math begins with Day 1's weigh-in"
     : (cov && cov.n_resolved
       ? ` · range held ${Math.round(cov.coverage_pct)}% of ${cov.n_resolved} graded`
       : " · ungraded until tomorrow");

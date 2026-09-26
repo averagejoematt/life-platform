@@ -159,7 +159,7 @@ REGISTRY = [
         # #4182: unlisted (the 25-page reach set) — served, off the 25-page reach set.
         "reading",
         "Reading",
-        "Books finished, what's on the shelf, and the ideas kept — the Mind pillar.",
+        "Books finished, what's on the shelf, and the ideas kept — the Mind area.",
         "Mind & accountability",
         "data",
         "/api/reading_overview",
@@ -628,7 +628,7 @@ REGISTRY = [
 # (how it's built & runs). And the reset-only pages (cycles / post-mortems / survival) move
 # to a footer-tier "The reset log" group — they're for Matt's own record, not readers.
 _REGROUP = {
-    "cycles": "The reset log",
+    "cycles": "The fresh starts",
     # Promoted out of the footer tier (2026-06-21): survival + post-mortems are the honesty
     # moat made literal — they show the collapses and handicap the attempt with small-n humility,
     # which is exactly the credibility a skeptic/clinician comes for. They belong in "How it holds up".
@@ -672,7 +672,7 @@ GROUP_ORDER = [
     "Protocol & experiments",
     "How it holds up",
     "The machine",
-    "The reset log",
+    "The fresh starts",
 ]
 
 # Authored editorial content (faithful to the preserved legacy + the locked docs).
@@ -865,7 +865,7 @@ PILLARS = [
         "lead": "wrong",
         "h1": "The Method",
         "lede": "How every number here is made, and every time the machine was wrong — shown, not summarised.",
-        "groups": ["How it holds up", "The machine", "The reset log"],
+        "groups": ["How it holds up", "The machine", "The fresh starts"],
     },
 ]
 
