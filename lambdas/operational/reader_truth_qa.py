@@ -291,9 +291,17 @@ def _iso_week_line(phase):
             notes.append("in progress")
         suffix = f"; {', '.join(notes)}" if notes else ""
         weeks.append(f"{iso_year}-W{iso_week:02d} = {mon.isoformat()} (Mon) to {sun.isoformat()} (Sun), {held}{suffix}")
+    day_n = (today - start).days + 1
+    exp_week = (day_n - 1) // 7 + 1
+    exp_lo = start + timedelta(days=(exp_week - 1) * 7)
+    exp_hi = exp_lo + timedelta(days=6)
+    # #4163: the first wording ("Week labels on this site are ISO-8601 weeks") taught the
+    # judge that the header's "DAY 20 · WEEK 3" was ISO W38, and it gated a correct
+    # header HIGH on 2026-09-25. The site carries TWO week systems; both are stated.
     return (
-        " Week labels on this site are ISO-8601 weeks (Monday to Sunday). Their exact dates are ground truth — "
-        "use these, never compute your own: " + "; ".join(weeks) + "."
+        f" 'DAY {day_n} · WEEK {exp_week}' is the experiment week (7-day blocks from Day 1; Week {exp_week} = "
+        f"{exp_lo.isoformat()}..{exp_hi.isoformat()}). 'WEEK YYYY-Wnn' is an ISO week (Mon-Sun). Never convert "
+        "one into the other. ISO dates — use these, never compute your own: " + "; ".join(weeks) + "."
     )
 
 
